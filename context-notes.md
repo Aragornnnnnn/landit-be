@@ -28,3 +28,9 @@
 - `application-local.yml`, `application-develop.yml`, `application-prod.yml`은 모두 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` placeholder만 읽도록 분리한다.
 - `.env.example`은 실제 로딩 파일이 아니라 로컬 환경변수 설정을 위한 secret 없는 예시로 둔다.
 - `./gradlew test`로 profile 설정 placeholder 검증과 기존 컨텍스트 부팅을 확인했다.
+
+## 2026-06-28 시간대 설정
+
+- repo에는 기존 timezone 설정이 없었다.
+- 서버 내부 기본 시간대와 JSON 직렬화 시간대를 `Asia/Seoul`로 맞춘다.
+- `./gradlew test`로 애플리케이션 컨텍스트 부팅 후 JVM 기본 timezone이 `Asia/Seoul`인지 확인했다.

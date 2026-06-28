@@ -22,3 +22,11 @@
 - [x] 설정 검증 테스트 추가.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## 시간대 설정
+
+- [x] 기존 timezone 설정 부재 확인.
+- [x] JVM 기본 timezone을 `Asia/Seoul`로 설정.
+- [x] Jackson timezone을 `Asia/Seoul`로 설정.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
