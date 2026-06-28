@@ -1,0 +1,21 @@
+<configuration>
+	<include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+	<include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+	<springProperty scope="context" name="sentryDsn" source="sentry.dsn" defaultValue=""/>
+	<springProperty scope="context" name="sentryEnvironment" source="sentry.environment" defaultValue="local"/>
+
+	<appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+		<options>
+			<dsn>${sentryDsn}</dsn>
+			<environment>${sentryEnvironment}</environment>
+		</options>
+		<minimumEventLevel>ERROR</minimumEventLevel>
+		<minimumBreadcrumbLevel>INFO</minimumBreadcrumbLevel>
+	</appender>
+
+	<root level="INFO">
+		<appender-ref ref="CONSOLE"/>
+		<appender-ref ref="SENTRY"/>
+	</root>
+</configuration>

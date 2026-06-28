@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: landit-be
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/landit}
+    username: ${DB_USERNAME:landit}
+    password: ${DB_PASSWORD:landit}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
