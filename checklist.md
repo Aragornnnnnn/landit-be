@@ -11,3 +11,14 @@
 - [x] 애플리케이션 컨텍스트 테스트 구성.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## DB 연결 설정
+
+- [x] 기존 DB/profile/secret 설정 방식 조사.
+- [x] SSM 직접 조회 패턴 부재 확인.
+- [x] env var 기반 DB 설정 유지 계획 수립.
+- [x] local/develop/prod profile 설정 분리.
+- [x] secret 없는 `.env.example` 추가.
+- [x] 설정 검증 테스트 추가.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.

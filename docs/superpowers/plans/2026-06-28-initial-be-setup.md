@@ -79,7 +79,7 @@ Expected: Sentry is connected through Logback without enabling a Boot 4 incompat
 - Consumes: Boot auto-configuration for DataSource, Flyway, JPA, Actuator, and Logback.
 - Produces: default local profile settings and test profile settings.
 
-- [x] **Step 1: Configure local application defaults**
+- [x] **Step 1: Configure common application defaults**
 
 Create `src/main/resources/application.yml`:
 
@@ -87,10 +87,6 @@ Create `src/main/resources/application.yml`:
 spring:
   application:
     name: landit-be
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/landit}
-    username: ${DB_USERNAME:landit}
-    password: ${DB_PASSWORD:landit}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -110,7 +106,7 @@ sentry:
   traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
 ```
 
-Expected: application starts with PostgreSQL environment variables when a DB is available.
+Expected: common settings do not contain DB credentials or connection defaults.
 
 - [x] **Step 2: Configure test profile**
 

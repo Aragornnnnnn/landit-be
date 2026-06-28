@@ -16,3 +16,15 @@
 - `./gradlew test`는 Sentry를 Logback appender로 바꾼 뒤 통과했다.
 - Initializr가 만든 `HELP.md`는 `.gitignore` 대상이어서 커밋되지 않는 생성 문서로 남지 않도록 제거했다.
 - 초기 설정은 하나의 논리 단위로 커밋한다.
+
+## 2026-06-28 DB 연결 설정
+
+- 사용자가 이번 작업은 이슈 번호 없이 진행하라고 명시해 AGENTS.md의 이슈 번호 요구는 예외로 처리한다.
+- repo에는 SSM Parameter Store를 직접 조회하는 코드나 의존성이 없다.
+- 기존 `application.yml`은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` env var를 읽지만 로컬 기본값을 포함하고 있었다.
+- SSM 값은 애플리케이션에서 직접 읽지 않고 배포/IaC 단계에서 env var로 주입하는 방향을 유지한다.
+- `DB_URL`에는 이미 `sslmode=require`와 `prepareThreshold=0`이 포함된 값을 주입받는 전제이므로 애플리케이션에서 JDBC URL을 재조립하지 않는다.
+- secret 값은 repo, 로그, 테스트 출력, 문서에 남기지 않는다.
+- `application-local.yml`, `application-develop.yml`, `application-prod.yml`은 모두 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` placeholder만 읽도록 분리한다.
+- `.env.example`은 실제 로딩 파일이 아니라 로컬 환경변수 설정을 위한 secret 없는 예시로 둔다.
+- `./gradlew test`로 profile 설정 placeholder 검증과 기존 컨텍스트 부팅을 확인했다.
