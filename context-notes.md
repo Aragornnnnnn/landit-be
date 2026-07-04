@@ -40,10 +40,22 @@
 - 사용자가 Notion 이슈 번호 `LAN-43`을 제공해 `feat/LAN-43` 브랜치에서 작업한다.
 - repo는 Gradle 기반 Spring Boot 서버이며 기존 Dockerfile과 `.github/workflows`는 없었다.
 - dev 배포는 개발자가 GitHub Actions 화면에서 직접 실행하도록 `workflow_dispatch`만 둔다.
-- AWS 인증은 static key 없이 GitHub OIDC를 사용하고, role ARN은 GitHub variable 또는 secret `AWS_ROLE_ARN`에서 받는다.
+- AWS 인증은 static key 없이 GitHub OIDC를 사용하고, role ARN은 `develop` GitHub Environment의 variable 또는 secret `AWS_ROLE_ARN`에서 받는다.
+- `develop` workflow는 GitHub Environment `develop`에 설정된 `AWS_ACCOUNT_ID`, `AWS_REGION`, `ECR_REGISTRY`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `HEALTH_CHECK_URL`을 읽는다.
+- GitHub Environment 변수는 job의 `environment`가 정해진 뒤 읽히도록 job-level `env`에 둔다.
 - Terraform task definition이 `latest` 이미지를 보므로 workflow에서는 task definition 재등록 없이 ECR push 후 ECS `update-service --force-new-deployment`만 수행한다.
 - 현재 dev ECS desired count가 0일 수 있으므로, desired count가 0이면 service stable wait와 health check는 건너뛴다.
 - desired count가 1 이상일 때 health check를 하려면 외부 접근 가능한 base URL이 필요하므로 GitHub variable 또는 secret `DEV_API_BASE_URL`로 받는다.
 - SSM parameter 값과 런타임 secret은 workflow에서 조회하거나 출력하지 않는다.
 - workflow YAML parse, `git diff --check`, `./gradlew test`는 통과했다.
 - 로컬 환경에 Docker CLI가 없어 Docker image build는 실행하지 못했다.
+
+## 2026-07-04 LAN-43 prod 배포 workflow
+
+- prod 배포도 개발자가 GitHub Actions 화면에서 직접 실행하도록 `workflow_dispatch`만 둔다.
+- GitHub Actions 수동 실행 화면에서 브랜치를 선택할 수 있으므로, prod workflow는 첫 step에서 `GITHUB_REF=refs/heads/main`을 확인하고 아니면 즉시 실패시킨다.
+- AWS 조회 결과 현재 계정에는 `develop-landit-cluster`, `develop-landit-api`, `develop-landit-worker`만 보이고 prod ECS/ECR 리소스는 아직 보이지 않았다.
+- prod workflow는 하드코딩된 리소스명 대신 GitHub Environment `prod`의 `AWS_ACCOUNT_ID`, `AWS_REGION`, `ECR_REGISTRY`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `HEALTH_CHECK_URL`을 읽는다.
+- prod role ARN은 `prod` GitHub Environment의 variable 또는 secret `AWS_ROLE_ARN`에서 받는다.
+- develop/prod workflow YAML parse, `git diff --check`, `./gradlew test`는 통과했다.
+- SSM parameter 값과 런타임 secret은 workflow에서 조회하거나 출력하지 않는다.

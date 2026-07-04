@@ -1,5 +1,5 @@
-# 개발자가 수동 실행해 develop ECS 서비스에 배포합니다.
-name: Deploy develop api
+# 개발자가 main 브랜치에서 수동 실행해 prod ECS 서비스에 배포합니다.
+name: Deploy prod api
 
 on:
   workflow_dispatch:
@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   deploy:
-    name: Build and deploy develop api
+    name: Build and deploy prod api
     runs-on: ubuntu-latest
-    environment: develop
+    environment: prod
     env:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
@@ -24,6 +24,13 @@ jobs:
       HEALTH_CHECK_URL: ${{ vars.HEALTH_CHECK_URL || secrets.HEALTH_CHECK_URL }}
 
     steps:
+      - name: Validate main branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Production deploy must run from main branch"
+            exit 1
+          fi
+
       - name: Validate deployment settings
         run: |
           test -n "$AWS_ROLE_ARN"

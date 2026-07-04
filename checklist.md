@@ -38,6 +38,19 @@
 - [x] 최소 Dockerfile 추가.
 - [x] dev 배포용 GitHub Actions workflow 추가.
 - [x] dev 배포 workflow를 수동 실행으로 제한.
+- [x] dev 배포 workflow를 `develop` GitHub Environment 변수 기반으로 변경.
+- [x] workflow YAML 문법 확인.
+- [x] `./gradlew test` 실행.
+- [x] `git diff`와 `git status --short` 확인.
+- [x] 논리 단위 커밋 생성.
+
+## LAN-43 prod 배포 workflow
+
+- [x] 현재 AWS ECS/ECR 리소스 이름 확인.
+- [x] prod 배포용 GitHub Actions workflow 추가.
+- [x] prod 배포 workflow를 수동 실행으로 제한.
+- [x] prod 배포 workflow를 `main` 브랜치에서만 진행하도록 제한.
+- [x] prod 배포 workflow를 `prod` GitHub Environment 변수 기반으로 변경.
 - [x] workflow YAML 문법 확인.
 - [x] `./gradlew test` 실행.
 - [x] `git diff`와 `git status --short` 확인.
