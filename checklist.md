@@ -37,6 +37,7 @@
 - [x] 기존 Dockerfile과 workflow 부재 확인.
 - [x] 최소 Dockerfile 추가.
 - [x] dev 배포용 GitHub Actions workflow 추가.
+- [x] dev 배포 workflow를 수동 실행으로 제한.
 - [x] workflow YAML 문법 확인.
 - [x] `./gradlew test` 실행.
 - [x] `git diff`와 `git status --short` 확인.

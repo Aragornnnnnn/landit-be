@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** develop 브랜치 push 또는 수동 실행으로 Landit BE dev 이미지를 ECR에 push하고 ECS 서비스를 새 배포로 갱신한다.
+**Goal:** 개발자가 수동 실행한 workflow로 Landit BE dev 이미지를 ECR에 push하고 ECS 서비스를 새 배포로 갱신한다.
 
 **Architecture:** 이 repo에는 기존 Dockerfile과 workflow가 없으므로 최소 Dockerfile과 단일 dev 배포 workflow만 추가한다. Terraform task definition이 `latest` 이미지를 보므로 task definition 재등록 없이 ECS `update-service --force-new-deployment`만 수행한다.
 
@@ -47,7 +47,7 @@ Exclude local build outputs, Git metadata, IDE files, and `.env` files from Dock
 
 - [x] **Step 3: Add GitHub Actions workflow**
 
-Trigger only on `workflow_dispatch` and `develop` branch push. Configure AWS credentials through OIDC, push commit SHA and `latest`, then call `aws ecs update-service --force-new-deployment`.
+Trigger only on `workflow_dispatch`. Configure AWS credentials through OIDC, push commit SHA and `latest`, then call `aws ecs update-service --force-new-deployment`.
 
 - [x] **Step 4: Verify**
 

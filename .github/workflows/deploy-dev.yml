@@ -1,11 +1,8 @@
-# develop 브랜치 변경을 dev ECS 서비스에 배포합니다.
+# 개발자가 수동 실행해 dev ECS 서비스에 배포합니다.
 name: Deploy Dev
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - develop
 
 permissions:
   contents: read
