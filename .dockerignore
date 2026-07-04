@@ -1,0 +1,11 @@
+# Docker build 컨텍스트에서 불필요한 로컬 산출물을 제외합니다.
+.git
+.github
+.gradle
+build
+.env
+.env.*
+.idea
+.vscode
+*.iml
+out
