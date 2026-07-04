@@ -30,3 +30,14 @@
 - [x] Jackson timezone을 `Asia/Seoul`로 설정.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## LAN-43 dev 배포 workflow
+
+- [x] repo 구조, build tool, Dockerfile, 기존 workflow, git 상태 확인.
+- [x] 기존 Dockerfile과 workflow 부재 확인.
+- [x] 최소 Dockerfile 추가.
+- [x] dev 배포용 GitHub Actions workflow 추가.
+- [x] workflow YAML 문법 확인.
+- [x] `./gradlew test` 실행.
+- [x] `git diff`와 `git status --short` 확인.
+- [x] 논리 단위 커밋 생성.
