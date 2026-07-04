@@ -1,0 +1,104 @@
+# develop 브랜치 변경을 dev ECS 서비스에 배포합니다.
+name: Deploy Dev
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_ACCOUNT_ID: "982529430654"
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: develop-landit-api
+  ECR_REGISTRY: 982529430654.dkr.ecr.ap-northeast-2.amazonaws.com
+  ECS_CLUSTER: develop-landit-cluster
+  ECS_SERVICE: develop-landit-api
+  HEALTH_PATH: /actuator/health
+  DEV_API_BASE_URL: ${{ vars.DEV_API_BASE_URL || secrets.DEV_API_BASE_URL }}
+
+jobs:
+  deploy:
+    name: Build and deploy dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          IMAGE_URI: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build --pull \
+            -t "$IMAGE_URI:$IMAGE_TAG" \
+            -t "$IMAGE_URI:latest" \
+            .
+          docker push "$IMAGE_URI:$IMAGE_TAG"
+          docker push "$IMAGE_URI:latest"
+
+      - name: Verify image in ECR
+        run: |
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="${GITHUB_SHA}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text >/dev/null
+
+      - name: Force ECS deployment
+        id: ecs
+        run: |
+          desired_count="$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --query 'services[0].desiredCount' \
+            --output text)"
+
+          if [ "$desired_count" = "None" ]; then
+            echo "ECS service was not found."
+            exit 1
+          fi
+
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --query 'service.serviceArn' \
+            --output text >/dev/null
+
+          echo "desired_count=$desired_count" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for stable service
+        if: ${{ steps.ecs.outputs.desired_count != '0' }}
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+
+      - name: Check service health
+        if: ${{ steps.ecs.outputs.desired_count != '0' }}
+        run: |
+          if [ -z "$DEV_API_BASE_URL" ]; then
+            echo "DEV_API_BASE_URL variable or secret is required when desired count is greater than 0."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --retry 12 \
+            --retry-delay 5 \
+            --retry-connrefused \
+            "${DEV_API_BASE_URL%/}${HEALTH_PATH}" >/dev/null
