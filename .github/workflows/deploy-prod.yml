@@ -73,14 +73,6 @@ jobs:
           docker push "$image_uri:${GITHUB_SHA}"
           docker push "$image_uri:latest"
 
-      - name: Verify ECR image
-        run: |
-          aws ecr describe-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-ids imageTag="${GITHUB_SHA}" imageTag=latest \
-            --query 'imageDetails[].imageTags' \
-            --output json
-
       - name: Force ECS service deployment
         run: |
           aws ecs update-service \

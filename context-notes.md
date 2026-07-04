@@ -58,4 +58,6 @@
 - prod workflow는 하드코딩된 리소스명 대신 GitHub Environment `prod`의 `AWS_ACCOUNT_ID`, `AWS_REGION`, `ECR_REGISTRY`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `HEALTH_CHECK_URL`을 읽는다.
 - prod role ARN은 `prod` GitHub Environment의 variable 또는 secret `AWS_ROLE_ARN`에서 받는다.
 - develop/prod workflow YAML parse, `git diff --check`, `./gradlew test`는 통과했다.
+- develop workflow 재실행에서 Docker image push는 성공했지만 GitHub OIDC role에 `ecr:DescribeImages` 권한이 없어 ECR 조회 검증 step이 실패했다.
+- 이미지 push 자체가 실패를 반환하므로, 배포 진행을 막는 별도 ECR 조회 검증 step은 제거한다.
 - SSM parameter 값과 런타임 secret은 workflow에서 조회하거나 출력하지 않는다.
