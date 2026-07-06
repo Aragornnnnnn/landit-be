@@ -76,3 +76,13 @@
 - `README.md`에서 주요 문서와 작업 로그를 바로 찾을 수 있도록 링크를 보강한다.
 - `landit-be`의 현재 배포 워크플로우는 API 서버만 다루므로, Worker 구현과 배포 소유 경계를 아키텍처 문서와 `AGENTS.md`에 명시한다.
 - 문서만 변경하므로 검증은 링크, YAML 문법, Git diff, 표기 검색으로 진행한다.
+
+## 2026-07-06 LAN-58 공통 응답과 예외 처리 체계
+
+- 사용자가 Notion 이슈 번호 `LAN-58`에 해당하는 작업 브랜치 생성을 요청해 `origin/develop` 기준 `feat/LAN-58`에서 작업한다.
+- SayNow BE의 핵심 응답 체계는 `ApiResponse<T>`와 `ErrorResponse`이고, 성공 응답은 `success=true`, 실패 응답은 `success=false`와 `error.code/message`를 사용한다.
+- SayNow BE의 예외 처리 핵심은 `ApiException`, `ErrorCode`, `GlobalExceptionHandler`다.
+- Landit BE는 아직 컨트롤러와 공통 응답/예외 코드가 없는 초기 골격 상태다.
+- 이번 변경은 응답/예외 처리 체계만 가져오고, SayNow의 인증/AI/시나리오/NPS 도메인별 `ErrorCode`와 Sentry reporter 추상화는 가져오지 않는다.
+- Landit은 이미 Logback Sentry appender를 사용하므로, 별도 Sentry SDK reporter 포트는 실제 필요가 생길 때 추가한다.
+- 새 테스트는 구현 전 `ErrorCode`, `ApiResponse`, `GlobalExceptionHandler` 부재로 컴파일 실패했고, 최소 구현 후 관련 테스트와 `./gradlew test`가 통과했다.
