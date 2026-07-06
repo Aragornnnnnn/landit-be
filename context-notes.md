@@ -161,3 +161,12 @@
 - 이미 적용된 migration은 수정하지 않는 원칙을 적용해 V4의 NPS 테이블 정의는 기존 `session_nps_response`로 되돌린다.
 - 세션 종속 NPS 응답을 사용자 기준 `nps_response`로 바꾸는 작업은 새 `V6__replace_session_nps_response.sql`에서 처리한다.
 - V6는 기존 `session_nps_response` 데이터를 `learning_session.user_profile_id`로 매핑해 `nps_response`로 이전한 뒤 기존 테이블을 제거한다.
+
+## 2026-07-07 ECS 배포 검증 fail-fast 개선
+
+- 사용자가 `origin/develop` 직접 수정을 요청해 별도 이슈 브랜치 없이 `develop`에서 작업한다.
+- 기존 `Verify ECS service`는 `aws ecs wait services-stable`이 완료될 때까지 중간 상태와 ECS 이벤트를 충분히 보여주지 못했다.
+- `Verify ECS service`는 최대 10분 동안 15초 간격으로 service 상태를 출력하고, PRIMARY deployment가 `FAILED`가 되면 최근 ECS 이벤트를 출력한 뒤 즉시 실패한다.
+- step-level `timeout-minutes`는 12분으로 둔다. 루프가 직접 10분 실패를 반환하고 이벤트를 출력할 시간을 남기기 위해서다.
+- API 서버 workflow의 `HEALTH_CHECK_URL` 검증과 curl health check는 ECS service 안정화 뒤 그대로 유지한다.
+- workflow만 변경했으므로 애플리케이션 테스트 대신 GitHub Actions YAML parse와 `git diff --check`로 검증한다.

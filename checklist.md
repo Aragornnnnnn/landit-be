@@ -168,3 +168,10 @@
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 ECS 배포 검증 fail-fast 개선
+
+- [x] `origin/develop` 기준 워크플로우 확인.
+- [x] develop/prod `Verify ECS service` 단계에 bounded wait와 ECS 이벤트 출력 추가.
+- [x] YAML 문법과 diff 검증.
+- [x] 논리 단위 커밋 생성.
