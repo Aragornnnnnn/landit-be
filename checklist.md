@@ -87,3 +87,14 @@
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## LAN-58 Sentry 예외 전송 정책
+
+- [x] 현재 브랜치와 작업트리 상태 확인.
+- [x] 기존 Landit Sentry 설정과 예외 핸들러 확인.
+- [x] Sentry reporter 전송 정책 테스트를 먼저 추가하고 실패 확인.
+- [x] Sentry reporter 경계와 기본 구현 추가.
+- [x] `GlobalExceptionHandler`가 5xx만 Sentry에 전송하도록 변경.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.

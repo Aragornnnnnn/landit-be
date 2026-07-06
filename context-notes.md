@@ -86,3 +86,13 @@
 - 이번 변경은 응답/예외 처리 체계만 가져오고, SayNow의 인증/AI/시나리오/NPS 도메인별 `ErrorCode`와 Sentry reporter 추상화는 가져오지 않는다.
 - Landit은 이미 Logback Sentry appender를 사용하므로, 별도 Sentry SDK reporter 포트는 실제 필요가 생길 때 추가한다.
 - 새 테스트는 구현 전 `ErrorCode`, `ApiResponse`, `GlobalExceptionHandler` 부재로 컴파일 실패했고, 최소 구현 후 관련 테스트와 `./gradlew test`가 통과했다.
+
+## 2026-07-06 LAN-58 Sentry 예외 전송 정책
+
+- 사용자가 Sentry 전송 방향을 승인해, SayNow처럼 reporter 경계는 두되 Landit 정책은 더 좁게 잡는다.
+- 클라이언트 흐름에 해당하는 4xx `ApiException`과 검증 예외는 Sentry event로 보내지 않는다.
+- 5xx `ApiException`과 예상하지 못한 예외만 Sentry event로 보낸다.
+- 새 환경변수는 필요 없다. 기존 `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` 설정을 그대로 사용한다.
+- 핸들러에서 직접 capture하는 예외는 `log.error`를 함께 남기지 않아 Logback Sentry appender와의 중복 전송 가능성을 줄인다.
+- `GlobalExceptionHandlerTests`는 구현 전 `SentryEventReporter` 부재로 컴파일 실패했고, reporter 경계와 기본 구현을 추가한 뒤 관련 테스트가 통과했다.
+- 전체 검증으로 `./gradlew test`를 실행해 새 Sentry reporter bean이 애플리케이션 컨텍스트에 등록되는 것까지 확인했다.

@@ -1,10 +1,9 @@
 // 컨트롤러에서 발생한 예외를 공통 API 오류 응답으로 변환한다.
 package com.landit.landitbe.common.exception;
 
+import com.landit.landitbe.common.observability.SentryEventReporter;
 import com.landit.landitbe.common.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,13 +15,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final SentryEventReporter sentryEventReporter;
+
+    public GlobalExceptionHandler(SentryEventReporter sentryEventReporter) {
+        this.sentryEventReporter = sentryEventReporter;
+    }
 
     /** 애플리케이션에서 명시적으로 던진 API 예외를 오류 응답으로 변환한다. */
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException exception) {
         if (exception.getStatus().is5xxServerError()) {
-            log.error("API exception", exception);
+            sentryEventReporter.captureException(exception);
         }
         return ResponseEntity.status(exception.getStatus())
                 .body(ApiResponse.error(exception.getErrorCode(), exception.getMessage()));
@@ -55,10 +58,10 @@ public class GlobalExceptionHandler {
         return error(ErrorCode.FORBIDDEN);
     }
 
-    /** 예상하지 못한 예외를 서버 오류로 변환하고 ERROR 로그로 남긴다. */
+    /** 예상하지 못한 예외를 Sentry에 전송하고 서버 오류로 변환한다. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception exception) {
-        log.error("Unexpected exception", exception);
+        sentryEventReporter.captureException(exception);
         return error(ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
