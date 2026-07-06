@@ -9,12 +9,24 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    locations: classpath:db/migration,classpath:db/{vendor}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+landit:
+  auth:
+    oidc:
+      google-audiences: ${LANDIT_AUTH_OIDC_GOOGLE_AUDIENCES:}
+      kakao-audiences: ${LANDIT_AUTH_OIDC_KAKAO_AUDIENCES:}
+      apple-audiences: ${LANDIT_AUTH_OIDC_APPLE_AUDIENCES:}
+    token:
+      secret: ${LANDIT_AUTH_TOKEN_SECRET}
+      access-expires-in-seconds: ${LANDIT_AUTH_TOKEN_ACCESS_EXPIRES_IN_SECONDS:1800}
+      refresh-expires-in-seconds: ${LANDIT_AUTH_TOKEN_REFRESH_EXPIRES_IN_SECONDS:1209600}
 
 sentry:
   dsn: ${SENTRY_DSN:}

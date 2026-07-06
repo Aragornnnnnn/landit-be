@@ -12,3 +12,10 @@ spring:
 
 sentry:
   dsn:
+
+landit:
+  auth:
+    oidc:
+      fake-enabled: true
+    token:
+      secret: landit-test-token-secret-that-is-long-enough

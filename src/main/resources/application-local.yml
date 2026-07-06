@@ -3,3 +3,10 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+landit:
+  auth:
+    oidc:
+      fake-enabled: ${LANDIT_AUTH_OIDC_FAKE_ENABLED:false}
+    token:
+      secret: ${LANDIT_AUTH_TOKEN_SECRET:landit-local-token-secret-change-before-production}
