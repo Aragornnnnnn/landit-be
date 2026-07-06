@@ -1,5 +1,5 @@
-// 세션 종료 후 사용자 만족도 응답을 저장한다.
-package com.landit.landitbe.session.domain;
+// 사용자의 NPS 응답을 저장하는 Entity
+package com.landit.landitbe.nps.domain;
 
 import com.landit.landitbe.common.domain.BaseCreatedAtEntity;
 import jakarta.persistence.Column;
@@ -10,15 +10,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "session_nps_response")
-public class SessionNpsResponse extends BaseCreatedAtEntity {
+@Table(name = "nps_response")
+public class NpsResponse extends BaseCreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "learning_session_id", nullable = false)
-    private Long learningSessionId;
+    @Column(name = "user_profile_id", nullable = false)
+    private Long userProfileId;
 
     @Column(nullable = false)
     private int score;
@@ -26,6 +26,6 @@ public class SessionNpsResponse extends BaseCreatedAtEntity {
     @Column(name = "opinion_text", columnDefinition = "text")
     private String opinionText;
 
-    protected SessionNpsResponse() {
+    protected NpsResponse() {
     }
 }

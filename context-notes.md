@@ -145,3 +145,12 @@
 - Entity 추가 후 `./gradlew test --tests 'com.landit.landitbe.DatabaseSchemaIntegrationTests'`와 `./gradlew test --tests 'com.landit.landitbe.auth.SocialAuthApiIntegrationTests'`가 통과했다.
 - 최종 검증으로 `git diff --check`와 `./gradlew test`를 실행했고 둘 다 통과했다.
 - 작업은 `feat: DBML 사용자 스키마와 인증 저장 구조 전환`, `feat: DBML 도메인 엔티티 매핑 추가`로 나누어 커밋했다.
+
+## 2026-07-07 LAN-66 NPS 응답 Entity 수정
+
+- 사용자가 NPS를 세션 종속 기능이 아닌 별도 기능으로 변경하기로 했다.
+- API 경로는 `POST /api/v1/nps` 기준으로 보며, NPS 응답은 `learning_session_id`를 받지 않는다.
+- 같은 사용자의 중복 제출은 허용하므로 `user_profile_id` unique 제약은 두지 않는다.
+- 기존 `session_nps_response`는 `nps_response`로 바꾸고 `user_profile_id`, `score`, `opinion_text`, `created_at`만 둔다.
+- `DatabaseSchemaIntegrationTests.npsResponseIsUserBoundAndAllowsDuplicateSubmissions`는 구현 전 `nps_response` 테이블 부재로 실패했고, Entity와 Flyway 수정 후 통과했다.
+- 최종 검증으로 `git diff --check`와 `./gradlew test`를 실행했고 둘 다 통과했다.

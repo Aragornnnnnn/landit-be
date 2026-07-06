@@ -77,6 +77,56 @@ class DatabaseSchemaIntegrationTests {
         assertThat(columnCount).isZero();
     }
 
+    @Test
+    void npsResponseIsUserBoundAndAllowsDuplicateSubmissions() {
+        assertTableExists("nps_response");
+        assertTableDoesNotExist("session_nps_response");
+        assertColumnExists("nps_response", "user_profile_id");
+        assertColumnDoesNotExist("nps_response", "learning_session_id");
+
+        jdbcTemplate.update(
+                """
+                        insert into user_profile (
+                            id,
+                            nickname,
+                            target_locale,
+                            base_locale,
+                            current_level,
+                            push_permission_status,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        values (990001, 'nps-test-user', 'en', 'ko', 1, 'NOT_DETERMINED',
+                            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """
+        );
+
+        jdbcTemplate.update(
+                """
+                        insert into nps_response (user_profile_id, score, opinion_text, created_at)
+                        values (990001, 3, 'first', CURRENT_TIMESTAMP)
+                        """
+        );
+        jdbcTemplate.update(
+                """
+                        insert into nps_response (user_profile_id, score, opinion_text, created_at)
+                        values (990001, 4, 'second', CURRENT_TIMESTAMP)
+                        """
+        );
+
+        Integer responseCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from nps_response
+                        where user_profile_id = 990001
+                        """,
+                Integer.class
+        );
+
+        assertThat(responseCount).isEqualTo(2);
+    }
+
     private void assertTableExists(String tableName) {
         Integer tableCount = jdbcTemplate.queryForObject(
                 """
@@ -89,6 +139,52 @@ class DatabaseSchemaIntegrationTests {
         );
 
         assertThat(tableCount).as("table %s", tableName).isEqualTo(1);
+    }
+
+    private void assertTableDoesNotExist(String tableName) {
+        Integer tableCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.tables
+                        where lower(table_name) = ?
+                        """,
+                Integer.class,
+                tableName
+        );
+
+        assertThat(tableCount).as("table %s", tableName).isZero();
+    }
+
+    private void assertColumnExists(String tableName, String columnName) {
+        Integer columnCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.columns
+                        where lower(table_name) = ?
+                          and lower(column_name) = ?
+                        """,
+                Integer.class,
+                tableName,
+                columnName
+        );
+
+        assertThat(columnCount).as("column %s.%s", tableName, columnName).isEqualTo(1);
+    }
+
+    private void assertColumnDoesNotExist(String tableName, String columnName) {
+        Integer columnCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.columns
+                        where lower(table_name) = ?
+                          and lower(column_name) = ?
+                        """,
+                Integer.class,
+                tableName,
+                columnName
+        );
+
+        assertThat(columnCount).as("column %s.%s", tableName, columnName).isZero();
     }
 
     private void assertIndexExists(String indexName) {

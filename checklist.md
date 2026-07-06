@@ -151,3 +151,14 @@
 - [x] `./gradlew test` 실행.
 - [x] 코드 리뷰 스킬로 변경 diff 검토.
 - [x] 논리 단위 커밋 생성.
+
+## LAN-66 NPS 응답 Entity 수정
+
+- [x] `feat/LAN-66` 브랜치에서 작업.
+- [x] 최신 `origin/main` 코드 반영.
+- [x] NPS 응답 스키마 회귀 테스트를 먼저 추가하고 실패 확인.
+- [x] `session_nps_response`를 세션 비종속 `nps_response`로 변경.
+- [x] 중복 제출을 허용하도록 unique 제약 제거.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
