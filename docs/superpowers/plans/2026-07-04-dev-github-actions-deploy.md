@@ -1,6 +1,7 @@
 # Dev GitHub Actions Deploy Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** 완료된 LAN-43 당시 실행 계획입니다. 현재 최종 배포 기준은 `.github/workflows/deploy-dev.yml`, `.github/workflows/deploy-prod.yml`, `context-notes.md`를 우선 확인합니다.
 
 **Goal:** 개발자가 수동 실행한 workflow로 Landit BE dev 이미지를 ECR에 push하고 ECS 서비스를 새 배포로 갱신한다.
 
