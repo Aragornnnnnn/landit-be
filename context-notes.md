@@ -92,7 +92,8 @@
 - 사용자가 Sentry 전송 방향을 승인해, SayNow처럼 reporter 경계는 두되 Landit 정책은 더 좁게 잡는다.
 - 클라이언트 흐름에 해당하는 4xx `ApiException`과 검증 예외는 Sentry event로 보내지 않는다.
 - 5xx `ApiException`과 예상하지 못한 예외만 Sentry event로 보낸다.
-- 새 환경변수는 필요 없다. 기존 `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` 설정을 그대로 사용한다.
+- 새 환경변수는 필요 없다. 기존 `SENTRY_DSN`, `SENTRY_ENVIRONMENT` 설정을 그대로 사용한다.
+- `SENTRY_TRACES_SAMPLE_RATE`는 현재 `sentry-logback` 기반 예외 전송 경로에서 사용하지 않으므로 활성 설정과 `.env.example`에서 제거한다.
 - 핸들러에서 직접 capture하는 예외는 `log.error`를 함께 남기지 않아 Logback Sentry appender와의 중복 전송 가능성을 줄인다.
 - `GlobalExceptionHandlerTests`는 구현 전 `SentryEventReporter` 부재로 컴파일 실패했고, reporter 경계와 기본 구현을 추가한 뒤 관련 테스트가 통과했다.
 - 전체 검증으로 `./gradlew test`를 실행해 새 Sentry reporter bean이 애플리케이션 컨텍스트에 등록되는 것까지 확인했다.

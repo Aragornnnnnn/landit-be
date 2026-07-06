@@ -95,6 +95,7 @@
 - [x] Sentry reporter 전송 정책 테스트를 먼저 추가하고 실패 확인.
 - [x] Sentry reporter 경계와 기본 구현 추가.
 - [x] `GlobalExceptionHandler`가 5xx만 Sentry에 전송하도록 변경.
+- [x] 사용하지 않는 `SENTRY_TRACES_SAMPLE_RATE` 설정 제거.
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.

@@ -19,4 +19,3 @@ management:
 sentry:
   dsn: ${SENTRY_DSN:}
   environment: ${SENTRY_ENVIRONMENT:local}
-  traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
