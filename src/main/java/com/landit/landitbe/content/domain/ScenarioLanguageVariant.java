@@ -1,0 +1,64 @@
+// 시나리오의 학습 언어와 기준 언어별 콘텐츠를 저장한다.
+package com.landit.landitbe.content.domain;
+
+import com.landit.landitbe.common.domain.ActiveStatus;
+import com.landit.landitbe.common.domain.BaseTimeEntity;
+import com.landit.landitbe.common.domain.InnerThoughtType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "scenario_language_variant")
+public class ScenarioLanguageVariant extends BaseTimeEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "scenario_id", nullable = false)
+    private Long scenarioId;
+
+    @Column(name = "target_locale", nullable = false, length = 35)
+    private String targetLocale;
+
+    @Column(name = "base_locale", nullable = false, length = 35)
+    private String baseLocale;
+
+    @Column(nullable = false, length = 100)
+    private String title;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String briefing;
+
+    @Column(name = "user_opening_instruction", columnDefinition = "text")
+    private String userOpeningInstruction;
+
+    @Column(name = "conversation_goal", nullable = false, length = 255)
+    private String conversationGoal;
+
+    @Column(name = "ai_opening_message", length = 500)
+    private String aiOpeningMessage;
+
+    @Column(name = "ai_opening_message_translation", length = 500)
+    private String aiOpeningMessageTranslation;
+
+    @Column(name = "ai_opening_inner_thought", columnDefinition = "text")
+    private String aiOpeningInnerThought;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_opening_inner_thought_type", length = 20)
+    private InnerThoughtType aiOpeningInnerThoughtType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ActiveStatus status;
+
+    protected ScenarioLanguageVariant() {
+    }
+}
