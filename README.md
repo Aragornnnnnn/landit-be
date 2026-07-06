@@ -20,6 +20,10 @@ Landit 백엔드 서버입니다. Java 21과 Spring Boot 4 기반으로 REST API
 - Java 21
 - PostgreSQL
 
+## Documentation
+
+- [백엔드 아키텍처](docs/architecture/backend.md)
+
 ## Environment
 
 애플리케이션은 DB 연결 정보를 직접 조립하지 않고 환경변수에서 그대로 읽습니다. 배포 환경에서는 IaC가 AWS SSM Parameter Store 값을 환경변수로 주입합니다.
