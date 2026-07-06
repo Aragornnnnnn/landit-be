@@ -47,18 +47,28 @@ class DatabaseSchemaIntegrationTests {
     @DisplayName("PostgreSQL 전용 migration에 ACTIVE partial unique index가 정의되어 있다.")
     @Test
     void postgresqlMigrationDefinesActivePartialUniqueIndexes() throws Exception {
-        String migrationSql = StreamUtils.copyToString(
-                new ClassPathResource(
-                        "db/postgresql/V5__add_dbml_partial_unique_indexes.sql"
-                ).getInputStream(),
-                java.nio.charset.StandardCharsets.UTF_8
-        );
+        String migrationSql = readMigrationSql("db/postgresql/V5__add_dbml_partial_unique_indexes.sql");
 
         assertThat(migrationSql).contains(
                 "CREATE UNIQUE INDEX uk_oauth_identity_active_provider_user",
                 "WHERE status = 'ACTIVE'",
                 "CREATE UNIQUE INDEX uk_oauth_identity_active_user_provider",
                 "CREATE UNIQUE INDEX uk_user_quest_active_user"
+        );
+    }
+
+    @DisplayName("NPS 테이블 교체는 이미 적용된 V4가 아니라 V6 migration에서 처리한다.")
+    @Test
+    void npsTableReplacementIsSeparatedFromAppliedV4Migration() throws Exception {
+        String v4MigrationSql = readMigrationSql("db/migration/V4__apply_dbml_schema.sql");
+        String v6MigrationSql = readMigrationSql("db/migration/V6__replace_session_nps_response.sql");
+
+        assertThat(v4MigrationSql)
+                .contains("CREATE TABLE session_nps_response")
+                .doesNotContain("CREATE TABLE nps_response");
+        assertThat(v6MigrationSql).contains(
+                "CREATE TABLE nps_response",
+                "DROP TABLE session_nps_response"
         );
     }
 
@@ -199,5 +209,12 @@ class DatabaseSchemaIntegrationTests {
         );
 
         assertThat(indexCount).as("index %s", indexName).isEqualTo(1);
+    }
+
+    private String readMigrationSql(String path) throws Exception {
+        return StreamUtils.copyToString(
+                new ClassPathResource(path).getInputStream(),
+                java.nio.charset.StandardCharsets.UTF_8
+        );
     }
 }

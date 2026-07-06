@@ -162,3 +162,9 @@
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+- [x] 이미 적용된 `V4__apply_dbml_schema.sql` 원복.
+- [x] NPS 테이블 교체를 새 `V6` migration으로 분리.
+- [x] Flyway checksum 재발 방지 테스트 추가.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.

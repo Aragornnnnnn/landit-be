@@ -154,3 +154,10 @@
 - 기존 `session_nps_response`는 `nps_response`로 바꾸고 `user_profile_id`, `score`, `opinion_text`, `created_at`만 둔다.
 - `DatabaseSchemaIntegrationTests.npsResponseIsUserBoundAndAllowsDuplicateSubmissions`는 구현 전 `nps_response` 테이블 부재로 실패했고, Entity와 Flyway 수정 후 통과했다.
 - 최종 검증으로 `git diff --check`와 `./gradlew test`를 실행했고 둘 다 통과했다.
+
+## 2026-07-07 LAN-66 Flyway V4 checksum 복구
+
+- `d732b34`에서 이미 DB에 적용된 `V4__apply_dbml_schema.sql`이 직접 수정되어 ECS 새 task가 Flyway checksum mismatch로 부팅 실패했다.
+- 이미 적용된 migration은 수정하지 않는 원칙을 적용해 V4의 NPS 테이블 정의는 기존 `session_nps_response`로 되돌린다.
+- 세션 종속 NPS 응답을 사용자 기준 `nps_response`로 바꾸는 작업은 새 `V6__replace_session_nps_response.sql`에서 처리한다.
+- V6는 기존 `session_nps_response` 데이터를 `learning_session.user_profile_id`로 매핑해 `nps_response`로 이전한 뒤 기존 테이블을 제거한다.
