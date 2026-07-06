@@ -99,3 +99,55 @@
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## LAN-55 OIDC 소셜 로그인
+
+- [x] `feat/LAN-55` 브랜치와 작업트리 상태 확인.
+- [x] SayNow BE 소셜 로그인, OIDC, nonce 검증 구현 확인.
+- [x] Landit BE의 현재 인증/DB/설정 구조 확인.
+- [x] 소셜 로그인 통합 테스트를 먼저 추가하고 실패 확인.
+- [x] nonce 누락과 불일치 거부 테스트를 먼저 추가하고 실패 확인.
+- [x] 사용자와 refresh token 테이블 마이그레이션 추가.
+- [x] 인증 도메인, DTO, 저장소 추가.
+- [x] OIDC verifier와 nonce 검증 추가.
+- [x] access token과 refresh token 발급 추가.
+- [x] 소셜 로그인 API 추가.
+- [x] SecurityFilterChain 설정 추가.
+- [x] 인증 환경변수 예시와 profile 설정 추가.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
+- [x] Apple audience 환경변수와 provider 지원 범위 반영.
+- [x] Apple 소셜 로그인 통합 테스트를 먼저 추가하고 실패 확인.
+- [x] Apple OIDC issuer, JWKS, audience 설정 추가.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
+- [x] `RemoteOidcTokenVerifier`를 SayNow의 provider settings 방식으로 정리.
+- [x] 리팩터링 후 소셜 로그인 통합 테스트 실행.
+- [x] 리팩터링 후 `./gradlew test` 실행.
+- [x] 코드 리뷰 스킬로 변경 diff 검토.
+- [x] 논리 단위 커밋 생성.
+
+## LAN-55 DBML Entity와 Flyway 전환
+
+- [x] 수정된 DBML 기준 구현 계획 작성.
+- [x] DBML 스키마 회귀 테스트를 먼저 추가하고 실패 확인.
+- [x] 기존 `users/refresh_tokens` 구조를 `user_profile/oauth_identity/refresh_token`으로 전환하는 Flyway 마이그레이션 추가.
+- [x] 인증 도메인 Entity와 Repository를 DBML 구조로 리팩터링.
+- [x] 나머지 DBML 테이블 Entity와 enum 추가.
+- [x] JSONB 컬럼을 `JsonNode`와 Hibernate JSON 타입으로 매핑.
+- [x] DB check constraint와 partial unique index 반영.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 의미 단위 커밋 생성.
+- [x] refresh token 회전 통합 테스트를 먼저 추가하고 실패 확인.
+- [x] logout refresh token 폐기 통합 테스트를 먼저 추가하고 실패 확인.
+- [x] withdraw와 access token 인증 필터 통합 테스트를 먼저 추가하고 실패 확인.
+- [x] SayNow 방식의 refresh/logout/withdraw 서비스 흐름 추가.
+- [x] access token 파싱과 Spring Security filter/principal 추가.
+- [x] 탈퇴 사용자 soft delete와 refresh token 일괄 폐기 반영.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 코드 리뷰 스킬로 변경 diff 검토.
+- [x] 논리 단위 커밋 생성.

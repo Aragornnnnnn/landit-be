@@ -97,3 +97,51 @@
 - 핸들러에서 직접 capture하는 예외는 `log.error`를 함께 남기지 않아 Logback Sentry appender와의 중복 전송 가능성을 줄인다.
 - `GlobalExceptionHandlerTests`는 구현 전 `SentryEventReporter` 부재로 컴파일 실패했고, reporter 경계와 기본 구현을 추가한 뒤 관련 테스트가 통과했다.
 - 전체 검증으로 `./gradlew test`를 실행해 새 Sentry reporter bean이 애플리케이션 컨텍스트에 등록되는 것까지 확인했다.
+
+## 2026-07-06 LAN-55 OIDC 소셜 로그인
+
+- 사용자가 Notion 이슈 번호 `LAN-55`에 해당하는 작업 브랜치 생성을 요청해 `origin/develop` 기준 `feat/LAN-55`에서 작업한다.
+- SayNow BE의 `POST /api/v1/auth/social-login`은 `provider`, `idToken`, `nonce`를 받고 OIDC ID Token 검증 후 자체 access/refresh token을 발급한다.
+- Landit BE에는 아직 인증 도메인, 사용자 테이블, token 설정, SecurityFilterChain이 없다.
+- 이번 범위는 소셜 로그인 API 1개와 그 API가 발급하는 access/refresh token 저장 경계까지로 제한한다. refresh, logout, withdraw API는 별도 이슈가 생기면 추가한다.
+- nonce는 선택값으로 두지 않는다. 요청 nonce가 없거나 ID Token claim nonce와 일치하지 않으면 `OIDC_NONCE_MISMATCH`로 거부한다.
+- 실제 런타임에는 `LANDIT_AUTH_TOKEN_SECRET`, `LANDIT_AUTH_OIDC_GOOGLE_AUDIENCES`, `LANDIT_AUTH_OIDC_KAKAO_AUDIENCES`가 필요하다. 테스트는 fake OIDC verifier를 사용하므로 실제 값이 필요하지 않다.
+- 자체 refresh token은 난수 기반 opaque token으로 발급하고 원문을 저장하지 않으며 SHA-256 해시만 저장한다.
+- access token에는 같은 초 안에 재로그인이 발생해도 토큰 값이 고유하도록 JWT payload에 `jti`를 포함한다.
+- 원격 OIDC 검증은 Google과 Kakao JWKS를 사용하고, Google issuer 별칭과 5분 clock skew, JWKS 캐시를 적용한다.
+- `./gradlew test --tests 'com.landit.landitbe.auth.SocialAuthApiIntegrationTests'`로 소셜 로그인, 신규 사용자 생성, 기존 사용자 재로그인, nonce 누락과 불일치 거부, 미지원 provider 거부를 확인했다.
+- SSM `/landit/develop`, `/landit/prod`에는 `LANDIT_AUTH_OIDC_APPLE_AUDIENCES`, `LANDIT_AUTH_OIDC_GOOGLE_AUDIENCES`, `LANDIT_AUTH_OIDC_KAKAO_AUDIENCES`가 생성되어 있다.
+- Apple도 같은 소셜 로그인 API에서 지원한다. Apple ID Token 검증은 issuer `https://appleid.apple.com`, JWKS `https://appleid.apple.com/auth/keys`, configured audience, nonce 필수 검증을 사용한다.
+- 현재 `RemoteOidcTokenVerifier`는 provider별 switch가 `jwksUri`, issuer, audience, nickname claim에 흩어져 있어 SayNow 구현보다 덜 깔끔하다.
+- 리팩터링은 동작 변경 없이 SayNow처럼 provider별 issuer, JWKS URI, audience, nickname claim을 `ProviderSettings` 한 곳에 모으는 방향으로 진행한다.
+- 리팩터링 후 `./gradlew test --tests 'com.landit.landitbe.auth.SocialAuthApiIntegrationTests'`, `./gradlew test`, enum completeness 검색과 diff 리뷰를 실행했다.
+- 사용자 피드백에 따라 LAN-55 범위를 소셜 로그인 API 1개에서 SayNow의 인증 생명주기 전체로 확장한다.
+- SayNow 기준으로 refresh는 refresh token을 한 번 쓰면 폐기하고 새 access/refresh token을 발급하는 rotation 방식이다.
+- logout은 전달받은 refresh token을 찾으면 폐기하고, 찾지 못해도 성공 응답을 반환하는 멱등 방식이다.
+- withdraw는 현재 access token으로 인증된 사용자를 탈퇴 처리하고 해당 사용자의 활성 refresh token을 모두 폐기한다.
+- SayNow의 withdraw는 `provider`, `sub`, `nickname`, `email`을 비우고 `deletedAt`을 남겨 unique 제약과 개인정보 보관 범위를 함께 정리한다.
+- Landit도 기존 `uk_users_provider_sub` unique 제약을 유지하므로 탈퇴 시 소셜 연결 값을 비우는 방식으로 맞춘다.
+- access token 인증은 controller가 직접 토큰을 파싱하지 않고 `OncePerRequestFilter`에서 Bearer token을 검증해 `AuthUserPrincipal`을 SecurityContext에 넣는 방식으로 구현한다.
+- 리뷰 중 refresh와 withdraw가 엇갈릴 수 있는 경계를 확인해 refresh token 조회에는 `PESSIMISTIC_WRITE` 잠금을 걸고, refresh 발급 전에 사용자 `deletedAt`도 확인한다.
+- 탈퇴 사용자에게 남은 refresh token row가 있어도 재발급을 거부하는 회귀 테스트를 추가했다.
+- 최종 검증으로 `./gradlew test --tests 'com.landit.landitbe.auth.SocialAuthApiIntegrationTests'`, `git diff --check`, `./gradlew test`를 실행했다.
+
+## 2026-07-07 LAN-55 DBML Entity와 Flyway 전환
+
+- 사용자가 DBML 구조를 유지하기로 결정해 기존 `users/refresh_tokens` 인증 저장 구조를 `user_profile/oauth_identity/refresh_token` 구조로 전환한다.
+- `oauth_identity`는 탈퇴나 연결 해제 row를 보존하기 위해 일반 unique 대신 ACTIVE 상태 row에만 partial unique index를 둔다.
+- `session_history_message_feedback`에서 `user_learning_expression_id`를 제거하고, `user_learning_expression.session_history_message_feedback_id` 단방향 참조만 유지한다.
+- DBML이 직접 표현하지 못하는 check constraint와 partial unique index는 Flyway 마이그레이션에서 관리한다.
+- `jsonb` 컬럼은 Entity에서 Jackson `JsonNode`와 Hibernate `@JdbcTypeCode(SqlTypes.JSON)`로 매핑한다.
+- 기존 마이그레이션은 이미 논리 이력이 있으므로 수정하지 않고 새 `V4__apply_dbml_schema.sql`에서 DBML 스키마로 전환한다.
+- 인증 흐름에서 실제 탐색이 필요한 `UserProfile`, `OauthIdentity`, `RefreshToken`만 JPA 객체 관계로 두고, 나머지 도메인 Entity는 FK를 `Long` 컬럼으로 매핑한다.
+- H2는 PostgreSQL partial unique index 문법을 지원하지 않아 공통 Flyway 위치에는 일반 조회 index만 두고, PostgreSQL 전용 partial unique index는 `db/postgresql` 위치로 분리한다.
+- `spring.flyway.locations`는 `classpath:db/migration,classpath:db/{vendor}`로 설정해 H2 테스트에서는 PostgreSQL 전용 migration이 실행되지 않게 한다.
+- `./gradlew test --tests 'com.landit.landitbe.DatabaseSchemaIntegrationTests'`로 DBML 핵심 테이블, 조회 index, feedback-expression 역참조 제거, PostgreSQL 전용 partial unique migration 파일 존재를 확인했다.
+- `./gradlew test --tests 'com.landit.landitbe.auth.SocialAuthApiIntegrationTests'`로 기존 소셜 로그인, refresh, logout, withdraw API 동작이 새 저장 구조에서도 유지되는 것을 확인했다.
+- DBML의 나머지 테이블은 서비스 로직이 아직 없으므로 JPA 객체 관계를 무리하게 만들지 않고 FK ID를 `Long`으로 매핑했다.
+- 콘텐츠, 세션, 복습, 퀘스트, 캐릭터, 푸시, 앱 버전 Entity와 enum을 추가했다.
+- `jsonb` 컬럼은 `JsonNode`와 `@JdbcTypeCode(SqlTypes.JSON)` 조합으로 매핑했고, H2 테스트의 Hibernate validate도 통과했다.
+- Entity 추가 후 `./gradlew test --tests 'com.landit.landitbe.DatabaseSchemaIntegrationTests'`와 `./gradlew test --tests 'com.landit.landitbe.auth.SocialAuthApiIntegrationTests'`가 통과했다.
+- 최종 검증으로 `git diff --check`와 `./gradlew test`를 실행했고 둘 다 통과했다.
+- 작업은 `feat: DBML 사용자 스키마와 인증 저장 구조 전환`, `feat: DBML 도메인 엔티티 매핑 추가`로 나누어 커밋했다.
