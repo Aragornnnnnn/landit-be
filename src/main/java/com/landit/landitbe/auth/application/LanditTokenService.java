@@ -49,7 +49,7 @@ public class LanditTokenService {
         try {
             String[] parts = token.split("\\.", -1);
             if (parts.length != 3) {
-                throw new ApiException(ErrorCode.AUTH_REQUIRED);
+                throw new ApiException(ErrorCode.INVALID_TOKEN);
             }
 
             String unsignedToken = parts[0] + "." + parts[1];
@@ -57,26 +57,26 @@ public class LanditTokenService {
                     sign(unsignedToken).getBytes(StandardCharsets.UTF_8),
                     parts[2].getBytes(StandardCharsets.UTF_8)
             )) {
-                throw new ApiException(ErrorCode.AUTH_REQUIRED);
+                throw new ApiException(ErrorCode.INVALID_TOKEN);
             }
 
             Map<String, Object> claims = objectMapper.readValue(BASE64_URL_DECODER.decode(parts[1]), CLAIMS_TYPE);
             if (!ACCESS_TOKEN_TYPE.equals(claims.get("type"))) {
-                throw new ApiException(ErrorCode.AUTH_REQUIRED);
+                throw new ApiException(ErrorCode.INVALID_TOKEN);
             }
             long expiresAt = number(claims.get("exp"));
             if (Instant.now().getEpochSecond() >= expiresAt) {
-                throw new ApiException(ErrorCode.ACCESS_TOKEN_EXPIRED);
+                throw new ApiException(ErrorCode.AUTH_REQUIRED);
             }
             String subject = text(claims.get("sub"));
             if (subject == null || subject.isBlank()) {
-                throw new ApiException(ErrorCode.AUTH_REQUIRED);
+                throw new ApiException(ErrorCode.INVALID_TOKEN);
             }
             return Long.valueOf(subject);
         } catch (ApiException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new ApiException(ErrorCode.AUTH_REQUIRED);
+            throw new ApiException(ErrorCode.INVALID_TOKEN);
         }
     }
 
@@ -144,7 +144,7 @@ public class LanditTokenService {
         try {
             return Long.parseLong(text(value));
         } catch (NumberFormatException exception) {
-            throw new ApiException(ErrorCode.AUTH_REQUIRED);
+            throw new ApiException(ErrorCode.INVALID_TOKEN);
         }
     }
 
