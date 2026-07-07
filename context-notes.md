@@ -197,6 +197,13 @@
 - Entity만 제거하면 DB의 NOT NULL 컬럼 때문에 신규 scenario insert가 깨질 수 있으므로, 기존 V4는 유지하고 새 migration으로 `scenario.completion_criteria`를 제거한다.
 - `DatabaseSchemaIntegrationTests.erdV2ColumnChangesAreAppliedByLatestMigration`는 구현 전 `scenario.completion_criteria`가 남아 있어 실패했고, `V8__drop_scenario_completion_criteria.sql`과 Entity 수정 후 통과했다.
 
+## 2026-07-07 OpenAPI JSON charset 명시
+
+- Safari에서 `https://api-develop.landit.im/v3/api-docs`를 직접 열면 한글이 깨져 보였다.
+- live 응답 바이트는 UTF-8이지만 응답 헤더가 `content-type: application/json`만 내려와 브라우저 원문 렌더링에서 charset 추론이 틀어질 수 있다.
+- JavaCompile UTF-8 고정은 class 파일의 annotation 문자열 보존에는 필요하지만, 브라우저 원문 JSON 표시 문제에는 응답 `Content-Type` charset 명시가 추가로 필요하다.
+- `/v3/api-docs`에만 `application/json;charset=UTF-8`을 명시하는 `ResponseBodyAdvice`를 추가한다.
+
 ## 2026-07-07 CONTRIBUTING 분리
 
 - 사용자가 별도 이슈 번호 없이 `origin/develop`에서 바로 작업하라고 명시해 이번 문서 정리는 이슈 번호 요구를 예외 처리한다.

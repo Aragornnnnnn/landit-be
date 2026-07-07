@@ -207,6 +207,16 @@
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
 
+## 2026-07-07 OpenAPI JSON charset 명시
+
+- [x] 브라우저에서 `/v3/api-docs` 원문 JSON 한글 깨짐 재현.
+- [x] live 응답 바이트가 UTF-8이고 `Content-Type`에 charset이 없음을 확인.
+- [x] OpenAPI docs charset 회귀 테스트를 먼저 추가하고 실패 확인.
+- [x] `/v3/api-docs` 응답에 UTF-8 charset 명시.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
+- [ ] origin/develop push.
+
 ## 2026-07-07 CONTRIBUTING 분리
 
 - [x] 사용자가 이슈 번호 없이 `origin/develop` 직접 작업을 요청한 예외 확인.
