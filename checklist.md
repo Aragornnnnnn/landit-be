@@ -206,3 +206,13 @@
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 CONTRIBUTING 분리
+
+- [x] 사용자가 이슈 번호 없이 `origin/develop` 직접 작업을 요청한 예외 확인.
+- [x] 현재 `AGENTS.md`, `README.md`, 기존 협업 규칙 위치 확인.
+- [x] 사람용 협업 규칙을 `CONTRIBUTING.md`로 분리.
+- [x] `AGENTS.md`를 에이전트 실행 규칙 중심으로 정리.
+- [x] `README.md` 문서 링크 갱신.
+- [x] 문서 diff 검토.
+- [x] 논리 단위 커밋 생성.

@@ -196,3 +196,10 @@
 - `completion_criteria`는 현재 `Scenario` Entity와 이미 적용된 `V4__apply_dbml_schema.sql`에만 남아 있다.
 - Entity만 제거하면 DB의 NOT NULL 컬럼 때문에 신규 scenario insert가 깨질 수 있으므로, 기존 V4는 유지하고 새 migration으로 `scenario.completion_criteria`를 제거한다.
 - `DatabaseSchemaIntegrationTests.erdV2ColumnChangesAreAppliedByLatestMigration`는 구현 전 `scenario.completion_criteria`가 남아 있어 실패했고, `V8__drop_scenario_completion_criteria.sql`과 Entity 수정 후 통과했다.
+
+## 2026-07-07 CONTRIBUTING 분리
+
+- 사용자가 별도 이슈 번호 없이 `origin/develop`에서 바로 작업하라고 명시해 이번 문서 정리는 이슈 번호 요구를 예외 처리한다.
+- 사람에게 필요한 협업 규칙은 `CONTRIBUTING.md`로 옮기고, `AGENTS.md`에는 에이전트가 작업 중 즉시 따라야 하는 실행 규칙과 참조 링크만 남긴다.
+- 이번 변경에서는 스킬을 새로 만들지 않는다. 반복 실행 절차가 실제로 쌓이면 커밋이나 배포 같은 좁은 주제만 별도 스킬로 분리한다.
+- 문서 변경만 있으므로 애플리케이션 테스트 대신 `git diff --check`와 변경 파일 diff를 검토한다.

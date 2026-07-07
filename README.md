@@ -22,6 +22,7 @@ Landit 백엔드 서버입니다. Java 21과 Spring Boot 4 기반으로 REST API
 
 ## Documentation
 
+- [기여 및 협업 규칙](CONTRIBUTING.md)
 - [백엔드 아키텍처](docs/architecture/backend.md)
 - [작업 체크리스트](checklist.md)
 - [컨텍스트 노트](context-notes.md)
