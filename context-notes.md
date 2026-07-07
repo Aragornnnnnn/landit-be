@@ -187,3 +187,5 @@
 - 소스 파일의 `ApiResponse`, `ErrorResponse` 한글 설명은 정상 UTF-8이므로 Swagger 설정 문제가 아니라 Java 컴파일 인코딩 경로 문제로 판단한다.
 - `build.gradle`에는 JavaCompile `options.encoding` 설정이 없어 빌드 환경 기본 charset이 UTF-8이 아니면 annotation 문자열이 깨져 class 파일에 들어갈 수 있다.
 - 해결은 Swagger 설정 추가가 아니라 JavaCompile 인코딩을 `UTF-8`로 고정하는 최소 변경으로 한다.
+- develop 배포 워크플로우 실행은 실제 환경 재배포라 명시 승인 없이 진행하지 않는다.
+- `https://api-develop.landit.im/v3/api-docs`를 다시 확인했을 때 응답은 `공통 API 응답 객체`, `요청 처리 성공 여부` 등 정상 한글로 내려왔다.

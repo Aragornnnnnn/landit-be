@@ -193,5 +193,5 @@
 - [x] `@Schema` 한글 설명 원문과 build 설정 확인.
 - [x] JavaCompile 인코딩을 UTF-8로 고정.
 - [x] `./gradlew test` 실행.
-- [ ] origin/develop push.
-- [ ] develop 배포 후 live `/v3/api-docs` 재확인.
+- [x] origin/develop push.
+- [x] live `/v3/api-docs` 재확인.
