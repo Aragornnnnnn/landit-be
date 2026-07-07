@@ -210,3 +210,11 @@
 - 사람에게 필요한 협업 규칙은 `CONTRIBUTING.md`로 옮기고, `AGENTS.md`에는 에이전트가 작업 중 즉시 따라야 하는 실행 규칙과 참조 링크만 남긴다.
 - 이번 변경에서는 스킬을 새로 만들지 않는다. 반복 실행 절차가 실제로 쌓이면 커밋이나 배포 같은 좁은 주제만 별도 스킬로 분리한다.
 - 문서 변경만 있으므로 애플리케이션 테스트 대신 `git diff --check`와 변경 파일 diff를 검토한다.
+
+## 2026-07-07 V8 migration 배포 실패 수정
+
+- GitHub Actions run `28850557666` job `85564534014`는 `Verify ECS service` step timeout으로 실패했다.
+- ECS task 자체는 `exitCode 1`로 종료됐고, CloudWatch `/landit/develop/api` 로그의 직접 원인은 Flyway `V8__drop_scenario_completion_criteria.sql` 실행 실패다.
+- develop DB에는 `scenario.completion_criteria` 컬럼이 이미 없어 `ALTER TABLE scenario DROP COLUMN completion_criteria`가 PostgreSQL `42703`으로 실패했다.
+- `V8`은 아직 실제 DB에 성공 적용되지 못했으므로 checksum 문제 없이 `DROP COLUMN IF EXISTS`로 수정한다.
+- PRIMARY deployment의 failed task가 있고 running/pending replacement가 없으면 workflow가 timeout까지 기다리지 않고 ECS 이벤트를 출력한 뒤 실패하게 한다.

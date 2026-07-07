@@ -116,11 +116,12 @@ jobs:
 
           if [ "$desired_count" -gt 0 ]; then
             for attempt in $(seq 1 40); do
-              rollout_state="$(aws ecs describe-services \
+              primary_state="$(aws ecs describe-services \
                 --cluster "$ECS_CLUSTER" \
                 --services "$ECS_SERVICE" \
-                --query 'services[0].deployments[?status==`PRIMARY`][0].rolloutState' \
+                --query 'services[0].deployments[?status==`PRIMARY`][0].[rolloutState,failedTasks,runningCount,pendingCount]' \
                 --output text)"
+              read -r rollout_state failed_tasks primary_running_count primary_pending_count <<< "$primary_state"
               deployment_count="$(aws ecs describe-services \
                 --cluster "$ECS_CLUSTER" \
                 --services "$ECS_SERVICE" \
@@ -136,6 +137,12 @@ jobs:
 
               if [ "$rollout_state" = "FAILED" ]; then
                 echo "PRIMARY ECS deployment failed"
+                print_service_events
+                exit 1
+              fi
+
+              if [ "$failed_tasks" != "None" ] && [ "$failed_tasks" -gt 0 ] && [ "$primary_running_count" -eq 0 ] && [ "$primary_pending_count" -eq 0 ]; then
+                echo "PRIMARY ECS deployment has failed tasks and no running or pending replacement task"
                 print_service_events
                 exit 1
               fi

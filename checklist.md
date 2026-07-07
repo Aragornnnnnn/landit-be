@@ -226,3 +226,11 @@
 - [x] `README.md` 문서 링크 갱신.
 - [x] 문서 diff 검토.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 V8 migration 배포 실패 수정
+
+- [x] GitHub Actions job 로그와 ECS task 로그 확인.
+- [x] `V8__drop_scenario_completion_criteria.sql`를 이미 컬럼이 없는 DB에서도 통과하도록 수정.
+- [x] ECS 배포 검증이 failed task를 timeout 전에 실패 처리하도록 수정.
+- [x] 관련 테스트와 YAML 검증 실행.
+- [x] 논리 단위 커밋 생성.
