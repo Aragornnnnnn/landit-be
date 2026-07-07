@@ -186,3 +186,12 @@
 - [x] 관련 테스트 실행.
 - [x] `./gradlew test` 실행.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 Swagger 한글 설명 인코딩 수정
+
+- [x] live `/v3/api-docs` 한글 설명 깨짐 재현.
+- [x] `@Schema` 한글 설명 원문과 build 설정 확인.
+- [x] JavaCompile 인코딩을 UTF-8로 고정.
+- [x] `./gradlew test` 실행.
+- [ ] origin/develop push.
+- [ ] develop 배포 후 live `/v3/api-docs` 재확인.

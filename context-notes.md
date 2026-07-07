@@ -180,3 +180,10 @@
 - 이미 적용된 `V4__apply_dbml_schema.sql`은 checksum 문제를 피하기 위해 수정하지 않고, 새 migration으로 차이를 반영한다.
 - `DatabaseSchemaIntegrationTests.erdV2ColumnChangesAreAppliedByLatestMigration`는 구현 전 `scenario.total_question_count` 부재로 실패했고, `V7__sync_erd_v2_columns.sql`과 Entity 수정 후 통과했다.
 - 기존 schema 검증은 `./gradlew test --tests 'com.landit.landitbe.DatabaseSchemaIntegrationTests'`로 확인했다.
+
+## 2026-07-07 Swagger 한글 설명 인코딩 수정
+
+- `https://api-develop.landit.im/v3/api-docs`의 `@Schema` 한글 설명이 `怨듯넻 API ...`처럼 깨져 내려왔다.
+- 소스 파일의 `ApiResponse`, `ErrorResponse` 한글 설명은 정상 UTF-8이므로 Swagger 설정 문제가 아니라 Java 컴파일 인코딩 경로 문제로 판단한다.
+- `build.gradle`에는 JavaCompile `options.encoding` 설정이 없어 빌드 환경 기본 charset이 UTF-8이 아니면 annotation 문자열이 깨져 class 파일에 들어갈 수 있다.
+- 해결은 Swagger 설정 추가가 아니라 JavaCompile 인코딩을 `UTF-8`로 고정하는 최소 변경으로 한다.
