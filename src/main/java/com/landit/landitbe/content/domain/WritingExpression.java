@@ -67,6 +67,9 @@ public class WritingExpression extends BaseTimeEntity {
     @Column(name = "representative_sentence_translation", nullable = false, columnDefinition = "text")
     private String representativeSentenceTranslation;
 
+    @Column(name = "representative_sentence_translation_highlight_text", nullable = false, length = 255)
+    private String representativeSentenceTranslationHighlightText;
+
     @Column(name = "representative_image_url", length = 500)
     private String representativeImageUrl;
 

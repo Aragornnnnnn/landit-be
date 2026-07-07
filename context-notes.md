@@ -170,3 +170,13 @@
 - step-level `timeout-minutes`는 12분으로 둔다. 루프가 직접 10분 실패를 반환하고 이벤트를 출력할 시간을 남기기 위해서다.
 - API 서버 workflow의 `HEALTH_CHECK_URL` 검증과 curl health check는 ECS service 안정화 뒤 그대로 유지한다.
 - workflow만 변경했으므로 애플리케이션 테스트 대신 GitHub Actions YAML parse와 `git diff --check`로 검증한다.
+
+## 2026-07-07 ERD 기준 Entity 동기화
+
+- 사용자가 이슈 번호 없이 바로 시작하라고 명시해 이번 작업도 이슈 번호 요구를 예외 처리한다.
+- 작업 기준은 `origin/develop`이고, 로컬 `develop`을 직접 오염시키지 않기 위해 `feat/erd-entity-sync` 브랜치를 생성한다.
+- 붙여넣은 ERD와 현재 Entity 차이는 `scenario.total_question_count`, `writing_expression.representative_sentence_translation_highlight_text`, `user_writing_expression_completion.scenario_id`다.
+- `writing_expression.representative_sentence_text`와 `representative_sentence_translation`은 사용자가 요청한 대로 `text` 매핑을 유지한다.
+- 이미 적용된 `V4__apply_dbml_schema.sql`은 checksum 문제를 피하기 위해 수정하지 않고, 새 migration으로 차이를 반영한다.
+- `DatabaseSchemaIntegrationTests.erdV2ColumnChangesAreAppliedByLatestMigration`는 구현 전 `scenario.total_question_count` 부재로 실패했고, `V7__sync_erd_v2_columns.sql`과 Entity 수정 후 통과했다.
+- 기존 schema 검증은 `./gradlew test --tests 'com.landit.landitbe.DatabaseSchemaIntegrationTests'`로 확인했다.

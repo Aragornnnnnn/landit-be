@@ -137,6 +137,17 @@ class DatabaseSchemaIntegrationTests {
         assertThat(responseCount).isEqualTo(2);
     }
 
+    @DisplayName("ERD v2 컬럼 차이를 최신 migration으로 반영한다.")
+    @Test
+    void erdV2ColumnChangesAreAppliedByLatestMigration() {
+        assertColumnExists("scenario", "total_question_count");
+        assertColumnDoesNotExist("scenario", "min_turns_to_goal");
+        assertColumnDoesNotExist("scenario", "max_turns_to_goal");
+
+        assertColumnExists("writing_expression", "representative_sentence_translation_highlight_text");
+        assertColumnExists("user_writing_expression_completion", "scenario_id");
+    }
+
     private void assertTableExists(String tableName) {
         Integer tableCount = jdbcTemplate.queryForObject(
                 """

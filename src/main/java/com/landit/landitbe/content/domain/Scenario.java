@@ -38,11 +38,8 @@ public class Scenario extends BaseTimeEntity {
     @Column(name = "first_speaker", nullable = false, length = 20)
     private ConversationSpeaker firstSpeaker;
 
-    @Column(name = "min_turns_to_goal", nullable = false)
-    private int minTurnsToGoal;
-
-    @Column(name = "max_turns_to_goal", nullable = false)
-    private int maxTurnsToGoal;
+    @Column(name = "total_question_count", nullable = false)
+    private int totalQuestionCount;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "completion_criteria", nullable = false, columnDefinition = "jsonb")

@@ -175,3 +175,14 @@
 - [x] develop/prod `Verify ECS service` 단계에 bounded wait와 ECS 이벤트 출력 추가.
 - [x] YAML 문법과 diff 검증.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 ERD 기준 Entity 동기화
+
+- [x] 사용자 지시에 따라 이슈 번호 없이 `origin/develop` 기준 브랜치 생성.
+- [x] ERD와 현재 Entity, Flyway migration 차이 재확인.
+- [x] ERD 기준 컬럼 회귀 테스트를 먼저 추가하고 실패 확인.
+- [x] 기존 적용 migration은 유지하고 새 migration으로 schema 변경.
+- [x] `scenario`, `writing_expression`, `user_writing_expression_completion` Entity 수정.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
