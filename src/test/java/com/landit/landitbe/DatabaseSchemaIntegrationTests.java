@@ -143,6 +143,7 @@ class DatabaseSchemaIntegrationTests {
         assertColumnExists("scenario", "total_question_count");
         assertColumnDoesNotExist("scenario", "min_turns_to_goal");
         assertColumnDoesNotExist("scenario", "max_turns_to_goal");
+        assertColumnDoesNotExist("scenario", "completion_criteria");
 
         assertColumnExists("writing_expression", "representative_sentence_translation_highlight_text");
         assertColumnExists("user_writing_expression_completion", "scenario_id");

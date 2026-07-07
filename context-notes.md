@@ -189,3 +189,10 @@
 - 해결은 Swagger 설정 추가가 아니라 JavaCompile 인코딩을 `UTF-8`로 고정하는 최소 변경으로 한다.
 - develop 배포 워크플로우 실행은 실제 환경 재배포라 명시 승인 없이 진행하지 않는다.
 - `https://api-develop.landit.im/v3/api-docs`를 다시 확인했을 때 응답은 `공통 API 응답 객체`, `요청 처리 성공 여부` 등 정상 한글로 내려왔다.
+
+## 2026-07-07 Scenario completion_criteria 제거
+
+- 사용자가 `Scenario` Entity에서 `completion_criteria` 제거를 요청했다.
+- `completion_criteria`는 현재 `Scenario` Entity와 이미 적용된 `V4__apply_dbml_schema.sql`에만 남아 있다.
+- Entity만 제거하면 DB의 NOT NULL 컬럼 때문에 신규 scenario insert가 깨질 수 있으므로, 기존 V4는 유지하고 새 migration으로 `scenario.completion_criteria`를 제거한다.
+- `DatabaseSchemaIntegrationTests.erdV2ColumnChangesAreAppliedByLatestMigration`는 구현 전 `scenario.completion_criteria`가 남아 있어 실패했고, `V8__drop_scenario_completion_criteria.sql`과 Entity 수정 후 통과했다.

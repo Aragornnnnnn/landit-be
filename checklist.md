@@ -195,3 +195,14 @@
 - [x] `./gradlew test` 실행.
 - [x] origin/develop push.
 - [x] live `/v3/api-docs` 재확인.
+
+## 2026-07-07 Scenario completion_criteria 제거
+
+- [x] `origin/develop` 최신 상태 반영.
+- [x] `completion_criteria` 사용처 확인.
+- [x] schema 회귀 테스트를 먼저 추가하고 실패 확인.
+- [x] `Scenario` Entity에서 `completionCriteria` 제거.
+- [x] 새 Flyway migration으로 `scenario.completion_criteria` 제거.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.

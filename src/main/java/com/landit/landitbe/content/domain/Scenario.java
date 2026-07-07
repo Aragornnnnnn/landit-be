@@ -1,7 +1,6 @@
 // 언어와 무관한 시나리오 원형 정보를 저장한다.
 package com.landit.landitbe.content.domain;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.BaseTimeEntity;
 import com.landit.landitbe.common.domain.ConversationSpeaker;
@@ -13,8 +12,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "scenario")
@@ -40,10 +37,6 @@ public class Scenario extends BaseTimeEntity {
 
     @Column(name = "total_question_count", nullable = false)
     private int totalQuestionCount;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "completion_criteria", nullable = false, columnDefinition = "jsonb")
-    private JsonNode completionCriteria;
 
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
