@@ -50,3 +50,10 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('migrateDatabase', JavaExec) {
+	group = 'database'
+	description = 'Run Flyway migrations against DB_URL.'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.landit.landitbe.FlywayMigrationRunner'
+}

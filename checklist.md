@@ -234,3 +234,12 @@
 - [x] ECS 배포 검증이 failed task를 timeout 전에 실패 처리하도록 수정.
 - [x] 관련 테스트와 YAML 검증 실행.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 Flyway와 ECS 배포 분리
+
+- [x] 현재 Flyway 실행 경로와 develop/prod profile 확인.
+- [x] 별도 Flyway migration 실행 task 추가.
+- [x] deploy workflow에서 ECS 배포 전 migration 실행.
+- [x] develop/prod 앱 런타임 Flyway 비활성화.
+- [x] 관련 테스트와 YAML 검증 실행.
+- [x] 논리 단위 커밋 생성.

@@ -1,0 +1,90 @@
+# DB 스키마 마이그레이션만 수동 실행하거나 배포 workflow에서 호출합니다.
+name: Flyway Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Migration target environment.
+        required: true
+        type: choice
+        options:
+          - develop
+          - prod
+      ref:
+        description: Git ref containing migration files. Defaults to the workflow ref.
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      environment:
+        description: Migration target environment.
+        required: true
+        type: string
+      ref:
+        description: Git ref containing migration files. Defaults to the workflow ref.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  migrate:
+    name: Migrate ${{ inputs.environment }} DB schema
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: flyway-migration-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+
+    steps:
+      - name: Validate migration settings
+        run: |
+          case "${{ inputs.environment }}" in
+            develop|prod)
+              ;;
+            *)
+              echo "Unsupported environment: ${{ inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+          test -n "$AWS_ROLE_ARN"
+          test -n "$AWS_REGION"
+
+      - name: Checkout migration files
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Flyway migration
+        run: |
+          parameter_prefix="/landit/${{ inputs.environment }}"
+          export DB_URL="$(aws ssm get-parameter \
+            --name "$parameter_prefix/DB_URL" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)"
+          export DB_USERNAME="$(aws ssm get-parameter \
+            --name "$parameter_prefix/DB_USERNAME" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)"
+          export DB_PASSWORD="$(aws ssm get-parameter \
+            --name "$parameter_prefix/DB_PASSWORD" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)"
+
+          ./gradlew migrateDatabase

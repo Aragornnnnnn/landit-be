@@ -218,3 +218,12 @@
 - develop DB에는 `scenario.completion_criteria` 컬럼이 이미 없어 `ALTER TABLE scenario DROP COLUMN completion_criteria`가 PostgreSQL `42703`으로 실패했다.
 - `V8`은 아직 실제 DB에 성공 적용되지 못했으므로 checksum 문제 없이 `DROP COLUMN IF EXISTS`로 수정한다.
 - PRIMARY deployment의 failed task가 있고 running/pending replacement가 없으면 workflow가 timeout까지 기다리지 않고 ECS 이벤트를 출력한 뒤 실패하게 한다.
+
+## 2026-07-07 Flyway와 ECS 배포 분리
+
+- ECS task 부팅 중 Flyway가 실패하면 DB migration 문제가 ECS 배포 안정화 실패처럼 보인다.
+- `flyway-migration.yml`을 별도 reusable workflow로 두고 deploy workflow의 선행 job에서 호출한다.
+- 새 Gradle task는 Spring context를 띄우지 않고 Flyway API만 직접 호출한다. 따라서 DB 접속 정보 외의 앱 런타임 secret이 필요 없다.
+- develop/prod profile에서는 `spring.flyway.enabled=false`로 앱 런타임 migration을 끈다.
+- DB 접속 정보는 GitHub Secrets로 복사하지 않고 workflow가 AWS SSM `/landit/{environment}`에서 직접 읽는다.
+- live IAM에서 `landit-github-actions-develop-deploy` role에 `/landit/develop/DB_*` `ssm:GetParameter` inline policy를 추가했다.

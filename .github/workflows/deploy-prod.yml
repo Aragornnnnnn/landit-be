@@ -9,8 +9,16 @@ permissions:
   id-token: write
 
 jobs:
+  migrate:
+    name: Migrate prod DB schema
+    uses: ./.github/workflows/flyway-migration.yml
+    with:
+      environment: prod
+      ref: ${{ github.ref }}
+
   deploy:
     name: Build and deploy prod api
+    needs: migrate
     runs-on: ubuntu-latest
     environment: prod
     env:
