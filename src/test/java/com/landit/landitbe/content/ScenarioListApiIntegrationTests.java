@@ -133,6 +133,23 @@ class ScenarioListApiIntegrationTests {
                 .andExpect(jsonPath("$.data.categories[2].scenarios[0].openingPreview").value(nullValue()));
     }
 
+    @Test
+    void scenariosLockNextScenarioUntilPreviousScenarioIsCleared() throws Exception {
+        JsonNode loginBody = login();
+        seedScenarios(null);
+
+        mockMvc.perform(get("/api/v1/scenarios")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + loginBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[1].lockReason")
+                        .value("PREVIOUS_SCENARIO_NOT_COMPLETED"))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
+    }
+
     private JsonNode login() throws Exception {
         String nonce = UUID.randomUUID().toString();
         MvcResult result = mockMvc.perform(post("/api/v1/auth/social-login")
@@ -149,7 +166,7 @@ class ScenarioListApiIntegrationTests {
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
 
-    private void seedScenarios(long userId) {
+    private void seedScenarios(Long userId) {
         insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
         insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
         insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
@@ -210,25 +227,27 @@ class ScenarioListApiIntegrationTests {
                 "ACTIVE"
         );
 
-        jdbcTemplate.update("""
-                        INSERT INTO user_scenario_progress (
-                            user_profile_id,
-                            scenario_id,
-                            target_locale,
-                            status,
-                            best_star_rating,
-                            best_native_score,
-                            completed_count,
-                            first_cleared_at,
-                            last_played_at,
-                            created_at,
-                            updated_at
-                        )
-                        VALUES (?, 202, 'en', 'CLEARED', 4, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
-                                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
-                userId
-        );
+        if (userId != null) {
+            jdbcTemplate.update("""
+                            INSERT INTO user_scenario_progress (
+                                user_profile_id,
+                                scenario_id,
+                                target_locale,
+                                status,
+                                best_star_rating,
+                                best_native_score,
+                                completed_count,
+                                first_cleared_at,
+                                last_played_at,
+                                created_at,
+                                updated_at
+                            )
+                            VALUES (?, 202, 'en', 'CLEARED', 4, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            """,
+                    userId
+            );
+        }
     }
 
     private void insertCategory(long categoryId, int displayOrder, String status, String name) {

@@ -7,7 +7,7 @@
 - 명세에는 locale query parameter가 없으므로 이번 API는 `user_profile`의 `target_locale`, `base_locale` 조합으로 조회한다.
 - 목록 조회는 Entity getter를 넓히지 않고 JPA projection query로 필요한 필드만 읽는다.
 - 별점은 DB의 `best_star_rating` 정수 1~5를 API의 1, 1.5, 2, 2.5, 3 범위로 변환한다.
-- 현재 스키마에는 별도 잠금 규칙 테이블이나 잠금 사유 컬럼이 없으므로 `category`, `scenario`, `scenario_language_variant`의 `status`가 `ACTIVE`가 아닌 경우 잠금으로 계산하고 고정 사유를 내려준다.
+- `category`, `scenario`, `scenario_language_variant`의 `status`는 활성/비활성 여부로만 보고, 시나리오 순차 잠금은 사용자 진행도 기준으로 계산한다.
 - 잠긴 시나리오는 `openingPreview`를 만들지 않는다.
 - AI first preview는 AI 시작 메시지, 번역, 속마음, 속마음 유형을 사용하고 USER first preview는 사용자 시작 안내만 사용한다.
 - Swagger 문서는 bearer security scheme과 `GET /api/v1/scenarios` operation/response DTO schema annotation으로 보강한다.
@@ -18,3 +18,9 @@
 - 커밋은 `CONTRIBUTING.md`의 30줄 내외 권장 규칙을 고려해 12개 논리 단위로 분할한다.
 - 병렬 브랜치 충돌을 줄이기 위해 LAN-62 작업 기록은 루트 `checklist.md`, `context-notes.md`가 아니라 `docs/tasks/LAN-62/`로 분리한다.
 - 앞으로 새 작업은 `docs/tasks/{ISSUE_NUMBER}/checklist.md`와 `docs/tasks/{ISSUE_NUMBER}/context-notes.md`에 기록하도록 `AGENTS.md`와 `README.md`에 반영한다.
+- SayNow BE의 `ScenarioService`는 카테고리 안의 시나리오를 `displayOrder` 순서로 순회하며 첫 시나리오는 열고, 이후 시나리오는 바로 앞 시나리오가 완료되어야 열리도록 계산한다.
+- Landit도 같은 규칙을 적용한다. `status`가 `INACTIVE`인 콘텐츠는 사용할 수 없는 상태로 유지하되, 정상 활성 콘텐츠의 잠금 여부는 같은 카테고리 내 이전 `displayOrder` 시나리오의 `CLEARED` 기록으로 판단한다.
+- 순차 잠금 사유는 SayNow와 맞춰 `PREVIOUS_SCENARIO_NOT_COMPLETED` 문자열을 사용한다.
+- `ScenarioListApiIntegrationTests.scenariosLockNextScenarioUntilPreviousScenarioIsCleared`를 추가해 이전 시나리오 완료 기록이 없으면 다음 시나리오가 잠기고 `openingPreview`가 null이 되는 동작을 고정한다.
+- 기존 목록 테스트는 1번 시나리오가 `CLEARED`일 때 2번 시나리오가 열리는 케이스를 계속 검증한다.
+- 검증으로 `./gradlew test --tests com.landit.landitbe.content.ScenarioListApiIntegrationTests`, `git diff --check`, `./gradlew test`를 실행했고 모두 통과했다.

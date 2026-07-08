@@ -25,6 +25,7 @@ public class ScenarioQueryService {
 
     private static final String CATEGORY_LOCK_REASON = "현재 사용할 수 없는 카테고리입니다.";
     private static final String SCENARIO_LOCK_REASON = "현재 사용할 수 없는 시나리오입니다.";
+    private static final String PREVIOUS_SCENARIO_NOT_COMPLETED = "PREVIOUS_SCENARIO_NOT_COMPLETED";
 
     private final ScenarioListQueryRepository scenarioListQueryRepository;
 
@@ -45,15 +46,19 @@ public class ScenarioQueryService {
                     row.categoryId(),
                     ignored -> new CategoryGroup(row)
             );
-            category.add(toScenarioResponse(row, category.categoryLocked()));
+            category.add(row);
         }
         return categories.values().stream().toList();
     }
 
-    private ScenarioResponse toScenarioResponse(ScenarioListRow row, boolean categoryLocked) {
+    private static ScenarioResponse toScenarioResponse(
+            ScenarioListRow row,
+            boolean categoryLocked,
+            boolean previousScenarioCompleted
+    ) {
         boolean completed = row.progressStatus() == UserScenarioProgressStatus.CLEARED;
-        // 카테고리가 잠기면 하위 시나리오도 함께 잠긴 것으로 응답한다.
-        boolean scenarioLocked = inactive(row.scenarioStatus()) || inactive(row.variantStatus());
+        boolean scenarioInactive = inactive(row.scenarioStatus()) || inactive(row.variantStatus());
+        boolean scenarioLocked = scenarioInactive || !previousScenarioCompleted;
         boolean locked = categoryLocked || scenarioLocked;
         return new ScenarioResponse(
                 row.scenarioId(),
@@ -67,29 +72,36 @@ public class ScenarioQueryService {
                 row.thumbnailUrl(),
                 completed,
                 locked,
-                lockReason(categoryLocked, scenarioLocked),
+                lockReason(categoryLocked, scenarioInactive, previousScenarioCompleted),
                 openingPreview(row, locked)
         );
     }
 
-    private String lockReason(boolean categoryLocked, boolean scenarioLocked) {
+    private static String lockReason(
+            boolean categoryLocked,
+            boolean scenarioInactive,
+            boolean previousScenarioCompleted
+    ) {
         if (categoryLocked) {
             return CATEGORY_LOCK_REASON;
         }
-        if (scenarioLocked) {
+        if (scenarioInactive) {
             return SCENARIO_LOCK_REASON;
+        }
+        if (!previousScenarioCompleted) {
+            return PREVIOUS_SCENARIO_NOT_COMPLETED;
         }
         return null;
     }
 
-    private BigDecimal starRating(boolean completed, Integer bestStarRating) {
+    private static BigDecimal starRating(boolean completed, Integer bestStarRating) {
         if (!completed || bestStarRating == null) {
             return null;
         }
         return BigDecimal.valueOf(bestStarRating + 1L).divide(BigDecimal.valueOf(2L));
     }
 
-    private OpeningPreviewResponse openingPreview(ScenarioListRow row, boolean locked) {
+    private static OpeningPreviewResponse openingPreview(ScenarioListRow row, boolean locked) {
         if (locked) {
             return null;
         }
@@ -124,7 +136,7 @@ public class ScenarioQueryService {
             int displayOrder,
             boolean categoryLocked,
             String categoryLockReason,
-            List<ScenarioResponse> scenarios
+            List<ScenarioListRow> rows
     ) {
 
         /** 카테고리 메타데이터는 같은 카테고리의 첫 row에서 가져오고, 시나리오는 이후에 누적한다. */
@@ -139,11 +151,18 @@ public class ScenarioQueryService {
             );
         }
 
-        private void add(ScenarioResponse scenario) {
-            scenarios.add(scenario);
+        private void add(ScenarioListRow row) {
+            rows.add(row);
         }
 
         private CategoryResponse toResponse() {
+            List<ScenarioResponse> scenarios = new ArrayList<>();
+            boolean previousScenarioCompleted = true;
+            for (ScenarioListRow row : rows) {
+                ScenarioResponse scenario = toScenarioResponse(row, categoryLocked, previousScenarioCompleted);
+                scenarios.add(scenario);
+                previousScenarioCompleted = scenario.completed();
+            }
             return new CategoryResponse(
                     categoryId,
                     categoryName,
