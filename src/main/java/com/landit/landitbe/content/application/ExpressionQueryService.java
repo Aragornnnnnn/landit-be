@@ -60,10 +60,11 @@ public class ExpressionQueryService {
                 .toList();
     }
 
-    /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없으면 RESOURCE_NOT_FOUND 예외를 던진다. */
+    /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다. */
     @Transactional(readOnly = true)
     public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
-        WritingExpression expression = writingExpressionRepository.findById(expressionId)
+        WritingExpression expression = writingExpressionRepository
+                .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
                 .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
 
         return toLearningResponse(expression);

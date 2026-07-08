@@ -121,7 +121,7 @@ class ExpressionQueryServiceTest {
         // given: DB에 학습하려는 표현 데이터가 있는 상황 가정
         // (learningExpression() 내부의 getter 스터빙이 findById 스터빙과 중첩되지 않도록 mock을 먼저 만든다)
         WritingExpression expression = learningExpression();
-        when(writingExpressionRepository.findById(EXPRESSION_ID))
+        when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
                 .thenReturn(Optional.of(expression));
 
         // when: getExpressionForLearning()를 호출하면
@@ -143,7 +143,7 @@ class ExpressionQueryServiceTest {
     @Test
     void 표현을_찾지_못하면_RESOURCE_NOT_FOUND_예외를_던진다() {
         // given: DB에 해당 표현 데이터가 없는 상황 가정
-        when(writingExpressionRepository.findById(EXPRESSION_ID))
+        when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
                 .thenReturn(Optional.empty());
 
         // when & then : 존재않는 표현 id로 getExpressionForLearning()를 호출하면 ApiException이 발생하고, errorCode가 RESOURCE_NOT_FOUND인지 검증

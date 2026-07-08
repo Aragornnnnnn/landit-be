@@ -98,6 +98,22 @@ class ExpressionLearningApiIntegrationTests {
                 .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
     }
 
+    /** INACTIVE(내려간) 표현은 존재하지 않는 것처럼 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
+    @Test
+    void learningStartRejectsInactiveExpression() throws Exception {
+        // given: INACTIVE 상태로 심어진 표현
+        Long expressionId = seedExpression("INACTIVE");
+        String accessToken = login("google-learn-3", "learn3@example.com", "Learn User3", "learn-nonce-3");
+
+        // when: 그 표현 ID로 호출하면
+        // then: 404 + RESOURCE_NOT_FOUND (내려간 콘텐츠는 노출되면 안 됨)
+        mockMvc.perform(get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+
     /**
      * 테스트용 Writing 표현 1건을 DB에 심고 그 표현의 PK를 반환한다.
      *
@@ -106,6 +122,11 @@ class ExpressionLearningApiIntegrationTests {
      * INSERT가 3번인 이유가 이것이고, 컬럼이 많은 건 writing_expression에 NOT NULL 컬럼이 많아서다.
      */
     private Long seedExpression() {
+        return seedExpression("ACTIVE");
+    }
+
+    /** status를 지정해 표현을 심는 버전. INACTIVE(내려간 콘텐츠) 케이스 검증에 사용한다. */
+    private Long seedExpression(String status) {
         LocalDateTime now = LocalDateTime.now();
 
         // 1) 최상위 부모: category
@@ -138,8 +159,8 @@ class ExpressionLearningApiIntegrationTests {
                         + "'What should I definitely see in Korea?', '한국에서 뭘 꼭 봐야 해?', "
                         + "'Gyeongbokgung Palace will blow your mind.', '경복궁은 널 완전 놀라게 할 거야.', "
                         + "'널 완전 놀라게 할 거야.', 'https://cdn.example.com/images/101.png', "
-                        + "CAST(? AS jsonb), 'ACTIVE', ?, ?)",
-                scenarioId, "[]", now, now
+                        + "CAST(? AS jsonb), ?, ?, ?)",
+                scenarioId, "[]", status, now, now
         );
     }
 
