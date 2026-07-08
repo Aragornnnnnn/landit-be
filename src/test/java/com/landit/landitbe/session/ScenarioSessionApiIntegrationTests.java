@@ -1,9 +1,10 @@
-// 시나리오 세션 API의 응답과 저장 상태를 검증한다.
+// 시나리오 세션 시작과 중도 종료 API의 응답과 저장 상태를 검증한다.
 package com.landit.landitbe.session;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -309,6 +310,72 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.error.message").value("PREVIOUS_SCENARIO_NOT_COMPLETED"));
     }
 
+    @Test
+    void endSessionInterruptsOwnedInProgressSession() throws Exception {
+        StartedSession startedSession = startUserFirstSession("end-owned@example.com", 9005, 1005, 2006, 3006);
+
+        mockMvc.perform(patch("/api/v1/sessions/%d/end".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(nullValue()))
+                .andExpect(jsonPath("$.error").value(nullValue()));
+
+        assertLearningSession(
+                startedSession.sessionId(),
+                startedSession.userId(),
+                9005,
+                "INTERRUPTED",
+                "USER",
+                "USER_ENDED"
+        );
+        Integer endedAtCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM learning_session WHERE id = ? AND ended_at IS NOT NULL",
+                Integer.class,
+                startedSession.sessionId()
+        );
+        assertThat(endedAtCount).isEqualTo(1);
+    }
+
+    private StartedSession startUserFirstSession(
+            String email,
+            long aiTutorId,
+            long categoryId,
+            long scenarioId,
+            long variantId
+    ) throws Exception {
+        JsonNode loginBody = login(email);
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(aiTutorId);
+        assignAiTutor(userId, aiTutorId);
+        seedCategory(categoryId, 1, "ACTIVE", "종료 테스트");
+        seedScenario(scenarioId, categoryId, 1, "USER", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                variantId,
+                scenarioId,
+                "종료",
+                "종료",
+                "종료",
+                "먼저 말해보세요.",
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/v1/scenarios/%d/sessions".formatted(scenarioId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long sessionId = objectMapper.readTree(result.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("sessionId")
+                .asLong();
+        return new StartedSession(userId, accessToken, sessionId);
+    }
+
     private JsonNode login(String email) throws Exception {
         String nonce = UUID.randomUUID().toString();
         MvcResult result = mockMvc.perform(post("/api/v1/auth/social-login")
@@ -538,5 +605,8 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(message.get("INPUT_TYPE")).isEqualTo("GENERATED");
         assertThat(message.get("MESSAGE_SEQUENCE")).isEqualTo(1);
         assertThat(message.get("TURN_NUMBER")).isEqualTo(1);
+    }
+
+    private record StartedSession(long userId, String accessToken, long sessionId) {
     }
 }
