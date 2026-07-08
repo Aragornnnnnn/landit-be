@@ -337,6 +337,50 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(endedAtCount).isEqualTo(1);
     }
 
+    @Test
+    void endSessionRejectsOtherUserSession() throws Exception {
+        StartedSession ownerSession = startUserFirstSession("owner@example.com", 9006, 1006, 2007, 3007);
+        JsonNode otherLoginBody = login("other@example.com");
+
+        mockMvc.perform(patch("/api/v1/sessions/%d/end".formatted(ownerSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + otherLoginBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void endSessionRejectsMissingSession() throws Exception {
+        JsonNode loginBody = login("missing-session@example.com");
+
+        mockMvc.perform(patch("/api/v1/sessions/999999/end")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    void endSessionRejectsAlreadyEndedSession() throws Exception {
+        StartedSession startedSession = startUserFirstSession("already-ended@example.com", 9007, 1007, 2008, 3008);
+        jdbcTemplate.update("""
+                        UPDATE learning_session
+                        SET status = 'COMPLETED',
+                            ended_by = 'SYSTEM',
+                            completion_reason = 'GOAL_COMPLETED',
+                            ended_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                startedSession.sessionId()
+        );
+
+        mockMvc.perform(patch("/api/v1/sessions/%d/end".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("SESSION_ALREADY_COMPLETED"));
+    }
+
     private StartedSession startUserFirstSession(
             String email,
             long aiTutorId,
