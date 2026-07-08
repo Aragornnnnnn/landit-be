@@ -1,8 +1,8 @@
-// Writing 표현의 실제 사용 빈도 수준을 정의한다.
+// Writing 표현의 어감·사용역 분류를 정의한다.
 package com.landit.landitbe.content.domain;
 
 public enum ExpressionUsageFrequencyLevel {
-    HIGH,
-    MEDIUM,
-    LOW
+    CLASSIC_COMMON,
+    BASIC,
+    SLANG_NEOLOGISM
 }
