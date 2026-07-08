@@ -51,4 +51,45 @@ public class UserScenarioProgress extends BaseTimeEntity {
 
     protected UserScenarioProgress() {
     }
+
+    private UserScenarioProgress(
+            Long userProfileId,
+            Long scenarioId,
+            String targetLocale,
+            UserScenarioProgressStatus status,
+            int completedCount,
+            LocalDateTime lastPlayedAt
+    ) {
+        this.userProfileId = userProfileId;
+        this.scenarioId = scenarioId;
+        this.targetLocale = targetLocale;
+        this.status = status;
+        this.completedCount = completedCount;
+        this.lastPlayedAt = lastPlayedAt;
+    }
+
+    /** 사용자가 시나리오를 처음 시작한 진행도 row를 생성한다. */
+    public static UserScenarioProgress start(
+            Long userProfileId,
+            Long scenarioId,
+            String targetLocale,
+            LocalDateTime startedAt
+    ) {
+        return new UserScenarioProgress(
+                userProfileId,
+                scenarioId,
+                targetLocale,
+                UserScenarioProgressStatus.IN_PROGRESS,
+                0,
+                startedAt
+        );
+    }
+
+    /** 재시도 시작 시 기존 최고 성과를 유지하면서 최근 플레이 시간을 갱신한다. */
+    public void markStarted(LocalDateTime startedAt) {
+        if (status != UserScenarioProgressStatus.CLEARED) {
+            status = UserScenarioProgressStatus.IN_PROGRESS;
+        }
+        lastPlayedAt = startedAt;
+    }
 }
