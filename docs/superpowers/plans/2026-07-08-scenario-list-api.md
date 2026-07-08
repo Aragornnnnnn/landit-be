@@ -61,8 +61,8 @@
 ### Task 3: 검증과 기록
 
 **Files:**
-- Modify: `checklist.md`
-- Modify: `context-notes.md`
+- Modify: `docs/tasks/LAN-62/checklist.md`
+- Modify: `docs/tasks/LAN-62/context-notes.md`
 
 **Interfaces:**
 - Consumes: 구현 결과와 테스트 결과.
@@ -70,5 +70,5 @@
 
 - [ ] `git diff --check`를 실행한다.
 - [ ] `./gradlew test`를 실행한다.
-- [ ] checklist와 context notes를 완료 상태로 갱신한다.
+- [ ] `docs/tasks/LAN-62`의 checklist와 context notes를 완료 상태로 갱신한다.
 - [ ] 논리 단위 커밋을 생성한다.
