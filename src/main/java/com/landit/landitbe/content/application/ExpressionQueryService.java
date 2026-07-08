@@ -31,6 +31,15 @@ import org.springframework.transaction.annotation.Transactional;
 @AllArgsConstructor
 public class ExpressionQueryService {
 
+    /** 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서 제외한다. */
+    private static final List<String> REQUIRED_PRACTICE_SENTENCE_KEYS = List.of(
+            "sentenceText",
+            "highlightingPart",
+            "sentenceTranslation",
+            "practiceQuestion",
+            "practiceQuestionTranslation"
+    );
+
     private final Random random = new Random();
 
     private final ScenarioService scenarioService;
@@ -80,9 +89,10 @@ public class ExpressionQueryService {
                     return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
 
-        List<PracticeSentenceResponse> extraPracticeSentences = parseExtraPracticeSentences(expression.getPracticeExamplesPayload());
+        List<PracticeSentenceResponse> extraPracticeSentences =
+                parseExtraPracticeSentences(expression.getPracticeExamplesPayload(), expressionId);
         if (extraPracticeSentences.isEmpty()) {
-            log.warn("추가 예문 조회 실패: 표현에 추가 예문이 없습니다. expressionId={}", expressionId);
+            log.warn("추가 예문 조회 실패: 표현에 유효한 추가 예문이 없습니다. expressionId={}", expressionId);
             throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
         }
 
@@ -95,24 +105,44 @@ public class ExpressionQueryService {
         );
     }
 
-    /** JSONB payload(JSON 배열)를 예문 응답 목록으로 파싱한다. imageUrl은 선택 필드라 없으면 null로 둔다. */
-    private List<PracticeSentenceResponse> parseExtraPracticeSentences(JsonNode payload) {
+    /**
+     * JSONB payload(JSON 배열)를 예문 응답 목록으로 파싱한다.
+     * 필수 키가 없거나 값이 빈 불량 예문은 빈 값으로 노출하는 대신 목록에서 제외하고 경고 로그를 남긴다.
+     * imageUrl은 유일한 선택 필드라 없으면 null로 둔다.
+     */
+    private List<PracticeSentenceResponse> parseExtraPracticeSentences(JsonNode payload, Long expressionId) {
         List<PracticeSentenceResponse> extraPracticeSentences = new ArrayList<>();
         if (payload == null || !payload.isArray()) {
             return extraPracticeSentences;
         }
 
-        for (JsonNode node : payload) {
+        for (int index = 0; index < payload.size(); index++) {
+            JsonNode node = payload.get(index);
+            if (hasMissingRequiredValue(node)) {
+                log.warn("추가 예문 파싱 제외: 필수 값이 누락된 예문입니다. expressionId={}, index={}", expressionId, index);
+                continue;
+            }
+
             extraPracticeSentences.add(new PracticeSentenceResponse(
-                    node.path("sentenceText").asText(),
-                    node.path("highlightingPart").asText(),
-                    node.path("sentenceTranslation").asText(),
-                    node.path("practiceQuestion").asText(),
-                    node.path("practiceQuestionTranslation").asText(),
+                    node.get("sentenceText").asText(),
+                    node.get("highlightingPart").asText(),
+                    node.get("sentenceTranslation").asText(),
+                    node.get("practiceQuestion").asText(),
+                    node.get("practiceQuestionTranslation").asText(),
                     node.hasNonNull("imageUrl") ? node.get("imageUrl").asText() : null
             ));
         }
         return extraPracticeSentences;
+    }
+
+    /** 예문 노드에 필수 키가 없거나 값이 비어 있는지 확인한다. */
+    private boolean hasMissingRequiredValue(JsonNode node) {
+        for (String requiredKey : REQUIRED_PRACTICE_SENTENCE_KEYS) {
+            if (!node.hasNonNull(requiredKey) || node.get(requiredKey).asText().isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 예문 목록에서 랜덤으로 1개를 골라 작문 연습 문제로 변환한다. (인덱스 범위: 0 ~ 목록 길이-1) */
