@@ -68,10 +68,10 @@ class ScenarioListApiIntegrationTests {
 
     @Test
     void scenariosReturnOrderedProgressLockAndOpeningPreview() throws Exception {
-        JsonNode loginBody = login();
-        long userId = loginBody.get("data").get("user").get("userId").asLong();
-        String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedScenarios(userId);
+        JsonNode loginResponseBody = login();
+        long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+        seedScenarioListData(userId);
 
         mockMvc.perform(get("/api/v1/scenarios")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
@@ -135,11 +135,12 @@ class ScenarioListApiIntegrationTests {
 
     @Test
     void scenariosLockNextScenarioUntilPreviousScenarioIsCleared() throws Exception {
-        JsonNode loginBody = login();
-        seedScenarios(null);
+        JsonNode loginResponseBody = login();
+        seedScenarioListData(null);
 
         mockMvc.perform(get("/api/v1/scenarios")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + loginBody.get("data").get("accessToken").asText()))
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
@@ -152,7 +153,7 @@ class ScenarioListApiIntegrationTests {
 
     private JsonNode login() throws Exception {
         String nonce = UUID.randomUUID().toString();
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/social-login")
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -163,10 +164,10 @@ class ScenarioListApiIntegrationTests {
                                 """.formatted(UUID.randomUUID(), nonce, nonce)))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        return objectMapper.readTree(loginResult.getResponse().getContentAsByteArray());
     }
 
-    private void seedScenarios(Long userId) {
+    private void seedScenarioListData(Long clearedUserId) {
         insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
         insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
         insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
@@ -227,7 +228,7 @@ class ScenarioListApiIntegrationTests {
                 "ACTIVE"
         );
 
-        if (userId != null) {
+        if (clearedUserId != null) {
             jdbcTemplate.update("""
                             INSERT INTO user_scenario_progress (
                                 user_profile_id,
@@ -245,19 +246,19 @@ class ScenarioListApiIntegrationTests {
                             VALUES (?, 202, 'en', 'CLEARED', 2.5, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
                                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             """,
-                    userId
+                    clearedUserId
             );
         }
     }
 
-    private void insertCategory(long categoryId, int displayOrder, String status, String name) {
+    private void insertCategory(long categoryId, int displayOrder, String categoryStatus, String categoryName) {
         jdbcTemplate.update("""
                         INSERT INTO category (id, display_order, status, created_at, updated_at)
                         VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 categoryId,
                 displayOrder,
-                status
+                categoryStatus
         );
         jdbcTemplate.update("""
                         INSERT INTO category_language_variant (
@@ -270,7 +271,7 @@ class ScenarioListApiIntegrationTests {
                         VALUES (?, 'ko', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 categoryId,
-                name
+                categoryName
         );
     }
 
@@ -280,7 +281,7 @@ class ScenarioListApiIntegrationTests {
             int displayOrder,
             String firstSpeaker,
             String difficulty,
-            String status,
+            String scenarioStatus,
             String thumbnailUrl,
             String ttsVoiceSetId
     ) {
@@ -307,7 +308,7 @@ class ScenarioListApiIntegrationTests {
                 firstSpeaker,
                 thumbnailUrl,
                 displayOrder,
-                status,
+                scenarioStatus,
                 ttsVoiceSetId
         );
     }
@@ -322,7 +323,7 @@ class ScenarioListApiIntegrationTests {
             String aiOpeningMessageTranslation,
             String aiOpeningInnerThought,
             String aiOpeningInnerThoughtType,
-            String status
+            String variantStatus
     ) {
         jdbcTemplate.update("""
                         INSERT INTO scenario_language_variant (
@@ -352,7 +353,7 @@ class ScenarioListApiIntegrationTests {
                 aiOpeningMessageTranslation,
                 aiOpeningInnerThought,
                 aiOpeningInnerThoughtType,
-                status
+                variantStatus
         );
     }
 }

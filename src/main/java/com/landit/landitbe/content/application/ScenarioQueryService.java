@@ -32,48 +32,49 @@ public class ScenarioQueryService {
     /** 인증된 사용자의 시나리오 목록 응답을 조회한다. */
     @Transactional(readOnly = true)
     public ScenarioListResponse getScenarioList(long userId) {
-        List<ScenarioListRow> rows = scenarioListQueryRepository.findScenarioList(userId);
-        return new ScenarioListResponse(categoryGroups(rows).stream()
+        List<ScenarioListRow> scenarioRows = scenarioListQueryRepository.findScenarioList(userId);
+        return new ScenarioListResponse(categoryGroups(scenarioRows).stream()
                 .map(CategoryGroup::toResponse)
                 .toList());
     }
 
     /** 평탄한 조회 결과를 응답 구조에 맞게 카테고리 단위로 묶는다. */
-    private List<CategoryGroup> categoryGroups(List<ScenarioListRow> rows) {
-        Map<Long, CategoryGroup> categories = new LinkedHashMap<>();
-        for (ScenarioListRow row : rows) {
-            CategoryGroup category = categories.computeIfAbsent(
-                    row.categoryId(),
-                    ignored -> new CategoryGroup(row)
+    private List<CategoryGroup> categoryGroups(List<ScenarioListRow> scenarioRows) {
+        Map<Long, CategoryGroup> categoryGroupsById = new LinkedHashMap<>();
+        for (ScenarioListRow scenarioRow : scenarioRows) {
+            CategoryGroup categoryGroup = categoryGroupsById.computeIfAbsent(
+                    scenarioRow.categoryId(),
+                    ignored -> new CategoryGroup(scenarioRow)
             );
-            category.add(row);
+            categoryGroup.addScenarioRow(scenarioRow);
         }
-        return categories.values().stream().toList();
+        return categoryGroupsById.values().stream().toList();
     }
 
     private static ScenarioResponse toScenarioResponse(
-            ScenarioListRow row,
+            ScenarioListRow scenarioRow,
             boolean categoryLocked,
             boolean previousScenarioCompleted
     ) {
-        boolean completed = row.progressStatus() == UserScenarioProgressStatus.CLEARED;
-        boolean scenarioInactive = inactive(row.scenarioStatus()) || inactive(row.variantStatus());
-        boolean scenarioLocked = scenarioInactive || !previousScenarioCompleted;
+        boolean completed = scenarioRow.progressStatus() == UserScenarioProgressStatus.CLEARED;
+        boolean scenarioOrVariantInactive = inactive(scenarioRow.scenarioStatus())
+                || inactive(scenarioRow.variantStatus());
+        boolean scenarioLocked = scenarioOrVariantInactive || !previousScenarioCompleted;
         boolean locked = categoryLocked || scenarioLocked;
         return new ScenarioResponse(
-                row.scenarioId(),
-                starRating(completed, row.bestStarRating()),
-                row.scenarioDisplayOrder(),
-                row.scenarioTitle(),
-                row.briefing(),
-                row.conversationGoal(),
-                row.difficulty().name(),
-                row.firstSpeaker().name(),
-                row.thumbnailUrl(),
+                scenarioRow.scenarioId(),
+                completedStarRating(completed, scenarioRow.bestStarRating()),
+                scenarioRow.scenarioDisplayOrder(),
+                scenarioRow.scenarioTitle(),
+                scenarioRow.briefing(),
+                scenarioRow.conversationGoal(),
+                scenarioRow.difficulty().name(),
+                scenarioRow.firstSpeaker().name(),
+                scenarioRow.thumbnailUrl(),
                 completed,
                 locked,
-                lockReason(categoryLocked, scenarioInactive, previousScenarioCompleted),
-                openingPreview(row, locked)
+                lockReason(categoryLocked, scenarioOrVariantInactive, previousScenarioCompleted),
+                openingPreview(scenarioRow, locked)
         );
     }
 
@@ -94,35 +95,35 @@ public class ScenarioQueryService {
         return null;
     }
 
-    private static BigDecimal starRating(boolean completed, BigDecimal bestStarRating) {
+    private static BigDecimal completedStarRating(boolean completed, BigDecimal bestStarRating) {
         if (!completed || bestStarRating == null) {
             return null;
         }
         return bestStarRating;
     }
 
-    private static OpeningPreviewResponse openingPreview(ScenarioListRow row, boolean locked) {
+    private static OpeningPreviewResponse openingPreview(ScenarioListRow scenarioRow, boolean locked) {
         if (locked) {
             return null;
         }
         // 첫 발화자가 AI인 경우에만 AI 시작 메시지와 속마음을 미리보기로 내려준다.
-        if (row.firstSpeaker() == ConversationSpeaker.AI) {
+        if (scenarioRow.firstSpeaker() == ConversationSpeaker.AI) {
             return new OpeningPreviewResponse(
-                    row.aiOpeningMessage(),
-                    row.aiOpeningMessageTranslation(),
+                    scenarioRow.aiOpeningMessage(),
+                    scenarioRow.aiOpeningMessageTranslation(),
                     null,
-                    row.innerThought(),
-                    row.innerThoughtType() == null ? null : row.innerThoughtType().name(),
-                    row.ttsVoiceSetId()
+                    scenarioRow.innerThought(),
+                    scenarioRow.innerThoughtType() == null ? null : scenarioRow.innerThoughtType().name(),
+                    scenarioRow.ttsVoiceSetId()
             );
         }
         return new OpeningPreviewResponse(
                 null,
                 null,
-                row.userOpeningInstruction(),
+                scenarioRow.userOpeningInstruction(),
                 null,
                 null,
-                row.ttsVoiceSetId()
+                scenarioRow.ttsVoiceSetId()
         );
     }
 
@@ -136,30 +137,34 @@ public class ScenarioQueryService {
             int displayOrder,
             boolean categoryLocked,
             String categoryLockReason,
-            List<ScenarioListRow> rows
+            List<ScenarioListRow> scenarioRows
     ) {
 
-        /** 카테고리 메타데이터는 같은 카테고리의 첫 row에서 가져오고, 시나리오는 이후에 누적한다. */
-        private CategoryGroup(ScenarioListRow row) {
+        /** 카테고리 메타데이터는 같은 카테고리의 첫 조회 결과에서 가져오고, 시나리오는 이후에 누적한다. */
+        private CategoryGroup(ScenarioListRow firstScenarioRow) {
             this(
-                    row.categoryId(),
-                    row.categoryName(),
-                    row.categoryDisplayOrder(),
-                    inactive(row.categoryStatus()),
-                    inactive(row.categoryStatus()) ? CATEGORY_LOCK_REASON : null,
+                    firstScenarioRow.categoryId(),
+                    firstScenarioRow.categoryName(),
+                    firstScenarioRow.categoryDisplayOrder(),
+                    inactive(firstScenarioRow.categoryStatus()),
+                    inactive(firstScenarioRow.categoryStatus()) ? CATEGORY_LOCK_REASON : null,
                     new ArrayList<>()
             );
         }
 
-        private void add(ScenarioListRow row) {
-            rows.add(row);
+        private void addScenarioRow(ScenarioListRow scenarioRow) {
+            scenarioRows.add(scenarioRow);
         }
 
         private CategoryResponse toResponse() {
             List<ScenarioResponse> scenarios = new ArrayList<>();
             boolean previousScenarioCompleted = true;
-            for (ScenarioListRow row : rows) {
-                ScenarioResponse scenario = toScenarioResponse(row, categoryLocked, previousScenarioCompleted);
+            for (ScenarioListRow scenarioRow : scenarioRows) {
+                ScenarioResponse scenario = toScenarioResponse(
+                        scenarioRow,
+                        categoryLocked,
+                        previousScenarioCompleted
+                );
                 scenarios.add(scenario);
                 previousScenarioCompleted = scenario.completed();
             }
