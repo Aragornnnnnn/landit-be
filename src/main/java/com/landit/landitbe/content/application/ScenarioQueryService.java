@@ -94,11 +94,11 @@ public class ScenarioQueryService {
         return null;
     }
 
-    private static BigDecimal starRating(boolean completed, Integer bestStarRating) {
+    private static BigDecimal starRating(boolean completed, BigDecimal bestStarRating) {
         if (!completed || bestStarRating == null) {
             return null;
         }
-        return BigDecimal.valueOf(bestStarRating + 1L).divide(BigDecimal.valueOf(2L));
+        return bestStarRating;
     }
 
     private static OpeningPreviewResponse openingPreview(ScenarioListRow row, boolean locked) {

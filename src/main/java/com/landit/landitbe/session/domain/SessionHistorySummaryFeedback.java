@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "session_history_summary_feedback")
@@ -30,7 +31,7 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
     private Integer nativeScore;
 
     @Column(name = "star_rating")
-    private Integer starRating;
+    private BigDecimal starRating;
 
     @Column(name = "total_message_count")
     private Integer totalMessageCount;

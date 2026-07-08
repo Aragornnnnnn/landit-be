@@ -242,7 +242,7 @@ class ScenarioListApiIntegrationTests {
                                 created_at,
                                 updated_at
                             )
-                            VALUES (?, 202, 'en', 'CLEARED', 4, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                            VALUES (?, 202, 'en', 'CLEARED', 2.5, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
                                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             """,
                     userId

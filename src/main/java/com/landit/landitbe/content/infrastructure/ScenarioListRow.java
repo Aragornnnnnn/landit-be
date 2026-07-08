@@ -6,6 +6,7 @@ import com.landit.landitbe.common.domain.ConversationSpeaker;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.content.domain.ScenarioDifficulty;
 import com.landit.landitbe.learning.domain.UserScenarioProgressStatus;
+import java.math.BigDecimal;
 
 public record ScenarioListRow(
         Long categoryId,
@@ -29,6 +30,6 @@ public record ScenarioListRow(
         InnerThoughtType innerThoughtType,
         String ttsVoiceSetId,
         UserScenarioProgressStatus progressStatus,
-        Integer bestStarRating
+        BigDecimal bestStarRating
 ) {
 }
