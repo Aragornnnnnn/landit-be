@@ -11,7 +11,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(name = "session_history")
 public class SessionHistory extends BaseCreatedAtEntity {
@@ -53,4 +55,48 @@ public class SessionHistory extends BaseCreatedAtEntity {
 
     protected SessionHistory() {
     }
+
+    private SessionHistory(
+            Long learningSessionId,
+            Long userProfileId,
+            SessionType sessionType,
+            String targetLocale,
+            String baseLocale,
+            LocalDateTime startedAt,
+            LocalDateTime endedAt,
+            int durationSeconds,
+            int userMessageCount
+    ) {
+        this.learningSessionId = learningSessionId;
+        this.userProfileId = userProfileId;
+        this.sessionType = sessionType;
+        this.targetLocale = targetLocale;
+        this.baseLocale = baseLocale;
+        this.startedAt = startedAt;
+        this.endedAt = endedAt;
+        this.durationSeconds = durationSeconds;
+        this.userMessageCount = userMessageCount;
+    }
+
+    /** 시작 메시지를 저장할 세션 히스토리 컨테이너를 생성한다. */
+    public static SessionHistory startedScenario(
+            Long learningSessionId,
+            Long userProfileId,
+            String targetLocale,
+            String baseLocale,
+            LocalDateTime startedAt
+    ) {
+        return new SessionHistory(
+                learningSessionId,
+                userProfileId,
+                SessionType.SCENARIO,
+                targetLocale,
+                baseLocale,
+                startedAt,
+                startedAt,
+                0,
+                0
+        );
+    }
+
 }

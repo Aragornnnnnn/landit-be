@@ -11,7 +11,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(name = "learning_session")
 public class LearningSession extends BaseTimeEntity {
@@ -60,4 +62,58 @@ public class LearningSession extends BaseTimeEntity {
 
     protected LearningSession() {
     }
+
+    private LearningSession(
+            Long userProfileId,
+            SessionType sessionType,
+            Long aiTutorId,
+            String targetLocale,
+            String baseLocale,
+            InputMode inputMode,
+            LearningSessionStatus status,
+            LocalDateTime startedAt
+    ) {
+        this.userProfileId = userProfileId;
+        this.sessionType = sessionType;
+        this.aiTutorId = aiTutorId;
+        this.targetLocale = targetLocale;
+        this.baseLocale = baseLocale;
+        this.inputMode = inputMode;
+        this.status = status;
+        this.startedAt = startedAt;
+    }
+
+    /** 시나리오 학습 세션을 진행 중 상태로 생성한다. */
+    public static LearningSession startScenario(
+            Long userProfileId,
+            Long aiTutorId,
+            String targetLocale,
+            String baseLocale,
+            LocalDateTime startedAt
+    ) {
+        return new LearningSession(
+                userProfileId,
+                SessionType.SCENARIO,
+                aiTutorId,
+                targetLocale,
+                baseLocale,
+                InputMode.MIXED,
+                LearningSessionStatus.IN_PROGRESS,
+                startedAt
+        );
+    }
+
+    /** 사용자가 진행 중인 세션을 중도 종료한다. */
+    public void interruptByUser(LocalDateTime endedAt) {
+        this.status = LearningSessionStatus.INTERRUPTED;
+        this.endedBy = SessionEndActor.USER;
+        this.completionReason = CompletionReason.USER_ENDED;
+        this.endedAt = endedAt;
+    }
+
+    /** 세션이 진행 중인지 반환한다. */
+    public boolean isInProgress() {
+        return status == LearningSessionStatus.IN_PROGRESS;
+    }
+
 }
