@@ -149,6 +149,28 @@ class DatabaseSchemaIntegrationTests {
         assertColumnExists("user_writing_expression_completion", "scenario_id");
     }
 
+    @DisplayName("시나리오 고정 질문 콘텐츠 테이블을 최신 migration으로 추가한다.")
+    @Test
+    void scenarioQuestionTablesAreAppliedByLatestMigration() {
+        assertTableExists("scenario_question");
+        assertColumnExists("scenario_question", "scenario_id");
+        assertColumnExists("scenario_question", "display_order");
+        assertColumnExists("scenario_question", "status");
+        assertTableConstraintExists("scenario_question", "uk_scenario_question_scenario_order");
+
+        assertTableExists("scenario_question_language_variant");
+        assertColumnExists("scenario_question_language_variant", "scenario_question_id");
+        assertColumnExists("scenario_question_language_variant", "target_locale");
+        assertColumnExists("scenario_question_language_variant", "base_locale");
+        assertColumnExists("scenario_question_language_variant", "question_text");
+        assertColumnExists("scenario_question_language_variant", "question_translation");
+        assertColumnExists("scenario_question_language_variant", "status");
+        assertTableConstraintExists(
+                "scenario_question_language_variant",
+                "uk_scenario_question_lang"
+        );
+    }
+
     private void assertTableExists(String tableName) {
         Integer tableCount = jdbcTemplate.queryForObject(
                 """
@@ -221,6 +243,24 @@ class DatabaseSchemaIntegrationTests {
         );
 
         assertThat(indexCount).as("index %s", indexName).isEqualTo(1);
+    }
+
+    private void assertTableConstraintExists(String tableName, String constraintName) {
+        Integer constraintCount = jdbcTemplate.queryForObject(
+                """
+                        select count(*)
+                        from information_schema.table_constraints
+                        where lower(table_name) = ?
+                          and lower(constraint_name) = ?
+                        """,
+                Integer.class,
+                tableName,
+                constraintName
+        );
+
+        assertThat(constraintCount)
+                .as("constraint %s.%s", tableName, constraintName)
+                .isEqualTo(1);
     }
 
     private String readMigrationSql(String path) throws Exception {
