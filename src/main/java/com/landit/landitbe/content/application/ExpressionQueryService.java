@@ -1,7 +1,10 @@
-// 시나리오별 Writing 표현 목록을 사용자 완료 여부와 함께 조회한다.
+// 원어민 표현 조회(시나리오별 목록, 학습 시작 상세)를 담당한다.
 package com.landit.landitbe.content.application;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
+import com.landit.landitbe.common.exception.ApiException;
+import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.content.api.dto.ExpressionLearningResponse;
 import com.landit.landitbe.content.api.dto.ExpressionResponse;
 import com.landit.landitbe.content.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.content.domain.WritingExpression;
@@ -47,6 +50,15 @@ public class ExpressionQueryService {
                 .toList();
     }
 
+    /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없으면 RESOURCE_NOT_FOUND 예외를 던진다. */
+    @Transactional(readOnly = true)
+    public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
+        WritingExpression expression = writingExpressionRepository.findById(expressionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        return toLearningResponse(expression);
+    }
+
     /** 미완료 표현 중 학습 순서가 가장 앞선 표현의 ID를 반환한다. 모두 완료했으면 빈 값을 반환한다. */
     private Optional<Long> firstIncompleteExpressionId(
             List<WritingExpression> expressions,
@@ -80,6 +92,22 @@ public class ExpressionQueryService {
                 expression.getBaseExpressionMeaningText(),
                 completed,
                 locked
+        );
+    }
+
+    /** Writing 표현 엔티티를 학습 시작 응답 DTO로 변환한다. */
+    private ExpressionLearningResponse toLearningResponse(WritingExpression expression) {
+        return new ExpressionLearningResponse(
+                expression.getId(),
+                expression.getTargetExpressionText(),
+                expression.getBaseExpressionMeaningText(),
+                expression.getUsageDescription(),
+                expression.getRepresentativeQuestionText(),
+                expression.getRepresentativeQuestionTranslation(),
+                expression.getRepresentativeSentenceText(),
+                expression.getRepresentativeSentenceTranslation(),
+                expression.getRepresentativeSentenceTranslationHighlightText(),
+                expression.getRepresentativeImageUrl()
         );
     }
 }
