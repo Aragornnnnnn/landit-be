@@ -1,4 +1,4 @@
-// 학습 세션 API 요청을 처리한다.
+// 시나리오에서 학습 세션을 시작하는 API 요청을 처리한다.
 package com.landit.landitbe.session.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
@@ -18,11 +18,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/scenarios")
 @RequiredArgsConstructor
 @RestController
-@Tag(name = "Session", description = "학습 세션 API")
-public class SessionController {
+@Tag(name = "Scenario Session", description = "시나리오 세션 API")
+public class ScenarioSessionController {
 
     private final ScenarioSessionStartUseCase scenarioSessionStartUseCase;
 
@@ -41,7 +41,7 @@ public class SessionController {
                     description = "시나리오 없음"
             )
     })
-    @PostMapping("/scenarios/{scenarioId}/sessions")
+    @PostMapping("/{scenarioId}/sessions")
     public ResponseEntity<ApiResponse<SessionStartResponse>> startScenarioSession(
             @AuthenticationPrincipal AuthUserPrincipal principal,
             @PathVariable Long scenarioId

@@ -29,6 +29,7 @@
 - [x] 시나리오 세션 시작 UseCase와 세션 중도 종료 UseCase 분리.
 - [x] Swagger Docs Interface 분리는 별도 이슈 범위로 분리.
 - [x] 리뷰 반영 후 관련 테스트 재실행.
+- [x] API 리소스 경계에 맞춰 시나리오 세션 시작 Controller와 세션 종료 Controller를 분리.
 
 ## 2026-07-09 후속 PR rebase
 
