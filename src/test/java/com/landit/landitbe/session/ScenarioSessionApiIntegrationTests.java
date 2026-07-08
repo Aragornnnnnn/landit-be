@@ -10,8 +10,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,6 +183,130 @@ class ScenarioSessionApiIntegrationTests {
                 sessionId
         );
         assertThat(messageCount).isZero();
+    }
+
+    @Test
+    void startScenarioHandlesConcurrentProgressCreationForSameUser() throws Exception {
+        JsonNode loginBody = login("concurrent-start@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9010);
+        assignAiTutor(userId, 9010);
+        seedCategory(1010, 1, "ACTIVE", "동시 시작");
+        seedScenario(2010, 1010, 1, "USER", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                3010,
+                2010,
+                "동시 시작",
+                "동시 시작",
+                "동시 시작",
+                "먼저 말해보세요.",
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        Callable<Integer> startRequest = () -> {
+            ready.countDown();
+            assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+            return mockMvc.perform(post("/api/v1/scenarios/2010/sessions")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+        };
+
+        try {
+            Future<Integer> first = executorService.submit(startRequest);
+            Future<Integer> second = executorService.submit(startRequest);
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(List.of(
+                    first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS)
+            )).containsExactlyInAnyOrder(201, 201);
+        } finally {
+            executorService.shutdownNow();
+        }
+
+        Integer progressCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM user_scenario_progress
+                        WHERE user_profile_id = ?
+                          AND scenario_id = ?
+                          AND target_locale = 'en'
+                        """,
+                Integer.class,
+                userId,
+                2010
+        );
+        assertThat(progressCount).isEqualTo(1);
+    }
+
+    @Test
+    void startScenarioRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/scenarios/2001/sessions"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+    }
+
+    @Test
+    void startScenarioRejectsMissingScenario() throws Exception {
+        JsonNode loginBody = login("missing-scenario@example.com");
+
+        mockMvc.perform(post("/api/v1/scenarios/999999/sessions")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("SCENARIO_NOT_FOUND"));
+    }
+
+    @Test
+    void startScenarioRejectsInactiveCategory() throws Exception {
+        JsonNode loginBody = login("locked-category@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        seedAiTutor(9003);
+        assignAiTutor(userId, 9003);
+        seedCategory(1003, 1, "INACTIVE", "잠긴 카테고리");
+        seedScenario(2003, 1003, 1, "AI", "ACTIVE", 2, null);
+        seedScenarioVariant(3003, 2003, "잠김", "잠김", "잠김", null, "Hello", "안녕", null, null, "ACTIVE");
+
+        mockMvc.perform(post("/api/v1/scenarios/2003/sessions")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("CATEGORY_LOCKED"));
+    }
+
+    @Test
+    void startScenarioRejectsPreviousScenarioNotCleared() throws Exception {
+        JsonNode loginBody = login("locked-scenario@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        seedAiTutor(9004);
+        assignAiTutor(userId, 9004);
+        seedCategory(1004, 1, "ACTIVE", "순차 카테고리");
+        seedScenario(2004, 1004, 1, "AI", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                3004, 2004, "첫번째", "첫번째", "첫번째", null, "First", "첫번째", null, null, "ACTIVE"
+        );
+        seedScenario(2005, 1004, 2, "AI", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                3005, 2005, "두번째", "두번째", "두번째", null, "Second", "두번째", null, null, "ACTIVE"
+        );
+
+        mockMvc.perform(post("/api/v1/scenarios/2005/sessions")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("SCENARIO_LOCKED"))
+                .andExpect(jsonPath("$.error.message").value("PREVIOUS_SCENARIO_NOT_COMPLETED"));
     }
 
     private JsonNode login(String email) throws Exception {
