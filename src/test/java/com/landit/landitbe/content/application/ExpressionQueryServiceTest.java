@@ -374,6 +374,97 @@ class ExpressionQueryServiceTest {
         assertThat(response.practiceSentence().get(1).imageUrl()).isEqualTo("https://cdn.example.com/practice/1.png");
     }
 
+    /**
+     * 기획자가 시딩한 예문에 필수 키가 빠졌거나 값이 비어 있으면, 그 예문만 응답에서 제외하고 경고 로그를 남긴다.
+     * (빈 예문 카드/빈 작문 문제가 사용자에게 노출되는 것을 막고, 로그로 데이터 오류를 추적한다)
+     */
+    @Test
+    void 필수_키가_빠지거나_빈_예문은_목록에서_제외되고_경고_로그를_남긴다() {
+        // given: 로그 검증용 ListAppender 부착
+        Logger logger = (Logger) LoggerFactory.getLogger(ExpressionQueryService.class);
+        ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+
+        // given: 정상 2개 + 불량 3개(sentenceText 키 누락 / practiceQuestion 빈 문자열 / sentenceTranslation null)가 섞인 payload
+        WritingExpression expression = makeWritingExpressionMockWithInfo(toJson("""
+                [
+                  {
+                    "sentenceText": "valid sentence 1",
+                    "highlightingPart": "valid-1",
+                    "sentenceTranslation": "정상 예문 1",
+                    "practiceQuestion": "question-1?",
+                    "practiceQuestionTranslation": "질문 1?"
+                  },
+                  {
+                    "highlightingPart": "missing-text",
+                    "sentenceTranslation": "sentenceText 키가 없음",
+                    "practiceQuestion": "question?",
+                    "practiceQuestionTranslation": "질문?"
+                  },
+                  {
+                    "sentenceText": "blank question sentence",
+                    "highlightingPart": "blank-question",
+                    "sentenceTranslation": "practiceQuestion이 빈 문자열",
+                    "practiceQuestion": "",
+                    "practiceQuestionTranslation": "질문?"
+                  },
+                  {
+                    "sentenceText": "null translation sentence",
+                    "highlightingPart": "null-translation",
+                    "sentenceTranslation": null,
+                    "practiceQuestion": "question?",
+                    "practiceQuestionTranslation": "질문?"
+                  },
+                  {
+                    "sentenceText": "valid sentence 2",
+                    "highlightingPart": "valid-2",
+                    "sentenceTranslation": "정상 예문 2",
+                    "practiceQuestion": "question-2?",
+                    "practiceQuestionTranslation": "질문 2?"
+                  }
+                ]
+                """));
+        when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE)).thenReturn(Optional.of(expression));
+
+        // when
+        ExpressionPracticeResponse response = expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+
+        // then: 불량 예문 3개는 제외되고 정상 예문 2개만 남는다
+        assertThat(response.practiceSentence()).hasSize(2);
+        assertThat(response.practiceSentence())
+                .extracting(PracticeSentenceResponse::sentenceText)
+                .containsExactly("valid sentence 1", "valid sentence 2");
+
+        // then: 어떤 표현의 예문이 불량인지 warn 로그가 남는다
+        assertThat(logAppender.list)
+                .anySatisfy(event -> {
+                    assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                    assertThat(event.getFormattedMessage()).contains(String.valueOf(EXPRESSION_ID));
+                });
+
+        logger.detachAppender(logAppender);
+    }
+
+    /** 모든 예문이 불량이면(제외 후 0개) 작문 문제를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
+    @Test
+    void 모든_예문이_불량이면_RESOURCE_NOT_FOUND_예외를_던진다() {
+        // given: 전부 필수 키가 빠진 payload
+        WritingExpression expression = makeWritingExpressionMock(toJson("""
+                [
+                  { "highlightingPart": "only-highlight" },
+                  { "sentenceTranslation": "해석만 있음" }
+                ]
+                """));
+        when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE)).thenReturn(Optional.of(expression));
+
+        // when & then
+        assertThatThrownBy(() -> expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID))
+                .isInstanceOf(ApiException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
     // ===== 추가 예문 테스트용 헬퍼 =====
 
     /** payload만 스터빙한 표현 mock. (표현 정보 getter까지 스터빙하면, 호출 안 되는 테스트에서 Mockito가 불필요 스터빙 오류를 내므로 분리) */

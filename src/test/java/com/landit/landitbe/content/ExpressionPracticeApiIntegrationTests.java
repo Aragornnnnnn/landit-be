@@ -132,6 +132,61 @@ class ExpressionPracticeApiIntegrationTests {
                 .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
     }
 
+    /** 필수 키가 빠진 불량 예문은 응답에서 제외되고 정상 예문만 반환되는지 검증한다. (빈 예문 카드 노출 방지) */
+    @Test
+    void practiceExcludesInvalidSentences() throws Exception {
+        // given: 정상 예문 4개 + sentenceText가 없는 불량 예문 1개가 섞인 payload로 시딩
+        String payloadWithInvalidSentence = """
+                [
+                  {
+                    "sentenceText": "valid-sentence-0",
+                    "highlightingPart": "valid-0",
+                    "sentenceTranslation": "정상 예문 0",
+                    "practiceQuestion": "question-0?",
+                    "practiceQuestionTranslation": "질문 0?"
+                  },
+                  {
+                    "sentenceText": "valid-sentence-1",
+                    "highlightingPart": "valid-1",
+                    "sentenceTranslation": "정상 예문 1",
+                    "practiceQuestion": "question-1?",
+                    "practiceQuestionTranslation": "질문 1?"
+                  },
+                  {
+                    "sentenceText": "valid-sentence-2",
+                    "highlightingPart": "valid-2",
+                    "sentenceTranslation": "정상 예문 2",
+                    "practiceQuestion": "question-2?",
+                    "practiceQuestionTranslation": "질문 2?"
+                  },
+                  {
+                    "sentenceText": "valid-sentence-3",
+                    "highlightingPart": "valid-3",
+                    "sentenceTranslation": "정상 예문 3",
+                    "practiceQuestion": "question-3?",
+                    "practiceQuestionTranslation": "질문 3?"
+                  },
+                  {
+                    "highlightingPart": "invalid",
+                    "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
+                    "practiceQuestion": "invalid?",
+                    "practiceQuestionTranslation": "불량?"
+                  }
+                ]
+                """;
+        Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payloadWithInvalidSentence);
+        String accessToken = login("google-practice-4", "practice4@example.com", "Practice User4", "practice-nonce-4");
+
+        // when: 조회하면
+        // then: 불량 예문은 제외되어 정상 4개만 반환된다.
+        mockMvc.perform(get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+                .andExpect(jsonPath("$.data.practiceSentence[*].highlightingPart").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("invalid"))));
+    }
+
     /**
      * 테스트용 Writing 표현 1건을 "추가 예문 4개가 담긴 payload"와 함께 DB에 심고 그 표현의 PK를 반환한다.
      *
@@ -145,6 +200,11 @@ class ExpressionPracticeApiIntegrationTests {
 
     /** status를 지정해 표현을 심는 버전. INACTIVE(내려간 콘텐츠) 케이스 검증에 사용한다. */
     private Long seedExpressionWithPracticeExamples(String status) {
+        return seedExpressionWithPracticeExamples(status, practiceExamplesPayloadJson());
+    }
+
+    /** payload JSON까지 지정해 표현을 심는 버전. 불량 예문 케이스 검증에 사용한다. */
+    private Long seedExpressionWithPracticeExamples(String status, String payloadJson) {
         LocalDateTime now = LocalDateTime.now();
 
         // 1) 최상위 부모: category
@@ -176,7 +236,7 @@ class ExpressionPracticeApiIntegrationTests {
                         + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
                         + "'representative sentence', '대표 예문 해석', '대표 강조', "
                         + "? FORMAT JSON, ?, ?, ?)",
-                scenarioId, practiceExamplesPayloadJson(), status, now, now
+                scenarioId, payloadJson, status, now, now
         );
     }
 
