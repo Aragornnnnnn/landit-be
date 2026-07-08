@@ -26,7 +26,7 @@ import com.landit.landitbe.session.infrastructure.ScenarioSessionStartRow;
 import com.landit.landitbe.session.infrastructure.SessionHistoryMessageRepository;
 import com.landit.landitbe.session.infrastructure.SessionHistoryRepository;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,27 +111,20 @@ public class ScenarioSessionStartUseCase {
     }
 
     /**
-     * 같은 카테고리 안에서 displayOrder 기준 이전 시나리오
-     * 완료 여부를 확인한다.
+     * 같은 카테고리 안에서 displayOrder 기준 직전 시나리오
+     * 완료 여부만 확인한다.
      */
     private void assertPreviousScenarioCleared(long userId, ScenarioSessionStartRow startRow) {
-        List<ScenarioSessionLockRow> rows = scenarioSessionStartQueryRepository
-                .findCategoryLockRows(
-                        userId,
-                        startRow.categoryId()
-                );
-        boolean previousScenarioCompleted = true;
-        for (ScenarioSessionLockRow row : rows) {
-            if (row.scenarioId().equals(startRow.scenarioId())) {
-                if (!previousScenarioCompleted) {
-                    throw new ApiException(
-                            ErrorCode.SCENARIO_LOCKED,
-                            PREVIOUS_SCENARIO_NOT_COMPLETED
-                    );
-                }
-                return;
-            }
-            previousScenarioCompleted = row.progressStatus() == UserScenarioProgressStatus.CLEARED;
+        Optional<ScenarioSessionLockRow> previousScenario = scenarioSessionStartQueryRepository
+                .findPreviousScenarioLockRow(userId, startRow.scenarioId());
+        if (previousScenario.isEmpty()) {
+            return;
+        }
+        if (previousScenario.get().progressStatus() != UserScenarioProgressStatus.CLEARED) {
+            throw new ApiException(
+                    ErrorCode.SCENARIO_LOCKED,
+                    PREVIOUS_SCENARIO_NOT_COMPLETED
+            );
         }
     }
 

@@ -30,6 +30,7 @@
 - 리뷰 반영 후 `git diff --check`, `./gradlew test --tests com.landit.landitbe.session.ScenarioSessionApiIntegrationTests`, `./gradlew test`를 실행했고 모두 통과했다.
 - 세션 시작과 중도 종료는 API 단위와 의존 Repository가 다르므로 `ScenarioSessionStartUseCase`와 `SessionEndUseCase`로 분리한다.
 - API adapter도 리소스 경계를 맞춘다. 시나리오 하위에서 세션을 생성하는 API는 `/api/v1/scenarios` prefix의 `ScenarioSessionController`가 담당하고, 기존 세션을 조작하는 API는 `/api/v1/sessions` prefix의 `SessionController`가 담당한다.
+- 시나리오 순차 잠금은 시작하려는 시나리오의 직전 displayOrder 시나리오 완료 여부만 필요하므로, 카테고리 전체 시나리오를 조회하지 않고 직전 시나리오 1개만 조회한다.
 
 ## 2026-07-09
 

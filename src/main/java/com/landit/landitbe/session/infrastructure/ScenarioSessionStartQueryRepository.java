@@ -2,7 +2,6 @@
 package com.landit.landitbe.session.infrastructure;
 
 import com.landit.landitbe.content.domain.Scenario;
-import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -44,28 +43,35 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
             @Param("scenarioId") long scenarioId
     );
 
-    /** 같은 카테고리 안의 사용자별 완료 상태를 displayOrder 순서로 조회한다. */
+    /** 시작할 시나리오의 직전 displayOrder 시나리오 완료 상태를 조회한다. */
     @Query("""
             SELECT new com.landit.landitbe.session.infrastructure.ScenarioSessionLockRow(
-                s.id,
+                previousScenario.id,
                 usp.status
             )
             FROM UserProfile up
-            JOIN Scenario s
-              ON s.categoryId = :categoryId
-            JOIN ScenarioLanguageVariant slv
-              ON slv.scenarioId = s.id
-             AND slv.targetLocale = up.targetLocale
-             AND slv.baseLocale = up.baseLocale
+            JOIN Scenario currentScenario
+              ON currentScenario.id = :scenarioId
+            JOIN Scenario previousScenario
+              ON previousScenario.categoryId = currentScenario.categoryId
+             AND previousScenario.displayOrder = (
+                SELECT MAX(candidate.displayOrder)
+                FROM Scenario candidate
+                JOIN ScenarioLanguageVariant candidateVariant
+                  ON candidateVariant.scenarioId = candidate.id
+                 AND candidateVariant.targetLocale = up.targetLocale
+                 AND candidateVariant.baseLocale = up.baseLocale
+                WHERE candidate.categoryId = currentScenario.categoryId
+                  AND candidate.displayOrder < currentScenario.displayOrder
+             )
             LEFT JOIN UserScenarioProgress usp
               ON usp.userProfileId = up.id
-             AND usp.scenarioId = s.id
+             AND usp.scenarioId = previousScenario.id
              AND usp.targetLocale = up.targetLocale
             WHERE up.id = :userId
-            ORDER BY s.displayOrder ASC
             """)
-    List<ScenarioSessionLockRow> findCategoryLockRows(
+    Optional<ScenarioSessionLockRow> findPreviousScenarioLockRow(
             @Param("userId") long userId,
-            @Param("categoryId") long categoryId
+            @Param("scenarioId") long scenarioId
     );
 }
