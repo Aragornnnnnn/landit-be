@@ -11,7 +11,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(name = "user_profile")
 public class UserProfile extends BaseTimeEntity {
@@ -94,20 +96,5 @@ public class UserProfile extends BaseTimeEntity {
     /** 활성 사용자인지 확인한다. */
     public boolean isActive() {
         return status == UserProfileStatus.ACTIVE;
-    }
-
-    /** 사용자 PK를 반환한다. */
-    public Long getId() {
-        return id;
-    }
-
-    /** 사용자 이메일을 반환한다. */
-    public String getEmail() {
-        return email;
-    }
-
-    /** 사용자 닉네임을 반환한다. */
-    public String getNickname() {
-        return nickname;
     }
 }
