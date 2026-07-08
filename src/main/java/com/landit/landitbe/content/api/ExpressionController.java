@@ -6,6 +6,8 @@ import com.landit.landitbe.common.response.ApiResponse;
 import com.landit.landitbe.content.api.dto.ExpressionResponse;
 import com.landit.landitbe.content.application.ExpressionQueryService;
 import java.util.List;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,13 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequestMapping("/api/v1/expressions")
 @RestController
+@RequiredArgsConstructor
 public class ExpressionController {
 
     private final ExpressionQueryService expressionQueryService;
-
-    public ExpressionController(ExpressionQueryService expressionQueryService) {
-        this.expressionQueryService = expressionQueryService;
-    }
 
     /**
      * 시나리오별 추가학습용 원어민 표현을 학습 순서대로 조회한다.
