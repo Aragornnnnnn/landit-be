@@ -27,7 +27,7 @@ public class WritingExpression extends BaseTimeEntity {
     private Long scenarioId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "expression_type", nullable = false, length = 20)
+    @Column(name = "expression_type", nullable = false, length = 30)
     private WritingExpressionType expressionType;
 
     @Enumerated(EnumType.STRING)
