@@ -8,8 +8,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import lombok.Getter;
 
 @Entity
+@Getter
 @Table(name = "user_writing_expression_completion")
 public class UserWritingExpressionCompletion {
 
