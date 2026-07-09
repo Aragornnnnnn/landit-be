@@ -18,6 +18,8 @@ management:
         include: health,info
 
 landit:
+  cors:
+    allowed-origins: ${LANDIT_CORS_ALLOWED_ORIGINS:}
   auth:
     oidc:
       google-audiences: ${LANDIT_AUTH_OIDC_GOOGLE_AUDIENCES:}
