@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,7 +35,7 @@ public class UserScenarioProgress extends BaseTimeEntity {
     private UserScenarioProgressStatus status;
 
     @Column(name = "best_star_rating")
-    private Integer bestStarRating;
+    private BigDecimal bestStarRating;
 
     @Column(name = "best_native_score")
     private Integer bestNativeScore;

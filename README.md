@@ -24,8 +24,7 @@ Landit 백엔드 서버입니다. Java 21과 Spring Boot 4 기반으로 REST API
 
 - [기여 및 협업 규칙](CONTRIBUTING.md)
 - [백엔드 아키텍처](docs/architecture/backend.md)
-- [작업 체크리스트](checklist.md)
-- [컨텍스트 노트](context-notes.md)
+- [작업별 노트](docs/tasks/README.md)
 - [초기 BE 설정 실행 계획](docs/superpowers/plans/2026-06-28-initial-be-setup.md)
 - [dev GitHub Actions 배포 실행 계획](docs/superpowers/plans/2026-07-04-dev-github-actions-deploy.md)
 

@@ -1,0 +1,39 @@
+# LAN-62 시나리오 목록 API 체크리스트
+
+- [x] `feat/LAN-62` 브랜치와 프로젝트 문서 확인.
+- [x] 기존 시나리오, 카테고리, 사용자 진행도, 인증 구조 확인.
+- [x] 실행 계획 문서 작성.
+- [x] Scenario 목록 API 통합 테스트를 먼저 추가하고 실패 확인.
+- [x] `GET /api/v1/scenarios` API 구현.
+- [x] 카테고리와 시나리오를 `displayOrder` 기준으로 정렬.
+- [x] 사용자별 완료 여부와 별점 응답 추가.
+- [x] 카테고리/시나리오 잠금 여부와 잠금 사유 응답 추가.
+- [x] AI first, USER first `openingPreview` 응답 분기 구현.
+- [x] 인증 실패 401 응답 처리.
+- [x] 서비스 잠금 계산과 통합 테스트 중복 축소.
+- [x] 시나리오 목록 API Swagger 문서 annotation 추가.
+- [x] 관련 테스트 실행.
+- [x] `./gradlew test` 실행.
+- [x] 논리 단위 커밋 생성.
+- [x] 작업 기록을 `docs/tasks/LAN-62/`로 분리.
+- [x] 작업별 노트 규칙을 문서에 반영.
+- [x] SayNow BE 기준 카테고리별 displayOrder 순차 해금 규칙 확인.
+- [x] 이전 시나리오 미완료 시 다음 시나리오가 잠기는 테스트 추가.
+- [x] 이전 시나리오 완료 시 다음 시나리오가 열리는 테스트 추가.
+- [x] `ScenarioQueryService` 잠금 계산을 사용자 진행도 기반으로 수정.
+- [x] 관련 테스트와 전체 테스트 실행.
+- [x] 논리 단위 커밋 생성.
+- [x] 별점 저장 스케일을 FE 별점 스케일인 1.0~3.0으로 정정.
+- [x] 별점 컬럼 decimal 전환 migration 추가.
+- [x] 시나리오 목록 API 별점 변환 로직 제거.
+- [x] 별점 스케일 관련 테스트와 전체 테스트 실행.
+
+## 2026-07-09 PR #3 충돌 해소
+
+- [x] `origin/develop` 최신 커밋을 확인한다.
+- [x] `feat/LAN-62`를 `origin/develop` 위로 rebase한다.
+- [x] 충돌 파일을 실제 변경 의도 기준으로 병합한다.
+- [x] `git diff --check`를 실행한다.
+- [x] 관련 테스트와 전체 테스트를 실행한다.
+- [x] `feat/LAN-62`를 `--force-with-lease`로 push한다.
+- [x] PR #3 mergeable 상태를 재확인한다.
