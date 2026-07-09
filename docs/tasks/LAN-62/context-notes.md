@@ -31,3 +31,11 @@
 - 별점 check constraint는 null 또는 `1.0`, `1.5`, `2.0`, `2.5`, `3.0`만 허용한다.
 - Java 엔티티와 projection의 별점 타입은 `Integer`가 아니라 `BigDecimal`로 맞춘다.
 - 시나리오 목록 응답은 DB 값을 별도 변환하지 않고 그대로 반환한다.
+
+## 2026-07-09
+
+- PR #3은 `feat/LAN-62`에서 `develop`으로 향하고, GitHub 기준 `CONFLICTING` 상태다.
+- 최신 `origin/develop`에는 PR #8 `feat/105`, PR #1 `feat/LAN-59`, PR #4 `feat/LAN-104`가 반영됐다.
+- 이번 작업의 1차 목표는 `feat/LAN-62`를 최신 `origin/develop` 위로 올려 PR #3 충돌을 없애는 것이다.
+- LAN-91 후속 PR 스택은 `feat/LAN-91-base`, `feat/LAN-91-start`, `feat/LAN-91-end` 순서로 `feat/LAN-62` 위에 쌓여 있으므로, LAN-62를 먼저 push한 뒤 아래 브랜치부터 rebase한다.
+- PR #9 `feat/LAN-81`은 `feat/LAN-79`를 base로 하는 별도 스택이라 이번 후속 PR rebase 범위에서 제외한다.
