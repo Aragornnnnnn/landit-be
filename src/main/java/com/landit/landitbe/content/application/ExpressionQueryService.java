@@ -2,6 +2,8 @@
 package com.landit.landitbe.content.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.auth.application.UserLocale;
+import com.landit.landitbe.auth.application.UserProfileService;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
@@ -43,16 +45,20 @@ public class ExpressionQueryService {
     private final Random random = new Random();
 
     private final ScenarioService scenarioService;
+    private final UserProfileService userProfileService;
     private final WritingExpressionRepository writingExpressionRepository;
     private final UserWritingExpressionCompletionRepository userWritingExpressionCompletionRepository;
 
-    /** 시나리오별 Writing 표현 목록을 학습 순서대로 조회하고 사용자 완료 여부를 반영한다. */
+    /** 시나리오별 Writing 표현 목록을 사용자 locale 기준 학습 순서대로 조회하고 완료 여부를 반영한다. */
     @Transactional(readOnly = true)
     public List<ExpressionResponse> getExpressionsPerScenario(Long userId, Long scenarioId) {
         scenarioService.validateExists(scenarioId);
 
+        // 사용자 프로필의 학습 locale 기준으로 조회한다. (locale 조합별로 displayOrder 시퀀스가 따로 존재)
+        UserLocale userLocale = userProfileService.getUserLocale(userId);
         List<WritingExpression> expressions = writingExpressionRepository
-                .findByScenarioIdAndStatusOrderByDisplayOrderAsc(scenarioId, ActiveStatus.ACTIVE);
+                .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
+                        scenarioId, userLocale.targetLocale(), userLocale.baseLocale(), ActiveStatus.ACTIVE);
 
         // 해당 유저가 클리어한 Writing 표현의 ID를 Set으로 수집한다.
         Set<Long> completedExpressionIds = userWritingExpressionCompletionRepository
