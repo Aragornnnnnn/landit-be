@@ -32,9 +32,10 @@
 
 ## 2026-07-09 후속 PR rebase
 
-- [ ] `feat/LAN-91-base`를 최신 `feat/LAN-62` 위로 rebase한다.
+- [x] `feat/LAN-91-base`를 PR #3 merge 이후 최신 `origin/develop` 위로 rebase한다.
 - [ ] `feat/LAN-91-start`를 갱신된 `feat/LAN-91-base` 위로 rebase한다.
 - [ ] `feat/LAN-91-end`를 갱신된 `feat/LAN-91-start` 위로 rebase한다.
+- [ ] PR #5 base를 `develop`으로 변경한다.
 - [ ] `git diff --check`를 실행한다.
 - [ ] LAN-91 관련 테스트와 전체 테스트를 실행한다.
 - [ ] 세 LAN-91 브랜치를 `--force-with-lease`로 push한다.

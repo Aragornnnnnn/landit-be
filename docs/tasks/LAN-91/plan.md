@@ -21,8 +21,9 @@
 
 ## 2026-07-09 후속 PR rebase 계획
 
-1. `feat/LAN-91-base`를 최신 `feat/LAN-62` 위로 rebase한다.
+1. `feat/LAN-91-base`를 PR #3 merge 이후 최신 `origin/develop` 위로 rebase한다.
 2. `feat/LAN-91-start`를 갱신된 `feat/LAN-91-base` 위로 rebase한다.
 3. `feat/LAN-91-end`를 갱신된 `feat/LAN-91-start` 위로 rebase한다.
-4. 각 브랜치를 `--force-with-lease`로 push한다.
-5. PR #5, #6, #7의 mergeable 상태를 재확인한다.
+4. PR #5의 base를 `develop`으로 바꾼다.
+5. 각 브랜치를 `--force-with-lease`로 push한다.
+6. PR #5, #6, #7의 mergeable 상태를 재확인한다.

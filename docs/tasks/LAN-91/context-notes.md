@@ -32,7 +32,8 @@
 
 ## 2026-07-09
 
-- PR #3 `feat/LAN-62`가 최신 `origin/develop` 위로 rebase되어 LAN-91 스택의 base도 갱신해야 한다.
+- PR #3 `feat/LAN-62`가 `origin/develop`에 merge되어 PR #5 `feat/LAN-91-base`는 더 이상 `feat/LAN-62`가 아니라 `develop`을 base로 바라봐야 한다.
 - LAN-91 후속 PR 스택은 PR #5 `feat/LAN-91-base`, PR #6 `feat/LAN-91-start`, PR #7 `feat/LAN-91-end` 순서다.
-- 각 브랜치는 바로 아래 브랜치를 base로 하는 stacked PR이므로 아래 브랜치부터 rebase하고 push한다.
+- 브랜치 ancestry도 PR base와 맞추기 위해 `feat/LAN-91-base`를 merge commit `origin/develop` 위로 다시 rebase한다.
+- PR #6과 PR #7은 그대로 stacked PR이므로 `feat/LAN-91-start`, `feat/LAN-91-end` 순서로 아래 브랜치부터 rebase하고 push한다.
 - PR #9 `feat/LAN-81`은 `feat/LAN-79` 기반 별도 스택이라 이번 LAN-91 rebase 범위에서 제외한다.
