@@ -42,6 +42,8 @@ class ScenarioListApiIntegrationTests {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
+        jdbcTemplate.update("DELETE FROM writing_expression");
         jdbcTemplate.update("DELETE FROM user_scenario_progress");
         jdbcTemplate.update("DELETE FROM scenario_language_variant");
         jdbcTemplate.update("DELETE FROM scenario");

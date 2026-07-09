@@ -39,3 +39,9 @@
 - 이번 작업의 1차 목표는 `feat/LAN-62`를 최신 `origin/develop` 위로 올려 PR #3 충돌을 없애는 것이다.
 - LAN-91 후속 PR 스택은 `feat/LAN-91-base`, `feat/LAN-91-start`, `feat/LAN-91-end` 순서로 `feat/LAN-62` 위에 쌓여 있으므로, LAN-62를 먼저 push한 뒤 아래 브랜치부터 rebase한다.
 - PR #9 `feat/LAN-81`은 `feat/LAN-79`를 base로 하는 별도 스택이라 이번 후속 PR rebase 범위에서 제외한다.
+- `feat/LAN-62` rebase 중 루트 `checklist.md`, `context-notes.md`는 develop의 LAN-59 과거 로그만 유지하고, LAN-62 작업 로그는 `docs/tasks/LAN-62/`에만 남겼다.
+- `AuthSecurityConfig` 충돌은 develop의 `GET /api/v1/expressions/**` 인증 경로와 LAN-62의 `GET /api/v1/scenarios` 인증 경로를 모두 유지해 해결했다.
+- 전체 테스트 첫 실행은 `ScenarioListApiIntegrationTests.setUp()`에서 `scenario` 삭제 시 `writing_expression.scenario_id` FK가 남아 실패했다.
+- 원인은 LAN-59 표현 API 통합 테스트가 남긴 `writing_expression`, `user_writing_expression_completion` 데이터와 LAN-62 테스트 cleanup 범위가 맞지 않은 것이다.
+- `ScenarioListApiIntegrationTests` setup에서 `user_writing_expression_completion`, `writing_expression`을 먼저 삭제하도록 보강했다.
+- 검증으로 `git diff --check`, `./gradlew test --tests com.landit.landitbe.content.ScenarioListApiIntegrationTests`, `./gradlew test`를 실행했고 모두 통과했다.
