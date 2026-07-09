@@ -3,13 +3,29 @@ package com.landit.landitbe.auth.infrastructure;
 
 import com.landit.landitbe.auth.domain.UserProfile;
 import com.landit.landitbe.auth.domain.UserProfileStatus;
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
 
     /** 특정 상태의 사용자 프로필을 PK로 조회한다. */
     Optional<UserProfile> findByIdAndStatus(Long id, UserProfileStatus status);
+
+    /**
+     * 활성 사용자 프로필을 PK로 조회하면서 동시 세션 시작을 직렬화한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select userProfile
+            from UserProfile userProfile
+            where userProfile.id = :id
+              and userProfile.status = com.landit.landitbe.auth.domain.UserProfileStatus.ACTIVE
+            """)
+    Optional<UserProfile> findActiveByIdForUpdate(@Param("id") Long id);
 
     /** 특정 상태의 사용자 프로필 존재 여부를 PK로 확인한다. */
     boolean existsByIdAndStatus(Long id, UserProfileStatus status);

@@ -13,9 +13,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+@Getter
 @Entity
 @Table(name = "session_history_message")
 public class SessionHistoryMessage extends BaseTimeEntity {
@@ -73,4 +75,48 @@ public class SessionHistoryMessage extends BaseTimeEntity {
 
     protected SessionHistoryMessage() {
     }
+
+    private SessionHistoryMessage(
+            Long sessionHistoryId,
+            int messageSequence,
+            int turnNumber,
+            ConversationSpeaker role,
+            String content,
+            String translatedContent,
+            SessionMessageInputType inputType,
+            String innerThought,
+            InnerThoughtType innerThoughtType
+    ) {
+        this.sessionHistoryId = sessionHistoryId;
+        this.messageSequence = messageSequence;
+        this.turnNumber = turnNumber;
+        this.role = role;
+        this.content = content;
+        this.translatedContent = translatedContent;
+        this.inputType = inputType;
+        this.innerThought = innerThought;
+        this.innerThoughtType = innerThoughtType;
+    }
+
+    /** AI first 시나리오의 첫 AI 메시지를 생성한다. */
+    public static SessionHistoryMessage aiOpening(
+            Long sessionHistoryId,
+            String content,
+            String translatedContent,
+            String innerThought,
+            InnerThoughtType innerThoughtType
+    ) {
+        return new SessionHistoryMessage(
+                sessionHistoryId,
+                1,
+                1,
+                ConversationSpeaker.AI,
+                content,
+                translatedContent,
+                SessionMessageInputType.GENERATED,
+                innerThought,
+                innerThoughtType
+        );
+    }
+
 }

@@ -31,4 +31,23 @@ public class ScenarioSession extends BaseTimeEntity {
 
     protected ScenarioSession() {
     }
+
+    private ScenarioSession(
+            Long learningSessionId,
+            Long scenarioLanguageVariantId,
+            GoalCompletionStatus goalCompletionStatus
+    ) {
+        this.learningSessionId = learningSessionId;
+        this.scenarioLanguageVariantId = scenarioLanguageVariantId;
+        this.goalCompletionStatus = goalCompletionStatus;
+    }
+
+    /** 새 시나리오 세션 보조 정보를 생성한다. */
+    public static ScenarioSession start(Long learningSessionId, Long scenarioLanguageVariantId) {
+        return new ScenarioSession(
+                learningSessionId,
+                scenarioLanguageVariantId,
+                GoalCompletionStatus.NOT_STARTED
+        );
+    }
 }
