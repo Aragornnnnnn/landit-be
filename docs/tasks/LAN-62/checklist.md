@@ -35,5 +35,5 @@
 - [x] 충돌 파일을 실제 변경 의도 기준으로 병합한다.
 - [x] `git diff --check`를 실행한다.
 - [x] 관련 테스트와 전체 테스트를 실행한다.
-- [ ] `feat/LAN-62`를 `--force-with-lease`로 push한다.
-- [ ] PR #3 mergeable 상태를 재확인한다.
+- [x] `feat/LAN-62`를 `--force-with-lease`로 push한다.
+- [x] PR #3 mergeable 상태를 재확인한다.

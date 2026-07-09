@@ -45,3 +45,4 @@
 - 원인은 LAN-59 표현 API 통합 테스트가 남긴 `writing_expression`, `user_writing_expression_completion` 데이터와 LAN-62 테스트 cleanup 범위가 맞지 않은 것이다.
 - `ScenarioListApiIntegrationTests` setup에서 `user_writing_expression_completion`, `writing_expression`을 먼저 삭제하도록 보강했다.
 - 검증으로 `git diff --check`, `./gradlew test --tests com.landit.landitbe.content.ScenarioListApiIntegrationTests`, `./gradlew test`를 실행했고 모두 통과했다.
+- `feat/LAN-62`를 원격에 `--force-with-lease`로 push한 뒤 PR #3이 GitHub 기준 `mergeable=true`로 바뀐 것을 확인했다.
