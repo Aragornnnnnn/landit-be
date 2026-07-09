@@ -1,24 +1,46 @@
-// 시나리오별 Writing 표현 목록을 사용자 완료 여부와 함께 조회한다.
+// 원어민 표현 조회(시나리오별 목록, 학습 시작 상세, 추가 예문)를 담당한다.
 package com.landit.landitbe.content.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.common.domain.ActiveStatus;
+import com.landit.landitbe.common.exception.ApiException;
+import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.content.api.dto.ExpressionLearningResponse;
+import com.landit.landitbe.content.api.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.content.api.dto.ExpressionResponse;
+import com.landit.landitbe.content.api.dto.PracticeSentenceResponse;
+import com.landit.landitbe.content.api.dto.WritingSentenceResponse;
 import com.landit.landitbe.content.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.content.domain.WritingExpression;
 import com.landit.landitbe.content.infrastructure.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.content.infrastructure.WritingExpressionRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class ExpressionQueryService {
+
+    /** 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서 제외한다. */
+    private static final List<String> REQUIRED_PRACTICE_SENTENCE_KEYS = List.of(
+            "sentenceText",
+            "highlightingPart",
+            "sentenceTranslation",
+            "practiceQuestion",
+            "practiceQuestionTranslation"
+    );
+
+    private final Random random = new Random();
 
     private final ScenarioService scenarioService;
     private final WritingExpressionRepository writingExpressionRepository;
@@ -45,6 +67,94 @@ public class ExpressionQueryService {
         return expressions.stream()
                 .map(expression -> toResponse(expression, completedExpressionIds, firstUnlockedExpressionId))
                 .toList();
+    }
+
+    /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다. */
+    @Transactional(readOnly = true)
+    public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
+        WritingExpression expression = writingExpressionRepository
+                .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
+                .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        return toLearningResponse(expression);
+    }
+
+    /** 학습 중인 표현의 추가 예문 목록과 작문 문제(랜덤 1개)를 조회한다. 표현이 없거나 INACTIVE거나 예문이 비어 있으면 RESOURCE_NOT_FOUND 예외를 던진다. */
+    @Transactional(readOnly = true)
+    public ExpressionPracticeResponse getExtraPracticeExamples(Long expressionId) {
+        WritingExpression expression = writingExpressionRepository
+                .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
+                .orElseThrow(() -> {
+                    log.warn("추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}", expressionId);
+                    return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+                });
+
+        List<PracticeSentenceResponse> extraPracticeSentences =
+                parseExtraPracticeSentences(expression.getPracticeExamplesPayload(), expressionId);
+        if (extraPracticeSentences.isEmpty()) {
+            log.warn("추가 예문 조회 실패: 표현에 유효한 추가 예문이 없습니다. expressionId={}", expressionId);
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        return new ExpressionPracticeResponse(
+                expression.getTargetExpressionText(),
+                expression.getBaseExpressionMeaningText(),
+                expression.getUsageDescription(),
+                extraPracticeSentences,
+                pickRandomWritingSentence(extraPracticeSentences)
+        );
+    }
+
+    /**
+     * JSONB payload(JSON 배열)를 예문 응답 목록으로 파싱한다.
+     * 필수 키가 없거나 값이 빈 불량 예문은 빈 값으로 노출하는 대신 목록에서 제외하고 경고 로그를 남긴다.
+     * imageUrl은 유일한 선택 필드라 없으면 null로 둔다.
+     */
+    private List<PracticeSentenceResponse> parseExtraPracticeSentences(JsonNode payload, Long expressionId) {
+        List<PracticeSentenceResponse> extraPracticeSentences = new ArrayList<>();
+        if (payload == null || !payload.isArray()) {
+            return extraPracticeSentences;
+        }
+
+        for (int index = 0; index < payload.size(); index++) {
+            JsonNode node = payload.get(index);
+            if (hasMissingRequiredValue(node)) {
+                log.warn("추가 예문 파싱 제외: 필수 값이 누락된 예문입니다. expressionId={}, index={}", expressionId, index);
+                continue;
+            }
+
+            extraPracticeSentences.add(new PracticeSentenceResponse(
+                    node.get("sentenceText").asText(),
+                    node.get("highlightingPart").asText(),
+                    node.get("sentenceTranslation").asText(),
+                    node.get("practiceQuestion").asText(),
+                    node.get("practiceQuestionTranslation").asText(),
+                    node.hasNonNull("imageUrl") ? node.get("imageUrl").asText() : null
+            ));
+        }
+        return extraPracticeSentences;
+    }
+
+    /** 예문 노드에 필수 키가 없거나 값이 비어 있는지 확인한다. */
+    private boolean hasMissingRequiredValue(JsonNode node) {
+        for (String requiredKey : REQUIRED_PRACTICE_SENTENCE_KEYS) {
+            if (!node.hasNonNull(requiredKey) || node.get(requiredKey).asText().isBlank()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 예문 목록에서 랜덤으로 1개를 골라 작문 연습 문제로 변환한다. (인덱스 범위: 0 ~ 목록 길이-1) */
+    private WritingSentenceResponse pickRandomWritingSentence(List<PracticeSentenceResponse> extraPracticeSentences) {
+        PracticeSentenceResponse picked = extraPracticeSentences.get(random.nextInt(extraPracticeSentences.size()));
+
+        return new WritingSentenceResponse(
+                picked.sentenceText(),
+                picked.sentenceTranslation(),
+                picked.practiceQuestion(),
+                picked.practiceQuestionTranslation()
+        );
     }
 
     /** 미완료 표현 중 학습 순서가 가장 앞선 표현의 ID를 반환한다. 모두 완료했으면 빈 값을 반환한다. */
@@ -80,6 +190,22 @@ public class ExpressionQueryService {
                 expression.getBaseExpressionMeaningText(),
                 completed,
                 locked
+        );
+    }
+
+    /** Writing 표현 엔티티를 학습 시작 응답 DTO로 변환한다. */
+    private ExpressionLearningResponse toLearningResponse(WritingExpression expression) {
+        return new ExpressionLearningResponse(
+                expression.getId(),
+                expression.getTargetExpressionText(),
+                expression.getBaseExpressionMeaningText(),
+                expression.getUsageDescription(),
+                expression.getRepresentativeQuestionText(),
+                expression.getRepresentativeQuestionTranslation(),
+                expression.getRepresentativeSentenceText(),
+                expression.getRepresentativeSentenceTranslation(),
+                expression.getRepresentativeSentenceTranslationHighlightText(),
+                expression.getRepresentativeImageUrl()
         );
     }
 }

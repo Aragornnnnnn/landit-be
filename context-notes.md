@@ -233,3 +233,9 @@
 - PR #1의 `feat/LAN-59`에는 오래된 Flyway 분리 커밋이 포함되어 현재 `develop`의 `flyway-migration.yml` 선행 job 구조와 충돌했다.
 - `origin/develop` 위로 rebase하면서 중복 Flyway 커밋은 건너뛰고, `develop`의 Flyway workflow 구조를 그대로 유지한다.
 - `src/main/java/com/landit/landitbe/FlywayMigrationRunner.java`, `.github/workflows/deploy-dev.yml`, `.github/workflows/deploy-prod.yml`는 rebase 후 `origin/develop`과 차이가 없어야 한다.
+
+## 2026-07-07 LAN-79 PR 충돌 정리
+
+- PR #2의 base는 `feat/LAN-59`이고, head `feat/LAN-79`는 rebase 전 LAN-59 히스토리 위에 만들어져 있었다.
+- PR #1에서 `feat/LAN-59`를 현재 `origin/develop` 위로 rebase하면서, PR #2에는 예전 LAN-59 커밋과 오래된 Flyway workflow 커밋이 남아 충돌했다.
+- `feat/LAN-79`는 LAN-79 전용 커밋 4개만 현재 `origin/feat/LAN-59` 위로 다시 얹는다.

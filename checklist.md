@@ -251,3 +251,11 @@
 - [x] 표현 조회 API diff만 남았는지 확인.
 - [x] 관련 검증 실행.
 - [x] PR 브랜치 push 전 상태 확인.
+
+## 2026-07-07 LAN-79 PR 충돌 정리
+
+- [x] `feat/LAN-79`를 현재 `origin/feat/LAN-59` 기준으로 rebase.
+- [x] LAN-79 전용 diff만 남았는지 확인.
+- [x] 배포 workflow 파일 diff가 제거됐는지 확인.
+- [x] 관련 검증 실행.
+- [x] PR 브랜치 push 전 상태 확인.

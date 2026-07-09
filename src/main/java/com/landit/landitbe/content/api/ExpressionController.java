@@ -3,6 +3,8 @@ package com.landit.landitbe.content.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.common.response.ApiResponse;
+import com.landit.landitbe.content.api.dto.ExpressionLearningResponse;
+import com.landit.landitbe.content.api.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.content.api.dto.ExpressionResponse;
 import com.landit.landitbe.content.application.ExpressionQueryService;
 import java.util.List;
@@ -34,5 +36,33 @@ public class ExpressionController {
     ) {
         return ApiResponse.success(
                 expressionQueryService.getExpressionsPerScenario(principal.userId(), scenarioId));
+    }
+
+    /**
+     * 사용자가 선택한 표현으로 표현 학습을 시작한다.
+     * 인증과 사용자 존재 검증은 보안 규칙과 AuthTokenFilter가 처리하므로 principal 주입은 생략한다.
+     *
+     * @param expressionId 학습할 영어 표현 ID
+     */
+    @GetMapping("/{expressionId}/learning-start")
+    public ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
+            @PathVariable Long expressionId
+    ) {
+        return ApiResponse.success(
+                expressionQueryService.getExpressionForLearning(expressionId));
+    }
+
+    /**
+     * 대표 예문 영작을 끝낸 뒤 추가 예문 목록과 작문 문제(예문 중 랜덤 1개)를 조회한다.
+     * 인증과 사용자 존재 검증은 보안 규칙과 AuthTokenFilter가 처리하므로 principal 주입은 생략한다.
+     *
+     * @param expressionId 학습 중인 영어 표현 ID
+     */
+    @GetMapping("/{expressionId}/practice")
+    public ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
+            @PathVariable Long expressionId
+    ) {
+        return ApiResponse.success(
+                expressionQueryService.getExtraPracticeExamples(expressionId));
     }
 }
