@@ -243,3 +243,11 @@
 - [x] develop/prod 앱 런타임 Flyway 비활성화.
 - [x] 관련 테스트와 YAML 검증 실행.
 - [x] 논리 단위 커밋 생성.
+
+## 2026-07-07 LAN-59 PR 충돌 정리
+
+- [x] `feat/LAN-59`를 `origin/develop` 기준으로 rebase.
+- [x] 중복 Flyway workflow 커밋 제거.
+- [x] 표현 조회 API diff만 남았는지 확인.
+- [x] 관련 검증 실행.
+- [x] PR 브랜치 push 전 상태 확인.

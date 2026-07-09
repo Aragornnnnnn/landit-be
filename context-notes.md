@@ -227,3 +227,9 @@
 - develop/prod profile에서는 `spring.flyway.enabled=false`로 앱 런타임 migration을 끈다.
 - DB 접속 정보는 GitHub Secrets로 복사하지 않고 workflow가 AWS SSM `/landit/{environment}`에서 직접 읽는다.
 - live IAM에서 `landit-github-actions-develop-deploy` role에 `/landit/develop/DB_*` `ssm:GetParameter` inline policy를 추가했다.
+
+## 2026-07-07 LAN-59 PR 충돌 정리
+
+- PR #1의 `feat/LAN-59`에는 오래된 Flyway 분리 커밋이 포함되어 현재 `develop`의 `flyway-migration.yml` 선행 job 구조와 충돌했다.
+- `origin/develop` 위로 rebase하면서 중복 Flyway 커밋은 건너뛰고, `develop`의 Flyway workflow 구조를 그대로 유지한다.
+- `src/main/java/com/landit/landitbe/FlywayMigrationRunner.java`, `.github/workflows/deploy-dev.yml`, `.github/workflows/deploy-prod.yml`는 rebase 후 `origin/develop`과 차이가 없어야 한다.

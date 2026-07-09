@@ -12,10 +12,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
+@Getter
 @Table(name = "writing_expression")
 public class WritingExpression extends BaseTimeEntity {
 
@@ -27,7 +29,7 @@ public class WritingExpression extends BaseTimeEntity {
     private Long scenarioId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "expression_type", nullable = false, length = 20)
+    @Column(name = "expression_type", nullable = false, length = 30)
     private WritingExpressionType expressionType;
 
     @Enumerated(EnumType.STRING)
