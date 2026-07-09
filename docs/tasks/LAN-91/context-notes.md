@@ -29,3 +29,10 @@
 - `ScenarioSessionStartUseCase`는 세션 시작 흐름이 길어 보이지 않도록 시작 row 조회, 세션 생성, AI 시작 메시지 저장, 응답 조립을 보조 메서드로 분리한다.
 - 리뷰 반영 후 `git diff --check`, `./gradlew test --tests com.landit.landitbe.session.ScenarioSessionApiIntegrationTests`, `./gradlew test`를 실행했고 모두 통과했다.
 - 세션 시작과 중도 종료는 API 단위와 의존 Repository가 다르므로 `ScenarioSessionStartUseCase`와 `SessionEndUseCase`로 분리한다.
+
+## 2026-07-09
+
+- PR #3 `feat/LAN-62`가 최신 `origin/develop` 위로 rebase되어 LAN-91 스택의 base도 갱신해야 한다.
+- LAN-91 후속 PR 스택은 PR #5 `feat/LAN-91-base`, PR #6 `feat/LAN-91-start`, PR #7 `feat/LAN-91-end` 순서다.
+- 각 브랜치는 바로 아래 브랜치를 base로 하는 stacked PR이므로 아래 브랜치부터 rebase하고 push한다.
+- PR #9 `feat/LAN-81`은 `feat/LAN-79` 기반 별도 스택이라 이번 LAN-91 rebase 범위에서 제외한다.

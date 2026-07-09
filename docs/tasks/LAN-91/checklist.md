@@ -29,3 +29,13 @@
 - [x] 시나리오 세션 시작 UseCase와 세션 중도 종료 UseCase 분리.
 - [x] Swagger Docs Interface 분리는 별도 이슈 범위로 분리.
 - [x] 리뷰 반영 후 관련 테스트 재실행.
+
+## 2026-07-09 후속 PR rebase
+
+- [ ] `feat/LAN-91-base`를 최신 `feat/LAN-62` 위로 rebase한다.
+- [ ] `feat/LAN-91-start`를 갱신된 `feat/LAN-91-base` 위로 rebase한다.
+- [ ] `feat/LAN-91-end`를 갱신된 `feat/LAN-91-start` 위로 rebase한다.
+- [ ] `git diff --check`를 실행한다.
+- [ ] LAN-91 관련 테스트와 전체 테스트를 실행한다.
+- [ ] 세 LAN-91 브랜치를 `--force-with-lease`로 push한다.
+- [ ] PR #5, #6, #7 mergeable 상태를 재확인한다.

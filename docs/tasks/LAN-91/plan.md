@@ -18,3 +18,11 @@
 3. 세션 종료에 필요한 소유자 검증과 상태 전이를 구현한다.
 4. Swagger annotation과 공통 오류 코드를 보강한다.
 5. LAN-91 관련 테스트와 전체 테스트를 실행한다.
+
+## 2026-07-09 후속 PR rebase 계획
+
+1. `feat/LAN-91-base`를 최신 `feat/LAN-62` 위로 rebase한다.
+2. `feat/LAN-91-start`를 갱신된 `feat/LAN-91-base` 위로 rebase한다.
+3. `feat/LAN-91-end`를 갱신된 `feat/LAN-91-start` 위로 rebase한다.
+4. 각 브랜치를 `--force-with-lease`로 push한다.
+5. PR #5, #6, #7의 mergeable 상태를 재확인한다.
