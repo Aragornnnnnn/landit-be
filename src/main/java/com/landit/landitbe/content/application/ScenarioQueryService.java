@@ -7,6 +7,7 @@ import com.landit.landitbe.content.api.dto.ScenarioListResponse;
 import com.landit.landitbe.content.api.dto.ScenarioListResponse.CategoryResponse;
 import com.landit.landitbe.content.api.dto.ScenarioListResponse.OpeningPreviewResponse;
 import com.landit.landitbe.content.api.dto.ScenarioListResponse.ScenarioResponse;
+import com.landit.landitbe.content.api.dto.TtsVoiceResponse;
 import com.landit.landitbe.content.infrastructure.ScenarioListQueryRepository;
 import com.landit.landitbe.content.infrastructure.ScenarioListRow;
 import com.landit.landitbe.learning.domain.UserScenarioProgressStatus;
@@ -114,7 +115,7 @@ public class ScenarioQueryService {
                     null,
                     scenarioRow.innerThought(),
                     scenarioRow.innerThoughtType() == null ? null : scenarioRow.innerThoughtType().name(),
-                    scenarioRow.ttsVoiceSetId()
+                    ttsVoice(scenarioRow)
             );
         }
         return new OpeningPreviewResponse(
@@ -123,7 +124,16 @@ public class ScenarioQueryService {
                 scenarioRow.userOpeningInstruction(),
                 null,
                 null,
-                scenarioRow.ttsVoiceSetId()
+                ttsVoice(scenarioRow)
+        );
+    }
+
+    private static TtsVoiceResponse ttsVoice(ScenarioListRow scenarioRow) {
+        return TtsVoiceResponse.from(
+                scenarioRow.ttsVoiceProvider(),
+                scenarioRow.ttsVoiceModel(),
+                scenarioRow.providerVoiceId(),
+                scenarioRow.ttsVoiceGender()
         );
     }
 
