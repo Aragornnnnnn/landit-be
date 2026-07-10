@@ -11,6 +11,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.common.domain.InnerThoughtType;
+import com.landit.landitbe.common.exception.ApiException;
+import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.session.domain.GoalCompletionStatus;
+import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
+import com.landit.landitbe.session.application.port.AiClosingMessageResult;
+import com.landit.landitbe.session.application.port.AiConversationClient;
+import com.landit.landitbe.session.application.port.AiNextMessageRequest;
+import com.landit.landitbe.session.application.port.AiNextMessageResult;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,7 +33,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -48,10 +60,14 @@ class ScenarioSessionApiIntegrationTests {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private FakeAiConversationClient fakeAiConversationClient;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
+        fakeAiConversationClient.reset();
         jdbcTemplate.update("DELETE FROM session_history_message_feedback");
         jdbcTemplate.update("DELETE FROM session_history_artifact");
         jdbcTemplate.update("DELETE FROM session_history_message");
@@ -59,6 +75,8 @@ class ScenarioSessionApiIntegrationTests {
         jdbcTemplate.update("DELETE FROM session_history");
         jdbcTemplate.update("DELETE FROM learning_session");
         jdbcTemplate.update("DELETE FROM user_scenario_progress");
+        jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
+        jdbcTemplate.update("DELETE FROM scenario_question");
         jdbcTemplate.update("DELETE FROM scenario_language_variant");
         jdbcTemplate.update("DELETE FROM scenario");
         jdbcTemplate.update("DELETE FROM category_language_variant");
@@ -436,6 +454,17 @@ class ScenarioSessionApiIntegrationTests {
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
 
+    private long startScenario(String accessToken, long scenarioId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/scenarios/%d/sessions".formatted(scenarioId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("sessionId")
+                .asLong();
+    }
+
     private void seedAiTutor(long aiTutorId) {
         jdbcTemplate.update("""
                         INSERT INTO ai_tutor (
@@ -569,6 +598,47 @@ class ScenarioSessionApiIntegrationTests {
         );
     }
 
+    private void seedScenarioQuestion(
+            long questionId,
+            long scenarioId,
+            int displayOrder,
+            String questionText,
+            String questionTranslation
+    ) {
+        jdbcTemplate.update("""
+                        INSERT INTO scenario_question (
+                            id,
+                            scenario_id,
+                            display_order,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """,
+                questionId,
+                scenarioId,
+                displayOrder
+        );
+        jdbcTemplate.update("""
+                        INSERT INTO scenario_question_language_variant (
+                            scenario_question_id,
+                            target_locale,
+                            base_locale,
+                            question_text,
+                            question_translation,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, 'en', 'ko', ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """,
+                questionId,
+                questionText,
+                questionTranslation
+        );
+    }
+
     private void assertLearningSession(
             long sessionId,
             long userId,
@@ -617,6 +687,33 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(scenarioSession.get("GOAL_COMPLETION_STATUS")).isEqualTo("NOT_STARTED");
     }
 
+    private void assertScenarioSessionGoalStatus(long sessionId, String goalCompletionStatus) {
+        String actualStatus = jdbcTemplate.queryForObject(
+                """
+                        SELECT goal_completion_status
+                        FROM scenario_session
+                        WHERE learning_session_id = ?
+                        """,
+                String.class,
+                sessionId
+        );
+        assertThat(actualStatus).isEqualTo(goalCompletionStatus);
+    }
+
+    private void assertSessionHistoryCompleted(long sessionId, int userMessageCount) {
+        Map<String, Object> history = jdbcTemplate.queryForMap(
+                """
+                        SELECT ended_at, duration_seconds, user_message_count
+                        FROM session_history
+                        WHERE learning_session_id = ?
+                        """,
+                sessionId
+        );
+        assertThat(history.get("ENDED_AT")).isNotNull();
+        assertThat(history.get("DURATION_SECONDS")).isNotNull();
+        assertThat(history.get("USER_MESSAGE_COUNT")).isEqualTo(userMessageCount);
+    }
+
     private void assertProgress(long userId, long scenarioId, String status) {
         Map<String, Object> progress = jdbcTemplate.queryForMap(
                 """
@@ -652,5 +749,75 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     private record StartedSession(long userId, String accessToken, long sessionId) {
+    }
+
+    @TestConfiguration
+    static class FakeAiClientConfiguration {
+
+        @Bean
+        @Primary
+        FakeAiConversationClient fakeAiConversationClient() {
+            return new FakeAiConversationClient();
+        }
+    }
+
+    private static class FakeAiConversationClient implements AiConversationClient {
+
+        private AiNextMessageRequest lastNextMessageRequest;
+
+        private AiClosingMessageRequest lastClosingMessageRequest;
+
+        private GoalCompletionStatus nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
+
+        private boolean failNextMessageGeneration;
+
+        @Override
+        public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
+            lastNextMessageRequest = request;
+            if (failNextMessageGeneration) {
+                throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+            }
+            return new AiNextMessageResult(
+                    "Oh, you like spicy pizza. What food did you eat recently?",
+                    "아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?",
+                    "매운 피자를 좋아한다고 이유까지 말해주네.",
+                    InnerThoughtType.GOOD,
+                    nextGoalCompletionStatus
+            );
+        }
+
+        @Override
+        public AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request) {
+            lastClosingMessageRequest = request;
+            return new AiClosingMessageResult(
+                    "Thanks for sharing. That was a good conversation.",
+                    "이야기해줘서 고마워. 좋은 대화였어.",
+                    "마지막까지 답해줘서 대화를 자연스럽게 마무리하면 좋겠다.",
+                    InnerThoughtType.NORMAL
+            );
+        }
+
+        private void reset() {
+            lastNextMessageRequest = null;
+            lastClosingMessageRequest = null;
+            nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
+            failNextMessageGeneration = false;
+        }
+
+        private void completeGoalOnNextMessage() {
+            nextGoalCompletionStatus = GoalCompletionStatus.COMPLETED;
+        }
+
+        private void failNextMessageGeneration() {
+            failNextMessageGeneration = true;
+        }
+
+        private AiNextMessageRequest lastNextMessageRequest() {
+            return lastNextMessageRequest;
+        }
+
+        private AiClosingMessageRequest lastClosingMessageRequest() {
+            return lastClosingMessageRequest;
+        }
     }
 }
