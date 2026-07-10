@@ -18,8 +18,9 @@ import lombok.Getter;
 @Table(name = "user_profile")
 public class UserProfile extends BaseTimeEntity {
 
-    private static final String DEFAULT_TARGET_LOCALE = "en";
-    private static final String DEFAULT_BASE_LOCALE = "ko";
+    // locale 표기는 콘텐츠 시딩 규칙과 동일하게 대문자('EN'/'KR')를 쓴다. (V13 마이그레이션으로 통일)
+    private static final String DEFAULT_TARGET_LOCALE = "EN";
+    private static final String DEFAULT_BASE_LOCALE = "KR";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

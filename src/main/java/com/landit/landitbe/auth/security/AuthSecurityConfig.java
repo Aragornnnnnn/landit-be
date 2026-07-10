@@ -69,6 +69,7 @@ public class AuthSecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/expressions/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/expressions/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/scenarios").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/messages").authenticated()
@@ -96,7 +97,7 @@ public class AuthSecurityConfig {
     }
 
     private AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> failureResponseWriter.write(response, ErrorCode.AUTH_REQUIRED);
+        return (request, response, authException) -> failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
     }
 
     private AccessDeniedHandler accessDeniedHandler() {

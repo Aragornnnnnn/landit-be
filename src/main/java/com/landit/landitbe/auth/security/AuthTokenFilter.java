@@ -59,7 +59,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         }
         if (!userProfileRepository.existsByIdAndStatus(userId, UserProfileStatus.ACTIVE)) {
             SecurityContextHolder.clearContext();
-            failureResponseWriter.write(response, ErrorCode.AUTH_REQUIRED);
+            failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
             return;
         }
 

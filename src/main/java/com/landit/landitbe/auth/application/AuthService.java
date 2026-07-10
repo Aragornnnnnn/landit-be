@@ -104,7 +104,7 @@ public class AuthService {
     @Transactional
     public void withdraw(Long userId) {
         UserProfile userProfile = userProfileRepository.findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
-                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_REQUIRED));
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
         refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
         oauthIdentityRepository.findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.ACTIVE)
                 .forEach(OauthIdentity::unlink);
@@ -127,7 +127,7 @@ public class AuthService {
                 .map(identity -> {
                     UserProfile userProfile = identity.getUserProfile();
                     if (!userProfile.isActive()) {
-                        throw new ApiException(ErrorCode.AUTH_REQUIRED);
+                        throw new ApiException(ErrorCode.INVALID_TOKEN);
                     }
                     userProfile.updateProfile(userInfo.email(), nickname);
                     identity.updateProviderEmail(userInfo.email());

@@ -18,6 +18,8 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.auth.application.UserLocale;
+import com.landit.landitbe.auth.application.UserProfileService;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
@@ -49,6 +51,9 @@ class ExpressionQueryServiceTest {
 
     @Mock
     private ScenarioService scenarioService;
+
+    @Mock
+    private UserProfileService userProfileService;
 
     @Mock
     private WritingExpressionRepository writingExpressionRepository;
@@ -113,7 +118,21 @@ class ExpressionQueryServiceTest {
                 .isInstanceOf(ApiException.class);
 
         verify(writingExpressionRepository, never())
-                .findByScenarioIdAndStatusOrderByDisplayOrderAsc(any(), any());
+                .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(any(), any(), any(), any());
+    }
+
+    /** 표현 목록은 사용자 프로필의 locale(target/base) 기준으로 조회되는지 검증한다. (LAN-59 리뷰 반영) */
+    @Test
+    void 표현_목록은_사용자_locale_기준으로_조회한다() {
+        givenExpressions(expression(101L, 1));
+        givenCompletedExpressionIds();
+
+        expressionQueryService.getExpressionsPerScenario(USER_ID, SCENARIO_ID);
+
+        // 사용자 locale(en/ko)이 repository 조회 조건으로 그대로 전달된다
+        verify(writingExpressionRepository)
+                .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
+                        SCENARIO_ID, "EN", "KR", ActiveStatus.ACTIVE);
     }
 
     @Test
@@ -155,12 +174,15 @@ class ExpressionQueryServiceTest {
 
     /**
      * "시나리오에 이 표현들이 저장되어 있다"는 상황을 만든다.
-     * 가짜 repository가 시나리오별 목록 조회로 불리면, 전달받은 표현 mock들을 그대로 돌려주도록 스터빙한다.
+     * 사용자 locale(en/ko)을 스터빙하고, 가짜 repository가 그 locale 기준 목록 조회로 불리면
+     * 전달받은 표현 mock들을 그대로 돌려주도록 스터빙한다.
      * (전달 순서 = displayOrder 오름차순 정렬 결과라고 가정하고 테스트를 작성한다)
      */
     private void givenExpressions(WritingExpression... expressions) {
+        when(userProfileService.getUserLocale(USER_ID)).thenReturn(new UserLocale("EN", "KR"));
         when(writingExpressionRepository
-                .findByScenarioIdAndStatusOrderByDisplayOrderAsc(eq(SCENARIO_ID), eq(ActiveStatus.ACTIVE)))
+                .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
+                        eq(SCENARIO_ID), eq("EN"), eq("KR"), eq(ActiveStatus.ACTIVE)))
                 .thenReturn(List.of(expressions));
     }
 

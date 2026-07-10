@@ -44,18 +44,18 @@ class ExpressionPracticeApiIntegrationTests {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** 토큰 없이 호출하면 401(AUTH_REQUIRED)로 거절되는지 검증한다. */
+    /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
     @Test
     void practiceRejectsMissingAccessToken() throws Exception {
         // given: 조회 대상 표현이 DB에 존재
         Long expressionId = seedExpressionWithPracticeExamples();
 
         // when: Authorization 헤더 없이 호출하면
-        // then: 401 + AUTH_REQUIRED
+        // then: 401 + INVALID_TOKEN
         mockMvc.perform(get("/api/v1/expressions/{expressionId}/practice", expressionId))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     /** 정상 호출 시 표현 정보 + 예문 4개 + 작문 문제(예문 중 하나)가 응답에 담기는지 검증한다. */
@@ -232,7 +232,7 @@ class ExpressionPracticeApiIntegrationTests {
                         + "practice_examples_payload, status, created_at, updated_at) "
                         // H2에서 CAST(? AS jsonb)는 문자열을 "JSON 문자열 값"으로 저장해버려서(배열로 파싱 안 됨)
                         // 진짜 JSON으로 파싱해 저장하는 H2 문법인 "? FORMAT JSON"을 쓴다.
-                        + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'en', 'ko', 1, 'blow my mind', '끝내주게 놀랍다', "
+                        + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
                         + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
                         + "'representative sentence', '대표 예문 해석', '대표 강조', "
                         + "? FORMAT JSON, ?, ?, ?)",

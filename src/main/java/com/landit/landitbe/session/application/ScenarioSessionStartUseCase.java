@@ -74,7 +74,7 @@ public class ScenarioSessionStartUseCase {
         // 같은 사용자의 동시 세션 시작 요청이 progress row 생성 구간을
         // 동시에 통과하지 못하도록 사용자 row를 잠근다.
         return userProfileRepository.findActiveByIdForUpdate(userId)
-                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_REQUIRED));
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
     }
 
     private ScenarioSessionStartRow findStartRow(long userId, long scenarioId) {

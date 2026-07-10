@@ -755,7 +755,7 @@ class ScenarioSessionApiIntegrationTests {
                         FROM user_scenario_progress
                         WHERE user_profile_id = ?
                           AND scenario_id = ?
-                          AND target_locale = 'en'
+                          AND target_locale = 'EN'
                         """,
                 Integer.class,
                 userId,
@@ -768,7 +768,7 @@ class ScenarioSessionApiIntegrationTests {
     void startScenarioRequiresAuthentication() throws Exception {
         mockMvc.perform(post("/api/v1/scenarios/2001/sessions"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     @Test
@@ -972,7 +972,7 @@ class ScenarioSessionApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'en-US', 'en', 'TEST', 'voice-id', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'en-US', 'EN', 'TEST', 'voice-id', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 aiTutorId
         );
@@ -1003,7 +1003,7 @@ class ScenarioSessionApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'ko', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 categoryId,
                 name
@@ -1077,7 +1077,7 @@ class ScenarioSessionApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, 'en', 'ko', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 variantId,
                 scenarioId,
@@ -1161,8 +1161,8 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(session.get("USER_PROFILE_ID")).isEqualTo(userId);
         assertThat(session.get("SESSION_TYPE")).isEqualTo("SCENARIO");
         assertThat(session.get("AI_TUTOR_ID")).isEqualTo(aiTutorId);
-        assertThat(session.get("TARGET_LOCALE")).isEqualTo("en");
-        assertThat(session.get("BASE_LOCALE")).isEqualTo("ko");
+        assertThat(session.get("TARGET_LOCALE")).isEqualTo("EN");
+        assertThat(session.get("BASE_LOCALE")).isEqualTo("KR");
         assertThat(session.get("INPUT_MODE")).isEqualTo("MIXED");
         assertThat(session.get("STATUS")).isEqualTo(status);
         assertThat(session.get("ENDED_BY")).isEqualTo(endedBy);
@@ -1216,7 +1216,7 @@ class ScenarioSessionApiIntegrationTests {
                         FROM user_scenario_progress
                         WHERE user_profile_id = ?
                           AND scenario_id = ?
-                          AND target_locale = 'en'
+                          AND target_locale = 'EN'
                         """,
                 userId,
                 scenarioId

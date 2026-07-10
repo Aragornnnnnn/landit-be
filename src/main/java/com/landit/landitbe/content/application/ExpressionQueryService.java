@@ -2,6 +2,8 @@
 package com.landit.landitbe.content.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.auth.application.UserLocale;
+import com.landit.landitbe.auth.application.UserProfileService;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
@@ -21,14 +23,14 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ExpressionQueryService {
 
     /** 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서 제외한다. */
@@ -40,19 +42,30 @@ public class ExpressionQueryService {
             "practiceQuestionTranslation"
     );
 
+    private static final String EXPRESSION_NOT_FOUND_LOG =
+            "추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}";
+    private static final String NO_VALID_PRACTICE_SENTENCE_LOG =
+            "추가 예문 조회 실패: 표현에 유효한 추가 예문이 없습니다. expressionId={}";
+    private static final String INVALID_PRACTICE_SENTENCE_EXCLUDED_LOG =
+            "추가 예문 파싱 제외: 필수 값이 누락된 예문입니다. expressionId={}, index={}";
+
     private final Random random = new Random();
 
     private final ScenarioService scenarioService;
+    private final UserProfileService userProfileService;
     private final WritingExpressionRepository writingExpressionRepository;
     private final UserWritingExpressionCompletionRepository userWritingExpressionCompletionRepository;
 
-    /** 시나리오별 Writing 표현 목록을 학습 순서대로 조회하고 사용자 완료 여부를 반영한다. */
+    /** 시나리오별 Writing 표현 목록을 사용자 locale 기준 학습 순서대로 조회하고 완료 여부를 반영한다. */
     @Transactional(readOnly = true)
     public List<ExpressionResponse> getExpressionsPerScenario(Long userId, Long scenarioId) {
         scenarioService.validateExists(scenarioId);
 
+        // 사용자 프로필의 학습 locale 기준으로 조회한다. (locale 조합별로 displayOrder 시퀀스가 따로 존재)
+        UserLocale userLocale = userProfileService.getUserLocale(userId);
         List<WritingExpression> expressions = writingExpressionRepository
-                .findByScenarioIdAndStatusOrderByDisplayOrderAsc(scenarioId, ActiveStatus.ACTIVE);
+                .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
+                        scenarioId, userLocale.targetLocale(), userLocale.baseLocale(), ActiveStatus.ACTIVE);
 
         // 해당 유저가 클리어한 Writing 표현의 ID를 Set으로 수집한다.
         Set<Long> completedExpressionIds = userWritingExpressionCompletionRepository
@@ -85,14 +98,14 @@ public class ExpressionQueryService {
         WritingExpression expression = writingExpressionRepository
                 .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
                 .orElseThrow(() -> {
-                    log.warn("추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}", expressionId);
+                    log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
                     return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
 
         List<PracticeSentenceResponse> extraPracticeSentences =
                 parseExtraPracticeSentences(expression.getPracticeExamplesPayload(), expressionId);
         if (extraPracticeSentences.isEmpty()) {
-            log.warn("추가 예문 조회 실패: 표현에 유효한 추가 예문이 없습니다. expressionId={}", expressionId);
+            log.warn(NO_VALID_PRACTICE_SENTENCE_LOG, expressionId);
             throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
         }
 
@@ -119,7 +132,7 @@ public class ExpressionQueryService {
         for (int index = 0; index < payload.size(); index++) {
             JsonNode node = payload.get(index);
             if (hasMissingRequiredValue(node)) {
-                log.warn("추가 예문 파싱 제외: 필수 값이 누락된 예문입니다. expressionId={}, index={}", expressionId, index);
+                log.warn(INVALID_PRACTICE_SENTENCE_EXCLUDED_LOG, expressionId, index);
                 continue;
             }
 

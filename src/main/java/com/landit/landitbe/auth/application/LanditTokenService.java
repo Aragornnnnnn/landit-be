@@ -66,7 +66,7 @@ public class LanditTokenService {
             }
             long expiresAt = number(claims.get("exp"));
             if (Instant.now().getEpochSecond() >= expiresAt) {
-                throw new ApiException(ErrorCode.AUTH_REQUIRED);
+                throw new ApiException(ErrorCode.INVALID_TOKEN);
             }
             String subject = text(claims.get("sub"));
             if (subject == null || subject.isBlank()) {
