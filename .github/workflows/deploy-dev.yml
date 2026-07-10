@@ -51,6 +51,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Run application tests
+        run: ./gradlew test --no-daemon
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -75,105 +78,30 @@ jobs:
           docker push "$image_uri:latest"
 
       - name: Force ECS service deployment
+        id: deploy
         run: |
-          aws ecs update-service \
+          deployment="$(aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE" \
             --force-new-deployment \
-            --query 'service.{serviceName:serviceName,status:status,desiredCount:desiredCount,runningCount:runningCount}' \
-            --output json
+            --output json)"
+          deployment_id="$(jq -r '.service.deployments[] | select(.status == "PRIMARY") | .id' <<< "$deployment")"
+          deployment_created_at="$(jq -r '.service.deployments[] | select(.status == "PRIMARY") | .createdAt' <<< "$deployment")"
 
-      - name: Verify ECS service
-        timeout-minutes: 12
-        run: |
-          desired_count="$(aws ecs describe-services \
-            --cluster "$ECS_CLUSTER" \
-            --services "$ECS_SERVICE" \
-            --query 'services[0].desiredCount' \
-            --output text)"
-
-          if [ "$desired_count" = "None" ] || [ "$desired_count" = "null" ]; then
-            echo "ECS service not found"
+          if [ -z "$deployment_id" ] || [ "$deployment_id" = "null" ] || [ -z "$deployment_created_at" ] || [ "$deployment_created_at" = "null" ]; then
+            echo "New PRIMARY ECS deployment was not returned by update-service"
+            echo "$deployment"
             exit 1
           fi
 
-          print_service_state() {
-            aws ecs describe-services \
-              --cluster "$ECS_CLUSTER" \
-              --services "$ECS_SERVICE" \
-              --query 'services[0].{serviceName:serviceName,status:status,desiredCount:desiredCount,runningCount:runningCount,pendingCount:pendingCount,deployments:deployments[*].{status:status,rolloutState:rolloutState,desiredCount:desiredCount,runningCount:runningCount,pendingCount:pendingCount,failedTasks:failedTasks}}' \
-              --output json
-          }
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+          echo "deployment_created_at=$deployment_created_at" >> "$GITHUB_OUTPUT"
+          echo "$deployment" | jq '.service | {serviceName, status, desiredCount, runningCount, deployments}'
 
-          print_service_events() {
-            aws ecs describe-services \
-              --cluster "$ECS_CLUSTER" \
-              --services "$ECS_SERVICE" \
-              --query 'services[0].events[0:10].[createdAt,message]' \
-              --output table
-          }
-
-          print_service_state
-
-          if [ "$desired_count" -gt 0 ]; then
-            for attempt in $(seq 1 40); do
-              primary_state="$(aws ecs describe-services \
-                --cluster "$ECS_CLUSTER" \
-                --services "$ECS_SERVICE" \
-                --query 'services[0].deployments[?status==`PRIMARY`][0].[rolloutState,failedTasks,runningCount,pendingCount]' \
-                --output text)"
-              read -r rollout_state failed_tasks primary_running_count primary_pending_count <<< "$primary_state"
-              case "$failed_tasks" in
-                "" | "None" | "null" | *[!0-9]*) failed_tasks=0 ;;
-              esac
-              deployment_count="$(aws ecs describe-services \
-                --cluster "$ECS_CLUSTER" \
-                --services "$ECS_SERVICE" \
-                --query 'length(services[0].deployments)' \
-                --output text)"
-              running_count="$(aws ecs describe-services \
-                --cluster "$ECS_CLUSTER" \
-                --services "$ECS_SERVICE" \
-                --query 'services[0].runningCount' \
-                --output text)"
-
-              print_service_state
-
-              if [ "$rollout_state" = "FAILED" ]; then
-                echo "PRIMARY ECS deployment failed"
-                print_service_events
-                exit 1
-              fi
-
-              if [ "$failed_tasks" -gt 0 ]; then
-                echo "PRIMARY ECS deployment has failed tasks"
-                print_service_state
-                print_service_events
-                exit 1
-              fi
-
-              if [ "$deployment_count" -eq 1 ] && [ "$running_count" -eq "$desired_count" ]; then
-                echo "ECS service is stable"
-                break
-              fi
-
-              if [ "$attempt" -eq 40 ]; then
-                echo "ECS service did not become stable within 10 minutes"
-                print_service_events
-                exit 1
-              fi
-
-              sleep 15
-            done
-
-            if [ -z "$HEALTH_CHECK_URL" ]; then
-              echo "HEALTH_CHECK_URL is required when desired count is greater than 0"
-              exit 1
-            fi
-
-            curl --fail --silent --show-error \
-              --retry 12 \
-              --retry-delay 5 \
-              --retry-connrefused \
-              "$HEALTH_CHECK_URL" >/dev/null
-          fi
+      - name: Verify ECS service
+        timeout-minutes: 5
+        env:
+          DEPLOYMENT_ID: ${{ steps.deploy.outputs.deployment_id }}
+          DEPLOYMENT_CREATED_AT: ${{ steps.deploy.outputs.deployment_created_at }}
+        run: |
+          bash .github/scripts/verify-ecs-deployment.sh
