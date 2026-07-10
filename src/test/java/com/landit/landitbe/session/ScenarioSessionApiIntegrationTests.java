@@ -83,8 +83,6 @@ class ScenarioSessionApiIntegrationTests {
         jdbcTemplate.update("DELETE FROM scenario");
         jdbcTemplate.update("DELETE FROM category_language_variant");
         jdbcTemplate.update("DELETE FROM category");
-        jdbcTemplate.update("UPDATE user_profile SET ai_tutor_id = NULL");
-        jdbcTemplate.update("DELETE FROM ai_tutor");
     }
 
     @Test
@@ -95,7 +93,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9001);
         assignAiTutor(userId, 9001);
         seedCategory(1001, 1, "ACTIVE", "음식");
-        seedScenario(2001, 1001, 1, "AI", "ACTIVE", 4, "voice-food");
+        seedScenario(2001, 1001, 1, "AI", "ACTIVE", 4);
         seedScenarioVariant(
                 3001,
                 2001,
@@ -107,6 +105,7 @@ class ScenarioSessionApiIntegrationTests {
                 "좋아하는 음식이 있어? 왜 좋아해?",
                 "음식 이야기는 처음 대화를 열기 좋다.",
                 "GOOD",
+                ttsVoiceId("en-US-Harper:MAI-Voice-2"),
                 "ACTIVE"
         );
 
@@ -120,7 +119,11 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"))
                 .andExpect(jsonPath("$.data.firstSpeaker").value("AI"))
                 .andExpect(jsonPath("$.data.userOpeningInstruction").value(nullValue()))
-                .andExpect(jsonPath("$.data.ttsVoiceSetId").value("voice-food"))
+                .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
+                .andExpect(jsonPath("$.data.ttsVoice.model").value("microsoft/mai-voice-2"))
+                .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId")
+                        .value("en-US-Harper:MAI-Voice-2"))
+                .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
                 .andExpect(jsonPath("$.data.currentMessage.messageId").value(notNullValue()))
                 .andExpect(jsonPath("$.data.currentMessage.turnNumber").value(1))
                 .andExpect(jsonPath("$.data.currentMessage.messageSequence").value(1))
@@ -155,7 +158,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9101);
         assignAiTutor(userId, 9101);
         seedCategory(1101, 1, "ACTIVE", "음식");
-        seedScenario(2101, 1101, 1, "AI", "ACTIVE", 2, "voice-food");
+        seedScenario(2101, 1101, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
                 3101,
                 2101,
@@ -165,6 +168,7 @@ class ScenarioSessionApiIntegrationTests {
                 null,
                 "What food do you like? Why do you like it?",
                 "좋아하는 음식이 있어? 왜 좋아해?",
+                null,
                 null,
                 null,
                 "ACTIVE"
@@ -272,7 +276,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9108);
         assignAiTutor(userId, 9108);
         seedCategory(1108, 1, "ACTIVE", "카페");
-        seedScenario(2108, 1108, 1, "USER", "ACTIVE", 1, null);
+        seedScenario(2108, 1108, 1, "USER", "ACTIVE", 1);
         seedScenarioVariant(
                 3108,
                 2108,
@@ -280,6 +284,7 @@ class ScenarioSessionApiIntegrationTests {
                 "카페에서 음료를 주문합니다.",
                 "원하는 음료를 주문합니다.",
                 "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
+                null,
                 null,
                 null,
                 null,
@@ -329,7 +334,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9102);
         assignAiTutor(userId, 9102);
         seedCategory(1102, 1, "ACTIVE", "음식");
-        seedScenario(2102, 1102, 1, "AI", "ACTIVE", 1, null);
+        seedScenario(2102, 1102, 1, "AI", "ACTIVE", 1);
         seedScenarioVariant(
                 3102,
                 2102,
@@ -339,6 +344,7 @@ class ScenarioSessionApiIntegrationTests {
                 null,
                 "What food do you like?",
                 "어떤 음식을 좋아해?",
+                null,
                 null,
                 null,
                 "ACTIVE"
@@ -390,7 +396,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9103);
         assignAiTutor(userId, 9103);
         seedCategory(1103, 1, "ACTIVE", "기숙사");
-        seedScenario(2103, 1103, 1, "AI", "ACTIVE", 2, null);
+        seedScenario(2103, 1103, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
                 3103,
                 2103,
@@ -400,6 +406,7 @@ class ScenarioSessionApiIntegrationTests {
                 null,
                 "What do you want me to do?",
                 "내가 어떻게 해주면 좋겠어?",
+                null,
                 null,
                 null,
                 "ACTIVE"
@@ -468,7 +475,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9104);
         assignAiTutor(ownerId, 9104);
         seedCategory(1104, 1, "ACTIVE", "권한");
-        seedScenario(2104, 1104, 1, "AI", "ACTIVE", 2, null);
+        seedScenario(2104, 1104, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
                 3104,
                 2104,
@@ -478,6 +485,7 @@ class ScenarioSessionApiIntegrationTests {
                 null,
                 "Hello",
                 "안녕",
+                null,
                 null,
                 null,
                 "ACTIVE"
@@ -597,7 +605,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9107);
         assignAiTutor(userId, 9107);
         seedCategory(1107, 1, "ACTIVE", "AI 실패");
-        seedScenario(2107, 1107, 1, "AI", "ACTIVE", 2, null);
+        seedScenario(2107, 1107, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
                 3107,
                 2107,
@@ -607,6 +615,7 @@ class ScenarioSessionApiIntegrationTests {
                 null,
                 "Hello",
                 "안녕",
+                null,
                 null,
                 null,
                 "ACTIVE"
@@ -648,7 +657,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9002);
         assignAiTutor(userId, 9002);
         seedCategory(1002, 1, "ACTIVE", "카페");
-        seedScenario(2002, 1002, 1, "USER", "ACTIVE", 3, null);
+        seedScenario(2002, 1002, 1, "USER", "ACTIVE", 3);
         seedScenarioVariant(
                 3002,
                 2002,
@@ -660,6 +669,7 @@ class ScenarioSessionApiIntegrationTests {
                 null,
                 null,
                 null,
+                ttsVoiceId("en-US-Ethan:MAI-Voice-2"),
                 "ACTIVE"
         );
 
@@ -672,7 +682,9 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.firstSpeaker").value("USER"))
                 .andExpect(jsonPath("$.data.userOpeningInstruction")
                         .value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
-                .andExpect(jsonPath("$.data.ttsVoiceSetId").value(nullValue()))
+                .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId")
+                        .value("en-US-Ethan:MAI-Voice-2"))
+                .andExpect(jsonPath("$.data.ttsVoice.gender").value("FEMALE"))
                 .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
                 .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
                 .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(3))
@@ -700,6 +712,36 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
+    void startScenarioReturnsNullTtsVoiceWhenVoiceIsInactive() throws Exception {
+        JsonNode loginBody = login("inactive-tts@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9011);
+        assignAiTutor(userId, 9011);
+        seedCategory(1011, 1, "ACTIVE", "비활성 음성");
+        seedScenario(2011, 1011, 1, "AI", "ACTIVE", 2);
+        seedScenarioVariant(
+                3011,
+                2011,
+                "비활성 음성",
+                "비활성 음성을 사용합니다.",
+                "비활성 음성 응답을 확인한다.",
+                null,
+                "Hello",
+                "안녕하세요",
+                null,
+                null,
+                insertTtsVoice(990201, "test-session-inactive-voice", "INACTIVE"),
+                "ACTIVE"
+        );
+
+        mockMvc.perform(post("/api/v1/scenarios/2011/sessions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.ttsVoice").value(nullValue()));
+    }
+
+    @Test
     void startScenarioHandlesConcurrentProgressCreationForSameUser() throws Exception {
         JsonNode loginBody = login("concurrent-start@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
@@ -707,7 +749,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9010);
         assignAiTutor(userId, 9010);
         seedCategory(1010, 1, "ACTIVE", "동시 시작");
-        seedScenario(2010, 1010, 1, "USER", "ACTIVE", 2, null);
+        seedScenario(2010, 1010, 1, "USER", "ACTIVE", 2);
         seedScenarioVariant(
                 3010,
                 2010,
@@ -715,6 +757,7 @@ class ScenarioSessionApiIntegrationTests {
                 "동시 시작",
                 "동시 시작",
                 "먼저 말해보세요.",
+                null,
                 null,
                 null,
                 null,
@@ -789,8 +832,10 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9003);
         assignAiTutor(userId, 9003);
         seedCategory(1003, 1, "INACTIVE", "잠긴 카테고리");
-        seedScenario(2003, 1003, 1, "AI", "ACTIVE", 2, null);
-        seedScenarioVariant(3003, 2003, "잠김", "잠김", "잠김", null, "Hello", "안녕", null, null, "ACTIVE");
+        seedScenario(2003, 1003, 1, "AI", "ACTIVE", 2);
+        seedScenarioVariant(
+                3003, 2003, "잠김", "잠김", "잠김", null, "Hello", "안녕", null, null, null, "ACTIVE"
+        );
 
         mockMvc.perform(post("/api/v1/scenarios/2003/sessions")
                         .header(HttpHeaders.AUTHORIZATION,
@@ -806,13 +851,13 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(9004);
         assignAiTutor(userId, 9004);
         seedCategory(1004, 1, "ACTIVE", "순차 카테고리");
-        seedScenario(2004, 1004, 1, "AI", "ACTIVE", 2, null);
+        seedScenario(2004, 1004, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
-                3004, 2004, "첫번째", "첫번째", "첫번째", null, "First", "첫번째", null, null, "ACTIVE"
+                3004, 2004, "첫번째", "첫번째", "첫번째", null, "First", "첫번째", null, null, null, "ACTIVE"
         );
-        seedScenario(2005, 1004, 2, "AI", "ACTIVE", 2, null);
+        seedScenario(2005, 1004, 2, "AI", "ACTIVE", 2);
         seedScenarioVariant(
-                3005, 2005, "두번째", "두번째", "두번째", null, "Second", "두번째", null, null, "ACTIVE"
+                3005, 2005, "두번째", "두번째", "두번째", null, "Second", "두번째", null, null, null, "ACTIVE"
         );
 
         mockMvc.perform(post("/api/v1/scenarios/2005/sessions")
@@ -907,7 +952,7 @@ class ScenarioSessionApiIntegrationTests {
         seedAiTutor(aiTutorId);
         assignAiTutor(userId, aiTutorId);
         seedCategory(categoryId, 1, "ACTIVE", "종료 테스트");
-        seedScenario(scenarioId, categoryId, 1, "USER", "ACTIVE", 2, null);
+        seedScenario(scenarioId, categoryId, 1, "USER", "ACTIVE", 2);
         seedScenarioVariant(
                 variantId,
                 scenarioId,
@@ -915,6 +960,7 @@ class ScenarioSessionApiIntegrationTests {
                 "종료",
                 "종료",
                 "먼저 말해보세요.",
+                null,
                 null,
                 null,
                 null,
@@ -966,13 +1012,11 @@ class ScenarioSessionApiIntegrationTests {
                             id,
                             accent_locale,
                             target_locale,
-                            voice_provider,
-                            voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'en-US', 'EN', 'TEST', 'voice-id', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'EN', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 aiTutorId
         );
@@ -1016,8 +1060,7 @@ class ScenarioSessionApiIntegrationTests {
             int displayOrder,
             String firstSpeaker,
             String status,
-            int totalQuestionCount,
-            String ttsVoiceSetId
+            int totalQuestionCount
     ) {
         jdbcTemplate.update("""
                         INSERT INTO scenario (
@@ -1030,19 +1073,17 @@ class ScenarioSessionApiIntegrationTests {
                             thumbnail_url,
                             display_order,
                             status,
-                            tts_voice_set_id,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, 'tutor', 'EASY', ?, ?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, 'tutor', 'EASY', ?, ?, NULL, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 scenarioId,
                 categoryId,
                 firstSpeaker,
                 totalQuestionCount,
                 displayOrder,
-                status,
-                ttsVoiceSetId
+                status
         );
     }
 
@@ -1057,6 +1098,7 @@ class ScenarioSessionApiIntegrationTests {
             String aiOpeningMessageTranslation,
             String aiOpeningInnerThought,
             String aiOpeningInnerThoughtType,
+            Long ttsVoiceId,
             String status
     ) {
         jdbcTemplate.update("""
@@ -1073,6 +1115,7 @@ class ScenarioSessionApiIntegrationTests {
                             ai_opening_message_translation,
                             ai_opening_inner_thought,
                             ai_opening_inner_thought_type,
+                            tts_voice_id,
                             status,
                             created_at,
                             updated_at
@@ -1089,6 +1132,7 @@ class ScenarioSessionApiIntegrationTests {
                 aiOpeningMessageTranslation,
                 aiOpeningInnerThought,
                 aiOpeningInnerThoughtType,
+                ttsVoiceId,
                 status
         );
     }
@@ -1134,6 +1178,37 @@ class ScenarioSessionApiIntegrationTests {
         );
     }
 
+    private long ttsVoiceId(String providerVoiceId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tts_voice WHERE provider_voice_id = ?",
+                Long.class,
+                providerVoiceId
+        );
+    }
+
+    private long insertTtsVoice(long id, String providerVoiceId, String status) {
+        jdbcTemplate.update("""
+                        INSERT INTO tts_voice (
+                            id,
+                            provider,
+                            model,
+                            provider_voice_id,
+                            gender,
+                            description,
+                            accent_locale,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, 'OPENROUTER', 'test-model', ?, 'MALE', '테스트 음성',
+                                'en-US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """,
+                id,
+                providerVoiceId,
+                status
+        );
+        return id;
+    }
     private void assertLearningSession(
             long sessionId,
             long userId,
