@@ -3,17 +3,23 @@ package com.landit.landitbe;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.landit.landitbe.session.infrastructure.ai.RemoteAiConversationClient;
 import java.util.TimeZone;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 @ActiveProfiles("test")
-@SpringBootTest
+@SpringBootTest(properties = "landit.ai.client-mode=remote")
 class LanditBeApplicationTests {
 
+	@Autowired
+	private RemoteAiConversationClient remoteAiConversationClient;
+
 	@Test
-	void contextLoads() {
+	void remoteAiClientModeLoadsApplicationContext() {
+		assertThat(remoteAiConversationClient).isNotNull();
 	}
 
 	@Test
