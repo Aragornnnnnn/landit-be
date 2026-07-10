@@ -99,7 +99,7 @@ jobs:
           echo "$deployment" | jq '.service | {serviceName, status, desiredCount, runningCount, deployments}'
 
       - name: Verify ECS service
-        timeout-minutes: 5
+        timeout-minutes: 10
         env:
           DEPLOYMENT_ID: ${{ steps.deploy.outputs.deployment_id }}
           DEPLOYMENT_CREATED_AT: ${{ steps.deploy.outputs.deployment_created_at }}
