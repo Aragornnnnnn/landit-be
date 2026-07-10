@@ -14,12 +14,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
-import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
 import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
+import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -382,7 +382,7 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
-    void submitMessageStoresClosingMessageWhenAiReportsGoalCompleted() throws Exception {
+    void submitMessageContinuesWhenAiReportsGoalCompletedButNextQuestionExists() throws Exception {
         fakeAiConversationClient.completeGoalOnNextMessage();
         JsonNode loginBody = login("goal-completed-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
@@ -424,25 +424,24 @@ class ScenarioSessionApiIntegrationTests {
                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.submittedMessage.innerThought")
-                        .value("마지막까지 답해줘서 대화를 자연스럽게 마무리하면 좋겠다."))
+                        .value("매운 피자를 좋아한다고 이유까지 말해주네."))
                 .andExpect(jsonPath("$.data.nextMessage.content")
-                        .value("Thanks for sharing. That was a good conversation."))
-                .andExpect(jsonPath("$.data.progress.completed").value(true));
+                        .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                .andExpect(jsonPath("$.data.progress.completed").value(false));
 
         assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
-        assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNull();
         assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
-        assertThat(fakeAiConversationClient.closingMessageTransactionActive()).containsOnly(false);
-        assertThat(fakeAiConversationClient.lastClosingMessageRequest().closingReason().name())
-                .isEqualTo("GOAL_COMPLETED");
+        assertThat(fakeAiConversationClient.closingMessageTransactionActive()).isEmpty();
         assertLearningSession(
                 sessionId,
                 userId,
                 9103,
-                "COMPLETED",
-                "SYSTEM",
-                "GOAL_COMPLETED"
+                "IN_PROGRESS",
+                null,
+                null
         );
+        assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
         List<String> contents = jdbcTemplate.queryForList(
                 """
                         SELECT shm.content
@@ -457,7 +456,7 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(contents).containsExactly(
                 "What do you want me to do?",
                 "Could you keep it down at night?",
-                "Thanks for sharing. That was a good conversation."
+                "Oh, you like spicy pizza. What food did you eat recently?"
         );
     }
 
