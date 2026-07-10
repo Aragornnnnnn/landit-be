@@ -52,6 +52,7 @@ public class ScenarioQueryService {
         return categoryGroupsById.values().stream().toList();
     }
 
+    /** 조회 row 하나에 완료 상태와 잠금 규칙을 적용해 시나리오 응답으로 조립한다. */
     private static ScenarioResponse toScenarioResponse(
             ScenarioListRow scenarioRow,
             boolean categoryLocked,
@@ -79,6 +80,7 @@ public class ScenarioQueryService {
         );
     }
 
+    /** 잠금 우선순위에 따라 FE에 노출할 잠금 사유를 결정한다. */
     private static String lockReason(
             boolean categoryLocked,
             boolean scenarioInactive,
@@ -96,6 +98,7 @@ public class ScenarioQueryService {
         return null;
     }
 
+    /** 완료된 시나리오에만 기존 최고 별점을 노출한다. */
     private static BigDecimal completedStarRating(boolean completed, BigDecimal bestStarRating) {
         if (!completed || bestStarRating == null) {
             return null;
@@ -103,6 +106,7 @@ public class ScenarioQueryService {
         return bestStarRating;
     }
 
+    /** 잠기지 않은 시나리오의 첫 화자에 맞춰 시작 화면 미리보기를 조립한다. */
     private static OpeningPreviewResponse openingPreview(ScenarioListRow scenarioRow, boolean locked) {
         if (locked) {
             return null;
@@ -128,6 +132,7 @@ public class ScenarioQueryService {
         );
     }
 
+    /** 활성 상태로 조회된 언어 variant의 TTS 음성을 응답 객체로 변환한다. */
     private static TtsVoiceResponse ttsVoice(ScenarioListRow scenarioRow) {
         return TtsVoiceResponse.from(
                 scenarioRow.ttsVoiceProvider(),
@@ -137,6 +142,7 @@ public class ScenarioQueryService {
         );
     }
 
+    /** 활성 상태가 아닌 콘텐츠를 잠금 대상으로 판단한다. */
     private static boolean inactive(ActiveStatus status) {
         return status != ActiveStatus.ACTIVE;
     }
@@ -162,10 +168,12 @@ public class ScenarioQueryService {
             );
         }
 
+        /** 같은 카테고리에 속한 시나리오 조회 row를 표시 순서대로 누적한다. */
         private void addScenarioRow(ScenarioListRow scenarioRow) {
             scenarioRows.add(scenarioRow);
         }
 
+        /** 누적한 시나리오에 순차 잠금 규칙을 적용해 카테고리 응답을 만든다. */
         private CategoryResponse toResponse() {
             List<ScenarioResponse> scenarios = new ArrayList<>();
             boolean previousScenarioCompleted = true;

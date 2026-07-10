@@ -17,7 +17,7 @@ public record TtsVoiceResponse(
         String gender
 ) {
 
-    /** 활성 TTS 음성 조회 결과를 응답으로 변환하고 미설정 결과는 null로 유지한다. */
+    /** 활성 TTS 음성 조회 결과를 응답으로 변환하고 미설정 또는 비활성 결과는 null로 유지한다. */
     public static TtsVoiceResponse from(
             TtsVoiceProvider provider,
             String model,

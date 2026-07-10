@@ -120,6 +120,7 @@ public class AuthService {
         userProfile.withdraw();
     }
 
+    /** 소셜 제공자별 닉네임 제공 방식 차이를 프로필에 저장할 값으로 정규화한다. */
     private String resolveNickname(SocialProvider provider, String requestNickname, String oidcNickname) {
         if (provider != SocialProvider.APPLE) {
             return oidcNickname;
@@ -127,6 +128,7 @@ public class AuthService {
         return requestNickname == null || requestNickname.isBlank() ? null : requestNickname;
     }
 
+    /** 기존 소셜 연결 사용자를 갱신하거나, 기본 AI 튜터가 설정된 신규 프로필을 생성한다. */
     private UserResult findOrCreateUser(OidcUserInfo userInfo, String nickname) {
         return oauthIdentityRepository.findByProviderAndProviderUserIdAndStatus(
                         userInfo.provider(),
@@ -159,6 +161,7 @@ public class AuthService {
                 });
     }
 
+    /** 신규 회원에게 할당할 활성 미국 영어 튜터가 정확히 하나인지 검증하고 ID를 반환한다. */
     private Long requireDefaultAiTutorId() {
         List<AiTutor> defaultTutorCandidates = aiTutorRepository
                 .findAllByAccentLocaleAndTargetLocaleAndStatus(
@@ -172,6 +175,7 @@ public class AuthService {
         return defaultTutorCandidates.getFirst().getId();
     }
 
+    /** 내부 사용자 및 로그인 결과를 인증 API 응답 형식으로 변환한다. */
     private AuthUserResponse userResponse(UserResult userResult) {
         UserProfile userProfile = userResult.userProfile();
         return new AuthUserResponse(
@@ -183,6 +187,7 @@ public class AuthService {
         );
     }
 
+    /** access token과 회전용 refresh token을 발급하고 refresh token 해시를 저장한다. */
     private IssuedTokens issueTokens(UserProfile userProfile) {
         String accessToken = tokenService.createAccessToken(userProfile);
         String refreshToken = tokenService.createRefreshToken();

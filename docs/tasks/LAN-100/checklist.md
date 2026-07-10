@@ -15,6 +15,7 @@
 - [x] 비활성 또는 미설정 TTS 음성이 `null`인지 검증한다.
 - [x] Swagger/OpenAPI 응답 설명을 갱신한다.
 - [x] `./gradlew test`를 실행한다.
+- [x] 흐름을 조율하는 메서드의 역할과 책임 Javadoc을 보강한다.
 - [x] 변경을 논리 단위 커밋으로 정리한다.
 - [ ] PostgreSQL에서 V14 Flyway 마이그레이션을 실행한다.
 - [ ] 운영 DB의 기존 `scenario.tts_voice_set_id` 값과 이전 결과를 확인한다.

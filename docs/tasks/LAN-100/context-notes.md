@@ -22,5 +22,6 @@
 - 비활성 또는 미설정 TTS 음성은 LEFT JOIN 결과를 비워 `ttsVoice = null`로 반환한다.
 - `./gradlew test --tests com.landit.landitbe.DatabaseSchemaIntegrationTests`가 통과했다.
 - `./gradlew test` 전체 테스트가 통과했다.
+- UseCase와 조회 조립 클래스의 메서드 분리가 많아 흐름을 따라가기 어려울 수 있으므로, 조건 검증, 조회, 생성, 응답 조립 책임이 드러나지 않는 메서드에 Javadoc을 보강했다.
 - 로컬 환경에 Docker와 `psql`이 없어 PostgreSQL Flyway 실행은 수행하지 못했다.
 - 운영 DB 접근 없이 작업했으므로 기존 `scenario.tts_voice_set_id` 값별 건수와 실제 이전 결과 확인은 남아 있다.

@@ -71,6 +71,7 @@ public class ScenarioSessionStartUseCase {
         return toStartResponse(learningSession, startRow, currentMessage);
     }
 
+    /** 세션 시작 흐름을 직렬화할 수 있도록 활성 사용자 프로필을 쓰기 잠금으로 조회한다. */
     private UserProfile findActiveUser(long userId) {
         // 같은 사용자의 동시 세션 시작 요청이 progress row 생성 구간을
         // 동시에 통과하지 못하도록 사용자 row를 잠근다.
@@ -78,12 +79,14 @@ public class ScenarioSessionStartUseCase {
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
     }
 
+    /** 사용자 언어 설정에 맞는 시나리오 시작 콘텐츠와 TTS 정보를 조회한다. */
     private ScenarioSessionStartRow findStartRow(long userId, long scenarioId) {
         return scenarioSessionStartQueryRepository
                 .findStartRow(userId, scenarioId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
     }
 
+    /** 학습 세션에 반드시 연결할 AI 튜터 ID의 존재를 검증한다. */
     private Long requireAiTutorId(UserProfile userProfile) {
         if (userProfile.getAiTutorId() == null) {
             throw new ApiException(
@@ -94,6 +97,7 @@ public class ScenarioSessionStartUseCase {
         return userProfile.getAiTutorId();
     }
 
+    /** 콘텐츠 활성 상태와 직전 시나리오 완료 조건을 모두 검증한다. */
     private void assertPlayable(long userId, ScenarioSessionStartRow startRow) {
         assertContentActive(startRow);
         assertPreviousScenarioCleared(userId, startRow);
@@ -155,6 +159,7 @@ public class ScenarioSessionStartUseCase {
                 );
     }
 
+    /** 학습 세션과 시나리오 세션을 함께 생성해 시작한 언어 variant를 연결한다. */
     private LearningSession createLearningSession(
             long userId,
             UserProfile userProfile,
@@ -207,6 +212,7 @@ public class ScenarioSessionStartUseCase {
         }
     }
 
+    /** AI first 시나리오의 세션 히스토리와 첫 AI 메시지를 저장한다. */
     private SessionHistoryMessage saveAiOpeningHistoryMessage(
             Long learningSessionId,
             UserProfile userProfile,
@@ -234,6 +240,7 @@ public class ScenarioSessionStartUseCase {
         return message;
     }
 
+    /** 저장된 AI 시작 메시지를 세션 시작 응답의 현재 메시지 형식으로 변환한다. */
     private CurrentMessageResponse toCurrentMessageResponse(SessionHistoryMessage message) {
         return new CurrentMessageResponse(
                 message.getId(),
@@ -276,6 +283,7 @@ public class ScenarioSessionStartUseCase {
         );
     }
 
+    /** 활성 상태가 아닌 카테고리와 시나리오 콘텐츠를 잠금 대상으로 판단한다. */
     private boolean inactive(ActiveStatus status) {
         return status != ActiveStatus.ACTIVE;
     }
