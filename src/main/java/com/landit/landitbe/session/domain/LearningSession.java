@@ -111,6 +111,14 @@ public class LearningSession extends BaseTimeEntity {
         this.endedAt = endedAt;
     }
 
+    /** 시스템이 목표 달성 또는 최대 턴 도달로 세션을 완료한다. */
+    public void completeBySystem(CompletionReason completionReason, LocalDateTime endedAt) {
+        this.status = LearningSessionStatus.COMPLETED;
+        this.endedBy = SessionEndActor.SYSTEM;
+        this.completionReason = completionReason;
+        this.endedAt = endedAt;
+    }
+
     /** 세션이 진행 중인지 반환한다. */
     public boolean isInProgress() {
         return status == LearningSessionStatus.IN_PROGRESS;
