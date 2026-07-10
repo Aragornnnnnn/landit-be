@@ -1,0 +1,35 @@
+# develop 대상 PR의 애플리케이션과 배포 검증 스크립트를 검사한다.
+name: Verify pull request
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify application and deployment script
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Verify deployment script syntax
+        run: bash -n .github/scripts/verify-ecs-deployment.sh
+
+      - name: Test deployment script
+        run: bash .github/scripts/test/verify-ecs-deployment_test.sh
+
+      - name: Run application tests
+        run: ./gradlew test --no-daemon
