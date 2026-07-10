@@ -107,7 +107,7 @@ class DatabaseSchemaIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        values (990001, 'nps-test-user', 'en', 'ko', 1, 'NOT_DETERMINED',
+                        values (990001, 'nps-test-user', 'EN', 'KR', 1, 'NOT_DETERMINED',
                             'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """
         );

@@ -56,7 +56,7 @@ class ScenarioListApiIntegrationTests {
         mockMvc.perform(get("/api/v1/scenarios"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     @Test
@@ -245,7 +245,7 @@ class ScenarioListApiIntegrationTests {
                                 created_at,
                                 updated_at
                             )
-                            VALUES (?, 202, 'en', 'CLEARED', 2.5, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                            VALUES (?, 202, 'EN', 'CLEARED', 2.5, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
                                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             """,
                     clearedUserId
@@ -270,7 +270,7 @@ class ScenarioListApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'ko', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 categoryId,
                 categoryName
@@ -344,7 +344,7 @@ class ScenarioListApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'en', 'ko', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 scenarioId,
                 title,

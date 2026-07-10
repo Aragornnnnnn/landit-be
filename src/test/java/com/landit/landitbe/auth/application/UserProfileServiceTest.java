@@ -34,8 +34,8 @@ class UserProfileServiceTest {
     void 활성_사용자의_locale을_반환한다() {
         // given: 프로필에 en/ko locale이 저장된 활성 사용자
         UserProfile userProfile = mock(UserProfile.class);
-        when(userProfile.getTargetLocale()).thenReturn("en");
-        when(userProfile.getBaseLocale()).thenReturn("ko");
+        when(userProfile.getTargetLocale()).thenReturn("EN");
+        when(userProfile.getBaseLocale()).thenReturn("KR");
         when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
                 .thenReturn(Optional.of(userProfile));
 
@@ -43,8 +43,8 @@ class UserProfileServiceTest {
         UserLocale locale = userProfileService.getUserLocale(USER_ID);
 
         // then
-        assertThat(locale.targetLocale()).isEqualTo("en");
-        assertThat(locale.baseLocale()).isEqualTo("ko");
+        assertThat(locale.targetLocale()).isEqualTo("EN");
+        assertThat(locale.baseLocale()).isEqualTo("KR");
     }
 
     /** 활성 사용자가 아니면(미존재/탈퇴) INVALID_TOKEN 예외를 던지는지 검증한다. (토큰 관련 오류는 INVALID_TOKEN으로 통일) */

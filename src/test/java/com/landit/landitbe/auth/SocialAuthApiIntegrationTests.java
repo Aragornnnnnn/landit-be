@@ -302,7 +302,7 @@ class SocialAuthApiIntegrationTests {
         mockMvc.perform(delete("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
 
         JsonNode loginBody = login(
                 "GOOGLE",

@@ -43,18 +43,18 @@ class ExpressionApiIntegrationTests {
 
     private final ObjectMapper objectMapper = new ObjectMapper(); // 응답 JSON 파싱용
 
-    /** 토큰 없이 호출하면 401(AUTH_REQUIRED)로 거절되는지 검증한다. */
+    /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
     @Test
     void getExpressionsRejectsMissingAccessToken() throws Exception {
         // given: 조회 대상 시나리오와 표현들이 DB에 존재
         Long scenarioId = seedScenarioWithExpressions();
 
         // when: Authorization 헤더 없이 호출하면
-        // then: 401 + AUTH_REQUIRED
+        // then: 401 + INVALID_TOKEN
         mockMvc.perform(get("/api/v1/expressions/{scenarioId}", scenarioId))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     /** 일부 완료 상태에서 표현이 학습 순서대로 반환되고, 완료/해금/잠김 3가지 상태가 규칙대로 계산되는지 검증한다. */
@@ -185,7 +185,7 @@ class ExpressionApiIntegrationTests {
     void getExpressionsReturnsOnlyUserLocaleExpressions() throws Exception {
         // given: en-ko 표현 5개가 있는 시나리오에 en-ja 표현 1개(displayOrder 1 중복)를 추가로 심는다
         Long scenarioId = seedScenarioWithExpressions();
-        insertWritingExpression(scenarioId, "en", "ja", 1, "ja-only expression", "日本語訳", LocalDateTime.now());
+        insertWritingExpression(scenarioId, "EN", "JA", 1, "ja-only expression", "日本語訳", LocalDateTime.now());
 
         String accessToken = login("google-expr-5", "expr5@example.com", "Expr User5", "expr-nonce-5");
 
@@ -256,7 +256,7 @@ class ExpressionApiIntegrationTests {
             LocalDateTime now
     ) {
         // 기본 시딩은 사용자 기본 locale(en/ko)과 동일하게 심는다.
-        insertWritingExpression(scenarioId, "en", "ko", displayOrder, targetExpressionText, baseExpressionMeaningText, now);
+        insertWritingExpression(scenarioId, "EN", "KR", displayOrder, targetExpressionText, baseExpressionMeaningText, now);
     }
 
     /** locale까지 지정해 표현을 심는 버전. 다국어 데이터 필터 검증에 사용한다. */

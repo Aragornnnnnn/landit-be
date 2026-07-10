@@ -32,8 +32,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         seedQuestionLanguageVariant(
                 991301L,
                 991201L,
-                "en",
-                "ko",
+                "EN",
+                "KR",
                 "What food do you like?",
                 "좋아하는 음식이 뭐야?",
                 "ACTIVE"
@@ -41,8 +41,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         seedQuestionLanguageVariant(
                 991302L,
                 991202L,
-                "en",
-                "ko",
+                "EN",
+                "KR",
                 "Do you cook often?",
                 "요리를 자주 해?",
                 "ACTIVE"
@@ -51,8 +51,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         Optional<ScenarioQuestionRow> question = scenarioQuestionQueryRepository.findActiveQuestion(
                 991101L,
                 2,
-                "en",
-                "ko"
+                "EN",
+                "KR"
         );
 
         assertThat(question).isPresent();
@@ -70,8 +70,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         seedQuestionLanguageVariant(
                 991303L,
                 991203L,
-                "en",
-                "ko",
+                "EN",
+                "KR",
                 "Inactive question",
                 "비활성 질문",
                 "ACTIVE"
@@ -79,15 +79,15 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         seedQuestionLanguageVariant(
                 991304L,
                 991204L,
-                "en",
-                "ko",
+                "EN",
+                "KR",
                 "Inactive variant",
                 "비활성 번역",
                 "INACTIVE"
         );
 
-        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, "en", "ko")).isEmpty();
-        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, "en", "ko")).isEmpty();
+        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, "EN", "KR")).isEmpty();
+        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, "EN", "KR")).isEmpty();
     }
 
     private void seedScenario(long scenarioId) {

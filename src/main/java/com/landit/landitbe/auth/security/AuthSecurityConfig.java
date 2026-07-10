@@ -95,7 +95,7 @@ public class AuthSecurityConfig {
     }
 
     private AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> failureResponseWriter.write(response, ErrorCode.AUTH_REQUIRED);
+        return (request, response, authException) -> failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
     }
 
     private AccessDeniedHandler accessDeniedHandler() {

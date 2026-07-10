@@ -43,18 +43,18 @@ class ExpressionLearningApiIntegrationTests {
 
     private final ObjectMapper objectMapper = new ObjectMapper(); // 응답 JSON 파싱용
 
-    /** 토큰 없이 호출하면 401(AUTH_REQUIRED)로 거절되는지 검증한다. */
+    /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
     @Test
     void learningStartRejectsMissingAccessToken() throws Exception {
         // given: 조회 대상 표현이 DB에 존재
         Long expressionId = seedExpression();
 
         // when: Authorization 헤더 없이 호출하면
-        // then: 401 + AUTH_REQUIRED
+        // then: 401 + INVALID_TOKEN
         mockMvc.perform(get("/api/v1/expressions/{expressionId}/learning-start", expressionId))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     /** 정상 호출 시 DB에 심어둔 표현 상세가 응답 필드에 그대로 담기는지 검증한다. */
@@ -154,7 +154,7 @@ class ExpressionLearningApiIntegrationTests {
                         + "representative_sentence_text, representative_sentence_translation, "
                         + "representative_sentence_translation_highlight_text, representative_image_url, "
                         + "practice_examples_payload, status, created_at, updated_at) "
-                        + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'en', 'ko', 1, 'blow my mind', '끝내주게 놀랍다', "
+                        + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
                         + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
                         + "'What should I definitely see in Korea?', '한국에서 뭘 꼭 봐야 해?', "
                         + "'Gyeongbokgung Palace will blow your mind.', '경복궁은 널 완전 놀라게 할 거야.', "
