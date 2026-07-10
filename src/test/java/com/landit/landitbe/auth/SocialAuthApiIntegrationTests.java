@@ -150,6 +150,38 @@ class SocialAuthApiIntegrationTests {
     }
 
     @Test
+    void socialLoginUsesRequestNicknameForApple() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"APPLE",
+                                  "idToken":"apple-sub-2|apple-nickname@example.com|Id Token Name|apple-nonce",
+                                  "nonce":"apple-nonce",
+                                  "nickname":"Apple Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
+    }
+
+    @Test
+    void socialLoginIgnoresRequestNicknameForGoogle() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"GOOGLE",
+                                  "idToken":"google-sub-4|google-nickname@example.com|Id Token Name|google-nonce",
+                                  "nonce":"google-nonce",
+                                  "nickname":"Ignored Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Id Token Name"));
+    }
+
+    @Test
     void socialLoginRejectsUnsupportedProvider() throws Exception {
         mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)

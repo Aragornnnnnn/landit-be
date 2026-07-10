@@ -55,6 +55,9 @@ public class AuthService {
     public AuthTokenResponse socialLogin(SocialLoginRequest request) {
         SocialProvider provider = SocialProvider.from(request.provider());
         OidcUserInfo userInfo = oidcTokenVerifier.verify(provider, request.idToken(), request.nonce());
+        if (provider == SocialProvider.APPLE && request.nickname() != null && !request.nickname().isBlank()) {
+            userInfo = new OidcUserInfo(provider, userInfo.sub(), userInfo.email(), request.nickname());
+        }
         UserResult userResult = findOrCreateUser(userInfo);
         IssuedTokens issuedTokens = issueTokens(userResult.userProfile());
 
