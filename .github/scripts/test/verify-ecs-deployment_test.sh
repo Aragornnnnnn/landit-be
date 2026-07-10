@@ -71,8 +71,8 @@ MOCK_TASK_LIST_JSON='{"taskArns":["arn:task/new"]}'
 MOCK_TASKS_JSON='{"tasks":[{"taskArn":"arn:task/new","taskDefinitionArn":"arn:task-definition/api:1","lastStatus":"STOPPED","startedAt":"2026-07-11T00:00:01Z","stopCode":"EssentialContainerExited","stoppedReason":"Essential container exited","containers":[{"name":"api","essential":true,"exitCode":0,"reason":"error"}]}]}'
 run_case essential_container_exited 1 "stopped task indicates startup failure"
 
-MOCK_TASKS_JSON='{"tasks":[{"taskArn":"arn:task/new","taskDefinitionArn":"arn:task-definition/api:1","lastStatus":"STOPPED","startedAt":"2026-07-11T00:00:01Z","stopCode":"TaskFailedToStart","stoppedReason":"Container exited","containers":[{"name":"api","essential":true,"exitCode":1,"reason":"error"}]}]}'
+MOCK_TASKS_JSON='{"tasks":[{"taskArn":"arn:task/new","taskDefinitionArn":"arn:task-definition/api:1","lastStatus":"STOPPED","createdAt":"2026-07-11T00:00:01Z","startedAt":null,"stopCode":"TaskFailedToStart","stoppedReason":"Container exited","containers":[{"name":"api","essential":true,"exitCode":1,"reason":"error"}]}]}'
 run_case nonzero_exit_code 1 "stopped task indicates startup failure"
 
-MOCK_TASKS_JSON='{"tasks":[{"taskArn":"arn:task/old","taskDefinitionArn":"arn:task-definition/api:1","lastStatus":"STOPPED","startedAt":"2026-07-10T00:00:01Z","stopCode":"EssentialContainerExited","stoppedReason":"Old deployment","containers":[{"name":"api","essential":true,"exitCode":1,"reason":"error"}]}]}'
+MOCK_TASKS_JSON='{"tasks":[{"taskArn":"arn:task/old","taskDefinitionArn":"arn:task-definition/api:1","lastStatus":"STOPPED","createdAt":"2026-07-10T00:00:01Z","startedAt":null,"stopCode":"EssentialContainerExited","stoppedReason":"Old deployment","containers":[{"name":"api","essential":true,"exitCode":1,"reason":"error"}]}]}'
 run_case old_stopped_task 1 "ECS service did not become stable within 5 minutes"

@@ -510,7 +510,7 @@ class ScenarioSessionApiIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
     }
 
     @Test
@@ -1126,7 +1126,7 @@ class ScenarioSessionApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'en', 'ko', ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 questionId,
                 questionText,

@@ -10,3 +10,5 @@
 - `origin/develop` rebase 후 전체 테스트의 기존 `ScenarioSessionApiIntegrationTests` 5건이 fake AI 응답 및 인증 기대값 불일치로 실패한다. 이번 DTO·회귀 테스트 변경 파일과 겹치지 않는다.
 - develop 배포는 Docker 빌드 전에 `./gradlew test --no-daemon`을 실행한다. ECS 검증은 `update-service`가 반환한 PRIMARY deployment ID와 생성 시각만 추적하며 10초 간격, 최대 5분으로 제한한다.
 - Bash mock 검증은 정상 안정화, nullable `failedTasks`, deployment 실패 태스크, essential container 종료, non-zero exit code, 이전 deployment 태스크 무시, 5분 타임아웃을 다룬다.
+- `TaskFailedToStart`는 `startedAt`이 없을 수 있으므로 새 deployment 태스크 필터는 `createdAt`, `startedAt` 순으로 사용한다.
+- `ScenarioSessionApiIntegrationTests`의 5건 실패는 테스트 fixture가 enum 전환 전 locale 값 `en`·`ko`를 저장해 고정 질문을 찾지 못한 것이 원인이다. fixture를 `EN`·`KR`로 맞추고 무인증 응답 기대값을 현재 계약인 `INVALID_TOKEN`으로 정정했다.

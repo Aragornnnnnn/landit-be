@@ -31,13 +31,13 @@ new_deployment_tasks() {
   fi
 
   aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks $task_arns --output json \
-    | jq --arg deployment_created_at "$DEPLOYMENT_CREATED_AT" '{tasks: [.tasks[]? | select((.startedAt // "") >= $deployment_created_at)]}'
+    | jq --arg deployment_created_at "$DEPLOYMENT_CREATED_AT" '{tasks: [.tasks[]? | select((.createdAt // .startedAt // "") >= $deployment_created_at)]}'
 }
 
 print_task_diagnostics() {
   local tasks_json="$1"
   echo "Tasks created by the new deployment"
-  jq '{tasks: [.tasks[]? | {taskArn, taskDefinitionArn, lastStatus, desiredStatus, startedAt, stoppedAt, stopCode, stoppedReason, containers: [.containers[]? | {name, essential, exitCode, reason, logStreamName}]}]}' <<< "$tasks_json"
+  jq '{tasks: [.tasks[]? | {taskArn, taskDefinitionArn, lastStatus, desiredStatus, createdAt, startedAt, stoppedAt, stopCode, stoppedReason, containers: [.containers[]? | {name, essential, exitCode, reason, logStreamName}]}]}' <<< "$tasks_json"
 }
 
 fail_deployment() {
