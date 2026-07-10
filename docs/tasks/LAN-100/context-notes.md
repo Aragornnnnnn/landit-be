@@ -25,3 +25,10 @@
 - UseCase와 조회 조립 클래스의 메서드 분리가 많아 흐름을 따라가기 어려울 수 있으므로, 조건 검증, 조회, 생성, 응답 조립 책임이 드러나지 않는 메서드에 Javadoc을 보강했다.
 - 로컬 환경에 Docker와 `psql`이 없어 PostgreSQL Flyway 실행은 수행하지 못했다.
 - 운영 DB 접근 없이 작업했으므로 기존 `scenario.tts_voice_set_id` 값별 건수와 신규 TTS 음성 지정 정책 확인은 남아 있다.
+
+## 2026-07-11
+
+- 운영 DB에는 기존 `scenario.tts_voice_set_id`와 기존 `ai_tutor` 데이터가 없음을 확인했다.
+- V14의 `user_profile.ai_tutor_id` backfill은 SQL 문자열 검사가 아니라 V13 상태 DB에서 V14를 실제 적용하는 회귀 테스트로 보강한다.
+- TTS 테스트 fixture는 `AccentLocale.EN_US`와 같은 저장값을 사용하고, Harper 여성 및 Ethan 남성 음성에 맞춰 변수명을 정리한다.
+- 세션 시작 테스트가 로그인 뒤 활성 `EN_US`/`EN` 튜터를 추가하면 다음 로그인에서 기본 튜터 후보가 중복된다. 별도 튜터 fixture를 만들지 않고 로그인 시 설정된 기본 튜터를 세션에 저장하는지 검증하도록 변경했다.

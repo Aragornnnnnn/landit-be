@@ -15,6 +15,8 @@
 - [x] 비활성 또는 미설정 TTS 음성이 `null`인지 검증한다.
 - [x] Swagger/OpenAPI 응답 설명을 갱신한다.
 - [x] `./gradlew test`를 실행한다.
+- [x] V13 상태의 기존 사용자 데이터를 V14로 실제 마이그레이션해 `ai_tutor_id` backfill과 기존 값 유지를 검증한다.
+- [x] TTS 음성 성별에 맞춰 테스트 fixture의 locale과 변수명을 정리한다.
 - [x] 흐름을 조율하는 메서드의 역할과 책임 Javadoc을 보강한다.
 - [x] 변경을 논리 단위 커밋으로 정리한다.
 - [ ] PostgreSQL에서 V14 Flyway 마이그레이션을 실행한다.

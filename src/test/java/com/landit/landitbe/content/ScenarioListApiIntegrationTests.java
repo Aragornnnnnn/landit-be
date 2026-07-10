@@ -227,8 +227,8 @@ class ScenarioListApiIntegrationTests {
     }
 
     private void seedScenarioListData(Long clearedUserId) {
-        long maleVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
-        long femaleVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
+        long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
+        long ethanVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
         insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
         insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
         insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
@@ -244,7 +244,7 @@ class ScenarioListApiIntegrationTests {
                 null,
                 null,
                 null,
-                femaleVoiceId,
+                ethanVoiceId,
                 "ACTIVE"
         );
 
@@ -259,7 +259,7 @@ class ScenarioListApiIntegrationTests {
                 "가장 좋아하는 음식이 뭐예요?",
                 "음식 이야기는 대화를 열기 좋다.",
                 "GOOD",
-                maleVoiceId,
+                harperVoiceId,
                 "ACTIVE"
         );
 

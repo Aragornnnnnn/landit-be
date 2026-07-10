@@ -90,8 +90,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("ai-first@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9001);
-        assignAiTutor(userId, 9001);
         seedCategory(1001, 1, "ACTIVE", "음식");
         seedScenario(2001, 1001, 1, "AI", "ACTIVE", 4);
         seedScenarioVariant(
@@ -144,7 +142,7 @@ class ScenarioSessionApiIntegrationTests {
                 .get("data")
                 .get("sessionId")
                 .asLong();
-        assertLearningSession(sessionId, userId, 9001, "IN_PROGRESS", null, null);
+        assertLearningSession(sessionId, userId, "IN_PROGRESS", null, null);
         assertScenarioSession(sessionId, 3001);
         assertProgress(userId, 2001, "IN_PROGRESS");
         assertHistoryMessage(sessionId, "AI", "What food do you like? Why do you like it?");
@@ -155,8 +153,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("message-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9101);
-        assignAiTutor(userId, 9101);
         seedCategory(1101, 1, "ACTIVE", "음식");
         seedScenario(2101, 1101, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -273,8 +269,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("user-first-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9108);
-        assignAiTutor(userId, 9108);
         seedCategory(1108, 1, "ACTIVE", "카페");
         seedScenario(2108, 1108, 1, "USER", "ACTIVE", 1);
         seedScenarioVariant(
@@ -331,8 +325,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("max-turn-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9102);
-        assignAiTutor(userId, 9102);
         seedCategory(1102, 1, "ACTIVE", "음식");
         seedScenario(2102, 1102, 1, "AI", "ACTIVE", 1);
         seedScenarioVariant(
@@ -378,7 +370,6 @@ class ScenarioSessionApiIntegrationTests {
         assertLearningSession(
                 sessionId,
                 userId,
-                9102,
                 "COMPLETED",
                 "SYSTEM",
                 "MAX_TURNS_REACHED"
@@ -393,8 +384,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("goal-completed-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9103);
-        assignAiTutor(userId, 9103);
         seedCategory(1103, 1, "ACTIVE", "기숙사");
         seedScenario(2103, 1103, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -443,7 +432,6 @@ class ScenarioSessionApiIntegrationTests {
         assertLearningSession(
                 sessionId,
                 userId,
-                9103,
                 "IN_PROGRESS",
                 null,
                 null
@@ -472,8 +460,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode ownerLoginBody = login("message-owner@example.com");
         long ownerId = ownerLoginBody.get("data").get("user").get("userId").asLong();
         String ownerAccessToken = ownerLoginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9104);
-        assignAiTutor(ownerId, 9104);
         seedCategory(1104, 1, "ACTIVE", "권한");
         seedScenario(2104, 1104, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -543,7 +529,6 @@ class ScenarioSessionApiIntegrationTests {
     void submitMessageRejectsCompletedSession() throws Exception {
         StartedSession startedSession = startUserFirstSession(
                 "message-completed@example.com",
-                9105,
                 1105,
                 2105,
                 3105
@@ -577,7 +562,6 @@ class ScenarioSessionApiIntegrationTests {
     void submitMessageRejectsBlankMessage() throws Exception {
         StartedSession startedSession = startUserFirstSession(
                 "message-blank@example.com",
-                9106,
                 1106,
                 2106,
                 3106
@@ -602,8 +586,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("message-ai-fail@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9107);
-        assignAiTutor(userId, 9107);
         seedCategory(1107, 1, "ACTIVE", "AI 실패");
         seedScenario(2107, 1107, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -654,8 +636,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("user-first@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9002);
-        assignAiTutor(userId, 9002);
         seedCategory(1002, 1, "ACTIVE", "카페");
         seedScenario(2002, 1002, 1, "USER", "ACTIVE", 3);
         seedScenarioVariant(
@@ -695,7 +675,7 @@ class ScenarioSessionApiIntegrationTests {
                 .get("data")
                 .get("sessionId")
                 .asLong();
-        assertLearningSession(sessionId, userId, 9002, "IN_PROGRESS", null, null);
+        assertLearningSession(sessionId, userId, "IN_PROGRESS", null, null);
         assertScenarioSession(sessionId, 3002);
         assertProgress(userId, 2002, "IN_PROGRESS");
         Integer messageCount = jdbcTemplate.queryForObject(
@@ -716,8 +696,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("inactive-tts@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9011);
-        assignAiTutor(userId, 9011);
         seedCategory(1011, 1, "ACTIVE", "비활성 음성");
         seedScenario(2011, 1011, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -746,8 +724,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login("concurrent-start@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(9010);
-        assignAiTutor(userId, 9010);
         seedCategory(1010, 1, "ACTIVE", "동시 시작");
         seedScenario(2010, 1010, 1, "USER", "ACTIVE", 2);
         seedScenarioVariant(
@@ -829,8 +805,6 @@ class ScenarioSessionApiIntegrationTests {
     void startScenarioRejectsInactiveCategory() throws Exception {
         JsonNode loginBody = login("locked-category@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
-        seedAiTutor(9003);
-        assignAiTutor(userId, 9003);
         seedCategory(1003, 1, "INACTIVE", "잠긴 카테고리");
         seedScenario(2003, 1003, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -848,8 +822,6 @@ class ScenarioSessionApiIntegrationTests {
     void startScenarioRejectsPreviousScenarioNotCleared() throws Exception {
         JsonNode loginBody = login("locked-scenario@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
-        seedAiTutor(9004);
-        assignAiTutor(userId, 9004);
         seedCategory(1004, 1, "ACTIVE", "순차 카테고리");
         seedScenario(2004, 1004, 1, "AI", "ACTIVE", 2);
         seedScenarioVariant(
@@ -870,7 +842,7 @@ class ScenarioSessionApiIntegrationTests {
 
     @Test
     void endSessionInterruptsOwnedInProgressSession() throws Exception {
-        StartedSession startedSession = startUserFirstSession("end-owned@example.com", 9005, 1005, 2006, 3006);
+        StartedSession startedSession = startUserFirstSession("end-owned@example.com", 1005, 2006, 3006);
 
         mockMvc.perform(patch("/api/v1/sessions/%d/end".formatted(startedSession.sessionId()))
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
@@ -882,7 +854,6 @@ class ScenarioSessionApiIntegrationTests {
         assertLearningSession(
                 startedSession.sessionId(),
                 startedSession.userId(),
-                9005,
                 "INTERRUPTED",
                 "USER",
                 "USER_ENDED"
@@ -897,7 +868,7 @@ class ScenarioSessionApiIntegrationTests {
 
     @Test
     void endSessionRejectsOtherUserSession() throws Exception {
-        StartedSession ownerSession = startUserFirstSession("owner@example.com", 9006, 1006, 2007, 3007);
+        StartedSession ownerSession = startUserFirstSession("owner@example.com", 1006, 2007, 3007);
         JsonNode otherLoginBody = login("other@example.com");
 
         mockMvc.perform(patch("/api/v1/sessions/%d/end".formatted(ownerSession.sessionId()))
@@ -920,7 +891,7 @@ class ScenarioSessionApiIntegrationTests {
 
     @Test
     void endSessionRejectsAlreadyEndedSession() throws Exception {
-        StartedSession startedSession = startUserFirstSession("already-ended@example.com", 9007, 1007, 2008, 3008);
+        StartedSession startedSession = startUserFirstSession("already-ended@example.com", 1007, 2008, 3008);
         jdbcTemplate.update("""
                         UPDATE learning_session
                         SET status = 'COMPLETED',
@@ -941,7 +912,6 @@ class ScenarioSessionApiIntegrationTests {
 
     private StartedSession startUserFirstSession(
             String email,
-            long aiTutorId,
             long categoryId,
             long scenarioId,
             long variantId
@@ -949,8 +919,6 @@ class ScenarioSessionApiIntegrationTests {
         JsonNode loginBody = login(email);
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
-        seedAiTutor(aiTutorId);
-        assignAiTutor(userId, aiTutorId);
         seedCategory(categoryId, 1, "ACTIVE", "종료 테스트");
         seedScenario(scenarioId, categoryId, 1, "USER", "ACTIVE", 2);
         seedScenarioVariant(
@@ -1004,30 +972,6 @@ class ScenarioSessionApiIntegrationTests {
                 .get("data")
                 .get("sessionId")
                 .asLong();
-    }
-
-    private void seedAiTutor(long aiTutorId) {
-        jdbcTemplate.update("""
-                        INSERT INTO ai_tutor (
-                            id,
-                            accent_locale,
-                            target_locale,
-                            status,
-                            created_at,
-                            updated_at
-                        )
-                        VALUES (?, 'EN', 'EN', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
-                aiTutorId
-        );
-    }
-
-    private void assignAiTutor(long userId, long aiTutorId) {
-        jdbcTemplate.update(
-                "UPDATE user_profile SET ai_tutor_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                aiTutorId,
-                userId
-        );
     }
 
     private void seedCategory(long categoryId, int displayOrder, String status, String name) {
@@ -1186,6 +1130,16 @@ class ScenarioSessionApiIntegrationTests {
         );
     }
 
+    private long defaultAiTutorId() {
+        return jdbcTemplate.queryForObject("""
+                SELECT id
+                FROM ai_tutor
+                WHERE accent_locale = 'EN_US'
+                  AND target_locale = 'EN'
+                  AND status = 'ACTIVE'
+                """, Long.class);
+    }
+
     private long insertTtsVoice(long id, String providerVoiceId, String status) {
         jdbcTemplate.update("""
                         INSERT INTO tts_voice (
@@ -1212,7 +1166,6 @@ class ScenarioSessionApiIntegrationTests {
     private void assertLearningSession(
             long sessionId,
             long userId,
-            long aiTutorId,
             String status,
             String endedBy,
             String completionReason
@@ -1235,7 +1188,7 @@ class ScenarioSessionApiIntegrationTests {
         );
         assertThat(session.get("USER_PROFILE_ID")).isEqualTo(userId);
         assertThat(session.get("SESSION_TYPE")).isEqualTo("SCENARIO");
-        assertThat(session.get("AI_TUTOR_ID")).isEqualTo(aiTutorId);
+        assertThat(session.get("AI_TUTOR_ID")).isEqualTo(defaultAiTutorId());
         assertThat(session.get("TARGET_LOCALE")).isEqualTo("EN");
         assertThat(session.get("BASE_LOCALE")).isEqualTo("KR");
         assertThat(session.get("INPUT_MODE")).isEqualTo("MIXED");

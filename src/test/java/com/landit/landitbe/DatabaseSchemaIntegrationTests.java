@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.util.StreamUtils;
 
@@ -257,6 +260,79 @@ class DatabaseSchemaIntegrationTests {
         assertThat(migrationSql).contains(
                 "UPDATE user_profile",
                 "WHERE ai_tutor_id IS NULL"
+        );
+    }
+
+    @DisplayName("V14 migration은 AI 튜터가 없는 기존 사용자만 기본 튜터로 backfill한다.")
+    @Test
+    void v14MigrationBackfillsOnlyUsersWithoutAiTutor() {
+        String databaseUrl = migrationTestDatabaseUrl();
+        JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(
+                new DriverManagerDataSource(databaseUrl, "sa", "")
+        );
+        migrateToVersion(databaseUrl, "13");
+        insertAiTutor(migrationJdbcTemplate, 990101L, "ACTIVE");
+        insertAiTutor(migrationJdbcTemplate, 990102L, "INACTIVE");
+        insertUserProfile(migrationJdbcTemplate, 990201L, null);
+        insertUserProfile(migrationJdbcTemplate, 990202L, 990102L);
+
+        migrateToLatestVersion(databaseUrl);
+
+        assertThat(userAiTutorId(migrationJdbcTemplate, 990201L)).isEqualTo(990101L);
+        assertThat(userAiTutorId(migrationJdbcTemplate, 990202L)).isEqualTo(990102L);
+    }
+
+    private String migrationTestDatabaseUrl() {
+        return "jdbc:h2:mem:lan100-v14-" + UUID.randomUUID()
+                + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1";
+    }
+
+    private void migrateToVersion(String databaseUrl, String targetVersion) {
+        Flyway.configure()
+                .dataSource(databaseUrl, "sa", "")
+                .locations("classpath:db/migration")
+                .target(targetVersion)
+                .load()
+                .migrate();
+    }
+
+    private void migrateToLatestVersion(String databaseUrl) {
+        Flyway.configure()
+                .dataSource(databaseUrl, "sa", "")
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+    }
+
+    private void insertAiTutor(JdbcTemplate migrationJdbcTemplate, long tutorId, String status) {
+        migrationJdbcTemplate.update("""
+                INSERT INTO ai_tutor (
+                    id, accent_locale, target_locale, status, created_at, updated_at
+                )
+                VALUES (?, 'EN_US', 'EN', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, tutorId, status);
+    }
+
+    private void insertUserProfile(
+            JdbcTemplate migrationJdbcTemplate,
+            long userProfileId,
+            Long aiTutorId
+    ) {
+        migrationJdbcTemplate.update("""
+                INSERT INTO user_profile (
+                    id, nickname, target_locale, base_locale, current_level, ai_tutor_id,
+                    push_permission_status, status, created_at, updated_at
+                )
+                VALUES (?, 'migration-test-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED', 'ACTIVE',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, userProfileId, aiTutorId);
+    }
+
+    private Long userAiTutorId(JdbcTemplate migrationJdbcTemplate, long userProfileId) {
+        return migrationJdbcTemplate.queryForObject(
+                "SELECT ai_tutor_id FROM user_profile WHERE id = ?",
+                Long.class,
+                userProfileId
         );
     }
 
