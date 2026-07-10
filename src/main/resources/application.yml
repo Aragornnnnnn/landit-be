@@ -29,6 +29,10 @@ landit:
       secret: ${LANDIT_AUTH_TOKEN_SECRET}
       access-expires-in-seconds: ${LANDIT_AUTH_TOKEN_ACCESS_EXPIRES_IN_SECONDS:1800}
       refresh-expires-in-seconds: ${LANDIT_AUTH_TOKEN_REFRESH_EXPIRES_IN_SECONDS:1209600}
+  ai:
+    client-mode: ${LANDIT_AI_CLIENT_MODE:local}
+    base-url: ${LANDIT_AI_BASE_URL:}
+    service-audience: ${LANDIT_AI_SERVICE_AUDIENCE:KOREAN_LEARNER}
 
 sentry:
   dsn: ${SENTRY_DSN:}
