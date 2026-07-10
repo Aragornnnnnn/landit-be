@@ -30,9 +30,9 @@ VALUES
         'OPENROUTER',
         'microsoft/mai-voice-2',
         'en-US-Harper:MAI-Voice-2',
-        'MALE',
-        '미국 영어 남성 음성',
-        'EN-US',
+        'FEMALE',
+        '미국 영어 여성 음성',
+        'EN_US',
         'ACTIVE',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -41,9 +41,9 @@ VALUES
         'OPENROUTER',
         'microsoft/mai-voice-2',
         'en-US-Ethan:MAI-Voice-2',
-        'FEMALE',
-        '미국 영어 여성 음성',
-        'EN-US',
+        'MALE',
+        '미국 영어 남성 음성',
+        'EN_US',
         'ACTIVE',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -57,7 +57,7 @@ INSERT INTO ai_tutor (
     updated_at
 )
 SELECT
-    'EN-US',
+    'EN_US',
     'EN',
     'ACTIVE',
     CURRENT_TIMESTAMP,
@@ -65,7 +65,7 @@ SELECT
 WHERE NOT EXISTS (
     SELECT 1
     FROM ai_tutor
-    WHERE accent_locale = 'EN-US'
+    WHERE accent_locale = 'EN_US'
       AND target_locale = 'EN'
       AND status = 'ACTIVE'
 );
@@ -84,7 +84,7 @@ SELECT
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 FROM ai_tutor tutor
-WHERE tutor.accent_locale = 'EN-US'
+WHERE tutor.accent_locale = 'EN_US'
   AND tutor.target_locale = 'EN'
   AND tutor.status = 'ACTIVE'
   AND NOT EXISTS (
@@ -98,7 +98,7 @@ UPDATE user_profile
 SET ai_tutor_id = (
     SELECT tutor.id
     FROM ai_tutor tutor
-    WHERE tutor.accent_locale = 'EN-US'
+    WHERE tutor.accent_locale = 'EN_US'
       AND tutor.target_locale = 'EN'
       AND tutor.status = 'ACTIVE'
 )
@@ -110,22 +110,6 @@ ALTER TABLE scenario_language_variant
 ALTER TABLE scenario_language_variant
     ADD CONSTRAINT fk_scenario_lang_tts_voice_id
         FOREIGN KEY (tts_voice_id) REFERENCES tts_voice (id);
-
-UPDATE scenario_language_variant variant
-SET tts_voice_id = (
-    SELECT voice.id
-    FROM scenario
-    JOIN tts_voice voice
-      ON voice.provider_voice_id = scenario.tts_voice_set_id
-    WHERE scenario.id = variant.scenario_id
-)
-WHERE EXISTS (
-    SELECT 1
-    FROM scenario
-    JOIN tts_voice voice
-      ON voice.provider_voice_id = scenario.tts_voice_set_id
-    WHERE scenario.id = variant.scenario_id
-);
 
 ALTER TABLE scenario
     DROP COLUMN tts_voice_set_id;

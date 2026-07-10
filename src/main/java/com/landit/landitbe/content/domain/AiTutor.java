@@ -1,6 +1,7 @@
-// AI 튜터의 공통 발화와 음성 설정을 저장한다.
+// 사용자의 학습과 평가 기준이 되는 AI 튜터 설정을 저장한다.
 package com.landit.landitbe.content.domain;
 
+import com.landit.landitbe.common.domain.AccentLocale;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.BaseTimeEntity;
 import com.landit.landitbe.common.domain.Locale;
@@ -23,8 +24,9 @@ public class AiTutor extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "accent_locale", nullable = false, length = 35)
-    private String accentLocale;
+    private AccentLocale accentLocale;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)

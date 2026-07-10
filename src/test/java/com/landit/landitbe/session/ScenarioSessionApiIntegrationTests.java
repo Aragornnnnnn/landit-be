@@ -123,7 +123,7 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.ttsVoice.model").value("microsoft/mai-voice-2"))
                 .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId")
                         .value("en-US-Harper:MAI-Voice-2"))
-                .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
+                .andExpect(jsonPath("$.data.ttsVoice.gender").value("FEMALE"))
                 .andExpect(jsonPath("$.data.currentMessage.messageId").value(notNullValue()))
                 .andExpect(jsonPath("$.data.currentMessage.turnNumber").value(1))
                 .andExpect(jsonPath("$.data.currentMessage.messageSequence").value(1))
@@ -684,7 +684,7 @@ class ScenarioSessionApiIntegrationTests {
                         .value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
                 .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId")
                         .value("en-US-Ethan:MAI-Voice-2"))
-                .andExpect(jsonPath("$.data.ttsVoice.gender").value("FEMALE"))
+                .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
                 .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
                 .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
                 .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(3))
@@ -1201,7 +1201,7 @@ class ScenarioSessionApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, 'OPENROUTER', 'test-model', ?, 'MALE', '테스트 음성',
-                                'en-US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                                'EN_US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 id,
                 providerVoiceId,

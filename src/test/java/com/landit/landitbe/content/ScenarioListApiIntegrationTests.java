@@ -113,7 +113,7 @@ class ScenarioListApiIntegrationTests {
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
                         .value("en-US-Harper:MAI-Voice-2"))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.gender")
-                        .value("MALE"))
+                        .value("FEMALE"))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
@@ -131,7 +131,7 @@ class ScenarioListApiIntegrationTests {
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoice.providerVoiceId")
                         .value("en-US-Ethan:MAI-Voice-2"))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoice.gender")
-                        .value("FEMALE"))
+                        .value("MALE"))
                 .andExpect(jsonPath("$.data.categories[1].categoryId").value(100))
                 .andExpect(jsonPath("$.data.categories[1].scenarios[0].locked").value(true))
                 .andExpect(jsonPath("$.data.categories[1].scenarios[0].lockReason").isNotEmpty())
@@ -445,7 +445,7 @@ class ScenarioListApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, 'OPENROUTER', 'test-model', ?, 'MALE', '테스트 음성',
-                                'en-US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                                'EN_US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 id,
                 providerVoiceId,

@@ -1,6 +1,7 @@
 // 시나리오 상대 역할에 사용할 TTS 음성 설정을 저장한다.
 package com.landit.landitbe.content.domain;
 
+import com.landit.landitbe.common.domain.AccentLocale;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
@@ -39,8 +40,9 @@ public class TtsVoice extends BaseTimeEntity {
     @Column(length = 255)
     private String description;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "accent_locale", nullable = false, length = 35)
-    private String accentLocale;
+    private AccentLocale accentLocale;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

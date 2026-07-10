@@ -228,7 +228,7 @@ class SocialAuthApiIntegrationTests {
         jdbcTemplate.update("""
                 UPDATE ai_tutor
                 SET status = 'INACTIVE'
-                WHERE accent_locale = 'EN-US'
+                WHERE accent_locale = 'EN_US'
                   AND target_locale = 'EN'
                   AND status = 'ACTIVE'
                 """);
@@ -249,7 +249,7 @@ class SocialAuthApiIntegrationTests {
             jdbcTemplate.update("""
                     UPDATE ai_tutor
                     SET status = 'ACTIVE'
-                    WHERE accent_locale = 'EN-US'
+                    WHERE accent_locale = 'EN_US'
                       AND target_locale = 'EN'
                       AND status = 'INACTIVE'
                     """);
@@ -262,7 +262,7 @@ class SocialAuthApiIntegrationTests {
                 INSERT INTO ai_tutor (
                     id, accent_locale, target_locale, status, created_at, updated_at
                 )
-                VALUES (990100, 'EN-US', 'EN', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (990100, 'EN_US', 'EN', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """);
         try {
             mockMvc.perform(post("/api/v1/auth/social-login")
@@ -310,7 +310,7 @@ class SocialAuthApiIntegrationTests {
         return jdbcTemplate.queryForObject("""
                 SELECT id
                 FROM ai_tutor
-                WHERE accent_locale = 'EN-US'
+                WHERE accent_locale = 'EN_US'
                   AND target_locale = 'EN'
                   AND status = 'ACTIVE'
                 """, Long.class);

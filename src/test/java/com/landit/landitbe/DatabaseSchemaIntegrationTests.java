@@ -210,11 +210,11 @@ class DatabaseSchemaIntegrationTests {
                         "en-US-Harper:MAI-Voice-2"
                 );
         assertThat(voices).extracting(row -> row.get("GENDER"))
-                .containsExactly("FEMALE", "MALE");
+                .containsExactly("MALE", "FEMALE");
         assertThat(voices).allSatisfy(row -> {
             assertThat(row.get("PROVIDER")).isEqualTo("OPENROUTER");
             assertThat(row.get("MODEL")).isEqualTo("microsoft/mai-voice-2");
-            assertThat(row.get("ACCENT_LOCALE")).isEqualTo("EN-US");
+            assertThat(row.get("ACCENT_LOCALE")).isEqualTo("EN_US");
             assertThat(row.get("STATUS")).isEqualTo("ACTIVE");
         });
 
@@ -225,7 +225,7 @@ class DatabaseSchemaIntegrationTests {
                 )
                 values (
                     'OPENROUTER', 'microsoft/mai-voice-2', 'en-US-Harper:MAI-Voice-2',
-                    'MALE', 'EN-US', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    'FEMALE', 'EN_US', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 )
                 """))
                 .isInstanceOf(DataIntegrityViolationException.class);
@@ -233,7 +233,7 @@ class DatabaseSchemaIntegrationTests {
         Integer defaultTutorCount = jdbcTemplate.queryForObject("""
                 select count(*)
                 from ai_tutor
-                where accent_locale = 'EN-US'
+                where accent_locale = 'EN_US'
                   and target_locale = 'EN'
                   and status = 'ACTIVE'
                 """, Integer.class);
@@ -243,7 +243,7 @@ class DatabaseSchemaIntegrationTests {
                 select count(*)
                 from ai_tutor_language_variant variant
                 join ai_tutor tutor on tutor.id = variant.ai_tutor_id
-                where tutor.accent_locale = 'EN-US'
+                where tutor.accent_locale = 'EN_US'
                   and tutor.target_locale = 'EN'
                   and tutor.status = 'ACTIVE'
                   and variant.base_locale = 'KR'
