@@ -16,9 +16,13 @@ import com.landit.landitbe.auth.domain.UserProfileStatus;
 import com.landit.landitbe.auth.infrastructure.OauthIdentityRepository;
 import com.landit.landitbe.auth.infrastructure.RefreshTokenRepository;
 import com.landit.landitbe.auth.infrastructure.UserProfileRepository;
+import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.content.domain.AiTutor;
+import com.landit.landitbe.content.infrastructure.AiTutorRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +31,11 @@ public class AuthService {
 
     private static final String TOKEN_TYPE = "Bearer";
     private static final String GUEST_NICKNAME = "Guest";
+    private static final String DEFAULT_AI_TUTOR_ACCENT_LOCALE = "en-US";
+    private static final String DEFAULT_AI_TUTOR_TARGET_LOCALE = "en";
 
     private final UserProfileRepository userProfileRepository;
+    private final AiTutorRepository aiTutorRepository;
     private final OauthIdentityRepository oauthIdentityRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OidcTokenVerifier oidcTokenVerifier;
@@ -37,6 +44,7 @@ public class AuthService {
 
     public AuthService(
             UserProfileRepository userProfileRepository,
+            AiTutorRepository aiTutorRepository,
             OauthIdentityRepository oauthIdentityRepository,
             RefreshTokenRepository refreshTokenRepository,
             OidcTokenVerifier oidcTokenVerifier,
@@ -44,6 +52,7 @@ public class AuthService {
             TokenProperties tokenProperties
     ) {
         this.userProfileRepository = userProfileRepository;
+        this.aiTutorRepository = aiTutorRepository;
         this.oauthIdentityRepository = oauthIdentityRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.oidcTokenVerifier = oidcTokenVerifier;
@@ -134,9 +143,11 @@ public class AuthService {
                     return new UserResult(userProfile, identity.getProvider(), false);
                 })
                 .orElseGet(() -> {
+                    Long defaultAiTutorId = requireDefaultAiTutorId();
                     UserProfile userProfile = userProfileRepository.save(new UserProfile(
                             userInfo.email(),
-                            nickname == null ? GUEST_NICKNAME : nickname
+                            nickname == null ? GUEST_NICKNAME : nickname,
+                            defaultAiTutorId
                     ));
                     oauthIdentityRepository.save(new OauthIdentity(
                             userProfile,
@@ -146,6 +157,19 @@ public class AuthService {
                     ));
                     return new UserResult(userProfile, userInfo.provider(), true);
                 });
+    }
+
+    private Long requireDefaultAiTutorId() {
+        List<AiTutor> defaultTutorCandidates = aiTutorRepository
+                .findAllByAccentLocaleAndTargetLocaleAndStatus(
+                        DEFAULT_AI_TUTOR_ACCENT_LOCALE,
+                        DEFAULT_AI_TUTOR_TARGET_LOCALE,
+                        ActiveStatus.ACTIVE
+                );
+        if (defaultTutorCandidates.size() != 1) {
+            throw new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
+        }
+        return defaultTutorCandidates.getFirst().getId();
     }
 
     private AuthUserResponse userResponse(UserResult userResult) {
