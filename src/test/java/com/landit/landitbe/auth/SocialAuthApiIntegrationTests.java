@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.auth.application.LanditTokenService;
 import com.landit.landitbe.auth.domain.OauthIdentity;
+import com.landit.landitbe.auth.domain.OauthIdentityStatus;
 import com.landit.landitbe.auth.domain.RefreshToken;
 import com.landit.landitbe.auth.domain.SocialProvider;
 import com.landit.landitbe.auth.domain.UserProfile;
@@ -310,6 +311,7 @@ class SocialAuthApiIntegrationTests {
                 "Withdraw User",
                 "withdraw-nonce"
         );
+        Long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
         String refreshToken = loginBody.get("data").get("refreshToken").asText();
 
@@ -319,6 +321,14 @@ class SocialAuthApiIntegrationTests {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(nullValue()))
                 .andExpect(jsonPath("$.error").value(nullValue()));
+
+        UserProfile withdrawnUser = userProfileRepository.findById(userId).orElseThrow();
+        OauthIdentity withdrawnIdentity = oauthIdentityRepository
+                .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.UNLINKED)
+                .getFirst();
+        assertThat(withdrawnUser.getEmail()).isEqualTo("withdraw@example.com");
+        assertThat(withdrawnUser.getNickname()).isEqualTo("Withdraw User");
+        assertThat(withdrawnIdentity).extracting("providerEmail").isEqualTo("withdraw@example.com");
 
         mockMvc.perform(post("/api/v1/auth/token/refresh")
                         .contentType(MediaType.APPLICATION_JSON)

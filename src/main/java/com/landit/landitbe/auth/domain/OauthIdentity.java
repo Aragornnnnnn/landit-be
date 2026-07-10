@@ -65,7 +65,6 @@ public class OauthIdentity extends BaseTimeEntity {
 
     /** OAuth identity를 더 이상 로그인에 쓰지 않도록 연결 해제한다. */
     public void unlink() {
-        this.providerEmail = null;
         this.status = OauthIdentityStatus.UNLINKED;
     }
 

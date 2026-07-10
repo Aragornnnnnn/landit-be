@@ -7,3 +7,5 @@
 - Apple nickname 누락 처리는 `socialLoginCreatesGuestForAppleWithoutRequestNickname`와 `socialLoginKeepsExistingAppleNicknameWhenRequestNicknameIsMissing`가, Google 무시는 `socialLoginIgnoresRequestNicknameForGoogle`가 검증한다.
 - 신규 Apple 사용자의 요청 `nickname`이 null 또는 blank이면 `Guest`를 저장한다.
 - 기존 Apple 사용자의 요청 `nickname`이 null 또는 blank이면 nickname을 갱신하지 않는다.
+- 탈퇴 시 `user_profile.email`, `user_profile.nickname`, `oauth_identity.provider_email`은 유지한다.
+- 탈퇴 후에도 refresh token 폐기, OAuth identity 연결 해제, 사용자 상태의 `WITHDRAWN` 전환은 유지한다.
