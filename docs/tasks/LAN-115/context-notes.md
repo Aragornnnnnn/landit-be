@@ -12,3 +12,4 @@
 - Bash mock 검증은 정상 안정화, nullable `failedTasks`, deployment 실패 태스크, essential container 종료, non-zero exit code, 이전 deployment 태스크 무시, 5분 타임아웃을 다룬다.
 - `TaskFailedToStart`는 `startedAt`이 없을 수 있으므로 새 deployment 태스크 필터는 `createdAt`, `startedAt` 순으로 사용한다.
 - `ScenarioSessionApiIntegrationTests`의 5건 실패는 테스트 fixture가 enum 전환 전 locale 값 `en`·`ko`를 저장해 고정 질문을 찾지 못한 것이 원인이다. fixture를 `EN`·`KR`로 맞추고 무인증 응답 기대값을 현재 계약인 `INVALID_TOKEN`으로 정정했다.
+- `pull_request`에서 develop을 대상으로 앱 테스트와 ECS Bash 검증을 실행하는 별도 CI workflow를 추가한다. AWS 권한은 주지 않으며, 수동 deploy workflow의 배포 직전 테스트는 유지한다.

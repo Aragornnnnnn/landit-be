@@ -9,3 +9,4 @@
 - [x] 시나리오 컨텍스트 JPQL locale 생성자 타입 불일치 수정 및 회귀 테스트 추가
 - [x] deploy-dev ECS 검증 스크립트 분리와 mock 테스트 추가
 - [x] TaskFailedToStart 태스크 식별 보강과 전체 Gradle 테스트 정상화
+- [x] develop 대상 PR 자동 검증 workflow 추가
