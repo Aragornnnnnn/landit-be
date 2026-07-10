@@ -20,6 +20,7 @@ import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,6 +45,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -143,6 +145,500 @@ class ScenarioSessionApiIntegrationTests {
         assertScenarioSession(sessionId, 3001);
         assertProgress(userId, 2001, "IN_PROGRESS");
         assertHistoryMessage(sessionId, "AI", "What food do you like? Why do you like it?");
+    }
+
+    @Test
+    void submitMessageSavesUserMessageGeneratesNextAiMessageAndReturnsProgress() throws Exception {
+        JsonNode loginBody = login("message-submit@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9101);
+        assignAiTutor(userId, 9101);
+        seedCategory(1101, 1, "ACTIVE", "음식");
+        seedScenario(2101, 1101, 1, "AI", "ACTIVE", 2, "voice-food");
+        seedScenarioVariant(
+                3101,
+                2101,
+                "음식에 대한 대화하기",
+                "좋아하는 음식과 최근에 먹은 음식에 대해 이야기합니다.",
+                "내 취향과 경험을 영어로 설명해봅니다.",
+                null,
+                "What food do you like? Why do you like it?",
+                "좋아하는 음식이 있어? 왜 좋아해?",
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(
+                4102,
+                2101,
+                2,
+                "What food did you eat recently?",
+                "최근에는 어떤 음식을 먹었어?"
+        );
+        long sessionId = startScenario(accessToken, 2101);
+
+        MvcResult result = mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I like pizza because it is spicy.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.data.sessionId").value(sessionId))
+                .andExpect(jsonPath("$.data.submittedMessage.messageId").value(notNullValue()))
+                .andExpect(jsonPath("$.data.submittedMessage.turnNumber").value(1))
+                .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(2))
+                .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
+                .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus").value("PREPARING"))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThought")
+                        .value("매운 피자를 좋아한다고 이유까지 말해주네."))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThoughtType").value("GOOD"))
+                .andExpect(jsonPath("$.data.nextMessage.messageId").value(notNullValue()))
+                .andExpect(jsonPath("$.data.nextMessage.turnNumber").value(2))
+                .andExpect(jsonPath("$.data.nextMessage.messageSequence").value(3))
+                .andExpect(jsonPath("$.data.nextMessage.role").value("AI"))
+                .andExpect(jsonPath("$.data.nextMessage.content")
+                        .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                .andExpect(jsonPath("$.data.nextMessage.translatedContent")
+                        .value("아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?"))
+                .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
+                .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
+                .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(2))
+                .andExpect(jsonPath("$.data.progress.completed").value(false))
+                .andReturn();
+
+        long submittedMessageId = objectMapper.readTree(result.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+        assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().submittedMessageId())
+                .isEqualTo(submittedMessageId);
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().submittedTurnNumber())
+                .isEqualTo(1);
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().scenario().scenarioId())
+                .isEqualTo(2101);
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().scenario().counterpartRole())
+                .isEqualTo("tutor");
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().conversationHistory())
+                .extracting("content")
+                .containsExactly(
+                        "What food do you like? Why do you like it?",
+                        "I like pizza because it is spicy."
+                );
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().questionId())
+                .isEqualTo(4102);
+        assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
+
+        List<Map<String, Object>> messages = jdbcTemplate.queryForList(
+                """
+                        SELECT shm.role,
+                               shm.content,
+                               shm.translated_content,
+                               shm.input_type,
+                               shm.inner_thought,
+                               shm.inner_thought_type,
+                               shm.message_sequence,
+                               shm.turn_number
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        ORDER BY shm.message_sequence ASC
+                        """,
+                sessionId
+        );
+        assertThat(messages).hasSize(3);
+        assertThat(messages.get(1).get("ROLE")).isEqualTo("USER");
+        assertThat(messages.get(1).get("INPUT_TYPE")).isEqualTo("VOICE");
+        assertThat(messages.get(1).get("INNER_THOUGHT"))
+                .isEqualTo("매운 피자를 좋아한다고 이유까지 말해주네.");
+        assertThat(messages.get(2).get("ROLE")).isEqualTo("AI");
+        assertThat(messages.get(2).get("CONTENT"))
+                .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
+    }
+
+    @Test
+    void submitFirstUserMessageForUserFirstScenarioCreatesHistoryAndUsesFirstQuestion() throws Exception {
+        JsonNode loginBody = login("user-first-submit@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9108);
+        assignAiTutor(userId, 9108);
+        seedCategory(1108, 1, "ACTIVE", "카페");
+        seedScenario(2108, 1108, 1, "USER", "ACTIVE", 1, null);
+        seedScenarioVariant(
+                3108,
+                2108,
+                "카페 주문",
+                "카페에서 음료를 주문합니다.",
+                "원하는 음료를 주문합니다.",
+                "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(
+                4108,
+                2108,
+                1,
+                "What size would you like?",
+                "어떤 사이즈로 드릴까요?"
+        );
+        long sessionId = startScenario(accessToken, 2108);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an iced americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submittedMessage.turnNumber").value(1))
+                .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(1))
+                .andExpect(jsonPath("$.data.nextMessage.turnNumber").value(2))
+                .andExpect(jsonPath("$.data.nextMessage.messageSequence").value(2))
+                .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
+                .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(1))
+                .andExpect(jsonPath("$.data.progress.completed").value(false));
+
+        assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().conversationHistory())
+                .extracting("content")
+                .containsExactly("I would like an iced americano.");
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void submitMessageCompletesSessionWithClosingMessageWhenNextQuestionDoesNotExist() throws Exception {
+        JsonNode loginBody = login("max-turn-submit@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9102);
+        assignAiTutor(userId, 9102);
+        seedCategory(1102, 1, "ACTIVE", "음식");
+        seedScenario(2102, 1102, 1, "AI", "ACTIVE", 1, null);
+        seedScenarioVariant(
+                3102,
+                2102,
+                "짧은 음식 대화",
+                "좋아하는 음식을 이야기합니다.",
+                "좋아하는 음식을 영어로 설명합니다.",
+                null,
+                "What food do you like?",
+                "어떤 음식을 좋아해?",
+                null,
+                null,
+                "ACTIVE"
+        );
+        long sessionId = startScenario(accessToken, 2102);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I like pizza.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nextMessage.content")
+                        .value("Thanks for sharing. That was a good conversation."))
+                .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
+                .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
+                .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(1))
+                .andExpect(jsonPath("$.data.progress.completed").value(true));
+
+        assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNull();
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.closingMessageTransactionActive()).containsOnly(false);
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest().closingReason().name())
+                .isEqualTo("MAX_TURNS_REACHED");
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest().goalCompletionStatus())
+                .isEqualTo(GoalCompletionStatus.COMPLETED);
+        assertLearningSession(
+                sessionId,
+                userId,
+                9102,
+                "COMPLETED",
+                "SYSTEM",
+                "MAX_TURNS_REACHED"
+        );
+        assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
+        assertSessionHistoryCompleted(sessionId, 1);
+    }
+
+    @Test
+    void submitMessageStoresClosingMessageWhenAiReportsGoalCompleted() throws Exception {
+        fakeAiConversationClient.completeGoalOnNextMessage();
+        JsonNode loginBody = login("goal-completed-submit@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9103);
+        assignAiTutor(userId, 9103);
+        seedCategory(1103, 1, "ACTIVE", "기숙사");
+        seedScenario(2103, 1103, 1, "AI", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                3103,
+                2103,
+                "조용히 해달라고 말하기",
+                "룸메이트에게 밤에 조용히 해달라고 말합니다.",
+                "불편함을 공격적이지 않게 전달합니다.",
+                null,
+                "What do you want me to do?",
+                "내가 어떻게 해주면 좋겠어?",
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(
+                4103,
+                2103,
+                2,
+                "Do you want me to stop now?",
+                "지금 그만하면 될까?"
+        );
+        long sessionId = startScenario(accessToken, 2103);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Could you keep it down at night?",
+                                  "inputType":"VOICE"
+                                }
+                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submittedMessage.innerThought")
+                        .value("마지막까지 답해줘서 대화를 자연스럽게 마무리하면 좋겠다."))
+                .andExpect(jsonPath("$.data.nextMessage.content")
+                        .value("Thanks for sharing. That was a good conversation."))
+                .andExpect(jsonPath("$.data.progress.completed").value(true));
+
+        assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
+        assertThat(fakeAiConversationClient.closingMessageTransactionActive()).containsOnly(false);
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest().closingReason().name())
+                .isEqualTo("GOAL_COMPLETED");
+        assertLearningSession(
+                sessionId,
+                userId,
+                9103,
+                "COMPLETED",
+                "SYSTEM",
+                "GOAL_COMPLETED"
+        );
+        List<String> contents = jdbcTemplate.queryForList(
+                """
+                        SELECT shm.content
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        ORDER BY shm.message_sequence ASC
+                        """,
+                String.class,
+                sessionId
+        );
+        assertThat(contents).containsExactly(
+                "What do you want me to do?",
+                "Could you keep it down at night?",
+                "Thanks for sharing. That was a good conversation."
+        );
+    }
+
+    @Test
+    void submitMessageRejectsOtherUserSession() throws Exception {
+        JsonNode ownerLoginBody = login("message-owner@example.com");
+        long ownerId = ownerLoginBody.get("data").get("user").get("userId").asLong();
+        String ownerAccessToken = ownerLoginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9104);
+        assignAiTutor(ownerId, 9104);
+        seedCategory(1104, 1, "ACTIVE", "권한");
+        seedScenario(2104, 1104, 1, "AI", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                3104,
+                2104,
+                "권한 테스트",
+                "권한 테스트",
+                "권한 테스트",
+                null,
+                "Hello",
+                "안녕",
+                null,
+                null,
+                "ACTIVE"
+        );
+        long sessionId = startScenario(ownerAccessToken, 2104);
+        JsonNode otherLoginBody = login("message-other@example.com");
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + otherLoginBody.get("data").get("accessToken").asText())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void submitMessageRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/sessions/1/messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+    }
+
+    @Test
+    void submitMessageRejectsMissingSession() throws Exception {
+        JsonNode loginBody = login("message-missing@example.com");
+
+        mockMvc.perform(post("/api/v1/sessions/999999/messages")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginBody.get("data").get("accessToken").asText())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
+    }
+
+    @Test
+    void submitMessageRejectsCompletedSession() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "message-completed@example.com",
+                9105,
+                1105,
+                2105,
+                3105
+        );
+        jdbcTemplate.update("""
+                        UPDATE learning_session
+                        SET status = 'COMPLETED',
+                            ended_by = 'SYSTEM',
+                            completion_reason = 'GOAL_COMPLETED',
+                            ended_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                startedSession.sessionId()
+        );
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("SESSION_ALREADY_COMPLETED"));
+    }
+
+    @Test
+    void submitMessageRejectsBlankMessage() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "message-blank@example.com",
+                9106,
+                1106,
+                2106,
+                3106
+        );
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"   ",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void submitMessageRollsBackUserMessageWhenAiGenerationFails() throws Exception {
+        fakeAiConversationClient.failNextMessageGeneration();
+        JsonNode loginBody = login("message-ai-fail@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedAiTutor(9107);
+        assignAiTutor(userId, 9107);
+        seedCategory(1107, 1, "ACTIVE", "AI 실패");
+        seedScenario(2107, 1107, 1, "AI", "ACTIVE", 2, null);
+        seedScenarioVariant(
+                3107,
+                2107,
+                "AI 실패 테스트",
+                "AI 실패 테스트",
+                "AI 실패 테스트",
+                null,
+                "Hello",
+                "안녕",
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4107, 2107, 2, "Next question", "다음 질문");
+        long sessionId = startScenario(accessToken, 2107);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
+
+        assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
+        Integer messageCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        """,
+                Integer.class,
+                sessionId
+        );
+        assertThat(messageCount).isEqualTo(1);
     }
 
     @Test
@@ -767,6 +1263,10 @@ class ScenarioSessionApiIntegrationTests {
 
         private AiClosingMessageRequest lastClosingMessageRequest;
 
+        private final List<Boolean> nextMessageTransactionActive = new ArrayList<>();
+
+        private final List<Boolean> closingMessageTransactionActive = new ArrayList<>();
+
         private GoalCompletionStatus nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
 
         private boolean failNextMessageGeneration;
@@ -774,6 +1274,9 @@ class ScenarioSessionApiIntegrationTests {
         @Override
         public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
             lastNextMessageRequest = request;
+            nextMessageTransactionActive.add(
+                    TransactionSynchronizationManager.isActualTransactionActive()
+            );
             if (failNextMessageGeneration) {
                 throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
             }
@@ -789,6 +1292,9 @@ class ScenarioSessionApiIntegrationTests {
         @Override
         public AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request) {
             lastClosingMessageRequest = request;
+            closingMessageTransactionActive.add(
+                    TransactionSynchronizationManager.isActualTransactionActive()
+            );
             return new AiClosingMessageResult(
                     "Thanks for sharing. That was a good conversation.",
                     "이야기해줘서 고마워. 좋은 대화였어.",
@@ -800,6 +1306,8 @@ class ScenarioSessionApiIntegrationTests {
         private void reset() {
             lastNextMessageRequest = null;
             lastClosingMessageRequest = null;
+            nextMessageTransactionActive.clear();
+            closingMessageTransactionActive.clear();
             nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
             failNextMessageGeneration = false;
         }
@@ -818,6 +1326,14 @@ class ScenarioSessionApiIntegrationTests {
 
         private AiClosingMessageRequest lastClosingMessageRequest() {
             return lastClosingMessageRequest;
+        }
+
+        private List<Boolean> nextMessageTransactionActive() {
+            return nextMessageTransactionActive;
+        }
+
+        private List<Boolean> closingMessageTransactionActive() {
+            return closingMessageTransactionActive;
         }
     }
 }
