@@ -5,6 +5,8 @@ import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.ConversationSpeaker;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.content.domain.ScenarioDifficulty;
+import com.landit.landitbe.content.domain.TtsVoiceGender;
+import com.landit.landitbe.content.domain.TtsVoiceProvider;
 import com.landit.landitbe.learning.domain.UserScenarioProgressStatus;
 import java.math.BigDecimal;
 
@@ -28,7 +30,10 @@ public record ScenarioListRow(
         String userOpeningInstruction,
         String innerThought,
         InnerThoughtType innerThoughtType,
-        String ttsVoiceSetId,
+        TtsVoiceProvider ttsVoiceProvider,
+        String ttsVoiceModel,
+        String providerVoiceId,
+        TtsVoiceGender ttsVoiceGender,
         UserScenarioProgressStatus progressStatus,
         BigDecimal bestStarRating
 ) {

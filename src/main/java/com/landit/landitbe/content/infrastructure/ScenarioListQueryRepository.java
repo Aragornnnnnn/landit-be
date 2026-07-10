@@ -33,7 +33,10 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
                 slv.userOpeningInstruction,
                 slv.aiOpeningInnerThought,
                 slv.aiOpeningInnerThoughtType,
-                s.ttsVoiceSetId,
+                tv.provider,
+                tv.model,
+                tv.providerVoiceId,
+                tv.gender,
                 usp.status,
                 usp.bestStarRating
             )
@@ -48,6 +51,9 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
               ON slv.scenarioId = s.id
              AND slv.targetLocale = up.targetLocale
              AND slv.baseLocale = up.baseLocale
+            LEFT JOIN TtsVoice tv
+              ON tv.id = slv.ttsVoiceId
+             AND tv.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
             LEFT JOIN UserScenarioProgress usp
               ON usp.userProfileId = up.id
              AND usp.scenarioId = s.id
