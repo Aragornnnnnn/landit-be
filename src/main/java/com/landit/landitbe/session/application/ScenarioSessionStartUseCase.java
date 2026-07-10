@@ -7,6 +7,7 @@ import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.ConversationSpeaker;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.content.api.dto.TtsVoiceResponse;
 import com.landit.landitbe.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.learning.domain.UserScenarioProgressStatus;
 import com.landit.landitbe.learning.infrastructure.UserScenarioProgressRepository;
@@ -264,7 +265,12 @@ public class ScenarioSessionStartUseCase {
                 SessionType.SCENARIO.name(),
                 startRow.firstSpeaker().name(),
                 userOpeningInstruction,
-                startRow.ttsVoiceSetId(),
+                TtsVoiceResponse.from(
+                        startRow.ttsVoiceProvider(),
+                        startRow.ttsVoiceModel(),
+                        startRow.providerVoiceId(),
+                        startRow.ttsVoiceGender()
+                ),
                 currentMessage,
                 new SessionProgressResponse(1, startRow.totalQuestionCount(), false)
         );

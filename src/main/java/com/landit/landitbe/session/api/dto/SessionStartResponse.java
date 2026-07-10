@@ -1,6 +1,7 @@
 // 시나리오 세션 시작 API의 응답 구조를 정의한다.
 package com.landit.landitbe.session.api.dto;
 
+import com.landit.landitbe.content.api.dto.TtsVoiceResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "시나리오 세션 시작 응답")
@@ -15,8 +16,8 @@ public record SessionStartResponse(
         String firstSpeaker,
         @Schema(description = "USER first 시 사용자 시작 안내")
         String userOpeningInstruction,
-        @Schema(description = "시나리오 TTS voice set ID")
-        String ttsVoiceSetId,
+        @Schema(description = "활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null")
+        TtsVoiceResponse ttsVoice,
         @Schema(description = "AI first 시 생성된 현재 메시지")
         CurrentMessageResponse currentMessage,
         @Schema(description = "세션 진행도")
