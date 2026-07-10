@@ -4,6 +4,7 @@ package com.landit.landitbe.learning.infrastructure;
 import com.landit.landitbe.learning.domain.UserScenarioProgress;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.landit.landitbe.common.domain.Locale;
 
 public interface UserScenarioProgressRepository extends JpaRepository<UserScenarioProgress, Long> {
 
@@ -11,6 +12,6 @@ public interface UserScenarioProgressRepository extends JpaRepository<UserScenar
     Optional<UserScenarioProgress> findByUserProfileIdAndScenarioIdAndTargetLocale(
             Long userProfileId,
             Long scenarioId,
-            String targetLocale
+            Locale targetLocale
     );
 }

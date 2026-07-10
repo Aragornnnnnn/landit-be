@@ -6,6 +6,7 @@ import com.landit.landitbe.content.domain.WritingExpression;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.landit.landitbe.common.domain.Locale;
 
 public interface WritingExpressionRepository extends JpaRepository<WritingExpression, Long> {
 
@@ -15,8 +16,8 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
      */
     List<WritingExpression> findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
             Long scenarioId,
-            String targetLocale,
-            String baseLocale,
+            Locale targetLocale,
+            Locale baseLocale,
             ActiveStatus status
     );
 

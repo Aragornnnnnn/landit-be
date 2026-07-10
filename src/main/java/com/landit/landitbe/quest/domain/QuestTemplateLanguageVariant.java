@@ -8,6 +8,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.landit.landitbe.common.domain.Locale;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 @Entity
 @Table(name = "quest_template_language_variant")
@@ -20,8 +23,9 @@ public class QuestTemplateLanguageVariant extends BaseTimeEntity {
     @Column(name = "quest_template_id", nullable = false)
     private Long questTemplateId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Column(nullable = false, length = 255)
     private String title;

@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
+import com.landit.landitbe.common.domain.Locale;
 
 @Getter
 @Entity
@@ -32,11 +33,13 @@ public class LearningSession extends BaseTimeEntity {
     @Column(name = "ai_tutor_id", nullable = false)
     private Long aiTutorId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "input_mode", nullable = false, length = 20)
@@ -67,8 +70,8 @@ public class LearningSession extends BaseTimeEntity {
             Long userProfileId,
             SessionType sessionType,
             Long aiTutorId,
-            String targetLocale,
-            String baseLocale,
+            Locale targetLocale,
+            Locale baseLocale,
             InputMode inputMode,
             LearningSessionStatus status,
             LocalDateTime startedAt
@@ -87,8 +90,8 @@ public class LearningSession extends BaseTimeEntity {
     public static LearningSession startScenario(
             Long userProfileId,
             Long aiTutorId,
-            String targetLocale,
-            String baseLocale,
+            Locale targetLocale,
+            Locale baseLocale,
             LocalDateTime startedAt
     ) {
         return new LearningSession(

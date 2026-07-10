@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Table(name = "session_history_message_feedback")
@@ -25,11 +26,13 @@ public class SessionHistoryMessageFeedback extends BaseTimeEntity {
     @Column(name = "session_history_message_id", nullable = false)
     private Long sessionHistoryMessageId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "processing_status", nullable = false, length = 20)

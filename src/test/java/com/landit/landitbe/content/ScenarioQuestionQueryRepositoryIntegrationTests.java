@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import com.landit.landitbe.common.domain.Locale;
 
 @ActiveProfiles("test")
 @SpringBootTest
@@ -51,8 +52,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         Optional<ScenarioQuestionRow> question = scenarioQuestionQueryRepository.findActiveQuestion(
                 991101L,
                 2,
-                "EN",
-                "KR"
+                Locale.EN,
+                Locale.KR
         );
 
         assertThat(question).isPresent();
@@ -86,8 +87,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                 "INACTIVE"
         );
 
-        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, "EN", "KR")).isEmpty();
-        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, "EN", "KR")).isEmpty();
+        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, Locale.EN, Locale.KR)).isEmpty();
+        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, Locale.EN, Locale.KR)).isEmpty();
     }
 
     private void seedScenario(long scenarioId) {

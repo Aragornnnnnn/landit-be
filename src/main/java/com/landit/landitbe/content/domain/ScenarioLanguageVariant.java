@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Table(name = "scenario_language_variant")
@@ -24,11 +25,13 @@ public class ScenarioLanguageVariant extends BaseTimeEntity {
     @Column(name = "scenario_id", nullable = false)
     private Long scenarioId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Column(nullable = false, length = 100)
     private String title;

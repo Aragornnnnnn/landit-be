@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import com.landit.landitbe.common.domain.Locale;
 
 @Repository
 public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQuestion, Long> {
@@ -32,7 +33,7 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
     Optional<ScenarioQuestionRow> findActiveQuestion(
             @Param("scenarioId") long scenarioId,
             @Param("displayOrder") int displayOrder,
-            @Param("targetLocale") String targetLocale,
-            @Param("baseLocale") String baseLocale
+            @Param("targetLocale") Locale targetLocale,
+            @Param("baseLocale") Locale baseLocale
     );
 }

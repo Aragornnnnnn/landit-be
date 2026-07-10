@@ -32,14 +32,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import com.landit.landitbe.common.domain.Locale;
 
 @ExtendWith(MockitoExtension.class)
 class CompleteExpressionLearningUseCaseTest {
 
     private static final Long USER_ID = 1L;
     private static final Long SCENARIO_ID = 10L;
-    private static final String TARGET_LOCALE = "EN";
-    private static final String BASE_LOCALE = "KR";
+    private static final Locale TARGET_LOCALE = Locale.EN;
+    private static final Locale BASE_LOCALE = Locale.KR;
 
     // 학습 순서: 201(1번) → 202(2번) → 203(3번)
     private static final Long UNLOCKED_EXPRESSION_ID = 201L;

@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Table(name = "ai_tutor")
@@ -23,8 +24,9 @@ public class AiTutor extends BaseTimeEntity {
     @Column(name = "accent_locale", nullable = false, length = 35)
     private String accentLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
     @Column(name = "voice_provider", length = 30)
     private String voiceProvider;
