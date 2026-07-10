@@ -20,7 +20,6 @@ public class UserProfile extends BaseTimeEntity {
 
     private static final String DEFAULT_TARGET_LOCALE = "en";
     private static final String DEFAULT_BASE_LOCALE = "ko";
-    private static final String WITHDRAWN_NICKNAME = "탈퇴 사용자";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -85,10 +84,8 @@ public class UserProfile extends BaseTimeEntity {
         }
     }
 
-    /** 사용자 프로필을 탈퇴 상태로 전환하고 개인 표시 정보를 정리한다. */
+    /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
     public void withdraw() {
-        this.email = null;
-        this.nickname = WITHDRAWN_NICKNAME;
         this.profileImageUrl = null;
         this.status = UserProfileStatus.WITHDRAWN;
     }

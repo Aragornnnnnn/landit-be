@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.auth.application.LanditTokenService;
 import com.landit.landitbe.auth.domain.OauthIdentity;
+import com.landit.landitbe.auth.domain.OauthIdentityStatus;
 import com.landit.landitbe.auth.domain.RefreshToken;
 import com.landit.landitbe.auth.domain.SocialProvider;
 import com.landit.landitbe.auth.domain.UserProfile;
@@ -131,7 +132,7 @@ class SocialAuthApiIntegrationTests {
     }
 
     @Test
-    void socialLoginSupportsAppleProvider() throws Exception {
+    void socialLoginCreatesGuestForAppleWithoutRequestNickname() throws Exception {
         mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -144,9 +145,69 @@ class SocialAuthApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.user.provider").value("APPLE"))
-                .andExpect(jsonPath("$.data.user.nickname").value("Apple User"))
+                .andExpect(jsonPath("$.data.user.nickname").value("Guest"))
                 .andExpect(jsonPath("$.data.user.email").value("apple@example.com"))
                 .andExpect(jsonPath("$.data.user.newUser").value(true));
+    }
+
+    @Test
+    void socialLoginUsesRequestNicknameForApple() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"APPLE",
+                                  "idToken":"apple-sub-2|apple-nickname@example.com|Id Token Name|apple-nonce",
+                                  "nonce":"apple-nonce",
+                                  "nickname":"Apple Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
+    }
+
+    @Test
+    void socialLoginKeepsExistingAppleNicknameWhenRequestNicknameIsMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"APPLE",
+                                  "idToken":"apple-sub-3|apple-existing@example.com|Id Token Name|apple-nonce-1",
+                                  "nonce":"apple-nonce-1",
+                                  "nickname":"Apple Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
+
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"APPLE",
+                                  "idToken":"apple-sub-3|apple-existing@example.com|Id Token Name|apple-nonce-2",
+                                  "nonce":"apple-nonce-2"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
+    }
+
+    @Test
+    void socialLoginIgnoresRequestNicknameForGoogle() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"GOOGLE",
+                                  "idToken":"google-sub-4|google-nickname@example.com|Id Token Name|google-nonce",
+                                  "nonce":"google-nonce",
+                                  "nickname":"Ignored Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Id Token Name"));
     }
 
     @Test
@@ -250,6 +311,7 @@ class SocialAuthApiIntegrationTests {
                 "Withdraw User",
                 "withdraw-nonce"
         );
+        Long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
         String refreshToken = loginBody.get("data").get("refreshToken").asText();
 
@@ -259,6 +321,14 @@ class SocialAuthApiIntegrationTests {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(nullValue()))
                 .andExpect(jsonPath("$.error").value(nullValue()));
+
+        UserProfile withdrawnUser = userProfileRepository.findById(userId).orElseThrow();
+        OauthIdentity withdrawnIdentity = oauthIdentityRepository
+                .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.UNLINKED)
+                .getFirst();
+        assertThat(withdrawnUser.getEmail()).isEqualTo("withdraw@example.com");
+        assertThat(withdrawnUser.getNickname()).isEqualTo("Withdraw User");
+        assertThat(withdrawnIdentity).extracting("providerEmail").isEqualTo("withdraw@example.com");
 
         mockMvc.perform(post("/api/v1/auth/token/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
