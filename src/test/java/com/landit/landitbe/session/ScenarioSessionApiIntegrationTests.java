@@ -1120,7 +1120,7 @@ class ScenarioSessionApiIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 variantId,
                 scenarioId,

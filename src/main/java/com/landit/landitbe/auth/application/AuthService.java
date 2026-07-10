@@ -17,6 +17,7 @@ import com.landit.landitbe.auth.infrastructure.OauthIdentityRepository;
 import com.landit.landitbe.auth.infrastructure.RefreshTokenRepository;
 import com.landit.landitbe.auth.infrastructure.UserProfileRepository;
 import com.landit.landitbe.common.domain.ActiveStatus;
+import com.landit.landitbe.common.domain.Locale;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.content.domain.AiTutor;
@@ -32,7 +33,7 @@ public class AuthService {
     private static final String TOKEN_TYPE = "Bearer";
     private static final String GUEST_NICKNAME = "Guest";
     private static final String DEFAULT_AI_TUTOR_ACCENT_LOCALE = "EN-US";
-    private static final String DEFAULT_AI_TUTOR_TARGET_LOCALE = "EN";
+    private static final Locale DEFAULT_AI_TUTOR_TARGET_LOCALE = Locale.EN;
 
     private final UserProfileRepository userProfileRepository;
     private final AiTutorRepository aiTutorRepository;

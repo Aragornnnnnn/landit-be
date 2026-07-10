@@ -2,6 +2,7 @@
 package com.landit.landitbe.content.infrastructure;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
+import com.landit.landitbe.common.domain.Locale;
 import com.landit.landitbe.content.domain.AiTutor;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,7 +12,7 @@ public interface AiTutorRepository extends JpaRepository<AiTutor, Long> {
     /** locale과 활성 상태가 일치하는 AI 튜터 후보를 모두 조회한다. */
     List<AiTutor> findAllByAccentLocaleAndTargetLocaleAndStatus(
             String accentLocale,
-            String targetLocale,
+            Locale targetLocale,
             ActiveStatus status
     );
 }
