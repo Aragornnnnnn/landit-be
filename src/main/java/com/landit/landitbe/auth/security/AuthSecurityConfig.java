@@ -71,6 +71,7 @@ public class AuthSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/expressions/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/scenarios").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/messages").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/sessions/*/end").authenticated()
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info", "/swagger-ui/**", "/v3/api-docs/**")
