@@ -58,6 +58,9 @@ public class ScenarioLanguageVariant extends BaseTimeEntity {
     @Column(name = "ai_opening_inner_thought_type", length = 20)
     private InnerThoughtType aiOpeningInnerThoughtType;
 
+    @Column(name = "tts_voice_id")
+    private Long ttsVoiceId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ActiveStatus status;

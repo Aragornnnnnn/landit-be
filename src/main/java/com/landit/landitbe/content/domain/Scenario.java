@@ -48,9 +48,6 @@ public class Scenario extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private ActiveStatus status;
 
-    @Column(name = "tts_voice_set_id", length = 100)
-    private String ttsVoiceSetId;
-
     protected Scenario() {
     }
 }
