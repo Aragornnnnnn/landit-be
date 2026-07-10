@@ -295,9 +295,9 @@ class ExpressionApiIntegrationTests {
     private void markExpressionCompleted(Long userProfileId, Long scenarioId, Long writingExpressionId) {
         jdbcTemplate.update(
                 "INSERT INTO user_writing_expression_completion "
-                        + "(user_profile_id, scenario_id, writing_expression_id, completed_at) "
-                        + "VALUES (?, ?, ?, ?)",
-                userProfileId, scenarioId, writingExpressionId, LocalDateTime.now()
+                        + "(user_profile_id, scenario_id, writing_expression_id, completed_at, last_completed_at) "
+                        + "VALUES (?, ?, ?, ?, ?)",
+                userProfileId, scenarioId, writingExpressionId, LocalDateTime.now(), LocalDateTime.now()
         );
     }
 
