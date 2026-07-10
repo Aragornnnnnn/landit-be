@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
@@ -97,6 +98,13 @@ public class SessionHistory extends BaseCreatedAtEntity {
                 0,
                 0
         );
+    }
+
+    /** 세션 완료 시 종료 시각과 사용자 메시지 수를 확정한다. */
+    public void complete(LocalDateTime endedAt, int userMessageCount) {
+        this.endedAt = endedAt;
+        this.durationSeconds = Math.toIntExact(Duration.between(startedAt, endedAt).toSeconds());
+        this.userMessageCount = userMessageCount;
     }
 
 }

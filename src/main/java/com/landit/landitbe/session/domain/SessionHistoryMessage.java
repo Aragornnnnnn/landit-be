@@ -119,4 +119,52 @@ public class SessionHistoryMessage extends BaseTimeEntity {
         );
     }
 
+    /** 사용자가 제출한 메시지를 생성한다. */
+    public static SessionHistoryMessage user(
+            Long sessionHistoryId,
+            int messageSequence,
+            int turnNumber,
+            String content,
+            SessionMessageInputType inputType
+    ) {
+        return new SessionHistoryMessage(
+                sessionHistoryId,
+                messageSequence,
+                turnNumber,
+                ConversationSpeaker.USER,
+                content,
+                null,
+                inputType,
+                null,
+                null
+        );
+    }
+
+    /** 히스토리에 저장할 AI 후속 메시지를 생성한다. */
+    public static SessionHistoryMessage aiGenerated(
+            Long sessionHistoryId,
+            int messageSequence,
+            int turnNumber,
+            String content,
+            String translatedContent
+    ) {
+        return new SessionHistoryMessage(
+                sessionHistoryId,
+                messageSequence,
+                turnNumber,
+                ConversationSpeaker.AI,
+                content,
+                translatedContent,
+                SessionMessageInputType.GENERATED,
+                null,
+                null
+        );
+    }
+
+    /** 사용자 메시지를 들은 상대 역할의 속마음을 기록한다. */
+    public void recordInnerThought(String innerThought, InnerThoughtType innerThoughtType) {
+        this.innerThought = innerThought;
+        this.innerThoughtType = innerThoughtType;
+    }
+
 }
