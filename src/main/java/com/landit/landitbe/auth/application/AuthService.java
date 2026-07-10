@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private static final String TOKEN_TYPE = "Bearer";
+    private static final String GUEST_NICKNAME = "Guest";
 
     private final UserProfileRepository userProfileRepository;
     private final OauthIdentityRepository oauthIdentityRepository;
@@ -55,10 +56,8 @@ public class AuthService {
     public AuthTokenResponse socialLogin(SocialLoginRequest request) {
         SocialProvider provider = SocialProvider.from(request.provider());
         OidcUserInfo userInfo = oidcTokenVerifier.verify(provider, request.idToken(), request.nonce());
-        if (provider == SocialProvider.APPLE && request.nickname() != null && !request.nickname().isBlank()) {
-            userInfo = new OidcUserInfo(provider, userInfo.sub(), userInfo.email(), request.nickname());
-        }
-        UserResult userResult = findOrCreateUser(userInfo);
+        String nickname = resolveNickname(provider, request.nickname(), userInfo.nickname());
+        UserResult userResult = findOrCreateUser(userInfo, nickname);
         IssuedTokens issuedTokens = issueTokens(userResult.userProfile());
 
         return new AuthTokenResponse(
@@ -112,7 +111,14 @@ public class AuthService {
         userProfile.withdraw();
     }
 
-    private UserResult findOrCreateUser(OidcUserInfo userInfo) {
+    private String resolveNickname(SocialProvider provider, String requestNickname, String oidcNickname) {
+        if (provider != SocialProvider.APPLE) {
+            return oidcNickname;
+        }
+        return requestNickname == null || requestNickname.isBlank() ? null : requestNickname;
+    }
+
+    private UserResult findOrCreateUser(OidcUserInfo userInfo, String nickname) {
         return oauthIdentityRepository.findByProviderAndProviderUserIdAndStatus(
                         userInfo.provider(),
                         userInfo.sub(),
@@ -123,14 +129,14 @@ public class AuthService {
                     if (!userProfile.isActive()) {
                         throw new ApiException(ErrorCode.AUTH_REQUIRED);
                     }
-                    userProfile.updateProfile(userInfo.email(), userInfo.nickname());
+                    userProfile.updateProfile(userInfo.email(), nickname);
                     identity.updateProviderEmail(userInfo.email());
                     return new UserResult(userProfile, identity.getProvider(), false);
                 })
                 .orElseGet(() -> {
                     UserProfile userProfile = userProfileRepository.save(new UserProfile(
                             userInfo.email(),
-                            userInfo.nickname()
+                            nickname == null ? GUEST_NICKNAME : nickname
                     ));
                     oauthIdentityRepository.save(new OauthIdentity(
                             userProfile,

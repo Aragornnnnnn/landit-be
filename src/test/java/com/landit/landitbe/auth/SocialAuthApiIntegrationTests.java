@@ -131,7 +131,7 @@ class SocialAuthApiIntegrationTests {
     }
 
     @Test
-    void socialLoginSupportsAppleProvider() throws Exception {
+    void socialLoginCreatesGuestForAppleWithoutRequestNickname() throws Exception {
         mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -144,7 +144,7 @@ class SocialAuthApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.user.provider").value("APPLE"))
-                .andExpect(jsonPath("$.data.user.nickname").value("Apple User"))
+                .andExpect(jsonPath("$.data.user.nickname").value("Guest"))
                 .andExpect(jsonPath("$.data.user.email").value("apple@example.com"))
                 .andExpect(jsonPath("$.data.user.newUser").value(true));
     }
@@ -159,6 +159,34 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"apple-sub-2|apple-nickname@example.com|Id Token Name|apple-nonce",
                                   "nonce":"apple-nonce",
                                   "nickname":"Apple Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
+    }
+
+    @Test
+    void socialLoginKeepsExistingAppleNicknameWhenRequestNicknameIsMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"APPLE",
+                                  "idToken":"apple-sub-3|apple-existing@example.com|Id Token Name|apple-nonce-1",
+                                  "nonce":"apple-nonce-1",
+                                  "nickname":"Apple Request Name"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
+
+        mockMvc.perform(post("/api/v1/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"APPLE",
+                                  "idToken":"apple-sub-3|apple-existing@example.com|Id Token Name|apple-nonce-2",
+                                  "nonce":"apple-nonce-2"
                                 }
                                 """))
                 .andExpect(status().isOk())

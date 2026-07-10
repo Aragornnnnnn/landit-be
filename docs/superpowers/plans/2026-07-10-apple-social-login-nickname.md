@@ -12,7 +12,8 @@
 
 - API 필드명은 기존 도메인 용어와 일치하는 `nickname`을 사용한다.
 - `nickname`은 nullable이며 Apple 외 제공자의 기존 ID Token 기반 처리에는 영향을 주지 않는다.
-- Apple 요청의 비어 있지 않은 `nickname`만 OIDC 검증 결과보다 우선한다.
+- Apple 요청의 비어 있지 않은 `nickname`만 사용자 프로필 nickname으로 사용한다.
+- 신규 Apple 요청의 nickname이 없으면 `Guest`를 저장하고, 기존 Apple 사용자의 nickname은 갱신하지 않는다.
 - 새 소스 파일을 만들지 않고 기존 파일을 최소 변경한다.
 
 ---
