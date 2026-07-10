@@ -31,8 +31,8 @@ public class AuthService {
 
     private static final String TOKEN_TYPE = "Bearer";
     private static final String GUEST_NICKNAME = "Guest";
-    private static final String DEFAULT_AI_TUTOR_ACCENT_LOCALE = "en-US";
-    private static final String DEFAULT_AI_TUTOR_TARGET_LOCALE = "en";
+    private static final String DEFAULT_AI_TUTOR_ACCENT_LOCALE = "EN-US";
+    private static final String DEFAULT_AI_TUTOR_TARGET_LOCALE = "EN";
 
     private final UserProfileRepository userProfileRepository;
     private final AiTutorRepository aiTutorRepository;

@@ -32,7 +32,7 @@ VALUES
         'en-US-Harper:MAI-Voice-2',
         'MALE',
         '미국 영어 남성 음성',
-        'en-US',
+        'EN-US',
         'ACTIVE',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -43,7 +43,7 @@ VALUES
         'en-US-Ethan:MAI-Voice-2',
         'FEMALE',
         '미국 영어 여성 음성',
-        'en-US',
+        'EN-US',
         'ACTIVE',
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
@@ -57,16 +57,16 @@ INSERT INTO ai_tutor (
     updated_at
 )
 SELECT
-    'en-US',
-    'en',
+    'EN-US',
+    'EN',
     'ACTIVE',
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
     SELECT 1
     FROM ai_tutor
-    WHERE accent_locale = 'en-US'
-      AND target_locale = 'en'
+    WHERE accent_locale = 'EN-US'
+      AND target_locale = 'EN'
       AND status = 'ACTIVE'
 );
 
@@ -79,27 +79,27 @@ INSERT INTO ai_tutor_language_variant (
 )
 SELECT
     tutor.id,
-    'ko',
+    'KR',
     '미국 영어 튜터',
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 FROM ai_tutor tutor
-WHERE tutor.accent_locale = 'en-US'
-  AND tutor.target_locale = 'en'
+WHERE tutor.accent_locale = 'EN-US'
+  AND tutor.target_locale = 'EN'
   AND tutor.status = 'ACTIVE'
   AND NOT EXISTS (
       SELECT 1
       FROM ai_tutor_language_variant variant
       WHERE variant.ai_tutor_id = tutor.id
-        AND variant.base_locale = 'ko'
+        AND variant.base_locale = 'KR'
   );
 
 UPDATE user_profile
 SET ai_tutor_id = (
     SELECT tutor.id
     FROM ai_tutor tutor
-    WHERE tutor.accent_locale = 'en-US'
-      AND tutor.target_locale = 'en'
+    WHERE tutor.accent_locale = 'EN-US'
+      AND tutor.target_locale = 'EN'
       AND tutor.status = 'ACTIVE'
 )
 WHERE ai_tutor_id IS NULL;

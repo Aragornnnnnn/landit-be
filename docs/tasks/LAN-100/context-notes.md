@@ -12,7 +12,8 @@
 - API에서는 내부 `tts_voice.id`를 노출하지 않고 `provider`, `model`, `providerVoiceId`, `gender`를 `ttsVoice` 객체로 반환한다.
 - TTS 음성이 없거나 `INACTIVE`이면 `ttsVoice`는 null이다.
 - `ttsVoice`는 첫 발화자와 관계없이 AI first와 USER first 응답에 동일하게 적용한다.
-- 기본 AI 튜터는 `accent_locale=en-US`, `target_locale=en`, `status=ACTIVE` 조건으로 조회하며 Java 코드에 ID를 하드코딩하지 않는다.
+- 기본 AI 튜터는 `accent_locale=EN-US`, `target_locale=EN`, `status=ACTIVE` 조건으로 조회하며 Java 코드에 ID를 하드코딩하지 않는다.
+- LAN-100에서 생성하는 locale 값은 대문자로 저장한다. 기본 AI 튜터 language variant의 `base_locale`은 서비스 기준 국가 코드 `KR`을 사용한다. `provider_voice_id`는 외부 Provider 식별자이므로 원문 `en-US-...` 형식을 유지한다.
 - 기본 튜터 후보가 없거나 여러 개이면 신규 프로필을 저장하지 않고 서버 오류로 처리한다.
 - V14는 기존 `scenario.tts_voice_set_id`가 신규 Provider 음성 ID와 정확히 일치할 때만 variant FK로 이전한다.
 - 매핑되지 않는 기존 TTS 값은 nullable인 `scenario_language_variant.tts_voice_id`에 값을 설정하지 않는다.

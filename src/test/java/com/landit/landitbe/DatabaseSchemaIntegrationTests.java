@@ -214,7 +214,7 @@ class DatabaseSchemaIntegrationTests {
         assertThat(voices).allSatisfy(row -> {
             assertThat(row.get("PROVIDER")).isEqualTo("OPENROUTER");
             assertThat(row.get("MODEL")).isEqualTo("microsoft/mai-voice-2");
-            assertThat(row.get("ACCENT_LOCALE")).isEqualTo("en-US");
+            assertThat(row.get("ACCENT_LOCALE")).isEqualTo("EN-US");
             assertThat(row.get("STATUS")).isEqualTo("ACTIVE");
         });
 
@@ -225,7 +225,7 @@ class DatabaseSchemaIntegrationTests {
                 )
                 values (
                     'OPENROUTER', 'microsoft/mai-voice-2', 'en-US-Harper:MAI-Voice-2',
-                    'MALE', 'en-US', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    'MALE', 'EN-US', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 )
                 """))
                 .isInstanceOf(DataIntegrityViolationException.class);
@@ -233,8 +233,8 @@ class DatabaseSchemaIntegrationTests {
         Integer defaultTutorCount = jdbcTemplate.queryForObject("""
                 select count(*)
                 from ai_tutor
-                where accent_locale = 'en-US'
-                  and target_locale = 'en'
+                where accent_locale = 'EN-US'
+                  and target_locale = 'EN'
                   and status = 'ACTIVE'
                 """, Integer.class);
         assertThat(defaultTutorCount).isEqualTo(1);
@@ -243,10 +243,10 @@ class DatabaseSchemaIntegrationTests {
                 select count(*)
                 from ai_tutor_language_variant variant
                 join ai_tutor tutor on tutor.id = variant.ai_tutor_id
-                where tutor.accent_locale = 'en-US'
-                  and tutor.target_locale = 'en'
+                where tutor.accent_locale = 'EN-US'
+                  and tutor.target_locale = 'EN'
                   and tutor.status = 'ACTIVE'
-                  and variant.base_locale = 'ko'
+                  and variant.base_locale = 'KR'
                   and variant.display_name = '미국 영어 튜터'
                 """, Integer.class);
         assertThat(koreanVariantCount).isEqualTo(1);
