@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -54,6 +55,9 @@ class SocialAuthApiIntegrationTests {
 
     @Autowired
     private LanditTokenService tokenService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -85,6 +89,7 @@ class SocialAuthApiIntegrationTests {
 
         JsonNode firstBody = objectMapper.readTree(firstLogin.getResponse().getContentAsByteArray());
         String userId = firstBody.get("data").get("user").get("userId").asText();
+        assertDefaultAiTutorAssigned(Long.parseLong(userId));
 
         mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,7 +138,7 @@ class SocialAuthApiIntegrationTests {
 
     @Test
     void socialLoginCreatesGuestForAppleWithoutRequestNickname() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/social-login")
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -147,7 +152,15 @@ class SocialAuthApiIntegrationTests {
                 .andExpect(jsonPath("$.data.user.provider").value("APPLE"))
                 .andExpect(jsonPath("$.data.user.nickname").value("Guest"))
                 .andExpect(jsonPath("$.data.user.email").value("apple@example.com"))
-                .andExpect(jsonPath("$.data.user.newUser").value(true));
+                .andExpect(jsonPath("$.data.user.newUser").value(true))
+                .andReturn();
+
+        long userId = objectMapper.readTree(result.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("user")
+                .get("userId")
+                .asLong();
+        assertDefaultAiTutorAssigned(userId);
     }
 
     @Test
@@ -211,6 +224,65 @@ class SocialAuthApiIntegrationTests {
     }
 
     @Test
+    void socialLoginRejectsNewUserWhenDefaultAiTutorIsMissing() throws Exception {
+        jdbcTemplate.update("""
+                UPDATE ai_tutor
+                SET status = 'INACTIVE'
+                WHERE accent_locale = 'en-US'
+                  AND target_locale = 'en'
+                  AND status = 'ACTIVE'
+                """);
+        try {
+            mockMvc.perform(post("/api/v1/auth/social-login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "provider":"GOOGLE",
+                                      "idToken":"missing-tutor|missing-tutor@example.com|Missing Tutor|nonce",
+                                      "nonce":"nonce"
+                                    }
+                                    """))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.error.code")
+                            .value("DEFAULT_AI_TUTOR_NOT_CONFIGURED"));
+        } finally {
+            jdbcTemplate.update("""
+                    UPDATE ai_tutor
+                    SET status = 'ACTIVE'
+                    WHERE accent_locale = 'en-US'
+                      AND target_locale = 'en'
+                      AND status = 'INACTIVE'
+                    """);
+        }
+    }
+
+    @Test
+    void socialLoginRejectsNewUserWhenDefaultAiTutorIsDuplicated() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO ai_tutor (
+                    id, accent_locale, target_locale, status, created_at, updated_at
+                )
+                VALUES (990100, 'en-US', 'en', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+        try {
+            mockMvc.perform(post("/api/v1/auth/social-login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "provider":"GOOGLE",
+                                      "idToken":"duplicate-tutor|duplicate-tutor@example.com|Duplicate Tutor|nonce",
+                                      "nonce":"nonce"
+                                    }
+                                    """))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.error.code")
+                            .value("DEFAULT_AI_TUTOR_NOT_CONFIGURED"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM ai_tutor WHERE id = 990100");
+        }
+    }
+
+    @Test
     void socialLoginRejectsUnsupportedProvider() throws Exception {
         mockMvc.perform(post("/api/v1/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -223,6 +295,25 @@ class SocialAuthApiIntegrationTests {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_SOCIAL_PROVIDER"));
+    }
+
+    private void assertDefaultAiTutorAssigned(long userId) {
+        Long aiTutorId = jdbcTemplate.queryForObject(
+                "SELECT ai_tutor_id FROM user_profile WHERE id = ?",
+                Long.class,
+                userId
+        );
+        assertThat(aiTutorId).isEqualTo(defaultAiTutorId());
+    }
+
+    private Long defaultAiTutorId() {
+        return jdbcTemplate.queryForObject("""
+                SELECT id
+                FROM ai_tutor
+                WHERE accent_locale = 'en-US'
+                  AND target_locale = 'en'
+                  AND status = 'ACTIVE'
+                """, Long.class);
     }
 
     @Test
@@ -354,7 +445,8 @@ class SocialAuthApiIntegrationTests {
     void refreshRejectsTokenOwnedByWithdrawnUser() throws Exception {
         UserProfile userProfile = userProfileRepository.save(new UserProfile(
                 "withdrawn-refresh@example.com",
-                "Withdrawn Refresh User"
+                "Withdrawn Refresh User",
+                defaultAiTutorId()
         ));
         oauthIdentityRepository.save(new OauthIdentity(
                 userProfile,
