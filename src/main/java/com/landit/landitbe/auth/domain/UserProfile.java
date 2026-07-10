@@ -12,15 +12,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
+import com.landit.landitbe.common.domain.Locale;
 
 @Getter
 @Entity
 @Table(name = "user_profile")
 public class UserProfile extends BaseTimeEntity {
 
-    // locale 표기는 콘텐츠 시딩 규칙과 동일하게 대문자('EN'/'KR')를 쓴다. (V13 마이그레이션으로 통일)
-    private static final String DEFAULT_TARGET_LOCALE = "EN";
-    private static final String DEFAULT_BASE_LOCALE = "KR";
+    private static final Locale DEFAULT_TARGET_LOCALE = Locale.EN;
+    private static final Locale DEFAULT_BASE_LOCALE = Locale.KR;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,11 +35,13 @@ public class UserProfile extends BaseTimeEntity {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "learning_level", length = 20)

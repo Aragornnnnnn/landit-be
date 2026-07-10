@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Table(name = "user_scenario_progress")
@@ -27,8 +28,9 @@ public class UserScenarioProgress extends BaseTimeEntity {
     @Column(name = "scenario_id", nullable = false)
     private Long scenarioId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -55,7 +57,7 @@ public class UserScenarioProgress extends BaseTimeEntity {
     private UserScenarioProgress(
             Long userProfileId,
             Long scenarioId,
-            String targetLocale,
+            Locale targetLocale,
             UserScenarioProgressStatus status,
             int completedCount,
             LocalDateTime lastPlayedAt
@@ -72,7 +74,7 @@ public class UserScenarioProgress extends BaseTimeEntity {
     public static UserScenarioProgress start(
             Long userProfileId,
             Long scenarioId,
-            String targetLocale,
+            Locale targetLocale,
             LocalDateTime startedAt
     ) {
         return new UserScenarioProgress(

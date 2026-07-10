@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.Getter;
+import com.landit.landitbe.common.domain.Locale;
 
 @Getter
 @Entity
@@ -33,11 +34,13 @@ public class SessionHistory extends BaseCreatedAtEntity {
     @Column(name = "session_type", nullable = false, length = 20)
     private SessionType sessionType;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt;
@@ -61,8 +64,8 @@ public class SessionHistory extends BaseCreatedAtEntity {
             Long learningSessionId,
             Long userProfileId,
             SessionType sessionType,
-            String targetLocale,
-            String baseLocale,
+            Locale targetLocale,
+            Locale baseLocale,
             LocalDateTime startedAt,
             LocalDateTime endedAt,
             int durationSeconds,
@@ -83,8 +86,8 @@ public class SessionHistory extends BaseCreatedAtEntity {
     public static SessionHistory startedScenario(
             Long learningSessionId,
             Long userProfileId,
-            String targetLocale,
-            String baseLocale,
+            Locale targetLocale,
+            Locale baseLocale,
             LocalDateTime startedAt
     ) {
         return new SessionHistory(

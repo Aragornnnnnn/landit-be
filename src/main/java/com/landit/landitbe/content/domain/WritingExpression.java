@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Getter
@@ -36,11 +37,13 @@ public class WritingExpression extends BaseTimeEntity {
     @Column(name = "usage_frequency_level", nullable = false, length = 20)
     private ExpressionUsageFrequencyLevel usageFrequencyLevel;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Column(name = "display_order", nullable = false)
     private int displayOrder;

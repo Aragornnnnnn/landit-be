@@ -11,6 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Table(name = "user_learning_expression")
@@ -23,11 +24,13 @@ public class UserLearningExpression extends BaseTimeEntity {
     @Column(name = "user_profile_id", nullable = false)
     private Long userProfileId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Column(name = "session_history_message_feedback_id", nullable = false)
     private Long sessionHistoryMessageFeedbackId;

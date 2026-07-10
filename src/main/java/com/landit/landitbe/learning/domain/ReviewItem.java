@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import com.landit.landitbe.common.domain.Locale;
 
 @Entity
 @Table(name = "review_item")
@@ -33,11 +34,13 @@ public class ReviewItem extends BaseTimeEntity {
     @Column(name = "session_history_message_feedback_id", nullable = false)
     private Long sessionHistoryMessageFeedbackId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "target_locale", nullable = false, length = 35)
-    private String targetLocale;
+    private Locale targetLocale;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "base_locale", nullable = false, length = 35)
-    private String baseLocale;
+    private Locale baseLocale;
 
     @Column(name = "review_date", nullable = false)
     private LocalDate reviewDate;

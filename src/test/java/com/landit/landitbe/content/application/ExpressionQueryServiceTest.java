@@ -41,6 +41,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import com.landit.landitbe.common.domain.Locale;
 
 @ExtendWith(MockitoExtension.class)
 class ExpressionQueryServiceTest {
@@ -132,7 +133,7 @@ class ExpressionQueryServiceTest {
         // 사용자 locale(en/ko)이 repository 조회 조건으로 그대로 전달된다
         verify(writingExpressionRepository)
                 .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-                        SCENARIO_ID, "EN", "KR", ActiveStatus.ACTIVE);
+                        SCENARIO_ID, Locale.EN, Locale.KR, ActiveStatus.ACTIVE);
     }
 
     @Test
@@ -179,10 +180,10 @@ class ExpressionQueryServiceTest {
      * (전달 순서 = displayOrder 오름차순 정렬 결과라고 가정하고 테스트를 작성한다)
      */
     private void givenExpressions(WritingExpression... expressions) {
-        when(userProfileService.getUserLocale(USER_ID)).thenReturn(new UserLocale("EN", "KR"));
+        when(userProfileService.getUserLocale(USER_ID)).thenReturn(new UserLocale(Locale.EN, Locale.KR));
         when(writingExpressionRepository
                 .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-                        eq(SCENARIO_ID), eq("EN"), eq("KR"), eq(ActiveStatus.ACTIVE)))
+                        eq(SCENARIO_ID), eq(Locale.EN), eq(Locale.KR), eq(ActiveStatus.ACTIVE)))
                 .thenReturn(List.of(expressions));
     }
 
