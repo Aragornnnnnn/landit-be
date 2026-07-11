@@ -5,7 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.session.application.port.AiMessageFeedbackContext;
+import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContext;
+import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiScenarioContext;
@@ -73,11 +74,12 @@ class RemoteAiConversationClientTest {
                         "friend",
                         "KOREAN_LEARNER"
                 ),
-                new AiMessageFeedbackContext(
+                new AiMessageFeedbackEvaluationContext(
+                        AiMessageFeedbackEvaluationContextType.AI_MESSAGE,
                         "What food do you like? Why do you like it?",
-                        "좋아하는 음식이 있어? 왜 좋아해?",
-                        "I like pizza because it is spicy."
-                )
+                        "좋아하는 음식이 있어? 왜 좋아해?"
+                ),
+                "I like pizza because it is spicy."
         ));
 
         JsonNode request = objectMapper.readTree(requestBody.get());
@@ -86,17 +88,75 @@ class RemoteAiConversationClientTest {
         assertThat(request.get("turnNumber").asInt()).isEqualTo(1);
         assertThat(request.get("messageSequence").asInt()).isEqualTo(2);
         assertThat(request.get("scenario").get("counterpartRole").asText()).isEqualTo("friend");
-        assertThat(request.get("messageContext").get("aiMessage").asText())
+        assertThat(request.get("evaluationContext").get("type").asText()).isEqualTo("AI_MESSAGE");
+        assertThat(request.get("evaluationContext").get("content").asText())
                 .isEqualTo("What food do you like? Why do you like it?");
-        assertThat(request.get("messageContext").get("aiMessageTranslation").asText())
+        assertThat(request.get("evaluationContext").get("translatedContent").asText())
                 .isEqualTo("좋아하는 음식이 있어? 왜 좋아해?");
-        assertThat(request.get("messageContext").get("userMessage").asText())
+        assertThat(request.get("userMessage").asText())
                 .isEqualTo("I like pizza because it is spicy.");
         assertThat(result).isEqualTo(new AiMessageFeedbackResult(
                 100L,
                 200L,
                 ProcessingStatus.PREPARING
         ));
+    }
+
+    @Test
+    void requestMessageFeedbackPostsScenarioOpeningInstructionContext() throws Exception {
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/v1/conversation/message-feedback", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] responseBody = """
+                    {
+                      "success": true,
+                      "data": {
+                        "sessionId": 101,
+                        "messageId": 201,
+                        "feedbackStatus": "PREPARING"
+                      },
+                      "error": null
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(202, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        RemoteAiConversationClient client = new RemoteAiConversationClient(
+                objectMapper,
+                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
+        );
+
+        client.requestMessageFeedback(new AiMessageFeedbackRequest(
+                101L,
+                201L,
+                1,
+                1,
+                new AiScenarioContext(
+                        20L,
+                        "카페에서 음료 주문하기",
+                        "카페 점원에게 원하는 음료를 주문합니다.",
+                        "원하는 음료를 자연스럽고 공손하게 주문합니다.",
+                        "cafe staff",
+                        "KOREAN_LEARNER"
+                ),
+                new AiMessageFeedbackEvaluationContext(
+                        AiMessageFeedbackEvaluationContextType.SCENARIO_OPENING_INSTRUCTION,
+                        "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
+                        null
+                ),
+                "Can I get an iced americano?"
+        ));
+
+        JsonNode request = objectMapper.readTree(requestBody.get());
+        assertThat(request.get("messageSequence").asInt()).isEqualTo(1);
+        assertThat(request.get("evaluationContext").get("type").asText())
+                .isEqualTo("SCENARIO_OPENING_INSTRUCTION");
+        assertThat(request.get("evaluationContext").get("content").asText())
+                .isEqualTo("점원에게 먼저 주문하고 싶은 음료를 말해보세요.");
+        assertThat(request.get("evaluationContext").get("translatedContent").isNull()).isTrue();
+        assertThat(request.get("userMessage").asText()).isEqualTo("Can I get an iced americano?");
     }
 
     private String baseUrl() {

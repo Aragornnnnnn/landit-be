@@ -247,11 +247,13 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageSequence()).isEqualTo(2);
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().scenario().scenarioId())
                 .isEqualTo(2101);
-        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().aiMessage())
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().type().name())
+                .isEqualTo("AI_MESSAGE");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
                 .isEqualTo("What food do you like? Why do you like it?");
-        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext()
-                .aiMessageTranslation()).isEqualTo("좋아하는 음식이 있어? 왜 좋아해?");
-        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().userMessage())
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext()
+                .translatedContent()).isEqualTo("좋아하는 음식이 있어? 왜 좋아해?");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
                 .isEqualTo("I like pizza because it is spicy.");
         assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
 
@@ -283,7 +285,7 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
-    void submitFirstUserMessageForUserFirstScenarioCreatesHistoryAndUsesFirstQuestion() throws Exception {
+    void submitUserFirstMessagesUseOpeningInstructionThenPrecedingAiMessage() throws Exception {
         JsonNode loginBody = login("user-first-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
         String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -325,7 +327,7 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.submittedMessage.turnNumber").value(1))
                 .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(1))
                 .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus")
-                        .value(nullValue()))
+                        .value("PREPARING"))
                 .andExpect(jsonPath("$.data.nextMessage.turnNumber").value(2))
                 .andExpect(jsonPath("$.data.nextMessage.messageSequence").value(2))
                 .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
@@ -338,7 +340,80 @@ class ScenarioSessionApiIntegrationTests {
                 .containsExactly("I would like an iced americano.");
         assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence())
                 .isEqualTo(1);
-        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageSequence()).isEqualTo(1);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().type().name())
+                .isEqualTo("SCENARIO_OPENING_INSTRUCTION");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
+                .isEqualTo("점원에게 먼저 주문하고 싶은 음료를 말해보세요.");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext()
+                .translatedContent()).isNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
+                .isEqualTo("I would like an iced americano.");
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"A medium size, please.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submittedMessage.turnNumber").value(2))
+                .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(3))
+                .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus")
+                        .value("PREPARING"));
+
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().type().name())
+                .isEqualTo("AI_MESSAGE");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
+                .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
+                .isEqualTo("A medium size, please.");
+    }
+
+    @Test
+    void submitUserFirstMessageWithoutOpeningInstructionReturnsInternalServerError() throws Exception {
+        JsonNode loginBody = login("user-first-missing-instruction@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1118, 1, "ACTIVE", "카페");
+        seedScenario(2118, 1118, 1, "USER", "ACTIVE", 1);
+        seedScenarioVariant(
+                3118,
+                2118,
+                "카페 주문",
+                "카페에서 음료를 주문합니다.",
+                "원하는 음료를 주문합니다.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(
+                4118,
+                2118,
+                1,
+                "What size would you like?",
+                "어떤 사이즈로 드릴까요?"
+        );
+        long sessionId = startScenario(accessToken, 2118);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Can I get an iced americano?",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
     }
 
     @Test
@@ -386,9 +461,9 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNull();
         assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
-        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().aiMessage())
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
                 .isEqualTo("What food do you like?");
-        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().userMessage())
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
                 .isEqualTo("I like pizza.");
         assertThat(fakeAiConversationClient.closingMessageTransactionActive()).containsOnly(false);
         assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
