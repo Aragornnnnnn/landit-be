@@ -21,8 +21,13 @@ import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
+import com.landit.landitbe.session.application.port.AiSessionFeedbackRequest;
+import com.landit.landitbe.session.application.port.AiSessionFeedbackResult;
+import com.landit.landitbe.session.application.port.AiSessionMessageFeedbackResult;
+import com.landit.landitbe.session.domain.FeedbackType;
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.session.domain.ProcessingStatus;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +79,7 @@ class ScenarioSessionApiIntegrationTests {
     void setUp() {
         fakeAiConversationClient.reset();
         jdbcTemplate.update("DELETE FROM session_history_message_feedback");
+        jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
         jdbcTemplate.update("DELETE FROM session_history_artifact");
         jdbcTemplate.update("DELETE FROM session_history_message");
         jdbcTemplate.update("DELETE FROM scenario_session");
@@ -587,7 +593,199 @@ class ScenarioSessionApiIntegrationTests {
                 "MAX_TURNS_REACHED"
         );
         assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
-        assertSessionHistoryCompleted(sessionId, 1);
+        assertSessionHistoryPlaceholder(sessionId);
+    }
+
+    @Test
+    void getSessionFeedbackCreatesResultAndReturnsExistingResultWithoutRegeneration() throws Exception {
+        StartedSession startedSession = startCompletedAiFirstSession("session-feedback-api@example.com");
+        long userId = startedSession.userId();
+        String accessToken = startedSession.accessToken();
+        long sessionId = startedSession.sessionId();
+
+        mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessionId").value(sessionId))
+                .andExpect(jsonPath("$.data.nativeScore").value(90))
+                .andExpect(jsonPath("$.data.starRating").value(3.0))
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].messageId").isNumber())
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].messageFeedbackId").isNumber())
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].evaluationContext.type")
+                        .value("AI_MESSAGE"))
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].evaluationContext.content")
+                        .value("What food do you like?"))
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
+
+        Map<String, Object> historyBeforeSecondRequest = jdbcTemplate.queryForMap(
+                """
+                        SELECT ended_at, duration_seconds, user_message_count
+                        FROM session_history
+                        WHERE learning_session_id = ?
+                        """,
+                sessionId
+        );
+        Map<String, Object> progressBeforeSecondRequest = jdbcTemplate.queryForMap(
+                """
+                        SELECT status, completed_count, first_cleared_at, last_played_at,
+                               best_star_rating, best_native_score
+                        FROM user_scenario_progress
+                        WHERE user_profile_id = ?
+                          AND scenario_id = 2120
+                          AND target_locale = 'EN'
+                        """,
+                userId
+        );
+
+        mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nativeScore").value(90));
+
+        assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_summary_feedback",
+                Integer.class
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message_feedback",
+                Integer.class
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForMap(
+                """
+                        SELECT ended_at, duration_seconds, user_message_count
+                        FROM session_history
+                        WHERE learning_session_id = ?
+                        """,
+                sessionId
+        )).isEqualTo(historyBeforeSecondRequest);
+        assertThat(jdbcTemplate.queryForMap(
+                """
+                        SELECT status, completed_count, first_cleared_at, last_played_at,
+                               best_star_rating, best_native_score
+                        FROM user_scenario_progress
+                        WHERE user_profile_id = ?
+                          AND scenario_id = 2120
+                          AND target_locale = 'EN'
+                        """,
+                userId
+        )).isEqualTo(progressBeforeSecondRequest);
+        Map<String, Object> progress = jdbcTemplate.queryForMap(
+                """
+                        SELECT status, completed_count
+                        FROM user_scenario_progress
+                        WHERE user_profile_id = ?
+                          AND scenario_id = 2120
+                          AND target_locale = 'EN'
+                        """,
+                userId
+        );
+        assertThat(progress.get("STATUS")).isEqualTo("CLEARED");
+        assertThat(progress.get("COMPLETED_COUNT")).isEqualTo(1);
+    }
+
+    @Test
+    void getSessionFeedbackRejectsInvalidAiResultWithoutPersistingFeedback() throws Exception {
+        StartedSession startedSession = startCompletedAiFirstSession(
+                "session-feedback-invalid-result@example.com"
+        );
+        fakeAiConversationClient.returnMismatchedSessionFeedbackStarRating();
+
+        mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_summary_feedback",
+                Integer.class
+        )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message_feedback",
+                Integer.class
+        )).isZero();
+    }
+
+    @Test
+    void getSessionFeedbackIncludesUserFirstOpeningInstructionAndAllUserMessages() throws Exception {
+        JsonNode loginBody = login("session-feedback-user-first@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1121, 1, "ACTIVE", "카페");
+        seedScenario(2121, 1121, 1, "USER", "ACTIVE", 1);
+        seedScenarioVariant(
+                3121,
+                2121,
+                "카페 주문",
+                "카페에서 음료를 주문합니다.",
+                "원하는 음료를 자연스럽게 주문합니다.",
+                "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(
+                4121,
+                2121,
+                1,
+                "Would you like anything else?",
+                "더 필요한 것은 없나요?"
+        );
+        long sessionId = startScenario(accessToken, 2121);
+
+        submitMessage(accessToken, sessionId, "Can I get an iced americano?");
+        submitMessage(accessToken, sessionId, "That is all, thank you.");
+
+        mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.messageFeedbacks.length()").value(2))
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].evaluationContext.type")
+                        .value("SCENARIO_OPENING_INSTRUCTION"))
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].evaluationContext.content")
+                        .value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
+                .andExpect(jsonPath("$.data.messageFeedbacks[0].evaluationContext.translatedContent")
+                        .value(nullValue()))
+                .andExpect(jsonPath("$.data.messageFeedbacks[1].evaluationContext.type")
+                        .value("AI_MESSAGE"))
+                .andExpect(jsonPath("$.data.messageFeedbacks[1].evaluationContext.content")
+                        .value("Oh, you like spicy pizza. What food did you eat recently?"));
+
+        assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().expectedMessageIds())
+                .containsExactlyElementsOf(userMessageIds(sessionId));
+        assertThat(fakeAiConversationClient.sessionFeedbackTransactionActive()).containsOnly(false);
+    }
+
+    @Test
+    void getSessionFeedbackRejectsInProgressSession() throws Exception {
+        JsonNode loginBody = login("session-feedback-in-progress@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1122, 1, "ACTIVE", "음식");
+        seedScenario(2122, 1122, 1, "AI", "ACTIVE", 1);
+        seedScenarioVariant(
+                3122,
+                2122,
+                "음식 대화",
+                "음식에 대해 이야기합니다.",
+                "음식 취향을 설명합니다.",
+                null,
+                "What food do you like?",
+                "어떤 음식을 좋아해?",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        long sessionId = startScenario(accessToken, 2122);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_COMPLETED"));
+
+        assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isZero();
     }
 
     @Test
@@ -1634,7 +1832,7 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(actualStatus).isEqualTo(goalCompletionStatus);
     }
 
-    private void assertSessionHistoryCompleted(long sessionId, int userMessageCount) {
+    private void assertSessionHistoryPlaceholder(long sessionId) {
         Map<String, Object> history = jdbcTemplate.queryForMap(
                 """
                         SELECT ended_at, duration_seconds, user_message_count
@@ -1644,8 +1842,8 @@ class ScenarioSessionApiIntegrationTests {
                 sessionId
         );
         assertThat(history.get("ENDED_AT")).isNotNull();
-        assertThat(history.get("DURATION_SECONDS")).isNotNull();
-        assertThat(history.get("USER_MESSAGE_COUNT")).isEqualTo(userMessageCount);
+        assertThat(history.get("DURATION_SECONDS")).isEqualTo(0);
+        assertThat(history.get("USER_MESSAGE_COUNT")).isEqualTo(0);
     }
 
     private void assertProgress(long userId, long scenarioId, String status) {
@@ -1682,6 +1880,59 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(message.get("TURN_NUMBER")).isEqualTo(1);
     }
 
+    private void submitMessage(String accessToken, long sessionId, String content) throws Exception {
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"%s",
+                                  "inputType":"VOICE"
+                                }
+                                """.formatted(content)))
+                .andExpect(status().isOk());
+    }
+
+    private List<Long> userMessageIds(long sessionId) {
+        return jdbcTemplate.queryForList(
+                """
+                        SELECT message.id
+                        FROM session_history_message message
+                        JOIN session_history history ON history.id = message.session_history_id
+                        WHERE history.learning_session_id = ?
+                          AND message.role = 'USER'
+                        ORDER BY message.message_sequence
+                        """,
+                Long.class,
+                sessionId
+        );
+    }
+
+    private StartedSession startCompletedAiFirstSession(String email) throws Exception {
+        JsonNode loginBody = login(email);
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1120, 1, "ACTIVE", "음식");
+        seedScenario(2120, 1120, 1, "AI", "ACTIVE", 1);
+        seedScenarioVariant(
+                3120,
+                2120,
+                "음식에 대한 대화",
+                "좋아하는 음식에 대해 이야기합니다.",
+                "음식 취향과 이유를 자연스럽게 설명합니다.",
+                null,
+                "What food do you like?",
+                "어떤 음식을 좋아해?",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        long sessionId = startScenario(accessToken, 2120);
+        submitMessage(accessToken, sessionId, "I like pizza.");
+        return new StartedSession(userId, accessToken, sessionId);
+    }
+
     private record StartedSession(long userId, String accessToken, long sessionId) {
     }
 
@@ -1703,17 +1954,25 @@ class ScenarioSessionApiIntegrationTests {
 
         private AiMessageFeedbackRequest lastMessageFeedbackRequest;
 
+        private AiSessionFeedbackRequest lastSessionFeedbackRequest;
+
         private final List<Boolean> nextMessageTransactionActive = new ArrayList<>();
 
         private final List<Boolean> closingMessageTransactionActive = new ArrayList<>();
 
         private final List<Boolean> messageFeedbackTransactionActive = new ArrayList<>();
 
+        private final List<Boolean> sessionFeedbackTransactionActive = new ArrayList<>();
+
         private GoalCompletionStatus nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
 
         private boolean failNextMessageGeneration;
 
         private boolean failMessageFeedbackRequest;
+
+        private BigDecimal sessionFeedbackStarRating = new BigDecimal("3.0");
+
+        private int sessionFeedbackCallCount;
 
         private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
 
@@ -1773,16 +2032,48 @@ class ScenarioSessionApiIntegrationTests {
             );
         }
 
+        @Override
+        public AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request) {
+            lastSessionFeedbackRequest = request;
+            sessionFeedbackTransactionActive.add(
+                    TransactionSynchronizationManager.isActualTransactionActive()
+            );
+            sessionFeedbackCallCount++;
+            return new AiSessionFeedbackResult(
+                    request.sessionId(),
+                    90,
+                    sessionFeedbackStarRating,
+                    "You clearly communicated your main idea.",
+                    "Keep practicing complete sentences with clear reasons.",
+                    request.expectedMessageIds().stream()
+                            .map(messageId -> new AiSessionMessageFeedbackResult(
+                                    messageId,
+                                    FeedbackType.GOOD,
+                                    "한국어로 이유를 덧붙여 자연스럽게 말한 것과 비슷해요.",
+                                    null,
+                                    "Your message clearly communicates the main idea.",
+                                    null,
+                                    null,
+                                    "Your message clearly communicates the main idea."
+                            ))
+                            .toList()
+            );
+        }
+
         private void reset() {
             lastNextMessageRequest = null;
             lastClosingMessageRequest = null;
             lastMessageFeedbackRequest = null;
+            lastSessionFeedbackRequest = null;
             nextMessageTransactionActive.clear();
             closingMessageTransactionActive.clear();
             messageFeedbackTransactionActive.clear();
+            sessionFeedbackTransactionActive.clear();
             nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
             failNextMessageGeneration = false;
             failMessageFeedbackRequest = false;
+            sessionFeedbackStarRating = new BigDecimal("3.0");
+            sessionFeedbackCallCount = 0;
             messageFeedbackStatus = ProcessingStatus.PREPARING;
             messageFeedbackResponseMessageId = null;
             messageFeedbackResponseSessionId = null;
@@ -1800,6 +2091,10 @@ class ScenarioSessionApiIntegrationTests {
             failMessageFeedbackRequest = true;
         }
 
+        private void returnMismatchedSessionFeedbackStarRating() {
+            sessionFeedbackStarRating = new BigDecimal("2.5");
+        }
+
         private void returnMessageFeedbackStatus(ProcessingStatus status) {
             messageFeedbackStatus = status;
         }
@@ -1810,6 +2105,18 @@ class ScenarioSessionApiIntegrationTests {
 
         private void returnMessageFeedbackForSessionId(long sessionId) {
             messageFeedbackResponseSessionId = sessionId;
+        }
+
+        private int sessionFeedbackCallCount() {
+            return sessionFeedbackCallCount;
+        }
+
+        private AiSessionFeedbackRequest lastSessionFeedbackRequest() {
+            return lastSessionFeedbackRequest;
+        }
+
+        private List<Boolean> sessionFeedbackTransactionActive() {
+            return sessionFeedbackTransactionActive;
         }
 
         private AiNextMessageRequest lastNextMessageRequest() {
