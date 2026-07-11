@@ -35,7 +35,8 @@ class GeneratedMessageRecorder {
     /** AI 생성 결과를 저장하고 사용자에게 반환할 메시지 제출 응답을 만든다. */
     SessionMessageSubmitResponse record(
             SubmittedMessageContext submittedContext,
-            SessionMessageAiGenerator.Generation generation
+            SessionMessageAiGenerator.Generation generation,
+            ProcessingStatus feedbackProcessingStatus
     ) {
         LearningSession learningSession = learningSessionFinder.findOwnedInProgressForUpdate(
                 submittedContext.userId(),
@@ -63,6 +64,7 @@ class GeneratedMessageRecorder {
         return toResponse(
                 submittedContext.sessionId(),
                 submittedMessage,
+                feedbackProcessingStatus,
                 new MessageGenerationResult(
                         nextMessage,
                         submittedContext.scenarioContext().totalQuestionCount(),
@@ -130,11 +132,12 @@ class GeneratedMessageRecorder {
     private SessionMessageSubmitResponse toResponse(
             long sessionId,
             SessionHistoryMessage submittedMessage,
+            ProcessingStatus feedbackProcessingStatus,
             MessageGenerationResult generationResult
     ) {
         return new SessionMessageSubmitResponse(
                 sessionId,
-                toSubmittedMessageResponse(submittedMessage),
+                toSubmittedMessageResponse(submittedMessage, feedbackProcessingStatus),
                 toNextMessageResponse(generationResult.nextMessage()),
                 new SessionProgressResponse(
                         generationResult.nextMessage().getTurnNumber(),
@@ -145,13 +148,16 @@ class GeneratedMessageRecorder {
         );
     }
 
-    private SubmittedMessageResponse toSubmittedMessageResponse(SessionHistoryMessage message) {
+    private SubmittedMessageResponse toSubmittedMessageResponse(
+            SessionHistoryMessage message,
+            ProcessingStatus feedbackProcessingStatus
+    ) {
         return new SubmittedMessageResponse(
                 message.getId(),
                 message.getTurnNumber(),
                 message.getMessageSequence(),
                 message.getRole().name(),
-                ProcessingStatus.PREPARING.name(),
+                feedbackProcessingStatus == null ? null : feedbackProcessingStatus.name(),
                 message.getInnerThought(),
                 message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name()
         );

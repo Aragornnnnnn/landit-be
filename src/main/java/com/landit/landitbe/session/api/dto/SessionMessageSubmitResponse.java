@@ -25,7 +25,7 @@ public record SessionMessageSubmitResponse(
             int messageSequence,
             @Schema(description = "발화 주체")
             String role,
-            @Schema(description = "메시지별 피드백 처리 상태")
+            @Schema(description = "메시지별 피드백 처리 상태. USER first 첫 메시지는 null", nullable = true)
             String feedbackProcessingStatus,
             @Schema(description = "상대 역할의 속마음")
             String innerThought,
