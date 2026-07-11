@@ -10,11 +10,9 @@ import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiClosingReason;
 import com.landit.landitbe.session.application.port.AiConversationClient;
 import com.landit.landitbe.session.application.port.AiConversationHistoryMessage;
-import com.landit.landitbe.session.application.port.AiConversationSettings;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
 import com.landit.landitbe.session.application.port.AiNextQuestion;
-import com.landit.landitbe.session.application.port.AiScenarioContext;
 import com.landit.landitbe.session.domain.CompletionReason;
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageContextRow;
@@ -28,7 +26,7 @@ import org.springframework.stereotype.Service;
 class SessionMessageAiGenerator {
 
     private final AiConversationClient aiConversationClient;
-    private final AiConversationSettings aiConversationSettings;
+    private final AiScenarioContextMapper aiScenarioContextMapper;
 
     /** 다음 AI 메시지 또는 종료 메시지를 생성한다. */
     Generation generate(Request request) {
@@ -76,7 +74,7 @@ class SessionMessageAiGenerator {
                 request.learningSessionId(),
                 request.submittedMessageId(),
                 request.submittedTurnNumber(),
-                toScenarioContext(request.scenarioContext()),
+                aiScenarioContextMapper.map(request.scenarioContext()),
                 request.conversationHistory(),
                 toAiNextQuestion(nextQuestion)
         );
@@ -93,7 +91,7 @@ class SessionMessageAiGenerator {
                         request.learningSessionId(),
                         request.submittedMessageId(),
                         request.submittedTurnNumber(),
-                        toScenarioContext(request.scenarioContext()),
+                        aiScenarioContextMapper.map(request.scenarioContext()),
                         request.conversationHistory(),
                         closingReason,
                         goalCompletionStatus
@@ -108,17 +106,6 @@ class SessionMessageAiGenerator {
                 goalCompletionStatus,
                 true,
                 completionReason
-        );
-    }
-
-    private AiScenarioContext toScenarioContext(ScenarioSessionMessageContextRow scenarioContext) {
-        return new AiScenarioContext(
-                scenarioContext.scenarioId(),
-                scenarioContext.title(),
-                scenarioContext.briefing(),
-                scenarioContext.conversationGoal(),
-                scenarioContext.counterpartRole(),
-                aiConversationSettings.serviceAudience()
         );
     }
 
