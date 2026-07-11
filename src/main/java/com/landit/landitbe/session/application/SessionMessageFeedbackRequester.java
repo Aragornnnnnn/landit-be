@@ -11,6 +11,7 @@ import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationC
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.domain.ProcessingStatus;
+import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageContextRow;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -47,23 +48,37 @@ class SessionMessageFeedbackRequester {
     private AiMessageFeedbackEvaluationContext evaluationContext(
             SubmittedMessageContext submittedContext
     ) {
-        if (isUserFirstOpeningMessage(submittedContext)) {
-            return scenarioOpeningInstructionContext(submittedContext);
+        return evaluationContext(
+                submittedContext.scenarioContext(),
+                submittedContext.conversationHistory()
+        );
+    }
+
+    /** 시나리오 시작 발화와 직전 AI 메시지에 맞는 평가 기준을 조립한다. */
+    static AiMessageFeedbackEvaluationContext evaluationContext(
+            ScenarioSessionMessageContextRow scenarioContext,
+            List<AiConversationHistoryMessage> conversationHistory
+    ) {
+        if (isUserFirstOpeningMessage(scenarioContext, conversationHistory)) {
+            return scenarioOpeningInstructionContext(scenarioContext);
         }
-        return precedingAiMessageContext(submittedContext.conversationHistory());
+        return precedingAiMessageContext(conversationHistory);
     }
 
     /** USER First 시나리오의 첫 사용자 메시지인지 판별한다. */
-    private boolean isUserFirstOpeningMessage(SubmittedMessageContext submittedContext) {
-        return submittedContext.scenarioContext().firstSpeaker() == ConversationSpeaker.USER
-                && submittedContext.conversationHistory().size() == 1;
+    private static boolean isUserFirstOpeningMessage(
+            ScenarioSessionMessageContextRow scenarioContext,
+            List<AiConversationHistoryMessage> conversationHistory
+    ) {
+        return scenarioContext.firstSpeaker() == ConversationSpeaker.USER
+                && conversationHistory.size() == 1;
     }
 
     /** USER First 시작 안내를 평가 기준으로 변환한다. */
-    private AiMessageFeedbackEvaluationContext scenarioOpeningInstructionContext(
-            SubmittedMessageContext submittedContext
+    private static AiMessageFeedbackEvaluationContext scenarioOpeningInstructionContext(
+            ScenarioSessionMessageContextRow scenarioContext
     ) {
-        String instruction = submittedContext.scenarioContext().userOpeningInstruction();
+        String instruction = scenarioContext.userOpeningInstruction();
         if (instruction == null || instruction.isBlank()) {
             throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -75,7 +90,7 @@ class SessionMessageFeedbackRequester {
     }
 
     /** 직전 AI 메시지를 사용자 발화의 평가 기준으로 변환한다. */
-    private AiMessageFeedbackEvaluationContext precedingAiMessageContext(
+    private static AiMessageFeedbackEvaluationContext precedingAiMessageContext(
             List<AiConversationHistoryMessage> conversationHistory
     ) {
         if (conversationHistory.size() < 2) {
