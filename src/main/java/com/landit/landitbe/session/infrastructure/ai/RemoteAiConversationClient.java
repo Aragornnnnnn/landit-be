@@ -10,9 +10,12 @@ import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
 import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
+import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
+import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
+import com.landit.landitbe.session.domain.ProcessingStatus;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -30,6 +33,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
     private static final String NEXT_MESSAGE_PATH = "/api/v1/conversation/next-message";
     private static final String CLOSING_MESSAGE_PATH = "/api/v1/conversation/closing-message";
+    private static final String MESSAGE_FEEDBACK_PATH = "/api/v1/conversation/message-feedback";
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper;
@@ -43,6 +47,11 @@ public class RemoteAiConversationClient implements AiConversationClient {
     @Override
     public AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request) {
         return post(closingMessageUri(), request, RemoteClosingMessageResponse.class).toResponse();
+    }
+
+    @Override
+    public AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request) {
+        return post(messageFeedbackUri(), request, RemoteMessageFeedbackResponse.class).toResult();
     }
 
     private <T> T post(URI uri, Object payload, Class<T> responseType) {
@@ -94,6 +103,10 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
     private URI closingMessageUri() {
         return aiBaseUri().resolve(CLOSING_MESSAGE_PATH);
+    }
+
+    private URI messageFeedbackUri() {
+        return aiBaseUri().resolve(MESSAGE_FEEDBACK_PATH);
     }
 
     private URI aiBaseUri() {
@@ -151,6 +164,21 @@ public class RemoteAiConversationClient implements AiConversationClient {
                     innerThought,
                     innerThoughtType
             );
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record RemoteMessageFeedbackResponse(
+            Long sessionId,
+            Long messageId,
+            ProcessingStatus feedbackStatus
+    ) {
+
+        private AiMessageFeedbackResult toResult() {
+            if (sessionId == null || messageId == null || feedbackStatus == null) {
+                throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+            }
+            return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus);
         }
     }
 

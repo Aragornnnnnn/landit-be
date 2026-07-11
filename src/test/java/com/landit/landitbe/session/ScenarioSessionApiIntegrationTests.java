@@ -17,9 +17,12 @@ import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
 import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
+import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
+import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
+import com.landit.landitbe.session.domain.ProcessingStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -1290,13 +1293,25 @@ class ScenarioSessionApiIntegrationTests {
 
         private AiClosingMessageRequest lastClosingMessageRequest;
 
+        private AiMessageFeedbackRequest lastMessageFeedbackRequest;
+
         private final List<Boolean> nextMessageTransactionActive = new ArrayList<>();
 
         private final List<Boolean> closingMessageTransactionActive = new ArrayList<>();
 
+        private final List<Boolean> messageFeedbackTransactionActive = new ArrayList<>();
+
         private GoalCompletionStatus nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
 
         private boolean failNextMessageGeneration;
+
+        private boolean failMessageFeedbackRequest;
+
+        private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
+
+        private Long messageFeedbackResponseMessageId;
+
+        private Long messageFeedbackResponseSessionId;
 
         @Override
         public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
@@ -1330,13 +1345,39 @@ class ScenarioSessionApiIntegrationTests {
             );
         }
 
+        @Override
+        public AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request) {
+            lastMessageFeedbackRequest = request;
+            messageFeedbackTransactionActive.add(
+                    TransactionSynchronizationManager.isActualTransactionActive()
+            );
+            if (failMessageFeedbackRequest) {
+                throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+            }
+            return new AiMessageFeedbackResult(
+                    messageFeedbackResponseSessionId == null
+                            ? request.sessionId()
+                            : messageFeedbackResponseSessionId,
+                    messageFeedbackResponseMessageId == null
+                            ? request.messageId()
+                            : messageFeedbackResponseMessageId,
+                    messageFeedbackStatus
+            );
+        }
+
         private void reset() {
             lastNextMessageRequest = null;
             lastClosingMessageRequest = null;
+            lastMessageFeedbackRequest = null;
             nextMessageTransactionActive.clear();
             closingMessageTransactionActive.clear();
+            messageFeedbackTransactionActive.clear();
             nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
             failNextMessageGeneration = false;
+            failMessageFeedbackRequest = false;
+            messageFeedbackStatus = ProcessingStatus.PREPARING;
+            messageFeedbackResponseMessageId = null;
+            messageFeedbackResponseSessionId = null;
         }
 
         private void completeGoalOnNextMessage() {
@@ -1347,6 +1388,22 @@ class ScenarioSessionApiIntegrationTests {
             failNextMessageGeneration = true;
         }
 
+        private void failMessageFeedbackRequest() {
+            failMessageFeedbackRequest = true;
+        }
+
+        private void returnMessageFeedbackStatus(ProcessingStatus status) {
+            messageFeedbackStatus = status;
+        }
+
+        private void returnMessageFeedbackForMessageId(long messageId) {
+            messageFeedbackResponseMessageId = messageId;
+        }
+
+        private void returnMessageFeedbackForSessionId(long sessionId) {
+            messageFeedbackResponseSessionId = sessionId;
+        }
+
         private AiNextMessageRequest lastNextMessageRequest() {
             return lastNextMessageRequest;
         }
@@ -1355,12 +1412,20 @@ class ScenarioSessionApiIntegrationTests {
             return lastClosingMessageRequest;
         }
 
+        private AiMessageFeedbackRequest lastMessageFeedbackRequest() {
+            return lastMessageFeedbackRequest;
+        }
+
         private List<Boolean> nextMessageTransactionActive() {
             return nextMessageTransactionActive;
         }
 
         private List<Boolean> closingMessageTransactionActive() {
             return closingMessageTransactionActive;
+        }
+
+        private List<Boolean> messageFeedbackTransactionActive() {
+            return messageFeedbackTransactionActive;
         }
     }
 }
