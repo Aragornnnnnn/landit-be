@@ -417,6 +417,71 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
+    void submitAiFirstMessageWithoutPrecedingAiMessageReturnsInternalServerError() throws Exception {
+        JsonNode loginBody = login("ai-first-missing-message@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1119, 1, "ACTIVE", "음식");
+        seedScenario(2119, 1119, 1, "AI", "ACTIVE", 1);
+        seedScenarioVariant(
+                3119,
+                2119,
+                "음식 대화",
+                "좋아하는 음식을 이야기합니다.",
+                "좋아하는 음식을 영어로 설명합니다.",
+                null,
+                "What food do you like?",
+                "어떤 음식을 좋아해?",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(
+                4119,
+                2119,
+                1,
+                "Why do you like it?",
+                "왜 좋아해?"
+        );
+        long sessionId = startScenario(accessToken, 2119);
+        jdbcTemplate.update(
+                """
+                        DELETE FROM session_history_message
+                        WHERE session_history_id = (
+                            SELECT id
+                            FROM session_history
+                            WHERE learning_session_id = ?
+                        )
+                        """,
+                sessionId
+        );
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I like pizza.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
+
+        Integer messageCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        """,
+                Integer.class,
+                sessionId
+        );
+        assertThat(messageCount).isZero();
+    }
+
+    @Test
     void submitMessageCompletesSessionWithClosingMessageWhenNextQuestionDoesNotExist() throws Exception {
         JsonNode loginBody = login("max-turn-submit@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();

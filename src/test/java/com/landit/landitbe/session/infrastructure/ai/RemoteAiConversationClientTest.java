@@ -2,9 +2,12 @@
 package com.landit.landitbe.session.infrastructure.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.common.exception.ApiException;
+import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
@@ -157,6 +160,85 @@ class RemoteAiConversationClientTest {
                 .isEqualTo("점원에게 먼저 주문하고 싶은 음료를 말해보세요.");
         assertThat(request.get("evaluationContext").get("translatedContent").isNull()).isTrue();
         assertThat(request.get("userMessage").asText()).isEqualTo("Can I get an iced americano?");
+    }
+
+    @Test
+    void requestMessageFeedbackPreservesAiResponseInvalidError() {
+        server.createContext("/api/v1/conversation/message-feedback", exchange -> {
+            byte[] responseBody = """
+                    {
+                      "success": false,
+                      "data": null,
+                      "error": {
+                        "code": "AI_RESPONSE_INVALID",
+                        "message": "AI 응답 형식이 올바르지 않습니다."
+                      }
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(502, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        RemoteAiConversationClient client = new RemoteAiConversationClient(
+                objectMapper,
+                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
+        );
+
+        assertThatThrownBy(() -> client.requestMessageFeedback(aiMessageFeedbackRequest()))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    }
+
+    @Test
+    void requestMessageFeedbackMapsOtherErrorResponseToGenerationFailed() {
+        server.createContext("/api/v1/conversation/message-feedback", exchange -> {
+            byte[] responseBody = """
+                    {
+                      "success": false,
+                      "data": null,
+                      "error": {
+                        "code": "AI_GENERATION_FAILED",
+                        "message": "AI 응답 생성에 실패했습니다."
+                      }
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(503, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        RemoteAiConversationClient client = new RemoteAiConversationClient(
+                objectMapper,
+                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
+        );
+
+        assertThatThrownBy(() -> client.requestMessageFeedback(aiMessageFeedbackRequest()))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
+    }
+
+    private AiMessageFeedbackRequest aiMessageFeedbackRequest() {
+        return new AiMessageFeedbackRequest(
+                100L,
+                200L,
+                1,
+                2,
+                new AiScenarioContext(
+                        10L,
+                        "음식에 대한 대화하기",
+                        "좋아하는 음식과 최근에 먹은 음식에 대해 이야기합니다.",
+                        "내 취향과 경험을 영어로 설명해봅니다.",
+                        "friend",
+                        "KOREAN_LEARNER"
+                ),
+                new AiMessageFeedbackEvaluationContext(
+                        AiMessageFeedbackEvaluationContextType.AI_MESSAGE,
+                        "What food do you like?",
+                        "어떤 음식을 좋아해?"
+                ),
+                "I like pizza."
+        );
     }
 
     private String baseUrl() {
