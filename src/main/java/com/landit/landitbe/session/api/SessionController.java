@@ -4,7 +4,9 @@ package com.landit.landitbe.session.api;
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.common.response.ApiResponse;
 import com.landit.landitbe.session.application.SessionEndUseCase;
+import com.landit.landitbe.session.application.SessionFeedbackUseCase;
 import com.landit.landitbe.session.application.SessionMessageSubmitUseCase;
+import com.landit.landitbe.session.api.dto.SessionFeedbackResponse;
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionController {
 
     private final SessionEndUseCase sessionEndUseCase;
+    private final SessionFeedbackUseCase sessionFeedbackUseCase;
     private final SessionMessageSubmitUseCase sessionMessageSubmitUseCase;
 
     /** 사용자 발화를 저장하고 다음 AI 메시지를 생성한다. */
@@ -55,6 +58,32 @@ public class SessionController {
         return ApiResponse.success(
                 HttpStatus.OK,
                 sessionMessageSubmitUseCase.submitMessage(principal.userId(), sessionId, request)
+        );
+    }
+
+    /** 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다. */
+    @Operation(
+            summary = "대화 최종 피드백 생성 및 조회",
+            description = "완료된 세션의 요약 피드백과 메시지별 피드백을 생성하거나 조회한다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "권한 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "세션 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "완료되지 않음 또는 피드백 미준비"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "AI 응답 형식 오류"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "최종 피드백 생성 실패")
+    })
+    @PostMapping("/{sessionId}/feedback")
+    public ResponseEntity<ApiResponse<SessionFeedbackResponse>> getOrCreateFeedback(
+            @AuthenticationPrincipal AuthUserPrincipal principal,
+            @PathVariable Long sessionId
+    ) {
+        return ApiResponse.success(
+                HttpStatus.OK,
+                sessionFeedbackUseCase.getOrCreate(principal.userId(), sessionId)
         );
     }
 
