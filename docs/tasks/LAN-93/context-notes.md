@@ -43,6 +43,13 @@
 - USER First 첫 발화의 피드백 생략 분기를 제거하고 시작 안내 기반 피드백 요청으로 변경했다.
 - AI First와 USER First의 요청 본문, 세션 전체 메시지 순번, FE 상태를 통합 테스트로 검증했다.
 
+## 자체 코드 리뷰 반영
+
+- AI 서버의 비-2xx 응답 중 `AI_RESPONSE_INVALID`만 BE의 `502`로 유지하고, 나머지는 `503 AI_GENERATION_FAILED`로 변환한다.
+- 직전 AI 메시지가 없거나 역할이 올바르지 않은 경우는 AI 응답 오류가 아닌 내부 히스토리 오류이므로 `500 INTERNAL_SERVER_ERROR`로 처리한다.
+- 피드백 요청이 정상 접수된 제출 응답은 항상 `PREPARING`이므로 OpenAPI의 USER First null 설명과 nullable 설정을 제거했다.
+- 원격 AI 오류 매핑과 AI First 히스토리 불일치 시 보상 삭제를 통합 테스트로 검증했다.
+
 ## 참고 구현
 
 - `saynow-be`의 `origin/develop`은 다음 질문 또는 종료 메시지를 생성한 뒤 턴별 피드백을 요청한다.
