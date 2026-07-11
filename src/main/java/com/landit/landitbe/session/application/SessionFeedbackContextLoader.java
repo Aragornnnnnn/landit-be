@@ -8,7 +8,9 @@ import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiConversationHistoryMessage;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.session.application.port.AiScenarioContext;
+import com.landit.landitbe.session.domain.LearningSession;
 import com.landit.landitbe.session.domain.ProcessingStatus;
+import com.landit.landitbe.session.domain.SessionHistory;
 import com.landit.landitbe.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.session.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageContextRow;
@@ -37,8 +39,8 @@ class SessionFeedbackContextLoader {
     /** 소유한 완료 시나리오 세션의 최종 피드백 입력을 불변 값으로 조회한다. */
     @Transactional(readOnly = true)
     public LoadedSessionFeedbackContext load(long userId, long sessionId) {
-        var learningSession = learningSessionFinder.findOwnedCompleted(userId, sessionId);
-        var sessionHistory = sessionHistoryRepository.findByLearningSessionId(sessionId)
+        LearningSession learningSession = learningSessionFinder.findOwnedCompleted(userId, sessionId);
+        SessionHistory sessionHistory = sessionHistoryRepository.findByLearningSessionId(sessionId)
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
         ScenarioSessionMessageContextRow scenarioContext = scenarioSessionMessageQueryRepository
                 .findContextByLearningSessionId(sessionId)
