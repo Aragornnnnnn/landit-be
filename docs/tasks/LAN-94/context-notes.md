@@ -7,6 +7,7 @@
 - FE 응답의 `evaluationContext`는 BE가 저장 메시지와 세션 스냅샷으로 구성한다.
 - USER First 첫 발화에는 세션 시작 시 저장한 시작 안내 스냅샷을 사용한다.
 - AI 호출은 트랜잭션 밖에서 실행한다. 저장 트랜잭션은 learning session lock과 summary 재조회로 DB 부작용만 멱등하게 처리한다.
+- 별점은 AI 응답값이 아니라 유효한 `nativeScore` 구간으로 BE가 계산한다. AI 별점이 다르면 경고 로그를 남기고 BE 계산값을 저장한다.
 - AI 캐시의 단일 인스턴스·3시간 TTL·AI 성공 후 BE 저장 실패 복구는 이번 범위 밖이다.
 
 ## 결과 확정 정책
@@ -23,4 +24,5 @@
 - 최종 피드백의 조회·저장·검증 흐름에는 메서드 역할과 트랜잭션 의도를 설명하는 주석을 추가했다.
 - H2 Flyway V15 적용과 전체 `./gradlew test`를 확인했다.
 - `git diff --check feat/LAN-93...HEAD`를 확인했다.
+- AI 별점 불일치에도 `nativeScore=90` 기준 `3.0`을 저장하고 반환하는 회귀 테스트를 추가했다.
 - PostgreSQL 실행 환경이 없어 실제 V15 적용은 아직 확인하지 못했다.

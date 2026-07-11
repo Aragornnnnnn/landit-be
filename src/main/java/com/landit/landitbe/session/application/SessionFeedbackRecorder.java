@@ -20,9 +20,11 @@ import com.landit.landitbe.session.infrastructure.SessionHistorySummaryFeedbackR
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 class SessionFeedbackRecorder {
@@ -42,6 +44,8 @@ class SessionFeedbackRecorder {
             AiSessionFeedbackResult result
     ) {
         validateResult(context, result);
+        BigDecimal starRating = starRatingFor(result.nativeScore());
+        logStarRatingMismatch(context.sessionId(), result.starRating(), starRating);
         // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
         LearningSession learningSession = learningSessionFinder.findOwnedCompletedForUpdate(
                 userId,
@@ -54,10 +58,10 @@ class SessionFeedbackRecorder {
             return ExistingSummaryFeedbackContext.from(existing).summaryFeedbackId();
         }
 
-        SessionHistorySummaryFeedback summaryFeedback = saveSummaryFeedback(context, result);
+        SessionHistorySummaryFeedback summaryFeedback = saveSummaryFeedback(context, result, starRating);
         saveMessageFeedbacks(context, result, summaryFeedback.getId());
         completeSessionHistory(context, learningSession);
-        completeScenarioProgress(context, learningSession, result);
+        completeScenarioProgress(context, learningSession, result.nativeScore(), starRating);
         return summaryFeedback.getId();
     }
 
@@ -70,8 +74,6 @@ class SessionFeedbackRecorder {
                 || !context.sessionId().equals(result.sessionId())
                 || result.nativeScore() < 0
                 || result.nativeScore() > 100
-                || result.starRating() == null
-                || expectedStarRating(result.nativeScore()).compareTo(result.starRating()) != 0
                 || blank(result.highlightMessage())
                 || blank(result.summaryMessage())) {
             throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -116,7 +118,8 @@ class SessionFeedbackRecorder {
     /** 세션 전체 점수와 요약 문구를 완료 상태의 summary feedback으로 저장한다. */
     private SessionHistorySummaryFeedback saveSummaryFeedback(
             LoadedSessionFeedbackContext context,
-            AiSessionFeedbackResult result
+            AiSessionFeedbackResult result,
+            BigDecimal starRating
     ) {
         int nativeLikeMessageCount = (int) result.messageFeedbacks().stream()
                 .filter(feedback -> feedback.feedbackType() == FeedbackType.GOOD)
@@ -124,7 +127,7 @@ class SessionFeedbackRecorder {
         return sessionHistorySummaryFeedbackRepository.save(SessionHistorySummaryFeedback.completed(
                 context.sessionHistoryId(),
                 result.nativeScore(),
-                result.starRating(),
+                starRating,
                 context.userMessages().size(),
                 nativeLikeMessageCount,
                 result.highlightMessage(),
@@ -173,7 +176,8 @@ class SessionFeedbackRecorder {
     private void completeScenarioProgress(
             LoadedSessionFeedbackContext context,
             LearningSession learningSession,
-            AiSessionFeedbackResult result
+            int nativeScore,
+            BigDecimal starRating
     ) {
         UserScenarioProgress progress = userScenarioProgressRepository
                 .findByUserProfileIdAndScenarioIdAndTargetLocale(
@@ -182,11 +186,11 @@ class SessionFeedbackRecorder {
                         learningSession.getTargetLocale()
                 )
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
-        progress.complete(result.starRating(), result.nativeScore(), learningSession.getEndedAt());
+        progress.complete(starRating, nativeScore, learningSession.getEndedAt());
     }
 
-    /** AI 계약의 native score 구간을 해당하는 FE 별점으로 변환한다. */
-    private BigDecimal expectedStarRating(int nativeScore) {
+    /** native score 구간으로 저장과 응답에 사용할 별점을 계산한다. */
+    private BigDecimal starRatingFor(int nativeScore) {
         if (nativeScore <= 54) {
             return new BigDecimal("1.0");
         }
@@ -200,6 +204,22 @@ class SessionFeedbackRecorder {
             return new BigDecimal("2.5");
         }
         return new BigDecimal("3.0");
+    }
+
+    /** AI가 보낸 별점이 점수 구간과 다르면 BE 계산값을 사용하고 계약 위반을 기록한다. */
+    private void logStarRatingMismatch(
+            long sessionId,
+            BigDecimal aiStarRating,
+            BigDecimal starRating
+    ) {
+        if (aiStarRating != null && aiStarRating.compareTo(starRating) != 0) {
+            log.warn(
+                    "AI final feedback star rating mismatched. sessionId={}, aiStarRating={}, starRating={}",
+                    sessionId,
+                    aiStarRating,
+                    starRating
+            );
+        }
     }
 
     /** 필수 문자열이 null 또는 공백인지 확인한다. */
