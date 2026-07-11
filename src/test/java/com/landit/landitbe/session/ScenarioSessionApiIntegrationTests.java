@@ -239,6 +239,21 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().questionId())
                 .isEqualTo(4102);
         assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().sessionId()).isEqualTo(sessionId);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageId())
+                .isEqualTo(submittedMessageId);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().turnNumber()).isEqualTo(1);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageSequence()).isEqualTo(2);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().scenario().scenarioId())
+                .isEqualTo(2101);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().aiMessage())
+                .isEqualTo("What food do you like? Why do you like it?");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext()
+                .aiMessageTranslation()).isEqualTo("좋아하는 음식이 있어? 왜 좋아해?");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().userMessage())
+                .isEqualTo("I like pizza because it is spicy.");
+        assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
 
         List<Map<String, Object>> messages = jdbcTemplate.queryForList(
                 """
@@ -309,6 +324,8 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.submittedMessage.turnNumber").value(1))
                 .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(1))
+                .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus")
+                        .value(nullValue()))
                 .andExpect(jsonPath("$.data.nextMessage.turnNumber").value(2))
                 .andExpect(jsonPath("$.data.nextMessage.messageSequence").value(2))
                 .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
@@ -321,6 +338,7 @@ class ScenarioSessionApiIntegrationTests {
                 .containsExactly("I would like an iced americano.");
         assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence())
                 .isEqualTo(1);
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNull();
     }
 
     @Test
@@ -356,6 +374,8 @@ class ScenarioSessionApiIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus")
+                        .value("PREPARING"))
                 .andExpect(jsonPath("$.data.nextMessage.content")
                         .value("Thanks for sharing. That was a good conversation."))
                 .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
@@ -365,7 +385,13 @@ class ScenarioSessionApiIntegrationTests {
 
         assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNull();
         assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().aiMessage())
+                .isEqualTo("What food do you like?");
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageContext().userMessage())
+                .isEqualTo("I like pizza.");
         assertThat(fakeAiConversationClient.closingMessageTransactionActive()).containsOnly(false);
+        assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
         assertThat(fakeAiConversationClient.lastClosingMessageRequest().closingReason().name())
                 .isEqualTo("MAX_TURNS_REACHED");
         assertThat(fakeAiConversationClient.lastClosingMessageRequest().goalCompletionStatus())
@@ -621,6 +647,205 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
 
         assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
+        Integer messageCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        """,
+                Integer.class,
+                sessionId
+        );
+        assertThat(messageCount).isEqualTo(1);
+    }
+
+    @Test
+    void submitMessageRollsBackUserMessageWhenMessageFeedbackRequestFails() throws Exception {
+        fakeAiConversationClient.failMessageFeedbackRequest();
+        JsonNode loginBody = login("message-feedback-fail@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1109, 1, "ACTIVE", "피드백 실패");
+        seedScenario(2109, 1109, 1, "AI", "ACTIVE", 2);
+        seedScenarioVariant(
+                3109,
+                2109,
+                "피드백 실패 테스트",
+                "피드백 실패 테스트",
+                "피드백 실패 테스트",
+                null,
+                "Hello",
+                "안녕",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4109, 2109, 2, "Next question", "다음 질문");
+        long sessionId = startScenario(accessToken, 2109);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
+
+        assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
+        Integer messageCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        """,
+                Integer.class,
+                sessionId
+        );
+        assertThat(messageCount).isEqualTo(1);
+    }
+
+    @Test
+    void submitMessageRollsBackUserMessageWhenMessageFeedbackStatusIsNotPreparing() throws Exception {
+        fakeAiConversationClient.returnMessageFeedbackStatus(ProcessingStatus.COMPLETED);
+        JsonNode loginBody = login("message-feedback-invalid@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1110, 1, "ACTIVE", "피드백 응답 오류");
+        seedScenario(2110, 1110, 1, "AI", "ACTIVE", 2);
+        seedScenarioVariant(
+                3110,
+                2110,
+                "피드백 응답 오류 테스트",
+                "피드백 응답 오류 테스트",
+                "피드백 응답 오류 테스트",
+                null,
+                "Hello",
+                "안녕",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4110, 2110, 2, "Next question", "다음 질문");
+        long sessionId = startScenario(accessToken, 2110);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+
+        Integer messageCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        """,
+                Integer.class,
+                sessionId
+        );
+        assertThat(messageCount).isEqualTo(1);
+    }
+
+    @Test
+    void submitMessageRollsBackUserMessageWhenMessageFeedbackResponseMessageIdDiffers() throws Exception {
+        fakeAiConversationClient.returnMessageFeedbackForMessageId(9999L);
+        JsonNode loginBody = login("message-feedback-id-invalid@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1111, 1, "ACTIVE", "피드백 식별자 오류");
+        seedScenario(2111, 1111, 1, "AI", "ACTIVE", 2);
+        seedScenarioVariant(
+                3111,
+                2111,
+                "피드백 식별자 오류 테스트",
+                "피드백 식별자 오류 테스트",
+                "피드백 식별자 오류 테스트",
+                null,
+                "Hello",
+                "안녕",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4111, 2111, 2, "Next question", "다음 질문");
+        long sessionId = startScenario(accessToken, 2111);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+
+        Integer messageCount = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                        """,
+                Integer.class,
+                sessionId
+        );
+        assertThat(messageCount).isEqualTo(1);
+    }
+
+    @Test
+    void submitMessageRollsBackUserMessageWhenMessageFeedbackResponseSessionIdDiffers() throws Exception {
+        fakeAiConversationClient.returnMessageFeedbackForSessionId(9999L);
+        JsonNode loginBody = login("message-feedback-session-id-invalid@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1112, 1, "ACTIVE", "피드백 세션 식별자 오류");
+        seedScenario(2112, 1112, 1, "AI", "ACTIVE", 2);
+        seedScenarioVariant(
+                3112,
+                2112,
+                "피드백 세션 식별자 오류 테스트",
+                "피드백 세션 식별자 오류 테스트",
+                "피드백 세션 식별자 오류 테스트",
+                null,
+                "Hello",
+                "안녕",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4112, 2112, 2, "Next question", "다음 질문");
+        long sessionId = startScenario(accessToken, 2112);
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"Hello",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
                         SELECT COUNT(*)
