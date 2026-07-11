@@ -18,6 +18,15 @@
 - LAN-93에서는 메시지별 피드백을 BE DB에 저장하지 않는다.
 - AI 서버는 메시지별 피드백을 캐시에 저장하고, 최종 피드백 저장은 별도 이슈에서 처리한다.
 
+## 구현 결과
+
+- `SessionMessageFeedbackRequester`가 직전 AI 메시지와 제출 사용자 메시지로 피드백 요청을 구성한다.
+- 직전 메시지가 없는 USER first 첫 발화는 피드백 요청 없이 `null` 상태를 반환한다.
+- `AiScenarioContextMapper`로 다음 메시지, 종료 메시지, 피드백 요청이 같은 시나리오 컨텍스트 조립 로직을 사용한다.
+- 원격 AI 클라이언트는 `/api/v1/conversation/message-feedback`의 202 응답을 처리한다.
+- 통합 테스트에서 요청 본문, USER first 생략, 실패 보상 삭제, 응답 상태, 메시지 ID, 세션 ID 검증을 확인했다.
+- 종료 메시지 생성 경로도 메시지별 피드백 요청과 `PREPARING` 응답을 반환하는지 검증했다.
+
 ## 참고 구현
 
 - `saynow-be`의 `origin/develop`은 다음 질문 또는 종료 메시지를 생성한 뒤 턴별 피드백을 요청한다.
