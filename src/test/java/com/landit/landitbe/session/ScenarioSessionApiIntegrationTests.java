@@ -685,7 +685,7 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
-    void getSessionFeedbackRejectsInvalidAiResultWithoutPersistingFeedback() throws Exception {
+    void getSessionFeedbackUsesNativeScoreStarRatingWhenAiStarRatingDiffers() throws Exception {
         StartedSession startedSession = startCompletedAiFirstSession(
                 "session-feedback-invalid-result@example.com"
         );
@@ -693,17 +693,14 @@ class ScenarioSessionApiIntegrationTests {
 
         mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nativeScore").value(90))
+                .andExpect(jsonPath("$.data.starRating").value(3.0));
 
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM session_history_summary_feedback",
-                Integer.class
-        )).isZero();
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM session_history_message_feedback",
-                Integer.class
-        )).isZero();
+                "SELECT star_rating FROM session_history_summary_feedback",
+                BigDecimal.class
+        )).isEqualByComparingTo("3.0");
     }
 
     @Test
