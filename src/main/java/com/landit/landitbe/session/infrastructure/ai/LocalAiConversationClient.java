@@ -9,8 +9,13 @@ import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
 import com.landit.landitbe.session.application.port.AiNextMessageResult;
+import com.landit.landitbe.session.application.port.AiSessionFeedbackRequest;
+import com.landit.landitbe.session.application.port.AiSessionFeedbackResult;
+import com.landit.landitbe.session.application.port.AiSessionMessageFeedbackResult;
+import com.landit.landitbe.session.domain.FeedbackType;
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.session.domain.ProcessingStatus;
+import java.math.BigDecimal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -57,6 +62,30 @@ public class LocalAiConversationClient implements AiConversationClient {
                 request.sessionId(),
                 request.messageId(),
                 ProcessingStatus.PREPARING
+        );
+    }
+
+    /** 로컬 환경에서 사용할 고정 세션 최종 피드백을 반환한다. */
+    @Override
+    public AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request) {
+        return new AiSessionFeedbackResult(
+                request.sessionId(),
+                90,
+                new BigDecimal("3.0"),
+                "You clearly communicated your main idea.",
+                "Keep practicing complete sentences with clear reasons.",
+                request.expectedMessageIds().stream()
+                        .map(messageId -> new AiSessionMessageFeedbackResult(
+                                messageId,
+                                FeedbackType.GOOD,
+                                "한국어로 이유를 덧붙여 자연스럽게 말한 것과 비슷해요.",
+                                null,
+                                "Your message clearly communicates the main idea.",
+                                null,
+                                null,
+                                "Your message clearly communicates the main idea."
+                        ))
+                        .toList()
         );
     }
 }
