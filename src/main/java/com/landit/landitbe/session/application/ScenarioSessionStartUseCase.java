@@ -177,7 +177,10 @@ public class ScenarioSessionStartUseCase {
         );
         scenarioSessionRepository.save(ScenarioSession.start(
                 learningSession.getId(),
-                startRow.variantId()
+                startRow.variantId(),
+                startRow.firstSpeaker() == ConversationSpeaker.USER
+                        ? startRow.userOpeningInstruction()
+                        : null
         ));
         return learningSession;
     }
