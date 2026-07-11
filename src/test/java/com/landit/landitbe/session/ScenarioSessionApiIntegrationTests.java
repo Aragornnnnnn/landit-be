@@ -375,6 +375,49 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
+    void userFirstMessageUsesOpeningInstructionSnapshot() throws Exception {
+        JsonNode loginBody = login("user-first-opening-snapshot@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1120, 1, "ACTIVE", "카페");
+        seedScenario(2120, 1120, 1, "USER", "ACTIVE", 1);
+        seedScenarioVariant(
+                3120,
+                2120,
+                "카페 주문",
+                "카페에서 음료를 주문합니다.",
+                "원하는 음료를 주문합니다.",
+                "수정 전 시작 안내입니다.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4120, 2120, 1, "What would you like to order?", "무엇을 주문할까요?");
+        long sessionId = startScenario(accessToken, 2120);
+        jdbcTemplate.update(
+                "UPDATE scenario_language_variant SET user_opening_instruction = ? WHERE id = ?",
+                "수정 후 시작 안내입니다.",
+                3120
+        );
+
+        mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
+                .isEqualTo("수정 전 시작 안내입니다.");
+    }
+
+    @Test
     void submitUserFirstMessageWithoutOpeningInstructionReturnsInternalServerError() throws Exception {
         JsonNode loginBody = login("user-first-missing-instruction@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
