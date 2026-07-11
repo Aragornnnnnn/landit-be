@@ -86,7 +86,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
         ).toResult();
     }
 
-    private <T> T post(URI uri, Object payload, Class<T> responseType, ErrorCode fallbackErrorCode) {
+    private <T> T post(URI uri, Object payload, Class<T> responseType, ErrorCode defaultErrorCode) {
         try {
             HttpRequest request = HttpRequest.newBuilder(uri)
                     .version(HttpClient.Version.HTTP_1_1)
@@ -102,21 +102,21 @@ public class RemoteAiConversationClient implements AiConversationClient {
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
             );
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw toApiException(response.body(), fallbackErrorCode);
+                throw toApiException(response.body(), defaultErrorCode);
             }
             return readData(response.body(), responseType);
         } catch (ApiException exception) {
             throw exception;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new ApiException(fallbackErrorCode);
+            throw new ApiException(defaultErrorCode);
         } catch (IOException exception) {
-            throw new ApiException(fallbackErrorCode);
+            throw new ApiException(defaultErrorCode);
         }
     }
 
     /** AI 서버 오류 응답에서 공개할 수 있는 오류 코드만 선별해 변환한다. */
-    private ApiException toApiException(String responseBody, ErrorCode fallbackErrorCode) {
+    private ApiException toApiException(String responseBody, ErrorCode defaultErrorCode) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             if (root != null) {
@@ -124,7 +124,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
                 if (ErrorCode.AI_RESPONSE_INVALID.name().equals(upstreamErrorCode)) {
                     return new ApiException(ErrorCode.AI_RESPONSE_INVALID);
                 }
-                if (fallbackErrorCode == ErrorCode.FEEDBACK_GENERATION_FAILED
+                if (defaultErrorCode == ErrorCode.FEEDBACK_GENERATION_FAILED
                         && "MESSAGE_FEEDBACK_NOT_READY".equals(upstreamErrorCode)) {
                     return new ApiException(ErrorCode.FEEDBACK_NOT_READY);
                 }
@@ -132,7 +132,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
         } catch (IOException ignored) {
             // 오류 본문을 해석할 수 없으면 외부 AI 호출 실패로 처리한다.
         }
-        return new ApiException(fallbackErrorCode);
+        return new ApiException(defaultErrorCode);
     }
 
     private <T> T readData(String responseBody, Class<T> responseType) {
@@ -165,9 +165,9 @@ public class RemoteAiConversationClient implements AiConversationClient {
         return aiBaseUri(ErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_FEEDBACK_PATH);
     }
 
-    private URI aiBaseUri(ErrorCode fallbackErrorCode) {
+    private URI aiBaseUri(ErrorCode defaultErrorCode) {
         if (properties.baseUrl() == null || properties.baseUrl().isBlank()) {
-            throw new ApiException(fallbackErrorCode);
+            throw new ApiException(defaultErrorCode);
         }
         return URI.create(properties.baseUrl());
     }

@@ -25,4 +25,5 @@
 - H2 Flyway V15 적용과 전체 `./gradlew test`를 확인했다.
 - `git diff --check feat/LAN-93...HEAD`를 확인했다.
 - AI 별점 불일치에도 `nativeScore=90` 기준 `3.0`을 저장하고 반환하는 회귀 테스트를 추가했다.
+- 리뷰 가독성을 위해 최종 피드백 컨텍스트 조회의 `var`를 명시 타입으로 바꾸고, 원격 AI 호출의 기본 오류 코드를 `defaultErrorCode`로 명명했다.
 - PostgreSQL 실행 환경이 없어 실제 V15 적용은 아직 확인하지 못했다.
