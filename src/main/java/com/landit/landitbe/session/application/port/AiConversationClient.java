@@ -11,4 +11,7 @@ public interface AiConversationClient {
 
     /** 사용자 메시지의 피드백 생성을 요청한다. */
     AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request);
+
+    /** 세션 최종 피드백을 생성한다. */
+    AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request);
 }
