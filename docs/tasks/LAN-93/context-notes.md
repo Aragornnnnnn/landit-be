@@ -11,14 +11,21 @@
 - 두 AI 호출의 공개 에러 코드는 구분하지 않고 내부 로그의 workflow로 구분한다.
 - 오류 발생 시 먼저 저장한 사용자 메시지를 제거하고 다음 AI 메시지는 저장하지 않는다.
 - FE는 명확한 `502` 또는 `503` 응답을 받았을 때 메시지 제출 API 전체를 재시도한다.
-- USER first 첫 사용자 메시지는 직전 AI 메시지가 없으므로 메시지별 피드백 요청을 생략한다.
-- 피드백 요청을 생략한 메시지의 `feedbackProcessingStatus`는 `null`이다.
+- AI First와 USER First 모두 기존 `/api/v1/conversation/message-feedback`을 사용한다.
+- 요청은 최상위 `evaluationContext`와 `userMessage`로 평가 기준과 평가 대상을 구분한다.
+- 평가 컨텍스트 타입은 `AI_MESSAGE`, `SCENARIO_OPENING_INSTRUCTION`을 사용한다.
+- AI First는 직전 AI 메시지를 평가 컨텍스트로 전달한다.
+- USER First 첫 사용자 메시지는 시나리오 시작 안내를 평가 컨텍스트로 전달한다.
+- USER First 첫 사용자 메시지도 피드백 요청이 정상 접수되면 `PREPARING`을 반환한다.
+- `messageSequence`는 턴 내부 순번이 아니라 세션 전체 메시지 순번이다.
+- `SCENARIO_OPENING_INSTRUCTION`은 첫 턴에만 사용하되 타입 판별은 시나리오의 `firstSpeaker`를 기준으로 한다.
+- AI 메시지의 `translatedContent`는 기준 locale 번역문이며, 시작 안내는 자체가 기준 locale 문구이므로 번역을 `null`로 전달한다.
 - 메시지별 피드백 요청이 정상 접수된 경우에만 `PREPARING`을 FE에 반환한다.
 - AI와 FE의 피드백 상태 값은 `PREPARING`, `COMPLETED`, `FAILED`를 사용한다.
 - LAN-93에서는 메시지별 피드백을 BE DB에 저장하지 않는다.
 - AI 서버는 메시지별 피드백을 캐시에 저장하고, 최종 피드백 저장은 별도 이슈에서 처리한다.
 
-## 구현 결과
+## 변경 전 구현 결과
 
 - `SessionMessageFeedbackRequester`가 직전 AI 메시지와 제출 사용자 메시지로 피드백 요청을 구성한다.
 - 직전 메시지가 없는 USER first 첫 발화는 피드백 요청 없이 `null` 상태를 반환한다.
@@ -26,6 +33,13 @@
 - 원격 AI 클라이언트는 `/api/v1/conversation/message-feedback`의 202 응답을 처리한다.
 - 통합 테스트에서 요청 본문, USER first 생략, 실패 보상 삭제, 응답 상태, 메시지 ID, 세션 ID 검증을 확인했다.
 - 종료 메시지 생성 경로도 메시지별 피드백 요청과 `PREPARING` 응답을 반환하는지 검증했다.
+
+## 변경 예정
+
+- 기존 `messageContext` 요청 DTO를 `evaluationContext`와 최상위 `userMessage` 구조로 교체한다.
+- 시나리오 메시지 컨텍스트 조회에 `firstSpeaker`와 `userOpeningInstruction`을 추가한다.
+- USER First 생략 분기를 제거하고 시작 안내 기반 피드백 요청으로 변경한다.
+- AI First와 USER First의 요청 본문 및 FE 상태를 통합 테스트로 검증한다.
 
 ## 참고 구현
 

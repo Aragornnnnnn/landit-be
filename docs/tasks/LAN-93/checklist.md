@@ -22,3 +22,16 @@
 - [x] 피드백 요청 실패 시 사용자 메시지가 제거되는지 검증한다.
 - [x] 피드백 응답 식별자 또는 상태가 잘못된 경우 `502`를 검증한다.
 - [x] `./gradlew test`를 실행한다.
+
+## USER First 피드백 계약 확장
+
+- [ ] 요청 DTO를 `evaluationContext`와 `userMessage` 구조로 변경한다.
+- [ ] 평가 컨텍스트 타입에 `AI_MESSAGE`, `SCENARIO_OPENING_INSTRUCTION`을 추가한다.
+- [ ] 시나리오 메시지 컨텍스트에서 `firstSpeaker`와 `userOpeningInstruction`을 조회한다.
+- [ ] AI First는 직전 AI 메시지를 평가 컨텍스트로 구성한다.
+- [ ] USER First 첫 발화는 시나리오 시작 안내를 평가 컨텍스트로 구성한다.
+- [ ] USER First 첫 발화도 메시지별 피드백을 요청하고 `PREPARING`을 반환한다.
+- [ ] `messageSequence`를 세션 전체 메시지 순번으로 전달한다.
+- [ ] 원격 AI 요청 직렬화 테스트를 새 계약에 맞게 변경한다.
+- [ ] AI First와 USER First 통합 테스트를 갱신한다.
+- [ ] `./gradlew test`를 다시 실행한다.
