@@ -7,6 +7,7 @@ public record AiMessageFeedbackRequest(
         int turnNumber,
         int messageSequence,
         AiScenarioContext scenario,
-        AiMessageFeedbackContext messageContext
+        AiMessageFeedbackEvaluationContext evaluationContext,
+        String userMessage
 ) {
 }
