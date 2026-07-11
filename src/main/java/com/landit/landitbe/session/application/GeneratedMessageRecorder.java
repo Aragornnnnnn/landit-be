@@ -8,15 +8,12 @@ import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse.NextMessageResponse;
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse.SessionProgressResponse;
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse.SubmittedMessageResponse;
-import com.landit.landitbe.session.domain.CompletionReason;
 import com.landit.landitbe.session.domain.LearningSession;
 import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.landit.landitbe.session.domain.ScenarioSession;
-import com.landit.landitbe.session.domain.SessionHistory;
 import com.landit.landitbe.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.session.infrastructure.ScenarioSessionRepository;
 import com.landit.landitbe.session.infrastructure.SessionHistoryMessageRepository;
-import com.landit.landitbe.session.infrastructure.SessionHistoryRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -29,7 +26,6 @@ class GeneratedMessageRecorder {
 
     private final LearningSessionFinder learningSessionFinder;
     private final ScenarioSessionRepository scenarioSessionRepository;
-    private final SessionHistoryRepository sessionHistoryRepository;
     private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
 
     /** AI 생성 결과를 저장하고 사용자에게 반환할 메시지 제출 응답을 만든다. */
@@ -43,7 +39,6 @@ class GeneratedMessageRecorder {
                 submittedContext.sessionId()
         );
         ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
-        SessionHistory sessionHistory = findSessionHistory(submittedContext.sessionHistoryId());
         SessionHistoryMessage submittedMessage = findSubmittedMessage(submittedContext);
         assertSubmittedMessageMatches(submittedContext, submittedMessage);
 
@@ -53,13 +48,12 @@ class GeneratedMessageRecorder {
         );
         scenarioSession.updateGoalCompletionStatus(generation.goalCompletionStatus());
         SessionHistoryMessage nextMessage = saveAiMessage(
-                sessionHistory,
                 submittedMessage,
                 generation.aiMessage(),
                 generation.translatedMessage()
         );
         if (generation.completed()) {
-            completeSession(learningSession, sessionHistory, generation.completionReason());
+            learningSession.completeBySystem(generation.completionReason(), LocalDateTime.now());
         }
         return toResponse(
                 submittedContext.sessionId(),
@@ -75,11 +69,6 @@ class GeneratedMessageRecorder {
 
     private ScenarioSession findScenarioSession(long sessionId) {
         return scenarioSessionRepository.findByLearningSessionId(sessionId)
-                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
-    }
-
-    private SessionHistory findSessionHistory(Long sessionHistoryId) {
-        return sessionHistoryRepository.findById(sessionHistoryId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     }
 
@@ -100,33 +89,17 @@ class GeneratedMessageRecorder {
     }
 
     private SessionHistoryMessage saveAiMessage(
-            SessionHistory sessionHistory,
             SessionHistoryMessage submittedMessage,
             String content,
             String translatedContent
     ) {
         return sessionHistoryMessageRepository.save(SessionHistoryMessage.aiGenerated(
-                sessionHistory.getId(),
+                submittedMessage.getSessionHistoryId(),
                 submittedMessage.getMessageSequence() + 1,
                 submittedMessage.getTurnNumber() + 1,
                 content,
                 translatedContent
         ));
-    }
-
-    private void completeSession(
-            LearningSession learningSession,
-            SessionHistory sessionHistory,
-            CompletionReason completionReason
-    ) {
-        LocalDateTime endedAt = LocalDateTime.now();
-        learningSession.completeBySystem(completionReason, endedAt);
-        int userMessageCount = (int) sessionHistoryMessageRepository
-                .findBySessionHistoryIdOrderByMessageSequenceAsc(sessionHistory.getId())
-                .stream()
-                .filter(message -> message.getRole() == ConversationSpeaker.USER)
-                .count();
-        sessionHistory.complete(endedAt, userMessageCount);
     }
 
     private SessionMessageSubmitResponse toResponse(
