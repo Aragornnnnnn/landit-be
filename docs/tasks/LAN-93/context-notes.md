@@ -55,3 +55,19 @@
 - `saynow-be`의 `origin/develop`은 다음 질문 또는 종료 메시지를 생성한 뒤 턴별 피드백을 요청한다.
 - saynow-be는 AI 호출을 트랜잭션 밖에서 수행하고 모든 응답이 유효할 때 결과를 저장한다.
 - Landit은 사용자 메시지가 별도 엔티티이므로 AI 피드백 요청 전에 사용자 메시지를 먼저 저장하고 실패 시 보상 삭제한다.
+
+## GitHub Wiki 갱신 계획
+
+- 기존 Wiki의 5개 핵심 페이지 구조는 역할이 명확하므로 유지한다.
+- `API Reference`에 분리되어 있던 현재 메시지 제출 계약과 LAN-93 예정 계약을 하나의 흐름으로 합친다.
+- LAN-93은 `feat/LAN-93`에서 구현과 검증이 끝났지만 아직 `origin/develop`에 병합되지 않았다는 상태를 명시한다.
+- `Home`과 `Project Architecture`도 USER First 첫 발화 피드백 요청과 `message-feedback` 호출을 동일하게 설명하도록 맞춘다.
+
+## GitHub Wiki 갱신 결과
+
+- 기존 5개 핵심 페이지와 사이드바 구조를 유지했다.
+- `API Reference`의 현재 메시지 제출 계약과 LAN-93 예정 계약을 하나의 메시지 제출·피드백 계약으로 합쳤다.
+- USER First 첫 발화도 `SCENARIO_OPENING_INSTRUCTION`을 기준으로 피드백을 요청하고 성공 시 `PREPARING`을 반환하도록 문서를 수정했다.
+- `Project Architecture`에 `next-message` 또는 `closing-message` 이후 `message-feedback`을 호출하는 트랜잭션 밖 흐름을 반영했다.
+- Wiki commit `30b8689`를 `master`에 push했다.
+- Home, API Reference, Project Architecture 페이지가 모두 HTTP `200`을 반환하는 것을 확인했다.

@@ -43,3 +43,11 @@
 - [x] `feedbackProcessingStatus` OpenAPI 설명과 nullable 정책을 실제 응답에 맞춘다.
 - [x] 원격 AI 오류 매핑과 내부 히스토리 오류 테스트를 추가한다.
 - [x] `./gradlew test`를 실행한다.
+
+## GitHub Wiki 반영
+
+- [x] 메시지 제출과 메시지별 피드백 계약을 현재 구현에 맞게 갱신한다.
+- [x] USER First 첫 발화의 평가 컨텍스트와 상태 정책을 문서화한다.
+- [x] 아키텍처 문서의 AI 호출 흐름과 클라이언트 설명을 갱신한다.
+- [x] Wiki 내부 링크와 Markdown 형식을 검증한다.
+- [x] Wiki 변경을 커밋하고 게시한다.
