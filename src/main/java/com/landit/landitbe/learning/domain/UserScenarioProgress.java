@@ -13,7 +13,9 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import com.landit.landitbe.common.domain.Locale;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(name = "user_scenario_progress")
 public class UserScenarioProgress extends BaseTimeEntity {
@@ -93,5 +95,23 @@ public class UserScenarioProgress extends BaseTimeEntity {
             status = UserScenarioProgressStatus.IN_PROGRESS;
         }
         lastPlayedAt = startedAt;
+    }
+
+    /** 시나리오 완료 결과로 진행도와 최고 성과를 갱신한다. */
+    public void complete(
+            BigDecimal starRating,
+            int nativeScore,
+            LocalDateTime endedAt
+    ) {
+        status = UserScenarioProgressStatus.CLEARED;
+        completedCount += 1;
+        if (firstClearedAt == null) {
+            firstClearedAt = endedAt;
+        }
+        lastPlayedAt = endedAt;
+        if (bestNativeScore == null || nativeScore > bestNativeScore) {
+            bestNativeScore = nativeScore;
+            bestStarRating = starRating;
+        }
     }
 }

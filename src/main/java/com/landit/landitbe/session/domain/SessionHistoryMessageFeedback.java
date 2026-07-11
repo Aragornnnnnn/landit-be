@@ -11,7 +11,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import com.landit.landitbe.common.domain.Locale;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(name = "session_history_message_feedback")
 public class SessionHistoryMessageFeedback extends BaseTimeEntity {
@@ -61,5 +63,63 @@ public class SessionHistoryMessageFeedback extends BaseTimeEntity {
     private String benchmarkMessage;
 
     protected SessionHistoryMessageFeedback() {
+    }
+
+    private SessionHistoryMessageFeedback(
+            Long sessionHistorySummaryFeedbackId,
+            Long sessionHistoryMessageId,
+            Locale targetLocale,
+            Locale baseLocale,
+            ProcessingStatus processingStatus,
+            FeedbackType feedbackType,
+            String baseLocaleAnalogy,
+            String positiveFeedback,
+            String feedbackDetail,
+            String correctionExpression,
+            String correctionReason,
+            String benchmarkMessage
+    ) {
+        this.sessionHistorySummaryFeedbackId = sessionHistorySummaryFeedbackId;
+        this.sessionHistoryMessageId = sessionHistoryMessageId;
+        this.targetLocale = targetLocale;
+        this.baseLocale = baseLocale;
+        this.processingStatus = processingStatus;
+        this.feedbackType = feedbackType;
+        this.baseLocaleAnalogy = baseLocaleAnalogy;
+        this.positiveFeedback = positiveFeedback;
+        this.feedbackDetail = feedbackDetail;
+        this.correctionExpression = correctionExpression;
+        this.correctionReason = correctionReason;
+        this.benchmarkMessage = benchmarkMessage;
+    }
+
+    /** AI 최종 피드백이 완료된 사용자 메시지 피드백을 생성한다. */
+    public static SessionHistoryMessageFeedback completed(
+            Long sessionHistorySummaryFeedbackId,
+            Long sessionHistoryMessageId,
+            Locale targetLocale,
+            Locale baseLocale,
+            FeedbackType feedbackType,
+            String baseLocaleAnalogy,
+            String positiveFeedback,
+            String feedbackDetail,
+            String correctionExpression,
+            String correctionReason,
+            String benchmarkMessage
+    ) {
+        return new SessionHistoryMessageFeedback(
+                sessionHistorySummaryFeedbackId,
+                sessionHistoryMessageId,
+                targetLocale,
+                baseLocale,
+                ProcessingStatus.COMPLETED,
+                feedbackType,
+                baseLocaleAnalogy,
+                positiveFeedback,
+                feedbackDetail,
+                correctionExpression,
+                correctionReason,
+                benchmarkMessage
+        );
     }
 }

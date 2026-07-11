@@ -11,7 +11,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(name = "session_history_summary_feedback")
 public class SessionHistorySummaryFeedback extends BaseTimeEntity {
@@ -46,5 +48,47 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
     private String summaryMessage;
 
     protected SessionHistorySummaryFeedback() {
+    }
+
+    private SessionHistorySummaryFeedback(
+            Long sessionHistoryId,
+            ProcessingStatus processingStatus,
+            int nativeScore,
+            BigDecimal starRating,
+            int totalMessageCount,
+            int nativeLikeMessageCount,
+            String highlightMessage,
+            String summaryMessage
+    ) {
+        this.sessionHistoryId = sessionHistoryId;
+        this.processingStatus = processingStatus;
+        this.nativeScore = nativeScore;
+        this.starRating = starRating;
+        this.totalMessageCount = totalMessageCount;
+        this.nativeLikeMessageCount = nativeLikeMessageCount;
+        this.highlightMessage = highlightMessage;
+        this.summaryMessage = summaryMessage;
+    }
+
+    /** AI 최종 피드백이 완료된 세션 히스토리 요약을 생성한다. */
+    public static SessionHistorySummaryFeedback completed(
+            Long sessionHistoryId,
+            int nativeScore,
+            BigDecimal starRating,
+            int totalMessageCount,
+            int nativeLikeMessageCount,
+            String highlightMessage,
+            String summaryMessage
+    ) {
+        return new SessionHistorySummaryFeedback(
+                sessionHistoryId,
+                ProcessingStatus.COMPLETED,
+                nativeScore,
+                starRating,
+                totalMessageCount,
+                nativeLikeMessageCount,
+                highlightMessage,
+                summaryMessage
+        );
     }
 }
