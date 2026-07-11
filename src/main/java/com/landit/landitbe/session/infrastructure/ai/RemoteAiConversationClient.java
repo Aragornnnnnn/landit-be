@@ -70,7 +70,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
             );
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+                throw toApiException(response.body());
             }
             return readData(response.body(), responseType);
         } catch (ApiException exception) {
@@ -81,6 +81,21 @@ public class RemoteAiConversationClient implements AiConversationClient {
         } catch (IOException exception) {
             throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
         }
+    }
+
+    /** AI 서버 오류 응답에서 공개할 수 있는 오류 코드만 선별해 변환한다. */
+    private ApiException toApiException(String responseBody) {
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            if (root != null
+                    && ErrorCode.AI_RESPONSE_INVALID.name()
+                    .equals(root.path("error").path("code").asText())) {
+                return new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+            }
+        } catch (IOException ignored) {
+            // 오류 본문을 해석할 수 없으면 외부 AI 호출 실패로 처리한다.
+        }
+        return new ApiException(ErrorCode.AI_GENERATION_FAILED);
     }
 
     private <T> T readData(String responseBody, Class<T> responseType) {

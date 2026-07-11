@@ -79,13 +79,13 @@ class SessionMessageFeedbackRequester {
             List<AiConversationHistoryMessage> conversationHistory
     ) {
         if (conversationHistory.size() < 2) {
-            throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+            throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
         AiConversationHistoryMessage precedingMessage = conversationHistory.get(
                 conversationHistory.size() - 2
         );
         if (!ConversationSpeaker.AI.name().equals(precedingMessage.role())) {
-            throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+            throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
         return new AiMessageFeedbackEvaluationContext(
                 AiMessageFeedbackEvaluationContextType.AI_MESSAGE,

@@ -157,7 +157,7 @@ class GeneratedMessageRecorder {
                 message.getTurnNumber(),
                 message.getMessageSequence(),
                 message.getRole().name(),
-                feedbackProcessingStatus == null ? null : feedbackProcessingStatus.name(),
+                feedbackProcessingStatus.name(),
                 message.getInnerThought(),
                 message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name()
         );
