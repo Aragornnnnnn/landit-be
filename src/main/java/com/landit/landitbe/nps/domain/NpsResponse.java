@@ -28,4 +28,10 @@ public class NpsResponse extends BaseCreatedAtEntity {
 
     protected NpsResponse() {
     }
+
+    public NpsResponse(Long userProfileId, int score, String opinionText) {
+        this.userProfileId = userProfileId;
+        this.score = score;
+        this.opinionText = opinionText;
+    }
 }

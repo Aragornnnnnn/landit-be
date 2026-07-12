@@ -19,22 +19,22 @@
 
 새 파일은 `src/test/java/com/landit/landitbe/nps/NpsApiIntegrationTests.java`다.
 
-- [ ] 정상 요청이 인증 사용자 ID, 점수, 의견으로 저장되는 실패 테스트를 작성한다.
-- [ ] 의견 누락, 빈 문자열, 공백 문자열이 `null`로 저장되는지 검증한다.
-- [ ] 같은 사용자의 반복 제출과 같은 내용 제출이 모두 별도 레코드로 저장되는지 검증한다.
-- [ ] 점수 `1`, `5`는 저장되고 범위 밖 값과 누락은 `400 VALIDATION_FAILED`인지 검증한다.
-- [ ] 인증 없는 요청은 `401`인지 검증한다.
-- [ ] 성공 응답이 `201 Created`와 `ApiResponse.success(null)`인지 검증한다.
+- [x] 정상 요청이 인증 사용자 ID, 점수, 의견으로 저장되는 실패 테스트를 작성했다.
+- [x] 의견 누락, `null`, 빈 문자열, 공백 문자열이 `null`로 저장되는지 검증했다.
+- [x] 같은 사용자의 반복 제출과 같은 내용 제출이 모두 별도 레코드로 저장되는지 검증했다.
+- [x] 점수 `1`, `5`는 저장되고 범위 밖 값과 누락은 `400 VALIDATION_FAILED`인지 검증했다.
+- [x] 인증 없는 요청은 `401`인지 검증했다.
+- [x] 성공 응답이 `201 Created`와 `ApiResponse.success(null)`인지 검증했다.
 
 ### 2. NPS 저장 API
 
 새 파일은 `nps/api/NpsController.java`, `nps/api/dto/NpsSubmitRequest.java`, `nps/application/NpsService.java`, `nps/infrastructure/NpsResponseRepository.java`다. 기존 `nps/domain/NpsResponse.java`에는 저장용 생성자만 추가한다.
 
-- [ ] Controller에서 `AuthUserPrincipal.userId()`와 검증된 요청을 Service에 전달한다.
-- [ ] 트랜잭션 Service에서 `opinionText == null || opinionText.isBlank()`일 때만 `null`로 정규화하고 새 엔티티를 저장한다.
-- [ ] 기존 제출 조회나 중복 차단 로직 없이 요청마다 `save`한다.
-- [ ] `201 Created`와 빈 공통 응답을 반환한다.
-- [ ] 요청 필드, `201`, `400`, `401`, `500` 응답을 OpenAPI에 문서화한다.
+- [x] Controller에서 `AuthUserPrincipal.userId()`와 검증된 요청을 Service에 전달했다.
+- [x] 트랜잭션 Service에서 `opinionText == null || opinionText.isBlank()`일 때만 `null`로 정규화하고 새 엔티티를 저장했다.
+- [x] 기존 제출 조회나 중복 차단 로직 없이 요청마다 `save`했다.
+- [x] 보안 설정에 `POST /api/v1/nps` 인증을 명시하고 `201 Created`와 빈 공통 응답을 반환했다.
+- [x] 요청 필드, `201`, `400`, `401`, `500` 응답을 OpenAPI에 문서화하고 API 문서 노출을 검증했다.
 
 ### 3. 검증
 
@@ -45,6 +45,13 @@ git diff --check origin/develop...HEAD
 ```
 
 기존 V6 마이그레이션의 점수 체크 제약, nullable `opinion_text`, 사용자별 유니크 제약 부재도 통합 테스트와 SQL 검토로 확인한다.
+
+## 검증 기록
+
+- `NpsApiIntegrationTests`를 먼저 추가해 구현 전 404 실패를 확인했다.
+- `./gradlew test --tests com.landit.landitbe.nps.NpsApiIntegrationTests --no-daemon`이 통과했다.
+- `./gradlew test --rerun-tasks --no-daemon`이 통과했다.
+- `git diff --check origin/develop...HEAD`가 통과했다.
 
 ## 커밋 단위
 
