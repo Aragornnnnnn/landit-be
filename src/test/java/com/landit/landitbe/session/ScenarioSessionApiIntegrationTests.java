@@ -106,7 +106,9 @@ class ScenarioSessionApiIntegrationTests {
                 2001,
                 1,
                 "What food do you like? Why do you like it?",
-                "좋아하는 음식이 있어? 왜 좋아해?"
+                "좋아하는 음식이 있어? 왜 좋아해?",
+                "질문 1번의 속마음",
+                "GOOD"
         );
         seedScenarioVariant(
                 3001,
@@ -147,7 +149,7 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.currentMessage.translatedContent")
                         .value("좋아하는 음식이 있어? 왜 좋아해?"))
                 .andExpect(jsonPath("$.data.currentMessage.innerThought")
-                        .value("음식 이야기는 처음 대화를 열기 좋다."))
+                        .value("질문 1번의 속마음"))
                 .andExpect(jsonPath("$.data.currentMessage.innerThoughtType").value("GOOD"))
                 .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
                 .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(4))
@@ -1721,10 +1723,10 @@ class ScenarioSessionApiIntegrationTests {
             String briefing,
             String conversationGoal,
             String userOpeningInstruction,
-            String aiOpeningMessage,
-            String aiOpeningMessageTranslation,
-            String aiOpeningInnerThought,
-            String aiOpeningInnerThoughtType,
+            String openingQuestionText,
+            String openingQuestionTranslation,
+            String openingInnerThought,
+            String openingInnerThoughtType,
             Long ttsVoiceId,
             String status
     ) {
@@ -1738,16 +1740,12 @@ class ScenarioSessionApiIntegrationTests {
                             briefing,
                             user_opening_instruction,
                             conversation_goal,
-                            ai_opening_message,
-                            ai_opening_message_translation,
-                            ai_opening_inner_thought,
-                            ai_opening_inner_thought_type,
                             tts_voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 variantId,
                 scenarioId,
@@ -1755,20 +1753,18 @@ class ScenarioSessionApiIntegrationTests {
                 briefing,
                 userOpeningInstruction,
                 conversationGoal,
-                aiOpeningMessage,
-                aiOpeningMessageTranslation,
-                aiOpeningInnerThought,
-                aiOpeningInnerThoughtType,
                 ttsVoiceId,
                 status
         );
-        if (aiOpeningMessage != null && !hasScenarioQuestion(scenarioId, 1)) {
+        if (openingQuestionText != null && !hasScenarioQuestion(scenarioId, 1)) {
             seedScenarioQuestion(
                     100_000L + scenarioId,
                     scenarioId,
                     1,
-                    aiOpeningMessage,
-                    aiOpeningMessageTranslation
+                    openingQuestionText,
+                    openingQuestionTranslation,
+                    openingInnerThought,
+                    openingInnerThoughtType
             );
         }
     }
@@ -1789,6 +1785,26 @@ class ScenarioSessionApiIntegrationTests {
             int displayOrder,
             String questionText,
             String questionTranslation
+    ) {
+        seedScenarioQuestion(
+                questionId,
+                scenarioId,
+                displayOrder,
+                questionText,
+                questionTranslation,
+                null,
+                null
+        );
+    }
+
+    private void seedScenarioQuestion(
+            long questionId,
+            long scenarioId,
+            int displayOrder,
+            String questionText,
+            String questionTranslation,
+            String innerThought,
+            String innerThoughtType
     ) {
         jdbcTemplate.update("""
                         INSERT INTO scenario_question (
@@ -1812,15 +1828,19 @@ class ScenarioSessionApiIntegrationTests {
                             base_locale,
                             question_text,
                             question_translation,
+                            inner_thought,
+                            inner_thought_type,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 questionId,
                 questionText,
-                questionTranslation
+                questionTranslation,
+                innerThought,
+                innerThoughtType
         );
     }
 

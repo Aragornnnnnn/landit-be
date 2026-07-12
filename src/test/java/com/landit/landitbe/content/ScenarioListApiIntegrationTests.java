@@ -113,7 +113,7 @@ class ScenarioListApiIntegrationTests {
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.userOpeningInstruction")
                         .value(nullValue()))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThought")
-                        .value("음식 이야기는 대화를 열기 좋다."))
+                        .value("질문 1번의 속마음"))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThoughtType").value("GOOD"))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.provider")
                         .value("OPENROUTER"))
@@ -186,10 +186,6 @@ class ScenarioListApiIntegrationTests {
                 "비활성 음성을 사용합니다.",
                 "비활성 음성 응답을 확인한다.",
                 null,
-                "Hello",
-                "안녕하세요",
-                null,
-                null,
                 inactiveVoiceId,
                 "ACTIVE"
         );
@@ -201,10 +197,6 @@ class ScenarioListApiIntegrationTests {
                 "음성을 설정하지 않았습니다.",
                 "미설정 음성 응답을 확인한다.",
                 "먼저 말해보세요.",
-                null,
-                null,
-                null,
-                null,
                 null,
                 "ACTIVE"
         );
@@ -249,10 +241,6 @@ class ScenarioListApiIntegrationTests {
                 "사용자가 먼저 말을 겁니다.",
                 "직원에게 음료를 주문한다.",
                 "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
-                null,
-                null,
-                null,
-                null,
                 ethanVoiceId,
                 "ACTIVE"
         );
@@ -264,10 +252,6 @@ class ScenarioListApiIntegrationTests {
                 "AI가 먼저 질문합니다.",
                 "좋아하는 음식을 설명한다.",
                 null,
-                "Legacy opening message",
-                "기존 시작 메시지",
-                "음식 이야기는 대화를 열기 좋다.",
-                "GOOD",
                 harperVoiceId,
                 "ACTIVE"
         );
@@ -276,7 +260,9 @@ class ScenarioListApiIntegrationTests {
                 202,
                 1,
                 "What is your favorite food?",
-                "가장 좋아하는 음식이 뭐예요?"
+                "가장 좋아하는 음식이 뭐예요?",
+                "질문 1번의 속마음",
+                "GOOD"
         );
 
         insertScenario(203, 100, 1, "AI", "HARD", "INACTIVE", null);
@@ -286,10 +272,6 @@ class ScenarioListApiIntegrationTests {
                 "비활성 시나리오입니다.",
                 "잠긴 시나리오를 확인한다.",
                 null,
-                "Locked opening",
-                "잠긴 시작 문구",
-                "잠겼다.",
-                "BAD",
                 null,
                 "ACTIVE"
         );
@@ -301,10 +283,6 @@ class ScenarioListApiIntegrationTests {
                 "카테고리가 비활성입니다.",
                 "카테고리 잠금을 확인한다.",
                 null,
-                "Category locked opening",
-                "카테고리 잠금 시작 문구",
-                "카테고리가 잠겼다.",
-                "NORMAL",
                 null,
                 "ACTIVE"
         );
@@ -339,6 +317,26 @@ class ScenarioListApiIntegrationTests {
             String questionText,
             String questionTranslation
     ) {
+        insertScenarioQuestion(
+                questionId,
+                scenarioId,
+                displayOrder,
+                questionText,
+                questionTranslation,
+                null,
+                null
+        );
+    }
+
+    private void insertScenarioQuestion(
+            long questionId,
+            long scenarioId,
+            int displayOrder,
+            String questionText,
+            String questionTranslation,
+            String innerThought,
+            String innerThoughtType
+    ) {
         jdbcTemplate.update("""
                         INSERT INTO scenario_question (
                             id,
@@ -361,15 +359,19 @@ class ScenarioListApiIntegrationTests {
                             base_locale,
                             question_text,
                             question_translation,
+                            inner_thought,
+                            inner_thought_type,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 questionId,
                 questionText,
-                questionTranslation
+                questionTranslation,
+                innerThought,
+                innerThoughtType
         );
     }
 
@@ -438,10 +440,6 @@ class ScenarioListApiIntegrationTests {
             String briefing,
             String conversationGoal,
             String userOpeningInstruction,
-            String aiOpeningMessage,
-            String aiOpeningMessageTranslation,
-            String aiOpeningInnerThought,
-            String aiOpeningInnerThoughtType,
             Long ttsVoiceId,
             String variantStatus
     ) {
@@ -454,26 +452,18 @@ class ScenarioListApiIntegrationTests {
                             briefing,
                             user_opening_instruction,
                             conversation_goal,
-                            ai_opening_message,
-                            ai_opening_message_translation,
-                            ai_opening_inner_thought,
-                            ai_opening_inner_thought_type,
                             tts_voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 scenarioId,
                 title,
                 briefing,
                 userOpeningInstruction,
                 conversationGoal,
-                aiOpeningMessage,
-                aiOpeningMessageTranslation,
-                aiOpeningInnerThought,
-                aiOpeningInnerThoughtType,
                 ttsVoiceId,
                 variantStatus
         );
