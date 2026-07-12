@@ -33,6 +33,8 @@ landit:
     client-mode: ${LANDIT_AI_CLIENT_MODE:local}
     base-url: ${LANDIT_AI_BASE_URL:}
     service-audience: ${LANDIT_AI_SERVICE_AUDIENCE:KOREAN_LEARNER}
+    connect-timeout: ${LANDIT_AI_CONNECT_TIMEOUT:5s}
+    request-timeout: ${LANDIT_AI_REQUEST_TIMEOUT:60s}
 
 sentry:
   dsn: ${SENTRY_DSN:}

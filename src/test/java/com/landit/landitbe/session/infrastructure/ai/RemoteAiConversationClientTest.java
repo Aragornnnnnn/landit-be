@@ -22,6 +22,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -65,10 +66,7 @@ class RemoteAiConversationClientTest {
             exchange.close();
         });
 
-        RemoteAiConversationClient client = new RemoteAiConversationClient(
-                objectMapper,
-                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
-        );
+        RemoteAiConversationClient client = remoteClient();
 
         AiMessageFeedbackResult result = client.requestMessageFeedback(new AiMessageFeedbackRequest(
                 100L,
@@ -132,10 +130,7 @@ class RemoteAiConversationClientTest {
             exchange.close();
         });
 
-        RemoteAiConversationClient client = new RemoteAiConversationClient(
-                objectMapper,
-                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
-        );
+        RemoteAiConversationClient client = remoteClient();
 
         client.requestMessageFeedback(new AiMessageFeedbackRequest(
                 101L,
@@ -186,10 +181,7 @@ class RemoteAiConversationClientTest {
             exchange.close();
         });
 
-        RemoteAiConversationClient client = new RemoteAiConversationClient(
-                objectMapper,
-                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
-        );
+        RemoteAiConversationClient client = remoteClient();
 
         assertThatThrownBy(() -> client.requestMessageFeedback(aiMessageFeedbackRequest()))
                 .isInstanceOfSatisfying(ApiException.class, exception ->
@@ -214,10 +206,7 @@ class RemoteAiConversationClientTest {
             exchange.close();
         });
 
-        RemoteAiConversationClient client = new RemoteAiConversationClient(
-                objectMapper,
-                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
-        );
+        RemoteAiConversationClient client = remoteClient();
 
         assertThatThrownBy(() -> client.requestMessageFeedback(aiMessageFeedbackRequest()))
                 .isInstanceOfSatisfying(ApiException.class, exception ->
@@ -239,44 +228,7 @@ class RemoteAiConversationClientTest {
         AtomicReference<String> requestBody = new AtomicReference<>();
         server.createContext("/api/v1/conversation/session-feedback", exchange -> {
             requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] responseBody = """
-                    {
-                      "success": true,
-                      "data": {
-                        "sessionId": 100,
-                        "nativeScore": 75,
-                        "starRating": 2.5,
-                        "highlightMessage": "You clearly explained your preference.",
-                        "summaryMessage": "Keep connecting your reasons with because.",
-                        "messageFeedbacks": [
-                          {
-                            "messageId": 200,
-                            "feedbackType": "GOOD",
-                            "baseLocaleAnalogy": "한국어로 자연스럽게 이유를 덧붙인 표현과 비슷해요.",
-                            "positiveFeedback": null,
-                            "feedbackDetail": "The reason makes your preference easy to understand.",
-                            "correctionExpression": null,
-                            "correctionReason": null,
-                            "benchmarkMessage": "I like pizza because it is spicy."
-                          },
-                          {
-                            "messageId": 201,
-                            "feedbackType": "NEEDS_IMPROVEMENT",
-                            "baseLocaleAnalogy": "한국어에서도 시제를 맞춰 말하는 것과 같아요.",
-                            "positiveFeedback": "Your main idea is clear.",
-                            "feedbackDetail": null,
-                            "correctionExpression": "I went to the cafe yesterday.",
-                            "correctionReason": "Use the past tense for a completed action.",
-                            "benchmarkMessage": "I went to the cafe yesterday."
-                          }
-                        ]
-                      },
-                      "error": null
-                    }
-                    """.getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, responseBody.length);
-            exchange.getResponseBody().write(responseBody);
-            exchange.close();
+            writeSessionFeedbackSuccessResponse(exchange);
         });
 
         RemoteAiConversationClient client = remoteClient();
@@ -316,6 +268,24 @@ class RemoteAiConversationClientTest {
                         "I went to the cafe yesterday."
                 )
         );
+    }
+
+    @Test
+    void generateSessionFeedbackMapsRequestTimeoutToFeedbackGenerationFailed() {
+        server.createContext("/api/v1/conversation/session-feedback", exchange -> {
+            try {
+                Thread.sleep(200L);
+                writeSessionFeedbackSuccessResponse(exchange);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                exchange.close();
+            }
+        });
+
+        assertThatThrownBy(() -> remoteClient(Duration.ofMillis(50))
+                .generateSessionFeedback(aiSessionFeedbackRequest()))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
     }
 
     @Test
@@ -397,10 +367,62 @@ class RemoteAiConversationClientTest {
     }
 
     private RemoteAiConversationClient remoteClient() {
+        return remoteClient(Duration.ofSeconds(60));
+    }
+
+    private RemoteAiConversationClient remoteClient(Duration requestTimeout) {
         return new RemoteAiConversationClient(
                 objectMapper,
-                new AiClientProperties(baseUrl(), "remote", "KOREAN_LEARNER")
+                new AiClientProperties(
+                        baseUrl(),
+                        "remote",
+                        "KOREAN_LEARNER",
+                        Duration.ofSeconds(5),
+                        requestTimeout
+                )
         );
+    }
+
+    private void writeSessionFeedbackSuccessResponse(com.sun.net.httpserver.HttpExchange exchange)
+            throws java.io.IOException {
+        byte[] responseBody = """
+                {
+                  "success": true,
+                  "data": {
+                    "sessionId": 100,
+                    "nativeScore": 75,
+                    "starRating": 2.5,
+                    "highlightMessage": "You clearly explained your preference.",
+                    "summaryMessage": "Keep connecting your reasons with because.",
+                    "messageFeedbacks": [
+                      {
+                        "messageId": 200,
+                        "feedbackType": "GOOD",
+                        "baseLocaleAnalogy": "한국어로 자연스럽게 이유를 덧붙인 표현과 비슷해요.",
+                        "positiveFeedback": null,
+                        "feedbackDetail": "The reason makes your preference easy to understand.",
+                        "correctionExpression": null,
+                        "correctionReason": null,
+                        "benchmarkMessage": "I like pizza because it is spicy."
+                      },
+                      {
+                        "messageId": 201,
+                        "feedbackType": "NEEDS_IMPROVEMENT",
+                        "baseLocaleAnalogy": "한국어에서도 시제를 맞춰 말하는 것과 같아요.",
+                        "positiveFeedback": "Your main idea is clear.",
+                        "feedbackDetail": null,
+                        "correctionExpression": "I went to the cafe yesterday.",
+                        "correctionReason": "Use the past tense for a completed action.",
+                        "benchmarkMessage": "I went to the cafe yesterday."
+                      }
+                    ]
+                  },
+                  "error": null
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, responseBody.length);
+        exchange.getResponseBody().write(responseBody);
+        exchange.close();
     }
 
     private void writeErrorResponse(com.sun.net.httpserver.HttpExchange exchange, int status, String code)
