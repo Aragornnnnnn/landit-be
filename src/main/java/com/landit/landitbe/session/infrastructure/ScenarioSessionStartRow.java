@@ -4,6 +4,8 @@ package com.landit.landitbe.session.infrastructure;
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.ConversationSpeaker;
 import com.landit.landitbe.common.domain.InnerThoughtType;
+import com.landit.landitbe.content.domain.TtsVoiceGender;
+import com.landit.landitbe.content.domain.TtsVoiceProvider;
 
 public record ScenarioSessionStartRow(
         Long scenarioId,
@@ -19,6 +21,9 @@ public record ScenarioSessionStartRow(
         String aiOpeningMessageTranslation,
         String aiOpeningInnerThought,
         InnerThoughtType aiOpeningInnerThoughtType,
-        String ttsVoiceSetId
+        TtsVoiceProvider ttsVoiceProvider,
+        String ttsVoiceModel,
+        String providerVoiceId,
+        TtsVoiceGender ttsVoiceGender
 ) {
 }

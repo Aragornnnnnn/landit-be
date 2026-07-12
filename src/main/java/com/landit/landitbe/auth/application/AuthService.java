@@ -16,9 +16,15 @@ import com.landit.landitbe.auth.domain.UserProfileStatus;
 import com.landit.landitbe.auth.infrastructure.OauthIdentityRepository;
 import com.landit.landitbe.auth.infrastructure.RefreshTokenRepository;
 import com.landit.landitbe.auth.infrastructure.UserProfileRepository;
+import com.landit.landitbe.common.domain.AccentLocale;
+import com.landit.landitbe.common.domain.ActiveStatus;
+import com.landit.landitbe.common.domain.Locale;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.content.domain.AiTutor;
+import com.landit.landitbe.content.infrastructure.AiTutorRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +33,11 @@ public class AuthService {
 
     private static final String TOKEN_TYPE = "Bearer";
     private static final String GUEST_NICKNAME = "Guest";
+    private static final AccentLocale DEFAULT_AI_TUTOR_ACCENT_LOCALE = AccentLocale.EN_US;
+    private static final Locale DEFAULT_AI_TUTOR_TARGET_LOCALE = Locale.EN;
 
     private final UserProfileRepository userProfileRepository;
+    private final AiTutorRepository aiTutorRepository;
     private final OauthIdentityRepository oauthIdentityRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OidcTokenVerifier oidcTokenVerifier;
@@ -37,6 +46,7 @@ public class AuthService {
 
     public AuthService(
             UserProfileRepository userProfileRepository,
+            AiTutorRepository aiTutorRepository,
             OauthIdentityRepository oauthIdentityRepository,
             RefreshTokenRepository refreshTokenRepository,
             OidcTokenVerifier oidcTokenVerifier,
@@ -44,6 +54,7 @@ public class AuthService {
             TokenProperties tokenProperties
     ) {
         this.userProfileRepository = userProfileRepository;
+        this.aiTutorRepository = aiTutorRepository;
         this.oauthIdentityRepository = oauthIdentityRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.oidcTokenVerifier = oidcTokenVerifier;
@@ -111,6 +122,7 @@ public class AuthService {
         userProfile.withdraw();
     }
 
+    /** 소셜 제공자별 닉네임 제공 방식 차이를 프로필에 저장할 값으로 정규화한다. */
     private String resolveNickname(SocialProvider provider, String requestNickname, String oidcNickname) {
         if (provider != SocialProvider.APPLE) {
             return oidcNickname;
@@ -118,6 +130,7 @@ public class AuthService {
         return requestNickname == null || requestNickname.isBlank() ? null : requestNickname;
     }
 
+    /** 기존 소셜 연결 사용자를 갱신하거나, 기본 AI 튜터가 설정된 신규 프로필을 생성한다. */
     private UserResult findOrCreateUser(OidcUserInfo userInfo, String nickname) {
         return oauthIdentityRepository.findByProviderAndProviderUserIdAndStatus(
                         userInfo.provider(),
@@ -134,9 +147,11 @@ public class AuthService {
                     return new UserResult(userProfile, identity.getProvider(), false);
                 })
                 .orElseGet(() -> {
+                    Long defaultAiTutorId = requireDefaultAiTutorId();
                     UserProfile userProfile = userProfileRepository.save(new UserProfile(
                             userInfo.email(),
-                            nickname == null ? GUEST_NICKNAME : nickname
+                            nickname == null ? GUEST_NICKNAME : nickname,
+                            defaultAiTutorId
                     ));
                     oauthIdentityRepository.save(new OauthIdentity(
                             userProfile,
@@ -148,6 +163,21 @@ public class AuthService {
                 });
     }
 
+    /** 신규 회원에게 할당할 활성 미국 영어 튜터가 정확히 하나인지 검증하고 ID를 반환한다. */
+    private Long requireDefaultAiTutorId() {
+        List<AiTutor> defaultTutorCandidates = aiTutorRepository
+                .findAllByAccentLocaleAndTargetLocaleAndStatus(
+                        DEFAULT_AI_TUTOR_ACCENT_LOCALE,
+                        DEFAULT_AI_TUTOR_TARGET_LOCALE,
+                        ActiveStatus.ACTIVE
+                );
+        if (defaultTutorCandidates.size() != 1) {
+            throw new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
+        }
+        return defaultTutorCandidates.getFirst().getId();
+    }
+
+    /** 내부 사용자 및 로그인 결과를 인증 API 응답 형식으로 변환한다. */
     private AuthUserResponse userResponse(UserResult userResult) {
         UserProfile userProfile = userResult.userProfile();
         return new AuthUserResponse(
@@ -159,6 +189,7 @@ public class AuthService {
         );
     }
 
+    /** access token과 회전용 refresh token을 발급하고 refresh token 해시를 저장한다. */
     private IssuedTokens issueTokens(UserProfile userProfile) {
         String accessToken = tokenService.createAccessToken(userProfile);
         String refreshToken = tokenService.createRefreshToken();

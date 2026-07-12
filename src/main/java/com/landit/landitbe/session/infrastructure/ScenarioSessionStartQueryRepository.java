@@ -25,7 +25,10 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
                 slv.aiOpeningMessageTranslation,
                 slv.aiOpeningInnerThought,
                 slv.aiOpeningInnerThoughtType,
-                s.ttsVoiceSetId
+                tv.provider,
+                tv.model,
+                tv.providerVoiceId,
+                tv.gender
             )
             FROM UserProfile up
             JOIN Scenario s
@@ -36,6 +39,9 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
               ON slv.scenarioId = s.id
              AND slv.targetLocale = up.targetLocale
              AND slv.baseLocale = up.baseLocale
+            LEFT JOIN TtsVoice tv
+              ON tv.id = slv.ttsVoiceId
+             AND tv.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
             WHERE up.id = :userId
             """)
     Optional<ScenarioSessionStartRow> findStartRow(

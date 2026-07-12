@@ -106,8 +106,14 @@ class ScenarioListApiIntegrationTests {
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThought")
                         .value("음식 이야기는 대화를 열기 좋다."))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThoughtType").value("GOOD"))
-                .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoiceSetId")
-                        .value("voice-ai"))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.provider")
+                        .value("OPENROUTER"))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.model")
+                        .value("microsoft/mai-voice-2"))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
+                        .value("en-US-Harper:MAI-Voice-2"))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.gender")
+                        .value("FEMALE"))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
@@ -122,8 +128,10 @@ class ScenarioListApiIntegrationTests {
                         .value(nullValue()))
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview.innerThoughtType")
                         .value(nullValue()))
-                .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoiceSetId")
-                        .value(nullValue()))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoice.providerVoiceId")
+                        .value("en-US-Ethan:MAI-Voice-2"))
+                .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoice.gender")
+                        .value("MALE"))
                 .andExpect(jsonPath("$.data.categories[1].categoryId").value(100))
                 .andExpect(jsonPath("$.data.categories[1].scenarios[0].locked").value(true))
                 .andExpect(jsonPath("$.data.categories[1].scenarios[0].lockReason").isNotEmpty())
@@ -153,6 +161,55 @@ class ScenarioListApiIntegrationTests {
                 .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
     }
 
+    @Test
+    void scenariosReturnNullTtsVoiceWhenVoiceIsInactiveOrMissing() throws Exception {
+        JsonNode loginResponseBody = login();
+        long inactiveVoiceId = insertTtsVoice(
+                990200,
+                "test-inactive-voice",
+                "INACTIVE"
+        );
+        insertCategory(110, 1, "ACTIVE", "비활성 음성");
+        insertScenario(210, 110, 1, "AI", "EASY", "ACTIVE", null);
+        insertScenarioVariant(
+                210,
+                "비활성 음성 시나리오",
+                "비활성 음성을 사용합니다.",
+                "비활성 음성 응답을 확인한다.",
+                null,
+                "Hello",
+                "안녕하세요",
+                null,
+                null,
+                inactiveVoiceId,
+                "ACTIVE"
+        );
+        insertCategory(111, 2, "ACTIVE", "미설정 음성");
+        insertScenario(211, 111, 1, "USER", "EASY", "ACTIVE", null);
+        insertScenarioVariant(
+                211,
+                "미설정 음성 시나리오",
+                "음성을 설정하지 않았습니다.",
+                "미설정 음성 응답을 확인한다.",
+                "먼저 말해보세요.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+
+        mockMvc.perform(get("/api/v1/scenarios")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice")
+                        .value(nullValue()))
+                .andExpect(jsonPath("$.data.categories[1].scenarios[0].openingPreview.ttsVoice")
+                        .value(nullValue()));
+    }
+
     private JsonNode login() throws Exception {
         String nonce = UUID.randomUUID().toString();
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/social-login")
@@ -170,11 +227,13 @@ class ScenarioListApiIntegrationTests {
     }
 
     private void seedScenarioListData(Long clearedUserId) {
+        long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
+        long ethanVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
         insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
         insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
         insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
 
-        insertScenario(201, 101, 2, "USER", "NORMAL", "ACTIVE", null, null);
+        insertScenario(201, 101, 2, "USER", "NORMAL", "ACTIVE", null);
         insertScenarioVariant(
                 201,
                 "USER 먼저 말하기",
@@ -185,10 +244,11 @@ class ScenarioListApiIntegrationTests {
                 null,
                 null,
                 null,
+                ethanVoiceId,
                 "ACTIVE"
         );
 
-        insertScenario(202, 101, 1, "AI", "EASY", "ACTIVE", "https://cdn.landit.com/ai.png", "voice-ai");
+        insertScenario(202, 101, 1, "AI", "EASY", "ACTIVE", "https://cdn.landit.com/ai.png");
         insertScenarioVariant(
                 202,
                 "AI 먼저 말하기",
@@ -199,10 +259,11 @@ class ScenarioListApiIntegrationTests {
                 "가장 좋아하는 음식이 뭐예요?",
                 "음식 이야기는 대화를 열기 좋다.",
                 "GOOD",
+                harperVoiceId,
                 "ACTIVE"
         );
 
-        insertScenario(203, 100, 1, "AI", "HARD", "INACTIVE", null, null);
+        insertScenario(203, 100, 1, "AI", "HARD", "INACTIVE", null);
         insertScenarioVariant(
                 203,
                 "잠긴 시나리오",
@@ -213,10 +274,11 @@ class ScenarioListApiIntegrationTests {
                 "잠긴 시작 문구",
                 "잠겼다.",
                 "BAD",
+                null,
                 "ACTIVE"
         );
 
-        insertScenario(204, 102, 1, "AI", "EASY", "ACTIVE", null, null);
+        insertScenario(204, 102, 1, "AI", "EASY", "ACTIVE", null);
         insertScenarioVariant(
                 204,
                 "카테고리가 잠긴 시나리오",
@@ -227,6 +289,7 @@ class ScenarioListApiIntegrationTests {
                 "카테고리 잠금 시작 문구",
                 "카테고리가 잠겼다.",
                 "NORMAL",
+                null,
                 "ACTIVE"
         );
 
@@ -284,8 +347,7 @@ class ScenarioListApiIntegrationTests {
             String firstSpeaker,
             String difficulty,
             String scenarioStatus,
-            String thumbnailUrl,
-            String ttsVoiceSetId
+            String thumbnailUrl
     ) {
         jdbcTemplate.update("""
                         INSERT INTO scenario (
@@ -298,11 +360,10 @@ class ScenarioListApiIntegrationTests {
                             thumbnail_url,
                             display_order,
                             status,
-                            tts_voice_set_id,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, 'tutor', ?, ?, 3, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, 'tutor', ?, ?, 3, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 scenarioId,
                 categoryId,
@@ -310,8 +371,7 @@ class ScenarioListApiIntegrationTests {
                 firstSpeaker,
                 thumbnailUrl,
                 displayOrder,
-                scenarioStatus,
-                ttsVoiceSetId
+                scenarioStatus
         );
     }
 
@@ -325,6 +385,7 @@ class ScenarioListApiIntegrationTests {
             String aiOpeningMessageTranslation,
             String aiOpeningInnerThought,
             String aiOpeningInnerThoughtType,
+            Long ttsVoiceId,
             String variantStatus
     ) {
         jdbcTemplate.update("""
@@ -340,11 +401,12 @@ class ScenarioListApiIntegrationTests {
                             ai_opening_message_translation,
                             ai_opening_inner_thought,
                             ai_opening_inner_thought_type,
+                            tts_voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                 scenarioId,
                 title,
@@ -355,7 +417,40 @@ class ScenarioListApiIntegrationTests {
                 aiOpeningMessageTranslation,
                 aiOpeningInnerThought,
                 aiOpeningInnerThoughtType,
+                ttsVoiceId,
                 variantStatus
         );
+    }
+
+    private long ttsVoiceId(String providerVoiceId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tts_voice WHERE provider_voice_id = ?",
+                Long.class,
+                providerVoiceId
+        );
+    }
+
+    private long insertTtsVoice(long id, String providerVoiceId, String status) {
+        jdbcTemplate.update("""
+                        INSERT INTO tts_voice (
+                            id,
+                            provider,
+                            model,
+                            provider_voice_id,
+                            gender,
+                            description,
+                            accent_locale,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, 'OPENROUTER', 'test-model', ?, 'MALE', '테스트 음성',
+                                'EN_US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """,
+                id,
+                providerVoiceId,
+                status
+        );
+        return id;
     }
 }

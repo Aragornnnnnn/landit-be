@@ -71,8 +71,8 @@ public record ScenarioListResponse(
             String innerThought,
             @Schema(description = "속마음 유형")
             String innerThoughtType,
-            @Schema(description = "시나리오 TTS voice set ID")
-            String ttsVoiceSetId
+            @Schema(description = "활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null")
+            TtsVoiceResponse ttsVoice
     ) {
     }
 }

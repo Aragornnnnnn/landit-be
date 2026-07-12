@@ -67,12 +67,13 @@ public class UserProfile extends BaseTimeEntity {
     protected UserProfile() {
     }
 
-    public UserProfile(String email, String nickname) {
+    public UserProfile(String email, String nickname, Long aiTutorId) {
         this.email = email;
         this.nickname = nickname;
         this.targetLocale = DEFAULT_TARGET_LOCALE;
         this.baseLocale = DEFAULT_BASE_LOCALE;
         this.currentLevel = 1;
+        this.aiTutorId = aiTutorId;
         this.pushPermissionStatus = PushPermissionStatus.NOT_DETERMINED;
         this.status = UserProfileStatus.ACTIVE;
     }

@@ -2,14 +2,20 @@
 package com.landit.landitbe;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.util.StreamUtils;
 
@@ -168,6 +174,165 @@ class DatabaseSchemaIntegrationTests {
         assertTableConstraintExists(
                 "scenario_question_language_variant",
                 "uk_scenario_question_lang"
+        );
+    }
+
+    @DisplayName("AI 튜터 음성과 시나리오 TTS 음성을 V14 migration으로 분리한다.")
+    @Test
+    void aiTutorAndScenarioTtsVoiceSchemaIsSeparatedByV14Migration() {
+        assertTableExists("tts_voice");
+        assertColumnExists("tts_voice", "provider");
+        assertColumnExists("tts_voice", "model");
+        assertColumnExists("tts_voice", "provider_voice_id");
+        assertColumnExists("tts_voice", "gender");
+        assertColumnExists("tts_voice", "description");
+        assertColumnExists("tts_voice", "accent_locale");
+        assertColumnExists("tts_voice", "status");
+        assertTableConstraintExists("tts_voice", "uk_tts_voice_provider_model_voice");
+
+        assertColumnDoesNotExist("ai_tutor", "voice_provider");
+        assertColumnDoesNotExist("ai_tutor", "voice_id");
+        assertColumnDoesNotExist("scenario", "tts_voice_set_id");
+        assertColumnExists("scenario_language_variant", "tts_voice_id");
+        assertTableConstraintExists("scenario_language_variant", "fk_scenario_lang_tts_voice_id");
+    }
+
+    @DisplayName("V14 migration이 기본 튜터와 시나리오 TTS 음성 두 건을 추가한다.")
+    @Test
+    void v14MigrationSeedsDefaultTutorAndScenarioTtsVoices() throws Exception {
+        List<Map<String, Object>> voices = jdbcTemplate.queryForList("""
+                select provider, model, provider_voice_id, gender, description, accent_locale, status
+                from tts_voice
+                order by provider_voice_id
+                """);
+
+        assertThat(voices).hasSize(2);
+        assertThat(voices).extracting(row -> row.get("PROVIDER_VOICE_ID"))
+                .containsExactly(
+                        "en-US-Ethan:MAI-Voice-2",
+                        "en-US-Harper:MAI-Voice-2"
+                );
+        assertThat(voices).extracting(row -> row.get("GENDER"))
+                .containsExactly("MALE", "FEMALE");
+        assertThat(voices).allSatisfy(row -> {
+            assertThat(row.get("PROVIDER")).isEqualTo("OPENROUTER");
+            assertThat(row.get("MODEL")).isEqualTo("microsoft/mai-voice-2");
+            assertThat(row.get("ACCENT_LOCALE")).isEqualTo("EN_US");
+            assertThat(row.get("STATUS")).isEqualTo("ACTIVE");
+        });
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                insert into tts_voice (
+                    provider, model, provider_voice_id, gender, accent_locale, status,
+                    created_at, updated_at
+                )
+                values (
+                    'OPENROUTER', 'microsoft/mai-voice-2', 'en-US-Harper:MAI-Voice-2',
+                    'FEMALE', 'EN_US', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                """))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        Integer defaultTutorCount = jdbcTemplate.queryForObject("""
+                select count(*)
+                from ai_tutor
+                where accent_locale = 'EN_US'
+                  and target_locale = 'EN'
+                  and status = 'ACTIVE'
+                """, Integer.class);
+        assertThat(defaultTutorCount).isEqualTo(1);
+
+        Integer koreanVariantCount = jdbcTemplate.queryForObject("""
+                select count(*)
+                from ai_tutor_language_variant variant
+                join ai_tutor tutor on tutor.id = variant.ai_tutor_id
+                where tutor.accent_locale = 'EN_US'
+                  and tutor.target_locale = 'EN'
+                  and tutor.status = 'ACTIVE'
+                  and variant.base_locale = 'KR'
+                  and variant.display_name = '미국 영어 튜터'
+                """, Integer.class);
+        assertThat(koreanVariantCount).isEqualTo(1);
+
+        String migrationSql = readMigrationSql(
+                "db/migration/V14__separate_ai_tutor_and_scenario_tts_voice.sql"
+        );
+        assertThat(migrationSql).contains(
+                "UPDATE user_profile",
+                "WHERE ai_tutor_id IS NULL"
+        );
+    }
+
+    @DisplayName("V14 migration은 AI 튜터가 없는 기존 사용자만 기본 튜터로 backfill한다.")
+    @Test
+    void v14MigrationBackfillsOnlyUsersWithoutAiTutor() {
+        String databaseUrl = migrationTestDatabaseUrl();
+        JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(
+                new DriverManagerDataSource(databaseUrl, "sa", "")
+        );
+        migrateToVersion(databaseUrl, "13");
+        insertAiTutor(migrationJdbcTemplate, 990101L, "ACTIVE");
+        insertAiTutor(migrationJdbcTemplate, 990102L, "INACTIVE");
+        insertUserProfile(migrationJdbcTemplate, 990201L, null);
+        insertUserProfile(migrationJdbcTemplate, 990202L, 990102L);
+
+        migrateToLatestVersion(databaseUrl);
+
+        assertThat(userAiTutorId(migrationJdbcTemplate, 990201L)).isEqualTo(990101L);
+        assertThat(userAiTutorId(migrationJdbcTemplate, 990202L)).isEqualTo(990102L);
+    }
+
+    private String migrationTestDatabaseUrl() {
+        return "jdbc:h2:mem:lan100-v14-" + UUID.randomUUID()
+                + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1";
+    }
+
+    private void migrateToVersion(String databaseUrl, String targetVersion) {
+        Flyway.configure()
+                .dataSource(databaseUrl, "sa", "")
+                .locations("classpath:db/migration")
+                .target(targetVersion)
+                .load()
+                .migrate();
+    }
+
+    private void migrateToLatestVersion(String databaseUrl) {
+        Flyway.configure()
+                .dataSource(databaseUrl, "sa", "")
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+    }
+
+    private void insertAiTutor(JdbcTemplate migrationJdbcTemplate, long tutorId, String status) {
+        migrationJdbcTemplate.update("""
+                INSERT INTO ai_tutor (
+                    id, accent_locale, target_locale, status, created_at, updated_at
+                )
+                VALUES (?, 'EN_US', 'EN', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, tutorId, status);
+    }
+
+    private void insertUserProfile(
+            JdbcTemplate migrationJdbcTemplate,
+            long userProfileId,
+            Long aiTutorId
+    ) {
+        migrationJdbcTemplate.update("""
+                INSERT INTO user_profile (
+                    id, nickname, target_locale, base_locale, current_level, ai_tutor_id,
+                    push_permission_status, status, created_at, updated_at
+                )
+                VALUES (?, 'migration-test-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED', 'ACTIVE',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, userProfileId, aiTutorId);
+    }
+
+    private Long userAiTutorId(JdbcTemplate migrationJdbcTemplate, long userProfileId) {
+        return migrationJdbcTemplate.queryForObject(
+                "SELECT ai_tutor_id FROM user_profile WHERE id = ?",
+                Long.class,
+                userProfileId
         );
     }
 
