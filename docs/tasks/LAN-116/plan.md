@@ -18,31 +18,31 @@
 
 관련 파일은 `V16__enforce_app_version_build_constraints.sql`, `V17__enforce_single_active_app_version.sql`, `DatabaseSchemaIntegrationTests.java`다.
 
-- [ ] 실패 테스트를 먼저 추가한다.
-- [ ] 공통 V16에서 `build_number >= 1`, `minimum_supported_build_number >= 0`, `minimum_supported_build_number <= build_number`를 강제한다.
-- [ ] PostgreSQL 전용 V17에서 `active = true`인 정책을 플랫폼별 한 건으로 제한한다.
-- [ ] H2 제약 적용과 PostgreSQL 전용 SQL 내용을 검증한다.
+- [x] 실패 테스트를 먼저 추가했다.
+- [x] 공통 V16에서 `build_number >= 1`, `minimum_supported_build_number >= 0`, `minimum_supported_build_number <= build_number`를 강제했다.
+- [x] PostgreSQL 전용 V17에서 `active = true`인 정책을 플랫폼별 한 건으로 제한했다.
+- [x] H2 제약 적용과 PostgreSQL 전용 SQL 내용을 검증했다.
 
 ### 2. 조회 API
 
 새 파일은 `AppVersionController`, `AppVersionCheckResponse`, `AppVersionQueryService`, `AppVersionRepository`, `AppVersionApiIntegrationTests`다. 기존 `AppVersion`과 `ErrorCode`도 수정한다.
 
-- [ ] API 통합 테스트를 먼저 작성해 404 실패를 확인한다.
-- [ ] 플랫폼별 활성 정책을 조회한다.
-- [ ] 현재 빌드가 최소 지원 빌드보다 낮으면 `FORCE`와 `forceUpdateReason`을 반환한다.
-- [ ] 현재 빌드가 최신 빌드보다 낮으면 `SOFT`와 `softUpdateReason`을 반환한다.
-- [ ] 나머지는 `NONE`과 `reason=null`을 반환한다.
-- [ ] 정책이 없으면 `APP_VERSION_POLICY_NOT_CONFIGURED`를 발생시킨다.
+- [x] API 통합 테스트를 먼저 작성해 404 실패를 확인했다.
+- [x] 플랫폼별 활성 정책을 조회했다.
+- [x] 현재 빌드가 최소 지원 빌드보다 낮으면 `FORCE`와 `forceUpdateReason`을 반환했다.
+- [x] 현재 빌드가 최신 빌드보다 낮으면 `SOFT`와 `softUpdateReason`을 반환했다.
+- [x] 나머지는 `NONE`과 `reason=null`을 반환했다.
+- [x] 정책이 없으면 `APP_VERSION_POLICY_NOT_CONFIGURED`를 발생시켰다.
 
 ### 3. 검증, 보안, OpenAPI
 
 `AppVersionController`, `GlobalExceptionHandler`, `AuthSecurityConfig`, `AppVersionApiIntegrationTests`를 수정한다.
 
-- [ ] Bean Validation으로 `buildNumber>=1`을 검증한다.
-- [ ] 잘못된 플랫폼과 필수값 누락을 `400 VALIDATION_FAILED`로 처리한다.
-- [ ] 보안 설정에 공개 GET 경로를 명시한다.
-- [ ] 요청 파라미터와 200·400·500 응답을 OpenAPI에 문서화한다.
-- [ ] iOS·Android 독립 조회, `FORCE`·`SOFT`·`NONE` 경계, 정책 누락, 무인증 호출, OpenAPI 노출을 통합 테스트로 검증한다.
+- [x] Bean Validation으로 `buildNumber>=1`을 검증했다.
+- [x] 잘못된 플랫폼과 필수값 누락을 `400 VALIDATION_FAILED`로 처리했다.
+- [x] 보안 설정에 공개 GET 경로를 명시했다.
+- [x] 요청 파라미터와 200·400·500 응답을 OpenAPI에 문서화했다.
+- [x] iOS·Android 독립 조회, `FORCE`·`SOFT`·`NONE` 경계, 정책 누락, 무인증 호출, OpenAPI 노출을 통합 테스트로 검증했다.
 
 ### 4. 전체 검증
 
@@ -54,6 +54,13 @@ git diff --check feat/LAN-94...HEAD
 ```
 
 PostgreSQL 환경이 있으면 시크릿을 출력하지 않고 `./gradlew migrateDatabase`로 V16과 V17을 실제 적용한다. 환경이 없으면 미검증 사유를 최종 결과에 명시한다.
+
+## 검증 기록
+
+- `DatabaseSchemaIntegrationTests`와 `AppVersionApiIntegrationTests`의 실패 테스트를 확인한 뒤 각각 통과시켰다.
+- `./gradlew test`가 통과했다.
+- `git diff --check feat/LAN-94...HEAD`가 통과했다.
+- PostgreSQL 연결 환경 변수가 없어 `./gradlew migrateDatabase`는 실행하지 못했다.
 
 ## 커밋 단위
 
