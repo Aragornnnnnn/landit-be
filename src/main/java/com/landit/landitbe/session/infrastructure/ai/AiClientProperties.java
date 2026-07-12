@@ -11,7 +11,8 @@ public record AiClientProperties(
         String clientMode,
         String serviceAudience,
         Duration connectTimeout,
-        Duration requestTimeout
+        Duration requestTimeout,
+        Duration sessionFeedbackRequestTimeout
 ) implements AiConversationSettings {
 
     public AiClientProperties {

@@ -271,7 +271,25 @@ class RemoteAiConversationClientTest {
     }
 
     @Test
-    void generateSessionFeedbackMapsRequestTimeoutToFeedbackGenerationFailed() {
+    void generateSessionFeedbackUsesLongerDedicatedRequestTimeout() {
+        server.createContext("/api/v1/conversation/session-feedback", exchange -> {
+            try {
+                Thread.sleep(70L);
+                writeSessionFeedbackSuccessResponse(exchange);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                exchange.close();
+            }
+        });
+
+        AiSessionFeedbackResult result = remoteClient(Duration.ofMillis(50), Duration.ofMillis(120))
+                .generateSessionFeedback(aiSessionFeedbackRequest());
+
+        assertThat(result.sessionId()).isEqualTo(100L);
+    }
+
+    @Test
+    void generateSessionFeedbackMapsDedicatedRequestTimeoutToFeedbackGenerationFailed() {
         server.createContext("/api/v1/conversation/session-feedback", exchange -> {
             try {
                 Thread.sleep(200L);
@@ -282,7 +300,7 @@ class RemoteAiConversationClientTest {
             }
         });
 
-        assertThatThrownBy(() -> remoteClient(Duration.ofMillis(50))
+        assertThatThrownBy(() -> remoteClient(Duration.ofSeconds(60), Duration.ofMillis(50))
                 .generateSessionFeedback(aiSessionFeedbackRequest()))
                 .isInstanceOfSatisfying(ApiException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
@@ -371,6 +389,13 @@ class RemoteAiConversationClientTest {
     }
 
     private RemoteAiConversationClient remoteClient(Duration requestTimeout) {
+        return remoteClient(requestTimeout, requestTimeout);
+    }
+
+    private RemoteAiConversationClient remoteClient(
+            Duration requestTimeout,
+            Duration sessionFeedbackRequestTimeout
+    ) {
         return new RemoteAiConversationClient(
                 objectMapper,
                 new AiClientProperties(
@@ -378,7 +403,8 @@ class RemoteAiConversationClientTest {
                         "remote",
                         "KOREAN_LEARNER",
                         Duration.ofSeconds(5),
-                        requestTimeout
+                        requestTimeout,
+                        sessionFeedbackRequestTimeout
                 )
         );
     }
