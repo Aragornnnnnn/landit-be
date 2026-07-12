@@ -27,6 +27,10 @@ public enum ErrorCode {
     OIDC_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "소셜 로그인 토큰이 올바르지 않습니다."),
     OIDC_NONCE_MISMATCH(HttpStatus.BAD_REQUEST, "소셜 로그인 요청 검증 값이 일치하지 않습니다."),
     OIDC_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "소셜 로그인 제공자 검증에 실패했습니다."),
+    APP_VERSION_POLICY_NOT_CONFIGURED(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "앱 버전 정책이 올바르게 설정되지 않았습니다."
+    ),
     DEFAULT_AI_TUTOR_NOT_CONFIGURED(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "기본 AI 튜터가 올바르게 설정되지 않았습니다."
