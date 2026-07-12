@@ -27,13 +27,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
-@RequiredArgsConstructor
 public class RemoteAiConversationClient implements AiConversationClient {
 
     private static final String NEXT_MESSAGE_PATH = "/api/v1/conversation/next-message";
@@ -41,9 +39,17 @@ public class RemoteAiConversationClient implements AiConversationClient {
     private static final String MESSAGE_FEEDBACK_PATH = "/api/v1/conversation/message-feedback";
     private static final String SESSION_FEEDBACK_PATH = "/api/v1/conversation/session-feedback";
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final AiClientProperties properties;
+
+    public RemoteAiConversationClient(ObjectMapper objectMapper, AiClientProperties properties) {
+        this.objectMapper = objectMapper;
+        this.properties = properties;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(properties.connectTimeout())
+                .build();
+    }
 
     @Override
     public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
@@ -92,6 +98,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
                     .version(HttpClient.Version.HTTP_1_1)
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
+                    .timeout(properties.requestTimeout())
                     .POST(HttpRequest.BodyPublishers.ofString(
                             objectMapper.writeValueAsString(payload),
                             StandardCharsets.UTF_8

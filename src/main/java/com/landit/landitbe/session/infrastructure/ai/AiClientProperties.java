@@ -2,13 +2,16 @@
 package com.landit.landitbe.session.infrastructure.ai;
 
 import com.landit.landitbe.session.application.port.AiConversationSettings;
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "landit.ai")
 public record AiClientProperties(
         String baseUrl,
         String clientMode,
-        String serviceAudience
+        String serviceAudience,
+        Duration connectTimeout,
+        Duration requestTimeout
 ) implements AiConversationSettings {
 
     public AiClientProperties {
