@@ -35,6 +35,7 @@ landit:
     service-audience: ${LANDIT_AI_SERVICE_AUDIENCE:KOREAN_LEARNER}
     connect-timeout: ${LANDIT_AI_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_AI_REQUEST_TIMEOUT:60s}
+    session-feedback-request-timeout: ${LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT:120s}
 
 sentry:
   dsn: ${SENTRY_DSN:}

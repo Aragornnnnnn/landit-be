@@ -26,6 +26,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -88,17 +89,28 @@ public class RemoteAiConversationClient implements AiConversationClient {
                 sessionFeedbackUri(),
                 request,
                 RemoteSessionFeedbackResponse.class,
-                ErrorCode.FEEDBACK_GENERATION_FAILED
+                ErrorCode.FEEDBACK_GENERATION_FAILED,
+                properties.sessionFeedbackRequestTimeout()
         ).toResult();
     }
 
     private <T> T post(URI uri, Object payload, Class<T> responseType, ErrorCode defaultErrorCode) {
+        return post(uri, payload, responseType, defaultErrorCode, properties.requestTimeout());
+    }
+
+    private <T> T post(
+            URI uri,
+            Object payload,
+            Class<T> responseType,
+            ErrorCode defaultErrorCode,
+            Duration requestTimeout
+    ) {
         try {
             HttpRequest request = HttpRequest.newBuilder(uri)
                     .version(HttpClient.Version.HTTP_1_1)
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
-                    .timeout(properties.requestTimeout())
+                    .timeout(requestTimeout)
                     .POST(HttpRequest.BodyPublishers.ofString(
                             objectMapper.writeValueAsString(payload),
                             StandardCharsets.UTF_8
