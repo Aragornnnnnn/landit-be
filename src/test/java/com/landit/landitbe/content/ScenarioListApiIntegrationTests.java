@@ -42,9 +42,18 @@ class ScenarioListApiIntegrationTests {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM session_history_message_feedback");
+        jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
+        jdbcTemplate.update("DELETE FROM session_history_artifact");
+        jdbcTemplate.update("DELETE FROM session_history_message");
+        jdbcTemplate.update("DELETE FROM scenario_session");
+        jdbcTemplate.update("DELETE FROM session_history");
+        jdbcTemplate.update("DELETE FROM learning_session");
         jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
         jdbcTemplate.update("DELETE FROM writing_expression");
         jdbcTemplate.update("DELETE FROM user_scenario_progress");
+        jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
+        jdbcTemplate.update("DELETE FROM scenario_question");
         jdbcTemplate.update("DELETE FROM scenario_language_variant");
         jdbcTemplate.update("DELETE FROM scenario");
         jdbcTemplate.update("DELETE FROM category_language_variant");
@@ -255,12 +264,19 @@ class ScenarioListApiIntegrationTests {
                 "AI가 먼저 질문합니다.",
                 "좋아하는 음식을 설명한다.",
                 null,
-                "What is your favorite food?",
-                "가장 좋아하는 음식이 뭐예요?",
+                "Legacy opening message",
+                "기존 시작 메시지",
                 "음식 이야기는 대화를 열기 좋다.",
                 "GOOD",
                 harperVoiceId,
                 "ACTIVE"
+        );
+        insertScenarioQuestion(
+                9202,
+                202,
+                1,
+                "What is your favorite food?",
+                "가장 좋아하는 음식이 뭐예요?"
         );
 
         insertScenario(203, 100, 1, "AI", "HARD", "INACTIVE", null);
@@ -314,6 +330,47 @@ class ScenarioListApiIntegrationTests {
                     clearedUserId
             );
         }
+    }
+
+    private void insertScenarioQuestion(
+            long questionId,
+            long scenarioId,
+            int displayOrder,
+            String questionText,
+            String questionTranslation
+    ) {
+        jdbcTemplate.update("""
+                        INSERT INTO scenario_question (
+                            id,
+                            scenario_id,
+                            display_order,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """,
+                questionId,
+                scenarioId,
+                displayOrder
+        );
+        jdbcTemplate.update("""
+                        INSERT INTO scenario_question_language_variant (
+                            scenario_question_id,
+                            target_locale,
+                            base_locale,
+                            question_text,
+                            question_translation,
+                            status,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, 'EN', 'KR', ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """,
+                questionId,
+                questionText,
+                questionTranslation
+        );
     }
 
     private void insertCategory(long categoryId, int displayOrder, String categoryStatus, String categoryName) {

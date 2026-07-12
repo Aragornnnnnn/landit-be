@@ -101,6 +101,13 @@ class ScenarioSessionApiIntegrationTests {
         String accessToken = loginBody.get("data").get("accessToken").asText();
         seedCategory(1001, 1, "ACTIVE", "음식");
         seedScenario(2001, 1001, 1, "AI", "ACTIVE", 4);
+        seedScenarioQuestion(
+                4001,
+                2001,
+                1,
+                "What food do you like? Why do you like it?",
+                "좋아하는 음식이 있어? 왜 좋아해?"
+        );
         seedScenarioVariant(
                 3001,
                 2001,
@@ -108,8 +115,8 @@ class ScenarioSessionApiIntegrationTests {
                 "음식 취향을 말합니다.",
                 "좋아하는 음식을 이유와 함께 말한다.",
                 null,
-                "What food do you like? Why do you like it?",
-                "좋아하는 음식이 있어? 왜 좋아해?",
+                "Legacy opening message",
+                "기존 시작 메시지",
                 "음식 이야기는 처음 대화를 열기 좋다.",
                 "GOOD",
                 ttsVoiceId("en-US-Harper:MAI-Voice-2"),
@@ -155,6 +162,36 @@ class ScenarioSessionApiIntegrationTests {
         assertScenarioSession(sessionId, 3001);
         assertProgress(userId, 2001, "IN_PROGRESS");
         assertHistoryMessage(sessionId, "AI", "What food do you like? Why do you like it?");
+    }
+
+    @Test
+    void startAiFirstScenarioWithoutFirstFixedQuestionReturnsInternalServerError() throws Exception {
+        JsonNode loginBody = login("ai-first-without-question@example.com");
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1002, 1, "ACTIVE", "음식");
+        seedScenario(2002, 1002, 1, "AI", "ACTIVE", 3);
+        seedScenarioVariant(
+                3002,
+                2002,
+                "좋아하는 음식",
+                "음식 취향을 말합니다.",
+                "좋아하는 음식을 이유와 함께 말한다.",
+                null,
+                "Legacy opening message",
+                "기존 시작 메시지",
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        jdbcTemplate.update("DELETE FROM scenario_question_language_variant WHERE scenario_question_id = ?", 102002L);
+        jdbcTemplate.update("DELETE FROM scenario_question WHERE id = ?", 102002L);
+
+        mockMvc.perform(post("/api/v1/scenarios/2002/sessions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
     }
 
     @Test
@@ -381,6 +418,46 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
+    void userFirstScenarioReadsAllFixedQuestionsInContinuousOrder() throws Exception {
+        JsonNode loginBody = login("user-first-continuous-order@example.com");
+        long userId = loginBody.get("data").get("user").get("userId").asLong();
+        String accessToken = loginBody.get("data").get("accessToken").asText();
+        seedCategory(1130, 1, "ACTIVE", "카페");
+        seedScenario(2130, 1130, 1, "USER", "ACTIVE", 4);
+        seedScenarioVariant(
+                3130,
+                2130,
+                "카페 주문",
+                "카페에서 음료를 주문합니다.",
+                "원하는 음료를 자연스럽게 주문합니다.",
+                "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE"
+        );
+        seedScenarioQuestion(4130, 2130, 1, "What would you like to order?", "무엇을 주문할까요?");
+        seedScenarioQuestion(4131, 2130, 2, "What size would you like?", "어떤 사이즈로 드릴까요?");
+        seedScenarioQuestion(4132, 2130, 3, "Would you like anything else?", "더 필요한 것은 없나요?");
+        long sessionId = startScenario(accessToken, 2130);
+
+        submitMessage(accessToken, sessionId, "I would like an iced americano.");
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence()).isEqualTo(1);
+
+        submitMessage(accessToken, sessionId, "A medium size, please.");
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence()).isEqualTo(2);
+
+        submitMessage(accessToken, sessionId, "That is all, thank you.");
+        assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence()).isEqualTo(3);
+
+        submitMessage(accessToken, sessionId, "No, thank you.");
+        assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
+        assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
+    }
+
+    @Test
     void userFirstMessageUsesOpeningInstructionSnapshot() throws Exception {
         JsonNode loginBody = login("user-first-opening-snapshot@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -488,7 +565,7 @@ class ScenarioSessionApiIntegrationTests {
         seedScenarioQuestion(
                 4119,
                 2119,
-                1,
+                2,
                 "Why do you like it?",
                 "왜 좋아해?"
         );
@@ -1685,6 +1762,25 @@ class ScenarioSessionApiIntegrationTests {
                 ttsVoiceId,
                 status
         );
+        if (aiOpeningMessage != null && !hasScenarioQuestion(scenarioId, 1)) {
+            seedScenarioQuestion(
+                    100_000L + scenarioId,
+                    scenarioId,
+                    1,
+                    aiOpeningMessage,
+                    aiOpeningMessageTranslation
+            );
+        }
+    }
+
+    private boolean hasScenarioQuestion(long scenarioId, int displayOrder) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM scenario_question WHERE scenario_id = ? AND display_order = ?",
+                Integer.class,
+                scenarioId,
+                displayOrder
+        );
+        return count != null && count > 0;
     }
 
     private void seedScenarioQuestion(

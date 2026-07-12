@@ -45,12 +45,6 @@ public class ScenarioLanguageVariant extends BaseTimeEntity {
     @Column(name = "conversation_goal", nullable = false, length = 255)
     private String conversationGoal;
 
-    @Column(name = "ai_opening_message", length = 500)
-    private String aiOpeningMessage;
-
-    @Column(name = "ai_opening_message_translation", length = 500)
-    private String aiOpeningMessageTranslation;
-
     @Column(name = "ai_opening_inner_thought", columnDefinition = "text")
     private String aiOpeningInnerThought;
 
