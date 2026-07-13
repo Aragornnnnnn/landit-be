@@ -16,7 +16,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class GlobalExceptionHandlerTests {
 
@@ -63,6 +65,20 @@ class GlobalExceptionHandlerTests {
         ResponseEntity<ApiResponse<Void>> response = handler.handleConstraintViolation(exception);
 
         assertError(response, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 값이 올바르지 않습니다.");
+        assertThat(errorLogs()).isEmpty();
+    }
+
+    @Test
+    void missingStaticResourceUsesNotFoundErrorWithoutSentryCapture() {
+        NoResourceFoundException exception = new NoResourceFoundException(
+                HttpMethod.GET,
+                "/",
+                "No static resource for request '/'."
+        );
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleNoResourceFound(exception);
+
+        assertError(response, HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "요청한 리소스를 찾을 수 없습니다.");
         assertThat(errorLogs()).isEmpty();
     }
 
