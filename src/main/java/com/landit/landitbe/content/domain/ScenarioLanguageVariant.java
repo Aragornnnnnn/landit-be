@@ -3,7 +3,6 @@ package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
 import com.landit.landitbe.common.domain.BaseTimeEntity;
-import com.landit.landitbe.common.domain.InnerThoughtType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -44,19 +43,6 @@ public class ScenarioLanguageVariant extends BaseTimeEntity {
 
     @Column(name = "conversation_goal", nullable = false, length = 255)
     private String conversationGoal;
-
-    @Column(name = "ai_opening_message", length = 500)
-    private String aiOpeningMessage;
-
-    @Column(name = "ai_opening_message_translation", length = 500)
-    private String aiOpeningMessageTranslation;
-
-    @Column(name = "ai_opening_inner_thought", columnDefinition = "text")
-    private String aiOpeningInnerThought;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "ai_opening_inner_thought_type", length = 20)
-    private InnerThoughtType aiOpeningInnerThoughtType;
 
     @Column(name = "tts_voice_id")
     private Long ttsVoiceId;

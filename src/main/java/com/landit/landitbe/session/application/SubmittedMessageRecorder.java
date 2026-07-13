@@ -63,7 +63,7 @@ class SubmittedMessageRecorder {
         Optional<ScenarioQuestionRow> nextQuestion = findNextQuestion(
                 learningSession,
                 scenarioContext,
-                nextQuestionSequence(previousMessages, submittedTurnNumber)
+                nextQuestionOrder(scenarioContext, submittedTurnNumber)
         );
         return new SubmittedMessageContext(
                 userId,
@@ -151,25 +151,24 @@ class SubmittedMessageRecorder {
         return submittedMessage;
     }
 
-    /** USER first 첫 발화는 1번 질문을, 이후 발화는 다음 턴 질문을 조회한다. */
-    private int nextQuestionSequence(
-            List<SessionHistoryMessage> previousMessages,
+    /** AI first는 시작 질문 다음 순서부터, USER first는 첫 질문부터 조회한다. */
+    private int nextQuestionOrder(
+            ScenarioSessionMessageContextRow scenarioContext,
             int submittedTurnNumber
     ) {
-        if (previousMessages.isEmpty()) {
-            return 1;
-        }
-        return submittedTurnNumber + 1;
+        return scenarioContext.firstSpeaker() == ConversationSpeaker.AI
+                ? submittedTurnNumber + 1
+                : submittedTurnNumber;
     }
 
     private Optional<ScenarioQuestionRow> findNextQuestion(
             LearningSession learningSession,
             ScenarioSessionMessageContextRow scenarioContext,
-            int nextQuestionSequence
+            int nextQuestionOrder
     ) {
         return scenarioQuestionQueryRepository.findActiveQuestion(
                 scenarioContext.scenarioId(),
-                nextQuestionSequence,
+                nextQuestionOrder,
                 learningSession.getTargetLocale(),
                 learningSession.getBaseLocale()
         );

@@ -21,10 +21,10 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
                 s.firstSpeaker,
                 s.totalQuestionCount,
                 slv.userOpeningInstruction,
-                slv.aiOpeningMessage,
-                slv.aiOpeningMessageTranslation,
-                slv.aiOpeningInnerThought,
-                slv.aiOpeningInnerThoughtType,
+                openingQuestionVariant.questionText,
+                openingQuestionVariant.questionTranslation,
+                openingQuestionVariant.innerThought,
+                openingQuestionVariant.innerThoughtType,
                 tv.provider,
                 tv.model,
                 tv.providerVoiceId,
@@ -39,6 +39,15 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
               ON slv.scenarioId = s.id
              AND slv.targetLocale = up.targetLocale
              AND slv.baseLocale = up.baseLocale
+            LEFT JOIN ScenarioQuestion openingQuestion
+              ON openingQuestion.scenarioId = s.id
+             AND openingQuestion.displayOrder = 1
+             AND openingQuestion.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
+            LEFT JOIN ScenarioQuestionLanguageVariant openingQuestionVariant
+              ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id
+             AND openingQuestionVariant.targetLocale = up.targetLocale
+             AND openingQuestionVariant.baseLocale = up.baseLocale
+             AND openingQuestionVariant.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
             LEFT JOIN TtsVoice tv
               ON tv.id = slv.ttsVoiceId
              AND tv.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE

@@ -200,6 +200,22 @@ class DatabaseSchemaIntegrationTests {
         );
     }
 
+    @DisplayName("V18 migration은 첫 질문 속마음을 질문 Variant로 옮긴다.")
+    @Test
+    void v18MovesOpeningInnerThoughtToQuestionLanguageVariant() {
+        assertColumnExists("scenario_question_language_variant", "inner_thought");
+        assertColumnExists("scenario_question_language_variant", "inner_thought_type");
+        assertTableConstraintExists(
+                "scenario_question_language_variant",
+                "chk_scenario_question_lang_inner_thought_pair"
+        );
+
+        assertColumnDoesNotExist("scenario_language_variant", "ai_opening_message");
+        assertColumnDoesNotExist("scenario_language_variant", "ai_opening_message_translation");
+        assertColumnDoesNotExist("scenario_language_variant", "ai_opening_inner_thought");
+        assertColumnDoesNotExist("scenario_language_variant", "ai_opening_inner_thought_type");
+    }
+
     @DisplayName("AI 튜터 음성과 시나리오 TTS 음성을 V14 migration으로 분리한다.")
     @Test
     void aiTutorAndScenarioTtsVoiceSchemaIsSeparatedByV14Migration() {
