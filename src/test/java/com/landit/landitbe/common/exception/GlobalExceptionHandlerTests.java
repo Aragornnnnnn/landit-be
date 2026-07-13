@@ -3,57 +3,84 @@ package com.landit.landitbe.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.landit.landitbe.common.observability.SentryEventReporter;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.common.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
+import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 class GlobalExceptionHandlerTests {
 
-    private final CapturingSentryEventReporter sentryEventReporter = new CapturingSentryEventReporter();
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler(sentryEventReporter);
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+
+    @BeforeEach
+    void attachLogAppender() {
+        logAppender.start();
+        logger.addAppender(logAppender);
+    }
+
+    @AfterEach
+    void detachLogAppender() {
+        logger.detachAppender(logAppender);
+        logAppender.stop();
+    }
 
     @Test
-    void clientApiExceptionUsesErrorCodeStatusAndMessageWithoutSentryCapture() {
+    void clientApiExceptionUsesErrorCodeStatusAndMessageWithoutErrorLog() {
         ApiException exception = new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "리소스가 없습니다.");
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleApiException(exception);
 
         assertError(response, HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "리소스가 없습니다.");
-        assertThat(sentryEventReporter.capturedException).isNull();
+        assertThat(errorLogs()).isEmpty();
     }
 
     @Test
-    void serverApiExceptionCapturesSentryEvent() {
+    void serverApiExceptionWritesSingleErrorLogWithThrowable() {
         ApiException exception = new ApiException(ErrorCode.INTERNAL_SERVER_ERROR, "처리할 수 없습니다.");
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleApiException(exception);
 
         assertError(response, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "처리할 수 없습니다.");
-        assertThat(sentryEventReporter.capturedException).isSameAs(exception);
+        assertSingleErrorLog(exception, "INTERNAL_SERVER_ERROR");
     }
 
     @Test
-    void validationExceptionUsesValidationFailedErrorWithoutSentryCapture() {
+    void validationExceptionUsesValidationFailedErrorWithoutErrorLog() {
         ConstraintViolationException exception = new ConstraintViolationException(Set.of());
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleConstraintViolation(exception);
 
         assertError(response, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 값이 올바르지 않습니다.");
-        assertThat(sentryEventReporter.capturedException).isNull();
+        assertThat(errorLogs()).isEmpty();
     }
 
     @Test
-    void unexpectedExceptionCapturesSentryEvent() {
+    void unexpectedExceptionWritesSingleErrorLogWithThrowable() {
         RuntimeException exception = new RuntimeException("boom");
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleUnexpectedException(exception);
 
         assertError(response, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다.");
-        assertThat(sentryEventReporter.capturedException).isSameAs(exception);
+        assertSingleErrorLog(exception, "예상하지 못한");
+    }
+
+    @Test
+    void handlerUsesDefaultConstructor() {
+        assertThat(GlobalExceptionHandler.class.getDeclaredConstructors())
+                .singleElement()
+                .satisfies(constructor -> assertThat(constructor.getParameterCount()).isZero());
     }
 
     private void assertError(
@@ -71,13 +98,21 @@ class GlobalExceptionHandlerTests {
         assertThat(response.getBody().error().message()).isEqualTo(message);
     }
 
-    private static class CapturingSentryEventReporter implements SentryEventReporter {
+    private void assertSingleErrorLog(Throwable exception, String messageFragment) {
+        assertThat(errorLogs())
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getFormattedMessage()).contains(messageFragment);
+                    assertThat(event.getThrowableProxy()).isNotNull();
+                    assertThat(event.getThrowableProxy().getClassName())
+                            .isEqualTo(exception.getClass().getName());
+                    assertThat(event.getThrowableProxy().getMessage()).isEqualTo(exception.getMessage());
+                });
+    }
 
-        private Throwable capturedException;
-
-        @Override
-        public void captureException(Throwable exception) {
-            this.capturedException = exception;
-        }
+    private List<ILoggingEvent> errorLogs() {
+        return logAppender.list.stream()
+                .filter(event -> event.getLevel() == Level.ERROR)
+                .toList();
     }
 }
