@@ -8,4 +8,7 @@ public interface AiConversationClient {
 
     /** 대화 종료 메시지를 생성한다. */
     AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request);
+
+    /** 사용자 메시지의 피드백 생성을 요청한다. */
+    AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request);
 }

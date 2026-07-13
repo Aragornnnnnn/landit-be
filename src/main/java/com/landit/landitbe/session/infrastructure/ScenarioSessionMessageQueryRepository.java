@@ -17,6 +17,8 @@ public interface ScenarioSessionMessageQueryRepository extends JpaRepository<Sce
                 scenarioVariant.briefing,
                 scenarioVariant.conversationGoal,
                 scenario.aiRole,
+                scenario.firstSpeaker,
+                scenarioVariant.userOpeningInstruction,
                 scenario.totalQuestionCount,
                 scenarioVariant.targetLocale,
                 scenarioVariant.baseLocale

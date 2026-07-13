@@ -3,9 +3,11 @@ package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse;
+import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.landit.landitbe.session.domain.SessionMessageInputType;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,10 +19,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class SessionMessageSubmitUseCase {
 
     private final SubmittedMessageRecorder submittedMessageRecorder;
     private final SessionMessageAiGenerator sessionMessageAiGenerator;
+    private final SessionMessageFeedbackRequester sessionMessageFeedbackRequester;
     private final GeneratedMessageRecorder generatedMessageRecorder;
     private final PlatformTransactionManager transactionManager;
 
@@ -38,9 +42,13 @@ public class SessionMessageSubmitUseCase {
         );
         try {
             // 외부 AI 호출 중에는 DB 트랜잭션과 세션 row lock을 유지하지 않는다.
-            SessionMessageAiGenerator.Generation generation =
-                    sessionMessageAiGenerator.generate(toAiRequest(submittedContext));
-            return executeInTransaction(() -> generatedMessageRecorder.record(submittedContext, generation));
+            SessionMessageAiGenerator.Generation generation = generateAiMessage(submittedContext);
+            ProcessingStatus feedbackProcessingStatus = requestMessageFeedback(submittedContext);
+            return executeInTransaction(() -> generatedMessageRecorder.record(
+                    submittedContext,
+                    generation,
+                    feedbackProcessingStatus
+            ));
         } catch (RuntimeException exception) {
             // AI 생성이나 결과 저장 실패 시 제출 메시지를 제거해 부분 히스토리를 막는다.
             removeSubmittedMessageInTransaction(submittedContext);
@@ -57,6 +65,28 @@ public class SessionMessageSubmitUseCase {
                 submittedContext.conversationHistory(),
                 submittedContext.nextQuestion()
         );
+    }
+
+    private SessionMessageAiGenerator.Generation generateAiMessage(
+            SubmittedMessageContext submittedContext
+    ) {
+        try {
+            return sessionMessageAiGenerator.generate(toAiRequest(submittedContext));
+        } catch (RuntimeException exception) {
+            log.warn("AI 메시지 생성에 실패했습니다. workflow=message_generation sessionId={}",
+                    submittedContext.sessionId(), exception);
+            throw exception;
+        }
+    }
+
+    private ProcessingStatus requestMessageFeedback(SubmittedMessageContext submittedContext) {
+        try {
+            return sessionMessageFeedbackRequester.request(submittedContext);
+        } catch (RuntimeException exception) {
+            log.warn("AI 메시지별 피드백 요청에 실패했습니다. workflow=message_feedback sessionId={} messageId={}",
+                    submittedContext.sessionId(), submittedContext.submittedMessageId(), exception);
+            throw exception;
+        }
     }
 
     private void removeSubmittedMessageInTransaction(SubmittedMessageContext submittedContext) {

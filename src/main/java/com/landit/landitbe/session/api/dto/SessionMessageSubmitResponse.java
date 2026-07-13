@@ -25,7 +25,10 @@ public record SessionMessageSubmitResponse(
             int messageSequence,
             @Schema(description = "발화 주체")
             String role,
-            @Schema(description = "메시지별 피드백 처리 상태")
+            @Schema(
+                    description = "메시지별 피드백 처리 상태. 정상 접수 시 PREPARING",
+                    allowableValues = {"PREPARING", "COMPLETED", "FAILED"}
+            )
             String feedbackProcessingStatus,
             @Schema(description = "상대 역할의 속마음")
             String innerThought,
