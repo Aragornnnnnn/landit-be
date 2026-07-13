@@ -12,7 +12,7 @@ Landit 백엔드 서버입니다. Java 21과 Spring Boot 4 기반으로 REST API
 - Flyway
 - PostgreSQL
 - springdoc-openapi
-- Sentry, Logback
+- Sentry, Logback, Micrometer OTLP
 - JUnit 5, H2
 
 ## Requirements
@@ -49,6 +49,21 @@ DB_URL=jdbc:postgresql://<host>:<port>/<database>?sslmode=require&prepareThresho
 DB_USERNAME=<db-username>
 DB_PASSWORD=<db-password>
 ```
+
+## Application Metrics
+
+애플리케이션 메트릭은 Micrometer OTLP로 Grafana Cloud에 직접 전송합니다. 기본값은 비활성화이며, 배포 환경에서 다음 환경변수를 주입해야 합니다.
+
+```bash
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=true
+MANAGEMENT_OTLP_METRICS_EXPORT_STEP=30s
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=<grafana-cloud-otlp-metrics-endpoint>
+OTEL_EXPORTER_OTLP_HEADERS=<grafana-cloud-authorization-header>
+OTEL_SERVICE_NAME=landit-be
+OTEL_RESOURCE_ATTRIBUTES=service.namespace=landit,deployment.environment.name=<environment>
+```
+
+`OTEL_EXPORTER_OTLP_HEADERS`는 인증정보이므로 SSM Parameter Store의 `SecureString`으로 관리합니다. 메트릭은 HTTP endpoint별 요청 수, 응답시간, 상태와 JVM memory, GC, thread 정보를 포함합니다. 외부 scrape를 사용하지 않으므로 Actuator HTTP endpoint는 `health`, `info`만 노출합니다.
 
 ## Run
 
