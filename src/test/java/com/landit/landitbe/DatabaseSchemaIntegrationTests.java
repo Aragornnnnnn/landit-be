@@ -63,6 +63,29 @@ class DatabaseSchemaIntegrationTests {
         );
     }
 
+    @DisplayName("앱 버전 정책은 유효한 빌드 번호 범위만 저장한다.")
+    @Test
+    void appVersionBuildConstraintRejectsInvalidRanges() {
+        assertThatThrownBy(() -> insertAppVersionForConstraintTest(0, 0))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertAppVersionForConstraintTest(18, 19))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @DisplayName("PostgreSQL 전용 migration에 플랫폼별 활성 정책 partial unique index가 정의되어 있다.")
+    @Test
+    void postgresqlMigrationDefinesSingleActiveAppVersionIndex() throws Exception {
+        String migrationSql = readMigrationSql(
+                "db/postgresql/V17__enforce_single_active_app_version.sql"
+        );
+
+        assertThat(migrationSql).contains(
+                "CREATE UNIQUE INDEX uk_app_version_active_platform",
+                "ON app_version (platform)",
+                "WHERE active = TRUE"
+        );
+    }
+
     @DisplayName("NPS 테이블 교체는 이미 적용된 V4가 아니라 V6 migration에서 처리한다.")
     @Test
     void npsTableReplacementIsSeparatedFromAppliedV4Migration() throws Exception {
@@ -333,6 +356,25 @@ class DatabaseSchemaIntegrationTests {
                 "SELECT ai_tutor_id FROM user_profile WHERE id = ?",
                 Long.class,
                 userProfileId
+        );
+    }
+
+    private void insertAppVersionForConstraintTest(long buildNumber, long minimumSupportedBuildNumber) {
+        jdbcTemplate.update(
+                """
+                        INSERT INTO app_version (
+                            platform, version_name, build_number, minimum_supported_build_number,
+                            force_update_reason, soft_update_reason, release_note, active,
+                            released_at, created_at
+                        )
+                        VALUES (
+                            'IOS', 'constraint-test', ?, ?,
+                            '강제 업데이트', '업데이트 권장', NULL, FALSE,
+                            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        )
+                        """,
+                buildNumber,
+                minimumSupportedBuildNumber
         );
     }
 

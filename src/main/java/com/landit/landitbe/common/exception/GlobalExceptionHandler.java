@@ -11,6 +11,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -46,7 +47,8 @@ public class GlobalExceptionHandler {
     /** 잘못된 요청 본문이나 필수 파라미터 누락을 공통 검증 오류로 변환한다. */
     @ExceptionHandler({
             MissingServletRequestParameterException.class,
-            HttpMessageNotReadableException.class
+            HttpMessageNotReadableException.class,
+            MethodArgumentTypeMismatchException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
         return error(ErrorCode.VALIDATION_FAILED);

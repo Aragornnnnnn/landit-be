@@ -51,4 +51,34 @@ public class AppVersion extends BaseCreatedAtEntity {
 
     protected AppVersion() {
     }
+
+    /** 최신 앱 버전명을 반환한다. */
+    public String getVersionName() {
+        return versionName;
+    }
+
+    /** 최신 앱 빌드 번호를 반환한다. */
+    public long getBuildNumber() {
+        return buildNumber;
+    }
+
+    /** 서버가 허용하는 최소 빌드 번호를 반환한다. */
+    public long getMinimumSupportedBuildNumber() {
+        return minimumSupportedBuildNumber;
+    }
+
+    /** 강제 업데이트 안내 사유를 반환한다. */
+    public String getForceUpdateReason() {
+        return forceUpdateReason;
+    }
+
+    /** 권장 업데이트 안내 사유를 반환한다. */
+    public String getSoftUpdateReason() {
+        return softUpdateReason;
+    }
+
+    /** 최신 버전 릴리스 시각을 반환한다. */
+    public LocalDateTime getReleasedAt() {
+        return releasedAt;
+    }
 }

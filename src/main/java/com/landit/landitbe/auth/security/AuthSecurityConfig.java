@@ -66,6 +66,7 @@ public class AuthSecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler()))
                 .authorizeHttpRequests(registry -> registry
+                        .requestMatchers(HttpMethod.GET, "/api/v1/app-versions/check").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/expressions/**").authenticated()
