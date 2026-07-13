@@ -13,6 +13,12 @@ spring:
 sentry:
   dsn:
 
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
+
 landit:
   auth:
     oidc:
