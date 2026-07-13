@@ -71,6 +71,7 @@ public class AuthSecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/expressions/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/expressions/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/nps").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/scenarios").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/messages").authenticated()
