@@ -3,6 +3,7 @@ name: Verify pull request
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches:
       - develop
 
