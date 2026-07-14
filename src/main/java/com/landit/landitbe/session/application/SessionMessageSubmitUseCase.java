@@ -6,7 +6,11 @@ import com.landit.landitbe.session.api.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
 import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.landit.landitbe.session.domain.SessionMessageInputType;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -93,17 +97,24 @@ public class SessionMessageSubmitUseCase {
         if (submittedContext.nextQuestion().isEmpty()) {
             return AsyncGenerationRequests.none();
         }
-        CompletableFuture<AiInnerThoughtResult> innerThoughtFuture = CompletableFuture.supplyAsync(
-                () -> sessionInnerThoughtGenerator.generate(submittedContext),
-                taskExecutor
+        CompletableFuture<AiInnerThoughtResult> innerThoughtFuture = submitCancellableAsync(
+                () -> sessionInnerThoughtGenerator.generate(submittedContext)
         );
-        CompletableFuture<Void> feedbackFuture = CompletableFuture.runAsync(
-                () -> requestMessageFeedback(submittedContext),
-                taskExecutor
-        ).exceptionally(exception -> {
-            log.warn("AI 메시지별 피드백 요청에 실패했습니다. workflow=message_feedback sessionId={} messageId={}",
-                    submittedContext.sessionId(), submittedContext.submittedMessageId(), exception);
-            return null;
+        CompletableFuture<Void> feedbackFuture;
+        try {
+            feedbackFuture = submitCancellableAsync(() -> {
+                requestMessageFeedback(submittedContext);
+                return null;
+            });
+        } catch (RuntimeException exception) {
+            innerThoughtFuture.cancel(true);
+            throw exception;
+        }
+        feedbackFuture.whenComplete((ignored, exception) -> {
+            if (exception != null) {
+                log.warn("AI 메시지별 피드백 요청에 실패했습니다. workflow=message_feedback sessionId={} messageId={}",
+                        submittedContext.sessionId(), submittedContext.submittedMessageId(), exception);
+            }
         });
         return new AsyncGenerationRequests(
                 submittedContext.submittedMessageId(),
@@ -128,14 +139,19 @@ public class SessionMessageSubmitUseCase {
         if (asyncGenerationRequests.innerThoughtFuture() == null) {
             return;
         }
-        asyncGenerationRequests.innerThoughtFuture().whenCompleteAsync((result, exception) -> {
-            if (exception == null) {
-                sessionInnerThoughtRecorder.complete(result);
-                return;
-            }
-            log.warn("AI 속마음 생성에 실패했습니다. workflow=inner_thought", exception);
-            sessionInnerThoughtRecorder.fail(asyncGenerationRequests.submittedMessageId());
-        }, taskExecutor);
+        CompletableFuture<AiInnerThoughtResult> recordingFuture = asyncGenerationRequests.innerThoughtFuture()
+                .whenCompleteAsync((result, exception) -> {
+                    if (exception == null) {
+                        sessionInnerThoughtRecorder.complete(result);
+                        return;
+                    }
+                    log.warn("AI 속마음 생성에 실패했습니다. workflow=inner_thought", exception);
+                    sessionInnerThoughtRecorder.fail(asyncGenerationRequests.submittedMessageId());
+                }, taskExecutor);
+        recordingFuture.exceptionally(exception -> {
+            log.error("AI 속마음 처리 결과를 저장하지 못했습니다. workflow=inner_thought", exception);
+            return null;
+        });
     }
 
     private SessionMessageAiGenerator.Request toAiRequest(SubmittedMessageContext submittedContext) {
@@ -182,6 +198,31 @@ public class SessionMessageSubmitUseCase {
         return new TransactionTemplate(transactionManager).execute(status -> supplier.get());
     }
 
+    /** 실행 중인 외부 AI 호출도 인터럽트할 수 있도록 FutureTask와 완료 상태를 연결한다. */
+    private <T> CompletableFuture<T> submitCancellableAsync(Callable<T> task) {
+        CancellableCompletableFuture<T> result = new CancellableCompletableFuture<>();
+        FutureTask<T> futureTask = new FutureTask<>(task) {
+            @Override
+            protected void done() {
+                if (isCancelled()) {
+                    result.cancel(false);
+                    return;
+                }
+                try {
+                    result.complete(get());
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    result.completeExceptionally(exception);
+                } catch (ExecutionException exception) {
+                    result.completeExceptionally(exception.getCause());
+                }
+            }
+        };
+        result.bind(futureTask);
+        taskExecutor.execute(futureTask);
+        return result;
+    }
+
     private record AsyncGenerationRequests(
             Long submittedMessageId,
             CompletableFuture<AiInnerThoughtResult> innerThoughtFuture,
@@ -199,6 +240,25 @@ public class SessionMessageSubmitUseCase {
             if (feedbackFuture != null) {
                 feedbackFuture.cancel(true);
             }
+        }
+    }
+
+    /** CompletableFuture 취소를 실제 실행 작업의 취소로 전달한다. */
+    private static class CancellableCompletableFuture<T> extends CompletableFuture<T> {
+
+        private Future<?> task;
+
+        private void bind(Future<?> task) {
+            this.task = task;
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
+            if (cancelled && task != null) {
+                task.cancel(mayInterruptIfRunning);
+            }
+            return cancelled;
         }
     }
 }

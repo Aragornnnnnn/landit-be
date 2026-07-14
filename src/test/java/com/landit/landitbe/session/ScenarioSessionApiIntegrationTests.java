@@ -300,6 +300,7 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().questionId())
                 .isEqualTo(4102);
         assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
+        assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().sessionId()).isEqualTo(sessionId);
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageId())
@@ -437,6 +438,38 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.processingStatus").value("FAILED"))
                 .andExpect(jsonPath("$.data.innerThought").value(nullValue()))
                 .andExpect(jsonPath("$.data.innerThoughtType").value(nullValue()));
+    }
+
+    @Test
+    void submitMessageMarksInnerThoughtFailedWhenResponseMessageIdDiffers() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "inner-thought-mismatch@example.com",
+                1206,
+                2206,
+                3206
+        );
+        seedScenarioQuestion(4206, 2206, 1, "What would you like?", "무엇을 원하세요?");
+        fakeAiConversationClient.returnInnerThoughtForMessageId(9999L);
+
+        MvcResult submitResult = mockMvc.perform(post(
+                        "/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long messageId = objectMapper.readTree(submitResult.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+
+        assertThat(awaitInnerThoughtStatus(messageId, "FAILED")).isTrue();
     }
 
     @Test
@@ -1300,6 +1333,7 @@ class ScenarioSessionApiIntegrationTests {
 
     @Test
     void submitMessageRollsBackUserMessageWhenAiGenerationFails() throws Exception {
+        fakeAiConversationClient.blockInnerThoughtGeneration();
         fakeAiConversationClient.failNextMessageGeneration();
         JsonNode loginBody = login("message-ai-fail@example.com");
         long userId = loginBody.get("data").get("user").get("userId").asLong();
@@ -1335,6 +1369,8 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
 
+        assertThat(fakeAiConversationClient.awaitInnerThoughtGenerationStarted()).isTrue();
+        assertThat(fakeAiConversationClient.awaitInnerThoughtGenerationInterrupted()).isTrue();
         assertThat(fakeAiConversationClient.nextMessageTransactionActive()).containsOnly(false);
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
@@ -2329,6 +2365,8 @@ class ScenarioSessionApiIntegrationTests {
 
         private boolean failInnerThoughtGeneration;
 
+        private Long innerThoughtResponseMessageId;
+
         private boolean failMessageFeedbackRequest;
 
         private BigDecimal sessionFeedbackStarRating = new BigDecimal("3.0");
@@ -2344,6 +2382,10 @@ class ScenarioSessionApiIntegrationTests {
         private CountDownLatch innerThoughtGenerationStarted = new CountDownLatch(1);
 
         private CountDownLatch innerThoughtGenerationRelease = new CountDownLatch(0);
+
+        private CountDownLatch innerThoughtGenerationInterrupted = new CountDownLatch(0);
+
+        private CountDownLatch messageFeedbackRequested = new CountDownLatch(1);
 
         @Override
         public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
@@ -2371,6 +2413,7 @@ class ScenarioSessionApiIntegrationTests {
                     throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
                 }
             } catch (InterruptedException exception) {
+                innerThoughtGenerationInterrupted.countDown();
                 Thread.currentThread().interrupt();
                 throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
             }
@@ -2379,7 +2422,9 @@ class ScenarioSessionApiIntegrationTests {
             }
             return new AiInnerThoughtResult(
                     request.sessionId(),
-                    request.submittedMessageId(),
+                    innerThoughtResponseMessageId == null
+                            ? request.submittedMessageId()
+                            : innerThoughtResponseMessageId,
                     "매운 피자를 좋아한다고 이유까지 말해주네.",
                     InnerThoughtType.GOOD
             );
@@ -2402,6 +2447,7 @@ class ScenarioSessionApiIntegrationTests {
         @Override
         public AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request) {
             lastMessageFeedbackRequest = request;
+            messageFeedbackRequested.countDown();
             messageFeedbackTransactionActive.add(
                     TransactionSynchronizationManager.isActualTransactionActive()
             );
@@ -2461,6 +2507,7 @@ class ScenarioSessionApiIntegrationTests {
             nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
             failNextMessageGeneration = false;
             failInnerThoughtGeneration = false;
+            innerThoughtResponseMessageId = null;
             failMessageFeedbackRequest = false;
             sessionFeedbackStarRating = new BigDecimal("3.0");
             sessionFeedbackCallCount = 0;
@@ -2469,6 +2516,8 @@ class ScenarioSessionApiIntegrationTests {
             messageFeedbackResponseSessionId = null;
             innerThoughtGenerationStarted = new CountDownLatch(1);
             innerThoughtGenerationRelease = new CountDownLatch(0);
+            innerThoughtGenerationInterrupted = new CountDownLatch(0);
+            messageFeedbackRequested = new CountDownLatch(1);
         }
 
         private void blockInnerThoughtGeneration() {
@@ -2478,6 +2527,14 @@ class ScenarioSessionApiIntegrationTests {
 
         private boolean awaitInnerThoughtGenerationStarted() throws InterruptedException {
             return innerThoughtGenerationStarted.await(5, TimeUnit.SECONDS);
+        }
+
+        private boolean awaitInnerThoughtGenerationInterrupted() throws InterruptedException {
+            return innerThoughtGenerationInterrupted.await(1, TimeUnit.SECONDS);
+        }
+
+        private boolean awaitMessageFeedbackRequest() throws InterruptedException {
+            return messageFeedbackRequested.await(5, TimeUnit.SECONDS);
         }
 
         private void releaseInnerThoughtGeneration() {
@@ -2494,6 +2551,10 @@ class ScenarioSessionApiIntegrationTests {
 
         private void failInnerThoughtGeneration() {
             failInnerThoughtGeneration = true;
+        }
+
+        private void returnInnerThoughtForMessageId(long messageId) {
+            innerThoughtResponseMessageId = messageId;
         }
 
         private void failMessageFeedbackRequest() {

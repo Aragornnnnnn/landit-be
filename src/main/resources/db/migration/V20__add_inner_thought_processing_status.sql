@@ -1,3 +1,4 @@
+-- 사용자 발화의 속마음 비동기 처리 상태를 저장한다.
 ALTER TABLE session_history_message
     ADD COLUMN inner_thought_processing_status VARCHAR(20);
 

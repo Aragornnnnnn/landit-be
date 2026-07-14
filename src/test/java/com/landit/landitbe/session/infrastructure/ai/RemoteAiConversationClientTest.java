@@ -112,6 +112,50 @@ class RemoteAiConversationClientTest {
     }
 
     @Test
+    void generateInnerThoughtRejectsResponseMissingRequiredFields() {
+        server.createContext("/api/v1/conversation/inner-thought", exchange -> {
+            byte[] responseBody = """
+                    {
+                      "success": true,
+                      "data": {
+                        "sessionId": 100,
+                        "messageId": 200,
+                        "innerThoughtType": "GOOD"
+                      },
+                      "error": null
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        assertThatThrownBy(() -> remoteClient().generateInnerThought(aiInnerThoughtRequest()))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    }
+
+    @Test
+    void generateInnerThoughtPreservesAiResponseInvalidError() {
+        server.createContext("/api/v1/conversation/inner-thought", exchange ->
+                writeErrorResponse(exchange, 502, "AI_RESPONSE_INVALID"));
+
+        assertThatThrownBy(() -> remoteClient().generateInnerThought(aiInnerThoughtRequest()))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    }
+
+    @Test
+    void generateInnerThoughtMapsIoFailureToGenerationFailed() {
+        RemoteAiConversationClient client = remoteClient();
+        server.stop(0);
+
+        assertThatThrownBy(() -> client.generateInnerThought(aiInnerThoughtRequest()))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
+    }
+
+    @Test
     void generateNextMessageAcceptsResponseWithoutInnerThought() throws Exception {
         server.createContext("/api/v1/conversation/next-message", exchange -> {
             byte[] responseBody = """
@@ -478,6 +522,29 @@ class RemoteAiConversationClientTest {
                         "어떤 음식을 좋아해?"
                 ),
                 "I like pizza."
+        );
+    }
+
+    private AiInnerThoughtRequest aiInnerThoughtRequest() {
+        return new AiInnerThoughtRequest(
+                100L,
+                200L,
+                1,
+                new AiScenarioContext(
+                        10L,
+                        "음식에 대한 대화하기",
+                        "좋아하는 음식과 최근에 먹은 음식에 대해 이야기합니다.",
+                        "내 취향과 경험을 영어로 설명해봅니다.",
+                        "friend",
+                        "KOREAN_LEARNER"
+                ),
+                List.of(new AiConversationHistoryMessage(
+                        200L,
+                        1,
+                        "USER",
+                        "I like pizza because it is spicy.",
+                        "매워서 피자를 좋아해요."
+                ))
         );
     }
 

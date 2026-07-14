@@ -29,7 +29,8 @@ public interface SessionHistoryMessageRepository extends JpaRepository<SessionHi
             update SessionHistoryMessage message
             set message.innerThought = :innerThought,
                 message.innerThoughtType = :innerThoughtType,
-                message.innerThoughtProcessingStatus = :completedStatus
+                message.innerThoughtProcessingStatus = :completedStatus,
+                message.updatedAt = CURRENT_TIMESTAMP
             where message.id = :messageId
               and message.innerThoughtProcessingStatus = :preparingStatus
             """)
@@ -45,7 +46,8 @@ public interface SessionHistoryMessageRepository extends JpaRepository<SessionHi
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update SessionHistoryMessage message
-            set message.innerThoughtProcessingStatus = :failedStatus
+            set message.innerThoughtProcessingStatus = :failedStatus,
+                message.updatedAt = CURRENT_TIMESTAMP
             where message.id = :messageId
               and message.innerThoughtProcessingStatus = :preparingStatus
             """)
