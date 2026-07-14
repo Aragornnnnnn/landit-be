@@ -30,6 +30,11 @@ public record SessionMessageSubmitResponse(
                     allowableValues = {"PREPARING", "COMPLETED", "FAILED"}
             )
             String feedbackProcessingStatus,
+            @Schema(
+                    description = "상대 역할 속마음 처리 상태",
+                    allowableValues = {"PREPARING", "COMPLETED", "FAILED"}
+            )
+            String innerThoughtProcessingStatus,
             @Schema(description = "상대 역할의 속마음")
             String innerThought,
             @Schema(description = "속마음 유형")

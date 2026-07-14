@@ -244,9 +244,10 @@ class ScenarioSessionApiIntegrationTests {
                 .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(2))
                 .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
                 .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus").value("PREPARING"))
-                .andExpect(jsonPath("$.data.submittedMessage.innerThought")
-                        .value("매운 피자를 좋아한다고 이유까지 말해주네."))
-                .andExpect(jsonPath("$.data.submittedMessage.innerThoughtType").value("GOOD"))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThoughtProcessingStatus")
+                        .value("PREPARING"))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThoughtType").value(nullValue()))
                 .andExpect(jsonPath("$.data.nextMessage.messageId").value(notNullValue()))
                 .andExpect(jsonPath("$.data.nextMessage.turnNumber").value(2))
                 .andExpect(jsonPath("$.data.nextMessage.messageSequence").value(3))
@@ -310,6 +311,7 @@ class ScenarioSessionApiIntegrationTests {
                                shm.input_type,
                                shm.inner_thought,
                                shm.inner_thought_type,
+                               shm.inner_thought_processing_status,
                                shm.message_sequence,
                                shm.turn_number
                         FROM session_history_message shm
@@ -322,8 +324,9 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(messages).hasSize(3);
         assertThat(messages.get(1).get("ROLE")).isEqualTo("USER");
         assertThat(messages.get(1).get("INPUT_TYPE")).isEqualTo("VOICE");
-        assertThat(messages.get(1).get("INNER_THOUGHT"))
-                .isEqualTo("매운 피자를 좋아한다고 이유까지 말해주네.");
+        assertThat(messages.get(1).get("INNER_THOUGHT")).isNull();
+        assertThat(messages.get(1).get("INNER_THOUGHT_PROCESSING_STATUS"))
+                .isEqualTo("PREPARING");
         assertThat(messages.get(2).get("ROLE")).isEqualTo("AI");
         assertThat(messages.get(2).get("CONTENT"))
                 .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
@@ -905,8 +908,9 @@ class ScenarioSessionApiIntegrationTests {
                                 }
                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.submittedMessage.innerThought")
-                        .value("매운 피자를 좋아한다고 이유까지 말해주네."))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThoughtProcessingStatus")
+                        .value("PREPARING"))
+                .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
                 .andExpect(jsonPath("$.data.nextMessage.content")
                         .value("Oh, you like spicy pizza. What food did you eat recently?"))
                 .andExpect(jsonPath("$.data.progress.completed").value(false));

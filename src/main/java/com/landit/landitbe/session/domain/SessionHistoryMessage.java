@@ -56,6 +56,10 @@ public class SessionHistoryMessage extends BaseTimeEntity {
     @Column(name = "inner_thought_type", length = 20)
     private InnerThoughtType innerThoughtType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "inner_thought_processing_status", length = 20)
+    private ProcessingStatus innerThoughtProcessingStatus;
+
     @Column(name = "pronunciation_score")
     private Integer pronunciationScore;
 
@@ -127,7 +131,7 @@ public class SessionHistoryMessage extends BaseTimeEntity {
             String content,
             SessionMessageInputType inputType
     ) {
-        return new SessionHistoryMessage(
+        SessionHistoryMessage message = new SessionHistoryMessage(
                 sessionHistoryId,
                 messageSequence,
                 turnNumber,
@@ -138,6 +142,8 @@ public class SessionHistoryMessage extends BaseTimeEntity {
                 null,
                 null
         );
+        message.innerThoughtProcessingStatus = ProcessingStatus.PREPARING;
+        return message;
     }
 
     /** 히스토리에 저장할 AI 후속 메시지를 생성한다. */
@@ -165,6 +171,14 @@ public class SessionHistoryMessage extends BaseTimeEntity {
     public void recordInnerThought(String innerThought, InnerThoughtType innerThoughtType) {
         this.innerThought = innerThought;
         this.innerThoughtType = innerThoughtType;
+        this.innerThoughtProcessingStatus = ProcessingStatus.COMPLETED;
+    }
+
+    /** 생성에 실패한 속마음의 처리 상태를 기록한다. */
+    public void markInnerThoughtFailed() {
+        if (innerThoughtProcessingStatus == ProcessingStatus.PREPARING) {
+            innerThoughtProcessingStatus = ProcessingStatus.FAILED;
+        }
     }
 
 }

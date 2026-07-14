@@ -42,10 +42,12 @@ class GeneratedMessageRecorder {
         SessionHistoryMessage submittedMessage = findSubmittedMessage(submittedContext);
         assertSubmittedMessageMatches(submittedContext, submittedMessage);
 
-        submittedMessage.recordInnerThought(
-                generation.innerThought(),
-                generation.innerThoughtType()
-        );
+        if (generation.completed()) {
+            submittedMessage.recordInnerThought(
+                    generation.innerThought(),
+                    generation.innerThoughtType()
+            );
+        }
         scenarioSession.updateGoalCompletionStatus(generation.goalCompletionStatus());
         SessionHistoryMessage nextMessage = saveAiMessage(
                 submittedMessage,
@@ -131,6 +133,7 @@ class GeneratedMessageRecorder {
                 message.getMessageSequence(),
                 message.getRole().name(),
                 feedbackProcessingStatus.name(),
+                message.getInnerThoughtProcessingStatus().name(),
                 message.getInnerThought(),
                 message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name()
         );

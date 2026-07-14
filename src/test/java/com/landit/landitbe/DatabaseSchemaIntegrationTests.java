@@ -217,6 +217,16 @@ class DatabaseSchemaIntegrationTests {
         assertColumnDoesNotExist("scenario_language_variant", "ai_opening_inner_thought_type");
     }
 
+    @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
+    @Test
+    void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
+        assertColumnExists("session_history_message", "inner_thought_processing_status");
+        assertTableConstraintExists(
+                "session_history_message",
+                "chk_session_message_inner_thought_status"
+        );
+    }
+
     @DisplayName("AI 튜터 음성과 시나리오 TTS 음성을 V14 migration으로 분리한다.")
     @Test
     void aiTutorAndScenarioTtsVoiceSchemaIsSeparatedByV14Migration() {
