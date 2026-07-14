@@ -6,8 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
+import com.landit.landitbe.session.application.port.AiConversationHistoryMessage;
+import com.landit.landitbe.session.application.port.AiInnerThoughtRequest;
+import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
+import com.landit.landitbe.session.application.port.AiNextMessageRequest;
+import com.landit.landitbe.session.application.port.AiNextMessageResult;
+import com.landit.landitbe.session.application.port.AiNextQuestion;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
@@ -17,6 +24,7 @@ import com.landit.landitbe.session.application.port.AiSessionFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiSessionFeedbackResult;
 import com.landit.landitbe.session.application.port.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.session.domain.FeedbackType;
+import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -43,6 +51,110 @@ class RemoteAiConversationClientTest {
     @AfterEach
     void stopServer() {
         server.stop(0);
+    }
+
+    @Test
+    void generateInnerThoughtPostsConversationContextAndMapsResponse() throws Exception {
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/v1/conversation/inner-thought", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] responseBody = """
+                    {
+                      "success": true,
+                      "data": {
+                        "sessionId": 100,
+                        "messageId": 200,
+                        "innerThought": "사용자가 이유를 덧붙여 답변했으니 관심을 표현하면 좋겠다.",
+                        "innerThoughtType": "GOOD"
+                      },
+                      "error": null
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        AiInnerThoughtResult result = remoteClient().generateInnerThought(new AiInnerThoughtRequest(
+                100L,
+                200L,
+                1,
+                new AiScenarioContext(
+                        10L,
+                        "음식에 대한 대화하기",
+                        "좋아하는 음식과 최근에 먹은 음식에 대해 이야기합니다.",
+                        "내 취향과 경험을 영어로 설명해봅니다.",
+                        "friend",
+                        "KOREAN_LEARNER"
+                ),
+                List.of(new AiConversationHistoryMessage(
+                        200L,
+                        1,
+                        "USER",
+                        "I like pizza because it is spicy.",
+                        "매워서 피자를 좋아해요."
+                ))
+        ));
+
+        JsonNode request = objectMapper.readTree(requestBody.get());
+        assertThat(request.get("sessionId").asLong()).isEqualTo(100L);
+        assertThat(request.get("submittedMessageId").asLong()).isEqualTo(200L);
+        assertThat(request.get("submittedTurnNumber").asInt()).isEqualTo(1);
+        assertThat(request.get("scenario").get("scenarioId").asLong()).isEqualTo(10L);
+        assertThat(request.get("conversationHistory")).hasSize(1);
+        assertThat(request.has("nextQuestion")).isFalse();
+        assertThat(result).isEqualTo(new AiInnerThoughtResult(
+                100L,
+                200L,
+                "사용자가 이유를 덧붙여 답변했으니 관심을 표현하면 좋겠다.",
+                InnerThoughtType.GOOD
+        ));
+    }
+
+    @Test
+    void generateNextMessageAcceptsResponseWithoutInnerThought() throws Exception {
+        server.createContext("/api/v1/conversation/next-message", exchange -> {
+            byte[] responseBody = """
+                    {
+                      "success": true,
+                      "data": {
+                        "aiMessage": "What food did you eat recently?",
+                        "translatedMessage": "최근에는 어떤 음식을 먹었어?",
+                        "goalCompletionStatus": "PARTIAL"
+                      },
+                      "error": null
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        AiNextMessageResult result = remoteClient().generateNextMessage(new AiNextMessageRequest(
+                100L,
+                200L,
+                1,
+                new AiScenarioContext(
+                        10L,
+                        "음식에 대한 대화하기",
+                        "좋아하는 음식과 최근에 먹은 음식에 대해 이야기합니다.",
+                        "내 취향과 경험을 영어로 설명해봅니다.",
+                        "friend",
+                        "KOREAN_LEARNER"
+                ),
+                List.of(new AiConversationHistoryMessage(
+                        200L,
+                        1,
+                        "USER",
+                        "I like pizza because it is spicy.",
+                        "매워서 피자를 좋아해요."
+                )),
+                new AiNextQuestion(1L, 2, "What food did you eat recently?", "최근에는 어떤 음식을 먹었어?")
+        ));
+
+        assertThat(result.aiMessage()).isEqualTo("What food did you eat recently?");
+        assertThat(result.translatedMessage()).isEqualTo("최근에는 어떤 음식을 먹었어?");
+        assertThat(result.goalCompletionStatus()).isEqualTo(GoalCompletionStatus.PARTIAL);
     }
 
     @Test

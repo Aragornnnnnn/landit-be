@@ -5,6 +5,8 @@ import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
 import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
+import com.landit.landitbe.session.application.port.AiInnerThoughtRequest;
+import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
@@ -37,10 +39,18 @@ public class LocalAiConversationClient implements AiConversationClient {
         return new AiNextMessageResult(
                 request.nextQuestion().questionEn(),
                 request.nextQuestion().questionKo(),
-                "사용자가 답변을 이어줘서 다음 질문으로 자연스럽게 "
-                        + "넘어가면 좋겠다.",
-                InnerThoughtType.NORMAL,
                 GoalCompletionStatus.PARTIAL
+        );
+    }
+
+    /** 로컬 환경에서 사용할 사용자 메시지 속마음을 반환한다. */
+    @Override
+    public AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request) {
+        return new AiInnerThoughtResult(
+                request.sessionId(),
+                request.submittedMessageId(),
+                "사용자가 답변을 이어줘서 다음 질문으로 자연스럽게 넘어가면 좋겠다.",
+                InnerThoughtType.NORMAL
         );
     }
 

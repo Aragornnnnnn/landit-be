@@ -10,6 +10,8 @@ import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
 import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
+import com.landit.landitbe.session.application.port.AiInnerThoughtRequest;
+import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
@@ -36,6 +38,7 @@ import org.springframework.stereotype.Component;
 public class RemoteAiConversationClient implements AiConversationClient {
 
     private static final String NEXT_MESSAGE_PATH = "/api/v1/conversation/next-message";
+    private static final String INNER_THOUGHT_PATH = "/api/v1/conversation/inner-thought";
     private static final String CLOSING_MESSAGE_PATH = "/api/v1/conversation/closing-message";
     private static final String MESSAGE_FEEDBACK_PATH = "/api/v1/conversation/message-feedback";
     private static final String SESSION_FEEDBACK_PATH = "/api/v1/conversation/session-feedback";
@@ -60,6 +63,16 @@ public class RemoteAiConversationClient implements AiConversationClient {
                 RemoteNextMessageResponse.class,
                 ErrorCode.AI_GENERATION_FAILED
         ).toResponse();
+    }
+
+    @Override
+    public AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request) {
+        return post(
+                innerThoughtUri(),
+                request,
+                RemoteInnerThoughtResponse.class,
+                ErrorCode.AI_GENERATION_FAILED
+        ).toResult();
     }
 
     @Override
@@ -176,6 +189,10 @@ public class RemoteAiConversationClient implements AiConversationClient {
         return aiBaseUri(ErrorCode.AI_GENERATION_FAILED).resolve(CLOSING_MESSAGE_PATH);
     }
 
+    private URI innerThoughtUri() {
+        return aiBaseUri(ErrorCode.AI_GENERATION_FAILED).resolve(INNER_THOUGHT_PATH);
+    }
+
     private URI messageFeedbackUri() {
         return aiBaseUri(ErrorCode.AI_GENERATION_FAILED).resolve(MESSAGE_FEEDBACK_PATH);
     }
@@ -195,26 +212,39 @@ public class RemoteAiConversationClient implements AiConversationClient {
     private record RemoteNextMessageResponse(
             String aiMessage,
             String translatedMessage,
-            String innerThought,
-            InnerThoughtType innerThoughtType,
             GoalCompletionStatus goalCompletionStatus
     ) {
 
         private AiNextMessageResult toResponse() {
             if (blank(aiMessage)
                     || blank(translatedMessage)
-                    || blank(innerThought)
-                    || innerThoughtType == null
                     || goalCompletionStatus == null) {
                 throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
             }
             return new AiNextMessageResult(
                     aiMessage,
                     translatedMessage,
-                    innerThought,
-                    innerThoughtType,
                     goalCompletionStatus
             );
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record RemoteInnerThoughtResponse(
+            Long sessionId,
+            Long messageId,
+            String innerThought,
+            InnerThoughtType innerThoughtType
+    ) {
+
+        private AiInnerThoughtResult toResult() {
+            if (sessionId == null
+                    || messageId == null
+                    || blank(innerThought)
+                    || innerThoughtType == null) {
+                throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+            }
+            return new AiInnerThoughtResult(sessionId, messageId, innerThought, innerThoughtType);
         }
     }
 

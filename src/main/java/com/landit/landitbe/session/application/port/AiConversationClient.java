@@ -6,6 +6,9 @@ public interface AiConversationClient {
     /** 다음 AI 메시지를 생성한다. */
     AiNextMessageResult generateNextMessage(AiNextMessageRequest request);
 
+    /** 사용자 메시지에 대한 상대 역할 속마음을 생성한다. */
+    AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request);
+
     /** 대화 종료 메시지를 생성한다. */
     AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request);
 

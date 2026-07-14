@@ -17,6 +17,8 @@ import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiClosingMessageRequest;
 import com.landit.landitbe.session.application.port.AiClosingMessageResult;
 import com.landit.landitbe.session.application.port.AiConversationClient;
+import com.landit.landitbe.session.application.port.AiInnerThoughtRequest;
+import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackRequest;
 import com.landit.landitbe.session.application.port.AiMessageFeedbackResult;
 import com.landit.landitbe.session.application.port.AiNextMessageRequest;
@@ -2109,9 +2111,17 @@ class ScenarioSessionApiIntegrationTests {
             return new AiNextMessageResult(
                     "Oh, you like spicy pizza. What food did you eat recently?",
                     "아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?",
-                    "매운 피자를 좋아한다고 이유까지 말해주네.",
-                    InnerThoughtType.GOOD,
                     nextGoalCompletionStatus
+            );
+        }
+
+        @Override
+        public AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request) {
+            return new AiInnerThoughtResult(
+                    request.sessionId(),
+                    request.submittedMessageId(),
+                    "매운 피자를 좋아한다고 이유까지 말해주네.",
+                    InnerThoughtType.GOOD
             );
         }
 

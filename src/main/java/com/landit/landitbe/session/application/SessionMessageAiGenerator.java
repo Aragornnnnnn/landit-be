@@ -58,8 +58,8 @@ class SessionMessageAiGenerator {
         return new Generation(
                 nextMessageResult.aiMessage(),
                 nextMessageResult.translatedMessage(),
-                nextMessageResult.innerThought(),
-                nextMessageResult.innerThoughtType(),
+                null,
+                null,
                 nextMessageResult.goalCompletionStatus(),
                 false,
                 null
@@ -122,8 +122,6 @@ class SessionMessageAiGenerator {
         if (result == null
                 || blank(result.aiMessage())
                 || blank(result.translatedMessage())
-                || blank(result.innerThought())
-                || result.innerThoughtType() == null
                 || result.goalCompletionStatus() == null) {
             throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
         }
