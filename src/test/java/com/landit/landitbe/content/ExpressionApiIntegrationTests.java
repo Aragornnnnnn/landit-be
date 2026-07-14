@@ -274,10 +274,10 @@ class ExpressionApiIntegrationTests {
                         + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
                         + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
                         + "usage_description, representative_sentence_text, representative_sentence_translation, "
-                        + "representative_sentence_translation_highlight_text, practice_examples_payload, status, "
+                        + "representative_sentence_words, representative_sentence_word_choices, practice_examples_payload, status, "
                         + "created_at, updated_at) "
                         + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', ?, ?, ?, ?, ?, 'usage summary', "
-                        + "'usage description', 'sample sentence', '샘플 문장', '샘플', CAST(? AS jsonb), 'ACTIVE', ?, ?)",
+                        + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
                 scenarioId, targetLocale, baseLocale, displayOrder,
                 targetExpressionText, baseExpressionMeaningText, "[]", now, now
         );

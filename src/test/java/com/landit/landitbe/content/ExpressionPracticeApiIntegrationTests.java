@@ -228,13 +228,13 @@ class ExpressionPracticeApiIntegrationTests {
                         + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
                         + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
                         + "usage_description, representative_sentence_text, representative_sentence_translation, "
-                        + "representative_sentence_translation_highlight_text, "
+                        + "representative_sentence_words, representative_sentence_word_choices, "
                         + "practice_examples_payload, status, created_at, updated_at) "
                         // H2에서 CAST(? AS jsonb)는 문자열을 "JSON 문자열 값"으로 저장해버려서(배열로 파싱 안 됨)
                         // 진짜 JSON으로 파싱해 저장하는 H2 문법인 "? FORMAT JSON"을 쓴다.
                         + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
                         + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
-                        + "'representative sentence', '대표 예문 해석', '대표 강조', "
+                        + "'representative sentence', '대표 예문 해석', ARRAY['sample'], ARRAY['sample','choice'], "
                         + "? FORMAT JSON, ?, ?, ?)",
                 scenarioId, payloadJson, status, now, now
         );

@@ -217,7 +217,8 @@ public class ExpressionQueryService {
                 expression.getRepresentativeQuestionTranslation(),
                 expression.getRepresentativeSentenceText(),
                 expression.getRepresentativeSentenceTranslation(),
-                expression.getRepresentativeSentenceTranslationHighlightText(),
+                expression.getRepresentativeSentenceWords(),
+                expression.getRepresentativeSentenceWordChoices(),
                 expression.getRepresentativeImageUrl()
         );
     }

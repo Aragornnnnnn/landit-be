@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.List;
 import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -72,8 +73,15 @@ public class WritingExpression extends BaseTimeEntity {
     @Column(name = "representative_sentence_translation", nullable = false, columnDefinition = "text")
     private String representativeSentenceTranslation;
 
-    @Column(name = "representative_sentence_translation_highlight_text", nullable = false, length = 255)
-    private String representativeSentenceTranslationHighlightText;
+    // 정답 예문을 단어 단위로 나눈 배열. 정답 판정용이라 순서를 그대로 유지한다.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "representative_sentence_words", nullable = false)
+    private List<String> representativeSentenceWords;
+
+    // 정답 단어 + 오답 단어를 섞은 선택지 배열. DB에 저장된 (섞인) 순서를 그대로 노출한다.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "representative_sentence_word_choices", nullable = false)
+    private List<String> representativeSentenceWordChoices;
 
     @Column(name = "representative_image_url", length = 500)
     private String representativeImageUrl;
