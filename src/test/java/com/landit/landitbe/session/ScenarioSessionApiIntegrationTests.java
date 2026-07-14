@@ -227,6 +227,7 @@ class ScenarioSessionApiIntegrationTests {
                 "최근에는 어떤 음식을 먹었어?"
         );
         long sessionId = startScenario(accessToken, 2101);
+        fakeAiConversationClient.blockInnerThoughtGeneration();
 
         MvcResult result = mockMvc.perform(post("/api/v1/sessions/%d/messages".formatted(sessionId))
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -269,6 +270,17 @@ class ScenarioSessionApiIntegrationTests {
                 .get("submittedMessage")
                 .get("messageId")
                 .asLong();
+        assertThat(fakeAiConversationClient.awaitInnerThoughtGenerationStarted()).isTrue();
+        assertThat(fakeAiConversationClient.lastInnerThoughtRequest()).isNotNull();
+        assertThat(fakeAiConversationClient.lastInnerThoughtRequest().sessionId()).isEqualTo(sessionId);
+        assertThat(fakeAiConversationClient.lastInnerThoughtRequest().submittedMessageId())
+                .isEqualTo(submittedMessageId);
+        assertThat(fakeAiConversationClient.lastInnerThoughtRequest().conversationHistory())
+                .extracting("content")
+                .containsExactly(
+                        "What food do you like? Why do you like it?",
+                        "I like pizza because it is spicy."
+                );
         assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
         assertThat(fakeAiConversationClient.lastNextMessageRequest().submittedMessageId())
                 .isEqualTo(submittedMessageId);
@@ -332,6 +344,7 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(messages.get(2).get("ROLE")).isEqualTo("AI");
         assertThat(messages.get(2).get("CONTENT"))
                 .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
+        fakeAiConversationClient.releaseInnerThoughtGeneration();
     }
 
     @Test
@@ -508,7 +521,7 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
-    void submitUserFirstMessageWithoutOpeningInstructionReturnsInternalServerError() throws Exception {
+    void submitUserFirstMessageWithoutOpeningInstructionStillReturnsNextMessage() throws Exception {
         JsonNode loginBody = login("user-first-missing-instruction@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
         seedCategory(1118, 1, "ACTIVE", "카페");
@@ -545,12 +558,11 @@ class ScenarioSessionApiIntegrationTests {
                                   "inputType":"VOICE"
                                 }
                                 """))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
+                .andExpect(status().isOk());
     }
 
     @Test
-    void submitAiFirstMessageWithoutPrecedingAiMessageReturnsInternalServerError() throws Exception {
+    void submitAiFirstMessageWithoutPrecedingAiMessageStillReturnsNextMessage() throws Exception {
         JsonNode loginBody = login("ai-first-missing-message@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
         seedCategory(1119, 1, "ACTIVE", "음식");
@@ -598,8 +610,7 @@ class ScenarioSessionApiIntegrationTests {
                                   "inputType":"VOICE"
                                 }
                                 """))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
+                .andExpect(status().isOk());
 
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
@@ -611,7 +622,7 @@ class ScenarioSessionApiIntegrationTests {
                 Integer.class,
                 sessionId
         );
-        assertThat(messageCount).isZero();
+        assertThat(messageCount).isEqualTo(2);
     }
 
     @Test
@@ -1124,7 +1135,7 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
-    void submitMessageRollsBackUserMessageWhenMessageFeedbackRequestFails() throws Exception {
+    void submitMessageKeepsNextMessageWhenMessageFeedbackRequestFails() throws Exception {
         fakeAiConversationClient.failMessageFeedbackRequest();
         JsonNode loginBody = login("message-feedback-fail@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1156,8 +1167,7 @@ class ScenarioSessionApiIntegrationTests {
                                   "inputType":"VOICE"
                                 }
                                 """))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
+                .andExpect(status().isOk());
 
         assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
@@ -1172,11 +1182,11 @@ class ScenarioSessionApiIntegrationTests {
                 Integer.class,
                 sessionId
         );
-        assertThat(messageCount).isEqualTo(1);
+        assertThat(messageCount).isEqualTo(3);
     }
 
     @Test
-    void submitMessageRollsBackUserMessageWhenMessageFeedbackStatusIsNotPreparing() throws Exception {
+    void submitMessageKeepsNextMessageWhenMessageFeedbackStatusIsInvalid() throws Exception {
         fakeAiConversationClient.returnMessageFeedbackStatus(ProcessingStatus.COMPLETED);
         JsonNode loginBody = login("message-feedback-invalid@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1208,8 +1218,7 @@ class ScenarioSessionApiIntegrationTests {
                                   "inputType":"VOICE"
                                 }
                                 """))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+                .andExpect(status().isOk());
 
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
@@ -1221,11 +1230,11 @@ class ScenarioSessionApiIntegrationTests {
                 Integer.class,
                 sessionId
         );
-        assertThat(messageCount).isEqualTo(1);
+        assertThat(messageCount).isEqualTo(3);
     }
 
     @Test
-    void submitMessageRollsBackUserMessageWhenMessageFeedbackResponseMessageIdDiffers() throws Exception {
+    void submitMessageKeepsNextMessageWhenMessageFeedbackResponseMessageIdDiffers() throws Exception {
         fakeAiConversationClient.returnMessageFeedbackForMessageId(9999L);
         JsonNode loginBody = login("message-feedback-id-invalid@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1257,8 +1266,7 @@ class ScenarioSessionApiIntegrationTests {
                                   "inputType":"VOICE"
                                 }
                                 """))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+                .andExpect(status().isOk());
 
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
@@ -1270,11 +1278,11 @@ class ScenarioSessionApiIntegrationTests {
                 Integer.class,
                 sessionId
         );
-        assertThat(messageCount).isEqualTo(1);
+        assertThat(messageCount).isEqualTo(3);
     }
 
     @Test
-    void submitMessageRollsBackUserMessageWhenMessageFeedbackResponseSessionIdDiffers() throws Exception {
+    void submitMessageKeepsNextMessageWhenMessageFeedbackResponseSessionIdDiffers() throws Exception {
         fakeAiConversationClient.returnMessageFeedbackForSessionId(9999L);
         JsonNode loginBody = login("message-feedback-session-id-invalid@example.com");
         String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1306,8 +1314,7 @@ class ScenarioSessionApiIntegrationTests {
                                   "inputType":"VOICE"
                                 }
                                 """))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+                .andExpect(status().isOk());
 
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
@@ -1319,7 +1326,7 @@ class ScenarioSessionApiIntegrationTests {
                 Integer.class,
                 sessionId
         );
-        assertThat(messageCount).isEqualTo(1);
+        assertThat(messageCount).isEqualTo(3);
     }
 
     @Test
@@ -2069,6 +2076,8 @@ class ScenarioSessionApiIntegrationTests {
 
         private AiNextMessageRequest lastNextMessageRequest;
 
+        private AiInnerThoughtRequest lastInnerThoughtRequest;
+
         private AiClosingMessageRequest lastClosingMessageRequest;
 
         private AiMessageFeedbackRequest lastMessageFeedbackRequest;
@@ -2099,6 +2108,10 @@ class ScenarioSessionApiIntegrationTests {
 
         private Long messageFeedbackResponseSessionId;
 
+        private CountDownLatch innerThoughtGenerationStarted = new CountDownLatch(1);
+
+        private CountDownLatch innerThoughtGenerationRelease = new CountDownLatch(0);
+
         @Override
         public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
             lastNextMessageRequest = request;
@@ -2117,6 +2130,17 @@ class ScenarioSessionApiIntegrationTests {
 
         @Override
         public AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request) {
+            CountDownLatch release = innerThoughtGenerationRelease;
+            lastInnerThoughtRequest = request;
+            innerThoughtGenerationStarted.countDown();
+            try {
+                if (!release.await(5, TimeUnit.SECONDS)) {
+                    throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+            }
             return new AiInnerThoughtResult(
                     request.sessionId(),
                     request.submittedMessageId(),
@@ -2188,7 +2212,9 @@ class ScenarioSessionApiIntegrationTests {
         }
 
         private void reset() {
+            innerThoughtGenerationRelease.countDown();
             lastNextMessageRequest = null;
+            lastInnerThoughtRequest = null;
             lastClosingMessageRequest = null;
             lastMessageFeedbackRequest = null;
             lastSessionFeedbackRequest = null;
@@ -2204,6 +2230,21 @@ class ScenarioSessionApiIntegrationTests {
             messageFeedbackStatus = ProcessingStatus.PREPARING;
             messageFeedbackResponseMessageId = null;
             messageFeedbackResponseSessionId = null;
+            innerThoughtGenerationStarted = new CountDownLatch(1);
+            innerThoughtGenerationRelease = new CountDownLatch(0);
+        }
+
+        private void blockInnerThoughtGeneration() {
+            innerThoughtGenerationStarted = new CountDownLatch(1);
+            innerThoughtGenerationRelease = new CountDownLatch(1);
+        }
+
+        private boolean awaitInnerThoughtGenerationStarted() throws InterruptedException {
+            return innerThoughtGenerationStarted.await(5, TimeUnit.SECONDS);
+        }
+
+        private void releaseInnerThoughtGeneration() {
+            innerThoughtGenerationRelease.countDown();
         }
 
         private void completeGoalOnNextMessage() {
@@ -2248,6 +2289,10 @@ class ScenarioSessionApiIntegrationTests {
 
         private AiNextMessageRequest lastNextMessageRequest() {
             return lastNextMessageRequest;
+        }
+
+        private AiInnerThoughtRequest lastInnerThoughtRequest() {
+            return lastInnerThoughtRequest;
         }
 
         private AiClosingMessageRequest lastClosingMessageRequest() {
