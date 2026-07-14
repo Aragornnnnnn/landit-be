@@ -29,6 +29,14 @@ class LearningSessionFinder {
         return learningSession;
     }
 
+    /** 세션 상태와 무관하게 소유권만 검증해 조회한다. */
+    LearningSession findOwned(long userId, long sessionId) {
+        return learningSessionRepository.findByIdAndUserProfileId(sessionId, userId)
+                .orElseThrow(() -> learningSessionRepository.existsById(sessionId)
+                        ? new ApiException(ErrorCode.FORBIDDEN)
+                        : new ApiException(ErrorCode.SESSION_NOT_FOUND));
+    }
+
     /** 소유한 완료 시나리오 세션을 조회하고 최종 피드백 생성 조건을 검증한다. */
     LearningSession findOwnedCompleted(long userId, long sessionId) {
         LearningSession learningSession = learningSessionRepository

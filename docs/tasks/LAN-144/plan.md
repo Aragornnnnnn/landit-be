@@ -22,7 +22,7 @@
 ### Task 1: 속마음 처리 상태 저장
 
 **Files:**
-- Create: `src/main/resources/db/migration/V19__add_inner_thought_processing_status.sql`
+- Create: `src/main/resources/db/migration/V20__add_inner_thought_processing_status.sql`
 - Modify: `src/main/java/com/landit/landitbe/session/domain/SessionHistoryMessage.java`
 - Modify: `src/main/java/com/landit/landitbe/session/api/dto/SessionMessageSubmitResponse.java`
 - Modify: `src/main/java/com/landit/landitbe/session/application/GeneratedMessageRecorder.java`
@@ -52,7 +52,7 @@ Run: `./gradlew test --tests com.landit.landitbe.DatabaseSchemaIntegrationTests 
 
 Expected: 새 컬럼 또는 `innerThoughtProcessingStatus`가 없어 FAIL.
 
-- [ ] **Step 3: V19 마이그레이션과 엔티티 상태 전이를 최소 구현한다.**
+- [ ] **Step 3: V20 마이그레이션과 엔티티 상태 전이를 최소 구현한다.**
 
 ```sql
 -- 사용자 메시지의 속마음 비동기 처리 상태를 저장한다.
@@ -101,7 +101,7 @@ Expected: PASS.
 - [ ] **Step 6: 상태 저장 변경을 커밋한다.**
 
 ```bash
-git add src/main/resources/db/migration/V19__add_inner_thought_processing_status.sql \
+git add src/main/resources/db/migration/V20__add_inner_thought_processing_status.sql \
   src/main/java/com/landit/landitbe/session/domain/SessionHistoryMessage.java \
   src/main/java/com/landit/landitbe/session/api/dto/SessionMessageSubmitResponse.java \
   src/main/java/com/landit/landitbe/session/application/GeneratedMessageRecorder.java \
@@ -354,3 +354,10 @@ git add src/main/java/com/landit/landitbe/session/api/dto/SessionInnerThoughtRes
   src/test/java/com/landit/landitbe/session/ScenarioSessionApiIntegrationTests.java
 git commit -m "feat: 속마음 처리 상태 조회 API 추가"
 ```
+
+## 구현 결과
+
+- `origin/develop`에 같은 버전 마이그레이션이 추가되어 속마음 상태 마이그레이션은 V20으로 반영했다.
+- 일반 턴은 `applicationTaskExecutor`에서 다음 질문, 속마음, 메시지별 피드백 요청을 병렬 시작하고 다음 질문 저장 뒤에만 속마음 상태를 조건부로 확정한다.
+- 속마음 조회 API는 소유권을 확인하고, `PREPARING`이 90초 이상이면 조건부로 `FAILED`로 바꾼다.
+- 완료·실패·만료·종료 턴·권한 경계와 전체 테스트 검증을 완료했고, 독립 검토에서 제안한 만료-완료 경합 테스트도 반영했다.

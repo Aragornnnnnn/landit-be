@@ -6,6 +6,7 @@ import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.landit.landitbe.session.domain.SessionHistoryMessage;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,9 @@ public interface SessionHistoryMessageRepository extends JpaRepository<SessionHi
 
     /** 세션 히스토리의 메시지를 메시지 순서대로 조회한다. */
     List<SessionHistoryMessage> findBySessionHistoryIdOrderByMessageSequenceAsc(Long sessionHistoryId);
+
+    /** 세션 히스토리에 속한 특정 메시지를 조회한다. */
+    Optional<SessionHistoryMessage> findByIdAndSessionHistoryId(Long id, Long sessionHistoryId);
 
     /** 세션 히스토리에서 특정 발화 주체의 메시지 수를 반환한다. */
     long countBySessionHistoryIdAndRole(Long sessionHistoryId, ConversationSpeaker role);

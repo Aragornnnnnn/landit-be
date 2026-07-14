@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -345,6 +346,220 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(messages.get(2).get("CONTENT"))
                 .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
         fakeAiConversationClient.releaseInnerThoughtGeneration();
+        assertThat(awaitInnerThoughtStatus(submittedMessageId, "COMPLETED")).isTrue();
+    }
+
+    @Test
+    void getInnerThoughtReturnsCompletedClosingMessageInnerThought() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "inner-thought-completed@example.com",
+                1201,
+                2201,
+                3201
+        );
+
+        MvcResult submitResult = mockMvc.perform(post(
+                        "/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long messageId = objectMapper.readTree(submitResult.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/%d/inner-thought".formatted(
+                        startedSession.sessionId(), messageId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.innerThought")
+                        .value("마지막까지 답해줘서 대화를 자연스럽게 마무리하면 좋겠다."))
+                .andExpect(jsonPath("$.data.innerThoughtType").value("NORMAL"));
+        assertThat(fakeAiConversationClient.lastInnerThoughtRequest()).isNull();
+    }
+
+    @Test
+    void submitMessageKeepsNextMessageWhenInnerThoughtGenerationFails() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "inner-thought-fail@example.com",
+                1203,
+                2203,
+                3203
+        );
+        seedScenarioQuestion(4203, 2203, 1, "What would you like?", "무엇을 원하세요?");
+        fakeAiConversationClient.failInnerThoughtGeneration();
+
+        MvcResult submitResult = mockMvc.perform(post(
+                        "/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nextMessage.content")
+                        .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                .andReturn();
+        long messageId = objectMapper.readTree(submitResult.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+
+        assertThat(awaitInnerThoughtStatus(messageId, "FAILED")).isTrue();
+        Integer generatedMessageCount = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                          AND shm.role = 'AI'
+                        """,
+                Integer.class,
+                startedSession.sessionId()
+        );
+        assertThat(generatedMessageCount).isEqualTo(1);
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/%d/inner-thought".formatted(
+                        startedSession.sessionId(), messageId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.processingStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.innerThought").value(nullValue()))
+                .andExpect(jsonPath("$.data.innerThoughtType").value(nullValue()));
+    }
+
+    @Test
+    void getInnerThoughtKeepsFailedWhenStaleTimeoutRacesWithLateCompletion() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "inner-thought-race@example.com",
+                1204,
+                2204,
+                3204
+        );
+        seedScenarioQuestion(4204, 2204, 1, "What would you like?", "무엇을 원하세요?");
+        fakeAiConversationClient.blockInnerThoughtGeneration();
+
+        MvcResult submitResult = mockMvc.perform(post(
+                        "/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long messageId = objectMapper.readTree(submitResult.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+        assertThat(fakeAiConversationClient.awaitInnerThoughtGenerationStarted()).isTrue();
+
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/%d/inner-thought".formatted(
+                        startedSession.sessionId(), messageId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.processingStatus").value("PREPARING"));
+
+        jdbcTemplate.update("""
+                        UPDATE session_history_message
+                        SET created_at = DATEADD('SECOND', -91, CURRENT_TIMESTAMP)
+                        WHERE id = ?
+                        """,
+                messageId
+        );
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/%d/inner-thought".formatted(
+                        startedSession.sessionId(), messageId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.processingStatus").value("FAILED"));
+
+        fakeAiConversationClient.releaseInnerThoughtGeneration();
+        assertThat(awaitInnerThoughtStatus(messageId, "FAILED")).isTrue();
+    }
+
+    @Test
+    void getInnerThoughtRejectsOtherUserAndMissingMessage() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "inner-thought-owner@example.com",
+                1205,
+                2205,
+                3205
+        );
+        JsonNode otherLoginBody = login("inner-thought-other@example.com");
+        String otherAccessToken = otherLoginBody.get("data").get("accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/999999/inner-thought".formatted(
+                        startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherAccessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/999999/inner-thought".formatted(
+                        startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void getInnerThoughtMarksStalePreparingResultAsFailed() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "inner-thought-stale@example.com",
+                1202,
+                2202,
+                3202
+        );
+
+        MvcResult submitResult = mockMvc.perform(post(
+                        "/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long messageId = objectMapper.readTree(submitResult.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+        jdbcTemplate.update("""
+                        UPDATE session_history_message
+                        SET inner_thought = NULL,
+                            inner_thought_type = NULL,
+                            inner_thought_processing_status = 'PREPARING',
+                            created_at = DATEADD('SECOND', -91, CURRENT_TIMESTAMP)
+                        WHERE id = ?
+                        """,
+                messageId
+        );
+
+        mockMvc.perform(get("/api/v1/sessions/%d/messages/%d/inner-thought".formatted(
+                        startedSession.sessionId(), messageId))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.processingStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.innerThought").value(nullValue()))
+                .andExpect(jsonPath("$.data.innerThoughtType").value(nullValue()));
     }
 
     @Test
@@ -1672,6 +1887,22 @@ class ScenarioSessionApiIntegrationTests {
                 .asLong();
     }
 
+    private boolean awaitInnerThoughtStatus(long messageId, String expectedStatus)
+            throws InterruptedException {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            String status = jdbcTemplate.queryForObject(
+                    "SELECT inner_thought_processing_status FROM session_history_message WHERE id = ?",
+                    String.class,
+                    messageId
+            );
+            if (expectedStatus.equals(status)) {
+                return true;
+            }
+            Thread.sleep(100L);
+        }
+        return false;
+    }
+
     private void seedCategory(long categoryId, int displayOrder, String status, String name) {
         jdbcTemplate.update("""
                         INSERT INTO category (id, display_order, status, created_at, updated_at)
@@ -2096,6 +2327,8 @@ class ScenarioSessionApiIntegrationTests {
 
         private boolean failNextMessageGeneration;
 
+        private boolean failInnerThoughtGeneration;
+
         private boolean failMessageFeedbackRequest;
 
         private BigDecimal sessionFeedbackStarRating = new BigDecimal("3.0");
@@ -2139,6 +2372,9 @@ class ScenarioSessionApiIntegrationTests {
                 }
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
+                throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+            }
+            if (failInnerThoughtGeneration) {
                 throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
             }
             return new AiInnerThoughtResult(
@@ -2224,6 +2460,7 @@ class ScenarioSessionApiIntegrationTests {
             sessionFeedbackTransactionActive.clear();
             nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
             failNextMessageGeneration = false;
+            failInnerThoughtGeneration = false;
             failMessageFeedbackRequest = false;
             sessionFeedbackStarRating = new BigDecimal("3.0");
             sessionFeedbackCallCount = 0;
@@ -2253,6 +2490,10 @@ class ScenarioSessionApiIntegrationTests {
 
         private void failNextMessageGeneration() {
             failNextMessageGeneration = true;
+        }
+
+        private void failInnerThoughtGeneration() {
+            failInnerThoughtGeneration = true;
         }
 
         private void failMessageFeedbackRequest() {
