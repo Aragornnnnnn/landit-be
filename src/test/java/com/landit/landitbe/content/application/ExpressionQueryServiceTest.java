@@ -156,7 +156,11 @@ class ExpressionQueryServiceTest {
         assertThat(response.representativeQuestionTranslation()).isEqualTo("한국에서 뭘 꼭 봐야 해?");
         assertThat(response.representativeSentenceText()).isEqualTo("Gyeongbokgung Palace will blow your mind.");
         assertThat(response.representativeSentenceTranslation()).isEqualTo("경복궁은 널 완전 놀라게 할 거야.");
-        assertThat(response.highlightingPart()).isEqualTo("널 완전 놀라게 할 거야."); // highlightingPart는 엔티티의 representativeSentenceTranslationHighlightText에서 온다.
+        // 정답 단어 배열은 정답 순서 그대로, 선택지 배열은 저장(섞인) 순서 그대로 유지되어야 한다.
+        assertThat(response.representativeSentenceWords())
+                .containsExactly("Gyeongbokgung", "Palace", "will", "blow", "your", "mind");
+        assertThat(response.representativeSentenceWordChoices())
+                .containsExactly("Gyeongbokgung", "blow", "will", "Palace", "amazing", "have", "get", "your", "mind");
         assertThat(response.representativeImageUrl()).isEqualTo("https://cdn.example.com/images/101.png");
     }
 
@@ -226,7 +230,10 @@ class ExpressionQueryServiceTest {
         when(expression.getRepresentativeQuestionTranslation()).thenReturn("한국에서 뭘 꼭 봐야 해?");
         when(expression.getRepresentativeSentenceText()).thenReturn("Gyeongbokgung Palace will blow your mind.");
         when(expression.getRepresentativeSentenceTranslation()).thenReturn("경복궁은 널 완전 놀라게 할 거야.");
-        when(expression.getRepresentativeSentenceTranslationHighlightText()).thenReturn("널 완전 놀라게 할 거야.");
+        when(expression.getRepresentativeSentenceWords())
+                .thenReturn(List.of("Gyeongbokgung", "Palace", "will", "blow", "your", "mind"));
+        when(expression.getRepresentativeSentenceWordChoices())
+                .thenReturn(List.of("Gyeongbokgung", "blow", "will", "Palace", "amazing", "have", "get", "your", "mind"));
         when(expression.getRepresentativeImageUrl()).thenReturn("https://cdn.example.com/images/101.png");
         return expression;
     }

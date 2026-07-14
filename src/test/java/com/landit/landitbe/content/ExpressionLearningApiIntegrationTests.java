@@ -1,6 +1,7 @@
 // 원어민 표현 학습 시작 API의 인증, 표현 상세 응답, 예외 처리를 검증한다.
 package com.landit.landitbe.content;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -78,8 +79,12 @@ class ExpressionLearningApiIntegrationTests {
                 .andExpect(jsonPath("$.data.representativeQuestionTranslation").value("한국에서 뭘 꼭 봐야 해?"))
                 .andExpect(jsonPath("$.data.representativeSentenceText").value("Gyeongbokgung Palace will blow your mind."))
                 .andExpect(jsonPath("$.data.representativeSentenceTranslation").value("경복궁은 널 완전 놀라게 할 거야."))
-                // highlightingPart는 representative_sentence_translation_highlight_text 컬럼 값이다.
-                .andExpect(jsonPath("$.data.highlightingPart").value("널 완전 놀라게 할 거야."))
+                // 정답 단어 배열: 정답 순서 그대로 유지되어야 한다.
+                .andExpect(jsonPath("$.data.representativeSentenceWords")
+                        .value(contains("Gyeongbokgung", "Palace", "will", "blow", "your", "mind")))
+                // 선택지 배열: DB 저장(섞인) 순서 그대로, 백엔드가 재정렬하지 않는다.
+                .andExpect(jsonPath("$.data.representativeSentenceWordChoices")
+                        .value(contains("Gyeongbokgung", "blow", "will", "Palace", "amazing", "have", "get", "your", "mind")))
                 .andExpect(jsonPath("$.data.representativeImageUrl").value("https://cdn.example.com/images/101.png"));
     }
 
@@ -152,13 +157,15 @@ class ExpressionLearningApiIntegrationTests {
                         + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
                         + "usage_description, representative_question_text, representative_question_translation, "
                         + "representative_sentence_text, representative_sentence_translation, "
-                        + "representative_sentence_translation_highlight_text, representative_image_url, "
+                        + "representative_sentence_words, representative_sentence_word_choices, representative_image_url, "
                         + "practice_examples_payload, status, created_at, updated_at) "
                         + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
                         + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
                         + "'What should I definitely see in Korea?', '한국에서 뭘 꼭 봐야 해?', "
                         + "'Gyeongbokgung Palace will blow your mind.', '경복궁은 널 완전 놀라게 할 거야.', "
-                        + "'널 완전 놀라게 할 거야.', 'https://cdn.example.com/images/101.png', "
+                        + "ARRAY['Gyeongbokgung','Palace','will','blow','your','mind'], "
+                        + "ARRAY['Gyeongbokgung','blow','will','Palace','amazing','have','get','your','mind'], "
+                        + "'https://cdn.example.com/images/101.png', "
                         + "CAST(? AS jsonb), ?, ?, ?)",
                 scenarioId, "[]", status, now, now
         );
