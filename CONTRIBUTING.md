@@ -40,6 +40,13 @@ Landit BE 개발 협업 규칙입니다. 아키텍처 레벨 결정은 GitHub Wi
 - public API 변경은 테스트와 OpenAPI 문서 갱신 여부를 함께 확인합니다.
 - 시크릿 값은 로그, 테스트 출력, 문서, 커밋 메시지에 노출하지 않습니다.
 
+Java 포맷 기준과 자동 검사 범위는 [Java 코드 스타일 문서](docs/development/java-style.md)를 따릅니다.
+
+```bash
+./gradlew spotlessCheck
+./gradlew spotlessApply
+```
+
 ## 테스트와 검증
 
 - 코드 변경 후 최소 검증 명령은 `./gradlew test`입니다.
