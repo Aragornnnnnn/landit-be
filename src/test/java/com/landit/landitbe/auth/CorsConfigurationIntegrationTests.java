@@ -18,24 +18,27 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
-@TestPropertySource(properties = {
-        "landit.cors.allowed-origins=https://web.landit.im"
-})
+@TestPropertySource(properties = {"landit.cors.allowed-origins=https://web.landit.im"})
 class CorsConfigurationIntegrationTests {
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired private MockMvc mockMvc;
 
-    @Test
-    void preflightForAuthenticatedApiUsesConfiguredOriginAndCodeDefaults() throws Exception {
-        mockMvc.perform(options("/api/v1/auth/me")
-                        .header(HttpHeaders.ORIGIN, "https://web.landit.im")
-                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "DELETE")
-                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization, Content-Type"))
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://web.landit.im"))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("DELETE")))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")));
-    }
+  @Test
+  void preflightForAuthenticatedApiUsesConfiguredOriginAndCodeDefaults() throws Exception {
+    mockMvc
+        .perform(
+            options("/api/v1/auth/me")
+                .header(HttpHeaders.ORIGIN, "https://web.landit.im")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "DELETE")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization, Content-Type"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://web.landit.im"))
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+        .andExpect(
+            header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("DELETE")))
+        .andExpect(
+            header()
+                .string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")));
+  }
 }

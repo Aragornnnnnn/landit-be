@@ -2,7 +2,7 @@
 package com.landit.landitbe.learning.domain;
 
 public enum QuizType {
-    MULTIPLE_CHOICE,
-    FILL_BLANK,
-    EXPRESSION_ASSEMBLY
+  MULTIPLE_CHOICE,
+  FILL_BLANK,
+  EXPRESSION_ASSEMBLY
 }

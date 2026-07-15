@@ -2,6 +2,6 @@
 package com.landit.landitbe.notification.domain;
 
 public enum UserPushTokenStatus {
-    ACTIVE,
-    REVOKED
+  ACTIVE,
+  REVOKED
 }

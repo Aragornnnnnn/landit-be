@@ -6,9 +6,9 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SessionHistoryMessageFeedbackRepository
-        extends JpaRepository<SessionHistoryMessageFeedback, Long> {
+    extends JpaRepository<SessionHistoryMessageFeedback, Long> {
 
-    /** 요약 피드백에 속한 메시지 피드백을 메시지 식별자 순으로 조회한다. */
-    List<SessionHistoryMessageFeedback>
-            findBySessionHistorySummaryFeedbackIdOrderBySessionHistoryMessageIdAsc(Long summaryId);
+  /** 요약 피드백에 속한 메시지 피드백을 메시지 식별자 순으로 조회한다. */
+  List<SessionHistoryMessageFeedback>
+      findBySessionHistorySummaryFeedbackIdOrderBySessionHistoryMessageIdAsc(Long summaryId);
 }

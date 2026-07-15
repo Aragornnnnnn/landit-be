@@ -20,22 +20,21 @@ import lombok.Getter;
 @Table(name = "ai_tutor")
 public class AiTutor extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "accent_locale", nullable = false, length = 35)
-    private AccentLocale accentLocale;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "accent_locale", nullable = false, length = 35)
+  private AccentLocale accentLocale;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "target_locale", nullable = false, length = 35)
-    private Locale targetLocale;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "target_locale", nullable = false, length = 35)
+  private Locale targetLocale;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ActiveStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ActiveStatus status;
 
-    protected AiTutor() {
-    }
+  protected AiTutor() {}
 }

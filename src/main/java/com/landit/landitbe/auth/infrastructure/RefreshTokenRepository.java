@@ -13,20 +13,19 @@ import org.springframework.data.repository.query.Param;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-    /** refresh token 해시로 저장된 토큰을 조회한다. */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<RefreshToken> findByTokenHash(String tokenHash);
+  /** refresh token 해시로 저장된 토큰을 조회한다. */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    /** 사용자의 아직 폐기되지 않은 refresh token을 모두 폐기한다. */
-    @Modifying
-    @Query("""
+  /** 사용자의 아직 폐기되지 않은 refresh token을 모두 폐기한다. */
+  @Modifying
+  @Query(
+      """
             update RefreshToken token
             set token.revokedAt = :revokedAt
             where token.userProfile.id = :userProfileId
               and token.revokedAt is null
             """)
-    void revokeAllActiveByUserProfileId(
-            @Param("userProfileId") Long userProfileId,
-            @Param("revokedAt") LocalDateTime revokedAt
-    );
+  void revokeAllActiveByUserProfileId(
+      @Param("userProfileId") Long userProfileId, @Param("revokedAt") LocalDateTime revokedAt);
 }

@@ -13,17 +13,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthFailureResponseWriter {
 
-    private final ObjectMapper objectMapper;
+  private final ObjectMapper objectMapper;
 
-    public AuthFailureResponseWriter() {
-        this.objectMapper = new ObjectMapper();
-    }
+  public AuthFailureResponseWriter() {
+    this.objectMapper = new ObjectMapper();
+  }
 
-    /** Security filter 구간에서 발생한 인증 실패를 공통 응답으로 쓴다. */
-    public void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
-        response.setStatus(errorCode.getStatus().value());
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getWriter(), ApiResponse.error(errorCode));
-    }
+  /** Security filter 구간에서 발생한 인증 실패를 공통 응답으로 쓴다. */
+  public void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+    response.setStatus(errorCode.getStatus().value());
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    objectMapper.writeValue(response.getWriter(), ApiResponse.error(errorCode));
+  }
 }

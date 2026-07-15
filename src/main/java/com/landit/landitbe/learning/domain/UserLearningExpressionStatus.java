@@ -2,8 +2,8 @@
 package com.landit.landitbe.learning.domain;
 
 public enum UserLearningExpressionStatus {
-    CANDIDATE,
-    REVIEWING,
-    LEARNED,
-    ARCHIVED
+  CANDIDATE,
+  REVIEWING,
+  LEARNED,
+  ARCHIVED
 }

@@ -4,8 +4,4 @@ package com.landit.landitbe.session.application.port;
 import com.landit.landitbe.session.domain.ProcessingStatus;
 
 public record AiMessageFeedbackResult(
-        Long sessionId,
-        Long messageId,
-        ProcessingStatus feedbackStatus
-) {
-}
+    Long sessionId, Long messageId, ProcessingStatus feedbackStatus) {}

@@ -18,20 +18,19 @@ import lombok.Getter;
 @Table(name = "scenario_question")
 public class ScenarioQuestion extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "scenario_id", nullable = false)
-    private Long scenarioId;
+  @Column(name = "scenario_id", nullable = false)
+  private Long scenarioId;
 
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder;
+  @Column(name = "display_order", nullable = false)
+  private int displayOrder;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ActiveStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ActiveStatus status;
 
-    protected ScenarioQuestion() {
-    }
+  protected ScenarioQuestion() {}
 }

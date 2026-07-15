@@ -3,6 +3,7 @@ package com.landit.landitbe.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.landit.landitbe.common.domain.Locale;
 import com.landit.landitbe.content.infrastructure.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.content.infrastructure.ScenarioQuestionRow;
 import java.util.Optional;
@@ -12,88 +13,55 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import com.landit.landitbe.common.domain.Locale;
 
 @ActiveProfiles("test")
 @SpringBootTest
 @Transactional
 class ScenarioQuestionQueryRepositoryIntegrationTests {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
+  @Autowired private ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
 
-    @Test
-    void findsActiveQuestionByScenarioDisplayOrderAndLocale() {
-        seedScenario(991101L);
-        seedQuestion(991201L, 991101L, 1, "ACTIVE");
-        seedQuestion(991202L, 991101L, 2, "ACTIVE");
-        seedQuestionLanguageVariant(
-                991301L,
-                991201L,
-                "EN",
-                "KR",
-                "What food do you like?",
-                "좋아하는 음식이 뭐야?",
-                "ACTIVE"
-        );
-        seedQuestionLanguageVariant(
-                991302L,
-                991202L,
-                "EN",
-                "KR",
-                "Do you cook often?",
-                "요리를 자주 해?",
-                "ACTIVE"
-        );
+  @Test
+  void findsActiveQuestionByScenarioDisplayOrderAndLocale() {
+    seedScenario(991101L);
+    seedQuestion(991201L, 991101L, 1, "ACTIVE");
+    seedQuestion(991202L, 991101L, 2, "ACTIVE");
+    seedQuestionLanguageVariant(
+        991301L, 991201L, "EN", "KR", "What food do you like?", "좋아하는 음식이 뭐야?", "ACTIVE");
+    seedQuestionLanguageVariant(
+        991302L, 991202L, "EN", "KR", "Do you cook often?", "요리를 자주 해?", "ACTIVE");
 
-        Optional<ScenarioQuestionRow> question = scenarioQuestionQueryRepository.findActiveQuestion(
-                991101L,
-                2,
-                Locale.EN,
-                Locale.KR
-        );
+    Optional<ScenarioQuestionRow> question =
+        scenarioQuestionQueryRepository.findActiveQuestion(991101L, 2, Locale.EN, Locale.KR);
 
-        assertThat(question).isPresent();
-        assertThat(question.get().questionId()).isEqualTo(991202L);
-        assertThat(question.get().sequence()).isEqualTo(2);
-        assertThat(question.get().questionText()).isEqualTo("Do you cook often?");
-        assertThat(question.get().questionTranslation()).isEqualTo("요리를 자주 해?");
-    }
+    assertThat(question).isPresent();
+    assertThat(question.get().questionId()).isEqualTo(991202L);
+    assertThat(question.get().sequence()).isEqualTo(2);
+    assertThat(question.get().questionText()).isEqualTo("Do you cook often?");
+    assertThat(question.get().questionTranslation()).isEqualTo("요리를 자주 해?");
+  }
 
-    @Test
-    void doesNotReturnInactiveQuestionOrInactiveVariant() {
-        seedScenario(991102L);
-        seedQuestion(991203L, 991102L, 1, "INACTIVE");
-        seedQuestion(991204L, 991102L, 2, "ACTIVE");
-        seedQuestionLanguageVariant(
-                991303L,
-                991203L,
-                "EN",
-                "KR",
-                "Inactive question",
-                "비활성 질문",
-                "ACTIVE"
-        );
-        seedQuestionLanguageVariant(
-                991304L,
-                991204L,
-                "EN",
-                "KR",
-                "Inactive variant",
-                "비활성 번역",
-                "INACTIVE"
-        );
+  @Test
+  void doesNotReturnInactiveQuestionOrInactiveVariant() {
+    seedScenario(991102L);
+    seedQuestion(991203L, 991102L, 1, "INACTIVE");
+    seedQuestion(991204L, 991102L, 2, "ACTIVE");
+    seedQuestionLanguageVariant(
+        991303L, 991203L, "EN", "KR", "Inactive question", "비활성 질문", "ACTIVE");
+    seedQuestionLanguageVariant(
+        991304L, 991204L, "EN", "KR", "Inactive variant", "비활성 번역", "INACTIVE");
 
-        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, Locale.EN, Locale.KR)).isEmpty();
-        assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, Locale.EN, Locale.KR)).isEmpty();
-    }
+    assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, Locale.EN, Locale.KR))
+        .isEmpty();
+    assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, Locale.EN, Locale.KR))
+        .isEmpty();
+  }
 
-    private void seedScenario(long scenarioId) {
-        jdbcTemplate.update(
-                """
+  private void seedScenario(long scenarioId) {
+    jdbcTemplate.update(
+        """
                         insert into category (
                             id,
                             display_order,
@@ -103,11 +71,10 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         )
                         values (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
-                scenarioId,
-                scenarioId
-        );
-        jdbcTemplate.update(
-                """
+        scenarioId,
+        scenarioId);
+    jdbcTemplate.update(
+        """
                         insert into scenario (
                             id,
                             category_id,
@@ -123,19 +90,13 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         values (?, ?, 'friend', 'EASY', 'AI', 2, 1, 'ACTIVE',
                             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
-                scenarioId,
-                scenarioId
-        );
-    }
+        scenarioId,
+        scenarioId);
+  }
 
-    private void seedQuestion(
-            long questionId,
-            long scenarioId,
-            int displayOrder,
-            String status
-    ) {
-        jdbcTemplate.update(
-                """
+  private void seedQuestion(long questionId, long scenarioId, int displayOrder, String status) {
+    jdbcTemplate.update(
+        """
                         insert into scenario_question (
                             id,
                             scenario_id,
@@ -146,24 +107,22 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         )
                         values (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
-                questionId,
-                scenarioId,
-                displayOrder,
-                status
-        );
-    }
+        questionId,
+        scenarioId,
+        displayOrder,
+        status);
+  }
 
-    private void seedQuestionLanguageVariant(
-            long variantId,
-            long questionId,
-            String targetLocale,
-            String baseLocale,
-            String questionText,
-            String questionTranslation,
-            String status
-    ) {
-        jdbcTemplate.update(
-                """
+  private void seedQuestionLanguageVariant(
+      long variantId,
+      long questionId,
+      String targetLocale,
+      String baseLocale,
+      String questionText,
+      String questionTranslation,
+      String status) {
+    jdbcTemplate.update(
+        """
                         insert into scenario_question_language_variant (
                             id,
                             scenario_question_id,
@@ -177,13 +136,12 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         )
                         values (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
-                variantId,
-                questionId,
-                targetLocale,
-                baseLocale,
-                questionText,
-                questionTranslation,
-                status
-        );
-    }
+        variantId,
+        questionId,
+        targetLocale,
+        baseLocale,
+        questionText,
+        questionTranslation,
+        status);
+  }
 }

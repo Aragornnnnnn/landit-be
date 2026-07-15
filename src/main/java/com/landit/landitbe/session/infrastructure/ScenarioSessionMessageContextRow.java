@@ -5,15 +5,13 @@ import com.landit.landitbe.common.domain.ConversationSpeaker;
 import com.landit.landitbe.common.domain.Locale;
 
 public record ScenarioSessionMessageContextRow(
-        Long scenarioId,
-        String title,
-        String briefing,
-        String conversationGoal,
-        String counterpartRole,
-        ConversationSpeaker firstSpeaker,
-        String userOpeningInstruction,
-        int totalQuestionCount,
-        Locale targetLocale,
-        Locale baseLocale
-) {
-}
+    Long scenarioId,
+    String title,
+    String briefing,
+    String conversationGoal,
+    String counterpartRole,
+    ConversationSpeaker firstSpeaker,
+    String userOpeningInstruction,
+    int totalQuestionCount,
+    Locale targetLocale,
+    Locale baseLocale) {}

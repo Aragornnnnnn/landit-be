@@ -2,7 +2,7 @@
 package com.landit.landitbe.auth.domain;
 
 public enum UserProfileStatus {
-    ACTIVE,
-    WITHDRAWN,
-    BANNED
+  ACTIVE,
+  WITHDRAWN,
+  BANNED
 }

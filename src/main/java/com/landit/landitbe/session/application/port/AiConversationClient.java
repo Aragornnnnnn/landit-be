@@ -3,18 +3,18 @@ package com.landit.landitbe.session.application.port;
 
 public interface AiConversationClient {
 
-    /** 다음 AI 메시지를 생성한다. */
-    AiNextMessageResult generateNextMessage(AiNextMessageRequest request);
+  /** 다음 AI 메시지를 생성한다. */
+  AiNextMessageResult generateNextMessage(AiNextMessageRequest request);
 
-    /** 사용자 메시지에 대한 상대 역할 속마음을 생성한다. */
-    AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request);
+  /** 사용자 메시지에 대한 상대 역할 속마음을 생성한다. */
+  AiInnerThoughtResult generateInnerThought(AiInnerThoughtRequest request);
 
-    /** 대화 종료 메시지를 생성한다. */
-    AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request);
+  /** 대화 종료 메시지를 생성한다. */
+  AiClosingMessageResult generateClosingMessage(AiClosingMessageRequest request);
 
-    /** 사용자 메시지의 피드백 생성을 요청한다. */
-    AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request);
+  /** 사용자 메시지의 피드백 생성을 요청한다. */
+  AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request);
 
-    /** 세션 최종 피드백을 생성한다. */
-    AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request);
+  /** 세션 최종 피드백을 생성한다. */
+  AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request);
 }

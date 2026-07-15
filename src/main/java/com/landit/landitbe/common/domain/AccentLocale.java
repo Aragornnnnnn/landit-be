@@ -2,5 +2,5 @@
 package com.landit.landitbe.common.domain;
 
 public enum AccentLocale {
-    EN_US
+  EN_US
 }

@@ -4,8 +4,4 @@ package com.landit.landitbe.session.application.port;
 import java.util.List;
 
 public record AiSessionFeedbackRequest(
-        Long sessionId,
-        AiScenarioContext scenario,
-        List<Long> expectedMessageIds
-) {
-}
+    Long sessionId, AiScenarioContext scenario, List<Long> expectedMessageIds) {}

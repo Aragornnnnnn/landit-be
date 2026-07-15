@@ -2,7 +2,7 @@
 package com.landit.landitbe.common.domain;
 
 public enum InnerThoughtType {
-    GOOD,
-    NORMAL,
-    BAD
+  GOOD,
+  NORMAL,
+  BAD
 }

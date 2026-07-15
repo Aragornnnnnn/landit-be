@@ -4,14 +4,4 @@ package com.landit.landitbe.auth.api.dto;
 import jakarta.validation.constraints.NotBlank;
 
 public record SocialLoginRequest(
-        @NotBlank
-        String provider,
-
-        @NotBlank
-        String idToken,
-
-        String nonce,
-
-        String nickname
-) {
-}
+    @NotBlank String provider, @NotBlank String idToken, String nonce, String nickname) {}

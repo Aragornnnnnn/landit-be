@@ -2,8 +2,8 @@
 package com.landit.landitbe.session.domain;
 
 public enum CompletionReason {
-    GOAL_COMPLETED,
-    MAX_TURNS_REACHED,
-    USER_ENDED,
-    TIME_LIMIT_REACHED
+  GOAL_COMPLETED,
+  MAX_TURNS_REACHED,
+  USER_ENDED,
+  TIME_LIMIT_REACHED
 }

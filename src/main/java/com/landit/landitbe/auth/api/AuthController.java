@@ -21,35 +21,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AuthController {
 
-    private final AuthService authService;
+  private final AuthService authService;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+  public AuthController(AuthService authService) {
+    this.authService = authService;
+  }
 
-    /** OIDC ID Token과 nonce를 검증한 뒤 자체 토큰을 발급한다. */
-    @PostMapping("/social-login")
-    public ApiResponse<AuthTokenResponse> socialLogin(@Valid @RequestBody SocialLoginRequest request) {
-        return ApiResponse.success(authService.socialLogin(request));
-    }
+  /** OIDC ID Token과 nonce를 검증한 뒤 자체 토큰을 발급한다. */
+  @PostMapping("/social-login")
+  public ApiResponse<AuthTokenResponse> socialLogin(
+      @Valid @RequestBody SocialLoginRequest request) {
+    return ApiResponse.success(authService.socialLogin(request));
+  }
 
-    /** refresh token을 회전하고 새 자체 토큰을 발급한다. */
-    @PostMapping("/token/refresh")
-    public ApiResponse<TokenRefreshResponse> refresh(@Valid @RequestBody TokenRefreshRequest request) {
-        return ApiResponse.success(authService.refresh(request));
-    }
+  /** refresh token을 회전하고 새 자체 토큰을 발급한다. */
+  @PostMapping("/token/refresh")
+  public ApiResponse<TokenRefreshResponse> refresh(
+      @Valid @RequestBody TokenRefreshRequest request) {
+    return ApiResponse.success(authService.refresh(request));
+  }
 
-    /** 전달받은 refresh token을 폐기한다. */
-    @PostMapping("/logout")
-    public ApiResponse<Void> logout(@Valid @RequestBody LogoutRequest request) {
-        authService.logout(request);
-        return ApiResponse.success(null);
-    }
+  /** 전달받은 refresh token을 폐기한다. */
+  @PostMapping("/logout")
+  public ApiResponse<Void> logout(@Valid @RequestBody LogoutRequest request) {
+    authService.logout(request);
+    return ApiResponse.success(null);
+  }
 
-    /** 현재 인증된 사용자를 탈퇴 처리한다. */
-    @DeleteMapping("/me")
-    public ApiResponse<Void> withdraw(@AuthenticationPrincipal AuthUserPrincipal principal) {
-        authService.withdraw(principal.userId());
-        return ApiResponse.success(null);
-    }
+  /** 현재 인증된 사용자를 탈퇴 처리한다. */
+  @DeleteMapping("/me")
+  public ApiResponse<Void> withdraw(@AuthenticationPrincipal AuthUserPrincipal principal) {
+    authService.withdraw(principal.userId());
+    return ApiResponse.success(null);
+  }
 }

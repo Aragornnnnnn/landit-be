@@ -3,8 +3,4 @@ package com.landit.landitbe.auth.application;
 
 import com.landit.landitbe.common.domain.Locale;
 
-public record UserLocale(
-        Locale targetLocale,
-        Locale baseLocale
-) {
-}
+public record UserLocale(Locale targetLocale, Locale baseLocale) {}

@@ -2,6 +2,6 @@
 package com.landit.landitbe.session.application.port;
 
 public enum AiMessageFeedbackEvaluationContextType {
-    AI_MESSAGE,
-    SCENARIO_OPENING_INSTRUCTION
+  AI_MESSAGE,
+  SCENARIO_OPENING_INSTRUCTION
 }

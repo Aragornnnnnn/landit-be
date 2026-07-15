@@ -11,17 +11,16 @@ import org.springframework.stereotype.Component;
 @Component
 class AiScenarioContextMapper {
 
-    private final AiConversationSettings aiConversationSettings;
+  private final AiConversationSettings aiConversationSettings;
 
-    /** 세션 시나리오 조회 결과를 AI 요청 컨텍스트로 변환한다. */
-    AiScenarioContext map(ScenarioSessionMessageContextRow scenarioContext) {
-        return new AiScenarioContext(
-                scenarioContext.scenarioId(),
-                scenarioContext.title(),
-                scenarioContext.briefing(),
-                scenarioContext.conversationGoal(),
-                scenarioContext.counterpartRole(),
-                aiConversationSettings.serviceAudience()
-        );
-    }
+  /** 세션 시나리오 조회 결과를 AI 요청 컨텍스트로 변환한다. */
+  AiScenarioContext map(ScenarioSessionMessageContextRow scenarioContext) {
+    return new AiScenarioContext(
+        scenarioContext.scenarioId(),
+        scenarioContext.title(),
+        scenarioContext.briefing(),
+        scenarioContext.conversationGoal(),
+        scenarioContext.counterpartRole(),
+        aiConversationSettings.serviceAudience());
+  }
 }

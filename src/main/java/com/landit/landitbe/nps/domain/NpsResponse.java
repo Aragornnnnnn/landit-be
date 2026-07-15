@@ -13,25 +13,24 @@ import jakarta.persistence.Table;
 @Table(name = "nps_response")
 public class NpsResponse extends BaseCreatedAtEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "user_profile_id", nullable = false)
-    private Long userProfileId;
+  @Column(name = "user_profile_id", nullable = false)
+  private Long userProfileId;
 
-    @Column(nullable = false)
-    private int score;
+  @Column(nullable = false)
+  private int score;
 
-    @Column(name = "opinion_text", columnDefinition = "text")
-    private String opinionText;
+  @Column(name = "opinion_text", columnDefinition = "text")
+  private String opinionText;
 
-    protected NpsResponse() {
-    }
+  protected NpsResponse() {}
 
-    public NpsResponse(Long userProfileId, int score, String opinionText) {
-        this.userProfileId = userProfileId;
-        this.score = score;
-        this.opinionText = opinionText;
-    }
+  public NpsResponse(Long userProfileId, int score, String opinionText) {
+    this.userProfileId = userProfileId;
+    this.score = score;
+    this.opinionText = opinionText;
+  }
 }

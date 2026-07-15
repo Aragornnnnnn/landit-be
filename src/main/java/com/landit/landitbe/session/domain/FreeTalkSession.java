@@ -13,16 +13,15 @@ import jakarta.persistence.Table;
 @Table(name = "free_talk_session")
 public class FreeTalkSession extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "learning_session_id", nullable = false)
-    private Long learningSessionId;
+  @Column(name = "learning_session_id", nullable = false)
+  private Long learningSessionId;
 
-    @Column(length = 255)
-    private String title;
+  @Column(length = 255)
+  private String title;
 
-    protected FreeTalkSession() {
-    }
+  protected FreeTalkSession() {}
 }

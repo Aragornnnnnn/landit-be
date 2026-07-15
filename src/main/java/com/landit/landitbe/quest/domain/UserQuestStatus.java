@@ -2,7 +2,7 @@
 package com.landit.landitbe.quest.domain;
 
 public enum UserQuestStatus {
-    ACTIVE,
-    COMPLETED,
-    CANCELLED
+  ACTIVE,
+  COMPLETED,
+  CANCELLED
 }

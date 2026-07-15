@@ -5,14 +5,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "사용자 메시지 속마음 조회 응답")
 public record SessionInnerThoughtResponse(
-        @Schema(
-                description = "속마음 처리 상태",
-                allowableValues = {"PREPARING", "COMPLETED", "FAILED"}
-        )
+    @Schema(
+            description = "속마음 처리 상태",
+            allowableValues = {"PREPARING", "COMPLETED", "FAILED"})
         String processingStatus,
-        @Schema(description = "상대 역할의 속마음. COMPLETED에서만 제공")
-        String innerThought,
-        @Schema(description = "속마음 유형. COMPLETED에서만 제공")
-        String innerThoughtType
-) {
-}
+    @Schema(description = "상대 역할의 속마음. COMPLETED에서만 제공") String innerThought,
+    @Schema(description = "속마음 유형. COMPLETED에서만 제공") String innerThoughtType) {}

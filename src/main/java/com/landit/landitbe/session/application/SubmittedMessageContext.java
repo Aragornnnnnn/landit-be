@@ -8,16 +8,14 @@ import java.util.List;
 import java.util.Optional;
 
 record SubmittedMessageContext(
-        long userId,
-        long sessionId,
-        Long learningSessionId,
-        Long sessionHistoryId,
-        Long submittedMessageId,
-        int submittedMessageSequence,
-        int submittedTurnNumber,
-        ScenarioSessionMessageContextRow scenarioContext,
-        List<AiConversationHistoryMessage> conversationHistory,
-        Optional<ScenarioQuestionRow> nextQuestion,
-        boolean createdSessionHistory
-) {
-}
+    long userId,
+    long sessionId,
+    Long learningSessionId,
+    Long sessionHistoryId,
+    Long submittedMessageId,
+    int submittedMessageSequence,
+    int submittedTurnNumber,
+    ScenarioSessionMessageContextRow scenarioContext,
+    List<AiConversationHistoryMessage> conversationHistory,
+    Optional<ScenarioQuestionRow> nextQuestion,
+    boolean createdSessionHistory) {}

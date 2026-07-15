@@ -5,6 +5,6 @@ import com.landit.landitbe.auth.domain.SocialProvider;
 
 public interface OidcTokenVerifier {
 
-    /** ID Token의 서명, 표준 claim, nonce를 검증한다. */
-    OidcUserInfo verify(SocialProvider provider, String idToken, String nonce);
+  /** ID Token의 서명, 표준 claim, nonce를 검증한다. */
+  OidcUserInfo verify(SocialProvider provider, String idToken, String nonce);
 }

@@ -7,34 +7,27 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record SessionFeedbackResponse(
-        Long sessionId,
-        Integer nativeScore,
-        BigDecimal starRating,
-        String highlightMessage,
-        String summaryMessage,
-        List<MessageFeedbackResponse> messageFeedbacks
-) {
+    Long sessionId,
+    Integer nativeScore,
+    BigDecimal starRating,
+    String highlightMessage,
+    String summaryMessage,
+    List<MessageFeedbackResponse> messageFeedbacks) {
 
-    public record MessageFeedbackResponse(
-            Long messageFeedbackId,
-            Long messageId,
-            int turnNumber,
-            String userMessage,
-            EvaluationContextResponse evaluationContext,
-            FeedbackType feedbackType,
-            String baseLocaleAnalogy,
-            String positiveFeedback,
-            String feedbackDetail,
-            String correctionExpression,
-            String correctionReason,
-            String benchmarkMessage
-    ) {
-    }
+  public record MessageFeedbackResponse(
+      Long messageFeedbackId,
+      Long messageId,
+      int turnNumber,
+      String userMessage,
+      EvaluationContextResponse evaluationContext,
+      FeedbackType feedbackType,
+      String baseLocaleAnalogy,
+      String positiveFeedback,
+      String feedbackDetail,
+      String correctionExpression,
+      String correctionReason,
+      String benchmarkMessage) {}
 
-    public record EvaluationContextResponse(
-            AiMessageFeedbackEvaluationContextType type,
-            String content,
-            String translatedContent
-    ) {
-    }
+  public record EvaluationContextResponse(
+      AiMessageFeedbackEvaluationContextType type, String content, String translatedContent) {}
 }

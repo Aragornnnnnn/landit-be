@@ -15,17 +15,15 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 class OtlpExportDisabledIntegrationTests {
 
-    @Autowired
-    private Environment environment;
+  @Autowired private Environment environment;
 
-    @Autowired
-    private ApplicationContext applicationContext;
+  @Autowired private ApplicationContext applicationContext;
 
-    @Test
-    void testProfileDisablesOtlpMetricsExport() {
-        assertThat(environment.getProperty("management.otlp.metrics.export.enabled", Boolean.class))
-                .isFalse();
-        assertThat(applicationContext.getBeanNamesForType(MeterRegistry.class))
-                .noneMatch(beanName -> beanName.toLowerCase().contains("otlp"));
-    }
+  @Test
+  void testProfileDisablesOtlpMetricsExport() {
+    assertThat(environment.getProperty("management.otlp.metrics.export.enabled", Boolean.class))
+        .isFalse();
+    assertThat(applicationContext.getBeanNamesForType(MeterRegistry.class))
+        .noneMatch(beanName -> beanName.toLowerCase().contains("otlp"));
+  }
 }

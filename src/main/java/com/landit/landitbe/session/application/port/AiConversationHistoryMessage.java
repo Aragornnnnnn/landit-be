@@ -2,10 +2,4 @@
 package com.landit.landitbe.session.application.port;
 
 public record AiConversationHistoryMessage(
-        Long messageId,
-        int turnNumber,
-        String role,
-        String content,
-        String translatedContent
-) {
-}
+    Long messageId, int turnNumber, String role, String content, String translatedContent) {}

@@ -2,11 +2,9 @@
 package com.landit.landitbe.session.application.port;
 
 public record AiScenarioContext(
-        Long scenarioId,
-        String title,
-        String briefing,
-        String conversationGoal,
-        String counterpartRole,
-        String serviceAudience
-) {
-}
+    Long scenarioId,
+    String title,
+    String briefing,
+    String conversationGoal,
+    String counterpartRole,
+    String serviceAudience) {}

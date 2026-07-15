@@ -10,21 +10,24 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
+@SecurityScheme(
+    name = "bearerAuth",
+    type = SecuritySchemeType.HTTP,
+    scheme = "bearer",
+    bearerFormat = "JWT")
 @EnableScheduling
 @ConfigurationPropertiesScan
 @SpringBootApplication
 public class LanditBeApplication {
 
-	private static final String APPLICATION_TIME_ZONE = "Asia/Seoul";
+  private static final String APPLICATION_TIME_ZONE = "Asia/Seoul";
 
-	public static void main(String[] args) {
-		SpringApplication.run(LanditBeApplication.class, args);
-	}
+  public static void main(String[] args) {
+    SpringApplication.run(LanditBeApplication.class, args);
+  }
 
-	@PostConstruct
-	void setApplicationTimeZone() {
-		TimeZone.setDefault(TimeZone.getTimeZone(APPLICATION_TIME_ZONE));
-	}
-
+  @PostConstruct
+  void setApplicationTimeZone() {
+    TimeZone.setDefault(TimeZone.getTimeZone(APPLICATION_TIME_ZONE));
+  }
 }

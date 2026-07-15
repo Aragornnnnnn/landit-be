@@ -12,13 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 @AllArgsConstructor
 public class ScenarioService {
 
-    private final ScenarioRepository scenarioRepository;
+  private final ScenarioRepository scenarioRepository;
 
-    /** 시나리오가 존재하지 않으면 SCENARIO_NOT_FOUND 예외를 던진다. */
-    @Transactional(readOnly = true)
-    public void validateExists(Long scenarioId) {
-        if (!scenarioRepository.existsById(scenarioId)) {
-            throw new ApiException(ErrorCode.SCENARIO_NOT_FOUND);
-        }
+  /** 시나리오가 존재하지 않으면 SCENARIO_NOT_FOUND 예외를 던진다. */
+  @Transactional(readOnly = true)
+  public void validateExists(Long scenarioId) {
+    if (!scenarioRepository.existsById(scenarioId)) {
+      throw new ApiException(ErrorCode.SCENARIO_NOT_FOUND);
     }
+  }
 }

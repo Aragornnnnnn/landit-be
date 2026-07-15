@@ -3,8 +3,4 @@ package com.landit.landitbe.auth.api.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record TokenRefreshRequest(
-        @NotBlank
-        String refreshToken
-) {
-}
+public record TokenRefreshRequest(@NotBlank String refreshToken) {}

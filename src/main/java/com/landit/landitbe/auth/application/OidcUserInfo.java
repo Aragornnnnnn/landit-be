@@ -3,10 +3,4 @@ package com.landit.landitbe.auth.application;
 
 import com.landit.landitbe.auth.domain.SocialProvider;
 
-public record OidcUserInfo(
-        SocialProvider provider,
-        String sub,
-        String email,
-        String nickname
-) {
-}
+public record OidcUserInfo(SocialProvider provider, String sub, String email, String nickname) {}

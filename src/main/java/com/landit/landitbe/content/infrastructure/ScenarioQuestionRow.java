@@ -2,9 +2,4 @@
 package com.landit.landitbe.content.infrastructure;
 
 public record ScenarioQuestionRow(
-        Long questionId,
-        int sequence,
-        String questionText,
-        String questionTranslation
-) {
-}
+    Long questionId, int sequence, String questionText, String questionTranslation) {}

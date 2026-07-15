@@ -2,7 +2,7 @@
 package com.landit.landitbe.session.domain;
 
 public enum ProcessingStatus {
-    PREPARING,
-    COMPLETED,
-    FAILED
+  PREPARING,
+  COMPLETED,
+  FAILED
 }

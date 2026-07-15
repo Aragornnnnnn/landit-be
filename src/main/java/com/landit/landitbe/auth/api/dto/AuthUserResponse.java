@@ -2,10 +2,4 @@
 package com.landit.landitbe.auth.api.dto;
 
 public record AuthUserResponse(
-        Long userId,
-        String nickname,
-        String email,
-        String provider,
-        boolean newUser
-) {
-}
+    Long userId, String nickname, String email, String provider, boolean newUser) {}

@@ -14,14 +14,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserProfileService {
 
-    private final UserProfileRepository userProfileRepository;
+  private final UserProfileRepository userProfileRepository;
 
-    /** 활성 사용자의 학습 locale(target/base)을 조회한다. 활성 사용자가 아니면 INVALID_TOKEN 예외를 던진다. */
-    @Transactional(readOnly = true)
-    public UserLocale getUserLocale(Long userId) {
-        UserProfile userProfile = userProfileRepository.findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
-                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
+  /** 활성 사용자의 학습 locale(target/base)을 조회한다. 활성 사용자가 아니면 INVALID_TOKEN 예외를 던진다. */
+  @Transactional(readOnly = true)
+  public UserLocale getUserLocale(Long userId) {
+    UserProfile userProfile =
+        userProfileRepository
+            .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
+            .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
 
-        return new UserLocale(userProfile.getTargetLocale(), userProfile.getBaseLocale());
-    }
+    return new UserLocale(userProfile.getTargetLocale(), userProfile.getBaseLocale());
+  }
 }

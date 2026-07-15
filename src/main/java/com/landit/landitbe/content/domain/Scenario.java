@@ -17,37 +17,36 @@ import jakarta.persistence.Table;
 @Table(name = "scenario")
 public class Scenario extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
+  @Column(name = "category_id", nullable = false)
+  private Long categoryId;
 
-    @Column(name = "ai_role", nullable = false, length = 80)
-    private String aiRole;
+  @Column(name = "ai_role", nullable = false, length = 80)
+  private String aiRole;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ScenarioDifficulty difficulty;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ScenarioDifficulty difficulty;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "first_speaker", nullable = false, length = 20)
-    private ConversationSpeaker firstSpeaker;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "first_speaker", nullable = false, length = 20)
+  private ConversationSpeaker firstSpeaker;
 
-    @Column(name = "total_question_count", nullable = false)
-    private int totalQuestionCount;
+  @Column(name = "total_question_count", nullable = false)
+  private int totalQuestionCount;
 
-    @Column(name = "thumbnail_url", length = 500)
-    private String thumbnailUrl;
+  @Column(name = "thumbnail_url", length = 500)
+  private String thumbnailUrl;
 
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder;
+  @Column(name = "display_order", nullable = false)
+  private int displayOrder;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ActiveStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ActiveStatus status;
 
-    protected Scenario() {
-    }
+  protected Scenario() {}
 }

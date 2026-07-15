@@ -16,29 +16,28 @@ import jakarta.persistence.Table;
 @Table(name = "character_stage")
 public class CharacterStage extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(nullable = false, length = 80)
-    private String species;
+  @Column(nullable = false, length = 80)
+  private String species;
 
-    @Column(name = "stage_number", nullable = false)
-    private int stageNumber;
+  @Column(name = "stage_number", nullable = false)
+  private int stageNumber;
 
-    @Column(name = "required_total_xp", nullable = false)
-    private int requiredTotalXp;
+  @Column(name = "required_total_xp", nullable = false)
+  private int requiredTotalXp;
 
-    @Column(name = "asset_url", length = 500)
-    private String assetUrl;
+  @Column(name = "asset_url", length = 500)
+  private String assetUrl;
 
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder;
+  @Column(name = "display_order", nullable = false)
+  private int displayOrder;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ActiveStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ActiveStatus status;
 
-    protected CharacterStage() {
-    }
+  protected CharacterStage() {}
 }

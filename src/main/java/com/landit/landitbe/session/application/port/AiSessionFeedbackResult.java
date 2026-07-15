@@ -5,11 +5,9 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record AiSessionFeedbackResult(
-        Long sessionId,
-        int nativeScore,
-        BigDecimal starRating,
-        String highlightMessage,
-        String summaryMessage,
-        List<AiSessionMessageFeedbackResult> messageFeedbacks
-) {
-}
+    Long sessionId,
+    int nativeScore,
+    BigDecimal starRating,
+    String highlightMessage,
+    String summaryMessage,
+    List<AiSessionMessageFeedbackResult> messageFeedbacks) {}

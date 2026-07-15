@@ -7,6 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SessionHistoryRepository extends JpaRepository<SessionHistory, Long> {
 
-    /** 학습 세션 ID로 세션 히스토리를 조회한다. */
-    Optional<SessionHistory> findByLearningSessionId(Long learningSessionId);
+  /** 학습 세션 ID로 세션 히스토리를 조회한다. */
+  Optional<SessionHistory> findByLearningSessionId(Long learningSessionId);
 }

@@ -2,7 +2,7 @@
 package com.landit.landitbe.session.domain;
 
 public enum GoalCompletionStatus {
-    NOT_STARTED,
-    PARTIAL,
-    COMPLETED
+  NOT_STARTED,
+  PARTIAL,
+  COMPLETED
 }

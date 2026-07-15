@@ -2,7 +2,7 @@
 package com.landit.landitbe.learning.domain;
 
 public enum UserScenarioProgressStatus {
-    NOT_STARTED,
-    IN_PROGRESS,
-    CLEARED
+  NOT_STARTED,
+  IN_PROGRESS,
+  CLEARED
 }

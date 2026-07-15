@@ -2,10 +2,8 @@
 package com.landit.landitbe.auth.api.dto;
 
 public record TokenRefreshResponse(
-        String tokenType,
-        String accessToken,
-        long accessTokenExpiresIn,
-        String refreshToken,
-        long refreshTokenExpiresIn
-) {
-}
+    String tokenType,
+    String accessToken,
+    long accessTokenExpiresIn,
+    String refreshToken,
+    long refreshTokenExpiresIn) {}

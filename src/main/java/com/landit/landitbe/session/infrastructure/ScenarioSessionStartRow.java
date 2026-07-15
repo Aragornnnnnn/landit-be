@@ -8,22 +8,20 @@ import com.landit.landitbe.content.domain.TtsVoiceGender;
 import com.landit.landitbe.content.domain.TtsVoiceProvider;
 
 public record ScenarioSessionStartRow(
-        Long scenarioId,
-        Long categoryId,
-        ActiveStatus categoryStatus,
-        ActiveStatus scenarioStatus,
-        Long variantId,
-        ActiveStatus variantStatus,
-        ConversationSpeaker firstSpeaker,
-        int totalQuestionCount,
-        String userOpeningInstruction,
-        String aiOpeningMessage,
-        String aiOpeningMessageTranslation,
-        String aiOpeningInnerThought,
-        InnerThoughtType aiOpeningInnerThoughtType,
-        TtsVoiceProvider ttsVoiceProvider,
-        String ttsVoiceModel,
-        String providerVoiceId,
-        TtsVoiceGender ttsVoiceGender
-) {
-}
+    Long scenarioId,
+    Long categoryId,
+    ActiveStatus categoryStatus,
+    ActiveStatus scenarioStatus,
+    Long variantId,
+    ActiveStatus variantStatus,
+    ConversationSpeaker firstSpeaker,
+    int totalQuestionCount,
+    String userOpeningInstruction,
+    String aiOpeningMessage,
+    String aiOpeningMessageTranslation,
+    String aiOpeningInnerThought,
+    InnerThoughtType aiOpeningInnerThoughtType,
+    TtsVoiceProvider ttsVoiceProvider,
+    String ttsVoiceModel,
+    String providerVoiceId,
+    TtsVoiceGender ttsVoiceGender) {}

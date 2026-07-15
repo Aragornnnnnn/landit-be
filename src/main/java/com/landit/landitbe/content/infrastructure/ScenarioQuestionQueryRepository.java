@@ -1,19 +1,20 @@
 // 세션 진행에 필요한 시나리오 고정 질문을 조회한다.
 package com.landit.landitbe.content.infrastructure;
 
+import com.landit.landitbe.common.domain.Locale;
 import com.landit.landitbe.content.domain.ScenarioQuestion;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import com.landit.landitbe.common.domain.Locale;
 
 @Repository
 public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQuestion, Long> {
 
-    /** 시나리오, 순서, 언어 조합에 맞는 활성 고정 질문을 조회한다. */
-    @Query("""
+  /** 시나리오, 순서, 언어 조합에 맞는 활성 고정 질문을 조회한다. */
+  @Query(
+      """
             SELECT new com.landit.landitbe.content.infrastructure.ScenarioQuestionRow(
                 scenarioQuestion.id,
                 scenarioQuestion.displayOrder,
@@ -30,10 +31,9 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
               AND questionVariant.baseLocale = :baseLocale
               AND questionVariant.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
             """)
-    Optional<ScenarioQuestionRow> findActiveQuestion(
-            @Param("scenarioId") long scenarioId,
-            @Param("displayOrder") int displayOrder,
-            @Param("targetLocale") Locale targetLocale,
-            @Param("baseLocale") Locale baseLocale
-    );
+  Optional<ScenarioQuestionRow> findActiveQuestion(
+      @Param("scenarioId") long scenarioId,
+      @Param("displayOrder") int displayOrder,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("baseLocale") Locale baseLocale);
 }

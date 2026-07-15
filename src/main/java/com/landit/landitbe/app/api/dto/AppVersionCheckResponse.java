@@ -4,17 +4,16 @@ package com.landit.landitbe.app.api.dto;
 import java.time.LocalDateTime;
 
 public record AppVersionCheckResponse(
-        UpdateType updateType,
-        String latestVersionName,
-        long latestBuildNumber,
-        long minimumSupportedBuildNumber,
-        String reason,
-        LocalDateTime releasedAt
-) {
+    UpdateType updateType,
+    String latestVersionName,
+    long latestBuildNumber,
+    long minimumSupportedBuildNumber,
+    String reason,
+    LocalDateTime releasedAt) {
 
-    public enum UpdateType {
-        FORCE,
-        SOFT,
-        NONE
-    }
+  public enum UpdateType {
+    FORCE,
+    SOFT,
+    NONE
+  }
 }

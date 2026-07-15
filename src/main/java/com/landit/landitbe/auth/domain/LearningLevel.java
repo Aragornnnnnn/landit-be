@@ -2,7 +2,7 @@
 package com.landit.landitbe.auth.domain;
 
 public enum LearningLevel {
-    BEGINNER,
-    INTERMEDIATE,
-    ADVANCED
+  BEGINNER,
+  INTERMEDIATE,
+  ADVANCED
 }

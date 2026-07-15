@@ -7,20 +7,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "landit.ai")
 public record AiClientProperties(
-        String baseUrl,
-        String clientMode,
-        String serviceAudience,
-        Duration connectTimeout,
-        Duration requestTimeout,
-        Duration sessionFeedbackRequestTimeout
-) implements AiConversationSettings {
+    String baseUrl,
+    String clientMode,
+    String serviceAudience,
+    Duration connectTimeout,
+    Duration requestTimeout,
+    Duration sessionFeedbackRequestTimeout)
+    implements AiConversationSettings {
 
-    public AiClientProperties {
-        if (clientMode == null || clientMode.isBlank()) {
-            clientMode = "local";
-        }
-        if (serviceAudience == null || serviceAudience.isBlank()) {
-            serviceAudience = "KOREAN_LEARNER";
-        }
+  public AiClientProperties {
+    if (clientMode == null || clientMode.isBlank()) {
+      clientMode = "local";
     }
+    if (serviceAudience == null || serviceAudience.isBlank()) {
+      serviceAudience = "KOREAN_LEARNER";
+    }
+  }
 }

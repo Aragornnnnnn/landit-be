@@ -3,8 +3,4 @@ package com.landit.landitbe.session.infrastructure;
 
 import com.landit.landitbe.learning.domain.UserScenarioProgressStatus;
 
-public record ScenarioSessionLockRow(
-        Long scenarioId,
-        UserScenarioProgressStatus progressStatus
-) {
-}
+public record ScenarioSessionLockRow(Long scenarioId, UserScenarioProgressStatus progressStatus) {}

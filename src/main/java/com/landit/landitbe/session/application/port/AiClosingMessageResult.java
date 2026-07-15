@@ -4,9 +4,7 @@ package com.landit.landitbe.session.application.port;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 
 public record AiClosingMessageResult(
-        String aiMessage,
-        String translatedMessage,
-        String innerThought,
-        InnerThoughtType innerThoughtType
-) {
-}
+    String aiMessage,
+    String translatedMessage,
+    String innerThought,
+    InnerThoughtType innerThoughtType) {}

@@ -4,13 +4,11 @@ package com.landit.landitbe.session.application.port;
 import com.landit.landitbe.session.domain.FeedbackType;
 
 public record AiSessionMessageFeedbackResult(
-        Long messageId,
-        FeedbackType feedbackType,
-        String baseLocaleAnalogy,
-        String positiveFeedback,
-        String feedbackDetail,
-        String correctionExpression,
-        String correctionReason,
-        String benchmarkMessage
-) {
-}
+    Long messageId,
+    FeedbackType feedbackType,
+    String baseLocaleAnalogy,
+    String positiveFeedback,
+    String feedbackDetail,
+    String correctionExpression,
+    String correctionReason,
+    String benchmarkMessage) {}

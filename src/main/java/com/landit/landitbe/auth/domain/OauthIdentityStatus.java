@@ -2,6 +2,6 @@
 package com.landit.landitbe.auth.domain;
 
 public enum OauthIdentityStatus {
-    ACTIVE,
-    UNLINKED
+  ACTIVE,
+  UNLINKED
 }

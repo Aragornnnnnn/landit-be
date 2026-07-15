@@ -12,17 +12,18 @@ import org.springframework.core.io.ClassPathResource;
 
 class DatabaseProfileConfigurationTests {
 
-    private final YamlPropertySourceLoader yamlLoader = new YamlPropertySourceLoader();
+  private final YamlPropertySourceLoader yamlLoader = new YamlPropertySourceLoader();
 
-    @ParameterizedTest
-    @ValueSource(strings = {"local", "develop", "prod"})
-    void databaseProfilesReadConnectionSettingsFromEnvironment(String profile) throws IOException {
-        PropertySource<?> propertySource = yamlLoader
+  @ParameterizedTest
+  @ValueSource(strings = {"local", "develop", "prod"})
+  void databaseProfilesReadConnectionSettingsFromEnvironment(String profile) throws IOException {
+    PropertySource<?> propertySource =
+        yamlLoader
             .load(profile, new ClassPathResource("application-" + profile + ".yml"))
             .getFirst();
 
-        assertEquals("${DB_URL}", propertySource.getProperty("spring.datasource.url"));
-        assertEquals("${DB_USERNAME}", propertySource.getProperty("spring.datasource.username"));
-        assertEquals("${DB_PASSWORD}", propertySource.getProperty("spring.datasource.password"));
-    }
+    assertEquals("${DB_URL}", propertySource.getProperty("spring.datasource.url"));
+    assertEquals("${DB_USERNAME}", propertySource.getProperty("spring.datasource.username"));
+    assertEquals("${DB_PASSWORD}", propertySource.getProperty("spring.datasource.password"));
+  }
 }

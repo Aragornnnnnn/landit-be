@@ -2,8 +2,4 @@
 package com.landit.landitbe.session.application.port;
 
 public record AiMessageFeedbackEvaluationContext(
-        AiMessageFeedbackEvaluationContextType type,
-        String content,
-        String translatedContent
-) {
-}
+    AiMessageFeedbackEvaluationContextType type, String content, String translatedContent) {}

@@ -2,7 +2,7 @@
 package com.landit.landitbe.session.domain;
 
 public enum SessionMessageInputType {
-    VOICE,
-    TEXT,
-    GENERATED
+  VOICE,
+  TEXT,
+  GENERATED
 }

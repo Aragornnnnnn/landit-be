@@ -2,6 +2,6 @@
 package com.landit.landitbe.common.domain;
 
 public enum ConversationSpeaker {
-    AI,
-    USER
+  AI,
+  USER
 }

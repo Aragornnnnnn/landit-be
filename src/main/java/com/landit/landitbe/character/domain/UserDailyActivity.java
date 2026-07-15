@@ -15,34 +15,33 @@ import java.time.LocalDateTime;
 @Table(name = "user_daily_activity")
 public class UserDailyActivity extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "user_profile_id", nullable = false)
-    private Long userProfileId;
+  @Column(name = "user_profile_id", nullable = false)
+  private Long userProfileId;
 
-    @Column(name = "activity_date", nullable = false)
-    private LocalDate activityDate;
+  @Column(name = "activity_date", nullable = false)
+  private LocalDate activityDate;
 
-    @Column(name = "completed_session_count", nullable = false)
-    private int completedSessionCount;
+  @Column(name = "completed_session_count", nullable = false)
+  private int completedSessionCount;
 
-    @Column(name = "completed_review_count", nullable = false)
-    private int completedReviewCount;
+  @Column(name = "completed_review_count", nullable = false)
+  private int completedReviewCount;
 
-    @Column(name = "study_seconds", nullable = false)
-    private int studySeconds;
+  @Column(name = "study_seconds", nullable = false)
+  private int studySeconds;
 
-    @Column(name = "review_all_correct_reward_xp", nullable = false)
-    private int reviewAllCorrectRewardXp;
+  @Column(name = "review_all_correct_reward_xp", nullable = false)
+  private int reviewAllCorrectRewardXp;
 
-    @Column(name = "review_all_correct_reward_granted_at")
-    private LocalDateTime reviewAllCorrectRewardGrantedAt;
+  @Column(name = "review_all_correct_reward_granted_at")
+  private LocalDateTime reviewAllCorrectRewardGrantedAt;
 
-    @Column(name = "active_day", nullable = false)
-    private boolean activeDay;
+  @Column(name = "active_day", nullable = false)
+  private boolean activeDay;
 
-    protected UserDailyActivity() {
-    }
+  protected UserDailyActivity() {}
 }

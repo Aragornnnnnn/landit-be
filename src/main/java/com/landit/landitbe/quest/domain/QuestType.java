@@ -2,7 +2,7 @@
 package com.landit.landitbe.quest.domain;
 
 public enum QuestType {
-    REVIEW,
-    SCENARIO,
-    FREE_TALK
+  REVIEW,
+  SCENARIO,
+  FREE_TALK
 }

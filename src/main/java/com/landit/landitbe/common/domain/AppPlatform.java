@@ -2,6 +2,6 @@
 package com.landit.landitbe.common.domain;
 
 public enum AppPlatform {
-    IOS,
-    ANDROID
+  IOS,
+  ANDROID
 }

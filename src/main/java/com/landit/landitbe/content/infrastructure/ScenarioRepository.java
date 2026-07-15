@@ -4,5 +4,4 @@ package com.landit.landitbe.content.infrastructure;
 import com.landit.landitbe.content.domain.Scenario;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ScenarioRepository extends JpaRepository<Scenario, Long> {
-}
+public interface ScenarioRepository extends JpaRepository<Scenario, Long> {}

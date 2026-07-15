@@ -9,19 +9,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class NpsService {
 
-    private final NpsResponseRepository npsResponseRepository;
+  private final NpsResponseRepository npsResponseRepository;
 
-    public NpsService(NpsResponseRepository npsResponseRepository) {
-        this.npsResponseRepository = npsResponseRepository;
-    }
+  public NpsService(NpsResponseRepository npsResponseRepository) {
+    this.npsResponseRepository = npsResponseRepository;
+  }
 
-    /** 사용자의 만족도 점수와 선택 의견을 새 응답으로 저장한다. */
-    @Transactional
-    public void submit(Long userProfileId, int score, String opinionText) {
-        npsResponseRepository.save(new NpsResponse(userProfileId, score, normalizeOpinionText(opinionText)));
-    }
+  /** 사용자의 만족도 점수와 선택 의견을 새 응답으로 저장한다. */
+  @Transactional
+  public void submit(Long userProfileId, int score, String opinionText) {
+    npsResponseRepository.save(
+        new NpsResponse(userProfileId, score, normalizeOpinionText(opinionText)));
+  }
 
-    private String normalizeOpinionText(String opinionText) {
-        return opinionText == null || opinionText.isBlank() ? null : opinionText;
-    }
+  private String normalizeOpinionText(String opinionText) {
+    return opinionText == null || opinionText.isBlank() ? null : opinionText;
+  }
 }

@@ -4,10 +4,8 @@ package com.landit.landitbe.session.application.port;
 import java.util.List;
 
 public record AiInnerThoughtRequest(
-        Long sessionId,
-        Long submittedMessageId,
-        int submittedTurnNumber,
-        AiScenarioContext scenario,
-        List<AiConversationHistoryMessage> conversationHistory
-) {
-}
+    Long sessionId,
+    Long submittedMessageId,
+    int submittedTurnNumber,
+    AiScenarioContext scenario,
+    List<AiConversationHistoryMessage> conversationHistory) {}

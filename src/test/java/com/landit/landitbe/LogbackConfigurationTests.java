@@ -10,12 +10,12 @@ import org.springframework.core.io.ClassPathResource;
 
 class LogbackConfigurationTests {
 
-    @Test
-    void koreanStandardTimePatternIsDeclaredBeforeBootDefaults() throws IOException {
-        String configuration = new ClassPathResource("logback-spring.xml")
-                .getContentAsString(StandardCharsets.UTF_8);
+  @Test
+  void koreanStandardTimePatternIsDeclaredBeforeBootDefaults() throws IOException {
+    String configuration =
+        new ClassPathResource("logback-spring.xml").getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(configuration.indexOf("name=\"LOG_DATEFORMAT_PATTERN\""))
-                .isLessThan(configuration.indexOf("logging/logback/defaults.xml"));
-    }
+    assertThat(configuration.indexOf("name=\"LOG_DATEFORMAT_PATTERN\""))
+        .isLessThan(configuration.indexOf("logging/logback/defaults.xml"));
+  }
 }

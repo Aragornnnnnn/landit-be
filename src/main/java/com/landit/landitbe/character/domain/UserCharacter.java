@@ -12,19 +12,18 @@ import java.time.LocalDateTime;
 @Table(name = "user_character")
 public class UserCharacter extends BaseTimeEntity {
 
-    @Id
-    @Column(name = "user_profile_id")
-    private Long userProfileId;
+  @Id
+  @Column(name = "user_profile_id")
+  private Long userProfileId;
 
-    @Column(name = "character_stage_id", nullable = false)
-    private Long characterStageId;
+  @Column(name = "character_stage_id", nullable = false)
+  private Long characterStageId;
 
-    @Column(name = "total_xp", nullable = false)
-    private int totalXp;
+  @Column(name = "total_xp", nullable = false)
+  private int totalXp;
 
-    @Column(name = "last_stage_up_at")
-    private LocalDateTime lastStageUpAt;
+  @Column(name = "last_stage_up_at")
+  private LocalDateTime lastStageUpAt;
 
-    protected UserCharacter() {
-    }
+  protected UserCharacter() {}
 }

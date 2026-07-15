@@ -2,12 +2,10 @@
 package com.landit.landitbe.session.application.port;
 
 public record AiMessageFeedbackRequest(
-        Long sessionId,
-        Long messageId,
-        int turnNumber,
-        int messageSequence,
-        AiScenarioContext scenario,
-        AiMessageFeedbackEvaluationContext evaluationContext,
-        String userMessage
-) {
-}
+    Long sessionId,
+    Long messageId,
+    int turnNumber,
+    int messageSequence,
+    AiScenarioContext scenario,
+    AiMessageFeedbackEvaluationContext evaluationContext,
+    String userMessage) {}

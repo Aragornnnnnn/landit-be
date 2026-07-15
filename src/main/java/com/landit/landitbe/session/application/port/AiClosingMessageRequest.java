@@ -5,12 +5,10 @@ import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import java.util.List;
 
 public record AiClosingMessageRequest(
-        Long sessionId,
-        Long submittedMessageId,
-        int submittedTurnNumber,
-        AiScenarioContext scenario,
-        List<AiConversationHistoryMessage> conversationHistory,
-        AiClosingReason closingReason,
-        GoalCompletionStatus goalCompletionStatus
-) {
-}
+    Long sessionId,
+    Long submittedMessageId,
+    int submittedTurnNumber,
+    AiScenarioContext scenario,
+    List<AiConversationHistoryMessage> conversationHistory,
+    AiClosingReason closingReason,
+    GoalCompletionStatus goalCompletionStatus) {}

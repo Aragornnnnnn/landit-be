@@ -2,7 +2,7 @@
 package com.landit.landitbe.content.domain;
 
 public enum ScenarioDifficulty {
-    EASY,
-    NORMAL,
-    HARD
+  EASY,
+  NORMAL,
+  HARD
 }

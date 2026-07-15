@@ -2,7 +2,7 @@
 package com.landit.landitbe.session.domain;
 
 public enum SessionEndActor {
-    USER,
-    SYSTEM,
-    TIME_LIMIT
+  USER,
+  SYSTEM,
+  TIME_LIMIT
 }

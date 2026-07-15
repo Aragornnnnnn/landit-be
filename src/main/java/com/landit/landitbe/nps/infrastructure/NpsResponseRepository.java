@@ -4,5 +4,4 @@ package com.landit.landitbe.nps.infrastructure;
 import com.landit.landitbe.nps.domain.NpsResponse;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface NpsResponseRepository extends JpaRepository<NpsResponse, Long> {
-}
+public interface NpsResponseRepository extends JpaRepository<NpsResponse, Long> {}

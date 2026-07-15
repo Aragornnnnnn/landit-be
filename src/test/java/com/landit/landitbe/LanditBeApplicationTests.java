@@ -17,25 +17,21 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest(properties = "landit.ai.client-mode=remote")
 class LanditBeApplicationTests {
 
-	@Autowired
-	private RemoteAiConversationClient remoteAiConversationClient;
+  @Autowired private RemoteAiConversationClient remoteAiConversationClient;
 
-	@Autowired
-	private JsonMapper jsonMapper;
+  @Autowired private JsonMapper jsonMapper;
 
-	@Autowired
-	private ApplicationContext applicationContext;
+  @Autowired private ApplicationContext applicationContext;
 
-	@Test
-	void remoteAiClientModeLoadsApplicationContext() {
-		assertThat(remoteAiConversationClient).isNotNull();
-		assertThat(jsonMapper).isNotNull();
-		assertThat(applicationContext.getBeansOfType(ObjectMapper.class)).isEmpty();
-	}
+  @Test
+  void remoteAiClientModeLoadsApplicationContext() {
+    assertThat(remoteAiConversationClient).isNotNull();
+    assertThat(jsonMapper).isNotNull();
+    assertThat(applicationContext.getBeansOfType(ObjectMapper.class)).isEmpty();
+  }
 
-	@Test
-	void applicationTimeZoneUsesAsiaSeoul() {
-		assertThat(TimeZone.getDefault().getID()).isEqualTo("Asia/Seoul");
-	}
-
+  @Test
+  void applicationTimeZoneUsesAsiaSeoul() {
+    assertThat(TimeZone.getDefault().getID()).isEqualTo("Asia/Seoul");
+  }
 }

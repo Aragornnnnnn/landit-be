@@ -6,25 +6,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "landit.auth.oidc")
 public record OidcProperties(
-        boolean fakeEnabled,
-        List<String> googleAudiences,
-        List<String> kakaoAudiences,
-        List<String> appleAudiences
-) {
+    boolean fakeEnabled,
+    List<String> googleAudiences,
+    List<String> kakaoAudiences,
+    List<String> appleAudiences) {
 
-    public OidcProperties {
-        googleAudiences = normalize(googleAudiences);
-        kakaoAudiences = normalize(kakaoAudiences);
-        appleAudiences = normalize(appleAudiences);
-    }
+  public OidcProperties {
+    googleAudiences = normalize(googleAudiences);
+    kakaoAudiences = normalize(kakaoAudiences);
+    appleAudiences = normalize(appleAudiences);
+  }
 
-    private static List<String> normalize(List<String> audiences) {
-        if (audiences == null) {
-            return List.of();
-        }
-        return audiences.stream()
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .toList();
+  private static List<String> normalize(List<String> audiences) {
+    if (audiences == null) {
+      return List.of();
     }
+    return audiences.stream().map(String::trim).filter(value -> !value.isBlank()).toList();
+  }
 }

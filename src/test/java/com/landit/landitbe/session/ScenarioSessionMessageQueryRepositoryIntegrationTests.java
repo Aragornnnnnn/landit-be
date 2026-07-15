@@ -15,11 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class ScenarioSessionMessageQueryRepositoryIntegrationTests {
 
-    @Autowired
-    private ScenarioSessionMessageQueryRepository scenarioSessionMessageQueryRepository;
+  @Autowired private ScenarioSessionMessageQueryRepository scenarioSessionMessageQueryRepository;
 
-    @Test
-    void returnsEmptyWhenLearningSessionDoesNotExist() {
-        assertThat(scenarioSessionMessageQueryRepository.findContextByLearningSessionId(999999L)).isEmpty();
-    }
+  @Test
+  void returnsEmptyWhenLearningSessionDoesNotExist() {
+    assertThat(scenarioSessionMessageQueryRepository.findContextByLearningSessionId(999999L))
+        .isEmpty();
+  }
 }

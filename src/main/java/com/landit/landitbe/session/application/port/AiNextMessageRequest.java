@@ -4,11 +4,9 @@ package com.landit.landitbe.session.application.port;
 import java.util.List;
 
 public record AiNextMessageRequest(
-        Long sessionId,
-        Long submittedMessageId,
-        int submittedTurnNumber,
-        AiScenarioContext scenario,
-        List<AiConversationHistoryMessage> conversationHistory,
-        AiNextQuestion nextQuestion
-) {
-}
+    Long sessionId,
+    Long submittedMessageId,
+    int submittedTurnNumber,
+    AiScenarioContext scenario,
+    List<AiConversationHistoryMessage> conversationHistory,
+    AiNextQuestion nextQuestion) {}

@@ -2,6 +2,6 @@
 package com.landit.landitbe.common.domain;
 
 public enum Locale {
-    EN,
-    KR
+  EN,
+  KR
 }

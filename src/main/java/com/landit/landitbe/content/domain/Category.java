@@ -16,17 +16,16 @@ import jakarta.persistence.Table;
 @Table(name = "category")
 public class Category extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder;
+  @Column(name = "display_order", nullable = false)
+  private int displayOrder;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ActiveStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ActiveStatus status;
 
-    protected Category() {
-    }
+  protected Category() {}
 }

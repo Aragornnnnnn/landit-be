@@ -22,87 +22,91 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class AuthSecurityConfig {
 
-    private static final List<String> CORS_ALLOWED_METHODS = List.of(
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE",
-            "OPTIONS"
-    );
-    private static final List<String> CORS_ALLOWED_HEADERS = List.of(
-            "Authorization",
-            "Content-Type",
-            "Accept",
-            "Origin"
-    );
-    private static final boolean CORS_ALLOW_CREDENTIALS = true;
+  private static final List<String> CORS_ALLOWED_METHODS =
+      List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+  private static final List<String> CORS_ALLOWED_HEADERS =
+      List.of("Authorization", "Content-Type", "Accept", "Origin");
+  private static final boolean CORS_ALLOW_CREDENTIALS = true;
 
-    private final AuthTokenFilter authTokenFilter;
-    private final AuthFailureResponseWriter failureResponseWriter;
+  private final AuthTokenFilter authTokenFilter;
+  private final AuthFailureResponseWriter failureResponseWriter;
 
-    public AuthSecurityConfig(
-            AuthTokenFilter authTokenFilter,
-            AuthFailureResponseWriter failureResponseWriter
-    ) {
-        this.authTokenFilter = authTokenFilter;
-        this.failureResponseWriter = failureResponseWriter;
-    }
+  public AuthSecurityConfig(
+      AuthTokenFilter authTokenFilter, AuthFailureResponseWriter failureResponseWriter) {
+    this.authTokenFilter = authTokenFilter;
+    this.failureResponseWriter = failureResponseWriter;
+  }
 
-    /** 소셜 로그인은 비인증 상태에서 호출할 수 있도록 허용한다. */
-    @Bean
-    SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            CorsConfigurationSource corsConfigurationSource
-    ) throws Exception {
-        return http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable)
-                .logout(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(authenticationEntryPoint())
-                        .accessDeniedHandler(accessDeniedHandler()))
-                .authorizeHttpRequests(registry -> registry
-                        .requestMatchers(HttpMethod.GET, "/api/v1/app-versions/check").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/me").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/expressions/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/expressions/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/nps").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/scenarios").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/messages").authenticated()
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/sessions/*/end").authenticated()
-                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/info", "/swagger-ui/**", "/v3/api-docs/**")
-                        .permitAll()
-                        .anyRequest().permitAll()
-                )
-                .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
-    }
+  /** 소셜 로그인은 비인증 상태에서 호출할 수 있도록 허용한다. */
+  @Bean
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
+    return http.csrf(AbstractHttpConfigurer::disable)
+        .cors(cors -> cors.configurationSource(corsConfigurationSource))
+        .httpBasic(AbstractHttpConfigurer::disable)
+        .formLogin(AbstractHttpConfigurer::disable)
+        .logout(AbstractHttpConfigurer::disable)
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(
+            exception ->
+                exception
+                    .authenticationEntryPoint(authenticationEntryPoint())
+                    .accessDeniedHandler(accessDeniedHandler()))
+        .authorizeHttpRequests(
+            registry ->
+                registry
+                    .requestMatchers(HttpMethod.GET, "/api/v1/app-versions/check")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/me")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/expressions/**")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/expressions/**")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/nps")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/scenarios")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/messages")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/sessions/*/end")
+                    .authenticated()
+                    .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR)
+                    .permitAll()
+                    .requestMatchers(
+                        "/actuator/health", "/actuator/info", "/swagger-ui/**", "/v3/api-docs/**")
+                    .permitAll()
+                    .anyRequest()
+                    .permitAll())
+        .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)
+        .build();
+  }
 
-    @Bean
-    CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
-        configuration.setAllowedMethods(CORS_ALLOWED_METHODS);
-        configuration.setAllowedHeaders(CORS_ALLOWED_HEADERS);
-        configuration.setAllowCredentials(CORS_ALLOW_CREDENTIALS);
+  @Bean
+  CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+    configuration.setAllowedMethods(CORS_ALLOWED_METHODS);
+    configuration.setAllowedHeaders(CORS_ALLOWED_HEADERS);
+    configuration.setAllowCredentials(CORS_ALLOW_CREDENTIALS);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+  }
 
-    private AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
-    }
+  private AuthenticationEntryPoint authenticationEntryPoint() {
+    return (request, response, authException) ->
+        failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
+  }
 
-    private AccessDeniedHandler accessDeniedHandler() {
-        return (request, response, accessDeniedException) -> failureResponseWriter.write(response, ErrorCode.FORBIDDEN);
-    }
+  private AccessDeniedHandler accessDeniedHandler() {
+    return (request, response, accessDeniedException) ->
+        failureResponseWriter.write(response, ErrorCode.FORBIDDEN);
+  }
 }

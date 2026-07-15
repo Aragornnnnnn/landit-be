@@ -2,7 +2,7 @@
 package com.landit.landitbe.learning.domain;
 
 public enum ReviewItemStatus {
-    READY,
-    COMPLETED,
-    SKIPPED
+  READY,
+  COMPLETED,
+  SKIPPED
 }

@@ -2,6 +2,6 @@
 package com.landit.landitbe.session.domain;
 
 public enum ArtifactType {
-    AUDIO_ORIGINAL,
-    RAW_AI_PAYLOAD
+  AUDIO_ORIGINAL,
+  RAW_AI_PAYLOAD
 }

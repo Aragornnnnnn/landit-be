@@ -16,30 +16,29 @@ import jakarta.persistence.Table;
 @Table(name = "quest_template")
 public class QuestTemplate extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "quest_type", nullable = false, length = 20)
-    private QuestType questType;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "quest_type", nullable = false, length = 20)
+  private QuestType questType;
 
-    @Column(name = "target_count", nullable = false)
-    private int targetCount;
+  @Column(name = "target_count", nullable = false)
+  private int targetCount;
 
-    @Column(name = "scenario_id")
-    private Long scenarioId;
+  @Column(name = "scenario_id")
+  private Long scenarioId;
 
-    @Column(name = "xp_reward", nullable = false)
-    private int xpReward;
+  @Column(name = "xp_reward", nullable = false)
+  private int xpReward;
 
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder;
+  @Column(name = "display_order", nullable = false)
+  private int displayOrder;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ActiveStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private ActiveStatus status;
 
-    protected QuestTemplate() {
-    }
+  protected QuestTemplate() {}
 }

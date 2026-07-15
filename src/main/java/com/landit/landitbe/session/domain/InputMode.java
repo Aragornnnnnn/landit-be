@@ -2,7 +2,7 @@
 package com.landit.landitbe.session.domain;
 
 public enum InputMode {
-    VOICE,
-    TEXT,
-    MIXED
+  VOICE,
+  TEXT,
+  MIXED
 }

@@ -2,6 +2,6 @@
 package com.landit.landitbe.content.domain;
 
 public enum TtsVoiceGender {
-    MALE,
-    FEMALE
+  MALE,
+  FEMALE
 }

@@ -10,33 +10,27 @@ import org.springframework.http.ResponseEntity;
 @JsonInclude(JsonInclude.Include.ALWAYS)
 @Schema(description = "공통 API 응답 객체")
 public record ApiResponse<T>(
-        @Schema(description = "요청 처리 성공 여부", example = "true")
-        boolean success,
+    @Schema(description = "요청 처리 성공 여부", example = "true") boolean success,
+    @Schema(description = "성공 응답 데이터. 실패 시 null입니다.") T data,
+    @Schema(description = "실패 오류 정보. 성공 시 null입니다.") ErrorResponse error) {
 
-        @Schema(description = "성공 응답 데이터. 실패 시 null입니다.")
-        T data,
+  /** 성공 응답 본문을 생성한다. */
+  public static <T> ApiResponse<T> success(T data) {
+    return new ApiResponse<>(true, data, null);
+  }
 
-        @Schema(description = "실패 오류 정보. 성공 시 null입니다.")
-        ErrorResponse error
-) {
+  /** 지정한 HTTP 상태의 성공 응답을 생성한다. */
+  public static <T> ResponseEntity<ApiResponse<T>> success(HttpStatus status, T data) {
+    return ResponseEntity.status(status).body(success(data));
+  }
 
-    /** 성공 응답 본문을 생성한다. */
-    public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, data, null);
-    }
+  /** 오류 코드의 기본 메시지로 실패 응답 본문을 생성한다. */
+  public static ApiResponse<Void> error(ErrorCode errorCode) {
+    return error(errorCode, errorCode.getMessage());
+  }
 
-    /** 지정한 HTTP 상태의 성공 응답을 생성한다. */
-    public static <T> ResponseEntity<ApiResponse<T>> success(HttpStatus status, T data) {
-        return ResponseEntity.status(status).body(success(data));
-    }
-
-    /** 오류 코드의 기본 메시지로 실패 응답 본문을 생성한다. */
-    public static ApiResponse<Void> error(ErrorCode errorCode) {
-        return error(errorCode, errorCode.getMessage());
-    }
-
-    /** 오류 코드와 별도 메시지로 실패 응답 본문을 생성한다. */
-    public static ApiResponse<Void> error(ErrorCode errorCode, String message) {
-        return new ApiResponse<>(false, null, new ErrorResponse(errorCode.name(), message));
-    }
+  /** 오류 코드와 별도 메시지로 실패 응답 본문을 생성한다. */
+  public static ApiResponse<Void> error(ErrorCode errorCode, String message) {
+    return new ApiResponse<>(false, null, new ErrorResponse(errorCode.name(), message));
+  }
 }

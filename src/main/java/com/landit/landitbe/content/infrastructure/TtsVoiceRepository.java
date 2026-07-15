@@ -4,5 +4,4 @@ package com.landit.landitbe.content.infrastructure;
 import com.landit.landitbe.content.domain.TtsVoice;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface TtsVoiceRepository extends JpaRepository<TtsVoice, Long> {
-}
+public interface TtsVoiceRepository extends JpaRepository<TtsVoice, Long> {}

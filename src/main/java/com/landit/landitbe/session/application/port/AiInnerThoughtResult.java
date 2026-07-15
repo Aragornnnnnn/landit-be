@@ -4,9 +4,4 @@ package com.landit.landitbe.session.application.port;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 
 public record AiInnerThoughtResult(
-        Long sessionId,
-        Long messageId,
-        String innerThought,
-        InnerThoughtType innerThoughtType
-) {
-}
+    Long sessionId, Long messageId, String innerThought, InnerThoughtType innerThoughtType) {}

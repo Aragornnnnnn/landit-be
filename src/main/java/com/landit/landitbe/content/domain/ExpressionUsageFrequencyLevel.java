@@ -2,7 +2,7 @@
 package com.landit.landitbe.content.domain;
 
 public enum ExpressionUsageFrequencyLevel {
-    CLASSIC_COMMON,
-    BASIC,
-    SLANG_NEOLOGISM
+  CLASSIC_COMMON,
+  BASIC,
+  SLANG_NEOLOGISM
 }

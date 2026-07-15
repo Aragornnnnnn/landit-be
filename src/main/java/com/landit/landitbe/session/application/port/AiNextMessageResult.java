@@ -4,8 +4,4 @@ package com.landit.landitbe.session.application.port;
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
 
 public record AiNextMessageResult(
-        String aiMessage,
-        String translatedMessage,
-        GoalCompletionStatus goalCompletionStatus
-) {
-}
+    String aiMessage, String translatedMessage, GoalCompletionStatus goalCompletionStatus) {}

@@ -2,6 +2,6 @@
 package com.landit.landitbe.session.domain;
 
 public enum FeedbackType {
-    GOOD,
-    NEEDS_IMPROVEMENT
+  GOOD,
+  NEEDS_IMPROVEMENT
 }

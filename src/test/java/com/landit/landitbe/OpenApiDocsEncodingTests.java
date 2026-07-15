@@ -18,13 +18,13 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class OpenApiDocsEncodingTests {
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired private MockMvc mockMvc;
 
-    @Test
-    void openApiDocsDeclareUtf8Charset() throws Exception {
-        mockMvc.perform(get("/v3/api-docs"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Content-Type", containsString("charset=UTF-8")));
-    }
+  @Test
+  void openApiDocsDeclareUtf8Charset() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Type", containsString("charset=UTF-8")));
+  }
 }

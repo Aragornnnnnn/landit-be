@@ -2,6 +2,6 @@
 package com.landit.landitbe.session.domain;
 
 public enum SessionType {
-    SCENARIO,
-    FREE_TALK
+  SCENARIO,
+  FREE_TALK
 }

@@ -2,5 +2,5 @@
 package com.landit.landitbe.content.domain;
 
 public enum TtsVoiceProvider {
-    OPENROUTER
+  OPENROUTER
 }

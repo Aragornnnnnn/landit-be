@@ -2,7 +2,7 @@
 package com.landit.landitbe.session.domain;
 
 public enum LearningSessionStatus {
-    IN_PROGRESS,
-    COMPLETED,
-    INTERRUPTED
+  IN_PROGRESS,
+  COMPLETED,
+  INTERRUPTED
 }

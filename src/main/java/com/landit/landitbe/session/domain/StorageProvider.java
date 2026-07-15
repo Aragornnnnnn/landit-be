@@ -2,5 +2,5 @@
 package com.landit.landitbe.session.domain;
 
 public enum StorageProvider {
-    S3
+  S3
 }

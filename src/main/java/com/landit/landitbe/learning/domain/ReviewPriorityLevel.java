@@ -2,7 +2,7 @@
 package com.landit.landitbe.learning.domain;
 
 public enum ReviewPriorityLevel {
-    LOW,
-    NORMAL,
-    HIGH
+  LOW,
+  NORMAL,
+  HIGH
 }

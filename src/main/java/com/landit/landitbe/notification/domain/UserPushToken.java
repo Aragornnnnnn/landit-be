@@ -16,24 +16,23 @@ import jakarta.persistence.Table;
 @Table(name = "user_push_token")
 public class UserPushToken extends BaseTimeEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(name = "user_profile_id", nullable = false)
-    private Long userProfileId;
+  @Column(name = "user_profile_id", nullable = false)
+  private Long userProfileId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private AppPlatform platform;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private AppPlatform platform;
 
-    @Column(nullable = false, length = 500)
-    private String token;
+  @Column(nullable = false, length = 500)
+  private String token;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private UserPushTokenStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private UserPushTokenStatus status;
 
-    protected UserPushToken() {
-    }
+  protected UserPushToken() {}
 }

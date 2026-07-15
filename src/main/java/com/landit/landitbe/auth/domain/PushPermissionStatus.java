@@ -2,7 +2,7 @@
 package com.landit.landitbe.auth.domain;
 
 public enum PushPermissionStatus {
-    GRANTED,
-    DENIED,
-    NOT_DETERMINED
+  GRANTED,
+  DENIED,
+  NOT_DETERMINED
 }

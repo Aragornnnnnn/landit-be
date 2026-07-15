@@ -27,78 +27,77 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @SpringBootTest
 @Import(ObservabilityIntegrationTests.OtlpMetricsSenderTestConfiguration.class)
-@TestPropertySource(properties = {
-        "management.otlp.metrics.export.enabled=true",
-        "management.otlp.metrics.export.step=1h",
-        "management.otlp.metrics.export.url=http://127.0.0.1:4318/v1/metrics"
-})
+@TestPropertySource(
+    properties = {
+      "management.otlp.metrics.export.enabled=true",
+      "management.otlp.metrics.export.step=1h",
+      "management.otlp.metrics.export.url=http://127.0.0.1:4318/v1/metrics"
+    })
 class ObservabilityIntegrationTests {
 
-    @Autowired
-    private ApplicationContext applicationContext;
+  @Autowired private ApplicationContext applicationContext;
 
-    @Autowired
-    private MeterRegistry meterRegistry;
+  @Autowired private MeterRegistry meterRegistry;
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired private MockMvc mockMvc;
 
-    @Autowired
-    private WebEndpointsSupplier webEndpointsSupplier;
+  @Autowired private WebEndpointsSupplier webEndpointsSupplier;
 
-    @Test
-    void otlpMeterRegistryIsConfigured() {
-        assertThat(applicationContext.getEnvironment()
+  @Test
+  void otlpMeterRegistryIsConfigured() {
+    assertThat(
+            applicationContext
+                .getEnvironment()
                 .getProperty("management.otlp.metrics.export.enabled", Boolean.class))
-                .isTrue();
-        assertThat(applicationContext.getBeanNamesForType(MeterRegistry.class))
-                .anyMatch(beanName -> beanName.toLowerCase().contains("otlp"));
+        .isTrue();
+    assertThat(applicationContext.getBeanNamesForType(MeterRegistry.class))
+        .anyMatch(beanName -> beanName.toLowerCase().contains("otlp"));
+  }
+
+  @Test
+  void httpServerRequestMetricRecordsRequestCountLatencyAndStatus() throws Exception {
+    mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+
+    Timer timer =
+        meterRegistry
+            .find("http.server.requests")
+            .tags(
+                "method", "GET",
+                "uri", "/actuator/health",
+                "status", "200",
+                "outcome", "SUCCESS")
+            .timer();
+
+    assertThat(timer).isNotNull();
+    assertThat(timer.count()).isPositive();
+    assertThat(timer.totalTime(timer.baseTimeUnit())).isPositive();
+  }
+
+  @Test
+  void jvmMemoryGcAndThreadMetricsAreRegistered() {
+    assertThat(meterRegistry.find("jvm.memory.used").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("jvm.gc.max.data.size").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("jvm.threads.live").meters()).isNotEmpty();
+  }
+
+  @Test
+  void metricActuatorEndpointsAreNotExposed() {
+    Set<String> exposedEndpointIds =
+        webEndpointsSupplier.getEndpoints().stream()
+            .map(endpoint -> endpoint.getEndpointId().toString())
+            .collect(Collectors.toSet());
+
+    assertThat(exposedEndpointIds)
+        .contains("health", "info")
+        .doesNotContain("metrics", "prometheus");
+  }
+
+  @TestConfiguration(proxyBeanMethods = false)
+  static class OtlpMetricsSenderTestConfiguration {
+
+    @Bean
+    OtlpMetricsSender otlpMetricsSender() {
+      return request -> {};
     }
-
-    @Test
-    void httpServerRequestMetricRecordsRequestCountLatencyAndStatus() throws Exception {
-        mockMvc.perform(get("/actuator/health"))
-                .andExpect(status().isOk());
-
-        Timer timer = meterRegistry.find("http.server.requests")
-                .tags(
-                        "method", "GET",
-                        "uri", "/actuator/health",
-                        "status", "200",
-                        "outcome", "SUCCESS"
-                )
-                .timer();
-
-        assertThat(timer).isNotNull();
-        assertThat(timer.count()).isPositive();
-        assertThat(timer.totalTime(timer.baseTimeUnit())).isPositive();
-    }
-
-    @Test
-    void jvmMemoryGcAndThreadMetricsAreRegistered() {
-        assertThat(meterRegistry.find("jvm.memory.used").meters()).isNotEmpty();
-        assertThat(meterRegistry.find("jvm.gc.max.data.size").meters()).isNotEmpty();
-        assertThat(meterRegistry.find("jvm.threads.live").meters()).isNotEmpty();
-    }
-
-    @Test
-    void metricActuatorEndpointsAreNotExposed() {
-        Set<String> exposedEndpointIds = webEndpointsSupplier.getEndpoints().stream()
-                .map(endpoint -> endpoint.getEndpointId().toString())
-                .collect(Collectors.toSet());
-
-        assertThat(exposedEndpointIds)
-                .contains("health", "info")
-                .doesNotContain("metrics", "prometheus");
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class OtlpMetricsSenderTestConfiguration {
-
-        @Bean
-        OtlpMetricsSender otlpMetricsSender() {
-            return request -> {
-            };
-        }
-    }
+  }
 }

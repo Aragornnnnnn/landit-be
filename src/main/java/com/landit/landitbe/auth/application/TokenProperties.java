@@ -5,8 +5,4 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "landit.auth.token")
 public record TokenProperties(
-        String secret,
-        long accessExpiresInSeconds,
-        long refreshExpiresInSeconds
-) {
-}
+    String secret, long accessExpiresInSeconds, long refreshExpiresInSeconds) {}
