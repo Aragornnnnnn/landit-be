@@ -2,8 +2,6 @@
 package com.landit.landitbe.session.infrastructure.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
@@ -32,6 +30,9 @@ import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
@@ -44,11 +45,11 @@ public class RemoteAiConversationClient implements AiConversationClient {
     private static final String SESSION_FEEDBACK_PATH = "/api/v1/conversation/session-feedback";
 
     private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private final AiClientProperties properties;
 
-    public RemoteAiConversationClient(ObjectMapper objectMapper, AiClientProperties properties) {
-        this.objectMapper = objectMapper;
+    public RemoteAiConversationClient(JsonMapper jsonMapper, AiClientProperties properties) {
+        this.jsonMapper = jsonMapper;
         this.properties = properties;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(properties.connectTimeout())
@@ -125,7 +126,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
                     .header("Content-Type", "application/json")
                     .timeout(requestTimeout)
                     .POST(HttpRequest.BodyPublishers.ofString(
-                            objectMapper.writeValueAsString(payload),
+                            jsonMapper.writeValueAsString(payload),
                             StandardCharsets.UTF_8
                     ))
                     .build();
@@ -150,9 +151,9 @@ public class RemoteAiConversationClient implements AiConversationClient {
     /** AI 서버 오류 응답에서 공개할 수 있는 오류 코드만 선별해 변환한다. */
     private ApiException toApiException(String responseBody, ErrorCode defaultErrorCode) {
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode root = jsonMapper.readTree(responseBody);
             if (root != null) {
-                String upstreamErrorCode = root.path("error").path("code").asText();
+                String upstreamErrorCode = root.path("error").path("code").asString();
                 if (ErrorCode.AI_RESPONSE_INVALID.name().equals(upstreamErrorCode)) {
                     return new ApiException(ErrorCode.AI_RESPONSE_INVALID);
                 }
@@ -161,7 +162,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
                     return new ApiException(ErrorCode.FEEDBACK_NOT_READY);
                 }
             }
-        } catch (IOException ignored) {
+        } catch (JacksonException ignored) {
             // 오류 본문을 해석할 수 없으면 외부 AI 호출 실패로 처리한다.
         }
         return new ApiException(defaultErrorCode);
@@ -169,14 +170,14 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
     private <T> T readData(String responseBody, Class<T> responseType) {
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode root = jsonMapper.readTree(responseBody);
             if (!root.path("success").asBoolean(false) || root.get("data") == null) {
                 throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
             }
-            return objectMapper.treeToValue(root.get("data"), responseType);
+            return jsonMapper.treeToValue(root.get("data"), responseType);
         } catch (ApiException exception) {
             throw exception;
-        } catch (IOException exception) {
+        } catch (JacksonException exception) {
             throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
         }
     }
