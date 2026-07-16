@@ -227,6 +227,69 @@ class DatabaseSchemaIntegrationTests {
         );
     }
 
+    @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")
+    @Test
+    void postgresqlMigrationNormalizesPracticeExamplesPayloadKeys() throws Exception {
+        String migrationSql = readMigrationSql(
+                "db/postgresql/V22__normalize_practice_examples_payload_keys.sql"
+        );
+
+        // 스네이크 키 → 파서(REQUIRED_PRACTICE_SENTENCE_KEYS)가 읽는 카멜 키로 변환하는지 확인한다.
+        assertThat(migrationSql).contains(
+                "jsonb_build_object",
+                "'sentenceText'",
+                "'highlightingPart'",
+                "'sentenceTranslation'",
+                "'practiceQuestion'",
+                "'practiceQuestionTranslation'",
+                "'imageUrl'",
+                "WITH ORDINALITY"
+        );
+        // 이미 카멜로 고쳐진 DB에서는 0행으로 지나가도록 멱등 가드가 있어야 한다.
+        assertThat(migrationSql).contains("e ? 'sentence_text'");
+    }
+
+    @DisplayName("표현 타입·빈도 컬럼은 enum 상수명이 아닌 값의 INSERT를 거부한다.")
+    @Test
+    void writingExpressionEnumCheckConstraintsRejectNonEnumValues() {
+        assertTableConstraintExists("writing_expression", "chk_writing_expression_type");
+        assertTableConstraintExists("writing_expression", "chk_writing_expression_usage_frequency_level");
+
+        // 시딩 파이프라인이 또 한글 라벨로 넣으면 500까지 가지 않고 INSERT 시점에 튕겨야 한다.
+        jdbcTemplate.update("""
+                insert into category (id, display_order, status, created_at, updated_at)
+                values (990201, 990201, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+        jdbcTemplate.update("""
+                insert into scenario (
+                    id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+                    display_order, status, created_at, updated_at
+                )
+                values (990202, 990201, 'barista', 'NORMAL', 'AI', 5,
+                    990202, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+
+        assertThatThrownBy(() -> insertWritingExpressionForConstraintTest("일상·루틴", "BASIC"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertWritingExpressionForConstraintTest("DAILY_ROUTINE", "기본"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private void insertWritingExpressionForConstraintTest(String expressionType, String usageFrequencyLevel) {
+        jdbcTemplate.update("""
+                insert into writing_expression (
+                    scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+                    display_order, target_expression_text, base_expression_meaning_text, usage_summary,
+                    usage_description, representative_sentence_text, representative_sentence_translation,
+                    representative_sentence_words, representative_sentence_word_choices,
+                    practice_examples_payload, status, created_at, updated_at
+                )
+                values (990202, ?, ?, 'EN', 'KR', 990203, 'sample', '샘플', 'summary',
+                    'description', 'sentence', '문장', ARRAY['sample'], ARRAY['sample','choice'],
+                    CAST('[]' AS jsonb), 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, expressionType, usageFrequencyLevel);
+    }
+
     @DisplayName("AI 튜터 음성과 시나리오 TTS 음성을 V14 migration으로 분리한다.")
     @Test
     void aiTutorAndScenarioTtsVoiceSchemaIsSeparatedByV14Migration() {

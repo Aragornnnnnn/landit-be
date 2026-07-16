@@ -4,8 +4,6 @@ package com.landit.landitbe.session.infrastructure.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.common.domain.InnerThoughtType;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
@@ -36,10 +34,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 class RemoteAiConversationClientTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private HttpServer server;
 
     @BeforeEach
@@ -96,7 +96,7 @@ class RemoteAiConversationClientTest {
                 ))
         ));
 
-        JsonNode request = objectMapper.readTree(requestBody.get());
+        JsonNode request = jsonMapper.readTree(requestBody.get());
         assertThat(request.get("sessionId").asLong()).isEqualTo(100L);
         assertThat(request.get("submittedMessageId").asLong()).isEqualTo(200L);
         assertThat(request.get("submittedTurnNumber").asInt()).isEqualTo(1);
@@ -245,19 +245,55 @@ class RemoteAiConversationClientTest {
                 "I like pizza because it is spicy."
         ));
 
-        JsonNode request = objectMapper.readTree(requestBody.get());
+        JsonNode request = jsonMapper.readTree(requestBody.get());
         assertThat(request.get("sessionId").asLong()).isEqualTo(100L);
         assertThat(request.get("messageId").asLong()).isEqualTo(200L);
         assertThat(request.get("turnNumber").asInt()).isEqualTo(1);
         assertThat(request.get("messageSequence").asInt()).isEqualTo(2);
-        assertThat(request.get("scenario").get("counterpartRole").asText()).isEqualTo("friend");
-        assertThat(request.get("evaluationContext").get("type").asText()).isEqualTo("AI_MESSAGE");
-        assertThat(request.get("evaluationContext").get("content").asText())
+        assertThat(request.get("scenario").get("counterpartRole").asString()).isEqualTo("friend");
+        assertThat(request.get("evaluationContext").get("type").asString()).isEqualTo("AI_MESSAGE");
+        assertThat(request.get("evaluationContext").get("content").asString())
                 .isEqualTo("What food do you like? Why do you like it?");
-        assertThat(request.get("evaluationContext").get("translatedContent").asText())
+        assertThat(request.get("evaluationContext").get("translatedContent").asString())
                 .isEqualTo("좋아하는 음식이 있어? 왜 좋아해?");
-        assertThat(request.get("userMessage").asText())
+        assertThat(request.get("userMessage").asString())
                 .isEqualTo("I like pizza because it is spicy.");
+        assertThat(result).isEqualTo(new AiMessageFeedbackResult(
+                100L,
+                200L,
+                ProcessingStatus.PREPARING
+        ));
+    }
+
+    @Test
+    void requestMessageFeedbackSerializesAndDeserializesWithJackson3JsonMapper() throws Exception {
+        JsonMapper jsonMapper = JsonMapper.builder().build();
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/api/v1/conversation/message-feedback", exchange -> {
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] responseBody = """
+                    {
+                      "success": true,
+                      "data": {
+                        "sessionId": 100,
+                        "messageId": 200,
+                        "feedbackStatus": "PREPARING",
+                        "ignoredField": "ignored"
+                      },
+                      "error": null
+                    }
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(202, responseBody.length);
+            exchange.getResponseBody().write(responseBody);
+            exchange.close();
+        });
+
+        AiMessageFeedbackResult result = remoteClient(jsonMapper)
+                .requestMessageFeedback(aiMessageFeedbackRequest());
+
+        JsonNode request = jsonMapper.readTree(requestBody.get());
+        assertThat(request.get("sessionId").asLong()).isEqualTo(100L);
+        assertThat(request.get("evaluationContext").get("type").asString()).isEqualTo("AI_MESSAGE");
         assertThat(result).isEqualTo(new AiMessageFeedbackResult(
                 100L,
                 200L,
@@ -309,14 +345,14 @@ class RemoteAiConversationClientTest {
                 "Can I get an iced americano?"
         ));
 
-        JsonNode request = objectMapper.readTree(requestBody.get());
+        JsonNode request = jsonMapper.readTree(requestBody.get());
         assertThat(request.get("messageSequence").asInt()).isEqualTo(1);
-        assertThat(request.get("evaluationContext").get("type").asText())
+        assertThat(request.get("evaluationContext").get("type").asString())
                 .isEqualTo("SCENARIO_OPENING_INSTRUCTION");
-        assertThat(request.get("evaluationContext").get("content").asText())
+        assertThat(request.get("evaluationContext").get("content").asString())
                 .isEqualTo("점원에게 먼저 주문하고 싶은 음료를 말해보세요.");
         assertThat(request.get("evaluationContext").get("translatedContent").isNull()).isTrue();
-        assertThat(request.get("userMessage").asText()).isEqualTo("Can I get an iced americano?");
+        assertThat(request.get("userMessage").asString()).isEqualTo("Can I get an iced americano?");
     }
 
     @Test
@@ -391,9 +427,9 @@ class RemoteAiConversationClientTest {
 
         AiSessionFeedbackResult result = client.generateSessionFeedback(aiSessionFeedbackRequest());
 
-        JsonNode request = objectMapper.readTree(requestBody.get());
+        JsonNode request = jsonMapper.readTree(requestBody.get());
         assertThat(request.get("sessionId").asLong()).isEqualTo(100L);
-        assertThat(request.get("scenario").get("serviceAudience").asText()).isEqualTo("KOREAN_LEARNER");
+        assertThat(request.get("scenario").get("serviceAudience").asString()).isEqualTo("KOREAN_LEARNER");
         assertThat(request.get("expectedMessageIds"))
                 .extracting(JsonNode::asLong)
                 .containsExactly(200L, 201L);
@@ -567,6 +603,22 @@ class RemoteAiConversationClientTest {
         return remoteClient(Duration.ofSeconds(60));
     }
 
+    private RemoteAiConversationClient remoteClient(JsonMapper jsonMapper) throws Exception {
+        return (RemoteAiConversationClient) RemoteAiConversationClient.class
+                .getConstructor(JsonMapper.class, AiClientProperties.class)
+                .newInstance(
+                        jsonMapper,
+                        new AiClientProperties(
+                                baseUrl(),
+                                "remote",
+                                "KOREAN_LEARNER",
+                                Duration.ofSeconds(5),
+                                Duration.ofSeconds(60),
+                                Duration.ofSeconds(60)
+                        )
+                );
+    }
+
     private RemoteAiConversationClient remoteClient(Duration requestTimeout) {
         return remoteClient(requestTimeout, requestTimeout);
     }
@@ -576,7 +628,7 @@ class RemoteAiConversationClientTest {
             Duration sessionFeedbackRequestTimeout
     ) {
         return new RemoteAiConversationClient(
-                objectMapper,
+                jsonMapper,
                 new AiClientProperties(
                         baseUrl(),
                         "remote",
