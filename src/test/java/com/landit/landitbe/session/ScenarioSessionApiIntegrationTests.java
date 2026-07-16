@@ -1028,7 +1028,7 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
-    void getSessionFeedbackUsesNativeScoreStarRatingWhenAiStarRatingDiffers() throws Exception {
+    void getSessionFeedbackStoresAiStarRatingWhenItDiffersFromNativeScoreBand() throws Exception {
         StartedSession startedSession = startCompletedAiFirstSession(
                 "session-feedback-invalid-result@example.com"
         );
@@ -1038,12 +1038,30 @@ class ScenarioSessionApiIntegrationTests {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.nativeScore").value(90))
-                .andExpect(jsonPath("$.data.starRating").value(3.0));
+                .andExpect(jsonPath("$.data.starRating").value(2.5));
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT star_rating FROM session_history_summary_feedback",
                 BigDecimal.class
-        )).isEqualByComparingTo("3.0");
+        )).isEqualByComparingTo("2.5");
+    }
+
+    @Test
+    void getSessionFeedbackRejectsUnsupportedAiStarRating() throws Exception {
+        StartedSession startedSession = startCompletedAiFirstSession(
+                "session-feedback-unsupported-star-rating@example.com"
+        );
+        fakeAiConversationClient.returnSessionFeedbackStarRating(new BigDecimal("4.0"));
+
+        mockMvc.perform(post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_summary_feedback",
+                Integer.class
+        )).isZero();
     }
 
     @Test
@@ -2563,6 +2581,10 @@ class ScenarioSessionApiIntegrationTests {
 
         private void returnMismatchedSessionFeedbackStarRating() {
             sessionFeedbackStarRating = new BigDecimal("2.5");
+        }
+
+        private void returnSessionFeedbackStarRating(BigDecimal starRating) {
+            sessionFeedbackStarRating = starRating;
         }
 
         private void returnMessageFeedbackStatus(ProcessingStatus status) {
