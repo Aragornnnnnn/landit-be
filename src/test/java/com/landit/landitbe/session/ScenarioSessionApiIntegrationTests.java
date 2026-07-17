@@ -604,6 +604,14 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void getInnerThoughtRequiresAuthentication() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/sessions/1/messages/1/inner-thought"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+  }
+
+  @Test
   void getInnerThoughtMarksStalePreparingResultAsFailed() throws Exception {
     StartedSession startedSession =
         startUserFirstSession("inner-thought-stale@example.com", 1202, 2202, 3202);
@@ -1207,6 +1215,14 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("SESSION_NOT_COMPLETED"));
 
     assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isZero();
+  }
+
+  @Test
+  void getSessionFeedbackRequiresAuthentication() throws Exception {
+    mockMvc
+        .perform(post("/api/v1/sessions/1/feedback"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
   @Test
