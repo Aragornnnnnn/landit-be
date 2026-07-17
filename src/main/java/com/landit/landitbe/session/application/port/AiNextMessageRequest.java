@@ -1,14 +1,14 @@
 // AI 다음 메시지 생성 요청 본문을 표현한다.
+
 package com.landit.landitbe.session.application.port;
 
 import java.util.List;
 
+/** AI 다음 메시지 생성 요청 본문을 표현한다. */
 public record AiNextMessageRequest(
-        Long sessionId,
-        Long submittedMessageId,
-        int submittedTurnNumber,
-        AiScenarioContext scenario,
-        List<AiConversationHistoryMessage> conversationHistory,
-        AiNextQuestion nextQuestion
-) {
-}
+    Long sessionId,
+    Long submittedMessageId,
+    int submittedTurnNumber,
+    AiScenarioContext scenario,
+    List<AiConversationHistoryMessage> conversationHistory,
+    AiNextQuestion nextQuestion) {}

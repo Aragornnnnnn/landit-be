@@ -1,4 +1,5 @@
 // 시나리오 목록 화면에 필요한 읽기 전용 JPA 조회를 정의한다.
+
 package com.landit.landitbe.content.infrastructure;
 
 import com.landit.landitbe.content.domain.Scenario;
@@ -8,11 +9,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** 시나리오 목록 화면에 필요한 읽기 전용 JPA 조회를 정의한다. */
 @Repository
 public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Long> {
 
-    /** 사용자 기본 언어 조합에 해당하는 목록 데이터를 조회한다. Entity 연관관계가 없는 FK는 명시적으로 join한다. */
-    @Query("""
+  /** 사용자 기본 언어 조합에 해당하는 목록 데이터를 조회한다. Entity 연관관계가 없는 FK는 명시적으로 join한다. */
+  @Query(
+      """
             SELECT new com.landit.landitbe.content.infrastructure.ScenarioListRow(
                 c.id,
                 clv.name,
@@ -69,6 +72,6 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
              AND usp.targetLocale = up.targetLocale
             WHERE up.id = :userId
             ORDER BY c.displayOrder ASC, s.displayOrder ASC
-            """)
-    List<ScenarioListRow> findScenarioList(@Param("userId") long userId);
+      """)
+  List<ScenarioListRow> findScenarioList(@Param("userId") long userId);
 }

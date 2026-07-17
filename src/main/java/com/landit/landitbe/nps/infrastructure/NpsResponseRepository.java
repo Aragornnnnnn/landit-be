@@ -1,8 +1,9 @@
 // NPS 응답 엔티티를 저장하는 Repository다.
+
 package com.landit.landitbe.nps.infrastructure;
 
 import com.landit.landitbe.nps.domain.NpsResponse;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface NpsResponseRepository extends JpaRepository<NpsResponse, Long> {
-}
+/** NPS 응답 엔티티를 저장하는 Repository다. */
+public interface NpsResponseRepository extends JpaRepository<NpsResponse, Long> {}

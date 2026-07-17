@@ -1,5 +1,7 @@
 plugins {
 	id 'java'
+	id 'checkstyle'
+	id 'com.diffplug.spotless' version '8.8.0'
 	id 'org.springframework.boot' version '4.0.7'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -20,6 +22,19 @@ tasks.withType(JavaCompile).configureEach {
 
 repositories {
 	mavenCentral()
+}
+
+spotless {
+	java {
+		target 'src/main/java/**/*.java', 'src/test/java/**/*.java'
+		googleJavaFormat('1.35.0')
+	}
+}
+
+checkstyle {
+	toolVersion = '13.8.0'
+	config = resources.text.fromFile('config/checkstyle/google_checks.xml')
+	configProperties = ['org.checkstyle.google.severity': 'error']
 }
 
 dependencies {

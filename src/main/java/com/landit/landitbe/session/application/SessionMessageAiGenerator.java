@@ -1,4 +1,5 @@
 // 사용자 발화 이후 생성할 AI 메시지를 요청한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.InnerThoughtType;
@@ -21,144 +22,128 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/** 사용자 발화 이후 생성할 AI 메시지를 요청한다. */
 @RequiredArgsConstructor
 @Service
 class SessionMessageAiGenerator {
 
-    private final AiConversationClient aiConversationClient;
-    private final AiScenarioContextMapper aiScenarioContextMapper;
+  private final AiConversationClient aiConversationClient;
+  private final AiScenarioContextMapper aiScenarioContextMapper;
 
-    /** 다음 AI 메시지 또는 종료 메시지를 생성한다. */
-    Generation generate(Request request) {
-        Optional<ScenarioQuestionRow> nextQuestion = request.nextQuestion();
+  /** 다음 AI 메시지 또는 종료 메시지를 생성한다. */
+  Generation generate(Request request) {
+    Optional<ScenarioQuestionRow> nextQuestion = request.nextQuestion();
 
-        // 다음 질문이 없으면 최대 턴에 도달한 것으로 보고
-        // 종료 메시지를 생성한다.
-        if (nextQuestion.isEmpty()) {
-            return generateClosingMessage(
-                    request,
-                    AiClosingReason.MAX_TURNS_REACHED,
-                    GoalCompletionStatus.COMPLETED,
-                    CompletionReason.MAX_TURNS_REACHED
-            );
-        }
-
-        return generateNextMessage(request, nextQuestion.get());
+    // 다음 질문이 없으면 최대 턴에 도달한 것으로 보고
+    // 종료 메시지를 생성한다.
+    if (nextQuestion.isEmpty()) {
+      return generateClosingMessage(
+          request,
+          AiClosingReason.MAX_TURNS_REACHED,
+          GoalCompletionStatus.COMPLETED,
+          CompletionReason.MAX_TURNS_REACHED);
     }
 
-    private Generation generateNextMessage(
-            Request request,
-            ScenarioQuestionRow nextQuestion
-    ) {
-        AiNextMessageResult nextMessageResult = aiConversationClient.generateNextMessage(
-                toNextMessageRequest(request, nextQuestion)
-        );
-        assertNextMessageResult(nextMessageResult);
+    return generateNextMessage(request, nextQuestion.get());
+  }
 
-        return new Generation(
-                nextMessageResult.aiMessage(),
-                nextMessageResult.translatedMessage(),
-                null,
-                null,
-                nextMessageResult.goalCompletionStatus(),
-                false,
-                null
-        );
-    }
+  private Generation generateNextMessage(Request request, ScenarioQuestionRow nextQuestion) {
+    AiNextMessageResult nextMessageResult =
+        aiConversationClient.generateNextMessage(toNextMessageRequest(request, nextQuestion));
+    assertNextMessageResult(nextMessageResult);
 
-    private AiNextMessageRequest toNextMessageRequest(
-            Request request,
-            ScenarioQuestionRow nextQuestion
-    ) {
-        return new AiNextMessageRequest(
+    return new Generation(
+        nextMessageResult.aiMessage(),
+        nextMessageResult.translatedMessage(),
+        null,
+        null,
+        nextMessageResult.goalCompletionStatus(),
+        false,
+        null);
+  }
+
+  private AiNextMessageRequest toNextMessageRequest(
+      Request request, ScenarioQuestionRow nextQuestion) {
+    return new AiNextMessageRequest(
+        request.learningSessionId(),
+        request.submittedMessageId(),
+        request.submittedTurnNumber(),
+        aiScenarioContextMapper.map(request.scenarioContext()),
+        request.conversationHistory(),
+        toAiNextQuestion(nextQuestion));
+  }
+
+  private Generation generateClosingMessage(
+      Request request,
+      AiClosingReason closingReason,
+      GoalCompletionStatus goalCompletionStatus,
+      CompletionReason completionReason) {
+    AiClosingMessageResult closingMessageResult =
+        aiConversationClient.generateClosingMessage(
+            new AiClosingMessageRequest(
                 request.learningSessionId(),
                 request.submittedMessageId(),
                 request.submittedTurnNumber(),
                 aiScenarioContextMapper.map(request.scenarioContext()),
                 request.conversationHistory(),
-                toAiNextQuestion(nextQuestion)
-        );
-    }
+                closingReason,
+                goalCompletionStatus));
+    assertClosingMessageResult(closingMessageResult);
+    return new Generation(
+        closingMessageResult.aiMessage(),
+        closingMessageResult.translatedMessage(),
+        closingMessageResult.innerThought(),
+        closingMessageResult.innerThoughtType(),
+        goalCompletionStatus,
+        true,
+        completionReason);
+  }
 
-    private Generation generateClosingMessage(
-            Request request,
-            AiClosingReason closingReason,
-            GoalCompletionStatus goalCompletionStatus,
-            CompletionReason completionReason
-    ) {
-        AiClosingMessageResult closingMessageResult = aiConversationClient.generateClosingMessage(
-                new AiClosingMessageRequest(
-                        request.learningSessionId(),
-                        request.submittedMessageId(),
-                        request.submittedTurnNumber(),
-                        aiScenarioContextMapper.map(request.scenarioContext()),
-                        request.conversationHistory(),
-                        closingReason,
-                        goalCompletionStatus
-                )
-        );
-        assertClosingMessageResult(closingMessageResult);
-        return new Generation(
-                closingMessageResult.aiMessage(),
-                closingMessageResult.translatedMessage(),
-                closingMessageResult.innerThought(),
-                closingMessageResult.innerThoughtType(),
-                goalCompletionStatus,
-                true,
-                completionReason
-        );
-    }
+  private AiNextQuestion toAiNextQuestion(ScenarioQuestionRow nextQuestion) {
+    return new AiNextQuestion(
+        nextQuestion.questionId(),
+        nextQuestion.sequence(),
+        nextQuestion.questionText(),
+        nextQuestion.questionTranslation());
+  }
 
-    private AiNextQuestion toAiNextQuestion(ScenarioQuestionRow nextQuestion) {
-        return new AiNextQuestion(
-                nextQuestion.questionId(),
-                nextQuestion.sequence(),
-                nextQuestion.questionText(),
-                nextQuestion.questionTranslation()
-        );
+  private void assertNextMessageResult(AiNextMessageResult result) {
+    if (result == null
+        || blank(result.aiMessage())
+        || blank(result.translatedMessage())
+        || result.goalCompletionStatus() == null) {
+      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
+  }
 
-    private void assertNextMessageResult(AiNextMessageResult result) {
-        if (result == null
-                || blank(result.aiMessage())
-                || blank(result.translatedMessage())
-                || result.goalCompletionStatus() == null) {
-            throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-        }
+  private void assertClosingMessageResult(AiClosingMessageResult result) {
+    if (result == null
+        || blank(result.aiMessage())
+        || blank(result.translatedMessage())
+        || blank(result.innerThought())
+        || result.innerThoughtType() == null) {
+      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
+  }
 
-    private void assertClosingMessageResult(AiClosingMessageResult result) {
-        if (result == null
-                || blank(result.aiMessage())
-                || blank(result.translatedMessage())
-                || blank(result.innerThought())
-                || result.innerThoughtType() == null) {
-            throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-        }
-    }
+  private boolean blank(String value) {
+    return value == null || value.isBlank();
+  }
 
-    private boolean blank(String value) {
-        return value == null || value.isBlank();
-    }
+  record Request(
+      Long learningSessionId,
+      Long submittedMessageId,
+      int submittedTurnNumber,
+      ScenarioSessionMessageContextRow scenarioContext,
+      List<AiConversationHistoryMessage> conversationHistory,
+      Optional<ScenarioQuestionRow> nextQuestion) {}
 
-    record Request(
-            Long learningSessionId,
-            Long submittedMessageId,
-            int submittedTurnNumber,
-            ScenarioSessionMessageContextRow scenarioContext,
-            List<AiConversationHistoryMessage> conversationHistory,
-            Optional<ScenarioQuestionRow> nextQuestion
-    ) {
-    }
-
-    record Generation(
-            String aiMessage,
-            String translatedMessage,
-            String innerThought,
-            InnerThoughtType innerThoughtType,
-            GoalCompletionStatus goalCompletionStatus,
-            boolean completed,
-            CompletionReason completionReason
-    ) {
-    }
+  record Generation(
+      String aiMessage,
+      String translatedMessage,
+      String innerThought,
+      InnerThoughtType innerThoughtType,
+      GoalCompletionStatus goalCompletionStatus,
+      boolean completed,
+      CompletionReason completionReason) {}
 }
