@@ -33,6 +33,7 @@ public class SessionMessageSubmitUseCase {
   private final SessionInnerThoughtGenerator sessionInnerThoughtGenerator;
   private final SessionInnerThoughtRecorder sessionInnerThoughtRecorder;
   private final SessionMessageFeedbackRequester sessionMessageFeedbackRequester;
+  private final SessionMessageFeedbackRecorder sessionMessageFeedbackRecorder;
   private final GeneratedMessageRecorder generatedMessageRecorder;
   private final PlatformTransactionManager transactionManager;
   private final TaskExecutor taskExecutor;
@@ -43,6 +44,7 @@ public class SessionMessageSubmitUseCase {
       SessionInnerThoughtGenerator sessionInnerThoughtGenerator,
       SessionInnerThoughtRecorder sessionInnerThoughtRecorder,
       SessionMessageFeedbackRequester sessionMessageFeedbackRequester,
+      SessionMessageFeedbackRecorder sessionMessageFeedbackRecorder,
       GeneratedMessageRecorder generatedMessageRecorder,
       PlatformTransactionManager transactionManager,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
@@ -51,6 +53,7 @@ public class SessionMessageSubmitUseCase {
     this.sessionInnerThoughtGenerator = sessionInnerThoughtGenerator;
     this.sessionInnerThoughtRecorder = sessionInnerThoughtRecorder;
     this.sessionMessageFeedbackRequester = sessionMessageFeedbackRequester;
+    this.sessionMessageFeedbackRecorder = sessionMessageFeedbackRecorder;
     this.generatedMessageRecorder = generatedMessageRecorder;
     this.transactionManager = transactionManager;
     this.taskExecutor = taskExecutor;
@@ -113,6 +116,7 @@ public class SessionMessageSubmitUseCase {
                 submittedContext.sessionId(),
                 submittedContext.submittedMessageId(),
                 exception);
+            sessionMessageFeedbackRecorder.fail(submittedContext.submittedMessageId());
           }
         });
     return new AsyncGenerationRequests(
