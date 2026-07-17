@@ -45,6 +45,7 @@ Java 포맷 기준과 자동 검사 범위는 [Java 코드 스타일 문서](doc
 ```bash
 ./gradlew spotlessCheck
 ./gradlew spotlessApply
+./gradlew checkstyleMain checkstyleTest
 ```
 
 ## 테스트와 검증

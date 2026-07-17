@@ -35,5 +35,8 @@ jobs:
       - name: Check Java code style
         run: ./gradlew spotlessCheck --no-daemon
 
+      - name: Check Google Java Style
+        run: ./gradlew checkstyleMain checkstyleTest --no-daemon
+
       - name: Run application tests
         run: ./gradlew test --no-daemon
