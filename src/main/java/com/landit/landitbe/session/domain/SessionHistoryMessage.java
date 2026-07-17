@@ -62,6 +62,10 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   @Column(name = "inner_thought_processing_status", length = 20)
   private ProcessingStatus innerThoughtProcessingStatus;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "feedback_processing_status", length = 20)
+  private ProcessingStatus feedbackProcessingStatus;
+
   @Column(name = "pronunciation_score")
   private Integer pronunciationScore;
 
@@ -141,6 +145,7 @@ public class SessionHistoryMessage extends BaseTimeEntity {
             null,
             null);
     message.innerThoughtProcessingStatus = ProcessingStatus.PREPARING;
+    message.feedbackProcessingStatus = ProcessingStatus.PREPARING;
     return message;
   }
 
