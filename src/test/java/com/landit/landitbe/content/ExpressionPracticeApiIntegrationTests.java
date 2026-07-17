@@ -1,4 +1,5 @@
 // 원어민 표현 추가 예문 조회 API의 인증, 예문 목록/작문 문제 응답, 예외 처리를 검증한다.
+
 package com.landit.landitbe.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +28,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/** 원어민 표현 추가 예문 조회 API의 인증, 예문 목록/작문 문제 응답, 예외 처리를 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -194,7 +196,7 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestionTranslation": "불량?"
                   }
                 ]
-                """;
+        """;
     Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payloadWithInvalidSentence);
     String accessToken =
         login("google-practice-4", "practice4@example.com", "Practice User4", "practice-nonce-4");
@@ -223,19 +225,20 @@ class ExpressionPracticeApiIntegrationTests {
     return seedExpressionWithPracticeExamples("ACTIVE");
   }
 
-  /** status를 지정해 표현을 심는 버전. INACTIVE(내려간 콘텐츠) 케이스 검증에 사용한다. */
+  /** Status를 지정해 표현을 심는 버전. INACTIVE(내려간 콘텐츠) 케이스 검증에 사용한다. */
   private Long seedExpressionWithPracticeExamples(String status) {
     return seedExpressionWithPracticeExamples(status, practiceExamplesPayloadJson());
   }
 
-  /** payload JSON까지 지정해 표현을 심는 버전. 불량 예문 케이스 검증에 사용한다. */
+  /** Payload JSON까지 지정해 표현을 심는 버전. 불량 예문 케이스 검증에 사용한다. */
   private Long seedExpressionWithPracticeExamples(String status, String payloadJson) {
     LocalDateTime now = LocalDateTime.now();
 
     // 1) 최상위 부모: category
     Long categoryId =
         insertAndGetId(
-            "INSERT INTO category (display_order, status, created_at, updated_at) VALUES (?, 'ACTIVE', ?, ?)",
+            "INSERT INTO category (display_order, status, created_at, updated_at) "
+                + "VALUES (?, 'ACTIVE', ?, ?)",
             nextDisplayOrder("category"),
             now,
             now);
@@ -257,7 +260,8 @@ class ExpressionPracticeApiIntegrationTests {
         "INSERT INTO writing_expression "
             + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
-            + "usage_description, representative_sentence_text, representative_sentence_translation, "
+            + "usage_description, representative_sentence_text, "
+            + "representative_sentence_translation, "
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "practice_examples_payload, status, created_at, updated_at) "
             // H2에서 CAST(? AS jsonb)는 문자열을 "JSON 문자열 값"으로 저장해버려서(배열로 파싱 안 됨)
@@ -290,7 +294,7 @@ class ExpressionPracticeApiIntegrationTests {
                       "practiceQuestionTranslation": "질문해석-%d",
                       "imageUrl": "https://cdn.example.com/practice/%d.png"
                     }
-                    """
+          """
               .formatted(i, i, i, i, i, i));
     }
     return json.append("]").toString();
@@ -319,7 +323,7 @@ class ExpressionPracticeApiIntegrationTests {
     return keyHolder.getKey().longValue(); // 그릇에서 생성된 PK를 꺼낸다
   }
 
-  /** display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
+  /** Display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
   private int nextDisplayOrder(String tableName) {
     Integer maxOrder =
         jdbcTemplate.queryForObject(
@@ -344,7 +348,7 @@ class ExpressionPracticeApiIntegrationTests {
                                   "idToken":"%s|%s|%s|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(sub, email, nickname, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();

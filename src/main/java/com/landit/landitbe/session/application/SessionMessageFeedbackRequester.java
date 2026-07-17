@@ -1,4 +1,5 @@
 // 사용자 메시지에 대한 AI 피드백 생성을 요청하고 접수 결과를 검증한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.ConversationSpeaker;
@@ -16,6 +17,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 사용자 메시지에 대한 AI 피드백 생성을 요청하고 접수 결과를 검증한다. */
 @RequiredArgsConstructor
 @Component
 class SessionMessageFeedbackRequester {

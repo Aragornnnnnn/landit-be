@@ -1,4 +1,5 @@
 // 원어민 표현 학습 시작 API의 인증, 표현 상세 응답, 예외 처리를 검증한다.
+
 package com.landit.landitbe.content;
 
 import static org.hamcrest.Matchers.contains;
@@ -26,6 +27,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/** 원어민 표현 학습 시작 API의 인증, 표현 상세 응답, 예외 처리를 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -157,14 +159,15 @@ class ExpressionLearningApiIntegrationTests {
     return seedExpression("ACTIVE");
   }
 
-  /** status를 지정해 표현을 심는 버전. INACTIVE(내려간 콘텐츠) 케이스 검증에 사용한다. */
+  /** Status를 지정해 표현을 심는 버전. INACTIVE(내려간 콘텐츠) 케이스 검증에 사용한다. */
   private Long seedExpression(String status) {
     LocalDateTime now = LocalDateTime.now();
 
     // 1) 최상위 부모: category
     Long categoryId =
         insertAndGetId(
-            "INSERT INTO category (display_order, status, created_at, updated_at) VALUES (?, 'ACTIVE', ?, ?)",
+            "INSERT INTO category (display_order, status, created_at, updated_at) "
+                + "VALUES (?, 'ACTIVE', ?, ?)",
             nextDisplayOrder("category"),
             now,
             now);
@@ -187,9 +190,11 @@ class ExpressionLearningApiIntegrationTests {
         "INSERT INTO writing_expression "
             + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
-            + "usage_description, representative_question_text, representative_question_translation, "
+            + "usage_description, representative_question_text, "
+            + "representative_question_translation, "
             + "representative_sentence_text, representative_sentence_translation, "
-            + "representative_sentence_words, representative_sentence_word_choices, representative_image_url, "
+            + "representative_sentence_words, representative_sentence_word_choices, "
+            + "representative_image_url, "
             + "practice_examples_payload, status, created_at, updated_at) "
             + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
             + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
@@ -233,7 +238,7 @@ class ExpressionLearningApiIntegrationTests {
     return keyHolder.getKey().longValue(); // 그릇에서 생성된 PK를 꺼낸다
   }
 
-  /** display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
+  /** Display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
   private int nextDisplayOrder(String tableName) {
     Integer maxOrder =
         jdbcTemplate.queryForObject(
@@ -260,7 +265,7 @@ class ExpressionLearningApiIntegrationTests {
                                   "idToken":"%s|%s|%s|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(sub, email, nickname, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();

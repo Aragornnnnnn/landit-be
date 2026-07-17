@@ -1,4 +1,5 @@
 // 사용자의 NPS 응답을 저장하는 Entity
+
 package com.landit.landitbe.nps.domain;
 
 import com.landit.landitbe.common.domain.BaseCreatedAtEntity;
@@ -9,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 사용자의 NPS 응답을 저장하는 Entity. */
 @Entity
 @Table(name = "nps_response")
 public class NpsResponse extends BaseCreatedAtEntity {
@@ -26,8 +28,10 @@ public class NpsResponse extends BaseCreatedAtEntity {
   @Column(name = "opinion_text", columnDefinition = "text")
   private String opinionText;
 
+  /** 동작을 수행한다. */
   protected NpsResponse() {}
 
+  /** 동작을 수행한다. */
   public NpsResponse(Long userProfileId, int score, String opinionText) {
     this.userProfileId = userProfileId;
     this.score = score;

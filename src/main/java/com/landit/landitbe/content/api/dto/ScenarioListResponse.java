@@ -1,14 +1,17 @@
 // 시나리오 목록 조회 API의 응답 구조를 정의한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 
+/** 시나리오 목록 조회 API의 응답 구조를 정의한다. */
 @Schema(description = "시나리오 전체 조회 응답")
 public record ScenarioListResponse(
     @Schema(description = "카테고리별 시나리오 목록") List<CategoryResponse> categories) {
 
+  /** 내부 타입을 정의한다. */
   @Schema(description = "시나리오 카테고리 응답")
   public record CategoryResponse(
       @Schema(description = "카테고리 ID") Long categoryId,
@@ -18,6 +21,7 @@ public record ScenarioListResponse(
       @Schema(description = "카테고리 잠금 사유") String categoryLockReason,
       @Schema(description = "카테고리에 속한 시나리오 목록") List<ScenarioResponse> scenarios) {}
 
+  /** 내부 타입을 정의한다. */
   @Schema(description = "시나리오 응답")
   public record ScenarioResponse(
       @Schema(description = "시나리오 ID") Long scenarioId,
@@ -34,6 +38,7 @@ public record ScenarioListResponse(
       @Schema(description = "시나리오 잠금 사유") String lockReason,
       @Schema(description = "잠기지 않은 시나리오의 시작 메시지 미리보기") OpeningPreviewResponse openingPreview) {}
 
+  /** 내부 타입을 정의한다. */
   @Schema(description = "시작 메시지 미리보기 응답")
   public record OpeningPreviewResponse(
       @Schema(description = "AI first 시 첫 AI 메시지") String aiOpeningMessage,

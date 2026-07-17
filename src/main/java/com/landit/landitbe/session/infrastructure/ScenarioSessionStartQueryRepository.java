@@ -1,4 +1,5 @@
 // 시나리오 세션 시작에 필요한 콘텐츠와 잠금 정보를 조회한다.
+
 package com.landit.landitbe.session.infrastructure;
 
 import com.landit.landitbe.content.domain.Scenario;
@@ -7,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 시나리오 세션 시작에 필요한 콘텐츠와 잠금 정보를 조회한다. */
 public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scenario, Long> {
 
   /** 사용자 언어 설정에 맞는 시나리오 시작 정보를 조회한다. */
@@ -53,7 +55,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
               ON tv.id = slv.ttsVoiceId
              AND tv.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
             WHERE up.id = :userId
-            """)
+      """)
   Optional<ScenarioSessionStartRow> findStartRow(
       @Param("userId") long userId, @Param("scenarioId") long scenarioId);
 
@@ -84,7 +86,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
              AND usp.scenarioId = previousScenario.id
              AND usp.targetLocale = up.targetLocale
             WHERE up.id = :userId
-            """)
+      """)
   Optional<ScenarioSessionLockRow> findPreviousScenarioLockRow(
       @Param("userId") long userId, @Param("scenarioId") long scenarioId);
 }

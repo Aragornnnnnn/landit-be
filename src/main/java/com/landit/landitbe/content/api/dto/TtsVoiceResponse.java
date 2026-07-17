@@ -1,10 +1,12 @@
 // 시나리오 상대 역할의 TTS 음성 정보를 API 응답으로 제공한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import com.landit.landitbe.content.domain.TtsVoiceGender;
 import com.landit.landitbe.content.domain.TtsVoiceProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** 시나리오 상대 역할의 TTS 음성 정보를 API 응답으로 제공한다. */
 @Schema(description = "시나리오 TTS 음성")
 public record TtsVoiceResponse(
     @Schema(description = "TTS Provider") String provider,

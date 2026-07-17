@@ -1,10 +1,12 @@
 // 세션 히스토리 메시지 피드백 엔티티의 조회와 저장을 담당한다.
+
 package com.landit.landitbe.session.infrastructure;
 
 import com.landit.landitbe.session.domain.SessionHistoryMessageFeedback;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** 세션 히스토리 메시지 피드백 엔티티의 조회와 저장을 담당한다. */
 public interface SessionHistoryMessageFeedbackRepository
     extends JpaRepository<SessionHistoryMessageFeedback, Long> {
 

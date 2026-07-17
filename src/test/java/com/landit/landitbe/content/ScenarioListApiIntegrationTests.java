@@ -1,4 +1,5 @@
 // 시나리오 목록 API의 정렬, 진행도, 잠금, 시작 미리보기를 검증한다.
+
 package com.landit.landitbe.content;
 
 import static org.hamcrest.Matchers.nullValue;
@@ -23,6 +24,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/** 시나리오 목록 API의 정렬, 진행도, 잠금, 시작 미리보기를 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -197,7 +199,7 @@ class ScenarioListApiIntegrationTests {
 
   @Test
   void scenariosReturnNullTtsVoiceWhenVoiceIsInactiveOrMissing() throws Exception {
-    JsonNode loginResponseBody = login();
+    final JsonNode loginResponseBody = login();
     long inactiveVoiceId = insertTtsVoice(990200, "test-inactive-voice", "INACTIVE");
     insertCategory(110, 1, "ACTIVE", "비활성 음성");
     insertScenario(210, 110, 1, "AI", "EASY", "ACTIVE", null);
@@ -237,7 +239,7 @@ class ScenarioListApiIntegrationTests {
                                   "idToken":"%s|scenario@example.com|Scenario User|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(UUID.randomUUID(), nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();
@@ -245,8 +247,8 @@ class ScenarioListApiIntegrationTests {
   }
 
   private void seedScenarioListData(Long clearedUserId) {
-    long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
-    long ethanVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
+    final long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
+    final long ethanVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
     insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
     insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
     insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
@@ -292,7 +294,7 @@ class ScenarioListApiIntegrationTests {
                             )
                             VALUES (?, 202, 'EN', 'CLEARED', 2.5, 90, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
                                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                            """,
+          """,
           clearedUserId);
     }
   }
@@ -326,7 +328,7 @@ class ScenarioListApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         questionId,
         scenarioId,
         displayOrder);
@@ -345,7 +347,7 @@ class ScenarioListApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         questionId,
         questionText,
         questionTranslation,
@@ -359,7 +361,7 @@ class ScenarioListApiIntegrationTests {
         """
                         INSERT INTO category (id, display_order, status, created_at, updated_at)
                         VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         categoryId,
         displayOrder,
         categoryStatus);
@@ -373,7 +375,7 @@ class ScenarioListApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         categoryId,
         categoryName);
   }
@@ -402,7 +404,7 @@ class ScenarioListApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, ?, 'tutor', ?, ?, 3, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         scenarioId,
         categoryId,
         difficulty,
@@ -436,7 +438,7 @@ class ScenarioListApiIntegrationTests {
                             updated_at
                         )
                         VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         scenarioId,
         title,
         briefing,
@@ -468,7 +470,7 @@ class ScenarioListApiIntegrationTests {
                         )
                         VALUES (?, 'OPENROUTER', 'test-model', ?, 'MALE', '테스트 음성',
                                 'EN_US', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         id,
         providerVoiceId,
         status);

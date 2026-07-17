@@ -1,4 +1,5 @@
 // 로컬 개발과 테스트에서 사용할 결정적 AI 대체 클라이언트다.
+
 package com.landit.landitbe.session.infrastructure.ai;
 
 import com.landit.landitbe.common.domain.InnerThoughtType;
@@ -21,6 +22,7 @@ import java.math.BigDecimal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/** 로컬 개발과 테스트에서 사용할 결정적 AI 대체 클라이언트다. */
 @Component
 @ConditionalOnProperty(
     prefix = "landit.ai",

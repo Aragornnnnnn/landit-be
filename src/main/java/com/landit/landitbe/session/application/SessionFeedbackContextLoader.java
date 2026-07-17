@@ -1,18 +1,14 @@
 // 최종 피드백 생성에 필요한 완료 세션 컨텍스트를 불변 값으로 조회한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.ConversationSpeaker;
-import com.landit.landitbe.common.domain.Locale;
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
 import com.landit.landitbe.session.application.port.AiConversationHistoryMessage;
-import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContext;
-import com.landit.landitbe.session.application.port.AiScenarioContext;
 import com.landit.landitbe.session.domain.LearningSession;
-import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.landit.landitbe.session.domain.SessionHistory;
 import com.landit.landitbe.session.domain.SessionHistoryMessage;
-import com.landit.landitbe.session.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageContextRow;
 import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.session.infrastructure.SessionHistoryMessageRepository;
@@ -20,11 +16,11 @@ import com.landit.landitbe.session.infrastructure.SessionHistoryRepository;
 import com.landit.landitbe.session.infrastructure.SessionHistorySummaryFeedbackRepository;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 최종 피드백 생성에 필요한 완료 세션 컨텍스트를 불변 값으로 조회한다. */
 @RequiredArgsConstructor
 @Component
 class SessionFeedbackContextLoader {
@@ -98,31 +94,5 @@ class SessionFeedbackContextLoader {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return List.copyOf(userMessages);
-  }
-}
-
-record LoadedSessionFeedbackContext(
-    Long sessionId,
-    Long sessionHistoryId,
-    Locale targetLocale,
-    Locale baseLocale,
-    AiScenarioContext scenario,
-    List<UserMessageContext> userMessages,
-    Optional<ExistingSummaryFeedbackContext> existingSummary) {}
-
-record UserMessageContext(
-    Long messageId,
-    int turnNumber,
-    String content,
-    AiMessageFeedbackEvaluationContext evaluationContext) {}
-
-record ExistingSummaryFeedbackContext(Long summaryFeedbackId) {
-
-  /** 완료 상태의 저장된 summary만 기존 최종 피드백 결과로 허용한다. */
-  static ExistingSummaryFeedbackContext from(SessionHistorySummaryFeedback summaryFeedback) {
-    if (summaryFeedback.getProcessingStatus() != ProcessingStatus.COMPLETED) {
-      throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
-    }
-    return new ExistingSummaryFeedbackContext(summaryFeedback.getId());
   }
 }

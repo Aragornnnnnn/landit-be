@@ -1,4 +1,5 @@
 // 시나리오별 원어민 표현 조회 API의 정렬, 완료 여부, 인증, 예외 처리를 검증한다.
+
 package com.landit.landitbe.content;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,6 +26,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/** 시나리오별 원어민 표현 조회 API의 정렬, 완료 여부, 인증, 예외 처리를 검증한다. */
 @ActiveProfiles("test") // test 프로파일 → H2 인메모리 DB 사용
 @AutoConfigureMockMvc // 서버 포트 없이 HTTP 요청을 흉내 내는 MockMvc 활성화
 @SpringBootTest // 스프링 앱 전체(컨트롤러~DB)를 실제로 띄우는 통합 테스트
@@ -225,7 +227,8 @@ class ExpressionApiIntegrationTests {
     LocalDateTime now = LocalDateTime.now();
     Long categoryId =
         insertAndGetId(
-            "INSERT INTO category (display_order, status, created_at, updated_at) VALUES (?, 'ACTIVE', ?, ?)",
+            "INSERT INTO category (display_order, status, created_at, updated_at) "
+                + "VALUES (?, 'ACTIVE', ?, ?)",
             nextDisplayOrder("category"),
             now,
             now);
@@ -279,7 +282,7 @@ class ExpressionApiIntegrationTests {
         scenarioId, "EN", "KR", displayOrder, targetExpressionText, baseExpressionMeaningText, now);
   }
 
-  /** locale까지 지정해 표현을 심는 버전. 다국어 데이터 필터 검증에 사용한다. */
+  /** Locale까지 지정해 표현을 심는 버전. 다국어 데이터 필터 검증에 사용한다. */
   private void insertWritingExpression(
       Long scenarioId,
       String targetLocale,
@@ -292,11 +295,14 @@ class ExpressionApiIntegrationTests {
         "INSERT INTO writing_expression "
             + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
-            + "usage_description, representative_sentence_text, representative_sentence_translation, "
-            + "representative_sentence_words, representative_sentence_word_choices, practice_examples_payload, status, "
+            + "usage_description, representative_sentence_text, "
+            + "representative_sentence_translation, "
+            + "representative_sentence_words, representative_sentence_word_choices, "
+            + "practice_examples_payload, status, "
             + "created_at, updated_at) "
             + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', ?, ?, ?, ?, ?, 'usage summary', "
-            + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
+            + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], "
+            + "ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
         scenarioId,
         targetLocale,
         baseLocale,
@@ -322,7 +328,8 @@ class ExpressionApiIntegrationTests {
       Long userProfileId, Long scenarioId, Long writingExpressionId) {
     jdbcTemplate.update(
         "INSERT INTO user_writing_expression_completion "
-            + "(user_profile_id, scenario_id, writing_expression_id, completed_at, last_completed_at) "
+            + "(user_profile_id, scenario_id, writing_expression_id, completed_at, "
+            + "last_completed_at) "
             + "VALUES (?, ?, ?, ?, ?)",
         userProfileId,
         scenarioId,
@@ -331,7 +338,7 @@ class ExpressionApiIntegrationTests {
         LocalDateTime.now());
   }
 
-  /** display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
+  /** Display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
   private int nextDisplayOrder(String tableName) {
     Integer maxOrder =
         jdbcTemplate.queryForObject(
@@ -356,7 +363,7 @@ class ExpressionApiIntegrationTests {
                                   "idToken":"%s|%s|%s|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(sub, email, nickname, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();

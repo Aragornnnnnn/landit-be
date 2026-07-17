@@ -1,4 +1,5 @@
 // AI 튜터의 기준 언어별 표시 이름을 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -12,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** AI 튜터의 기준 언어별 표시 이름을 저장한다. */
 @Entity
 @Table(name = "ai_tutor_language_variant")
 public class AiTutorLanguageVariant extends BaseTimeEntity {
@@ -30,5 +32,6 @@ public class AiTutorLanguageVariant extends BaseTimeEntity {
   @Column(name = "display_name", nullable = false, length = 100)
   private String displayName;
 
+  /** 동작을 수행한다. */
   protected AiTutorLanguageVariant() {}
 }

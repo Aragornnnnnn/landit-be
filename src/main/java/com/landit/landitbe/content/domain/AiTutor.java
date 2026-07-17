@@ -1,4 +1,5 @@
 // 사용자의 학습과 평가 기준이 되는 AI 튜터 설정을 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.AccentLocale;
@@ -15,6 +16,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
+/** 사용자의 학습과 평가 기준이 되는 AI 튜터 설정을 저장한다. */
 @Getter
 @Entity
 @Table(name = "ai_tutor")
@@ -36,5 +38,6 @@ public class AiTutor extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 
+  /** 동작을 수행한다. */
   protected AiTutor() {}
 }

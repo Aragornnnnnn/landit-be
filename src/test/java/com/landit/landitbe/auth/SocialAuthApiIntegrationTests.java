@@ -1,4 +1,5 @@
 // 소셜 로그인 API의 사용자 생성, 토큰 발급, nonce 검증을 검증한다.
+
 package com.landit.landitbe.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +33,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/** 소셜 로그인 API의 사용자 생성, 토큰 발급, nonce 검증을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -70,7 +72,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"google-sub-1|ryan@example.com|Ryan|nonce-1",
                                   "nonce":"nonce-1"
                                 }
-                                """))
+                        """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.error").value(nullValue()))
@@ -101,7 +103,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"google-sub-1|ryan@example.com|Ryan|nonce-2",
                                   "nonce":"nonce-2"
                                 }
-                                """))
+                    """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.userId").value(userId))
         .andExpect(jsonPath("$.data.user.newUser").value(false));
@@ -119,7 +121,7 @@ class SocialAuthApiIntegrationTests {
                                   "provider":"GOOGLE",
                                   "idToken":"google-sub-2|nonce@example.com|Nonce User|nonce-1"
                                 }
-                                """))
+                    """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("OIDC_NONCE_MISMATCH"));
@@ -138,7 +140,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"google-sub-3|nonce@example.com|Nonce User|expected-nonce",
                                   "nonce":"different-nonce"
                                 }
-                                """))
+                    """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("OIDC_NONCE_MISMATCH"));
@@ -158,7 +160,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"apple-sub-1|apple@example.com|Apple User|apple-nonce",
                                   "nonce":"apple-nonce"
                                 }
-                                """))
+                        """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.user.provider").value("APPLE"))
@@ -191,7 +193,7 @@ class SocialAuthApiIntegrationTests {
                                   "nonce":"apple-nonce",
                                   "nickname":"Apple Request Name"
                                 }
-                                """))
+                    """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
   }
@@ -210,7 +212,7 @@ class SocialAuthApiIntegrationTests {
                                   "nonce":"apple-nonce-1",
                                   "nickname":"Apple Request Name"
                                 }
-                                """))
+                    """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
 
@@ -225,7 +227,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"apple-sub-3|apple-existing@example.com|Id Token Name|apple-nonce-2",
                                   "nonce":"apple-nonce-2"
                                 }
-                                """))
+                    """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
   }
@@ -244,7 +246,7 @@ class SocialAuthApiIntegrationTests {
                                   "nonce":"google-nonce",
                                   "nickname":"Ignored Request Name"
                                 }
-                                """))
+                    """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.nickname").value("Id Token Name"));
   }
@@ -258,7 +260,7 @@ class SocialAuthApiIntegrationTests {
                 WHERE accent_locale = 'EN_US'
                   AND target_locale = 'EN'
                   AND status = 'ACTIVE'
-                """);
+        """);
     try {
       mockMvc
           .perform(
@@ -271,7 +273,7 @@ class SocialAuthApiIntegrationTests {
                                       "idToken":"missing-tutor|missing-tutor@example.com|Missing Tutor|nonce",
                                       "nonce":"nonce"
                                     }
-                                    """))
+                      """))
           .andExpect(status().isInternalServerError())
           .andExpect(jsonPath("$.error.code").value("DEFAULT_AI_TUTOR_NOT_CONFIGURED"));
     } finally {
@@ -282,7 +284,7 @@ class SocialAuthApiIntegrationTests {
                     WHERE accent_locale = 'EN_US'
                       AND target_locale = 'EN'
                       AND status = 'INACTIVE'
-                    """);
+          """);
     }
   }
 
@@ -294,7 +296,7 @@ class SocialAuthApiIntegrationTests {
                     id, accent_locale, target_locale, status, created_at, updated_at
                 )
                 VALUES (990100, 'EN_US', 'EN', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """);
+        """);
     try {
       mockMvc
           .perform(
@@ -307,7 +309,7 @@ class SocialAuthApiIntegrationTests {
                                       "idToken":"duplicate-tutor|duplicate-tutor@example.com|Duplicate Tutor|nonce",
                                       "nonce":"nonce"
                                     }
-                                    """))
+                      """))
           .andExpect(status().isInternalServerError())
           .andExpect(jsonPath("$.error.code").value("DEFAULT_AI_TUTOR_NOT_CONFIGURED"));
     } finally {
@@ -328,7 +330,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"naver-sub|naver@example.com|Naver User|nonce",
                                   "nonce":"nonce"
                                 }
-                                """))
+                    """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_SOCIAL_PROVIDER"));
   }
@@ -348,7 +350,7 @@ class SocialAuthApiIntegrationTests {
                 WHERE accent_locale = 'EN_US'
                   AND target_locale = 'EN'
                   AND status = 'ACTIVE'
-                """,
+        """,
         Long.class);
   }
 
@@ -368,7 +370,7 @@ class SocialAuthApiIntegrationTests {
                                 {
                                   "refreshToken":"%s"
                                 }
-                                """
+                        """
                             .formatted(refreshToken)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
@@ -394,7 +396,7 @@ class SocialAuthApiIntegrationTests {
                                 {
                                   "refreshToken":"%s"
                                 }
-                                """
+                    """
                         .formatted(refreshToken)))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.success").value(false))
@@ -416,7 +418,7 @@ class SocialAuthApiIntegrationTests {
                                 {
                                   "refreshToken":"%s"
                                 }
-                                """
+                    """
                         .formatted(refreshToken)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
@@ -432,7 +434,7 @@ class SocialAuthApiIntegrationTests {
                                 {
                                   "refreshToken":"%s"
                                 }
-                                """
+                    """
                         .formatted(refreshToken)))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
@@ -483,7 +485,7 @@ class SocialAuthApiIntegrationTests {
                                 {
                                   "refreshToken":"%s"
                                 }
-                                """
+                    """
                         .formatted(refreshToken)))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
@@ -529,7 +531,7 @@ class SocialAuthApiIntegrationTests {
                                 {
                                   "refreshToken":"%s"
                                 }
-                                """
+                    """
                         .formatted(refreshToken)))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.success").value(false))
@@ -550,7 +552,7 @@ class SocialAuthApiIntegrationTests {
                                   "idToken":"%s|%s|%s|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(provider, sub, email, nickname, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();

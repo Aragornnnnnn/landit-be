@@ -1,4 +1,5 @@
 // 엔티티의 생성 시간과 수정 시간을 공통으로 관리한다.
+
 package com.landit.landitbe.common.domain;
 
 import jakarta.persistence.Column;
@@ -7,6 +8,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import java.time.LocalDateTime;
 
+/** 엔티티의 생성 시간과 수정 시간을 공통으로 관리한다. */
 @MappedSuperclass
 public abstract class BaseTimeEntity {
 

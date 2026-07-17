@@ -1,4 +1,5 @@
 // 시나리오 목록 조회 API 요청을 받아 공통 응답으로 반환한다.
+
 package com.landit.landitbe.content.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 시나리오 목록 조회 API 요청을 받아 공통 응답으로 반환한다. */
 @RequestMapping("/api/v1/scenarios")
 @RequiredArgsConstructor
 @RestController

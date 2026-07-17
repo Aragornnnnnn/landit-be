@@ -1,6 +1,8 @@
 // 대화 진행에 필요한 AI 서버 호출을 추상화한다.
+
 package com.landit.landitbe.session.application.port;
 
+/** 대화 진행에 필요한 AI 서버 호출을 추상화한다. */
 public interface AiConversationClient {
 
   /** 다음 AI 메시지를 생성한다. */

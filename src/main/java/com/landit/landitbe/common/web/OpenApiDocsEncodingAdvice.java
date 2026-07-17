@@ -1,4 +1,5 @@
 // OpenAPI JSON 문서 응답의 문자 인코딩을 명시한다.
+
 package com.landit.landitbe.common.web;
 
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,7 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
+/** OpenAPI JSON 문서 응답의 문자 인코딩을 명시한다. */
 @ControllerAdvice
 public class OpenApiDocsEncodingAdvice implements ResponseBodyAdvice<Object> {
 

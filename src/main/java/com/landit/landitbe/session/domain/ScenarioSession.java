@@ -1,4 +1,5 @@
 // 시나리오 세션에만 필요한 정보를 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -11,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 시나리오 세션에만 필요한 정보를 저장한다. */
 @Entity
 @Table(name = "scenario_session")
 public class ScenarioSession extends BaseTimeEntity {
@@ -32,6 +34,7 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "goal_completion_status", length = 20)
   private GoalCompletionStatus goalCompletionStatus;
 
+  /** 동작을 수행한다. */
   protected ScenarioSession() {}
 
   private ScenarioSession(

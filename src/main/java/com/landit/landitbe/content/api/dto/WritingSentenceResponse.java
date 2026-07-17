@@ -1,8 +1,10 @@
 // 추가 예문 중 랜덤으로 선택된 작문 연습 문제를 표현한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** 추가 예문 중 랜덤으로 선택된 작문 연습 문제를 표현한다. */
 @Schema(description = "작문 연습 문제. practiceSentence 중 서버에서 랜덤으로 1개를 선택해 내려줌")
 public record WritingSentenceResponse(
     @Schema(

@@ -1,4 +1,5 @@
 // 사용자에게 할당된 퀘스트와 진행 상태를 저장한다.
+
 package com.landit.landitbe.quest.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/** 사용자에게 할당된 퀘스트와 진행 상태를 저장한다. */
 @Entity
 @Table(name = "user_quest")
 public class UserQuest extends BaseTimeEntity {
@@ -50,5 +52,6 @@ public class UserQuest extends BaseTimeEntity {
   @Column(name = "reward_granted_at")
   private LocalDateTime rewardGrantedAt;
 
+  /** 동작을 수행한다. */
   protected UserQuest() {}
 }

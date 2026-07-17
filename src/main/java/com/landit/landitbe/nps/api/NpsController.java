@@ -1,4 +1,5 @@
 // 인증된 사용자의 NPS 제출 요청을 처리하는 Controller다.
+
 package com.landit.landitbe.nps.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 인증된 사용자의 NPS 제출 요청을 처리하는 Controller다. */
 @RequestMapping("/api/v1/nps")
 @RestController
 @Tag(name = "NPS", description = "서비스 만족도 API")
@@ -25,6 +27,7 @@ public class NpsController {
 
   private final NpsService npsService;
 
+  /** 동작을 수행한다. */
   public NpsController(NpsService npsService) {
     this.npsService = npsService;
   }

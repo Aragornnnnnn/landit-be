@@ -1,4 +1,5 @@
 // 원어민 표현 조회(시나리오별 목록, 학습 시작 상세, 추가 예문)를 담당한다.
+
 package com.landit.landitbe.content.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 원어민 표현 조회(시나리오별 목록, 학습 시작 상세, 추가 예문)를 담당한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor

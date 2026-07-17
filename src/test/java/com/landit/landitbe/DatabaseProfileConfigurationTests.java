@@ -1,4 +1,5 @@
 // DB 프로필 설정이 환경변수 placeholder만 사용하는지 검증한다.
+
 package com.landit.landitbe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,6 +11,7 @@ import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 
+/** DB 프로필 설정이 환경변수 placeholder만 사용하는지 검증한다. */
 class DatabaseProfileConfigurationTests {
 
   private final YamlPropertySourceLoader yamlLoader = new YamlPropertySourceLoader();

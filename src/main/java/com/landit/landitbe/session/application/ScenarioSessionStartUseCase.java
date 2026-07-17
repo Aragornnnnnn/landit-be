@@ -1,4 +1,5 @@
 // 시나리오 세션 시작 유스케이스를 조율한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.auth.domain.UserProfile;
@@ -32,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 시나리오 세션 시작 유스케이스를 조율한다. */
 @RequiredArgsConstructor
 @Service
 public class ScenarioSessionStartUseCase {
@@ -217,7 +219,7 @@ public class ScenarioSessionStartUseCase {
         message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name());
   }
 
-  /** firstSpeaker에 맞춰 AI 메시지 또는 USER first 시작 안내만 응답에 담는다. */
+  /** FirstSpeaker에 맞춰 AI 메시지 또는 USER first 시작 안내만 응답에 담는다. */
   private SessionStartResponse toStartResponse(
       LearningSession learningSession,
       ScenarioSessionStartRow startRow,

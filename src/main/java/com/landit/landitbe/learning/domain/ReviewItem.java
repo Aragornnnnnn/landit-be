@@ -1,4 +1,5 @@
 // 자정 스케줄링으로 생성된 복습 문항을 저장한다.
+
 package com.landit.landitbe.learning.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/** 자정 스케줄링으로 생성된 복습 문항을 저장한다. */
 @Entity
 @Table(name = "review_item")
 public class ReviewItem extends BaseTimeEntity {
@@ -72,5 +74,6 @@ public class ReviewItem extends BaseTimeEntity {
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
+  /** 동작을 수행한다. */
   protected ReviewItem() {}
 }

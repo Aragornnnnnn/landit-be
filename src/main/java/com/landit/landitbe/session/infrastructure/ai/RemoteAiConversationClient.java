@@ -1,4 +1,5 @@
 // 원격 AI 서버의 대화 생성 API를 호출한다.
+
 package com.landit.landitbe.session.infrastructure.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -34,6 +35,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+/** 원격 AI 서버의 대화 생성 API를 호출한다. */
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
 public class RemoteAiConversationClient implements AiConversationClient {
@@ -48,6 +50,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
   private final JsonMapper jsonMapper;
   private final AiClientProperties properties;
 
+  /** 동작을 수행한다. */
   public RemoteAiConversationClient(JsonMapper jsonMapper, AiClientProperties properties) {
     this.jsonMapper = jsonMapper;
     this.properties = properties;

@@ -1,4 +1,5 @@
 // 인증 API의 CORS preflight 처리와 응답 정책을 검증한다.
+
 package com.landit.landitbe.auth;
 
 import static org.hamcrest.Matchers.containsString;
@@ -15,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+/** 인증 API의 CORS preflight 처리와 응답 정책을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest

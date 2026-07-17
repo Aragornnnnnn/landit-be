@@ -1,4 +1,5 @@
 // 인증 API와 문서, 상태 확인 경로를 허용하는 Spring Security 설정을 정의한다.
+
 package com.landit.landitbe.auth.security;
 
 import com.landit.landitbe.common.exception.ErrorCode;
@@ -19,6 +20,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+/** 인증 API와 문서, 상태 확인 경로를 허용하는 Spring Security 설정을 정의한다. */
 @Configuration
 public class AuthSecurityConfig {
 
@@ -31,6 +33,7 @@ public class AuthSecurityConfig {
   private final AuthTokenFilter authTokenFilter;
   private final AuthFailureResponseWriter failureResponseWriter;
 
+  /** 동작을 수행한다. */
   public AuthSecurityConfig(
       AuthTokenFilter authTokenFilter, AuthFailureResponseWriter failureResponseWriter) {
     this.authTokenFilter = authTokenFilter;

@@ -1,4 +1,5 @@
 // NPS 제출 API의 저장, 검증, 인증 정책을 검증한다.
+
 package com.landit.landitbe.nps;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+/** NPS 제출 API의 저장, 검증, 인증 정책을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -171,7 +173,7 @@ class NpsApiIntegrationTests {
                 JOIN user_profile ON user_profile.id = nps_response.user_profile_id
                 WHERE user_profile.email = ?
                 ORDER BY nps_response.id
-                """,
+        """,
         email);
   }
 
@@ -189,7 +191,7 @@ class NpsApiIntegrationTests {
                                   "idToken":"%s|%s|%s|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(sub, email, nickname, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();

@@ -1,4 +1,5 @@
 // 시나리오 목록 조회 결과 한 행을 담는 JPA projection record다.
+
 package com.landit.landitbe.content.infrastructure;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
@@ -10,6 +11,7 @@ import com.landit.landitbe.content.domain.TtsVoiceProvider;
 import com.landit.landitbe.learning.domain.UserScenarioProgressStatus;
 import java.math.BigDecimal;
 
+/** 시나리오 목록 조회 결과 한 행을 담는 JPA projection record다. */
 public record ScenarioListRow(
     Long categoryId,
     String categoryName,

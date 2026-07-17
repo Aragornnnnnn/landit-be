@@ -1,4 +1,5 @@
 // 사용자별 시나리오 진행 상태와 최고 성과를 저장한다.
+
 package com.landit.landitbe.learning.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
+/** 사용자별 시나리오 진행 상태와 최고 성과를 저장한다. */
 @Getter
 @Entity
 @Table(name = "user_scenario_progress")
@@ -53,6 +55,7 @@ public class UserScenarioProgress extends BaseTimeEntity {
   @Column(name = "last_played_at")
   private LocalDateTime lastPlayedAt;
 
+  /** 동작을 수행한다. */
   protected UserScenarioProgress() {}
 
   private UserScenarioProgress(

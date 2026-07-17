@@ -1,4 +1,5 @@
 // 사용자 메시지 속마음 상태를 조회하고 만료를 처리한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.ConversationSpeaker;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 사용자 메시지 속마음 상태를 조회하고 만료를 처리한다. */
 @RequiredArgsConstructor
 @Service
 public class SessionInnerThoughtQueryService {

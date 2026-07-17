@@ -1,8 +1,10 @@
 // 추가 예문 조회 응답의 예문 1건을 표현한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** 추가 예문 조회 응답의 예문 1건을 표현한다. */
 @Schema(description = "추가 예문 항목")
 public record PracticeSentenceResponse(
     @Schema(description = "예문 텍스트", example = "Her voice blows my mind every time.")

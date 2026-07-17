@@ -1,4 +1,5 @@
 // 공통 예외 핸들러의 오류 응답 매핑을 검증한다.
+
 package com.landit.landitbe.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/** 공통 예외 핸들러의 오류 응답 매핑을 검증한다. */
 class GlobalExceptionHandlerTests {
 
   private final GlobalExceptionHandler handler = new GlobalExceptionHandler();

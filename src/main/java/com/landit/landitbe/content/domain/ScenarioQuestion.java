@@ -1,4 +1,5 @@
 // 시나리오 안에서 순서를 가지는 고정 질문 원형을 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
+/** 시나리오 안에서 순서를 가지는 고정 질문 원형을 저장한다. */
 @Getter
 @Entity
 @Table(name = "scenario_question")
@@ -32,5 +34,6 @@ public class ScenarioQuestion extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 
+  /** 동작을 수행한다. */
   protected ScenarioQuestion() {}
 }

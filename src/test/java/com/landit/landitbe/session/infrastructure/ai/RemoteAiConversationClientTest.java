@@ -1,4 +1,5 @@
 // 원격 AI 대화 클라이언트의 메시지별 피드백 요청 계약을 검증한다.
+
 package com.landit.landitbe.session.infrastructure.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+/** 원격 AI 대화 클라이언트의 메시지별 피드백 요청 계약을 검증한다. */
 class RemoteAiConversationClientTest {
 
   private final JsonMapper jsonMapper = JsonMapper.builder().build();
@@ -73,7 +75,7 @@ class RemoteAiConversationClientTest {
                       },
                       "error": null
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(200, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -131,7 +133,7 @@ class RemoteAiConversationClientTest {
                       },
                       "error": null
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(200, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -186,7 +188,7 @@ class RemoteAiConversationClientTest {
                       },
                       "error": null
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(200, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -237,7 +239,7 @@ class RemoteAiConversationClientTest {
                       },
                       "error": null
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(202, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -304,7 +306,7 @@ class RemoteAiConversationClientTest {
                       },
                       "error": null
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(202, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -340,7 +342,7 @@ class RemoteAiConversationClientTest {
                       },
                       "error": null
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(202, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -393,7 +395,7 @@ class RemoteAiConversationClientTest {
                         "message": "AI 응답 형식이 올바르지 않습니다."
                       }
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(502, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -424,7 +426,7 @@ class RemoteAiConversationClientTest {
                         "message": "AI 응답 생성에 실패했습니다."
                       }
                     }
-                    """
+              """
                   .getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(503, responseBody.length);
           exchange.getResponseBody().write(responseBody);
@@ -724,7 +726,7 @@ class RemoteAiConversationClientTest {
                   },
                   "error": null
                 }
-                """
+        """
             .getBytes(StandardCharsets.UTF_8);
     exchange.sendResponseHeaders(200, responseBody.length);
     exchange.getResponseBody().write(responseBody);
@@ -735,16 +737,16 @@ class RemoteAiConversationClientTest {
       com.sun.net.httpserver.HttpExchange exchange, int status, String code)
       throws java.io.IOException {
     byte[] responseBody =
-        ("""
-                {
-                  "success": false,
-                  "data": null,
-                  "error": {
-                    "code": "%s",
-                    "message": "AI 요청에 실패했습니다."
-                  }
-                }
-                """)
+        """
+        {
+          "success": false,
+          "data": null,
+          "error": {
+            "code": "%s",
+            "message": "AI 요청에 실패했습니다."
+          }
+        }
+        """
             .formatted(code)
             .getBytes(StandardCharsets.UTF_8);
     exchange.sendResponseHeaders(status, responseBody.length);

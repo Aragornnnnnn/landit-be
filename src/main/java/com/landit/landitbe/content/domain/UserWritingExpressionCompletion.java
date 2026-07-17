@@ -1,4 +1,5 @@
 // 사용자가 완료한 Writing 표현 기록을 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import jakarta.persistence.Column;
@@ -10,6 +11,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
+/** 사용자가 완료한 Writing 표현 기록을 저장한다. */
 @Entity
 @Getter
 @Table(name = "user_writing_expression_completion")
@@ -34,12 +36,13 @@ public class UserWritingExpressionCompletion {
   @Column(name = "last_completed_at", nullable = false)
   private LocalDateTime lastCompletedAt;
 
+  /** 동작을 수행한다. */
   protected UserWritingExpressionCompletion() {}
 
   /** 사용자가 특정 시나리오의 표현 학습을 완료했음을 기록하는 엔티티를 CREATE한다. */
   public UserWritingExpressionCompletion(
       Long userProfileId, Long scenarioId, Long writingExpressionId) {
-    LocalDateTime now = LocalDateTime.now();
+    final LocalDateTime now = LocalDateTime.now();
     this.userProfileId = userProfileId;
     this.scenarioId = scenarioId;
     this.writingExpressionId = writingExpressionId;

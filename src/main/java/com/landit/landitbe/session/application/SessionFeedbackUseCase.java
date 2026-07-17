@@ -1,4 +1,5 @@
 // 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.exception.ApiException;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/** 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다. */
 @RequiredArgsConstructor
 @Service
 public class SessionFeedbackUseCase {

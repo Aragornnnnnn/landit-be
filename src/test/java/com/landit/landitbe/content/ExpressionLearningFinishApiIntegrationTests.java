@@ -1,4 +1,5 @@
 // 원어민 표현 학습 완료 API의 인증, 완료 기록 생성/멱등 갱신, 잠금/미존재 예외를 검증한다.
+
 package com.landit.landitbe.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,6 +26,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/** 원어민 표현 학습 완료 API의 인증, 완료 기록 생성/멱등 갱신, 잠금/미존재 예외를 검증한다. */
 @ActiveProfiles("test") // test 프로파일 → H2 인메모리 DB 사용
 @AutoConfigureMockMvc // 서버 포트 없이 HTTP 요청을 흉내 내는 MockMvc 활성화
 @SpringBootTest // 스프링 앱 전체(컨트롤러~DB)를 실제로 띄우는 통합 테스트
@@ -167,7 +169,8 @@ class ExpressionLearningFinishApiIntegrationTests {
     LocalDateTime now = LocalDateTime.now();
     Long categoryId =
         insertAndGetId(
-            "INSERT INTO category (display_order, status, created_at, updated_at) VALUES (?, 'ACTIVE', ?, ?)",
+            "INSERT INTO category (display_order, status, created_at, updated_at) "
+                + "VALUES (?, 'ACTIVE', ?, ?)",
             nextDisplayOrder("category"),
             now,
             now);
@@ -195,11 +198,14 @@ class ExpressionLearningFinishApiIntegrationTests {
         "INSERT INTO writing_expression "
             + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
-            + "usage_description, representative_sentence_text, representative_sentence_translation, "
-            + "representative_sentence_words, representative_sentence_word_choices, practice_examples_payload, status, "
+            + "usage_description, representative_sentence_text, "
+            + "representative_sentence_translation, "
+            + "representative_sentence_words, representative_sentence_word_choices, "
+            + "practice_examples_payload, status, "
             + "created_at, updated_at) "
             + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', ?, ?, ?, 'usage summary', "
-            + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
+            + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], "
+            + "ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
         scenarioId,
         displayOrder,
         "expression-" + displayOrder,
@@ -209,7 +215,7 @@ class ExpressionLearningFinishApiIntegrationTests {
         now);
   }
 
-  /** completed_at / last_completed_at을 명시적으로 지정해 완료 기록을 심는다. (재완료 갱신 검증용) */
+  /** Completed_at / last_completed_at을 명시적으로 지정해 완료 기록을 심는다. (재완료 갱신 검증용) */
   private void insertCompletion(
       Long userProfileId,
       Long scenarioId,
@@ -218,7 +224,8 @@ class ExpressionLearningFinishApiIntegrationTests {
       LocalDateTime lastCompletedAt) {
     jdbcTemplate.update(
         "INSERT INTO user_writing_expression_completion "
-            + "(user_profile_id, scenario_id, writing_expression_id, completed_at, last_completed_at) "
+            + "(user_profile_id, scenario_id, writing_expression_id, completed_at, "
+            + "last_completed_at) "
             + "VALUES (?, ?, ?, ?, ?)",
         userProfileId,
         scenarioId,
@@ -295,7 +302,7 @@ class ExpressionLearningFinishApiIntegrationTests {
                                   "idToken":"%s|%s|%s|%s",
                                   "nonce":"%s"
                                 }
-                                """
+                        """
                             .formatted(sub, email, nickname, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();

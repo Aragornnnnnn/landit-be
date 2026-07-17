@@ -1,4 +1,5 @@
 // 세션 히스토리 전체 피드백과 결과 요약을 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -13,6 +14,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import lombok.Getter;
 
+/** 세션 히스토리 전체 피드백과 결과 요약을 저장한다. */
 @Getter
 @Entity
 @Table(name = "session_history_summary_feedback")
@@ -47,6 +49,7 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
   @Column(name = "summary_message", columnDefinition = "text")
   private String summaryMessage;
 
+  /** 동작을 수행한다. */
   protected SessionHistorySummaryFeedback() {}
 
   private SessionHistorySummaryFeedback(

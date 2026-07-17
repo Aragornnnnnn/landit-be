@@ -1,4 +1,5 @@
 // 사용자에게 복습 후보가 된 개선 표현과 학습 상태를 저장한다.
+
 package com.landit.landitbe.learning.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
+/** 사용자에게 복습 후보가 된 개선 표현과 학습 상태를 저장한다. */
 @Entity
 @Table(name = "user_learning_expression")
 public class UserLearningExpression extends BaseTimeEntity {
@@ -79,5 +81,6 @@ public class UserLearningExpression extends BaseTimeEntity {
   @Column(name = "session_history_message_id")
   private Long sessionHistoryMessageId;
 
+  /** 동작을 수행한다. */
   protected UserLearningExpression() {}
 }

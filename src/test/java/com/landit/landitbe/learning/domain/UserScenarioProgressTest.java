@@ -1,4 +1,5 @@
 // 사용자 시나리오 진행도의 완료 성과 갱신을 검증한다.
+
 package com.landit.landitbe.learning.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 
+/** 사용자 시나리오 진행도의 완료 성과 갱신을 검증한다. */
 class UserScenarioProgressTest {
 
   @Test

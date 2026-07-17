@@ -1,4 +1,5 @@
 // 사용자 디바이스의 푸시 토큰을 저장한다.
+
 package com.landit.landitbe.notification.domain;
 
 import com.landit.landitbe.common.domain.AppPlatform;
@@ -12,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 사용자 디바이스의 푸시 토큰을 저장한다. */
 @Entity
 @Table(name = "user_push_token")
 public class UserPushToken extends BaseTimeEntity {
@@ -34,5 +36,6 @@ public class UserPushToken extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private UserPushTokenStatus status;
 
+  /** 동작을 수행한다. */
   protected UserPushToken() {}
 }

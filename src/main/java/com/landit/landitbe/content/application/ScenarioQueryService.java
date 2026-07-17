@@ -1,4 +1,5 @@
 // 시나리오 목록 조회 결과를 사용자별 응답 형태로 조립한다.
+
 package com.landit.landitbe.content.application;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 시나리오 목록 조회 결과를 사용자별 응답 형태로 조립한다. */
 @RequiredArgsConstructor
 @Service
 public class ScenarioQueryService {

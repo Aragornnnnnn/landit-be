@@ -1,4 +1,5 @@
 // AI 생성 결과를 세션 히스토리와 세션 상태에 반영한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.ConversationSpeaker;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** AI 생성 결과를 세션 히스토리와 세션 상태에 반영한다. */
 @RequiredArgsConstructor
 @Component
 class GeneratedMessageRecorder {
@@ -33,7 +35,7 @@ class GeneratedMessageRecorder {
       SubmittedMessageContext submittedContext,
       SessionMessageAiGenerator.Generation generation,
       ProcessingStatus feedbackProcessingStatus) {
-    LearningSession learningSession =
+    final LearningSession learningSession =
         learningSessionFinder.findOwnedInProgressForUpdate(
             submittedContext.userId(), submittedContext.sessionId());
     ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());

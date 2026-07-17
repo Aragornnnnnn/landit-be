@@ -1,4 +1,5 @@
 // 로그인 성공 후 사용할 자체 access token과 refresh token을 생성한다.
+
 package com.landit.landitbe.auth.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -20,6 +21,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
 
+/** 로그인 성공 후 사용할 자체 access token과 refresh token을 생성한다. */
 @Component
 public class LanditTokenService {
 
@@ -33,6 +35,7 @@ public class LanditTokenService {
   private final TokenProperties properties;
   private final ObjectMapper objectMapper;
 
+  /** 동작을 수행한다. */
   public LanditTokenService(TokenProperties properties) {
     this.properties = properties;
     this.objectMapper = new ObjectMapper();
@@ -43,7 +46,7 @@ public class LanditTokenService {
     return createToken(userProfile, ACCESS_TOKEN_TYPE, properties.accessExpiresInSeconds());
   }
 
-  /** access token을 검증하고 사용자 PK를 반환한다. */
+  /** Access token을 검증하고 사용자 PK를 반환한다. */
   public Long parseAccessToken(String token) {
     try {
       String[] parts = token.split("\\.", -1);
@@ -86,7 +89,7 @@ public class LanditTokenService {
     return BASE64_URL_ENCODER.encodeToString(bytes);
   }
 
-  /** refresh token 원문 저장을 피하기 위해 SHA-256 해시를 생성한다. */
+  /** Refresh token 원문 저장을 피하기 위해 SHA-256 해시를 생성한다. */
   public String hashToken(String token) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");

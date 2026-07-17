@@ -1,4 +1,5 @@
 // 기록 탭과 장기 보관을 위한 학습 결과 이력을 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.landit.landitbe.common.domain.BaseCreatedAtEntity;
@@ -15,6 +16,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
+/** 기록 탭과 장기 보관을 위한 학습 결과 이력을 저장한다. */
 @Getter
 @Entity
 @Table(name = "session_history")
@@ -57,6 +59,7 @@ public class SessionHistory extends BaseCreatedAtEntity {
   @Column(name = "xp_reward")
   private Integer xpReward;
 
+  /** 동작을 수행한다. */
   protected SessionHistory() {}
 
   private SessionHistory(

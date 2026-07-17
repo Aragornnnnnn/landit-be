@@ -1,4 +1,5 @@
 // 시나리오 도메인의 조회와 존재 검증을 담당한다.
+
 package com.landit.landitbe.content.application;
 
 import com.landit.landitbe.common.exception.ApiException;
@@ -8,6 +9,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 시나리오 도메인의 조회와 존재 검증을 담당한다. */
 @Service
 @AllArgsConstructor
 public class ScenarioService {

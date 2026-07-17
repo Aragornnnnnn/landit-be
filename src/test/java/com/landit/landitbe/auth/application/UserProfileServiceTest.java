@@ -1,4 +1,5 @@
 // UserProfileService의 사용자 locale 조회를 단위 검증한다.
+
 package com.landit.landitbe.auth.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/** UserProfileService의 사용자 locale 조회를 단위 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
 
@@ -30,7 +32,7 @@ class UserProfileServiceTest {
 
   /** 활성 사용자의 학습 locale(target/base)을 프로필에서 그대로 반환하는지 검증한다. */
   @Test
-  void 활성_사용자의_locale을_반환한다() {
+  void shouldReturnLocaleForActiveUser() {
     // given: 프로필에 en/ko locale이 저장된 활성 사용자
     UserProfile userProfile = mock(UserProfile.class);
     when(userProfile.getTargetLocale()).thenReturn(Locale.EN);
@@ -48,7 +50,7 @@ class UserProfileServiceTest {
 
   /** 활성 사용자가 아니면(미존재/탈퇴) INVALID_TOKEN 예외를 던지는지 검증한다. (토큰 관련 오류는 INVALID_TOKEN으로 통일) */
   @Test
-  void 활성_사용자가_아니면_INVALID_TOKEN_예외를_던진다() {
+  void shouldThrowInvalidTokenForInactiveUser() {
     // given: 해당 ID의 활성 사용자가 없음
     when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
         .thenReturn(Optional.empty());

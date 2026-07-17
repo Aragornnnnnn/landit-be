@@ -1,4 +1,5 @@
 // 진행 중이거나 막 종료된 학습 세션의 생명주기 정보를 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -14,6 +15,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
+/** 진행 중이거나 막 종료된 학습 세션의 생명주기 정보를 저장한다. */
 @Getter
 @Entity
 @Table(name = "learning_session")
@@ -63,6 +65,7 @@ public class LearningSession extends BaseTimeEntity {
   @Column(name = "ended_at")
   private LocalDateTime endedAt;
 
+  /** 동작을 수행한다. */
   protected LearningSession() {}
 
   private LearningSession(

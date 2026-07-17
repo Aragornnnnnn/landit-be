@@ -1,4 +1,5 @@
 // 앱 버전 확인 API의 플랫폼 분리, 업데이트 정책, 오류 응답을 검증한다.
+
 package com.landit.landitbe.app;
 
 import static org.hamcrest.Matchers.nullValue;
@@ -15,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+/** 앱 버전 확인 API의 플랫폼 분리, 업데이트 정책, 오류 응답을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -172,7 +174,7 @@ class AppVersionApiIntegrationTests {
                             ?, ?, ?, ?, ?, ?, NULL, TRUE,
                             TIMESTAMP '2026-06-09 12:00:00', CURRENT_TIMESTAMP
                         )
-                        """,
+        """,
         platform,
         versionName,
         buildNumber,

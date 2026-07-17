@@ -1,4 +1,5 @@
 // 세션 최종 피드백 API의 응답 구조를 정의한다.
+
 package com.landit.landitbe.session.api.dto;
 
 import com.landit.landitbe.session.application.port.AiMessageFeedbackEvaluationContextType;
@@ -6,6 +7,7 @@ import com.landit.landitbe.session.domain.FeedbackType;
 import java.math.BigDecimal;
 import java.util.List;
 
+/** 세션 최종 피드백 API의 응답 구조를 정의한다. */
 public record SessionFeedbackResponse(
     Long sessionId,
     Integer nativeScore,
@@ -14,6 +16,7 @@ public record SessionFeedbackResponse(
     String summaryMessage,
     List<MessageFeedbackResponse> messageFeedbacks) {
 
+  /** 내부 타입을 정의한다. */
   public record MessageFeedbackResponse(
       Long messageFeedbackId,
       Long messageId,
@@ -28,6 +31,7 @@ public record SessionFeedbackResponse(
       String correctionReason,
       String benchmarkMessage) {}
 
+  /** 내부 타입을 정의한다. */
   public record EvaluationContextResponse(
       AiMessageFeedbackEvaluationContextType type, String content, String translatedContent) {}
 }

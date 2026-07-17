@@ -1,8 +1,10 @@
 // 공통 예외가 사용할 애플리케이션 오류 코드와 HTTP 상태를 정의한다.
+
 package com.landit.landitbe.common.exception;
 
 import org.springframework.http.HttpStatus;
 
+/** 공통 예외가 사용할 애플리케이션 오류 코드와 HTTP 상태를 정의한다. */
 public enum ErrorCode {
   VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
   INVALID_REQUEST(HttpStatus.BAD_REQUEST, "잘못된 요청입니다."),

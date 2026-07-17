@@ -1,4 +1,5 @@
 // 테스트 환경에서 OTLP 외부 전송이 비활성화되는지 검증한다.
+
 package com.landit.landitbe;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +12,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 
+/** 테스트 환경에서 OTLP 외부 전송이 비활성화되는지 검증한다. */
 @ActiveProfiles("test")
 @SpringBootTest
 class OtlpExportDisabledIntegrationTests {

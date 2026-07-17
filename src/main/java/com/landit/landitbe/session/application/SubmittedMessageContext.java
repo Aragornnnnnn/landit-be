@@ -1,4 +1,5 @@
 // 사용자 발화 저장 결과와 AI 요청에 필요한 컨텍스트를 전달한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.content.infrastructure.ScenarioQuestionRow;
@@ -7,6 +8,7 @@ import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageContextR
 import java.util.List;
 import java.util.Optional;
 
+/** 사용자 발화 저장 결과와 AI 요청에 필요한 컨텍스트를 전달한다. */
 record SubmittedMessageContext(
     long userId,
     long sessionId,

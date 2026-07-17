@@ -1,4 +1,5 @@
 // 사용자 발화에 대한 AI 속마음을 생성한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.exception.ApiException;
@@ -9,6 +10,7 @@ import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 사용자 발화에 대한 AI 속마음을 생성한다. */
 @RequiredArgsConstructor
 @Component
 class SessionInnerThoughtGenerator {

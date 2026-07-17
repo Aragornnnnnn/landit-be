@@ -1,6 +1,8 @@
 // AI 메시지별 피드백 생성을 요청하는 본문을 표현한다.
+
 package com.landit.landitbe.session.application.port;
 
+/** AI 메시지별 피드백 생성을 요청하는 본문을 표현한다. */
 public record AiMessageFeedbackRequest(
     Long sessionId,
     Long messageId,

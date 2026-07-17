@@ -1,9 +1,11 @@
 // OIDC 검증에 필요한 audience와 테스트용 fake verifier 사용 여부를 바인딩한다.
+
 package com.landit.landitbe.auth.application;
 
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/** OIDC 검증에 필요한 audience와 테스트용 fake verifier 사용 여부를 바인딩한다. */
 @ConfigurationProperties(prefix = "landit.auth.oidc")
 public record OidcProperties(
     boolean fakeEnabled,
@@ -11,6 +13,7 @@ public record OidcProperties(
     List<String> kakaoAudiences,
     List<String> appleAudiences) {
 
+  /** 동작을 수행한다. */
   public OidcProperties {
     googleAudiences = normalize(googleAudiences);
     kakaoAudiences = normalize(kakaoAudiences);

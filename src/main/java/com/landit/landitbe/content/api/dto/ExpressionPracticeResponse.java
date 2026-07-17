@@ -1,9 +1,11 @@
 // 원어민 표현 학습 중 추가 예문 조회 응답을 표현한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+/** 원어민 표현 학습 중 추가 예문 조회 응답을 표현한다. */
 @Schema(description = "원어민 표현 추가 예문 조회 응답")
 public record ExpressionPracticeResponse(
     @Schema(description = "타겟 표현", example = "blow my mind") String targetExpressionText,

@@ -1,4 +1,5 @@
 // 학습 세션의 소유권, 상태, 잠금 조건을 검증하며 조회한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.exception.ApiException;
@@ -10,6 +11,7 @@ import com.landit.landitbe.session.infrastructure.LearningSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 학습 세션의 소유권, 상태, 잠금 조건을 검증하며 조회한다. */
 @RequiredArgsConstructor
 @Component
 class LearningSessionFinder {

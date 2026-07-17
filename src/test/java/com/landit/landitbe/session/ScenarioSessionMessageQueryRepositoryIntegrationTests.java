@@ -1,4 +1,5 @@
 // 사용자 발화 제출용 시나리오 컨텍스트 조회의 DTO 생성자 매핑을 검증한다.
+
 package com.landit.landitbe.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -10,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 사용자 발화 제출용 시나리오 컨텍스트 조회의 DTO 생성자 매핑을 검증한다. */
 @ActiveProfiles("test")
 @SpringBootTest
 @Transactional

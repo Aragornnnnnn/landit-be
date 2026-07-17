@@ -1,4 +1,5 @@
 // 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다.
+
 package com.landit.landitbe.content.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다. */
 @RequestMapping("/api/v1/expressions")
 @RestController
 @RequiredArgsConstructor

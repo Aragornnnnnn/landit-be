@@ -1,4 +1,5 @@
 // 세션 히스토리에 남길 AI와 사용자 메시지를 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +18,7 @@ import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/** 세션 히스토리에 남길 AI와 사용자 메시지를 저장한다. */
 @Getter
 @Entity
 @Table(name = "session_history_message")
@@ -77,6 +79,7 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   @Column(name = "reused_expression_payload", columnDefinition = "jsonb")
   private JsonNode reusedExpressionPayload;
 
+  /** 동작을 수행한다. */
   protected SessionHistoryMessage() {}
 
   private SessionHistoryMessage(

@@ -1,8 +1,10 @@
 // 시나리오별 Writing 표현 조회 응답 항목을 표현한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** 시나리오별 Writing 표현 조회 응답 항목을 표현한다. */
 @Schema(description = "시나리오별 Writing 표현 조회 응답 항목")
 public record ExpressionResponse(
     @Schema(description = "표현 고유 ID", example = "101") Long expressionId,

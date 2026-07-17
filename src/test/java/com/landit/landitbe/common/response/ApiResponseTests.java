@@ -1,4 +1,5 @@
 // 공통 API 응답 객체의 생성 규칙을 검증한다.
+
 package com.landit.landitbe.common.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+/** 공통 API 응답 객체의 생성 규칙을 검증한다. */
 class ApiResponseTests {
 
   @Test

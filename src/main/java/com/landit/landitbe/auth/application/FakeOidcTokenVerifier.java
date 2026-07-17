@@ -1,4 +1,5 @@
 // 테스트에서 외부 OIDC 제공자 호출 없이 ID Token 검증 결과를 만든다.
+
 package com.landit.landitbe.auth.application;
 
 import com.landit.landitbe.auth.domain.SocialProvider;
@@ -9,13 +10,14 @@ import java.security.MessageDigest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/** 테스트에서 외부 OIDC 제공자 호출 없이 ID Token 검증 결과를 만든다. */
 @Component
 @ConditionalOnProperty(prefix = "landit.auth.oidc", name = "fake-enabled", havingValue = "true")
 public class FakeOidcTokenVerifier implements OidcTokenVerifier {
 
   private static final int TOKEN_PART_COUNT = 4;
 
-  /** fake ID Token 형식의 nonce와 요청 nonce를 비교한다. */
+  /** Fake ID Token 형식의 nonce와 요청 nonce를 비교한다. */
   @Override
   public OidcUserInfo verify(SocialProvider provider, String idToken, String nonce) {
     String[] parts = idToken.split("\\|", -1);

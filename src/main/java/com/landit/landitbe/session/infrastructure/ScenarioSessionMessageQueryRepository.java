@@ -1,4 +1,5 @@
 // 사용자 발화 제출에 필요한 시나리오 컨텍스트를 조회한다.
+
 package com.landit.landitbe.session.infrastructure;
 
 import com.landit.landitbe.session.domain.ScenarioSession;
@@ -7,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 사용자 발화 제출에 필요한 시나리오 컨텍스트를 조회한다. */
 public interface ScenarioSessionMessageQueryRepository
     extends JpaRepository<ScenarioSession, Long> {
 
@@ -31,7 +33,7 @@ public interface ScenarioSessionMessageQueryRepository
             JOIN Scenario scenario
               ON scenario.id = scenarioVariant.scenarioId
             WHERE scenarioSession.learningSessionId = :learningSessionId
-            """)
+      """)
   Optional<ScenarioSessionMessageContextRow> findContextByLearningSessionId(
       @Param("learningSessionId") long learningSessionId);
 }

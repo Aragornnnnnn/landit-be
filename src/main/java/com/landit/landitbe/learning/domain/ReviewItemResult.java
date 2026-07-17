@@ -1,4 +1,5 @@
 // 복습 문항의 제출 결과를 저장한다.
+
 package com.landit.landitbe.learning.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,6 +13,7 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/** 복습 문항의 제출 결과를 저장한다. */
 @Entity
 @Table(name = "review_item_result")
 public class ReviewItemResult extends BaseCreatedAtEntity {
@@ -36,5 +38,6 @@ public class ReviewItemResult extends BaseCreatedAtEntity {
   @Column(name = "answer_payload", columnDefinition = "jsonb")
   private JsonNode answerPayload;
 
+  /** 동작을 수행한다. */
   protected ReviewItemResult() {}
 }

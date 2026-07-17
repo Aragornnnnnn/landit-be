@@ -1,4 +1,5 @@
 // 세션 진행에 필요한 시나리오 고정 질문을 조회한다.
+
 package com.landit.landitbe.content.infrastructure;
 
 import com.landit.landitbe.common.domain.Locale;
@@ -9,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/** 세션 진행에 필요한 시나리오 고정 질문을 조회한다. */
 @Repository
 public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQuestion, Long> {
 
@@ -30,7 +32,7 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
               AND questionVariant.targetLocale = :targetLocale
               AND questionVariant.baseLocale = :baseLocale
               AND questionVariant.status = com.landit.landitbe.common.domain.ActiveStatus.ACTIVE
-            """)
+      """)
   Optional<ScenarioQuestionRow> findActiveQuestion(
       @Param("scenarioId") long scenarioId,
       @Param("displayOrder") int displayOrder,

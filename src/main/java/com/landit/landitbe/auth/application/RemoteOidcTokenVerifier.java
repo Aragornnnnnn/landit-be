@@ -1,4 +1,5 @@
 // 실제 OIDC 제공자의 공개키로 ID Token 서명과 claim을 검증한다.
+
 package com.landit.landitbe.auth.application;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -30,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/** 실제 OIDC 제공자의 공개키로 ID Token 서명과 claim을 검증한다. */
 @Component
 @ConditionalOnProperty(
     prefix = "landit.auth.oidc",
@@ -48,6 +50,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
   private final HttpClient httpClient;
   private final Map<SocialProvider, JsonNode> jwksCache = new ConcurrentHashMap<>();
 
+  /** 동작을 수행한다. */
   public RemoteOidcTokenVerifier(OidcProperties properties) {
     this.properties = properties;
     this.objectMapper = new ObjectMapper();

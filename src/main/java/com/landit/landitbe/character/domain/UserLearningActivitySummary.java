@@ -1,4 +1,5 @@
 // 사용자별 누적 학습 통계와 스트릭 상태를 저장한다.
+
 package com.landit.landitbe.character.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -9,6 +10,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/** 사용자별 누적 학습 통계와 스트릭 상태를 저장한다. */
 @Entity
 @Table(name = "user_learning_activity_summary")
 public class UserLearningActivitySummary extends BaseTimeEntity {
@@ -50,5 +52,6 @@ public class UserLearningActivitySummary extends BaseTimeEntity {
   @Column(name = "last_activity_date")
   private LocalDate lastActivityDate;
 
+  /** 동작을 수행한다. */
   protected UserLearningActivitySummary() {}
 }

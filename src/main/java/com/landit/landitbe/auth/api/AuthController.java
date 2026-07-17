@@ -1,4 +1,5 @@
 // 인증 API 요청을 받아 소셜 로그인 결과를 공통 응답으로 반환한다.
+
 package com.landit.landitbe.auth.api;
 
 import com.landit.landitbe.auth.api.dto.AuthTokenResponse;
@@ -17,12 +18,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 인증 API 요청을 받아 소셜 로그인 결과를 공통 응답으로 반환한다. */
 @RequestMapping("/api/v1/auth")
 @RestController
 public class AuthController {
 
   private final AuthService authService;
 
+  /** 동작을 수행한다. */
   public AuthController(AuthService authService) {
     this.authService = authService;
   }
@@ -34,7 +37,7 @@ public class AuthController {
     return ApiResponse.success(authService.socialLogin(request));
   }
 
-  /** refresh token을 회전하고 새 자체 토큰을 발급한다. */
+  /** Refresh token을 회전하고 새 자체 토큰을 발급한다. */
   @PostMapping("/token/refresh")
   public ApiResponse<TokenRefreshResponse> refresh(
       @Valid @RequestBody TokenRefreshRequest request) {

@@ -1,4 +1,5 @@
 // 세션 히스토리의 외부 저장 artifact 경로를 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -11,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 세션 히스토리의 외부 저장 artifact 경로를 저장한다. */
 @Entity
 @Table(name = "session_history_artifact")
 public class SessionHistoryArtifact extends BaseTimeEntity {
@@ -39,5 +41,6 @@ public class SessionHistoryArtifact extends BaseTimeEntity {
   @Column(name = "byte_size")
   private Long byteSize;
 
+  /** 동작을 수행한다. */
   protected SessionHistoryArtifact() {}
 }

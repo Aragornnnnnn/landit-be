@@ -1,4 +1,5 @@
 // 앱 버전 확인 요청을 받아 플랫폼별 업데이트 정책을 반환한다.
+
 package com.landit.landitbe.app.api;
 
 import com.landit.landitbe.app.api.dto.AppVersionCheckResponse;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 앱 버전 확인 요청을 받아 플랫폼별 업데이트 정책을 반환한다. */
 @RequestMapping("/api/v1/app-versions")
 @RequiredArgsConstructor
 @RestController

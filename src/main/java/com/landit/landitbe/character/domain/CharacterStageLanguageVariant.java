@@ -1,4 +1,5 @@
 // 캐릭터 단계의 기준 언어별 표시 이름을 저장한다.
+
 package com.landit.landitbe.character.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -12,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 캐릭터 단계의 기준 언어별 표시 이름을 저장한다. */
 @Entity
 @Table(name = "character_stage_language_variant")
 public class CharacterStageLanguageVariant extends BaseTimeEntity {
@@ -30,5 +32,6 @@ public class CharacterStageLanguageVariant extends BaseTimeEntity {
   @Column(nullable = false, length = 100)
   private String name;
 
+  /** 동작을 수행한다. */
   protected CharacterStageLanguageVariant() {}
 }

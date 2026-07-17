@@ -1,4 +1,5 @@
 // 퀘스트 원형의 기준 언어별 표시 문구를 저장한다.
+
 package com.landit.landitbe.quest.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -12,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 퀘스트 원형의 기준 언어별 표시 문구를 저장한다. */
 @Entity
 @Table(name = "quest_template_language_variant")
 public class QuestTemplateLanguageVariant extends BaseTimeEntity {
@@ -33,5 +35,6 @@ public class QuestTemplateLanguageVariant extends BaseTimeEntity {
   @Column(columnDefinition = "text")
   private String description;
 
+  /** 동작을 수행한다. */
   protected QuestTemplateLanguageVariant() {}
 }

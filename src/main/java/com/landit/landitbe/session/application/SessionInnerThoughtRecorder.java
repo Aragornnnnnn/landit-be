@@ -1,4 +1,5 @@
 // 비동기 AI 속마음 생성 결과를 세션 메시지에 반영한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.session.application.port.AiInnerThoughtResult;
@@ -8,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 비동기 AI 속마음 생성 결과를 세션 메시지에 반영한다. */
 @RequiredArgsConstructor
 @Component
 class SessionInnerThoughtRecorder {

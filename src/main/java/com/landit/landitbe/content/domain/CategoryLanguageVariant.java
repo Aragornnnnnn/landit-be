@@ -1,4 +1,5 @@
 // 카테고리의 기준 언어별 표시 문구를 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -12,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 카테고리의 기준 언어별 표시 문구를 저장한다. */
 @Entity
 @Table(name = "category_language_variant")
 public class CategoryLanguageVariant extends BaseTimeEntity {
@@ -30,5 +32,6 @@ public class CategoryLanguageVariant extends BaseTimeEntity {
   @Column(nullable = false, length = 100)
   private String name;
 
+  /** 동작을 수행한다. */
   protected CategoryLanguageVariant() {}
 }

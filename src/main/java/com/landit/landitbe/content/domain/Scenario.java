@@ -1,4 +1,5 @@
 // 언어와 무관한 시나리오 원형 정보를 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
@@ -13,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/** 언어와 무관한 시나리오 원형 정보를 저장한다. */
 @Entity
 @Table(name = "scenario")
 public class Scenario extends BaseTimeEntity {
@@ -48,5 +50,6 @@ public class Scenario extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 
+  /** 동작을 수행한다. */
   protected Scenario() {}
 }

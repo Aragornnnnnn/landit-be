@@ -1,4 +1,5 @@
 // 사용자 프로필의 조회성 보조 기능(학습 locale 등)을 다른 모듈에 제공한다.
+
 package com.landit.landitbe.auth.application;
 
 import com.landit.landitbe.auth.domain.UserProfile;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 사용자 프로필의 조회성 보조 기능(학습 locale 등)을 다른 모듈에 제공한다. */
 @Service
 @RequiredArgsConstructor
 public class UserProfileService {

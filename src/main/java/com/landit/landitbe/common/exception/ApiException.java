@@ -1,8 +1,10 @@
 // 서비스 로직에서 공통 오류 코드로 실패를 표현하는 런타임 예외다.
+
 package com.landit.landitbe.common.exception;
 
 import org.springframework.http.HttpStatus;
 
+/** 서비스 로직에서 공통 오류 코드로 실패를 표현하는 런타임 예외다. */
 public class ApiException extends RuntimeException {
 
   private final ErrorCode errorCode;

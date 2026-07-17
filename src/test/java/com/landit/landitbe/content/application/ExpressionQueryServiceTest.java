@@ -1,4 +1,5 @@
 // ExpressionQueryService의 완료/잠김 계산, 학습 시작 상세 조회, 추가 예문 조회를 단위 검증한다.
+
 package com.landit.landitbe.content.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +44,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
+/** ExpressionQueryService의 완료/잠김 계산, 학습 시작 상세 조회, 추가 예문 조회를 단위 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class ExpressionQueryServiceTest {
 
@@ -61,7 +63,7 @@ class ExpressionQueryServiceTest {
   @InjectMocks private ExpressionQueryService expressionQueryService;
 
   @Test
-  void 미완료_표현_중_학습_순서가_가장_앞선_하나만_해금된다() {
+  void shouldUnlockOnlyEarliestIncompleteExpression() {
     givenExpressions(expression(101L, 1), expression(102L, 2), expression(103L, 3));
     givenCompletedExpressionIds(101L);
 
@@ -81,7 +83,7 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
-  void 모든_표현을_완료하면_전부_잠기지_않는다() {
+  void shouldKeepAllExpressionsUnlockedWhenAllCompleted() {
     givenExpressions(expression(101L, 1), expression(102L, 2), expression(103L, 3));
     givenCompletedExpressionIds(101L, 102L, 103L);
 
@@ -97,7 +99,7 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
-  void 아무것도_완료하지_않으면_학습_순서가_가장_앞선_표현만_해금된다() {
+  void shouldUnlockOnlyEarliestExpressionWhenNoneCompleted() {
     givenExpressions(expression(101L, 1), expression(102L, 2), expression(103L, 3));
     givenCompletedExpressionIds();
 
@@ -111,7 +113,7 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
-  void 존재하지_않는_시나리오면_표현을_조회하지_않고_예외를_전파한다() {
+  void shouldPropagateWhenScenarioNotFound() {
     doThrow(new ApiException(ErrorCode.SCENARIO_NOT_FOUND))
         .when(scenarioService)
         .validateExists(SCENARIO_ID);
@@ -126,7 +128,7 @@ class ExpressionQueryServiceTest {
 
   /** 표현 목록은 사용자 프로필의 locale(target/base) 기준으로 조회되는지 검증한다. (LAN-59 리뷰 반영) */
   @Test
-  void 표현_목록은_사용자_locale_기준으로_조회한다() {
+  void shouldFindExpressionsByUserLocale() {
     givenExpressions(expression(101L, 1));
     givenCompletedExpressionIds();
 
@@ -139,7 +141,7 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
-  void 표현을_찾으면_학습_시작_상세_정보를_응답으로_반환한다() {
+  void shouldReturnLearningStartDetailsWhenExpressionFound() {
     // given: DB에 학습하려는 표현 데이터가 있는 상황 가정
     // (learningExpression() 내부의 getter 스터빙이 findById 스터빙과 중첩되지 않도록 mock을 먼저 만든다)
     WritingExpression expression = learningExpression();
@@ -172,7 +174,7 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
-  void 표현을_찾지_못하면_RESOURCE_NOT_FOUND_예외를_던진다() {
+  void shouldThrowWhenExpressionNotFound() {
     // given: DB에 해당 표현 데이터가 없는 상황 가정
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.empty());
@@ -267,7 +269,7 @@ class ExpressionQueryServiceTest {
 
   /** 없는 표현 ID로 추가 예문을 조회하면 RESOURCE_NOT_FOUND 예외를 던지고, 어떤 ID가 없었는지 warn 로그를 남긴다. */
   @Test
-  void 없는_표현_ID로_추가_예문을_조회하면_예외를_던지고_로그를_남긴다() {
+  void shouldLogAndThrowWhenExpressionIdNotFound() {
     // given: 로그를 검증하기 위해 서비스 로거에 ListAppender(로그를 리스트에 담아주는 가짜 출력지)를 부착
     Logger logger = (Logger) LoggerFactory.getLogger(ExpressionQueryService.class);
     ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
@@ -297,7 +299,7 @@ class ExpressionQueryServiceTest {
 
   /** 적절한 표현 ID로 조회하면 표현 정보 + 예문 4개 + 작문 문제(writingSentence)가 담긴 응답을 반환한다. */
   @Test
-  void 적절한_표현_ID로_추가_예문을_조회하면_상세_응답을_반환한다() {
+  void shouldReturnDetailForValidExpressionId() {
     // given: 예문 4개가 payload에 담긴 표현이 DB에 있는 상황
     WritingExpression expression =
         makeWritingExpressionMockWithInfo(makePracticeExamplesPayload(4));
@@ -343,7 +345,7 @@ class ExpressionQueryServiceTest {
    * 호출해 2가지 이상 등장하는지 확인한다. (예문 4개 중 100번 모두 같은 게 나올 확률은 (1/4)^99 수준이라 사실상 0)
    */
   @Test
-  void 같은_표현을_여러_번_조회하면_writingSentence가_다양하게_뽑힌다() {
+  void shouldSelectDifferentWritingSentencesForRepeatedQueries() {
     // given
     WritingExpression expression =
         makeWritingExpressionMockWithInfo(makePracticeExamplesPayload(4));
@@ -369,7 +371,7 @@ class ExpressionQueryServiceTest {
    * payload(2개)로도 writingSentence가 항상 목록 안의 값인지(=인덱스가 범위를 벗어나지 않는지) 확인한다.
    */
   @Test
-  void 예문_개수가_4개가_아니어도_writingSentence는_항상_목록_안에서_뽑힌다() {
+  void shouldSelectWritingSentenceFromAvailableExamples() {
     // given: 예문이 2개뿐인 표현
     WritingExpression expression =
         makeWritingExpressionMockWithInfo(makePracticeExamplesPayload(2));
@@ -386,9 +388,9 @@ class ExpressionQueryServiceTest {
     }
   }
 
-  /** payload가 빈 배열이면(예문 0개) writingSentence를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
+  /** Payload가 빈 배열이면(예문 0개) writingSentence를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
   @Test
-  void 예문이_하나도_없는_표현이면_RESOURCE_NOT_FOUND_예외를_던진다() {
+  void shouldThrowWhenExpressionHasNoExamples() {
     // given: payload가 빈 배열인 표현
     WritingExpression expression = makeWritingExpressionMock(toJson("[]"));
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
@@ -401,9 +403,9 @@ class ExpressionQueryServiceTest {
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
   }
 
-  /** imageUrl은 명세상 유일한 선택(N) 필드다. payload에 imageUrl이 없어도 파싱이 깨지지 않고 null로 매핑된다. */
+  /** ImageUrl은 명세상 유일한 선택(N) 필드다. payload에 imageUrl이 없어도 파싱이 깨지지 않고 null로 매핑된다. */
   @Test
-  void 예문에_imageUrl이_없으면_null로_매핑된다() {
+  void shouldMapMissingImageUrlToNull() {
     // given: imageUrl 키가 아예 없는 예문 1개 + 있는 예문 1개
     WritingExpression expression =
         makeWritingExpressionMockWithInfo(
@@ -445,7 +447,7 @@ class ExpressionQueryServiceTest {
    * 막고, 로그로 데이터 오류를 추적한다)
    */
   @Test
-  void 필수_키가_빠지거나_빈_예문은_목록에서_제외되고_경고_로그를_남긴다() {
+  void shouldExcludeInvalidExamplesAndLogWarning() {
     // given: 로그 검증용 ListAppender 부착
     Logger logger = (Logger) LoggerFactory.getLogger(ExpressionQueryService.class);
     ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
@@ -521,7 +523,7 @@ class ExpressionQueryServiceTest {
 
   /** 모든 예문이 불량이면(제외 후 0개) 작문 문제를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
   @Test
-  void 모든_예문이_불량이면_RESOURCE_NOT_FOUND_예외를_던진다() {
+  void shouldThrowWhenAllExamplesAreInvalid() {
     // given: 전부 필수 키가 빠진 payload
     WritingExpression expression =
         makeWritingExpressionMock(
@@ -544,7 +546,7 @@ class ExpressionQueryServiceTest {
 
   // ===== 추가 예문 테스트용 헬퍼 =====
 
-  /** payload만 스터빙한 표현 mock. (표현 정보 getter까지 스터빙하면, 호출 안 되는 테스트에서 Mockito가 불필요 스터빙 오류를 내므로 분리) */
+  /** Payload만 스터빙한 표현 mock. (표현 정보 getter까지 스터빙하면, 호출 안 되는 테스트에서 Mockito가 불필요 스터빙 오류를 내므로 분리) */
   private WritingExpression makeWritingExpressionMock(JsonNode payload) {
     WritingExpression expression = mock(WritingExpression.class);
 
@@ -552,7 +554,7 @@ class ExpressionQueryServiceTest {
     return expression;
   }
 
-  /** payload + 응답에 들어갈 표현 정보(타겟/뜻/설명)까지 스터빙한 표현 mock. */
+  /** Payload + 응답에 들어갈 표현 정보(타겟/뜻/설명)까지 스터빙한 표현 mock. */
   private WritingExpression makeWritingExpressionMockWithInfo(JsonNode payload) {
     WritingExpression expression = makeWritingExpressionMock(payload);
 
@@ -580,7 +582,7 @@ class ExpressionQueryServiceTest {
                       "practiceQuestionTranslation": "질문해석-%d",
                       "imageUrl": "https://cdn.example.com/practice/%d.png"
                     }
-                    """
+          """
               .formatted(i, i, i, i, i, i));
     }
     return toJson(json.append("]").toString());

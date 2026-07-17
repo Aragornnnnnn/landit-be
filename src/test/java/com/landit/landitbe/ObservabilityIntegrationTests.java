@@ -1,4 +1,5 @@
 // Grafana Cloud로 전송할 HTTP 요청과 JVM 메트릭 등록을 검증한다.
+
 package com.landit.landitbe;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+/** Grafana Cloud로 전송할 HTTP 요청과 JVM 메트릭 등록을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest

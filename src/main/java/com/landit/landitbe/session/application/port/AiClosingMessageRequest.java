@@ -1,9 +1,11 @@
 // AI 종료 메시지 생성 요청 본문을 표현한다.
+
 package com.landit.landitbe.session.application.port;
 
 import com.landit.landitbe.session.domain.GoalCompletionStatus;
 import java.util.List;
 
+/** AI 종료 메시지 생성 요청 본문을 표현한다. */
 public record AiClosingMessageRequest(
     Long sessionId,
     Long submittedMessageId,

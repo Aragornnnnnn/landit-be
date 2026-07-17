@@ -1,4 +1,5 @@
 // 기존 학습 세션을 조작하는 API 요청을 처리한다.
+
 package com.landit.landitbe.session.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 기존 학습 세션을 조작하는 API 요청을 처리한다. */
 @RequestMapping("/api/v1/sessions")
 @RequiredArgsConstructor
 @RestController

@@ -1,4 +1,5 @@
 // 원어민 표현 학습 완료 유스케이스를 처리한다.
+
 package com.landit.landitbe.content.application;
 
 import com.landit.landitbe.auth.application.UserLocale;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 원어민 표현 학습 완료 유스케이스를 처리한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor

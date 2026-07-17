@@ -1,4 +1,5 @@
 // 소셜 로그인 제공자별 사용자 식별 정보를 저장한다.
+
 package com.landit.landitbe.auth.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -14,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+/** 소셜 로그인 제공자별 사용자 식별 정보를 저장한다. */
 @Entity
 @Table(name = "oauth_identity")
 public class OauthIdentity extends BaseTimeEntity {
@@ -40,8 +42,10 @@ public class OauthIdentity extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private OauthIdentityStatus status;
 
+  /** 동작을 수행한다. */
   protected OauthIdentity() {}
 
+  /** 동작을 수행한다. */
   public OauthIdentity(
       UserProfile userProfile,
       SocialProvider provider,

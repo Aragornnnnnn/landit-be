@@ -1,9 +1,11 @@
 // 원어민 표현 학습 시작 시 내려주는 표현 상세 응답을 표현한다.
+
 package com.landit.landitbe.content.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+/** 원어민 표현 학습 시작 시 내려주는 표현 상세 응답을 표현한다. */
 @Schema(description = "원어민 표현 학습 시작 응답")
 public record ExpressionLearningResponse(
     @Schema(description = "표현 고유 ID", example = "101") Long expressionId,
@@ -28,7 +30,8 @@ public record ExpressionLearningResponse(
     @Schema(
             description = "정답 단어와 오답 단어를 섞은 선택지 배열(저장된 섞인 순서 그대로)",
             example =
-                "[\"Gyeongbokgung\", \"blow\", \"will\", \"Palace\", \"amazing\", \"have\", \"get\", \"your\", \"mind\"]")
+                "[\"Gyeongbokgung\", \"blow\", \"will\", \"Palace\", \"amazing\", "
+                    + "\"have\", \"get\", \"your\", \"mind\"]")
         List<String> representativeSentenceWordChoices,
     @Schema(description = "대표 예문 이미지 URL", example = "https://cdn.example.com/images/101.png")
         String representativeImageUrl) {}

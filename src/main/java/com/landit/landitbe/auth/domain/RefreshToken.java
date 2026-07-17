@@ -1,4 +1,5 @@
 // 사용자에게 발급한 refresh token의 해시와 만료 정보를 저장한다.
+
 package com.landit.landitbe.auth.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -14,6 +15,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 
+/** 사용자에게 발급한 refresh token의 해시와 만료 정보를 저장한다. */
 @Entity
 @Table(
     name = "refresh_token",
@@ -38,8 +40,10 @@ public class RefreshToken extends BaseTimeEntity {
   @Column(name = "revoked_at")
   private LocalDateTime revokedAt;
 
+  /** 동작을 수행한다. */
   protected RefreshToken() {}
 
+  /** 동작을 수행한다. */
   public RefreshToken(UserProfile userProfile, String tokenHash, LocalDateTime expiresAt) {
     this.userProfile = userProfile;
     this.tokenHash = tokenHash;
@@ -51,17 +55,17 @@ public class RefreshToken extends BaseTimeEntity {
     return revokedAt == null && expiresAt.isAfter(now);
   }
 
-  /** refresh token을 더 이상 사용할 수 없도록 폐기한다. */
+  /** Refresh token을 더 이상 사용할 수 없도록 폐기한다. */
   public void revoke(LocalDateTime revokedAt) {
     this.revokedAt = revokedAt;
   }
 
-  /** refresh token PK를 반환한다. */
+  /** Refresh token PK를 반환한다. */
   public Long getId() {
     return id;
   }
 
-  /** refresh token을 발급받은 사용자를 반환한다. */
+  /** Refresh token을 발급받은 사용자를 반환한다. */
   public UserProfile getUserProfile() {
     return userProfile;
   }

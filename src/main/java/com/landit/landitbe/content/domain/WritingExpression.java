@@ -1,4 +1,5 @@
 // 시나리오에 연결된 Writing 보충학습 표현 콘텐츠를 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,6 +19,7 @@ import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/** 시나리오에 연결된 Writing 보충학습 표현 콘텐츠를 저장한다. */
 @Entity
 @Getter
 @Table(name = "writing_expression")
@@ -94,5 +96,6 @@ public class WritingExpression extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 
+  /** 동작을 수행한다. */
   protected WritingExpression() {}
 }

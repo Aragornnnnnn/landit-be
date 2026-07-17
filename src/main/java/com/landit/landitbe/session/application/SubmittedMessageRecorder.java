@@ -1,4 +1,5 @@
 // 사용자 발화를 저장하고 AI 호출에 필요한 컨텍스트를 만든다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.ConversationSpeaker;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 사용자 발화를 저장하고 AI 호출에 필요한 컨텍스트를 만든다. */
 @RequiredArgsConstructor
 @Component
 class SubmittedMessageRecorder {

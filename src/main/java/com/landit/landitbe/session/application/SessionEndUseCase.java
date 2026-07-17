@@ -1,4 +1,5 @@
 // 학습 세션 중도 종료 유스케이스를 처리한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.exception.ApiException;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 학습 세션 중도 종료 유스케이스를 처리한다. */
 @RequiredArgsConstructor
 @Service
 public class SessionEndUseCase {

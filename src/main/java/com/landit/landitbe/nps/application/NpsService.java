@@ -1,4 +1,5 @@
 // 사용자의 NPS 응답을 정규화해 저장하는 Service다.
+
 package com.landit.landitbe.nps.application;
 
 import com.landit.landitbe.nps.domain.NpsResponse;
@@ -6,11 +7,13 @@ import com.landit.landitbe.nps.infrastructure.NpsResponseRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 사용자의 NPS 응답을 정규화해 저장하는 Service다. */
 @Service
 public class NpsService {
 
   private final NpsResponseRepository npsResponseRepository;
 
+  /** 동작을 수행한다. */
   public NpsService(NpsResponseRepository npsResponseRepository) {
     this.npsResponseRepository = npsResponseRepository;
   }

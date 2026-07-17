@@ -1,4 +1,5 @@
 // 앱 버전별 업데이트 정책을 저장한다.
+
 package com.landit.landitbe.app.domain;
 
 import com.landit.landitbe.common.domain.AppPlatform;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
+/** 앱 버전별 업데이트 정책을 저장한다. */
 @Entity
 @Table(name = "app_version")
 public class AppVersion extends BaseCreatedAtEntity {
@@ -49,6 +51,7 @@ public class AppVersion extends BaseCreatedAtEntity {
   @Column(name = "released_at")
   private LocalDateTime releasedAt;
 
+  /** 동작을 수행한다. */
   protected AppVersion() {}
 
   /** 최신 앱 버전명을 반환한다. */

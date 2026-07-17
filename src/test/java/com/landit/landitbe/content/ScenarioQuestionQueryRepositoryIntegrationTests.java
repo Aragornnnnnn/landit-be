@@ -1,4 +1,5 @@
 // 시나리오 고정 질문 조회 Repository의 locale, 순서, 활성 상태 조건을 검증한다.
+
 package com.landit.landitbe.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 시나리오 고정 질문 조회 Repository의 locale, 순서, 활성 상태 조건을 검증한다. */
 @ActiveProfiles("test")
 @SpringBootTest
 @Transactional
@@ -70,7 +72,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                             updated_at
                         )
                         values (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         scenarioId,
         scenarioId);
     jdbcTemplate.update(
@@ -89,7 +91,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         )
                         values (?, ?, 'friend', 'EASY', 'AI', 2, 1, 'ACTIVE',
                             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         scenarioId,
         scenarioId);
   }
@@ -106,7 +108,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                             updated_at
                         )
                         values (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         questionId,
         scenarioId,
         displayOrder,
@@ -135,7 +137,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                             updated_at
                         )
                         values (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """,
+        """,
         variantId,
         questionId,
         targetLocale,

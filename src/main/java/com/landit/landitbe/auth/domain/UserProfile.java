@@ -1,4 +1,5 @@
 // 서비스 사용자 프로필과 학습 기본 설정을 저장한다.
+
 package com.landit.landitbe.auth.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -14,6 +15,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
+/** 서비스 사용자 프로필과 학습 기본 설정을 저장한다. */
 @Getter
 @Entity
 @Table(name = "user_profile")
@@ -64,8 +66,10 @@ public class UserProfile extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private UserProfileStatus status;
 
+  /** 동작을 수행한다. */
   protected UserProfile() {}
 
+  /** 동작을 수행한다. */
   public UserProfile(String email, String nickname, Long aiTutorId) {
     this.email = email;
     this.nickname = nickname;

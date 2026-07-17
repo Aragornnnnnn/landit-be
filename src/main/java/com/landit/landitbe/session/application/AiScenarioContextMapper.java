@@ -1,4 +1,5 @@
 // 세션 조회 결과를 AI 요청용 시나리오 컨텍스트로 변환한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.session.application.port.AiConversationSettings;
@@ -7,6 +8,7 @@ import com.landit.landitbe.session.infrastructure.ScenarioSessionMessageContextR
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 세션 조회 결과를 AI 요청용 시나리오 컨텍스트로 변환한다. */
 @RequiredArgsConstructor
 @Component
 class AiScenarioContextMapper {

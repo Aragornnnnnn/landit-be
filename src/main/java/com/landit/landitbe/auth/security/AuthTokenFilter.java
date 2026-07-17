@@ -1,4 +1,5 @@
 // Bearer access token을 검증해 SecurityContext에 인증 주체를 저장한다.
+
 package com.landit.landitbe.auth.security;
 
 import com.landit.landitbe.auth.application.LanditTokenService;
@@ -18,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/** Bearer access token을 검증해 SecurityContext에 인증 주체를 저장한다. */
 @Component
 public class AuthTokenFilter extends OncePerRequestFilter {
 
@@ -27,6 +29,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
   private final UserProfileRepository userProfileRepository;
   private final AuthFailureResponseWriter failureResponseWriter;
 
+  /** 동작을 수행한다. */
   public AuthTokenFilter(
       LanditTokenService tokenService,
       UserProfileRepository userProfileRepository,

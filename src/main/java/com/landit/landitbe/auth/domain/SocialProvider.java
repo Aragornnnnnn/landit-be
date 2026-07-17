@@ -1,9 +1,11 @@
 // 소셜 로그인을 지원하는 OIDC 제공자를 정의한다.
+
 package com.landit.landitbe.auth.domain;
 
 import com.landit.landitbe.common.exception.ApiException;
 import com.landit.landitbe.common.exception.ErrorCode;
 
+/** 소셜 로그인을 지원하는 OIDC 제공자를 정의한다. */
 public enum SocialProvider {
   GOOGLE,
   KAKAO,

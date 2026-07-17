@@ -1,4 +1,5 @@
 // 원어민 표현 학습 완료 유스케이스의 완료 기록 생성, 멱등 처리, 잠금/미존재 예외를 단위 검증한다.
+
 package com.landit.landitbe.content.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +35,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
+/** 원어민 표현 학습 완료 유스케이스의 완료 기록 생성, 멱등 처리, 잠금/미존재 예외를 단위 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class CompleteExpressionLearningUseCaseTest {
 
@@ -56,7 +58,7 @@ class CompleteExpressionLearningUseCaseTest {
 
   /** 없는(또는 INACTIVE) 표현을 완료하려 하면 RESOURCE_NOT_FOUND 예외를 던지고 아무것도 저장하지 않는다. */
   @Test
-  void 없는_표현을_완료하면_RESOURCE_NOT_FOUND_예외를_던진다() {
+  void shouldThrowWhenExpressionNotFound() {
     // given: 해당 ID의 활성 표현이 없음
     when(writingExpressionRepository.findByIdAndStatus(UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.empty());
@@ -74,10 +76,10 @@ class CompleteExpressionLearningUseCaseTest {
 
   /** 해금된(미완료 중 학습 순서가 가장 앞선) 표현을 완료하면 완료 기록을 올바른 값으로 저장한다. */
   @Test
-  void 해금된_표현을_완료하면_완료_기록을_저장한다() {
+  void shouldSaveCompletionForUnlockedExpression() {
     // given: 아무것도 완료하지 않은 사용자 + 학습 순서 201→202→203인 시나리오
-    given표현이존재하고사용자완료가없다();
-    given사용자locale표현목록(
+    givenExpressionAndNoUserCompletion();
+    givenUserLocaleExpressionList(
         orderedExpression(UNLOCKED_EXPRESSION_ID),
         orderedExpression(202L),
         orderedExpression(LOCKED_EXPRESSION_ID));
@@ -104,7 +106,7 @@ class CompleteExpressionLearningUseCaseTest {
 
   /** 이미 완료한 표현을 다시 완료 요청하면(멱등) 예외 없이 정상 종료하고 새 기록을 저장하지 않는다. last_completed_at 필드만 갱신된다. */
   @Test
-  void 이미_완료한_표현을_다시_완료하면_새_기록_없이_마지막_완료_시각만_갱신한다() {
+  void shouldUpdateLastCompletedAtForRepeatedCompletion() {
     // given: 표현이 존재하고, 사용자가 이미 그 표현을 완료한 상태
     WritingExpression expression = expressionInScenario();
     UserWritingExpressionCompletion completedRecord =
@@ -126,7 +128,7 @@ class CompleteExpressionLearningUseCaseTest {
 
   /** 아직 잠긴(미완료 중 학습 순서가 앞선 표현이 남은) 표현을 완료하려 하면 EXPRESSION_LOCKED 예외 + 경고 로그, 저장 없음. */
   @Test
-  void 잠긴_표현을_완료하면_EXPRESSION_LOCKED_예외를_던지고_로그를_남긴다() {
+  void shouldLogAndThrowWhenExpressionIsLocked() {
     // given: 로그 검증용 ListAppender 부착
     Logger logger =
         (Logger)
@@ -139,8 +141,8 @@ class CompleteExpressionLearningUseCaseTest {
     logger.addAppender(logAppender);
 
     // given: 아무것도 완료하지 않은 사용자 + 학습 순서 201→202→203 (201이 해금 대상)
-    given표현이존재하고사용자완료가없다();
-    given사용자locale표현목록(
+    givenExpressionAndNoUserCompletion();
+    givenUserLocaleExpressionList(
         orderedExpression(UNLOCKED_EXPRESSION_ID),
         orderedExpression(202L),
         orderedExpression(LOCKED_EXPRESSION_ID));
@@ -168,7 +170,7 @@ class CompleteExpressionLearningUseCaseTest {
   // ===== 헬퍼 =====
 
   /** "표현이 존재하고(ACTIVE) 사용자가 이 시나리오에서 완료한 표현이 없다"는 상황을 만든다. */
-  private void given표현이존재하고사용자완료가없다() {
+  private void givenExpressionAndNoUserCompletion() {
     WritingExpression expression = expressionInScenario();
 
     when(writingExpressionRepository.findByIdAndStatus(
@@ -180,7 +182,7 @@ class CompleteExpressionLearningUseCaseTest {
   }
 
   /** 사용자 locale(EN/KR) 기준으로 이 시나리오의 표현 목록(학습 순서)이 이렇게 조회된다고 스터빙한다. */
-  private void given사용자locale표현목록(WritingExpression... expressions) {
+  private void givenUserLocaleExpressionList(WritingExpression... expressions) {
     when(userProfileService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(TARGET_LOCALE, BASE_LOCALE));
     when(writingExpressionRepository

@@ -1,4 +1,5 @@
 // 컨트롤러에서 발생한 예외를 공통 API 오류 응답으로 변환한다.
+
 package com.landit.landitbe.common.exception;
 
 import com.landit.landitbe.common.response.ApiResponse;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/** 컨트롤러에서 발생한 예외를 공통 API 오류 응답으로 변환한다. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

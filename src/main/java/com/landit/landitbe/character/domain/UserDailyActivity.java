@@ -1,4 +1,5 @@
 // 사용자별 일별 학습 활동 기록을 저장한다.
+
 package com.landit.landitbe.character.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -11,6 +12,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** 사용자별 일별 학습 활동 기록을 저장한다. */
 @Entity
 @Table(name = "user_daily_activity")
 public class UserDailyActivity extends BaseTimeEntity {
@@ -43,5 +45,6 @@ public class UserDailyActivity extends BaseTimeEntity {
   @Column(name = "active_day", nullable = false)
   private boolean activeDay;
 
+  /** 동작을 수행한다. */
   protected UserDailyActivity() {}
 }

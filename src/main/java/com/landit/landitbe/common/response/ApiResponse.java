@@ -1,4 +1,5 @@
 // 모든 API 응답을 success, data, error 형태로 감싼다.
+
 package com.landit.landitbe.common.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -7,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+/** 모든 API 응답을 success, data, error 형태로 감싼다. */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 @Schema(description = "공통 API 응답 객체")
 public record ApiResponse<T>(

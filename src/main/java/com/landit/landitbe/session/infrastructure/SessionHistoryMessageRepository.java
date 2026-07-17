@@ -1,4 +1,5 @@
 // 세션 히스토리 메시지 엔티티의 저장을 담당한다.
+
 package com.landit.landitbe.session.infrastructure;
 
 import com.landit.landitbe.common.domain.ConversationSpeaker;
@@ -12,6 +13,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 세션 히스토리 메시지 엔티티의 저장을 담당한다. */
 public interface SessionHistoryMessageRepository
     extends JpaRepository<SessionHistoryMessage, Long> {
 
@@ -36,7 +38,7 @@ public interface SessionHistoryMessageRepository
                 message.updatedAt = CURRENT_TIMESTAMP
             where message.id = :messageId
               and message.innerThoughtProcessingStatus = :preparingStatus
-            """)
+      """)
   int completeInnerThoughtIfPreparing(
       @Param("messageId") long messageId,
       @Param("innerThought") String innerThought,
@@ -53,7 +55,7 @@ public interface SessionHistoryMessageRepository
                 message.updatedAt = CURRENT_TIMESTAMP
             where message.id = :messageId
               and message.innerThoughtProcessingStatus = :preparingStatus
-            """)
+      """)
   int markInnerThoughtFailedIfPreparing(
       @Param("messageId") long messageId,
       @Param("failedStatus") ProcessingStatus failedStatus,

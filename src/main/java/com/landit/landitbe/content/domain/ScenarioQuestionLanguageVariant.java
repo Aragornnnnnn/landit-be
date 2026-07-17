@@ -1,4 +1,5 @@
 // 시나리오 고정 질문의 학습 언어와 기준 언어별 문구를 저장한다.
+
 package com.landit.landitbe.content.domain;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
@@ -15,6 +16,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
+/** 시나리오 고정 질문의 학습 언어와 기준 언어별 문구를 저장한다. */
 @Getter
 @Entity
 @Table(name = "scenario_question_language_variant")
@@ -52,5 +54,6 @@ public class ScenarioQuestionLanguageVariant extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 
+  /** 동작을 수행한다. */
   protected ScenarioQuestionLanguageVariant() {}
 }

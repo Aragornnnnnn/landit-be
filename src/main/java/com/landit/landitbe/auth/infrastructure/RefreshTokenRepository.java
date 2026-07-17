@@ -1,4 +1,5 @@
 // refresh token 엔티티를 저장한다.
+
 package com.landit.landitbe.auth.infrastructure;
 
 import com.landit.landitbe.auth.domain.RefreshToken;
@@ -11,9 +12,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** Refresh token 엔티티를 저장한다. */
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-  /** refresh token 해시로 저장된 토큰을 조회한다. */
+  /** Refresh token 해시로 저장된 토큰을 조회한다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<RefreshToken> findByTokenHash(String tokenHash);
 
@@ -25,7 +27,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             set token.revokedAt = :revokedAt
             where token.userProfile.id = :userProfileId
               and token.revokedAt is null
-            """)
+      """)
   void revokeAllActiveByUserProfileId(
       @Param("userProfileId") Long userProfileId, @Param("revokedAt") LocalDateTime revokedAt);
 }

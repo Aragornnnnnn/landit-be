@@ -1,4 +1,5 @@
 // 사용자 발화 이후 생성할 AI 메시지를 요청한다.
+
 package com.landit.landitbe.session.application;
 
 import com.landit.landitbe.common.domain.InnerThoughtType;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/** 사용자 발화 이후 생성할 AI 메시지를 요청한다. */
 @RequiredArgsConstructor
 @Service
 class SessionMessageAiGenerator {

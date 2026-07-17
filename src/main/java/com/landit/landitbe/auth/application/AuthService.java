@@ -1,4 +1,5 @@
 // OIDC 검증 결과를 바탕으로 사용자를 가입 또는 갱신하고 자체 토큰을 발급한다.
+
 package com.landit.landitbe.auth.application;
 
 import com.landit.landitbe.auth.api.dto.AuthTokenResponse;
@@ -28,6 +29,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** OIDC 검증 결과를 바탕으로 사용자를 가입 또는 갱신하고 자체 토큰을 발급한다. */
 @Service
 public class AuthService {
 
@@ -44,6 +46,7 @@ public class AuthService {
   private final LanditTokenService tokenService;
   private final TokenProperties tokenProperties;
 
+  /** 동작을 수행한다. */
   public AuthService(
       UserProfileRepository userProfileRepository,
       AiTutorRepository aiTutorRepository,
@@ -79,7 +82,7 @@ public class AuthService {
         userResponse(userResult));
   }
 
-  /** refresh token을 회전하고 새 자체 토큰을 발급한다. */
+  /** Refresh token을 회전하고 새 자체 토큰을 발급한다. */
   @Transactional
   public TokenRefreshResponse refresh(TokenRefreshRequest request) {
     LocalDateTime now = LocalDateTime.now();
@@ -187,7 +190,7 @@ public class AuthService {
         userResult.newUser());
   }
 
-  /** access token과 회전용 refresh token을 발급하고 refresh token 해시를 저장한다. */
+  /** Access token과 회전용 refresh token을 발급하고 refresh token 해시를 저장한다. */
   private IssuedTokens issueTokens(UserProfile userProfile) {
     String accessToken = tokenService.createAccessToken(userProfile);
     String refreshToken = tokenService.createRefreshToken();

@@ -1,4 +1,5 @@
 // 사용자 메시지별 상세 피드백을 저장한다.
+
 package com.landit.landitbe.session.domain;
 
 import com.landit.landitbe.common.domain.BaseTimeEntity;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
+/** 사용자 메시지별 상세 피드백을 저장한다. */
 @Getter
 @Entity
 @Table(name = "session_history_message_feedback")
@@ -62,6 +64,7 @@ public class SessionHistoryMessageFeedback extends BaseTimeEntity {
   @Column(name = "benchmark_message", columnDefinition = "text")
   private String benchmarkMessage;
 
+  /** 동작을 수행한다. */
   protected SessionHistoryMessageFeedback() {}
 
   private SessionHistoryMessageFeedback(

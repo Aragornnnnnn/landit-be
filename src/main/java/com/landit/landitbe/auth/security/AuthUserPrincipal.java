@@ -1,4 +1,5 @@
 // 인증된 사용자 ID를 Spring Security principal로 표현한다.
+
 package com.landit.landitbe.auth.security;
 
 import java.util.Collection;
@@ -6,8 +7,10 @@ import java.util.List;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+/** 인증된 사용자 ID를 Spring Security principal로 표현한다. */
 public record AuthUserPrincipal(Long userId) implements UserDetails {
 
+  /** 동작을 수행한다. */
   public AuthUserPrincipal {
     if (userId == null) {
       throw new IllegalArgumentException("userId must not be null");

@@ -1,4 +1,5 @@
 // 시나리오에 속한 Writing 표현을 학습 순서 기준으로 조회한다.
+
 package com.landit.landitbe.content.infrastructure;
 
 import com.landit.landitbe.common.domain.ActiveStatus;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** 시나리오에 속한 Writing 표현을 학습 순서 기준으로 조회한다. */
 public interface WritingExpressionRepository extends JpaRepository<WritingExpression, Long> {
 
   /**

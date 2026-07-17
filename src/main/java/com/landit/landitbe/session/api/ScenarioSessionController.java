@@ -1,4 +1,5 @@
 // 시나리오에서 학습 세션을 시작하는 API 요청을 처리한다.
+
 package com.landit.landitbe.session.api;
 
 import com.landit.landitbe.auth.security.AuthUserPrincipal;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 시나리오에서 학습 세션을 시작하는 API 요청을 처리한다. */
 @RequestMapping("/api/v1/scenarios")
 @RequiredArgsConstructor
 @RestController
