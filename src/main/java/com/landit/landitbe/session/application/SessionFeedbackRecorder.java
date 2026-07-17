@@ -20,11 +20,9 @@ import com.landit.landitbe.session.infrastructure.SessionHistorySummaryFeedbackR
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @RequiredArgsConstructor
 @Component
 class SessionFeedbackRecorder {
@@ -44,8 +42,7 @@ class SessionFeedbackRecorder {
             AiSessionFeedbackResult result
     ) {
         validateResult(context, result);
-        BigDecimal starRating = starRatingFor(result.nativeScore());
-        logStarRatingMismatch(context.sessionId(), result.starRating(), starRating);
+        BigDecimal starRating = result.starRating();
         // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
         LearningSession learningSession = learningSessionFinder.findOwnedCompletedForUpdate(
                 userId,
@@ -74,11 +71,22 @@ class SessionFeedbackRecorder {
                 || !context.sessionId().equals(result.sessionId())
                 || result.nativeScore() < 0
                 || result.nativeScore() > 100
+                || !validStarRating(result.starRating())
                 || blank(result.highlightMessage())
                 || blank(result.summaryMessage())) {
             throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
         }
         validateMessageFeedbacks(context.userMessages(), result.messageFeedbacks());
+    }
+
+    /** AI가 반환할 수 있는 별점 값인지 검증한다. */
+    private boolean validStarRating(BigDecimal starRating) {
+        return starRating != null
+                && (starRating.compareTo(new BigDecimal("1.0")) == 0
+                || starRating.compareTo(new BigDecimal("1.5")) == 0
+                || starRating.compareTo(new BigDecimal("2.0")) == 0
+                || starRating.compareTo(new BigDecimal("2.5")) == 0
+                || starRating.compareTo(new BigDecimal("3.0")) == 0);
     }
 
     /** AI가 요청한 사용자 메시지 순서와 동일한 개수·식별자의 피드백을 반환했는지 검증한다. */
@@ -187,39 +195,6 @@ class SessionFeedbackRecorder {
                 )
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
         progress.complete(starRating, nativeScore, learningSession.getEndedAt());
-    }
-
-    /** native score 구간으로 저장과 응답에 사용할 별점을 계산한다. */
-    private BigDecimal starRatingFor(int nativeScore) {
-        if (nativeScore <= 54) {
-            return new BigDecimal("1.0");
-        }
-        if (nativeScore <= 64) {
-            return new BigDecimal("1.5");
-        }
-        if (nativeScore <= 74) {
-            return new BigDecimal("2.0");
-        }
-        if (nativeScore <= 89) {
-            return new BigDecimal("2.5");
-        }
-        return new BigDecimal("3.0");
-    }
-
-    /** AI가 보낸 별점이 점수 구간과 다르면 BE 계산값을 사용하고 계약 위반을 기록한다. */
-    private void logStarRatingMismatch(
-            long sessionId,
-            BigDecimal aiStarRating,
-            BigDecimal starRating
-    ) {
-        if (aiStarRating != null && aiStarRating.compareTo(starRating) != 0) {
-            log.warn(
-                    "AI final feedback star rating mismatched. sessionId={}, aiStarRating={}, starRating={}",
-                    sessionId,
-                    aiStarRating,
-                    starRating
-            );
-        }
     }
 
     /** 필수 문자열이 null 또는 공백인지 확인한다. */
