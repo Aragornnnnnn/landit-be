@@ -227,6 +227,16 @@ class DatabaseSchemaIntegrationTests {
         );
     }
 
+    @DisplayName("V24 migration은 사용자 메시지 피드백 처리 상태를 추가한다.")
+    @Test
+    void v24AddsFeedbackProcessingStatusToSessionHistoryMessage() {
+        assertColumnExists("session_history_message", "feedback_processing_status");
+        assertTableConstraintExists(
+                "session_history_message",
+                "chk_session_message_feedback_status"
+        );
+    }
+
     @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")
     @Test
     void postgresqlMigrationNormalizesPracticeExamplesPayloadKeys() throws Exception {

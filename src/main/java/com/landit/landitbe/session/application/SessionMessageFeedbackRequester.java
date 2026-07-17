@@ -22,12 +22,16 @@ class SessionMessageFeedbackRequester {
 
     private final AiConversationClient aiConversationClient;
     private final AiScenarioContextMapper aiScenarioContextMapper;
+    private final SessionMessageFeedbackRecorder sessionMessageFeedbackRecorder;
 
     /** 사용자 메시지의 평가 기준을 구성해 피드백 생성을 요청한다. */
     ProcessingStatus request(SubmittedMessageContext submittedContext) {
         AiMessageFeedbackRequest request = toRequest(submittedContext);
         AiMessageFeedbackResult result = aiConversationClient.requestMessageFeedback(request);
         validateResult(result, request);
+        if (result.feedbackStatus() == ProcessingStatus.FAILED) {
+            sessionMessageFeedbackRecorder.fail(submittedContext.submittedMessageId());
+        }
         return result.feedbackStatus();
     }
 
@@ -116,7 +120,8 @@ class SessionMessageFeedbackRequester {
         if (result == null
                 || !request.sessionId().equals(result.sessionId())
                 || !request.messageId().equals(result.messageId())
-                || result.feedbackStatus() != ProcessingStatus.PREPARING) {
+                || (result.feedbackStatus() != ProcessingStatus.PREPARING
+                && result.feedbackStatus() != ProcessingStatus.FAILED)) {
             throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
         }
     }
