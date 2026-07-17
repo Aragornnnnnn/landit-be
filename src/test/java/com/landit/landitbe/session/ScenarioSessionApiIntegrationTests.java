@@ -441,6 +441,38 @@ class ScenarioSessionApiIntegrationTests {
     }
 
     @Test
+    void submitMessageMarksMessageFeedbackFailedWhenAiReportsFailed() throws Exception {
+        StartedSession startedSession = startUserFirstSession(
+                "message-feedback-failed@example.com",
+                1208,
+                2208,
+                3208
+        );
+        seedScenarioQuestion(4208, 2208, 1, "What would you like?", "무엇을 원하세요?");
+        fakeAiConversationClient.returnMessageFeedbackStatus(ProcessingStatus.FAILED);
+
+        MvcResult submitResult = mockMvc.perform(post(
+                        "/api/v1/sessions/%d/messages".formatted(startedSession.sessionId()))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content":"I would like an americano.",
+                                  "inputType":"VOICE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long messageId = objectMapper.readTree(submitResult.getResponse().getContentAsByteArray())
+                .get("data")
+                .get("submittedMessage")
+                .get("messageId")
+                .asLong();
+
+        assertThat(awaitMessageFeedbackStatus(messageId, "FAILED")).isTrue();
+    }
+
+    @Test
     void submitMessageMarksInnerThoughtFailedWhenResponseMessageIdDiffers() throws Exception {
         StartedSession startedSession = startUserFirstSession(
                 "inner-thought-mismatch@example.com",
@@ -1441,6 +1473,18 @@ class ScenarioSessionApiIntegrationTests {
         assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
         assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
         assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
+        Long messageId = jdbcTemplate.queryForObject(
+                """
+                        SELECT shm.id
+                        FROM session_history_message shm
+                        JOIN session_history sh ON sh.id = shm.session_history_id
+                        WHERE sh.learning_session_id = ?
+                          AND shm.role = 'USER'
+                        """,
+                Long.class,
+                sessionId
+        );
+        assertThat(awaitMessageFeedbackStatus(messageId, "FAILED")).isTrue();
         Integer messageCount = jdbcTemplate.queryForObject(
                 """
                         SELECT COUNT(*)
@@ -1946,6 +1990,22 @@ class ScenarioSessionApiIntegrationTests {
         for (int attempt = 0; attempt < 50; attempt++) {
             String status = jdbcTemplate.queryForObject(
                     "SELECT inner_thought_processing_status FROM session_history_message WHERE id = ?",
+                    String.class,
+                    messageId
+            );
+            if (expectedStatus.equals(status)) {
+                return true;
+            }
+            Thread.sleep(100L);
+        }
+        return false;
+    }
+
+    private boolean awaitMessageFeedbackStatus(long messageId, String expectedStatus)
+            throws InterruptedException {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            String status = jdbcTemplate.queryForObject(
+                    "SELECT feedback_processing_status FROM session_history_message WHERE id = ?",
                     String.class,
                     messageId
             );

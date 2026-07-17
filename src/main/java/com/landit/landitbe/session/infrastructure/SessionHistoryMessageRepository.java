@@ -56,4 +56,19 @@ public interface SessionHistoryMessageRepository extends JpaRepository<SessionHi
             @Param("failedStatus") ProcessingStatus failedStatus,
             @Param("preparingStatus") ProcessingStatus preparingStatus
     );
+
+    /** 준비 상태인 메시지의 피드백 처리 상태만 실패로 바꾼다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update SessionHistoryMessage message
+            set message.feedbackProcessingStatus = :failedStatus,
+                message.updatedAt = CURRENT_TIMESTAMP
+            where message.id = :messageId
+              and message.feedbackProcessingStatus = :preparingStatus
+            """)
+    int markFeedbackFailedIfPreparing(
+            @Param("messageId") long messageId,
+            @Param("failedStatus") ProcessingStatus failedStatus,
+            @Param("preparingStatus") ProcessingStatus preparingStatus
+    );
 }
