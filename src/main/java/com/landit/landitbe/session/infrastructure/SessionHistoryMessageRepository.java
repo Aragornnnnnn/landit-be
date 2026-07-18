@@ -75,4 +75,19 @@ public interface SessionHistoryMessageRepository
       @Param("messageId") long messageId,
       @Param("failedStatus") ProcessingStatus failedStatus,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
+
+  /** 준비 상태인 메시지들의 피드백 처리 상태를 완료로 바꾼다. */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+            update SessionHistoryMessage message
+            set message.feedbackProcessingStatus = :completedStatus,
+                message.updatedAt = CURRENT_TIMESTAMP
+            where message.id in :messageIds
+              and message.feedbackProcessingStatus = :preparingStatus
+      """)
+  int markFeedbackCompletedIfPreparing(
+      @Param("messageIds") List<Long> messageIds,
+      @Param("completedStatus") ProcessingStatus completedStatus,
+      @Param("preparingStatus") ProcessingStatus preparingStatus);
 }

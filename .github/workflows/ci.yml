@@ -1,11 +1,9 @@
-# develop 대상 PR의 애플리케이션과 배포 검증 스크립트를 검사한다.
+# 모든 PR의 애플리케이션과 배포 검증 스크립트를 검사한다.
 name: Verify pull request
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
-    branches:
-      - develop
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
