@@ -11,6 +11,7 @@ import com.landit.landitbe.session.application.port.AiSessionFeedbackResult;
 import com.landit.landitbe.session.application.port.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.session.domain.FeedbackType;
 import com.landit.landitbe.session.domain.LearningSession;
+import com.landit.landitbe.session.domain.ProcessingStatus;
 import com.landit.landitbe.session.domain.SessionHistory;
 import com.landit.landitbe.session.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.session.domain.SessionHistorySummaryFeedback;
@@ -158,6 +159,10 @@ class SessionFeedbackRecorder {
               feedback.correctionReason(),
               feedback.benchmarkMessage()));
     }
+    sessionHistoryMessageRepository.markFeedbackCompletedIfPreparing(
+        context.userMessages().stream().map(UserMessageContext::messageId).toList(),
+        ProcessingStatus.COMPLETED,
+        ProcessingStatus.PREPARING);
   }
 
   /** 세션 종료 시각을 기준으로 히스토리의 종료 정보와 사용자 메시지 수를 확정한다. */

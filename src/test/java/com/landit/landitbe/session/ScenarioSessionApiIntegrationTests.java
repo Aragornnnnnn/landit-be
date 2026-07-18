@@ -1097,6 +1097,24 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void getSessionFeedbackCompletesSourceMessageWhenDetailedFeedbackIsCompleted() throws Exception {
+    StartedSession startedSession =
+        startCompletedAiFirstSession("session-feedback-message-status@example.com");
+    long messageId = userMessageIds(startedSession.sessionId()).getFirst();
+    assertThat(awaitMessageFeedbackStatus(messageId, "PREPARING")).isTrue();
+
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+        .andExpect(status().isOk());
+
+    Map<String, Object> statuses = messageFeedbackProcessingStatuses(messageId);
+    assertThat(statuses.get("DETAILED_FEEDBACK_STATUS")).isEqualTo("COMPLETED");
+    assertThat(statuses.get("SOURCE_MESSAGE_STATUS")).isEqualTo("COMPLETED");
+  }
+
+  @Test
   void getSessionFeedbackStoresAiStarRatingWhenItDiffersFromNativeScoreBand() throws Exception {
     StartedSession startedSession =
         startCompletedAiFirstSession("session-feedback-invalid-result@example.com");
@@ -1184,6 +1202,13 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().expectedMessageIds())
         .containsExactlyElementsOf(userMessageIds(sessionId));
     assertThat(fakeAiConversationClient.sessionFeedbackTransactionActive()).containsOnly(false);
+    assertThat(messageFeedbackProcessingStatusesForSession(sessionId))
+        .hasSize(2)
+        .allSatisfy(
+            statuses -> {
+              assertThat(statuses.get("DETAILED_FEEDBACK_STATUS")).isEqualTo("COMPLETED");
+              assertThat(statuses.get("SOURCE_MESSAGE_STATUS")).isEqualTo("COMPLETED");
+            });
   }
 
   @Test
@@ -2423,6 +2448,32 @@ class ScenarioSessionApiIntegrationTests {
         ORDER BY message.message_sequence
         """,
         Long.class,
+        sessionId);
+  }
+
+  private Map<String, Object> messageFeedbackProcessingStatuses(long messageId) {
+    return jdbcTemplate.queryForMap(
+        """
+        SELECT feedback.processing_status AS detailed_feedback_status,
+               message.feedback_processing_status AS source_message_status
+        FROM session_history_message_feedback feedback
+        JOIN session_history_message message ON message.id = feedback.session_history_message_id
+        WHERE message.id = ?
+        """,
+        messageId);
+  }
+
+  private List<Map<String, Object>> messageFeedbackProcessingStatusesForSession(long sessionId) {
+    return jdbcTemplate.queryForList(
+        """
+        SELECT feedback.processing_status AS detailed_feedback_status,
+               message.feedback_processing_status AS source_message_status
+        FROM session_history_message_feedback feedback
+        JOIN session_history_message message ON message.id = feedback.session_history_message_id
+        JOIN session_history history ON history.id = message.session_history_id
+        WHERE history.learning_session_id = ?
+        ORDER BY message.message_sequence
+        """,
         sessionId);
   }
 
