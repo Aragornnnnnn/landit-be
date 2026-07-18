@@ -39,6 +39,7 @@
 
 **Files:**
 - Modify: `.github/workflows/deploy-prod.yml`
+- Create: `.github/release.yml`
 
 **Interfaces:**
 - Consumes: 필수 `workflow_dispatch.inputs.version` 문자열과 성공한 `main` 배포의 `GITHUB_SHA`.
@@ -51,6 +52,7 @@
 - [x] 브랜치·버전·태그 중복 검증이 Flyway migration보다 먼저 완료되도록 preflight job을 둔다.
 - [x] 기존 Flyway, ECR, ECS, 안정화 검증 순서는 변경하지 않는다.
 - [x] ECS 안정화 검증 뒤에 annotated tag push와 `gh release create --generate-notes`를 추가한다.
+- [x] 수동으로 지정한 PR 타입 라벨을 기준으로 GitHub Release 변경 내역을 분류하고 `skip-changelog` 라벨은 제외한다.
 - [x] Ruby Psych로 workflow YAML 문법을 확인하고, 가능하면 `actionlint`도 실행한다.
 
 ### Task 3: 전체 변경 검증과 기록
@@ -72,6 +74,7 @@
 ## 검증 결과
 
 - `ruby -e 'require "psych"; Psych.parse_file(".github/workflows/deploy-prod.yml")'` 통과.
+- `.github/release.yml`의 YAML 문법과 `feat`, `bug`, `refactor`, `chore`, `deploy`, `docs`, `skip-changelog` 분류 규칙 검증 통과.
 - 임시 Git 저장소에서 유효한 `1.2.4` 허용, 잘못된 버전 형식 거부, 기존 `be-v1.2.3` 태그 중복 감지를 확인.
 - `./gradlew test --no-daemon` 통과.
 - `git diff --check` 통과.
