@@ -16,6 +16,10 @@ management:
     web:
       exposure:
         include: health,info
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
   otlp:
     metrics:
       export:
