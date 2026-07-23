@@ -21,7 +21,17 @@ public record SessionMessageSubmitResponse(
     @Schema(description = "다음 AI 메시지") NextMessageResponse nextMessage,
     @Schema(description = "세션 진행도") SessionProgressResponse progress) {
 
-  /** 저장된 사용자·AI 메시지와 진행 상태를 제출 응답으로 변환한다. */
+  /**
+   * 저장된 사용자·AI 메시지와 진행 상태를 제출 응답으로 변환한다.
+   *
+   * @param sessionId 세션 ID
+   * @param submittedMessage 제출된 사용자 메시지
+   * @param feedbackProcessingStatus 메시지별 피드백 처리 상태
+   * @param nextMessage 다음 AI 메시지
+   * @param totalQuestionCount 고정 질문 개수
+   * @param completed 세션 완료 여부
+   * @return 사용자 발화 제출 응답
+   */
   public static SessionMessageSubmitResponse from(
       Long sessionId,
       SessionHistoryMessage submittedMessage,
@@ -65,7 +75,13 @@ public record SessionMessageSubmitResponse(
       @Schema(description = "상대 역할의 속마음") String innerThought,
       @Schema(description = "속마음 유형") String innerThoughtType) {
 
-    /** 저장된 사용자 메시지와 피드백 상태를 응답으로 변환한다. */
+    /**
+     * 저장된 사용자 메시지와 피드백 상태를 응답으로 변환한다.
+     *
+     * @param message 저장된 사용자 메시지
+     * @param feedbackProcessingStatus 메시지별 피드백 처리 상태
+     * @return 제출된 사용자 메시지 응답
+     */
     public static SubmittedMessageResponse from(
         SessionHistoryMessage message, ProcessingStatus feedbackProcessingStatus) {
       return new SubmittedMessageResponse(
@@ -99,7 +115,12 @@ public record SessionMessageSubmitResponse(
       @Schema(description = "메시지 본문") String content,
       @Schema(description = "기준 locale 번역") String translatedContent) {
 
-    /** 저장된 AI 메시지를 다음 메시지 응답으로 변환한다. */
+    /**
+     * 저장된 AI 메시지를 다음 메시지 응답으로 변환한다.
+     *
+     * @param message 저장된 AI 메시지
+     * @return 다음 AI 메시지 응답
+     */
     public static NextMessageResponse from(SessionHistoryMessage message) {
       return new NextMessageResponse(
           message.getId(),
@@ -126,7 +147,14 @@ public record SessionMessageSubmitResponse(
       @Schema(description = "고정 질문 개수") int totalQuestionCount,
       @Schema(description = "세션 완료 여부") boolean completed) {
 
-    /** 다음 AI 메시지와 콘텐츠 질문 수를 세션 진행도 응답으로 변환한다. */
+    /**
+     * 다음 AI 메시지와 콘텐츠 질문 수를 세션 진행도 응답으로 변환한다.
+     *
+     * @param nextMessage 다음 AI 메시지
+     * @param totalQuestionCount 고정 질문 개수
+     * @param completed 세션 완료 여부
+     * @return 세션 진행도 응답
+     */
     public static SessionProgressResponse from(
         SessionHistoryMessage nextMessage, int totalQuestionCount, boolean completed) {
       return new SessionProgressResponse(

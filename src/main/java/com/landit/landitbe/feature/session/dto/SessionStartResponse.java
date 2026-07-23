@@ -33,7 +33,14 @@ public record SessionStartResponse(
     @Schema(description = "AI first 시 생성된 현재 메시지") CurrentMessageResponse currentMessage,
     @Schema(description = "세션 진행도") SessionProgressResponse progress) {
 
-  /** 생성된 세션과 시나리오 시작 정보를 API 응답으로 변환한다. */
+  /**
+   * 생성된 세션과 시나리오 시작 정보를 API 응답으로 변환한다.
+   *
+   * @param learningSession 생성된 학습 세션
+   * @param startProjection 시나리오 시작 조회 Projection
+   * @param currentMessage AI가 먼저 발화할 때 생성된 현재 메시지
+   * @return 시나리오 세션 시작 응답
+   */
   public static SessionStartResponse from(
       LearningSession learningSession,
       ScenarioSessionStartProjection startProjection,
@@ -80,7 +87,12 @@ public record SessionStartResponse(
       @Schema(description = "첫 화면에 보여줄 상대 역할의 속마음") String innerThought,
       @Schema(description = "속마음 유형") String innerThoughtType) {
 
-    /** 저장된 AI 시작 메시지를 현재 메시지 응답으로 변환한다. */
+    /**
+     * 저장된 AI 시작 메시지를 현재 메시지 응답으로 변환한다.
+     *
+     * @param message 저장된 AI 시작 메시지
+     * @return 현재 메시지 응답
+     */
     public static CurrentMessageResponse from(SessionHistoryMessage message) {
       return new CurrentMessageResponse(
           message.getId(),
@@ -107,7 +119,12 @@ public record SessionStartResponse(
       @Schema(description = "고정 질문 개수") int totalQuestionCount,
       @Schema(description = "세션 완료 여부") boolean completed) {
 
-    /** 시나리오 시작 정보를 첫 턴 진행도로 변환한다. */
+    /**
+     * 시나리오 시작 정보를 첫 턴 진행도로 변환한다.
+     *
+     * @param startProjection 시나리오 시작 조회 Projection
+     * @return 첫 턴 세션 진행도 응답
+     */
     public static SessionProgressResponse from(ScenarioSessionStartProjection startProjection) {
       return new SessionProgressResponse(1, startProjection.totalQuestionCount(), false);
     }

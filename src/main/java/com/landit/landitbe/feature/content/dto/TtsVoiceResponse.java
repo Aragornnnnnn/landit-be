@@ -21,7 +21,15 @@ public record TtsVoiceResponse(
     @Schema(description = "Provider에서 사용하는 음성 ID") String providerVoiceId,
     @Schema(description = "음성 성별") String gender) {
 
-  /** 활성 TTS 음성 조회 결과를 응답으로 변환하고 미설정 또는 비활성 결과는 null로 유지한다. */
+  /**
+   * 활성 TTS 음성 조회 결과를 응답으로 변환하고 미설정 또는 비활성 결과는 null로 유지한다.
+   *
+   * @param provider TTS Provider
+   * @param model TTS 모델
+   * @param providerVoiceId Provider에서 사용하는 음성 ID
+   * @param gender 음성 성별
+   * @return TTS 음성 응답. Provider가 없으면 null
+   */
   public static TtsVoiceResponse from(
       TtsVoiceProvider provider, String model, String providerVoiceId, TtsVoiceGender gender) {
     if (provider == null) {

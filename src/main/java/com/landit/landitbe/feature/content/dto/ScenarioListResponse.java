@@ -16,7 +16,12 @@ import java.util.List;
 public record ScenarioListResponse(
     @Schema(description = "카테고리별 시나리오 목록") List<CategoryResponse> categories) {
 
-  /** 카테고리 응답 목록을 시나리오 전체 응답으로 변환한다. */
+  /**
+   * 카테고리 응답 목록을 시나리오 전체 응답으로 변환한다.
+   *
+   * @param categories 카테고리별 시나리오 목록
+   * @return 시나리오 전체 조회 응답
+   */
   public static ScenarioListResponse from(List<CategoryResponse> categories) {
     return new ScenarioListResponse(categories);
   }
@@ -40,7 +45,17 @@ public record ScenarioListResponse(
       @Schema(description = "카테고리 잠금 사유") String categoryLockReason,
       @Schema(description = "카테고리에 속한 시나리오 목록") List<ScenarioResponse> scenarios) {
 
-    /** 카테고리 메타데이터와 시나리오 목록을 카테고리 응답으로 변환한다. */
+    /**
+     * 카테고리 메타데이터와 시나리오 목록을 카테고리 응답으로 변환한다.
+     *
+     * @param categoryId 카테고리 ID
+     * @param categoryName 카테고리 이름
+     * @param displayOrder 카테고리 노출 순서
+     * @param locked 카테고리 잠금 여부
+     * @param lockReason 카테고리 잠금 사유
+     * @param scenarios 카테고리에 속한 시나리오 목록
+     * @return 시나리오 카테고리 응답
+     */
     public static CategoryResponse from(
         Long categoryId,
         String categoryName,
@@ -86,7 +101,17 @@ public record ScenarioListResponse(
       @Schema(description = "시나리오 잠금 사유") String lockReason,
       @Schema(description = "잠기지 않은 시나리오의 시작 메시지 미리보기") OpeningPreviewResponse openingPreview) {
 
-    /** 조회 Projection과 계산된 진행 상태를 시나리오 응답으로 변환한다. */
+    /**
+     * 조회 Projection과 계산된 진행 상태를 시나리오 응답으로 변환한다.
+     *
+     * @param projection 시나리오 조회 Projection
+     * @param starRating 완료한 시나리오의 별점
+     * @param completed 사용자 시나리오 완료 여부
+     * @param locked 시나리오 잠금 여부
+     * @param lockReason 시나리오 잠금 사유
+     * @param openingPreview 시작 메시지 미리보기
+     * @return 시나리오 응답
+     */
     public static ScenarioResponse from(
         ScenarioListProjection projection,
         BigDecimal starRating,
@@ -130,7 +155,12 @@ public record ScenarioListResponse(
       @Schema(description = "속마음 유형") String innerThoughtType,
       @Schema(description = "활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null") TtsVoiceResponse ttsVoice) {
 
-    /** AI가 먼저 발화하는 시나리오의 미리보기를 생성한다. */
+    /**
+     * AI가 먼저 발화하는 시나리오의 미리보기를 생성한다.
+     *
+     * @param projection 시나리오 조회 Projection
+     * @return AI가 먼저 발화하는 시작 메시지 미리보기
+     */
     public static OpeningPreviewResponse fromAi(ScenarioListProjection projection) {
       return new OpeningPreviewResponse(
           projection.aiOpeningMessage(),
@@ -145,7 +175,12 @@ public record ScenarioListResponse(
               projection.ttsVoiceGender()));
     }
 
-    /** 사용자가 먼저 발화하는 시나리오의 미리보기를 생성한다. */
+    /**
+     * 사용자가 먼저 발화하는 시나리오의 미리보기를 생성한다.
+     *
+     * @param projection 시나리오 조회 Projection
+     * @return 사용자가 먼저 발화하는 시작 메시지 미리보기
+     */
     public static OpeningPreviewResponse fromUser(ScenarioListProjection projection) {
       return new OpeningPreviewResponse(
           null,
