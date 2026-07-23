@@ -2,20 +2,14 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
-import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
+import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.client.ai.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.LearningSession;
-import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.session.domain.SessionHistorySummaryFeedback;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageFeedbackRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistorySummaryFeedbackRepository;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -27,14 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
-class SessionFeedbackRecorder {
+class SessionFeedbackCompletionService {
 
-  private final LearningSessionFinder learningSessionFinder;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistorySummaryFeedbackRepository sessionHistorySummaryFeedbackRepository;
-  private final SessionHistoryMessageFeedbackRepository sessionHistoryMessageFeedbackRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
-  private final UserScenarioProgressRepository userScenarioProgressRepository;
+  private final LearningSessionService learningSessionService;
+  private final SessionHistoryService sessionHistoryService;
+  private final SessionFeedbackDataService sessionFeedbackDataService;
+  private final SessionMessageService sessionMessageService;
+  private final LearningProgressService learningProgressService;
 
   /** 유효한 AI 최종 피드백을 저장하고 세션 결과를 최초 한 번 확정한다. */
   @Transactional
@@ -43,11 +36,9 @@ class SessionFeedbackRecorder {
     BigDecimal starRating = result.starRating();
     // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
     LearningSession learningSession =
-        learningSessionFinder.findOwnedCompletedForUpdate(userId, context.sessionId());
+        learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
     SessionHistorySummaryFeedback existing =
-        sessionHistorySummaryFeedbackRepository
-            .findBySessionHistoryId(context.sessionHistoryId())
-            .orElse(null);
+        sessionFeedbackDataService.findSummaryByHistoryId(context.sessionHistoryId()).orElse(null);
     if (existing != null) {
       return ExistingSummaryFeedbackContext.from(existing).summaryFeedbackId();
     }
@@ -126,7 +117,7 @@ class SessionFeedbackRecorder {
             result.messageFeedbacks().stream()
                 .filter(feedback -> feedback.feedbackType() == FeedbackType.GOOD)
                 .count();
-    return sessionHistorySummaryFeedbackRepository.save(
+    return sessionFeedbackDataService.saveSummary(
         SessionHistorySummaryFeedback.completed(
             context.sessionHistoryId(),
             result.nativeScore(),
@@ -142,10 +133,11 @@ class SessionFeedbackRecorder {
       LoadedSessionFeedbackContext context,
       AiSessionFeedbackResult result,
       Long summaryFeedbackId) {
+    List<SessionHistoryMessageFeedback> feedbacks = new java.util.ArrayList<>();
     for (int index = 0; index < context.userMessages().size(); index++) {
       UserMessageContext userMessage = context.userMessages().get(index);
       AiSessionMessageFeedbackResult feedback = result.messageFeedbacks().get(index);
-      sessionHistoryMessageFeedbackRepository.save(
+      feedbacks.add(
           SessionHistoryMessageFeedback.completed(
               summaryFeedbackId,
               userMessage.messageId(),
@@ -159,23 +151,18 @@ class SessionFeedbackRecorder {
               feedback.correctionReason(),
               feedback.benchmarkMessage()));
     }
-    sessionHistoryMessageRepository.markFeedbackCompletedIfPreparing(
-        context.userMessages().stream().map(UserMessageContext::messageId).toList(),
-        ProcessingStatus.COMPLETED,
-        ProcessingStatus.PREPARING);
+    sessionFeedbackDataService.saveMessageFeedbacks(feedbacks);
+    sessionMessageService.completeFeedback(
+        context.userMessages().stream().map(UserMessageContext::messageId).toList());
   }
 
   /** 세션 종료 시각을 기준으로 히스토리의 종료 정보와 사용자 메시지 수를 확정한다. */
   private void completeSessionHistory(
       LoadedSessionFeedbackContext context, LearningSession learningSession) {
-    SessionHistory sessionHistory =
-        sessionHistoryRepository
-            .findById(context.sessionHistoryId())
-            .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
+    SessionHistory sessionHistory = sessionHistoryService.require(context.sessionHistoryId());
     int userMessageCount =
         Math.toIntExact(
-            sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(
-                sessionHistory.getId(), ConversationSpeaker.USER));
+            sessionMessageService.countByRole(sessionHistory.getId(), ConversationSpeaker.USER));
     sessionHistory.complete(learningSession.getEndedAt(), userMessageCount);
   }
 
@@ -185,14 +172,13 @@ class SessionFeedbackRecorder {
       LearningSession learningSession,
       int nativeScore,
       BigDecimal starRating) {
-    UserScenarioProgress progress =
-        userScenarioProgressRepository
-            .findByUserProfileIdAndScenarioIdAndTargetLocale(
-                learningSession.getUserProfileId(),
-                context.scenario().scenarioId(),
-                learningSession.getTargetLocale())
-            .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
-    progress.complete(starRating, nativeScore, learningSession.getEndedAt());
+    learningProgressService.completeScenario(
+        learningSession.getUserProfileId(),
+        context.scenario().scenarioId(),
+        learningSession.getTargetLocale(),
+        starRating,
+        nativeScore,
+        learningSession.getEndedAt());
   }
 
   /** 필수 문자열이 null 또는 공백인지 확인한다. */

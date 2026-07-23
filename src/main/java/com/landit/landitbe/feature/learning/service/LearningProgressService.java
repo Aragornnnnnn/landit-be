@@ -7,6 +7,8 @@ import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompleti
 import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.shared.domain.Locale;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,8 +66,10 @@ public class LearningProgressService {
       BigDecimal starRating,
       int nativeScore,
       LocalDateTime endedAt) {
-    userScenarioProgressRepository
-        .findByUserProfileIdAndScenarioIdAndTargetLocale(userId, scenarioId, targetLocale)
-        .ifPresent(progress -> progress.complete(starRating, nativeScore, endedAt));
+    UserScenarioProgress progress =
+        userScenarioProgressRepository
+            .findByUserProfileIdAndScenarioIdAndTargetLocale(userId, scenarioId, targetLocale)
+            .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
+    progress.complete(starRating, nativeScore, endedAt);
   }
 }

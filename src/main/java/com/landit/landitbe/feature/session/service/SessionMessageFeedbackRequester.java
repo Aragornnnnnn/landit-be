@@ -4,10 +4,12 @@ package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackRequest;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackResult;
+import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
@@ -23,8 +25,8 @@ import org.springframework.stereotype.Component;
 class SessionMessageFeedbackRequester {
 
   private final AiConversationClient aiConversationClient;
-  private final AiScenarioContextMapper aiScenarioContextMapper;
-  private final SessionMessageFeedbackRecorder sessionMessageFeedbackRecorder;
+  private final AiConversationSettings aiConversationSettings;
+  private final SessionMessageService sessionMessageService;
 
   /** 사용자 메시지의 평가 기준을 구성해 피드백 생성을 요청한다. */
   ProcessingStatus request(SubmittedMessageContext submittedContext) {
@@ -32,7 +34,7 @@ class SessionMessageFeedbackRequester {
     AiMessageFeedbackResult result = aiConversationClient.requestMessageFeedback(request);
     validateResult(result, request);
     if (result.feedbackStatus() == ProcessingStatus.FAILED) {
-      sessionMessageFeedbackRecorder.fail(submittedContext.submittedMessageId());
+      sessionMessageService.failFeedback(submittedContext.submittedMessageId());
     }
     return result.feedbackStatus();
   }
@@ -44,7 +46,7 @@ class SessionMessageFeedbackRequester {
         submittedContext.submittedMessageId(),
         submittedContext.submittedTurnNumber(),
         submittedContext.submittedMessageSequence(),
-        aiScenarioContextMapper.map(submittedContext.scenarioContext()),
+        AiScenarioContext.from(submittedContext.scenarioContext(), aiConversationSettings),
         evaluationContext(submittedContext),
         submittedContext.conversationHistory().getLast().content());
   }

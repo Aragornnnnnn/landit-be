@@ -8,9 +8,11 @@ import com.landit.landitbe.feature.session.client.ai.AiClosingMessageResult;
 import com.landit.landitbe.feature.session.client.ai.AiClosingReason;
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.client.ai.AiNextMessageRequest;
 import com.landit.landitbe.feature.session.client.ai.AiNextMessageResult;
 import com.landit.landitbe.feature.session.client.ai.AiNextQuestion;
+import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.domain.CompletionReason;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
@@ -28,7 +30,7 @@ import org.springframework.stereotype.Service;
 class SessionMessageAiGenerator {
 
   private final AiConversationClient aiConversationClient;
-  private final AiScenarioContextMapper aiScenarioContextMapper;
+  private final AiConversationSettings aiConversationSettings;
 
   /** 다음 AI 메시지 또는 종료 메시지를 생성한다. */
   Generation generate(Request request) {
@@ -68,7 +70,7 @@ class SessionMessageAiGenerator {
         request.learningSessionId(),
         request.submittedMessageId(),
         request.submittedTurnNumber(),
-        aiScenarioContextMapper.map(request.scenarioContext()),
+        AiScenarioContext.from(request.scenarioContext(), aiConversationSettings),
         request.conversationHistory(),
         toAiNextQuestion(nextQuestion));
   }
@@ -84,7 +86,7 @@ class SessionMessageAiGenerator {
                 request.learningSessionId(),
                 request.submittedMessageId(),
                 request.submittedTurnNumber(),
-                aiScenarioContextMapper.map(request.scenarioContext()),
+                AiScenarioContext.from(request.scenarioContext(), aiConversationSettings),
                 request.conversationHistory(),
                 closingReason,
                 goalCompletionStatus));

@@ -8,18 +8,20 @@ import com.landit.landitbe.feature.session.domain.SessionType;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 학습 세션의 소유권, 상태, 잠금 조건을 검증하며 조회한다. */
 @RequiredArgsConstructor
-@Component
-class LearningSessionFinder {
+@Service
+public class LearningSessionService {
 
   private final LearningSessionRepository learningSessionRepository;
 
   /** 소유자와 진행 상태를 검증하면서 메시지 제출 대상 세션을 잠금 조회한다. */
-  LearningSession findOwnedInProgressForUpdate(long userId, long sessionId) {
+  public LearningSession findOwnedInProgressForUpdate(long userId, long sessionId) {
     LearningSession learningSession =
         learningSessionRepository
             .findByIdAndUserProfileIdForUpdate(sessionId, userId)
@@ -35,7 +37,7 @@ class LearningSessionFinder {
   }
 
   /** 세션 상태와 무관하게 소유권만 검증해 조회한다. */
-  LearningSession findOwned(long userId, long sessionId) {
+  public LearningSession findOwned(long userId, long sessionId) {
     return learningSessionRepository
         .findByIdAndUserProfileId(sessionId, userId)
         .orElseThrow(
@@ -46,7 +48,7 @@ class LearningSessionFinder {
   }
 
   /** 소유한 완료 시나리오 세션을 조회하고 최종 피드백 생성 조건을 검증한다. */
-  LearningSession findOwnedCompleted(long userId, long sessionId) {
+  public LearningSession findOwnedCompleted(long userId, long sessionId) {
     LearningSession learningSession =
         learningSessionRepository
             .findByIdAndUserProfileId(sessionId, userId)
@@ -60,7 +62,7 @@ class LearningSessionFinder {
   }
 
   /** 최종 피드백 저장 중 세션 결과 확정을 직렬화하며 완료 세션을 잠금 조회한다. */
-  LearningSession findOwnedCompletedForUpdate(long userId, long sessionId) {
+  public LearningSession findOwnedCompletedForUpdate(long userId, long sessionId) {
     LearningSession learningSession =
         learningSessionRepository
             .findByIdAndUserProfileIdForUpdate(sessionId, userId)
@@ -82,5 +84,20 @@ class LearningSessionFinder {
         || learningSession.getEndedAt() == null) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /** 새 학습 세션을 저장한다. */
+  public LearningSession save(LearningSession learningSession) {
+    return learningSessionRepository.save(learningSession);
+  }
+
+  /** 진행 중인 세션을 사용자 중도 종료 상태로 전환한다. */
+  @Transactional
+  public void endSession(long userId, long sessionId) {
+    LearningSession learningSession = findOwned(userId, sessionId);
+    if (!learningSession.isInProgress()) {
+      throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
+    }
+    learningSession.interruptByUser(LocalDateTime.now());
   }
 }

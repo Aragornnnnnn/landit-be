@@ -1,23 +1,17 @@
-// 시나리오 세션 시작 유스케이스를 조율한다.
+// 시나리오 세션 시작 흐름을 조율한다.
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgressStatus;
-import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
+import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
-import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse.CurrentMessageResponse;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionLockProjection;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import com.landit.landitbe.shared.domain.ActiveStatus;
@@ -30,22 +24,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 시나리오 세션 시작 유스케이스를 조율한다. */
+/** 시나리오 세션 시작 흐름을 조율한다. */
 @RequiredArgsConstructor
 @Service
-public class ScenarioSessionStartUseCase {
+public class ScenarioSessionStartService {
 
   private static final String PREVIOUS_SCENARIO_NOT_COMPLETED = "PREVIOUS_SCENARIO_NOT_COMPLETED";
 
-  // DB Repository는 현재 기준상 Port로 감싸지 않고
-  // UseCase 트랜잭션에서 직접 조율한다.
-  private final UserProfileRepository userProfileRepository;
-  private final ScenarioSessionStartQueryRepository scenarioSessionStartQueryRepository;
-  private final UserScenarioProgressRepository userScenarioProgressRepository;
-  private final LearningSessionRepository learningSessionRepository;
-  private final ScenarioSessionRepository scenarioSessionRepository;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final UserProfileService userProfileService;
+  private final LearningProgressService learningProgressService;
+  private final LearningSessionService learningSessionService;
+  private final ScenarioSessionService scenarioSessionService;
+  private final SessionHistoryService sessionHistoryService;
+  private final SessionMessageService sessionMessageService;
 
   /** 선택한 시나리오로 학습 세션을 시작한다. */
   @Transactional
@@ -69,16 +60,12 @@ public class ScenarioSessionStartUseCase {
   private UserProfile findActiveUser(long userId) {
     // 같은 사용자의 동시 세션 시작 요청이 progress row 생성 구간을
     // 동시에 통과하지 못하도록 사용자 row를 잠근다.
-    return userProfileRepository
-        .findActiveByIdForUpdate(userId)
-        .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
+    return userProfileService.requireActiveForUpdate(userId);
   }
 
   /** 사용자 언어 설정에 맞는 시나리오 시작 콘텐츠와 TTS 정보를 조회한다. */
   private ScenarioSessionStartProjection findStartRow(long userId, long scenarioId) {
-    return scenarioSessionStartQueryRepository
-        .findStartRow(userId, scenarioId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
+    return scenarioSessionService.requireStartProjection(userId, scenarioId);
   }
 
   /** 학습 세션에 반드시 연결할 AI 튜터 ID의 존재를 검증한다. */
@@ -108,8 +95,7 @@ public class ScenarioSessionStartUseCase {
   /** 같은 카테고리 안에서 displayOrder 기준 직전 시나리오 완료 여부만 확인한다. */
   private void assertPreviousScenarioCleared(long userId, ScenarioSessionStartProjection startRow) {
     Optional<ScenarioSessionLockProjection> previousScenario =
-        scenarioSessionStartQueryRepository.findPreviousScenarioLockRow(
-            userId, startRow.scenarioId());
+        scenarioSessionService.findPreviousScenarioLock(userId, startRow.scenarioId());
     if (previousScenario.isEmpty()) {
       return;
     }
@@ -121,18 +107,8 @@ public class ScenarioSessionStartUseCase {
   /** 최초 시작과 재시도를 같은 흐름으로 처리하되, 기존 완료 성과는 유지한다. */
   private void ensureProgress(
       UserProfile userProfile, ScenarioSessionStartProjection startRow, LocalDateTime startedAt) {
-    userScenarioProgressRepository
-        .findByUserProfileIdAndScenarioIdAndTargetLocale(
-            userProfile.getId(), startRow.scenarioId(), userProfile.getTargetLocale())
-        .ifPresentOrElse(
-            progress -> progress.markStarted(startedAt),
-            () ->
-                userScenarioProgressRepository.save(
-                    UserScenarioProgress.start(
-                        userProfile.getId(),
-                        startRow.scenarioId(),
-                        userProfile.getTargetLocale(),
-                        startedAt)));
+    learningProgressService.startScenario(
+        userProfile.getId(), startRow.scenarioId(), userProfile.getTargetLocale(), startedAt);
   }
 
   /** 학습 세션과 시나리오 세션을 함께 생성해 시작한 언어 variant를 연결한다. */
@@ -142,14 +118,14 @@ public class ScenarioSessionStartUseCase {
       ScenarioSessionStartProjection startRow,
       LocalDateTime startedAt) {
     LearningSession learningSession =
-        learningSessionRepository.save(
+        learningSessionService.save(
             LearningSession.startScenario(
                 userId,
                 requireAiTutorId(userProfile),
                 userProfile.getTargetLocale(),
                 userProfile.getBaseLocale(),
                 startedAt));
-    scenarioSessionRepository.save(
+    scenarioSessionService.save(
         ScenarioSession.start(
             learningSession.getId(),
             startRow.variantId(),
@@ -185,7 +161,7 @@ public class ScenarioSessionStartUseCase {
       ScenarioSessionStartProjection startRow,
       LocalDateTime startedAt) {
     SessionHistory sessionHistory =
-        sessionHistoryRepository.save(
+        sessionHistoryService.save(
             SessionHistory.startedScenario(
                 learningSessionId,
                 userProfile.getId(),
@@ -193,7 +169,7 @@ public class ScenarioSessionStartUseCase {
                 userProfile.getBaseLocale(),
                 startedAt));
     SessionHistoryMessage message =
-        sessionHistoryMessageRepository.save(
+        sessionMessageService.save(
             SessionHistoryMessage.aiOpening(
                 sessionHistory.getId(),
                 startRow.aiOpeningMessage(),

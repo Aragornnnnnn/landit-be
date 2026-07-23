@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.docs.ScenarioSessionControllerDocs;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse;
-import com.landit.landitbe.feature.session.service.ScenarioSessionStartUseCase;
+import com.landit.landitbe.feature.session.service.ScenarioSessionStartService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ScenarioSessionController implements ScenarioSessionControllerDocs {
 
-  private final ScenarioSessionStartUseCase scenarioSessionStartUseCase;
+  private final ScenarioSessionStartService scenarioSessionStartService;
 
   /** 선택한 시나리오로 학습 세션을 시작한다. */
   @Override
@@ -29,6 +29,6 @@ public class ScenarioSessionController implements ScenarioSessionControllerDocs 
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long scenarioId) {
     return ApiResponse.success(
         HttpStatus.CREATED,
-        scenarioSessionStartUseCase.startScenarioSession(principal.userId(), scenarioId));
+        scenarioSessionStartService.startScenarioSession(principal.userId(), scenarioId));
   }
 }

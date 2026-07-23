@@ -2,16 +2,13 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
+import com.landit.landitbe.feature.content.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.domain.SessionMessageInputType;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -25,19 +22,19 @@ import org.springframework.stereotype.Component;
 /** 사용자 발화를 저장하고 AI 호출에 필요한 컨텍스트를 만든다. */
 @RequiredArgsConstructor
 @Component
-class SubmittedMessageRecorder {
+class SubmittedMessageService {
 
-  private final LearningSessionFinder learningSessionFinder;
-  private final ScenarioSessionMessageQueryRepository scenarioSessionMessageQueryRepository;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
-  private final ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
+  private final LearningSessionService learningSessionService;
+  private final ScenarioSessionService scenarioSessionService;
+  private final SessionHistoryService sessionHistoryService;
+  private final SessionMessageService sessionMessageService;
+  private final ScenarioContentService scenarioContentService;
 
   /** 사용자 메시지를 저장하고 AI 요청에 필요한 세션 컨텍스트를 반환한다. */
   SubmittedMessageContext record(
       long userId, long sessionId, String content, SessionMessageInputType inputType) {
     LearningSession learningSession =
-        learningSessionFinder.findOwnedInProgressForUpdate(userId, sessionId);
+        learningSessionService.findOwnedInProgressForUpdate(userId, sessionId);
     ScenarioSessionMessageContextProjection scenarioContext = findScenarioContext(sessionId);
     SessionHistoryLookup sessionHistoryLookup = findOrCreateSessionHistory(learningSession);
     SessionHistory sessionHistory = sessionHistoryLookup.sessionHistory();
@@ -70,31 +67,24 @@ class SubmittedMessageRecorder {
 
   /** AI 생성 실패 시 먼저 저장한 사용자 메시지를 제거한다. */
   void remove(SubmittedMessageContext submittedContext) {
-    sessionHistoryMessageRepository
-        .findById(submittedContext.submittedMessageId())
-        .ifPresent(sessionHistoryMessageRepository::delete);
-    sessionHistoryMessageRepository.flush();
+    sessionMessageService.deleteIfExists(submittedContext.submittedMessageId());
     if (submittedContext.createdSessionHistory()) {
-      sessionHistoryRepository
-          .findById(submittedContext.sessionHistoryId())
-          .ifPresent(sessionHistoryRepository::delete);
+      sessionHistoryService.deleteIfExists(submittedContext.sessionHistoryId());
     }
   }
 
   private ScenarioSessionMessageContextProjection findScenarioContext(long sessionId) {
-    return scenarioSessionMessageQueryRepository
-        .findContextByLearningSessionId(sessionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+    return scenarioSessionService.requireMessageContext(sessionId);
   }
 
   private SessionHistoryLookup findOrCreateSessionHistory(LearningSession learningSession) {
     Optional<SessionHistory> sessionHistory =
-        sessionHistoryRepository.findByLearningSessionId(learningSession.getId());
+        sessionHistoryService.findByLearningSessionId(learningSession.getId());
     if (sessionHistory.isPresent()) {
       return new SessionHistoryLookup(sessionHistory.get(), false);
     }
     return new SessionHistoryLookup(
-        sessionHistoryRepository.save(
+        sessionHistoryService.save(
             SessionHistory.startedScenario(
                 learningSession.getId(),
                 learningSession.getUserProfileId(),
@@ -105,8 +95,7 @@ class SubmittedMessageRecorder {
   }
 
   private List<SessionHistoryMessage> findPreviousMessages(SessionHistory sessionHistory) {
-    return sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
-        sessionHistory.getId());
+    return sessionMessageService.findAll(sessionHistory.getId());
   }
 
   /** 기존 히스토리 기준으로 이번 사용자 메시지가 답변할 턴 번호를 계산한다. */
@@ -128,14 +117,13 @@ class SubmittedMessageRecorder {
       String content,
       SessionMessageInputType inputType) {
     SessionHistoryMessage submittedMessage =
-        sessionHistoryMessageRepository.save(
+        sessionMessageService.saveAndFlush(
             SessionHistoryMessage.user(
                 sessionHistory.getId(),
                 previousMessages.size() + 1,
                 submittedTurnNumber,
                 content,
                 inputType));
-    sessionHistoryMessageRepository.flush();
     return submittedMessage;
   }
 
@@ -151,7 +139,7 @@ class SubmittedMessageRecorder {
       LearningSession learningSession,
       ScenarioSessionMessageContextProjection scenarioContext,
       int nextQuestionOrder) {
-    return scenarioQuestionQueryRepository.findActiveQuestion(
+    return scenarioContentService.findActiveQuestion(
         scenarioContext.scenarioId(),
         nextQuestionOrder,
         learningSession.getTargetLocale(),

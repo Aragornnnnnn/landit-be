@@ -7,8 +7,6 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -19,11 +17,11 @@ import org.springframework.stereotype.Component;
 /** AI 생성 결과를 세션 히스토리와 세션 상태에 반영한다. */
 @RequiredArgsConstructor
 @Component
-class GeneratedMessageRecorder {
+class GeneratedMessageService {
 
-  private final LearningSessionFinder learningSessionFinder;
-  private final ScenarioSessionRepository scenarioSessionRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final LearningSessionService learningSessionService;
+  private final ScenarioSessionService scenarioSessionService;
+  private final SessionMessageService sessionMessageService;
 
   /** AI 생성 결과를 저장하고 사용자에게 반환할 메시지 제출 응답을 만든다. */
   SessionMessageSubmitResponse record(
@@ -31,7 +29,7 @@ class GeneratedMessageRecorder {
       SessionMessageAiGenerator.Generation generation,
       ProcessingStatus feedbackProcessingStatus) {
     final LearningSession learningSession =
-        learningSessionFinder.findOwnedInProgressForUpdate(
+        learningSessionService.findOwnedInProgressForUpdate(
             submittedContext.userId(), submittedContext.sessionId());
     ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
     SessionHistoryMessage submittedMessage = findSubmittedMessage(submittedContext);
@@ -56,15 +54,11 @@ class GeneratedMessageRecorder {
   }
 
   private ScenarioSession findScenarioSession(long sessionId) {
-    return scenarioSessionRepository
-        .findByLearningSessionId(sessionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+    return scenarioSessionService.requireByLearningSessionId(sessionId);
   }
 
   private SessionHistoryMessage findSubmittedMessage(SubmittedMessageContext submittedContext) {
-    return sessionHistoryMessageRepository
-        .findById(submittedContext.submittedMessageId())
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+    return sessionMessageService.require(submittedContext.submittedMessageId());
   }
 
   private void assertSubmittedMessageMatches(
@@ -78,7 +72,7 @@ class GeneratedMessageRecorder {
 
   private SessionHistoryMessage saveAiMessage(
       SessionHistoryMessage submittedMessage, String content, String translatedContent) {
-    return sessionHistoryMessageRepository.save(
+    return sessionMessageService.save(
         SessionHistoryMessage.aiGenerated(
             submittedMessage.getSessionHistoryId(),
             submittedMessage.getMessageSequence() + 1,

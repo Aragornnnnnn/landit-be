@@ -20,41 +20,35 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * UseCase: API 요청 하나의 전체 흐름과 트랜잭션 경계를 책임진다. Recorder: 그 흐름 안에서 사용자 메시지 저장이나 AI 결과 저장 같은 특정 기록 작업만
- * 책임진다.
- */
+/** 사용자 발화 저장, 병렬 AI 요청, 후속 메시지 저장과 실패 보상을 조율한다. */
 @Service
 @Slf4j
-public class SessionMessageSubmitUseCase {
+public class SessionMessageSubmitService {
 
-  private final SubmittedMessageRecorder submittedMessageRecorder;
+  private final SubmittedMessageService submittedMessageService;
   private final SessionMessageAiGenerator sessionMessageAiGenerator;
   private final SessionInnerThoughtGenerator sessionInnerThoughtGenerator;
-  private final SessionInnerThoughtRecorder sessionInnerThoughtRecorder;
+  private final SessionMessageService sessionMessageService;
   private final SessionMessageFeedbackRequester sessionMessageFeedbackRequester;
-  private final SessionMessageFeedbackRecorder sessionMessageFeedbackRecorder;
-  private final GeneratedMessageRecorder generatedMessageRecorder;
+  private final GeneratedMessageService generatedMessageService;
   private final PlatformTransactionManager transactionManager;
   private final TaskExecutor taskExecutor;
 
-  SessionMessageSubmitUseCase(
-      SubmittedMessageRecorder submittedMessageRecorder,
+  SessionMessageSubmitService(
+      SubmittedMessageService submittedMessageService,
       SessionMessageAiGenerator sessionMessageAiGenerator,
       SessionInnerThoughtGenerator sessionInnerThoughtGenerator,
-      SessionInnerThoughtRecorder sessionInnerThoughtRecorder,
+      SessionMessageService sessionMessageService,
       SessionMessageFeedbackRequester sessionMessageFeedbackRequester,
-      SessionMessageFeedbackRecorder sessionMessageFeedbackRecorder,
-      GeneratedMessageRecorder generatedMessageRecorder,
+      GeneratedMessageService generatedMessageService,
       PlatformTransactionManager transactionManager,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
-    this.submittedMessageRecorder = submittedMessageRecorder;
+    this.submittedMessageService = submittedMessageService;
     this.sessionMessageAiGenerator = sessionMessageAiGenerator;
     this.sessionInnerThoughtGenerator = sessionInnerThoughtGenerator;
-    this.sessionInnerThoughtRecorder = sessionInnerThoughtRecorder;
+    this.sessionMessageService = sessionMessageService;
     this.sessionMessageFeedbackRequester = sessionMessageFeedbackRequester;
-    this.sessionMessageFeedbackRecorder = sessionMessageFeedbackRecorder;
-    this.generatedMessageRecorder = generatedMessageRecorder;
+    this.generatedMessageService = generatedMessageService;
     this.transactionManager = transactionManager;
     this.taskExecutor = taskExecutor;
   }
@@ -67,7 +61,7 @@ public class SessionMessageSubmitUseCase {
     // AI 요청에 사용자 메시지 ID가 필요하므로 짧은 트랜잭션으로 먼저 저장한다.
     SubmittedMessageContext submittedContext =
         executeInTransaction(
-            () -> submittedMessageRecorder.record(userId, sessionId, content, inputType));
+            () -> submittedMessageService.record(userId, sessionId, content, inputType));
     AsyncGenerationRequests asyncGenerationRequests = AsyncGenerationRequests.none();
     try {
       asyncGenerationRequests = startAsyncGeneration(submittedContext);
@@ -78,7 +72,7 @@ public class SessionMessageSubmitUseCase {
       SessionMessageSubmitResponse response =
           executeInTransaction(
               () ->
-                  generatedMessageRecorder.record(
+                  generatedMessageService.record(
                       submittedContext, generation, feedbackProcessingStatus));
       recordInnerThoughtAfterMessageGeneration(asyncGenerationRequests);
       return response;
@@ -116,7 +110,7 @@ public class SessionMessageSubmitUseCase {
                 submittedContext.sessionId(),
                 submittedContext.submittedMessageId(),
                 exception);
-            sessionMessageFeedbackRecorder.fail(submittedContext.submittedMessageId());
+            sessionMessageService.failFeedback(submittedContext.submittedMessageId());
           }
         });
     return new AsyncGenerationRequests(
@@ -142,11 +136,13 @@ public class SessionMessageSubmitUseCase {
             .whenCompleteAsync(
                 (result, exception) -> {
                   if (exception == null) {
-                    sessionInnerThoughtRecorder.complete(result);
+                    sessionMessageService.completeInnerThought(
+                        result.messageId(), result.innerThought(), result.innerThoughtType());
                     return;
                   }
                   log.warn("AI 속마음 생성에 실패했습니다. workflow=inner_thought", exception);
-                  sessionInnerThoughtRecorder.fail(asyncGenerationRequests.submittedMessageId());
+                  sessionMessageService.failInnerThought(
+                      asyncGenerationRequests.submittedMessageId());
                 },
                 taskExecutor);
     recordingFuture.exceptionally(
@@ -195,7 +191,7 @@ public class SessionMessageSubmitUseCase {
   private void removeSubmittedMessageInTransaction(SubmittedMessageContext submittedContext) {
     executeInTransaction(
         () -> {
-          submittedMessageRecorder.remove(submittedContext);
+          submittedMessageService.remove(submittedContext);
           return null;
         });
   }

@@ -10,8 +10,6 @@ import com.landit.landitbe.feature.session.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse.EvaluationContextResponse;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse.MessageFeedbackResponse;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageFeedbackRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistorySummaryFeedbackRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
@@ -24,17 +22,16 @@ import org.springframework.stereotype.Service;
 /** 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다. */
 @RequiredArgsConstructor
 @Service
-public class SessionFeedbackUseCase {
+public class SessionFeedbackService {
 
-  private final SessionFeedbackContextLoader contextLoader;
-  private final SessionFeedbackRecorder recorder;
-  private final SessionHistoryMessageFeedbackRepository messageFeedbackRepository;
-  private final SessionHistorySummaryFeedbackRepository summaryFeedbackRepository;
+  private final SessionFeedbackContextService contextService;
+  private final SessionFeedbackCompletionService completionService;
+  private final SessionFeedbackDataService sessionFeedbackDataService;
   private final AiConversationClient aiConversationClient;
 
   /** 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다. */
   public SessionFeedbackResponse getOrCreate(long userId, long sessionId) {
-    LoadedSessionFeedbackContext context = contextLoader.load(userId, sessionId);
+    LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
     ExistingSummaryFeedbackContext existingSummary = context.existingSummary().orElse(null);
     if (existingSummary != null) {
       // 이미 확정된 결과는 AI를 다시 호출하지 않고 그대로 반환한다.
@@ -48,7 +45,7 @@ public class SessionFeedbackUseCase {
                 context.sessionId(),
                 context.scenario(),
                 context.userMessages().stream().map(UserMessageContext::messageId).toList()));
-    Long summaryFeedbackId = recorder.record(userId, context, result);
+    Long summaryFeedbackId = completionService.record(userId, context, result);
     return responseFor(context, summaryFeedbackId);
   }
 
@@ -56,9 +53,7 @@ public class SessionFeedbackUseCase {
   private SessionFeedbackResponse responseFor(
       LoadedSessionFeedbackContext context, Long summaryFeedbackId) {
     List<SessionHistoryMessageFeedback> feedbacks =
-        messageFeedbackRepository
-            .findBySessionHistorySummaryFeedbackIdOrderBySessionHistoryMessageIdAsc(
-                summaryFeedbackId);
+        sessionFeedbackDataService.findMessageFeedbacks(summaryFeedbackId);
     if (feedbacks.size() != context.userMessages().size()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
@@ -69,9 +64,7 @@ public class SessionFeedbackUseCase {
                     SessionHistoryMessageFeedback::getSessionHistoryMessageId,
                     Function.identity()));
     SessionHistorySummaryFeedback summary =
-        summaryFeedbackRepository
-            .findById(summaryFeedbackId)
-            .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
+        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
 
     return SessionFeedbackResponse.from(
         context.sessionId(),

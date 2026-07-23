@@ -364,7 +364,7 @@ git commit -m "refactor: Controller 경로와 DTO 변환 책임 통일"
 - Produces: the Repository ownership table fixed in `design.md`.
 - Preserves: message processing status, session ownership, optimistic/row locking, compensation delete and feedback idempotency.
 
-- [ ] **Step 1: Repository 소유 Service 단위 테스트를 작성한다**
+- [x] **Step 1: Repository 소유 Service 단위 테스트를 작성한다**
 
 ```java
 @Test
@@ -377,7 +377,7 @@ void findOwnedInProgressRejectsCompletedSession() {
 }
 ```
 
-- [ ] **Step 2: 요청 흐름 Service의 Repository 의존을 소유 Service로 교체한다**
+- [x] **Step 2: 요청 흐름 Service의 Repository 의존을 소유 Service로 교체한다**
 
 ```text
 ScenarioSessionStartService
@@ -390,7 +390,7 @@ ScenarioSessionStartService
 └── SessionMessageService
 ```
 
-- [ ] **Step 3: AI 호출과 저장 트랜잭션을 분리한다**
+- [x] **Step 3: AI 호출과 저장 트랜잭션을 분리한다**
 
 ```text
 SessionFeedbackService
@@ -401,7 +401,7 @@ SessionFeedbackService
 
 `SessionFeedbackService`에는 `@Transactional`을 두지 않는다. `SessionFeedbackContextService`는 읽기 전용 트랜잭션, `SessionFeedbackCompletionService`는 결과 저장 트랜잭션을 시작한다.
 
-- [ ] **Step 4: 금지된 이름과 직접 Repository 의존을 검사한다**
+- [x] **Step 4: 금지된 이름과 직접 Repository 의존을 검사한다**
 
 Run: `rg -n "class .*UseCase|class .*Finder|class .*Recorder|class .*Loader" src/main/java/com/landit/landitbe/feature`
 
@@ -411,7 +411,7 @@ Run: `rg -n "private final .*Repository" src/main/java/com/landit/landitbe/featu
 
 Expected: 설계 문서의 Repository 소유 Service에서만 결과가 나와야 한다.
 
-- [ ] **Step 5: Session 테스트와 전체 검사를 실행한다**
+- [x] **Step 5: Session 테스트와 전체 검사를 실행한다**
 
 Run: `./gradlew test --tests '*Session*Test' --tests '*Session*IntegrationTests'`
 
@@ -421,7 +421,7 @@ Run: `./gradlew check`
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 6: Session Service 변경을 커밋한다**
+- [x] **Step 6: Session Service 변경을 커밋한다**
 
 ```bash
 git add src/main/java src/test/java

@@ -3,13 +3,11 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
+import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.SessionHistorySummaryFeedbackRepository;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -23,30 +21,27 @@ import org.springframework.transaction.annotation.Transactional;
 /** 최종 피드백 생성에 필요한 완료 세션 컨텍스트를 불변 값으로 조회한다. */
 @RequiredArgsConstructor
 @Component
-class SessionFeedbackContextLoader {
+class SessionFeedbackContextService {
 
-  private final LearningSessionFinder learningSessionFinder;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
-  private final ScenarioSessionMessageQueryRepository scenarioSessionMessageQueryRepository;
-  private final SessionHistorySummaryFeedbackRepository sessionHistorySummaryFeedbackRepository;
-  private final AiScenarioContextMapper aiScenarioContextMapper;
+  private final LearningSessionService learningSessionService;
+  private final SessionHistoryService sessionHistoryService;
+  private final SessionMessageService sessionMessageService;
+  private final ScenarioSessionService scenarioSessionService;
+  private final SessionFeedbackDataService sessionFeedbackDataService;
+  private final AiConversationSettings aiConversationSettings;
 
   /** 소유한 완료 시나리오 세션의 최종 피드백 입력을 불변 값으로 조회한다. */
   @Transactional(readOnly = true)
   public LoadedSessionFeedbackContext load(long userId, long sessionId) {
-    LearningSession learningSession = learningSessionFinder.findOwnedCompleted(userId, sessionId);
+    LearningSession learningSession = learningSessionService.findOwnedCompleted(userId, sessionId);
     SessionHistory sessionHistory =
-        sessionHistoryRepository
+        sessionHistoryService
             .findByLearningSessionId(sessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
     ScenarioSessionMessageContextProjection scenarioContext =
-        scenarioSessionMessageQueryRepository
-            .findContextByLearningSessionId(sessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
+        scenarioSessionService.requireMessageContext(sessionId);
     List<SessionHistoryMessage> historyMessages =
-        sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
-            sessionHistory.getId());
+        sessionMessageService.findAll(sessionHistory.getId());
 
     // 이후 AI 호출과 응답 조립에 필요한 값을 트랜잭션 안에서 모두 읽어 불변 컨텍스트로 넘긴다.
     return new LoadedSessionFeedbackContext(
@@ -54,10 +49,10 @@ class SessionFeedbackContextLoader {
         sessionHistory.getId(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
-        aiScenarioContextMapper.map(scenarioContext),
+        AiScenarioContext.from(scenarioContext, aiConversationSettings),
         userMessages(historyMessages, scenarioContext),
-        sessionHistorySummaryFeedbackRepository
-            .findBySessionHistoryId(sessionHistory.getId())
+        sessionFeedbackDataService
+            .findSummaryByHistoryId(sessionHistory.getId())
             .map(ExistingSummaryFeedbackContext::from));
   }
 

@@ -8,10 +8,10 @@ import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
-import com.landit.landitbe.feature.session.service.SessionEndUseCase;
-import com.landit.landitbe.feature.session.service.SessionFeedbackUseCase;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
+import com.landit.landitbe.feature.session.service.SessionFeedbackService;
 import com.landit.landitbe.feature.session.service.SessionInnerThoughtQueryService;
-import com.landit.landitbe.feature.session.service.SessionMessageSubmitUseCase;
+import com.landit.landitbe.feature.session.service.SessionMessageSubmitService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,9 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SessionController implements SessionControllerDocs {
 
-  private final SessionEndUseCase sessionEndUseCase;
-  private final SessionFeedbackUseCase sessionFeedbackUseCase;
-  private final SessionMessageSubmitUseCase sessionMessageSubmitUseCase;
+  private final LearningSessionService learningSessionService;
+  private final SessionFeedbackService sessionFeedbackService;
+  private final SessionMessageSubmitService sessionMessageSubmitService;
   private final SessionInnerThoughtQueryService sessionInnerThoughtQueryService;
 
   /** 사용자 발화를 저장하고 다음 AI 메시지를 생성한다. */
@@ -43,7 +43,7 @@ public class SessionController implements SessionControllerDocs {
       @RequestBody SessionMessageSubmitRequest request) {
     return ApiResponse.success(
         HttpStatus.OK,
-        sessionMessageSubmitUseCase.submitMessage(principal.userId(), sessionId, request));
+        sessionMessageSubmitService.submitMessage(principal.userId(), sessionId, request));
   }
 
   /** 사용자 메시지의 상대 역할 속마음 처리 상태를 조회한다. */
@@ -64,7 +64,7 @@ public class SessionController implements SessionControllerDocs {
   public ResponseEntity<ApiResponse<SessionFeedbackResponse>> getOrCreateFeedback(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
     return ApiResponse.success(
-        HttpStatus.OK, sessionFeedbackUseCase.getOrCreate(principal.userId(), sessionId));
+        HttpStatus.OK, sessionFeedbackService.getOrCreate(principal.userId(), sessionId));
   }
 
   /** 진행 중인 학습 세션을 사용자가 중도 종료한다. */
@@ -72,7 +72,7 @@ public class SessionController implements SessionControllerDocs {
   @PatchMapping("/api/v1/sessions/{sessionId}/end")
   public ApiResponse<Void> endSession(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
-    sessionEndUseCase.endSession(principal.userId(), sessionId);
+    learningSessionService.endSession(principal.userId(), sessionId);
     return ApiResponse.success(null);
   }
 }
