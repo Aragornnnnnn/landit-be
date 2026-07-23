@@ -30,7 +30,7 @@ public class NpsController implements NpsControllerDocs {
     this.npsService = npsService;
   }
 
-  /** 인증된 사용자의 NPS 응답을 저장한다. */
+  /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/nps")
   public ResponseEntity<ApiResponse<Void>> submit(

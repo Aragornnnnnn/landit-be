@@ -24,7 +24,14 @@ public record ExpressionResponse(
     @Schema(description = "학습 완료 여부", example = "true") boolean completed,
     @Schema(description = "잠김 여부(해금 전 상태)", example = "false") boolean locked) {
 
-  /** 표현 엔티티와 사용자 진행 상태를 목록 응답 항목으로 변환한다. */
+  /**
+   * 표현 엔티티와 사용자 진행 상태를 목록 응답 항목으로 변환한다.
+   *
+   * @param expression 변환할 표현 엔티티
+   * @param completed 학습 완료 여부
+   * @param locked 잠김 여부
+   * @return 시나리오별 표현 응답 항목
+   */
   public static ExpressionResponse from(
       WritingExpression expression, boolean completed, boolean locked) {
     return new ExpressionResponse(

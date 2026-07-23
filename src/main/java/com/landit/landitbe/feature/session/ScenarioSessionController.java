@@ -22,7 +22,7 @@ public class ScenarioSessionController implements ScenarioSessionControllerDocs 
 
   private final ScenarioSessionStartService scenarioSessionStartService;
 
-  /** 선택한 시나리오로 학습 세션을 시작한다. */
+  /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/scenarios/{scenarioId}/sessions")
   public ResponseEntity<ApiResponse<SessionStartResponse>> startScenarioSession(

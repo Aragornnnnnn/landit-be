@@ -27,12 +27,7 @@ public class ExpressionController implements ExpressionControllerDocs {
   private final ExpressionQueryService expressionQueryService;
   private final ExpressionLearningCompletionService expressionLearningCompletionService;
 
-  /**
-   * 시나리오별 추가학습용 원어민 표현을 학습 순서대로 조회한다.
-   *
-   * @param principal 인증 토큰에서 추출한 현재 사용자. 완료 여부를 이 사용자 기준으로 판정한다.
-   * @param scenarioId 조회할 시나리오 ID
-   */
+  /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/expressions/{scenarioId}")
   public ApiResponse<List<ExpressionResponse>> getExpressions(
@@ -41,11 +36,7 @@ public class ExpressionController implements ExpressionControllerDocs {
         expressionQueryService.getExpressionsPerScenario(principal.userId(), scenarioId));
   }
 
-  /**
-   * 사용자가 선택한 표현으로 표현 학습을 시작한다. 인증과 사용자 존재 검증은 보안 규칙과 AuthTokenFilter가 처리하므로 principal 주입은 생략한다.
-   *
-   * @param expressionId 학습할 영어 표현 ID
-   */
+  /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/expressions/{expressionId}/learning-start")
   public ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
@@ -53,12 +44,7 @@ public class ExpressionController implements ExpressionControllerDocs {
     return ApiResponse.success(expressionQueryService.getExpressionForLearning(expressionId));
   }
 
-  /**
-   * 대표 예문 영작을 끝낸 뒤 추가 예문 목록과 작문 문제(예문 중 랜덤 1개)를 조회한다. 인증과 사용자 존재 검증은 보안 규칙과 AuthTokenFilter가 처리하므로
-   * principal 주입은 생략한다.
-   *
-   * @param expressionId 학습 중인 영어 표현 ID
-   */
+  /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/expressions/{expressionId}/practice")
   public ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
@@ -66,12 +52,7 @@ public class ExpressionController implements ExpressionControllerDocs {
     return ApiResponse.success(expressionQueryService.getExtraPracticeExamples(expressionId));
   }
 
-  /**
-   * 사용자가 표현 학습을 완료한다. 이미 완료한 표현이면 마지막 완료 시각만 갱신하고, 잠긴 표현이면 거절한다.
-   *
-   * @param principal 인증 토큰에서 추출한 현재 사용자
-   * @param expressionId 학습 완료한 영어 표현 ID
-   */
+  /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/expressions/{expressionId}/learning-finish")
   public ApiResponse<Map<String, Object>> finishLearning(

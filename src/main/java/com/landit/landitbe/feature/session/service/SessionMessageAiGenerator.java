@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
+import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.session.client.ai.AiClosingMessageRequest;
 import com.landit.landitbe.feature.session.client.ai.AiClosingMessageResult;
 import com.landit.landitbe.feature.session.client.ai.AiClosingReason;
@@ -34,7 +34,7 @@ class SessionMessageAiGenerator {
 
   /** 다음 AI 메시지 또는 종료 메시지를 생성한다. */
   Generation generate(Request request) {
-    Optional<ScenarioQuestionProjection> nextQuestion = request.nextQuestion();
+    Optional<NextQuestionContext> nextQuestion = request.nextQuestion();
 
     // 다음 질문이 없으면 최대 턴에 도달한 것으로 보고
     // 종료 메시지를 생성한다.
@@ -49,7 +49,7 @@ class SessionMessageAiGenerator {
     return generateNextMessage(request, nextQuestion.get());
   }
 
-  private Generation generateNextMessage(Request request, ScenarioQuestionProjection nextQuestion) {
+  private Generation generateNextMessage(Request request, NextQuestionContext nextQuestion) {
     AiNextMessageResult nextMessageResult =
         aiConversationClient.generateNextMessage(toNextMessageRequest(request, nextQuestion));
     assertNextMessageResult(nextMessageResult);
@@ -65,7 +65,7 @@ class SessionMessageAiGenerator {
   }
 
   private AiNextMessageRequest toNextMessageRequest(
-      Request request, ScenarioQuestionProjection nextQuestion) {
+      Request request, NextQuestionContext nextQuestion) {
     return new AiNextMessageRequest(
         request.learningSessionId(),
         request.submittedMessageId(),
@@ -101,7 +101,7 @@ class SessionMessageAiGenerator {
         completionReason);
   }
 
-  private AiNextQuestion toAiNextQuestion(ScenarioQuestionProjection nextQuestion) {
+  private AiNextQuestion toAiNextQuestion(NextQuestionContext nextQuestion) {
     return new AiNextQuestion(
         nextQuestion.questionId(),
         nextQuestion.sequence(),
@@ -138,7 +138,7 @@ class SessionMessageAiGenerator {
       int submittedTurnNumber,
       ScenarioSessionMessageContextProjection scenarioContext,
       List<AiConversationHistoryMessage> conversationHistory,
-      Optional<ScenarioQuestionProjection> nextQuestion) {}
+      Optional<NextQuestionContext> nextQuestion) {}
 
   record Generation(
       String aiMessage,

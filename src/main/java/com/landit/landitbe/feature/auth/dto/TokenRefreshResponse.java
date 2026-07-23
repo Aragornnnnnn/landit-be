@@ -18,7 +18,16 @@ public record TokenRefreshResponse(
     String refreshToken,
     long refreshTokenExpiresIn) {
 
-  /** 회전 발급한 토큰 값을 갱신 응답으로 변환한다. */
+  /**
+   * 회전 발급한 토큰 값을 갱신 응답으로 변환한다.
+   *
+   * @param tokenType 인증 토큰 유형
+   * @param accessToken 새 Access token
+   * @param accessTokenExpiresIn Access token 만료 시간
+   * @param refreshToken 새 Refresh token
+   * @param refreshTokenExpiresIn Refresh token 만료 시간
+   * @return 토큰 갱신 응답
+   */
   public static TokenRefreshResponse from(
       String tokenType,
       String accessToken,

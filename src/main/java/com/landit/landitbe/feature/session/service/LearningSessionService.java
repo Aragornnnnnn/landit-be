@@ -25,7 +25,7 @@ public class LearningSessionService {
   private final LearningSessionRepository learningSessionRepository;
 
   /**
-   * 소유자와 진행 상태를 검증하면서 메시지 제출 대상 세션을 잠금 조회한다.
+   * 소유자와 진행 상태를 검증하면서 상태 변경 대상 세션을 잠금 조회한다.
    *
    * @param userId 세션 소유자 ID
    * @param sessionId 학습 세션 ID
@@ -137,10 +137,7 @@ public class LearningSessionService {
    */
   @Transactional
   public void endSession(long userId, long sessionId) {
-    LearningSession learningSession = findOwned(userId, sessionId);
-    if (!learningSession.isInProgress()) {
-      throw new SessionException(SessionErrorCode.SESSION_ALREADY_COMPLETED);
-    }
+    LearningSession learningSession = findOwnedInProgressForUpdate(userId, sessionId);
     learningSession.interruptByUser(LocalDateTime.now());
     log.info("learning session ended by user: userId={}, sessionId={}", userId, sessionId);
   }

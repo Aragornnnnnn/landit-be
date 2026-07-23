@@ -27,7 +27,14 @@ public record SessionFeedbackResponse(
     String summaryMessage,
     List<MessageFeedbackResponse> messageFeedbacks) {
 
-  /** 저장된 세션 요약 피드백과 메시지별 응답을 최종 피드백 응답으로 변환한다. */
+  /**
+   * 저장된 세션 요약 피드백과 메시지별 응답을 최종 피드백 응답으로 변환한다.
+   *
+   * @param sessionId 학습 세션 ID
+   * @param summary 저장된 세션 요약 피드백
+   * @param messageFeedbacks 메시지별 피드백 응답
+   * @return 세션 최종 피드백 응답
+   */
   public static SessionFeedbackResponse from(
       Long sessionId,
       SessionHistorySummaryFeedback summary,
@@ -71,7 +78,15 @@ public record SessionFeedbackResponse(
       String correctionReason,
       String benchmarkMessage) {
 
-    /** 저장된 메시지 피드백과 평가 당시 메시지 정보를 응답으로 변환한다. */
+    /**
+     * 저장된 메시지 피드백과 평가 당시 메시지 정보를 응답으로 변환한다.
+     *
+     * @param feedback 저장된 메시지 피드백
+     * @param turnNumber 대화 턴 번호
+     * @param userMessage 사용자 메시지
+     * @param evaluationContext 메시지 평가 기준
+     * @return 메시지별 피드백 응답
+     */
     public static MessageFeedbackResponse from(
         SessionHistoryMessageFeedback feedback,
         int turnNumber,
@@ -103,7 +118,14 @@ public record SessionFeedbackResponse(
   public record EvaluationContextResponse(
       AiMessageFeedbackEvaluationContextType type, String content, String translatedContent) {
 
-    /** 평가 컨텍스트 값을 API 응답으로 변환한다. */
+    /**
+     * 평가 컨텍스트 값을 API 응답으로 변환한다.
+     *
+     * @param type 평가 컨텍스트 유형
+     * @param content 메시지 본문
+     * @param translatedContent 번역된 메시지 본문
+     * @return 메시지 평가 컨텍스트 응답
+     */
     public static EvaluationContextResponse from(
         AiMessageFeedbackEvaluationContextType type, String content, String translatedContent) {
       return new EvaluationContextResponse(type, content, translatedContent);

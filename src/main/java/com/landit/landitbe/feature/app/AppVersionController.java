@@ -22,7 +22,7 @@ public class AppVersionController implements AppVersionControllerDocs {
 
   private final AppVersionQueryService appVersionQueryService;
 
-  /** 현재 앱 빌드의 업데이트 필요 수준을 확인한다. */
+  /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/app-versions/check")
   public ApiResponse<AppVersionCheckResponse> check(

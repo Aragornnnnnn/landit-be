@@ -30,7 +30,12 @@ public record PracticeSentenceResponse(
             example = "https://cdn.landit.com/writing/examples/001.png")
         String imageUrl) {
 
-  /** 추가 예문 JSON 객체를 API 응답 항목으로 변환한다. */
+  /**
+   * 추가 예문 JSON 객체를 API 응답 항목으로 변환한다.
+   *
+   * @param node 추가 예문 JSON 객체
+   * @return 추가 예문 응답 항목
+   */
   public static PracticeSentenceResponse from(JsonNode node) {
     return new PracticeSentenceResponse(
         node.get("sentenceText").asText(),

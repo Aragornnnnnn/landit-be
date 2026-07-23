@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.auth.TokenProperties;
-import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -46,9 +45,14 @@ public class LanditTokenService {
     this.objectMapper = new ObjectMapper();
   }
 
-  /** 사용자 식별자를 담은 access token을 생성한다. */
-  public String createAccessToken(UserProfile userProfile) {
-    return createToken(userProfile, ACCESS_TOKEN_TYPE, properties.accessExpiresInSeconds());
+  /**
+   * 사용자 식별자를 담은 access token을 생성한다.
+   *
+   * @param userId 사용자 ID
+   * @return 서명된 access token
+   */
+  public String createAccessToken(Long userId) {
+    return createToken(userId, ACCESS_TOKEN_TYPE, properties.accessExpiresInSeconds());
   }
 
   /** Access token을 검증하고 사용자 PK를 반환한다. */
@@ -104,11 +108,11 @@ public class LanditTokenService {
     }
   }
 
-  private String createToken(UserProfile userProfile, String tokenType, long expiresInSeconds) {
+  private String createToken(Long userId, String tokenType, long expiresInSeconds) {
     Instant now = Instant.now();
     Map<String, Object> header = Map.of("alg", "HS256", "typ", "JWT");
     Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("sub", String.valueOf(userProfile.getId()));
+    payload.put("sub", String.valueOf(userId));
     payload.put("type", tokenType);
     payload.put("jti", UUID.randomUUID().toString());
     payload.put("iat", now.getEpochSecond());

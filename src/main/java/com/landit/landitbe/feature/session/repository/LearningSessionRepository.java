@@ -16,7 +16,7 @@ public interface LearningSessionRepository extends JpaRepository<LearningSession
   /** 특정 사용자가 소유한 학습 세션을 조회한다. */
   Optional<LearningSession> findByIdAndUserProfileId(Long id, Long userProfileId);
 
-  /** 같은 세션에 대한 동시 메시지 제출을 직렬화하며 소유 세션을 조회한다. */
+  /** 같은 세션에 대한 동시 상태 변경을 직렬화하며 소유 세션을 조회한다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """

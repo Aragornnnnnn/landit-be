@@ -10,7 +10,7 @@ import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -76,19 +75,17 @@ public class ExpressionQueryService {
                 ActiveStatus.ACTIVE);
 
     // 해당 유저가 클리어한 Writing 표현의 ID를 Set으로 수집한다.
-    Set<Long> completedExpressionIds =
-        learningProgressService.findExpressionCompletions(userId, scenarioId).stream()
-            .map(UserWritingExpressionCompletion::getWritingExpressionId)
-            .collect(Collectors.toSet());
+    CompletedExpressionIds completedExpressionIds =
+        learningProgressService.findCompletedExpressionIds(userId, scenarioId);
 
     // 미완료 표현 중 학습 순서가 가장 앞선 하나만 해금되고 그 뒤로는 잠긴다. (리스트는 displayOrder 오름차순)
     Optional<Long> firstUnlockedExpressionId =
-        firstIncompleteExpressionId(expressions, completedExpressionIds);
+        firstIncompleteExpressionId(expressions, completedExpressionIds.values());
 
     return expressions.stream()
         .map(
             expression ->
-                responseFor(expression, completedExpressionIds, firstUnlockedExpressionId))
+                responseFor(expression, completedExpressionIds.values(), firstUnlockedExpressionId))
         .toList();
   }
 

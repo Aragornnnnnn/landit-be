@@ -547,3 +547,13 @@ Expected: 계획 검증 기록 외에는 커밋되지 않은 변경 없음.
 - 금지된 `api/application/infrastructure` 패키지, `UseCase/Finder` 클래스, 클래스 레벨 `@RequestMapping`, 구 FQCN이 없음을 확인.
 - `shared`에서 `feature`로 향하는 import가 없음을 확인.
 - `origin/develop` 대비 Flyway 마이그레이션 변경이 없고 `git diff --check origin/develop`이 통과함.
+
+## CodeRabbit 리뷰 보완
+
+- 2026-07-23 세션 종료가 쓰기 잠금 조회를 사용하도록 변경해 동시 종료 요청을 직렬화함.
+- 인증 기능이 프로필 엔티티를 직접 참조하지 않도록 연관 ID와 `AuthProfile` 공개 계약을 사용함.
+- 인증 기능이 프로필 예외 타입을 직접 참조하지 않도록 `Optional`과 처리 여부로 상태를 전달함.
+- 콘텐츠 기능이 학습 엔티티를 직접 참조하지 않도록 `CompletedExpressionIds` 공개 계약을 사용함.
+- 세션 기능이 콘텐츠 Repository Projection을 직접 참조하지 않도록 `NextQuestionContext` 공개 계약을 사용함.
+- Controller 문서 인터페이스와 공개 DTO 변환 메서드의 Javadoc 계약을 보완함.
+- 2026-07-23 `./gradlew check` 통과.

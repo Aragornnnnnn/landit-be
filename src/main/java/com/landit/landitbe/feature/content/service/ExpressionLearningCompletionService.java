@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.content.service;
 
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -14,7 +14,6 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,30 +52,17 @@ public class ExpressionLearningCompletionService {
     // 끝.
     Long scenarioId = expression.getScenarioId();
 
-    List<UserWritingExpressionCompletion> completions =
-        learningProgressService.findExpressionCompletions(
-            userId, scenarioId); // 유저가 해당 시나리오 관련 표현들 중에서 학습 완료한 것들을 리스트로 가져옴.
-
-    // completions 리스트에서, writingExpressionId == expressionId인 걸 찾아서, 첫 번째로 찾은 걸 가져와라 (없으면 없다고 해라)
-    Optional<UserWritingExpressionCompletion> existingCompletion =
-        completions.stream()
-            .filter(completion -> completion.getWritingExpressionId().equals(expressionId))
-            .findFirst();
+    CompletedExpressionIds completedExpressionIds =
+        learningProgressService.findCompletedExpressionIds(userId, scenarioId);
 
     // 1. 만약에 이미 완료한 표현 리스트에 있는 경우라면, lastCompletedAt만 갱신하고 끝내라.
-    if (existingCompletion.isPresent()) {
+    if (completedExpressionIds.values().contains(expressionId)) {
       learningProgressService.completeExpression(userId, scenarioId, expressionId);
       return;
     }
 
-    // 아직 완료 안한 표현이면, 완료한 표현 id를 이 set에 담는다.
-    Set<Long> completedExpressionIds =
-        completions.stream()
-            .map(UserWritingExpressionCompletion::getWritingExpressionId)
-            .collect(Collectors.toSet());
-
     // 2. lock 여부 확인 -> 만약 잠겨있다면 에러를 터트린다.
-    if (!isUnlockedExpression(userId, scenarioId, expressionId, completedExpressionIds)) {
+    if (!isUnlockedExpression(userId, scenarioId, expressionId, completedExpressionIds.values())) {
       log.warn(LOCKED_EXPRESSION_LOG, userId, expressionId);
       throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
     }

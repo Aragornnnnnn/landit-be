@@ -25,7 +25,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
       """
             update RefreshToken token
             set token.revokedAt = :revokedAt
-            where token.userProfile.id = :userProfileId
+            where token.userProfileId = :userProfileId
               and token.revokedAt is null
       """)
   void revokeAllActiveByUserProfileId(

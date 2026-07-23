@@ -22,7 +22,13 @@ public record AiScenarioContext(
     String counterpartRole,
     String serviceAudience) {
 
-  /** 세션 시나리오 Projection과 AI 설정을 요청 컨텍스트로 변환한다. */
+  /**
+   * 세션 시나리오 Projection과 AI 설정을 요청 컨텍스트로 변환한다.
+   *
+   * @param projection 세션 시나리오 조회 결과
+   * @param settings AI 대화 설정
+   * @return AI 대화 생성용 시나리오 컨텍스트
+   */
   public static AiScenarioContext from(
       ScenarioSessionMessageContextProjection projection, AiConversationSettings settings) {
     return new AiScenarioContext(

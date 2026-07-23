@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.service;
 
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.shared.domain.Locale;
@@ -24,17 +25,22 @@ public class LearningProgressService {
   private final UserScenarioProgressRepository userScenarioProgressRepository;
   private final UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
+  /** 특정 시나리오에서 완료한 표현 엔티티를 기능 내부에서 조회한다. */
+  private List<UserWritingExpressionCompletion> findExpressionCompletions(
+      Long userId, Long scenarioId) {
+    return expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(userId, scenarioId);
+  }
+
   /**
-   * 사용자가 특정 시나리오에서 완료한 표현 기록을 조회한다.
+   * 사용자가 특정 시나리오에서 완료한 표현 ID를 조회한다.
    *
    * @param userId 사용자 ID
    * @param scenarioId 시나리오 ID
-   * @return 완료한 표현 기록 목록
+   * @return 완료한 표현 ID 집합
    */
   @Transactional(readOnly = true)
-  public List<UserWritingExpressionCompletion> findExpressionCompletions(
-      Long userId, Long scenarioId) {
-    return expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(userId, scenarioId);
+  public CompletedExpressionIds findCompletedExpressionIds(Long userId, Long scenarioId) {
+    return CompletedExpressionIds.from(findExpressionCompletions(userId, scenarioId));
   }
 
   /**

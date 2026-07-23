@@ -39,7 +39,7 @@ public class SessionMessageService {
    *
    * @param messageId 메시지 ID
    * @return 조회한 메시지
-   * @throws SessionException 세션 히스토리에 속한 메시지가 없을 때
+   * @throws ApiException 메시지가 없을 때
    */
   public SessionHistoryMessage require(long messageId) {
     return sessionHistoryMessageRepository

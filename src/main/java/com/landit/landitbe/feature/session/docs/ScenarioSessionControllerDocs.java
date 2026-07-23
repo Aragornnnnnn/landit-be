@@ -15,7 +15,13 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Scenario Session", description = "시나리오 세션 API")
 public interface ScenarioSessionControllerDocs {
 
-  /** 선택한 시나리오로 학습 세션을 시작한다. */
+  /**
+   * 선택한 시나리오로 학습 세션을 시작한다.
+   *
+   * @param principal 인증된 사용자
+   * @param scenarioId 시작할 시나리오 ID
+   * @return 생성된 학습 세션과 첫 메시지
+   */
   @Operation(
       summary = "시나리오 세션 시작",
       description = "선택한 시나리오로 SCENARIO 타입 학습 세션을 시작한다.",

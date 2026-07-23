@@ -18,7 +18,14 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Session", description = "학습 세션 API")
 public interface SessionControllerDocs {
 
-  /** 사용자 발화를 저장하고 다음 AI 메시지를 생성한다. */
+  /**
+   * 사용자 발화를 저장하고 다음 AI 메시지를 생성한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 학습 세션 ID
+   * @param request 사용자 발화와 입력 방식
+   * @return 저장된 사용자 발화와 AI 후속 메시지
+   */
   @Operation(
       summary = "사용자 발화 제출",
       description = "사용자 메시지를 저장하고 다음 AI 메시지 또는 종료 메시지를 생성한다.",
@@ -49,7 +56,14 @@ public interface SessionControllerDocs {
   ResponseEntity<ApiResponse<SessionMessageSubmitResponse>> submitMessage(
       AuthUserPrincipal principal, Long sessionId, SessionMessageSubmitRequest request);
 
-  /** 사용자 메시지의 상대 역할 속마음 처리 상태를 조회한다. */
+  /**
+   * 사용자 메시지의 상대 역할 속마음 처리 상태를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 학습 세션 ID
+   * @param messageId 사용자 메시지 ID
+   * @return 속마음 처리 상태와 완료 결과
+   */
   @Operation(
       summary = "사용자 메시지 속마음 조회",
       description = "속마음 생성 상태와 완료된 속마음 결과를 조회한다.",
@@ -71,7 +85,13 @@ public interface SessionControllerDocs {
   ResponseEntity<ApiResponse<SessionInnerThoughtResponse>> getInnerThought(
       AuthUserPrincipal principal, Long sessionId, Long messageId);
 
-  /** 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다. */
+  /**
+   * 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 학습 세션 ID
+   * @return 세션 요약과 메시지별 피드백
+   */
   @Operation(
       summary = "대화 최종 피드백 생성 및 조회",
       description = "완료된 세션의 요약 피드백과 메시지별 피드백을 생성하거나 조회한다.",
@@ -102,7 +122,13 @@ public interface SessionControllerDocs {
   ResponseEntity<ApiResponse<SessionFeedbackResponse>> getOrCreateFeedback(
       AuthUserPrincipal principal, Long sessionId);
 
-  /** 진행 중인 학습 세션을 사용자가 중도 종료한다. */
+  /**
+   * 진행 중인 학습 세션을 사용자가 중도 종료한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 종료할 학습 세션 ID
+   * @return 데이터가 없는 성공 응답
+   */
   @Operation(
       summary = "세션 중도 종료",
       description = "진행 중인 학습 세션을 INTERRUPTED 상태로 종료한다.",

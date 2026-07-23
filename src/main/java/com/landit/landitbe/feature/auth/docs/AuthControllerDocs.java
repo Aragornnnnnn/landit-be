@@ -18,7 +18,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "Auth", description = "사용자 인증 API")
 public interface AuthControllerDocs {
 
-  /** OIDC ID Token을 검증하고 서비스 토큰을 발급한다. */
+  /**
+   * OIDC ID Token을 검증하고 서비스 토큰을 발급한다.
+   *
+   * @param request OIDC ID Token과 로그인 부가 정보
+   * @return 자체 토큰과 로그인 사용자 정보
+   */
   @Operation(summary = "소셜 로그인", description = "OIDC ID Token과 nonce를 검증하고 서비스 토큰을 발급한다.")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -30,7 +35,12 @@ public interface AuthControllerDocs {
   })
   ApiResponse<AuthTokenResponse> socialLogin(SocialLoginRequest request);
 
-  /** Refresh token을 회전하고 새 서비스 토큰을 발급한다. */
+  /**
+   * Refresh token을 회전하고 새 서비스 토큰을 발급한다.
+   *
+   * @param request 기존 Refresh token
+   * @return 새 access token과 Refresh token
+   */
   @Operation(summary = "토큰 갱신", description = "유효한 refresh token을 회전하고 새 토큰을 발급한다.")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -42,11 +52,21 @@ public interface AuthControllerDocs {
   })
   ApiResponse<TokenRefreshResponse> refresh(TokenRefreshRequest request);
 
-  /** 전달받은 refresh token을 폐기한다. */
+  /**
+   * 전달받은 refresh token을 폐기한다.
+   *
+   * @param request 폐기할 Refresh token
+   * @return 데이터가 없는 성공 응답
+   */
   @Operation(summary = "로그아웃", description = "전달받은 refresh token을 폐기한다.")
   ApiResponse<Void> logout(LogoutRequest request);
 
-  /** 현재 인증된 사용자를 탈퇴 처리한다. */
+  /**
+   * 현재 인증된 사용자를 탈퇴 처리한다.
+   *
+   * @param principal 인증된 사용자
+   * @return 데이터가 없는 성공 응답
+   */
   @Operation(
       summary = "회원 탈퇴",
       description = "현재 사용자를 탈퇴 처리하고 활성 refresh token을 폐기한다.",

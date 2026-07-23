@@ -51,7 +51,12 @@ public record ExpressionLearningResponse(
     @Schema(description = "대표 예문 이미지 URL", example = "https://cdn.example.com/images/101.png")
         String representativeImageUrl) {
 
-  /** 표현 엔티티를 학습 시작 응답으로 변환한다. */
+  /**
+   * 표현 엔티티를 학습 시작 응답으로 변환한다.
+   *
+   * @param expression 변환할 표현 엔티티
+   * @return 표현 학습 시작 응답
+   */
   public static ExpressionLearningResponse from(WritingExpression expression) {
     return new ExpressionLearningResponse(
         expression.getId(),

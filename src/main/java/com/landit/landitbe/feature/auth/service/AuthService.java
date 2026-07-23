@@ -18,7 +18,7 @@ import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.service.AiTutorService;
-import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.Locale;
@@ -80,7 +80,7 @@ public class AuthService {
    *
    * @param request OIDC ID Token과 로그인 부가 정보
    * @return 자체 토큰과 로그인 사용자 정보
-   * @throws ApiException OIDC 검증에 실패하거나 활성 AI 튜터가 없을 때
+   * @throws ApiException OIDC 검증에 실패하거나 활성 사용자 또는 AI 튜터가 없을 때
    */
   @Transactional
   public AuthTokenResponse socialLogin(SocialLoginRequest request) {
@@ -88,7 +88,7 @@ public class AuthService {
     OidcUserInfo userInfo = oidcTokenVerifier.verify(provider, request.idToken(), request.nonce());
     String nickname = resolveNickname(provider, request.nickname(), userInfo.nickname());
     UserResult userResult = findOrCreateUser(userInfo, nickname);
-    IssuedTokens issuedTokens = issueTokens(userResult.userProfile());
+    IssuedTokens issuedTokens = issueTokens(userResult.authProfile());
 
     AuthTokenResponse response =
         AuthTokenResponse.from(
@@ -100,7 +100,7 @@ public class AuthService {
             userResponse(userResult));
     log.info(
         "social login completed: userId={}, provider={}, newUser={}",
-        userResult.userProfile().getId(),
+        userResult.authProfile().userId(),
         provider,
         userResult.newUser());
     return response;
@@ -121,13 +121,16 @@ public class AuthService {
         refreshTokenRepository
             .findByTokenHash(refreshTokenHash)
             .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
-    UserProfile userProfile = refreshToken.getUserProfile();
-    if (!refreshToken.isActive(now) || !userProfile.isActive()) {
+    if (!refreshToken.isActive(now)) {
       throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
     }
+    AuthProfile authProfile =
+        userProfileService
+            .findAuthenticationProfile(refreshToken.getUserProfileId())
+            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
 
     refreshToken.revoke(now);
-    IssuedTokens issuedTokens = issueTokens(userProfile);
+    IssuedTokens issuedTokens = issueTokens(authProfile);
     TokenRefreshResponse response =
         TokenRefreshResponse.from(
             TOKEN_TYPE,
@@ -135,7 +138,7 @@ public class AuthService {
             tokenProperties.accessExpiresInSeconds(),
             issuedTokens.refreshToken(),
             tokenProperties.refreshExpiresInSeconds());
-    log.info("auth token refreshed: userId={}", userProfile.getId());
+    log.info("auth token refreshed: userId={}", authProfile.userId());
     return response;
   }
 
@@ -160,12 +163,13 @@ public class AuthService {
    */
   @Transactional
   public void withdraw(Long userId) {
-    UserProfile userProfile = userProfileService.requireActive(userId);
+    if (!userProfileService.withdrawIfActive(userId)) {
+      throw new ApiException(ErrorCode.INVALID_TOKEN);
+    }
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
     oauthIdentityRepository
         .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.ACTIVE)
         .forEach(OauthIdentity::unlink);
-    userProfile.withdraw();
     log.info("user withdrawal completed: userId={}", userId);
   }
 
@@ -185,27 +189,26 @@ public class AuthService {
             userInfo.provider(), userInfo.sub(), OauthIdentityStatus.ACTIVE)
         .map(
             identity -> {
-              UserProfile userProfile = identity.getUserProfile();
-              if (!userProfile.isActive()) {
-                throw new ApiException(ErrorCode.INVALID_TOKEN);
-              }
-              userProfile.updateProfile(userInfo.email(), nickname);
+              AuthProfile authProfile =
+                  userProfileService
+                      .updateAuthenticationProfile(
+                          identity.getUserProfileId(), userInfo.email(), nickname)
+                      .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
               identity.updateProviderEmail(userInfo.email());
-              return new UserResult(userProfile, identity.getProvider(), false);
+              return new UserResult(authProfile, identity.getProvider(), false);
             })
         .orElseGet(
             () -> {
               Long defaultAiTutorId = requireDefaultAiTutorId();
-              UserProfile userProfile =
-                  userProfileService.save(
-                      new UserProfile(
-                          userInfo.email(),
-                          nickname == null ? GUEST_NICKNAME : nickname,
-                          defaultAiTutorId));
+              AuthProfile authProfile =
+                  userProfileService.createAuthenticationProfile(
+                      userInfo.email(),
+                      nickname == null ? GUEST_NICKNAME : nickname,
+                      defaultAiTutorId);
               oauthIdentityRepository.save(
                   new OauthIdentity(
-                      userProfile, userInfo.provider(), userInfo.sub(), userInfo.email()));
-              return new UserResult(userProfile, userInfo.provider(), true);
+                      authProfile.userId(), userInfo.provider(), userInfo.sub(), userInfo.email()));
+              return new UserResult(authProfile, userInfo.provider(), true);
             });
   }
 
@@ -218,22 +221,22 @@ public class AuthService {
   /** 내부 사용자 및 로그인 결과를 인증 API 응답 형식으로 변환한다. */
   private AuthUserResponse userResponse(UserResult userResult) {
     return AuthUserResponse.from(
-        userResult.userProfile(), userResult.provider(), userResult.newUser());
+        userResult.authProfile(), userResult.provider(), userResult.newUser());
   }
 
   /** Access token과 회전용 refresh token을 발급하고 refresh token 해시를 저장한다. */
-  private IssuedTokens issueTokens(UserProfile userProfile) {
-    String accessToken = tokenService.createAccessToken(userProfile);
+  private IssuedTokens issueTokens(AuthProfile authProfile) {
+    String accessToken = tokenService.createAccessToken(authProfile.userId());
     String refreshToken = tokenService.createRefreshToken();
     refreshTokenRepository.save(
         new RefreshToken(
-            userProfile,
+            authProfile.userId(),
             tokenService.hashToken(refreshToken),
             LocalDateTime.now().plusSeconds(tokenProperties.refreshExpiresInSeconds())));
     return new IssuedTokens(accessToken, refreshToken);
   }
 
-  private record UserResult(UserProfile userProfile, SocialProvider provider, boolean newUser) {}
+  private record UserResult(AuthProfile authProfile, SocialProvider provider, boolean newUser) {}
 
   private record IssuedTokens(String accessToken, String refreshToken) {}
 }

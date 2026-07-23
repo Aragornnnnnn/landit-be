@@ -15,7 +15,13 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "NPS", description = "서비스 만족도 API")
 public interface NpsControllerDocs {
 
-  /** 인증된 사용자의 NPS 응답을 저장한다. */
+  /**
+   * 인증된 사용자의 NPS 응답을 저장한다.
+   *
+   * @param principal 인증된 사용자
+   * @param request NPS 점수와 선택 의견
+   * @return 생성 결과를 담은 HTTP 응답
+   */
   @Operation(
       summary = "NPS 제출",
       description = "서비스 전반 만족도 점수와 선택 의견을 저장한다.",

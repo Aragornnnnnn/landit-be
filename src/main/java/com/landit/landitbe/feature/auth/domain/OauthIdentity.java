@@ -2,18 +2,14 @@
 
 package com.landit.landitbe.feature.auth.domain;
 
-import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 /** 소셜 로그인 제공자별 사용자 식별 정보를 저장한다. */
@@ -25,9 +21,8 @@ public class OauthIdentity extends BaseTimeEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "user_profile_id", nullable = false)
-  private UserProfile userProfile;
+  @Column(name = "user_profile_id", nullable = false)
+  private Long userProfileId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
@@ -49,17 +44,14 @@ public class OauthIdentity extends BaseTimeEntity {
   /**
    * 활성 OAuth 연결 정보를 생성한다.
    *
-   * @param userProfile 연결할 사용자 프로필
+   * @param userProfileId 연결할 사용자 프로필 ID
    * @param provider 소셜 로그인 제공자
    * @param providerUserId 제공자가 발급한 사용자 식별자
    * @param providerEmail 제공자에서 받은 이메일
    */
   public OauthIdentity(
-      UserProfile userProfile,
-      SocialProvider provider,
-      String providerUserId,
-      String providerEmail) {
-    this.userProfile = userProfile;
+      Long userProfileId, SocialProvider provider, String providerUserId, String providerEmail) {
+    this.userProfileId = userProfileId;
     this.provider = provider;
     this.providerUserId = providerUserId;
     this.providerEmail = providerEmail;
@@ -78,9 +70,9 @@ public class OauthIdentity extends BaseTimeEntity {
     this.status = OauthIdentityStatus.UNLINKED;
   }
 
-  /** 연결된 서비스 사용자 프로필을 반환한다. */
-  public UserProfile getUserProfile() {
-    return userProfile;
+  /** 연결된 서비스 사용자 프로필 ID를 반환한다. */
+  public Long getUserProfileId() {
+    return userProfileId;
   }
 
   /** OAuth 제공자를 반환한다. */

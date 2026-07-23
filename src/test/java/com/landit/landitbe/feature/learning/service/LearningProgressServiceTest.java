@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.shared.domain.Locale;
@@ -59,6 +61,22 @@ class LearningProgressServiceTest {
 
     verify(completion).markCompletedAgain();
     verify(expressionCompletionRepository, never()).save(any());
+  }
+
+  /** 다른 기능에는 학습 완료 엔티티 대신 완료한 표현 ID record를 반환한다. */
+  @Test
+  void returnsCompletedExpressionIds() {
+    UserWritingExpressionCompletion first = mock(UserWritingExpressionCompletion.class);
+    UserWritingExpressionCompletion second = mock(UserWritingExpressionCompletion.class);
+    when(first.getWritingExpressionId()).thenReturn(10L);
+    when(second.getWritingExpressionId()).thenReturn(20L);
+    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(USER_ID, SCENARIO_ID))
+        .thenReturn(List.of(first, second));
+
+    CompletedExpressionIds result =
+        learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID);
+
+    assertThat(result.values()).containsExactlyInAnyOrder(10L, 20L);
   }
 
   /** 기존 시나리오 진행도가 있으면 새 row를 만들지 않고 시작 시각을 갱신한다. */

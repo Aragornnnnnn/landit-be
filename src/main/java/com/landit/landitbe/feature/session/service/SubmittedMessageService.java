@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
+import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -46,7 +46,7 @@ class SubmittedMessageService {
     List<AiConversationHistoryMessage> conversationHistory =
         toConversationHistory(previousMessages, submittedMessage);
 
-    Optional<ScenarioQuestionProjection> nextQuestion =
+    Optional<NextQuestionContext> nextQuestion =
         findNextQuestion(
             learningSession,
             scenarioContext,
@@ -135,7 +135,7 @@ class SubmittedMessageService {
         : submittedTurnNumber;
   }
 
-  private Optional<ScenarioQuestionProjection> findNextQuestion(
+  private Optional<NextQuestionContext> findNextQuestion(
       LearningSession learningSession,
       ScenarioSessionMessageContextProjection scenarioContext,
       int nextQuestionOrder) {

@@ -13,6 +13,7 @@ public final class FlywayMigrationRunner {
    * 환경 변수의 데이터베이스 접속 정보로 Flyway 마이그레이션을 실행한다.
    *
    * @param args 실행 인자
+   * @throws IllegalStateException 필수 DB 환경 변수가 없거나 비어 있을 때
    */
   public static void main(String[] args) {
     Flyway.configure()

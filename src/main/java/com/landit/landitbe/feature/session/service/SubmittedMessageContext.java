@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
+import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import java.util.List;
@@ -19,5 +19,5 @@ record SubmittedMessageContext(
     int submittedTurnNumber,
     ScenarioSessionMessageContextProjection scenarioContext,
     List<AiConversationHistoryMessage> conversationHistory,
-    Optional<ScenarioQuestionProjection> nextQuestion,
+    Optional<NextQuestionContext> nextQuestion,
     boolean createdSessionHistory) {}

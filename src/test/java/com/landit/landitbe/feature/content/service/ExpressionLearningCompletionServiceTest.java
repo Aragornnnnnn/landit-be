@@ -17,7 +17,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -27,6 +27,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -98,13 +99,10 @@ class ExpressionLearningCompletionServiceTest {
   void shouldUpdateLastCompletedAtForRepeatedCompletion() {
     // given: 표현이 존재하고, 사용자가 이미 그 표현을 완료한 상태
     WritingExpression expression = expressionInScenario();
-    UserWritingExpressionCompletion completedRecord =
-        completion(UNLOCKED_EXPRESSION_ID); // 표현 학습 이미 완료해서 userWritingExpressionCompletion이 존재함
-
     when(writingExpressionRepository.findByIdAndStatus(UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(learningProgressService.findExpressionCompletions(USER_ID, SCENARIO_ID))
-        .thenReturn(List.of(completedRecord));
+    when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
+        .thenReturn(new CompletedExpressionIds(Set.of(UNLOCKED_EXPRESSION_ID)));
 
     // when: 같은 표현을 다시 완료해도
     expressionLearningCompletionService.completeLearning(USER_ID, UNLOCKED_EXPRESSION_ID);
@@ -167,8 +165,8 @@ class ExpressionLearningCompletionServiceTest {
     when(writingExpressionRepository.findByIdAndStatus(
             any(), org.mockito.ArgumentMatchers.eq(ActiveStatus.ACTIVE)))
         .thenReturn(Optional.of(expression));
-    when(learningProgressService.findExpressionCompletions(USER_ID, SCENARIO_ID))
-        .thenReturn(List.of()); // 빈리스트 = 해당 유저가 시나리오 id에서 아직 완료한 표현이 없음
+    when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
+        .thenReturn(new CompletedExpressionIds(Set.of()));
   }
 
   /** 사용자 locale(EN/KR) 기준으로 이 시나리오의 표현 목록(학습 순서)이 이렇게 조회된다고 스터빙한다. */
@@ -196,12 +194,5 @@ class ExpressionLearningCompletionServiceTest {
         .when(expression.getId())
         .thenReturn(id); // lenient = 이 스터빙은 이번 테스트에서 호출이 안 돼도 괜찮으니까, 안 쓰인다고 에러 내지 마라
     return expression;
-  }
-
-  /** "이 표현을 완료했다"는 기록 mock. 완료 여부 판정에 쓰는 getWritingExpressionId만 스터빙한다. */
-  private UserWritingExpressionCompletion completion(Long writingExpressionId) {
-    UserWritingExpressionCompletion completion = mock(UserWritingExpressionCompletion.class);
-    when(completion.getWritingExpressionId()).thenReturn(writingExpressionId);
-    return completion;
   }
 }

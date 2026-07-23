@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.content.service;
 
+import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
-import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -23,11 +23,12 @@ public class ScenarioContentService {
    * @param displayOrder 질문 순서
    * @param targetLocale 학습 대상 locale
    * @param baseLocale 기준 locale
-   * @return 조건에 맞는 질문 Projection
+   * @return 조건에 맞는 다음 질문 컨텍스트
    */
-  public Optional<ScenarioQuestionProjection> findActiveQuestion(
+  public Optional<NextQuestionContext> findActiveQuestion(
       long scenarioId, int displayOrder, Locale targetLocale, Locale baseLocale) {
-    return scenarioQuestionQueryRepository.findActiveQuestion(
-        scenarioId, displayOrder, targetLocale, baseLocale);
+    return scenarioQuestionQueryRepository
+        .findActiveQuestion(scenarioId, displayOrder, targetLocale, baseLocale)
+        .map(NextQuestionContext::from);
   }
 }

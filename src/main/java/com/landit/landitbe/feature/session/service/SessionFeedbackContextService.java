@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -30,7 +31,15 @@ class SessionFeedbackContextService {
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final AiConversationSettings aiConversationSettings;
 
-  /** 소유한 완료 시나리오 세션의 최종 피드백 입력을 불변 값으로 조회한다. */
+  /**
+   * 소유한 완료 시나리오 세션의 최종 피드백 입력을 불변 값으로 조회한다.
+   *
+   * @param userId 세션 소유자 ID
+   * @param sessionId 학습 세션 ID
+   * @return 최종 피드백 생성에 필요한 불변 컨텍스트
+   * @throws SessionException 세션이 없거나 접근할 수 없거나 완료되지 않았을 때
+   * @throws ApiException 세션 히스토리 또는 사용자 메시지가 없을 때
+   */
   @Transactional(readOnly = true)
   public LoadedSessionFeedbackContext load(long userId, long sessionId) {
     LearningSession learningSession = learningSessionService.findOwnedCompleted(userId, sessionId);

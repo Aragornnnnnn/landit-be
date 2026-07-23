@@ -5,10 +5,12 @@ package com.landit.landitbe.feature.profile.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
@@ -71,5 +73,37 @@ class UserProfileServiceTest {
         .isInstanceOf(UserProfileException.class)
         .extracting("errorCode")
         .isEqualTo(UserProfileErrorCode.INVALID_TOKEN);
+  }
+
+  /** 인증 기능에는 Profile 엔티티 대신 갱신된 인증용 record를 반환한다. */
+  @Test
+  void updatesAuthenticationProfileAsRecord() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfile.getId()).thenReturn(USER_ID);
+    when(userProfile.getNickname()).thenReturn("updated nickname");
+    when(userProfile.getEmail()).thenReturn("updated@example.com");
+    when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
+        .thenReturn(Optional.of(userProfile));
+
+    AuthProfile profile =
+        userProfileService
+            .updateAuthenticationProfile(USER_ID, "updated@example.com", "updated nickname")
+            .orElseThrow();
+
+    verify(userProfile).updateProfile("updated@example.com", "updated nickname");
+    assertThat(profile)
+        .isEqualTo(new AuthProfile(USER_ID, "updated nickname", "updated@example.com"));
+  }
+
+  /** 비활성 사용자는 인증 기능용 갱신 계약에서 빈 결과로 반환한다. */
+  @Test
+  void returnsEmptyWhenUpdatingInactiveAuthenticationProfile() {
+    when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
+        .thenReturn(Optional.empty());
+
+    assertThat(
+            userProfileService.updateAuthenticationProfile(
+                USER_ID, "updated@example.com", "updated nickname"))
+        .isEmpty();
   }
 }

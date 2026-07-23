@@ -4,13 +4,16 @@ package com.landit.landitbe.feature.session.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -40,5 +43,18 @@ class LearningSessionServiceTest {
         .isInstanceOf(SessionException.class)
         .extracting("errorCode")
         .isEqualTo(SessionErrorCode.FORBIDDEN);
+  }
+
+  /** 사용자 세션 종료도 메시지 저장과 같은 잠금을 사용해 상태 변경을 직렬화한다. */
+  @Test
+  void endsSessionWithLockedLookup() {
+    LearningSession session = mock(LearningSession.class);
+    when(session.isInProgress()).thenReturn(true);
+    when(repository.findByIdAndUserProfileIdForUpdate(10L, 1L)).thenReturn(Optional.of(session));
+
+    service.endSession(1L, 10L);
+
+    verify(repository).findByIdAndUserProfileIdForUpdate(10L, 1L);
+    verify(session).interruptByUser(any(LocalDateTime.class));
   }
 }

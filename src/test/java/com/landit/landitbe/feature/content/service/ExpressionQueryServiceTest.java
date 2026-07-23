@@ -25,7 +25,7 @@ import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -205,10 +205,10 @@ class ExpressionQueryServiceTest {
    * 스터빙한다. 아무 인자도 안 넘기면(빈 가변인자) "하나도 완료하지 않은 상황"이 된다.
    */
   private void givenCompletedExpressionIds(Long... completedExpressionIds) {
-    List<UserWritingExpressionCompletion> completions =
-        java.util.Arrays.stream(completedExpressionIds).map(this::completion).toList();
-    when(learningProgressService.findExpressionCompletions(USER_ID, SCENARIO_ID))
-        .thenReturn(completions);
+    when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
+        .thenReturn(
+            new CompletedExpressionIds(
+                new HashSet<>(java.util.Arrays.asList(completedExpressionIds))));
   }
 
   /**
@@ -254,14 +254,6 @@ class ExpressionQueryServiceTest {
     when(expression.getRepresentativeImageUrl())
         .thenReturn("https://cdn.example.com/images/101.png");
     return expression;
-  }
-
-  /** "특정 표현을 완료했다"는 기록 1건의 mock을 만든다. 서비스가 완료 여부 판정에 쓰는 getWritingExpressionId()만 스터빙한다. */
-  private UserWritingExpressionCompletion completion(Long writingExpressionId) {
-    UserWritingExpressionCompletion completion = mock(UserWritingExpressionCompletion.class);
-
-    when(completion.getWritingExpressionId()).thenReturn(writingExpressionId);
-    return completion;
   }
 
   // ===== 추가 예문 조회(getExtraPracticeExamples) 테스트 =====

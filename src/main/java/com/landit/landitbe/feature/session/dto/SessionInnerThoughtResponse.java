@@ -22,12 +22,21 @@ public record SessionInnerThoughtResponse(
     @Schema(description = "상대 역할의 속마음. COMPLETED에서만 제공") String innerThought,
     @Schema(description = "속마음 유형. COMPLETED에서만 제공") String innerThoughtType) {
 
-  /** 처리에 실패한 속마음 응답을 생성한다. */
+  /**
+   * 처리에 실패한 속마음 응답을 생성한다.
+   *
+   * @return 실패 상태의 속마음 응답
+   */
   public static SessionInnerThoughtResponse failed() {
     return new SessionInnerThoughtResponse(ProcessingStatus.FAILED.name(), null, null);
   }
 
-  /** 사용자 메시지의 속마음 처리 상태를 API 응답으로 변환한다. */
+  /**
+   * 사용자 메시지의 속마음 처리 상태를 API 응답으로 변환한다.
+   *
+   * @param message 변환할 사용자 메시지
+   * @return 속마음 처리 상태와 완료 결과
+   */
   public static SessionInnerThoughtResponse from(SessionHistoryMessage message) {
     ProcessingStatus status = message.getInnerThoughtProcessingStatus();
     if (status != ProcessingStatus.COMPLETED) {

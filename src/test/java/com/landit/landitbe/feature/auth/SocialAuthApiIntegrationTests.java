@@ -509,14 +509,14 @@ class SocialAuthApiIntegrationTests {
                 "withdrawn-refresh@example.com", "Withdrawn Refresh User", defaultAiTutorId()));
     oauthIdentityRepository.save(
         new OauthIdentity(
-            userProfile,
+            userProfile.getId(),
             SocialProvider.GOOGLE,
             "google-withdrawn-refresh-1",
             "withdrawn-refresh@example.com"));
     String refreshToken = "withdrawn-user-refresh-token";
     refreshTokenRepository.save(
         new RefreshToken(
-            userProfile,
+            userProfile.getId(),
             tokenService.hashToken(refreshToken),
             LocalDateTime.now().plusMinutes(10)));
     userProfile.withdraw();

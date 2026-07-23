@@ -33,7 +33,7 @@ public class AuthController implements AuthControllerDocs {
     this.authService = authService;
   }
 
-  /** OIDC ID Token과 nonce를 검증한 뒤 자체 토큰을 발급한다. */
+  /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/auth/social-login")
   public ApiResponse<AuthTokenResponse> socialLogin(
@@ -41,7 +41,7 @@ public class AuthController implements AuthControllerDocs {
     return ApiResponse.success(authService.socialLogin(request));
   }
 
-  /** Refresh token을 회전하고 새 자체 토큰을 발급한다. */
+  /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/auth/token/refresh")
   public ApiResponse<TokenRefreshResponse> refresh(
@@ -49,7 +49,7 @@ public class AuthController implements AuthControllerDocs {
     return ApiResponse.success(authService.refresh(request));
   }
 
-  /** 전달받은 refresh token을 폐기한다. */
+  /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/auth/logout")
   public ApiResponse<Void> logout(@Valid @RequestBody LogoutRequest request) {
@@ -57,7 +57,7 @@ public class AuthController implements AuthControllerDocs {
     return ApiResponse.success(null);
   }
 
-  /** 현재 인증된 사용자를 탈퇴 처리한다. */
+  /** {@inheritDoc} */
   @Override
   @DeleteMapping("/api/v1/auth/me")
   public ApiResponse<Void> withdraw(@AuthenticationPrincipal AuthUserPrincipal principal) {
