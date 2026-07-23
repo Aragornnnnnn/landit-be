@@ -4,8 +4,8 @@ package com.landit.landitbe.feature.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.landit.landitbe.feature.content.infrastructure.ScenarioQuestionQueryRepository;
-import com.landit.landitbe.feature.content.infrastructure.ScenarioQuestionRow;
+import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
+import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
     seedQuestionLanguageVariant(
         991302L, 991202L, "EN", "KR", "Do you cook often?", "요리를 자주 해?", "ACTIVE");
 
-    Optional<ScenarioQuestionRow> question =
+    Optional<ScenarioQuestionProjection> question =
         scenarioQuestionQueryRepository.findActiveQuestion(991101L, 2, Locale.EN, Locale.KR);
 
     assertThat(question).isPresent();

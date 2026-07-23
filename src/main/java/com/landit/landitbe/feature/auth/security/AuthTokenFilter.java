@@ -2,9 +2,9 @@
 
 package com.landit.landitbe.feature.auth.security;
 
-import com.landit.landitbe.feature.auth.application.LanditTokenService;
 import com.landit.landitbe.feature.auth.domain.UserProfileStatus;
-import com.landit.landitbe.feature.auth.infrastructure.UserProfileRepository;
+import com.landit.landitbe.feature.auth.repository.UserProfileRepository;
+import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import jakarta.servlet.FilterChain;

@@ -5,7 +5,7 @@ package com.landit.landitbe;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.session.infrastructure.ai.RemoteAiConversationClient;
+import com.landit.landitbe.feature.session.client.ai.RemoteAiConversationClient;
 import java.util.TimeZone;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -11,15 +11,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.auth.application.LanditTokenService;
 import com.landit.landitbe.feature.auth.domain.OauthIdentity;
 import com.landit.landitbe.feature.auth.domain.OauthIdentityStatus;
 import com.landit.landitbe.feature.auth.domain.RefreshToken;
 import com.landit.landitbe.feature.auth.domain.SocialProvider;
 import com.landit.landitbe.feature.auth.domain.UserProfile;
-import com.landit.landitbe.feature.auth.infrastructure.OauthIdentityRepository;
-import com.landit.landitbe.feature.auth.infrastructure.RefreshTokenRepository;
-import com.landit.landitbe.feature.auth.infrastructure.UserProfileRepository;
+import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
+import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
+import com.landit.landitbe.feature.auth.repository.UserProfileRepository;
+import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

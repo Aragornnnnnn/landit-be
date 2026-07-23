@@ -170,7 +170,7 @@ git commit -m "refactor: 기능과 공통 패키지 상위 경계 분리"
 - Produces: 기능 루트 Controller, `dto`, `docs`, `domain`, `repository`, `service`, `client`, `exception`.
 - Preserves: Spring component scanning, JPA repository scanning and Configuration Properties binding.
 
-- [ ] **Step 1: Projection 이름과 JPQL 생성자 경로를 함께 변경한다**
+- [x] **Step 1: Projection 이름과 JPQL 생성자 경로를 함께 변경한다**
 
 ```text
 ScenarioListRow → ScenarioListProjection
@@ -180,19 +180,19 @@ ScenarioSessionLockRow → ScenarioSessionLockProjection
 ScenarioSessionMessageContextRow → ScenarioSessionMessageContextProjection
 ```
 
-- [ ] **Step 2: 역할 패키지 이동 후 구 패키지를 검사한다**
+- [x] **Step 2: 역할 패키지 이동 후 구 패키지를 검사한다**
 
 Run: `find src/main/java/com/landit/landitbe/feature -type d \( -name api -o -name application -o -name infrastructure \)`
 
 Expected: 출력 없음.
 
-- [ ] **Step 3: 설정 위치를 검사한다**
+- [x] **Step 3: 설정 위치를 검사한다**
 
 Run: `rg -l "@ConfigurationProperties|@Configuration" src/main/java/com/landit/landitbe/feature src/main/java/com/landit/landitbe/shared`
 
 Expected: 기능 고유 설정이 아닌 최상위 설정 클래스 출력 없음.
 
-- [ ] **Step 4: 컴파일과 Repository 통합 테스트를 실행한다**
+- [x] **Step 4: 컴파일과 Repository 통합 테스트를 실행한다**
 
 Run: `./gradlew test --tests '*QueryRepositoryIntegrationTests'`
 
@@ -202,7 +202,7 @@ Run: `./gradlew check`
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 5: 역할 패키지 이동을 커밋한다**
+- [x] **Step 5: 역할 패키지 이동을 커밋한다**
 
 ```bash
 git add src/main/java src/test/java
