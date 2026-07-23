@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "ko-KR"
+early_access: false
+tone_instructions: >-
+  한국어로 간결하고 직접적으로 작성한다. 실제 결함, 보안 문제, 계약 위반,
+  회귀 가능성처럼 조치가 필요한 내용만 지적한다. 각 지적에는 근거와 영향을
+  포함하고 취향 차이, CI가 검사하는 포맷, 요청 범위 밖 리팩터링은 제안하지 않는다.
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  poem: false
+  in_progress_fortune: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "^develop$"
+      - "^main$"
+      - "^release/.*"
+      - "^feat/.*"
+  path_instructions:
+    - path: "src/main/java/**/api/**"
+      instructions: |
+        인증·인가와 리소스 소유권 검증 누락을 우선 확인한다.
+        Bean Validation, 오류 코드와 HTTP 상태, 응답 DTO 호환성을 확인한다.
+        공개 API 계약 변경에는 테스트와 OpenAPI 반영이 함께 있는지 확인한다.
+    - path: "src/main/java/**/application/**"
+      instructions: |
+        상태 변경과 트랜잭션 경계를 확인한다.
+        DB 트랜잭션 중 AI나 외부 네트워크 호출을 유지하는 변경을 지적한다.
+        멱등성, 중복 요청, 동시 실행, 상태 전이의 원자성 회귀를 확인한다.
+        단순 조회에 새 추상화나 불필요한 Port 계층을 요구하지 않는다.
+    - path: "src/main/java/**/session/infrastructure/ai/**"
+      instructions: |
+        연결된 landit-ai의 요청·응답 필드, enum, nullability, 오류 계약과 비교한다.
+        timeout과 provider 실패가 BE 도메인 오류로 안전하게 매핑되는지 확인한다.
+        API key, raw 사용자 발화, 민감한 prompt가 로그나 Sentry에 남지 않아야 한다.
+    - path: "src/main/java/**/auth/**"
+      instructions: |
+        OAuth 검증, 토큰 발급·갱신·폐기, 로그아웃·탈퇴 실패 경로를 확인한다.
+        토큰이나 사용자 민감정보가 로그, 예외, 응답에 노출되는 변경을 지적한다.
+    - path: "src/main/resources/db/migration/**"
+      instructions: |
+        적용된 Flyway 파일 수정 대신 새 버전 마이그레이션인지 확인한다.
+        JPA 엔티티와 스키마, 운영 PostgreSQL과 테스트 H2의 정합성을 확인한다.
+        기존 데이터 손실, 긴 잠금, 대규모 backfill, checksum 변경 위험을 지적한다.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  linked_repositories:
+    - repository: "Aragornnnnnn/landit-fe"
+      instructions: >-
+        웹·모바일 클라이언트 저장소다. 공개 HTTP API 변경의 경로, DTO, nullability,
+        오류 코드, 인증 갱신 호환성을 검증할 때 참고한다.
+    - repository: "Aragornnnnnn/landit-ai"
+      instructions: >-
+        AI 생성 서버다. AI Port와 원격 클라이언트의 요청·응답 DTO, enum,
+        nullability, 오류 계약 호환성을 검증할 때 참고한다.
