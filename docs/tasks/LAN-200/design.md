@@ -100,6 +100,18 @@ com.landit.landitbe
 - `UserProfile`과 활성 상태를 소유한다.
 - 닉네임, 이메일, 학습 locale과 선택한 AI 튜터 ID를 소유한다.
 - 다른 기능에는 Entity 대신 목적에 맞는 record를 반환한다.
+- 인증 자격증명을 발급하거나 폐기하는 흐름에는 활성 프로필을 쓰기 잠금으로 제공한다.
+
+### 인증 자격증명 동시성
+
+- 기존 사용자에게 Refresh Token을 발급하는 흐름과 회원 탈퇴는 같은 `UserProfile` 행을 먼저 쓰기 잠금한다.
+- Refresh Token 회전은 프로필 잠금 후 `revoked_at IS NULL`과 만료 시각을 조건으로 기존 토큰을 폐기한다.
+- 조건부 폐기 결과가 1건일 때만 새 Access Token과 Refresh Token을 발급한다.
+- 회원 탈퇴는 프로필 잠금을 트랜잭션 종료까지 유지하면서 활성 Refresh Token 폐기와 OAuth 연결 해제를 수행한다.
+- 소셜 로그인으로 기존 사용자 자격증명을 발급할 때도 같은 프로필 잠금을 사용한다.
+- 로그아웃도 토큰 소유자의 프로필을 먼저 잠근 뒤 Refresh Token을 폐기한다.
+- 잠금 순서는 `UserProfile`에서 `RefreshToken`으로 통일해 교착 상태를 방지한다.
+- 신규 프로필은 외부에 자격증명이 노출되기 전 같은 트랜잭션에서 생성되므로 기존 사용자 잠금 대상에서 제외한다.
 
 ### Content
 

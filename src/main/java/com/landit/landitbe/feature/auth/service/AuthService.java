@@ -115,21 +115,19 @@ public class AuthService {
    */
   @Transactional
   public TokenRefreshResponse refresh(TokenRefreshRequest request) {
-    LocalDateTime now = LocalDateTime.now();
     String refreshTokenHash = tokenService.hashToken(request.refreshToken());
-    RefreshToken refreshToken =
+    Long userProfileId =
         refreshTokenRepository
-            .findByTokenHash(refreshTokenHash)
+            .findUserProfileIdByTokenHash(refreshTokenHash)
             .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
-    if (!refreshToken.isActive(now)) {
-      throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
-    }
     AuthProfile authProfile =
         userProfileService
-            .findAuthenticationProfile(refreshToken.getUserProfileId())
+            .findAuthenticationProfileForUpdate(userProfileId)
             .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
-
-    refreshToken.revoke(now);
+    LocalDateTime now = LocalDateTime.now();
+    if (refreshTokenRepository.revokeActiveByTokenHash(refreshTokenHash, now) != 1) {
+      throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+    }
     IssuedTokens issuedTokens = issueTokens(authProfile);
     TokenRefreshResponse response =
         TokenRefreshResponse.from(
@@ -149,9 +147,14 @@ public class AuthService {
    */
   @Transactional
   public void logout(LogoutRequest request) {
+    String refreshTokenHash = tokenService.hashToken(request.refreshToken());
     refreshTokenRepository
-        .findByTokenHash(tokenService.hashToken(request.refreshToken()))
-        .ifPresent(refreshToken -> refreshToken.revoke(LocalDateTime.now()));
+        .findUserProfileIdByTokenHash(refreshTokenHash)
+        .flatMap(userProfileService::findAuthenticationProfileForUpdate)
+        .ifPresent(
+            ignored ->
+                refreshTokenRepository.revokeActiveByTokenHash(
+                    refreshTokenHash, LocalDateTime.now()));
     log.info("logout request completed");
   }
 
@@ -163,7 +166,7 @@ public class AuthService {
    */
   @Transactional
   public void withdraw(Long userId) {
-    if (!userProfileService.withdrawIfActive(userId)) {
+    if (!userProfileService.withdrawIfActiveForUpdate(userId)) {
       throw new ApiException(ErrorCode.INVALID_TOKEN);
     }
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
@@ -191,7 +194,7 @@ public class AuthService {
             identity -> {
               AuthProfile authProfile =
                   userProfileService
-                      .updateAuthenticationProfile(
+                      .updateAuthenticationProfileForUpdate(
                           identity.getUserProfileId(), userInfo.email(), nickname)
                       .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
               identity.updateProviderEmail(userInfo.email());

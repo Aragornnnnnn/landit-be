@@ -76,16 +76,16 @@ public class UserProfileService {
   }
 
   /**
-   * 활성 사용자 프로필을 인증 기능 공개 계약으로 조회한다.
+   * 활성 사용자 프로필을 쓰기 잠금으로 조회해 인증 기능 공개 계약으로 반환한다.
+   *
+   * <p>잠금은 현재 트랜잭션이 끝날 때까지 유지된다.
    *
    * @param userId 조회할 사용자 ID
    * @return 인증 기능용 사용자 프로필. 활성 프로필이 없으면 빈 값
    */
-  @Transactional(readOnly = true)
-  public Optional<AuthProfile> findAuthenticationProfile(Long userId) {
-    return userProfileRepository
-        .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
-        .map(AuthProfile::from);
+  @Transactional
+  public Optional<AuthProfile> findAuthenticationProfileForUpdate(Long userId) {
+    return userProfileRepository.findActiveByIdForUpdate(userId).map(AuthProfile::from);
   }
 
   /**
@@ -97,10 +97,10 @@ public class UserProfileService {
    * @return 갱신된 인증 사용자 프로필. 활성 프로필이 없으면 빈 값
    */
   @Transactional
-  public Optional<AuthProfile> updateAuthenticationProfile(
+  public Optional<AuthProfile> updateAuthenticationProfileForUpdate(
       Long userId, String email, String nickname) {
     return userProfileRepository
-        .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
+        .findActiveByIdForUpdate(userId)
         .map(
             userProfile -> {
               userProfile.updateProfile(email, nickname);
@@ -115,9 +115,9 @@ public class UserProfileService {
    * @return 탈퇴 처리 여부
    */
   @Transactional
-  public boolean withdrawIfActive(Long userId) {
+  public boolean withdrawIfActiveForUpdate(Long userId) {
     return userProfileRepository
-        .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
+        .findActiveByIdForUpdate(userId)
         .map(
             userProfile -> {
               userProfile.withdraw();

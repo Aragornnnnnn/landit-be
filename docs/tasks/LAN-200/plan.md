@@ -557,3 +557,90 @@ Expected: 계획 검증 기록 외에는 커밋되지 않은 변경 없음.
 - 세션 기능이 콘텐츠 Repository Projection을 직접 참조하지 않도록 `NextQuestionContext` 공개 계약을 사용함.
 - Controller 문서 인터페이스와 공개 DTO 변환 메서드의 Javadoc 계약을 보완함.
 - 2026-07-23 `./gradlew check` 통과.
+
+### Task 9: 인증 자격증명 발급과 탈퇴 동시성 보완
+
+**Files:**
+- Modify: `src/main/java/com/landit/landitbe/feature/auth/service/AuthService.java`
+- Modify: `src/main/java/com/landit/landitbe/feature/auth/repository/RefreshTokenRepository.java`
+- Modify: `src/main/java/com/landit/landitbe/feature/auth/domain/RefreshToken.java`
+- Modify: `src/main/java/com/landit/landitbe/feature/auth/domain/OauthIdentity.java`
+- Modify: `src/main/java/com/landit/landitbe/feature/profile/service/UserProfileService.java`
+- Modify: `src/main/java/com/landit/landitbe/feature/profile/repository/UserProfileRepository.java`
+- Modify: `src/main/java/com/landit/landitbe/feature/session/service/SubmittedMessageContext.java`
+- Test: `src/test/java/com/landit/landitbe/feature/auth/service/AuthServiceTest.java`
+- Test: `src/test/java/com/landit/landitbe/feature/profile/service/UserProfileServiceTest.java`
+- Test: `src/test/java/com/landit/landitbe/feature/auth/SocialAuthApiIntegrationTests.java`
+
+**Interfaces:**
+- Produces: `UserProfileService.findAuthenticationProfileForUpdate(Long)`
+- Produces: `UserProfileService.updateAuthenticationProfileForUpdate(Long, String, String)`
+- Produces: `UserProfileService.withdrawIfActiveForUpdate(Long)`
+- Produces: `RefreshTokenRepository.findUserProfileIdByTokenHash(String)`
+- Produces: `RefreshTokenRepository.revokeActiveByTokenHash(String, LocalDateTime)`
+- Preserves: HTTP 요청·응답, DB 스키마와 인증 실패 오류 코드.
+
+- [x] **Step 1: 원자적 토큰 회전 실패 테스트를 작성한다**
+
+`AuthServiceTest`에서 Refresh Token 소유자 조회 후 프로필 잠금이 조건부 토큰 폐기보다 먼저 실행되는지 검증한다. 조건부 폐기 결과가 `0`이면 `REFRESH_TOKEN_INVALID`가 발생하고 새 Refresh Token을 저장하지 않아야 한다.
+
+Run: `./gradlew test --tests 'com.landit.landitbe.feature.auth.service.AuthServiceTest'`
+
+Expected: 새 잠금·조건부 폐기 계약이 없어 컴파일 또는 assertion 실패.
+
+- [x] **Step 2: 프로필 잠금 Service 실패 테스트를 작성한다**
+
+`UserProfileServiceTest`에서 인증 프로필 조회·갱신·탈퇴가 모두 `findActiveByIdForUpdate`를 사용하고, 비활성 사용자는 빈 값 또는 `false`를 반환하는지 검증한다.
+
+Run: `./gradlew test --tests 'com.landit.landitbe.feature.profile.service.UserProfileServiceTest'`
+
+Expected: 인증용 잠금 메서드가 없어 컴파일 실패.
+
+- [x] **Step 3: 프로필 우선 잠금과 조건부 토큰 폐기를 구현한다**
+
+`AuthService.refresh()`는 토큰 해시로 사용자 ID를 조회하고, 활성 프로필을 쓰기 잠금한 다음 아래 조건부 폐기 결과가 `1`일 때만 새 토큰을 발급한다.
+
+```java
+int revokeActiveByTokenHash(String tokenHash, LocalDateTime revokedAt);
+```
+
+기존 사용자 소셜 로그인, 로그아웃과 탈퇴도 `findActiveByIdForUpdate`를 사용하는 Profile Service 계약으로 통일한다. 토큰 만료 기준 시각은 프로필 잠금을 획득한 뒤 계산한다. 신규 사용자는 기존 행과 경쟁하지 않으므로 현재 생성 흐름을 유지한다.
+
+- [x] **Step 4: 관련 단위 테스트를 통과시킨다**
+
+Run: `./gradlew test --tests 'com.landit.landitbe.feature.auth.service.AuthServiceTest' --tests 'com.landit.landitbe.feature.profile.service.UserProfileServiceTest'`
+
+Expected: `BUILD SUCCESSFUL`.
+
+- [x] **Step 5: 인증 API 회귀 테스트를 실행한다**
+
+Run: `./gradlew test --tests 'com.landit.landitbe.feature.auth.SocialAuthApiIntegrationTests'`
+
+Expected: 토큰 회전, 로그아웃, 탈퇴, 비활성 사용자 실패와 동시 회전·탈퇴 계약 통과.
+
+- [x] **Step 6: Javadoc 리뷰를 보완한다**
+
+`RefreshToken.getUserProfileId()`, `OauthIdentity.getUserProfileId()`에 `@return`을 추가한다. `SubmittedMessageContext`의 모든 record 구성 요소를 선언부 `@param`으로 설명하고 `nextQuestion`이 마지막 질문 이후 비어 있음을 명시한다.
+
+- [x] **Step 7: 전체 검사를 실행하고 커밋한다**
+
+Run: `./gradlew check`
+
+Expected: `BUILD SUCCESSFUL`.
+
+```bash
+git add docs/tasks/LAN-200 src/main/java src/test/java
+git commit -m "fix: 인증 자격증명 동시성 보완"
+```
+
+### Task 9 검증 결과
+
+- 2026-07-23 새 인증·프로필 잠금 계약이 없는 상태에서 단위 테스트 컴파일 실패를 확인함.
+- 2026-07-23 `./gradlew test --tests 'com.landit.landitbe.feature.auth.service.AuthServiceTest' --tests 'com.landit.landitbe.feature.profile.service.UserProfileServiceTest'` 통과.
+- 2026-07-23 `./gradlew test --tests 'com.landit.landitbe.feature.auth.SocialAuthApiIntegrationTests'` 통과.
+- 2026-07-23 별도 요청 스레드에서 동일 Refresh Token을 동시에 회전하면 한 요청만 성공하고, 회전과 탈퇴가 겹쳐도 탈퇴 후 사용할 수 있는 Refresh Token이 남지 않음을 검증함.
+- 2026-07-23 첫 `./gradlew check`에서 새 테스트의 Spotless·Checkstyle 위반을 확인하고 포맷을 수정함.
+- 2026-07-23 포맷 수정 후 `./gradlew check` 통과.
+- 2026-07-23 독립 코드 리뷰에서 만료 기준 시각과 로그아웃 잠금 순서 지적을 반영한 뒤 Critical·Important 이슈가 없음을 재확인함.
+- 로컬에 PostgreSQL 실행 환경이 없어 동시 요청 검증은 프로젝트 테스트 DB인 H2에서 수행함.
+- 2026-07-23 최종 `./gradlew clean check`에서 모든 포맷·Checkstyle·테스트 통과.

@@ -75,19 +75,34 @@ class UserProfileServiceTest {
         .isEqualTo(UserProfileErrorCode.INVALID_TOKEN);
   }
 
-  /** 인증 기능에는 Profile 엔티티 대신 갱신된 인증용 record를 반환한다. */
+  /** 인증 기능의 조회 계약은 활성 프로필을 쓰기 잠금으로 조회한다. */
+  @Test
+  void findsAuthenticationProfileWithWriteLock() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfile.getId()).thenReturn(USER_ID);
+    when(userProfile.getNickname()).thenReturn("nickname");
+    when(userProfile.getEmail()).thenReturn("user@example.com");
+    when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
+        .thenReturn(Optional.of(userProfile));
+
+    assertThat(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
+        .contains(new AuthProfile(USER_ID, "nickname", "user@example.com"));
+  }
+
+  /** 인증 기능에는 Profile 엔티티 대신 쓰기 잠금으로 갱신된 인증용 record를 반환한다. */
   @Test
   void updatesAuthenticationProfileAsRecord() {
     UserProfile userProfile = mock(UserProfile.class);
     when(userProfile.getId()).thenReturn(USER_ID);
     when(userProfile.getNickname()).thenReturn("updated nickname");
     when(userProfile.getEmail()).thenReturn("updated@example.com");
-    when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
+    when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
         .thenReturn(Optional.of(userProfile));
 
     AuthProfile profile =
         userProfileService
-            .updateAuthenticationProfile(USER_ID, "updated@example.com", "updated nickname")
+            .updateAuthenticationProfileForUpdate(
+                USER_ID, "updated@example.com", "updated nickname")
             .orElseThrow();
 
     verify(userProfile).updateProfile("updated@example.com", "updated nickname");
@@ -98,12 +113,22 @@ class UserProfileServiceTest {
   /** 비활성 사용자는 인증 기능용 갱신 계약에서 빈 결과로 반환한다. */
   @Test
   void returnsEmptyWhenUpdatingInactiveAuthenticationProfile() {
-    when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
-        .thenReturn(Optional.empty());
+    when(userProfileRepository.findActiveByIdForUpdate(USER_ID)).thenReturn(Optional.empty());
 
     assertThat(
-            userProfileService.updateAuthenticationProfile(
+            userProfileService.updateAuthenticationProfileForUpdate(
                 USER_ID, "updated@example.com", "updated nickname"))
         .isEmpty();
+  }
+
+  /** 탈퇴 처리는 활성 프로필을 쓰기 잠금으로 조회해 상태를 변경한다. */
+  @Test
+  void withdrawsAuthenticationProfileWithWriteLock() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
+        .thenReturn(Optional.of(userProfile));
+
+    assertThat(userProfileService.withdrawIfActiveForUpdate(USER_ID)).isTrue();
+    verify(userProfile).withdraw();
   }
 }

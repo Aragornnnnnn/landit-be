@@ -17,7 +17,7 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
   /** 특정 상태의 사용자 프로필을 PK로 조회한다. */
   Optional<UserProfile> findByIdAndStatus(Long id, UserProfileStatus status);
 
-  /** 활성 사용자 프로필을 PK로 조회하면서 동시 세션 시작을 직렬화한다. */
+  /** 활성 사용자 프로필을 PK로 조회하면서 프로필 상태 변경을 직렬화한다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """

@@ -21,6 +21,12 @@ import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +38,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 소셜 로그인 API의 사용자 생성, 토큰 발급, nonce 검증을 검증한다. */
 @ActiveProfiles("test")
@@ -404,6 +411,114 @@ class SocialAuthApiIntegrationTests {
   }
 
   @Test
+  @Transactional
+  void conditionalRefreshTokenRevocationConsumesTokenOnlyOnce() {
+    UserProfile userProfile =
+        userProfileRepository.save(
+            new UserProfile(
+                "conditional-refresh@example.com", "Conditional Refresh User", defaultAiTutorId()));
+    String refreshTokenHash = tokenService.hashToken("conditional-refresh-token");
+    LocalDateTime now = LocalDateTime.now();
+    refreshTokenRepository.save(
+        new RefreshToken(userProfile.getId(), refreshTokenHash, now.plusMinutes(10)));
+
+    assertThat(refreshTokenRepository.revokeActiveByTokenHash(refreshTokenHash, now)).isEqualTo(1);
+    assertThat(refreshTokenRepository.revokeActiveByTokenHash(refreshTokenHash, now.plusSeconds(1)))
+        .isZero();
+  }
+
+  /** 동일한 Refresh Token을 동시에 사용해도 한 요청만 새 토큰을 발급한다. */
+  @Test
+  void concurrentRefreshConsumesTokenOnlyOnce() throws Exception {
+    JsonNode loginBody =
+        login(
+            "GOOGLE",
+            "google-concurrent-refresh-1",
+            "concurrent-refresh@example.com",
+            "Concurrent Refresh User",
+            "concurrent-refresh-nonce");
+    String refreshToken = loginBody.get("data").get("refreshToken").asText();
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    try {
+      Future<Integer> firstStatus =
+          executor.submit(() -> concurrentRefreshStatus(refreshToken, ready, start));
+      Future<Integer> secondStatus =
+          executor.submit(() -> concurrentRefreshStatus(refreshToken, ready, start));
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+
+      assertThat(
+              List.of(
+                  firstStatus.get(10, TimeUnit.SECONDS), secondStatus.get(10, TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(200, 401);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  /** Refresh Token 회전과 탈퇴가 겹쳐도 탈퇴 완료 후 사용할 수 있는 토큰이 남지 않는다. */
+  @Test
+  void concurrentRefreshAndWithdrawalLeaveNoUsableRefreshToken() throws Exception {
+    JsonNode loginBody =
+        login(
+            "GOOGLE",
+            "google-concurrent-withdraw-1",
+            "concurrent-withdraw@example.com",
+            "Concurrent Withdraw User",
+            "concurrent-withdraw-nonce");
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+    String refreshToken = loginBody.get("data").get("refreshToken").asText();
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    MvcResult refreshResult;
+    MvcResult withdrawResult;
+
+    try {
+      final Future<MvcResult> refreshFuture =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                awaitConcurrentStart(start);
+                return performRefresh(refreshToken);
+              });
+      final Future<MvcResult> withdrawFuture =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                awaitConcurrentStart(start);
+                return mockMvc
+                    .perform(
+                        delete("/api/v1/auth/me")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                    .andReturn();
+              });
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      refreshResult = refreshFuture.get(10, TimeUnit.SECONDS);
+      withdrawResult = withdrawFuture.get(10, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertThat(withdrawResult.getResponse().getStatus()).isEqualTo(200);
+    assertThat(refreshResult.getResponse().getStatus()).isIn(200, 401);
+    assertRefreshRejected(refreshToken);
+    if (refreshResult.getResponse().getStatus() == 200) {
+      String rotatedRefreshToken =
+          objectMapper
+              .readTree(refreshResult.getResponse().getContentAsByteArray())
+              .get("data")
+              .get("refreshToken")
+              .asText();
+      assertRefreshRejected(rotatedRefreshToken);
+    }
+  }
+
+  @Test
   void logoutRevokesRefreshToken() throws Exception {
     JsonNode loginBody =
         login("GOOGLE", "google-logout-1", "logout@example.com", "Logout User", "logout-nonce");
@@ -557,5 +672,49 @@ class SocialAuthApiIntegrationTests {
             .andExpect(status().isOk())
             .andReturn();
     return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+  }
+
+  private int concurrentRefreshStatus(
+      String refreshToken, CountDownLatch ready, CountDownLatch start) throws Exception {
+    ready.countDown();
+    awaitConcurrentStart(start);
+    return performRefresh(refreshToken).getResponse().getStatus();
+  }
+
+  private void awaitConcurrentStart(CountDownLatch start) throws InterruptedException {
+    if (!start.await(5, TimeUnit.SECONDS)) {
+      throw new IllegalStateException("동시 요청 시작 신호를 기다리는 시간이 초과됐습니다.");
+    }
+  }
+
+  private MvcResult performRefresh(String refreshToken) throws Exception {
+    return mockMvc
+        .perform(
+            post("/api/v1/auth/token/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                            {
+                              "refreshToken":"%s"
+                            }
+                    """
+                        .formatted(refreshToken)))
+        .andReturn();
+  }
+
+  private void assertRefreshRejected(String refreshToken) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/token/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                            {
+                              "refreshToken":"%s"
+                            }
+                    """
+                        .formatted(refreshToken)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
   }
 }

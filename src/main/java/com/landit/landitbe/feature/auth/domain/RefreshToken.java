@@ -52,22 +52,29 @@ public class RefreshToken extends BaseTimeEntity {
     this.expiresAt = expiresAt;
   }
 
-  /** 현재 시각 기준으로 재발급에 사용할 수 있는 refresh token인지 확인한다. */
-  public boolean isActive(LocalDateTime now) {
-    return revokedAt == null && expiresAt.isAfter(now);
-  }
-
-  /** Refresh token을 더 이상 사용할 수 없도록 폐기한다. */
+  /**
+   * Refresh token을 더 이상 사용할 수 없도록 폐기한다.
+   *
+   * @param revokedAt 토큰 폐기 시각
+   */
   public void revoke(LocalDateTime revokedAt) {
     this.revokedAt = revokedAt;
   }
 
-  /** Refresh token PK를 반환한다. */
+  /**
+   * Refresh token PK를 반환한다.
+   *
+   * @return Refresh token PK
+   */
   public Long getId() {
     return id;
   }
 
-  /** Refresh token을 발급받은 사용자 ID를 반환한다. */
+  /**
+   * Refresh token을 발급받은 사용자 ID를 반환한다.
+   *
+   * @return 토큰 소유 사용자 프로필 ID
+   */
   public Long getUserProfileId() {
     return userProfileId;
   }

@@ -58,7 +58,11 @@ public class OauthIdentity extends BaseTimeEntity {
     this.status = OauthIdentityStatus.ACTIVE;
   }
 
-  /** OAuth 제공자에서 받은 최신 이메일을 저장한다. */
+  /**
+   * OAuth 제공자에서 받은 최신 이메일을 저장한다.
+   *
+   * @param providerEmail 제공자에서 받은 최신 이메일
+   */
   public void updateProviderEmail(String providerEmail) {
     if (providerEmail != null) {
       this.providerEmail = providerEmail;
@@ -70,12 +74,20 @@ public class OauthIdentity extends BaseTimeEntity {
     this.status = OauthIdentityStatus.UNLINKED;
   }
 
-  /** 연결된 서비스 사용자 프로필 ID를 반환한다. */
+  /**
+   * 연결된 서비스 사용자 프로필 ID를 반환한다.
+   *
+   * @return 연결된 사용자 프로필 ID
+   */
   public Long getUserProfileId() {
     return userProfileId;
   }
 
-  /** OAuth 제공자를 반환한다. */
+  /**
+   * OAuth 제공자를 반환한다.
+   *
+   * @return OAuth 제공자
+   */
   public SocialProvider getProvider() {
     return provider;
   }
