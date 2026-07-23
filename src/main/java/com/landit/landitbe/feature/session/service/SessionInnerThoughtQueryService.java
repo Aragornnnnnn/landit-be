@@ -41,11 +41,11 @@ public class SessionInnerThoughtQueryService {
           sessionHistoryMessageRepository.markInnerThoughtFailedIfPreparing(
               messageId, ProcessingStatus.FAILED, ProcessingStatus.PREPARING);
       if (updated == 1) {
-        return new SessionInnerThoughtResponse(ProcessingStatus.FAILED.name(), null, null);
+        return SessionInnerThoughtResponse.failed();
       }
       message = findUserMessage(sessionHistory.getId(), messageId);
     }
-    return toResponse(message);
+    return SessionInnerThoughtResponse.from(message);
   }
 
   private SessionHistoryMessage findUserMessage(long sessionHistoryId, long messageId) {
@@ -65,14 +65,5 @@ public class SessionInnerThoughtQueryService {
             .getCreatedAt()
             .plusSeconds(PREPARING_TIMEOUT_SECONDS)
             .isAfter(LocalDateTime.now());
-  }
-
-  private SessionInnerThoughtResponse toResponse(SessionHistoryMessage message) {
-    ProcessingStatus processingStatus = message.getInnerThoughtProcessingStatus();
-    if (processingStatus != ProcessingStatus.COMPLETED) {
-      return new SessionInnerThoughtResponse(processingStatus.name(), null, null);
-    }
-    return new SessionInnerThoughtResponse(
-        processingStatus.name(), message.getInnerThought(), message.getInnerThoughtType().name());
   }
 }

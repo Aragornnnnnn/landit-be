@@ -38,7 +38,7 @@ public class SessionFeedbackUseCase {
     ExistingSummaryFeedbackContext existingSummary = context.existingSummary().orElse(null);
     if (existingSummary != null) {
       // 이미 확정된 결과는 AI를 다시 호출하지 않고 그대로 반환한다.
-      return toResponse(context, existingSummary.summaryFeedbackId());
+      return responseFor(context, existingSummary.summaryFeedbackId());
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
@@ -49,11 +49,11 @@ public class SessionFeedbackUseCase {
                 context.scenario(),
                 context.userMessages().stream().map(UserMessageContext::messageId).toList()));
     Long summaryFeedbackId = recorder.record(userId, context, result);
-    return toResponse(context, summaryFeedbackId);
+    return responseFor(context, summaryFeedbackId);
   }
 
   /** 저장된 최종 피드백과 평가 당시 사용자 메시지 컨텍스트를 API 응답으로 조립한다. */
-  private SessionFeedbackResponse toResponse(
+  private SessionFeedbackResponse responseFor(
       LoadedSessionFeedbackContext context, Long summaryFeedbackId) {
     List<SessionHistoryMessageFeedback> feedbacks =
         messageFeedbackRepository
@@ -73,41 +73,30 @@ public class SessionFeedbackUseCase {
             .findById(summaryFeedbackId)
             .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
 
-    return new SessionFeedbackResponse(
+    return SessionFeedbackResponse.from(
         context.sessionId(),
-        summary.getNativeScore(),
-        summary.getStarRating(),
-        summary.getHighlightMessage(),
-        summary.getSummaryMessage(),
+        summary,
         context.userMessages().stream()
             .map(
                 userMessage ->
-                    toMessageFeedbackResponse(
+                    messageFeedbackResponse(
                         feedbackByMessageId.get(userMessage.messageId()), userMessage))
             .toList());
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
-  private MessageFeedbackResponse toMessageFeedbackResponse(
+  private MessageFeedbackResponse messageFeedbackResponse(
       SessionHistoryMessageFeedback feedback, UserMessageContext userMessage) {
     if (feedback == null) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
-    return new MessageFeedbackResponse(
-        feedback.getId(),
-        feedback.getSessionHistoryMessageId(),
+    return MessageFeedbackResponse.from(
+        feedback,
         userMessage.turnNumber(),
         userMessage.content(),
-        new EvaluationContextResponse(
+        EvaluationContextResponse.from(
             userMessage.evaluationContext().type(),
             userMessage.evaluationContext().content(),
-            userMessage.evaluationContext().translatedContent()),
-        feedback.getFeedbackType(),
-        feedback.getBaseLocaleAnalogy(),
-        feedback.getPositiveFeedback(),
-        feedback.getFeedbackDetail(),
-        feedback.getCorrectionExpression(),
-        feedback.getCorrectionReason(),
-        feedback.getBenchmarkMessage());
+            userMessage.evaluationContext().translatedContent()));
   }
 }

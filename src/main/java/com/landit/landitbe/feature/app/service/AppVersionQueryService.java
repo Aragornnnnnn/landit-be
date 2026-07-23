@@ -28,13 +28,7 @@ public class AppVersionQueryService {
             .findByPlatformAndActiveTrue(platform)
             .orElseThrow(() -> new ApiException(ErrorCode.APP_VERSION_POLICY_NOT_CONFIGURED));
     UpdateType updateType = updateType(currentBuildNumber, policy);
-    return new AppVersionCheckResponse(
-        updateType,
-        policy.getVersionName(),
-        policy.getBuildNumber(),
-        policy.getMinimumSupportedBuildNumber(),
-        reason(updateType, policy),
-        policy.getReleasedAt());
+    return AppVersionCheckResponse.from(policy, updateType, reason(updateType, policy));
   }
 
   private UpdateType updateType(long currentBuildNumber, AppVersion policy) {

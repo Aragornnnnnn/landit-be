@@ -14,4 +14,14 @@ public record WritingSentenceResponse(
     @Schema(description = "선택된 예문의 해석", example = "특수효과가 끝내줬어.") String writingSentenceTranslation,
     @Schema(description = "선택된 예문의 연습 질문", example = "How was the musical?") String writingQuestion,
     @Schema(description = "선택된 연습 질문의 해석", example = "뮤지컬 어땠어?")
-        String writingQuestionTranslation) {}
+        String writingQuestionTranslation) {
+
+  /** 추가 예문 응답을 작문 문제 응답으로 변환한다. */
+  public static WritingSentenceResponse from(PracticeSentenceResponse sentence) {
+    return new WritingSentenceResponse(
+        sentence.sentenceText(),
+        sentence.sentenceTranslation(),
+        sentence.practiceQuestion(),
+        sentence.practiceQuestionTranslation());
+  }
+}

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /** 추가 예문 조회 응답의 예문 1건을 표현한다. */
@@ -18,4 +19,16 @@ public record PracticeSentenceResponse(
     @Schema(
             description = "예문 이미지 URL. 없으면 null",
             example = "https://cdn.landit.com/writing/examples/001.png")
-        String imageUrl) {}
+        String imageUrl) {
+
+  /** 추가 예문 JSON 객체를 API 응답 항목으로 변환한다. */
+  public static PracticeSentenceResponse from(JsonNode node) {
+    return new PracticeSentenceResponse(
+        node.get("sentenceText").asText(),
+        node.get("highlightingPart").asText(),
+        node.get("sentenceTranslation").asText(),
+        node.get("practiceQuestion").asText(),
+        node.get("practiceQuestionTranslation").asText(),
+        node.hasNonNull("imageUrl") ? node.get("imageUrl").asText() : null);
+  }
+}

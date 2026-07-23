@@ -6,7 +6,6 @@ import com.landit.landitbe.feature.content.dto.ScenarioListResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.CategoryResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.OpeningPreviewResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.ScenarioResponse;
-import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.content.repository.ScenarioListQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgressStatus;
@@ -37,8 +36,8 @@ public class ScenarioQueryService {
   public ScenarioListResponse getScenarioList(long userId) {
     List<ScenarioListProjection> scenarioRows =
         scenarioListQueryRepository.findScenarioList(userId);
-    return new ScenarioListResponse(
-        categoryGroups(scenarioRows).stream().map(CategoryGroup::toResponse).toList());
+    return ScenarioListResponse.from(
+        categoryGroups(scenarioRows).stream().map(CategoryGroup::asCategoryResponse).toList());
   }
 
   /** 평탄한 조회 결과를 응답 구조에 맞게 카테고리 단위로 묶는다. */
@@ -63,16 +62,9 @@ public class ScenarioQueryService {
         inactive(scenarioRow.scenarioStatus()) || inactive(scenarioRow.variantStatus());
     boolean scenarioLocked = scenarioOrVariantInactive || !previousScenarioCompleted;
     boolean locked = categoryLocked || scenarioLocked;
-    return new ScenarioResponse(
-        scenarioRow.scenarioId(),
+    return ScenarioResponse.from(
+        scenarioRow,
         completedStarRating(completed, scenarioRow.bestStarRating()),
-        scenarioRow.scenarioDisplayOrder(),
-        scenarioRow.scenarioTitle(),
-        scenarioRow.briefing(),
-        scenarioRow.conversationGoal(),
-        scenarioRow.difficulty().name(),
-        scenarioRow.firstSpeaker().name(),
-        scenarioRow.thumbnailUrl(),
         completed,
         locked,
         lockReason(categoryLocked, scenarioOrVariantInactive, previousScenarioCompleted),
@@ -110,25 +102,9 @@ public class ScenarioQueryService {
     }
     // 첫 발화자가 AI인 경우에만 AI 시작 메시지와 속마음을 미리보기로 내려준다.
     if (scenarioRow.firstSpeaker() == ConversationSpeaker.AI) {
-      return new OpeningPreviewResponse(
-          scenarioRow.aiOpeningMessage(),
-          scenarioRow.aiOpeningMessageTranslation(),
-          null,
-          scenarioRow.innerThought(),
-          scenarioRow.innerThoughtType() == null ? null : scenarioRow.innerThoughtType().name(),
-          ttsVoice(scenarioRow));
+      return OpeningPreviewResponse.fromAi(scenarioRow);
     }
-    return new OpeningPreviewResponse(
-        null, null, scenarioRow.userOpeningInstruction(), null, null, ttsVoice(scenarioRow));
-  }
-
-  /** 활성 상태로 조회된 언어 variant의 TTS 음성을 응답 객체로 변환한다. */
-  private static TtsVoiceResponse ttsVoice(ScenarioListProjection scenarioRow) {
-    return TtsVoiceResponse.from(
-        scenarioRow.ttsVoiceProvider(),
-        scenarioRow.ttsVoiceModel(),
-        scenarioRow.providerVoiceId(),
-        scenarioRow.ttsVoiceGender());
+    return OpeningPreviewResponse.fromUser(scenarioRow);
   }
 
   /** 활성 상태가 아닌 콘텐츠를 잠금 대상으로 판단한다. */
@@ -161,7 +137,7 @@ public class ScenarioQueryService {
     }
 
     /** 누적한 시나리오에 순차 잠금 규칙을 적용해 카테고리 응답을 만든다. */
-    private CategoryResponse toResponse() {
+    private CategoryResponse asCategoryResponse() {
       List<ScenarioResponse> scenarios = new ArrayList<>();
       boolean previousScenarioCompleted = true;
       for (ScenarioListProjection scenarioRow : scenarioRows) {
@@ -170,7 +146,7 @@ public class ScenarioQueryService {
         scenarios.add(scenario);
         previousScenarioCompleted = scenario.completed();
       }
-      return new CategoryResponse(
+      return CategoryResponse.from(
           categoryId,
           categoryName,
           displayOrder,

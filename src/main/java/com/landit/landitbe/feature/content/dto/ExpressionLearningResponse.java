@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.dto;
 
+import com.landit.landitbe.feature.content.domain.WritingExpression;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -34,4 +35,21 @@ public record ExpressionLearningResponse(
                     + "\"have\", \"get\", \"your\", \"mind\"]")
         List<String> representativeSentenceWordChoices,
     @Schema(description = "대표 예문 이미지 URL", example = "https://cdn.example.com/images/101.png")
-        String representativeImageUrl) {}
+        String representativeImageUrl) {
+
+  /** 표현 엔티티를 학습 시작 응답으로 변환한다. */
+  public static ExpressionLearningResponse from(WritingExpression expression) {
+    return new ExpressionLearningResponse(
+        expression.getId(),
+        expression.getTargetExpressionText(),
+        expression.getBaseExpressionMeaningText(),
+        expression.getUsageDescription(),
+        expression.getRepresentativeQuestionText(),
+        expression.getRepresentativeQuestionTranslation(),
+        expression.getRepresentativeSentenceText(),
+        expression.getRepresentativeSentenceTranslation(),
+        expression.getRepresentativeSentenceWords(),
+        expression.getRepresentativeSentenceWordChoices(),
+        expression.getRepresentativeImageUrl());
+  }
+}

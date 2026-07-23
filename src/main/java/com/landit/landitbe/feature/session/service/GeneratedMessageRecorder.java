@@ -7,9 +7,6 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse.NextMessageResponse;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse.SessionProgressResponse;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse.SubmittedMessageResponse;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
@@ -23,8 +20,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Component
 class GeneratedMessageRecorder {
-
-  private static final int AI_MESSAGE_SEQUENCE_IN_TURN = 2;
 
   private final LearningSessionFinder learningSessionFinder;
   private final ScenarioSessionRepository scenarioSessionRepository;
@@ -51,14 +46,13 @@ class GeneratedMessageRecorder {
     if (generation.completed()) {
       learningSession.completeBySystem(generation.completionReason(), LocalDateTime.now());
     }
-    return toResponse(
+    return SessionMessageSubmitResponse.from(
         submittedContext.sessionId(),
         submittedMessage,
         feedbackProcessingStatus,
-        new MessageGenerationResult(
-            nextMessage,
-            submittedContext.scenarioContext().totalQuestionCount(),
-            generation.completed()));
+        nextMessage,
+        submittedContext.scenarioContext().totalQuestionCount(),
+        generation.completed());
   }
 
   private ScenarioSession findScenarioSession(long sessionId) {
@@ -92,46 +86,4 @@ class GeneratedMessageRecorder {
             content,
             translatedContent));
   }
-
-  private SessionMessageSubmitResponse toResponse(
-      long sessionId,
-      SessionHistoryMessage submittedMessage,
-      ProcessingStatus feedbackProcessingStatus,
-      MessageGenerationResult generationResult) {
-    return new SessionMessageSubmitResponse(
-        sessionId,
-        toSubmittedMessageResponse(submittedMessage, feedbackProcessingStatus),
-        toNextMessageResponse(generationResult.nextMessage()),
-        new SessionProgressResponse(
-            generationResult.nextMessage().getTurnNumber(),
-            AI_MESSAGE_SEQUENCE_IN_TURN,
-            generationResult.totalQuestionCount(),
-            generationResult.completed()));
-  }
-
-  private SubmittedMessageResponse toSubmittedMessageResponse(
-      SessionHistoryMessage message, ProcessingStatus feedbackProcessingStatus) {
-    return new SubmittedMessageResponse(
-        message.getId(),
-        message.getTurnNumber(),
-        message.getMessageSequence(),
-        message.getRole().name(),
-        feedbackProcessingStatus.name(),
-        message.getInnerThoughtProcessingStatus().name(),
-        message.getInnerThought(),
-        message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name());
-  }
-
-  private NextMessageResponse toNextMessageResponse(SessionHistoryMessage message) {
-    return new NextMessageResponse(
-        message.getId(),
-        message.getTurnNumber(),
-        message.getMessageSequence(),
-        message.getRole().name(),
-        message.getContent(),
-        message.getTranslatedContent());
-  }
-
-  private record MessageGenerationResult(
-      SessionHistoryMessage nextMessage, int totalQuestionCount, boolean completed) {}
 }

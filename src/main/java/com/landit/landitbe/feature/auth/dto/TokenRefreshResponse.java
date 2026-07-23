@@ -8,4 +8,16 @@ public record TokenRefreshResponse(
     String accessToken,
     long accessTokenExpiresIn,
     String refreshToken,
-    long refreshTokenExpiresIn) {}
+    long refreshTokenExpiresIn) {
+
+  /** 회전 발급한 토큰 값을 갱신 응답으로 변환한다. */
+  public static TokenRefreshResponse from(
+      String tokenType,
+      String accessToken,
+      long accessTokenExpiresIn,
+      String refreshToken,
+      long refreshTokenExpiresIn) {
+    return new TokenRefreshResponse(
+        tokenType, accessToken, accessTokenExpiresIn, refreshToken, refreshTokenExpiresIn);
+  }
+}

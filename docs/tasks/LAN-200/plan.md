@@ -287,7 +287,7 @@ git commit -m "refactor: 프로필과 학습 진행 소유권 분리"
 - Preserves: all existing HTTP paths and JSON contracts.
 - Produces: Controller의 전체 Mapping, Swagger docs interface, response record `from()`, request record `toEntity()`.
 
-- [ ] **Step 1: Controller 경로를 전체 경로로 변경한다**
+- [x] **Step 1: Controller 경로를 전체 경로로 변경한다**
 
 ```java
 @PostMapping("/api/v1/scenarios/{scenarioId}/sessions")
@@ -300,11 +300,11 @@ public ResponseEntity<ApiResponse<SessionStartResponse>> startScenarioSession(..
 
 클래스 레벨 `@RequestMapping`을 모두 제거한다.
 
-- [ ] **Step 2: LAN-102 Swagger 인터페이스 패턴을 모든 Controller에 적용한다**
+- [x] **Step 2: LAN-102 Swagger 인터페이스 패턴을 모든 Controller에 적용한다**
 
 Controller는 `*ControllerDocs`를 구현하고 Mapping 애너테이션만 소유한다. `@Operation`, `@ApiResponses`, `@Parameter`는 `docs` 인터페이스에 둔다.
 
-- [ ] **Step 3: 변환 코드를 record로 이동한다**
+- [x] **Step 3: 변환 코드를 record로 이동한다**
 
 ```java
 public static SessionInnerThoughtResponse from(SessionHistoryMessage message) {
@@ -319,7 +319,7 @@ public NpsResponse toEntity(Long userProfileId) {
 }
 ```
 
-- [ ] **Step 4: Controller와 Service의 변환 잔여물을 검사한다**
+- [x] **Step 4: Controller와 Service의 변환 잔여물을 검사한다**
 
 Run: `rg -n "toResponse|new .*Response\\(" src/main/java/com/landit/landitbe/feature/*/service`
 
@@ -329,13 +329,13 @@ Run: `rg -n "@RequestMapping" src/main/java/com/landit/landitbe/feature`
 
 Expected: 출력 없음.
 
-- [ ] **Step 5: API와 OpenAPI 테스트를 실행한다**
+- [x] **Step 5: API와 OpenAPI 테스트를 실행한다**
 
 Run: `./gradlew test --tests '*ApiIntegrationTests' --tests '*OpenApi*Tests'`
 
 Expected: 기존 API 계약과 OpenAPI 테스트 통과.
 
-- [ ] **Step 6: Controller와 변환 변경을 커밋한다**
+- [x] **Step 6: Controller와 변환 변경을 커밋한다**
 
 ```bash
 git add src/main/java src/test/java

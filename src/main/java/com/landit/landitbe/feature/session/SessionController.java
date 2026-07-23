@@ -22,11 +22,9 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 기존 학습 세션을 조작하는 API 요청을 처리한다. */
-@RequestMapping("/api/v1/sessions")
 @RequiredArgsConstructor
 @RestController
 public class SessionController implements SessionControllerDocs {
@@ -38,7 +36,7 @@ public class SessionController implements SessionControllerDocs {
 
   /** 사용자 발화를 저장하고 다음 AI 메시지를 생성한다. */
   @Override
-  @PostMapping("/{sessionId}/messages")
+  @PostMapping("/api/v1/sessions/{sessionId}/messages")
   public ResponseEntity<ApiResponse<SessionMessageSubmitResponse>> submitMessage(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @PathVariable Long sessionId,
@@ -50,7 +48,7 @@ public class SessionController implements SessionControllerDocs {
 
   /** 사용자 메시지의 상대 역할 속마음 처리 상태를 조회한다. */
   @Override
-  @GetMapping("/{sessionId}/messages/{messageId}/inner-thought")
+  @GetMapping("/api/v1/sessions/{sessionId}/messages/{messageId}/inner-thought")
   public ResponseEntity<ApiResponse<SessionInnerThoughtResponse>> getInnerThought(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @PathVariable Long sessionId,
@@ -62,7 +60,7 @@ public class SessionController implements SessionControllerDocs {
 
   /** 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다. */
   @Override
-  @PostMapping("/{sessionId}/feedback")
+  @PostMapping("/api/v1/sessions/{sessionId}/feedback")
   public ResponseEntity<ApiResponse<SessionFeedbackResponse>> getOrCreateFeedback(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
     return ApiResponse.success(
@@ -71,7 +69,7 @@ public class SessionController implements SessionControllerDocs {
 
   /** 진행 중인 학습 세션을 사용자가 중도 종료한다. */
   @Override
-  @PatchMapping("/{sessionId}/end")
+  @PatchMapping("/api/v1/sessions/{sessionId}/end")
   public ApiResponse<Void> endSession(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
     sessionEndUseCase.endSession(principal.userId(), sessionId);

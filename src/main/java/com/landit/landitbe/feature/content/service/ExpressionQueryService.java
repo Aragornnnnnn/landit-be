@@ -87,7 +87,8 @@ public class ExpressionQueryService {
 
     return expressions.stream()
         .map(
-            expression -> toResponse(expression, completedExpressionIds, firstUnlockedExpressionId))
+            expression ->
+                responseFor(expression, completedExpressionIds, firstUnlockedExpressionId))
         .toList();
   }
 
@@ -99,7 +100,7 @@ public class ExpressionQueryService {
             .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
 
-    return toLearningResponse(expression);
+    return ExpressionLearningResponse.from(expression);
   }
 
   /**
@@ -124,12 +125,8 @@ public class ExpressionQueryService {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
-    return new ExpressionPracticeResponse(
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
-        expression.getUsageDescription(),
-        extraPracticeSentences,
-        pickRandomWritingSentence(extraPracticeSentences));
+    return ExpressionPracticeResponse.from(
+        expression, extraPracticeSentences, pickRandomWritingSentence(extraPracticeSentences));
   }
 
   /**
@@ -150,14 +147,7 @@ public class ExpressionQueryService {
         continue;
       }
 
-      extraPracticeSentences.add(
-          new PracticeSentenceResponse(
-              node.get("sentenceText").asText(),
-              node.get("highlightingPart").asText(),
-              node.get("sentenceTranslation").asText(),
-              node.get("practiceQuestion").asText(),
-              node.get("practiceQuestionTranslation").asText(),
-              node.hasNonNull("imageUrl") ? node.get("imageUrl").asText() : null));
+      extraPracticeSentences.add(PracticeSentenceResponse.from(node));
     }
     return extraPracticeSentences;
   }
@@ -178,11 +168,7 @@ public class ExpressionQueryService {
     PracticeSentenceResponse picked =
         extraPracticeSentences.get(random.nextInt(extraPracticeSentences.size()));
 
-    return new WritingSentenceResponse(
-        picked.sentenceText(),
-        picked.sentenceTranslation(),
-        picked.practiceQuestion(),
-        picked.practiceQuestionTranslation());
+    return WritingSentenceResponse.from(picked);
   }
 
   /** 미완료 표현 중 학습 순서가 가장 앞선 표현의 ID를 반환한다. 모두 완료했으면 빈 값을 반환한다. */
@@ -195,7 +181,7 @@ public class ExpressionQueryService {
   }
 
   /** Writing 표현을 완료 여부와 잠김 여부를 계산한 응답으로 변환한다. */
-  private ExpressionResponse toResponse(
+  private ExpressionResponse responseFor(
       WritingExpression expression,
       Set<Long> completedExpressionIds,
       Optional<Long> firstUnlockedExpressionId) {
@@ -209,28 +195,6 @@ public class ExpressionQueryService {
     boolean completed = completedExpressionIds.contains(expression.getId());
     boolean locked = !completed && !isFirstUnlockedExpression;
 
-    return new ExpressionResponse(
-        expression.getId(),
-        expression.getDisplayOrder(),
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
-        completed,
-        locked);
-  }
-
-  /** Writing 표현 엔티티를 학습 시작 응답 DTO로 변환한다. */
-  private ExpressionLearningResponse toLearningResponse(WritingExpression expression) {
-    return new ExpressionLearningResponse(
-        expression.getId(),
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
-        expression.getUsageDescription(),
-        expression.getRepresentativeQuestionText(),
-        expression.getRepresentativeQuestionTranslation(),
-        expression.getRepresentativeSentenceText(),
-        expression.getRepresentativeSentenceTranslation(),
-        expression.getRepresentativeSentenceWords(),
-        expression.getRepresentativeSentenceWordChoices(),
-        expression.getRepresentativeImageUrl());
+    return ExpressionResponse.from(expression, completed, locked);
   }
 }

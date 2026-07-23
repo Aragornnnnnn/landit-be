@@ -72,7 +72,7 @@ public class AuthService {
     UserResult userResult = findOrCreateUser(userInfo, nickname);
     IssuedTokens issuedTokens = issueTokens(userResult.userProfile());
 
-    return new AuthTokenResponse(
+    return AuthTokenResponse.from(
         TOKEN_TYPE,
         issuedTokens.accessToken(),
         tokenProperties.accessExpiresInSeconds(),
@@ -97,7 +97,7 @@ public class AuthService {
 
     refreshToken.revoke(now);
     IssuedTokens issuedTokens = issueTokens(userProfile);
-    return new TokenRefreshResponse(
+    return TokenRefreshResponse.from(
         TOKEN_TYPE,
         issuedTokens.accessToken(),
         tokenProperties.accessExpiresInSeconds(),
@@ -172,13 +172,8 @@ public class AuthService {
 
   /** 내부 사용자 및 로그인 결과를 인증 API 응답 형식으로 변환한다. */
   private AuthUserResponse userResponse(UserResult userResult) {
-    UserProfile userProfile = userResult.userProfile();
-    return new AuthUserResponse(
-        userProfile.getId(),
-        userProfile.getNickname(),
-        userProfile.getEmail(),
-        userResult.provider().name(),
-        userResult.newUser());
+    return AuthUserResponse.from(
+        userResult.userProfile(), userResult.provider(), userResult.newUser());
   }
 
   /** Access token과 회전용 refresh token을 발급하고 refresh token 해시를 저장한다. */

@@ -9,4 +9,17 @@ public record AuthTokenResponse(
     long accessTokenExpiresIn,
     String refreshToken,
     long refreshTokenExpiresIn,
-    AuthUserResponse user) {}
+    AuthUserResponse user) {
+
+  /** 발급된 토큰과 사용자 정보를 로그인 응답으로 변환한다. */
+  public static AuthTokenResponse from(
+      String tokenType,
+      String accessToken,
+      long accessTokenExpiresIn,
+      String refreshToken,
+      long refreshTokenExpiresIn,
+      AuthUserResponse user) {
+    return new AuthTokenResponse(
+        tokenType, accessToken, accessTokenExpiresIn, refreshToken, refreshTokenExpiresIn, user);
+  }
+}

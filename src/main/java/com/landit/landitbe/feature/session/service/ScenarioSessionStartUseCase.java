@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgressStatus;
 import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
@@ -12,10 +11,8 @@ import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
-import com.landit.landitbe.feature.session.domain.SessionType;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse.CurrentMessageResponse;
-import com.landit.landitbe.feature.session.dto.SessionStartResponse.SessionProgressResponse;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
@@ -65,7 +62,7 @@ public class ScenarioSessionStartUseCase {
       currentMessage = saveAiOpeningMessage(learningSession.getId(), userProfile, startRow, now);
     }
 
-    return toStartResponse(learningSession, startRow, currentMessage);
+    return SessionStartResponse.from(learningSession, startRow, currentMessage);
   }
 
   /** 세션 시작 흐름을 직렬화할 수 있도록 활성 사용자 프로필을 쓰기 잠금으로 조회한다. */
@@ -171,7 +168,7 @@ public class ScenarioSessionStartUseCase {
     assertAiOpeningMessageConfigured(startRow);
     SessionHistoryMessage message =
         saveAiOpeningHistoryMessage(learningSessionId, userProfile, startRow, startedAt);
-    return toCurrentMessageResponse(message);
+    return CurrentMessageResponse.from(message);
   }
 
   /** AI first 시작 데이터가 비어 있으면 콘텐츠 설정 오류로 본다. */
@@ -204,43 +201,6 @@ public class ScenarioSessionStartUseCase {
                 startRow.aiOpeningInnerThought(),
                 startRow.aiOpeningInnerThoughtType()));
     return message;
-  }
-
-  /** 저장된 AI 시작 메시지를 세션 시작 응답의 현재 메시지 형식으로 변환한다. */
-  private CurrentMessageResponse toCurrentMessageResponse(SessionHistoryMessage message) {
-    return new CurrentMessageResponse(
-        message.getId(),
-        message.getTurnNumber(),
-        message.getMessageSequence(),
-        message.getRole().name(),
-        message.getContent(),
-        message.getTranslatedContent(),
-        message.getInnerThought(),
-        message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name());
-  }
-
-  /** FirstSpeaker에 맞춰 AI 메시지 또는 USER first 시작 안내만 응답에 담는다. */
-  private SessionStartResponse toStartResponse(
-      LearningSession learningSession,
-      ScenarioSessionStartProjection startRow,
-      CurrentMessageResponse currentMessage) {
-    String userOpeningInstruction = null;
-    if (startRow.firstSpeaker() == ConversationSpeaker.USER) {
-      userOpeningInstruction = startRow.userOpeningInstruction();
-    }
-    return new SessionStartResponse(
-        learningSession.getId(),
-        startRow.scenarioId(),
-        SessionType.SCENARIO.name(),
-        startRow.firstSpeaker().name(),
-        userOpeningInstruction,
-        TtsVoiceResponse.from(
-            startRow.ttsVoiceProvider(),
-            startRow.ttsVoiceModel(),
-            startRow.providerVoiceId(),
-            startRow.ttsVoiceGender()),
-        currentMessage,
-        new SessionProgressResponse(1, startRow.totalQuestionCount(), false));
   }
 
   /** 활성 상태가 아닌 카테고리와 시나리오 콘텐츠를 잠금 대상으로 판단한다. */
