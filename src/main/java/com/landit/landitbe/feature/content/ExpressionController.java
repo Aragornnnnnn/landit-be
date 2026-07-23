@@ -6,7 +6,7 @@ import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
-import com.landit.landitbe.feature.content.service.CompleteExpressionLearningUseCase;
+import com.landit.landitbe.feature.content.service.ExpressionLearningCompletionService;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExpressionController {
 
   private final ExpressionQueryService expressionQueryService;
-  private final CompleteExpressionLearningUseCase completeExpressionLearningUseCase;
+  private final ExpressionLearningCompletionService expressionLearningCompletionService;
 
   /**
    * 시나리오별 추가학습용 원어민 표현을 학습 순서대로 조회한다.
@@ -141,7 +141,7 @@ public class ExpressionController {
   @PostMapping("/{expressionId}/learning-finish")
   public ApiResponse<Map<String, Object>> finishLearning(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
-    completeExpressionLearningUseCase.completeLearning(principal.userId(), expressionId);
+    expressionLearningCompletionService.completeLearning(principal.userId(), expressionId);
     return ApiResponse.success(Map.of());
   }
 }

@@ -1,6 +1,6 @@
 // 서비스 사용자 프로필의 생명주기 상태를 정의한다.
 
-package com.landit.landitbe.feature.auth.domain;
+package com.landit.landitbe.feature.profile.domain;
 
 /** 서비스 사용자 프로필의 생명주기 상태를 정의한다. */
 public enum UserProfileStatus {

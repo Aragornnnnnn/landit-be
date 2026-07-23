@@ -1,6 +1,6 @@
 // 서비스 사용자 프로필과 학습 기본 설정을 저장한다.
 
-package com.landit.landitbe.feature.auth.domain;
+package com.landit.landitbe.feature.profile.domain;
 
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import com.landit.landitbe.shared.domain.Locale;

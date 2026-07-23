@@ -6,7 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.auth.TokenProperties;
-import com.landit.landitbe.feature.auth.domain.UserProfile;
+import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;

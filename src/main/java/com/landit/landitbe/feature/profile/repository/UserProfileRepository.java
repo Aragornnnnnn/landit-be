@@ -1,9 +1,9 @@
 // 사용자 프로필 엔티티를 PK와 상태 기준으로 조회한다.
 
-package com.landit.landitbe.feature.auth.repository;
+package com.landit.landitbe.feature.profile.repository;
 
-import com.landit.landitbe.feature.auth.domain.UserProfile;
-import com.landit.landitbe.feature.auth.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,7 +24,7 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
             select userProfile
             from UserProfile userProfile
             where userProfile.id = :id
-              and userProfile.status = com.landit.landitbe.feature.auth.domain.UserProfileStatus.ACTIVE
+              and userProfile.status = com.landit.landitbe.feature.profile.domain.UserProfileStatus.ACTIVE
       """)
   Optional<UserProfile> findActiveByIdForUpdate(@Param("id") Long id);
 

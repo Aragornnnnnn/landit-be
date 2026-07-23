@@ -19,16 +19,16 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.auth.service.UserLocale;
-import com.landit.landitbe.feature.auth.service.UserProfileService;
-import com.landit.landitbe.feature.content.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
-import com.landit.landitbe.feature.content.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.service.LearningProgressService;
+import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -58,7 +58,7 @@ class ExpressionQueryServiceTest {
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
 
-  @Mock private UserWritingExpressionCompletionRepository userWritingExpressionCompletionRepository;
+  @Mock private LearningProgressService learningProgressService;
 
   @InjectMocks private ExpressionQueryService expressionQueryService;
 
@@ -207,8 +207,7 @@ class ExpressionQueryServiceTest {
   private void givenCompletedExpressionIds(Long... completedExpressionIds) {
     List<UserWritingExpressionCompletion> completions =
         java.util.Arrays.stream(completedExpressionIds).map(this::completion).toList();
-    when(userWritingExpressionCompletionRepository.findAllByUserProfileIdAndScenarioId(
-            USER_ID, SCENARIO_ID))
+    when(learningProgressService.findExpressionCompletions(USER_ID, SCENARIO_ID))
         .thenReturn(completions);
   }
 

@@ -1,8 +1,8 @@
 // 사용자가 완료한 Writing 표현 기록을 사용자와 시나리오 기준으로 조회한다.
 
-package com.landit.landitbe.feature.content.repository;
+package com.landit.landitbe.feature.learning.repository;
 
-import com.landit.landitbe.feature.content.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

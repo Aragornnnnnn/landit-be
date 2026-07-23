@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.auth.domain;
 
+import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

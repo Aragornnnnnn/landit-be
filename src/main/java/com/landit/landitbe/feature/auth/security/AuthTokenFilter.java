@@ -2,9 +2,8 @@
 
 package com.landit.landitbe.feature.auth.security;
 
-import com.landit.landitbe.feature.auth.domain.UserProfileStatus;
-import com.landit.landitbe.feature.auth.repository.UserProfileRepository;
 import com.landit.landitbe.feature.auth.service.LanditTokenService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
@@ -26,16 +25,16 @@ public class AuthTokenFilter extends OncePerRequestFilter {
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final LanditTokenService tokenService;
-  private final UserProfileRepository userProfileRepository;
+  private final UserProfileService userProfileService;
   private final AuthFailureResponseWriter failureResponseWriter;
 
   /** 동작을 수행한다. */
   public AuthTokenFilter(
       LanditTokenService tokenService,
-      UserProfileRepository userProfileRepository,
+      UserProfileService userProfileService,
       AuthFailureResponseWriter failureResponseWriter) {
     this.tokenService = tokenService;
-    this.userProfileRepository = userProfileRepository;
+    this.userProfileService = userProfileService;
     this.failureResponseWriter = failureResponseWriter;
   }
 
@@ -57,7 +56,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
       failureResponseWriter.write(response, exception.getErrorCode());
       return;
     }
-    if (!userProfileRepository.existsByIdAndStatus(userId, UserProfileStatus.ACTIVE)) {
+    if (!userProfileService.existsActive(userId)) {
       SecurityContextHolder.clearContext();
       failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
       return;

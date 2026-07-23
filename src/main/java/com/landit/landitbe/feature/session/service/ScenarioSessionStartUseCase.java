@@ -2,12 +2,12 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.auth.domain.UserProfile;
-import com.landit.landitbe.feature.auth.repository.UserProfileRepository;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgressStatus;
 import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
+import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;

@@ -1,6 +1,6 @@
 // 사용자가 완료한 Writing 표현 기록을 저장한다.
 
-package com.landit.landitbe.feature.content.domain;
+package com.landit.landitbe.feature.learning.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

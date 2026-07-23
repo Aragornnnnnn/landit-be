@@ -3,17 +3,17 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.landit.landitbe.feature.auth.service.UserLocale;
-import com.landit.landitbe.feature.auth.service.UserProfileService;
-import com.landit.landitbe.feature.content.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
-import com.landit.landitbe.feature.content.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.service.LearningProgressService;
+import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -58,7 +58,7 @@ public class ExpressionQueryService {
   private final ScenarioService scenarioService;
   private final UserProfileService userProfileService;
   private final WritingExpressionRepository writingExpressionRepository;
-  private final UserWritingExpressionCompletionRepository userWritingExpressionCompletionRepository;
+  private final LearningProgressService learningProgressService;
 
   /** 시나리오별 Writing 표현 목록을 사용자 locale 기준 학습 순서대로 조회하고 완료 여부를 반영한다. */
   @Transactional(readOnly = true)
@@ -77,9 +77,7 @@ public class ExpressionQueryService {
 
     // 해당 유저가 클리어한 Writing 표현의 ID를 Set으로 수집한다.
     Set<Long> completedExpressionIds =
-        userWritingExpressionCompletionRepository
-            .findAllByUserProfileIdAndScenarioId(userId, scenarioId)
-            .stream()
+        learningProgressService.findExpressionCompletions(userId, scenarioId).stream()
             .map(UserWritingExpressionCompletion::getWritingExpressionId)
             .collect(Collectors.toSet());
 

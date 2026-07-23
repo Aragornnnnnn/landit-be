@@ -1,13 +1,13 @@
-// 원어민 표현 학습 완료 유스케이스를 처리한다.
+// 원어민 표현 학습 완료 흐름를 처리한다.
 
 package com.landit.landitbe.feature.content.service;
 
-import com.landit.landitbe.feature.auth.service.UserLocale;
-import com.landit.landitbe.feature.auth.service.UserProfileService;
-import com.landit.landitbe.feature.content.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
-import com.landit.landitbe.feature.content.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
+import com.landit.landitbe.feature.learning.service.LearningProgressService;
+import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -20,18 +20,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 원어민 표현 학습 완료 유스케이스를 처리한다. */
+/** 원어민 표현 학습 완료 흐름를 처리한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CompleteExpressionLearningUseCase {
+public class ExpressionLearningCompletionService {
 
   private static final String LOCKED_EXPRESSION_LOG =
       "표현 학습 완료 실패: 아직 잠긴 표현입니다. userId={}, expressionId={}";
 
   private final WritingExpressionRepository writingExpressionRepository;
   private final UserProfileService userProfileService;
-  private final UserWritingExpressionCompletionRepository userWritingExpressionCompletionRepository;
+  private final LearningProgressService learningProgressService;
 
   /**
    * 표현 학습 완료를 기록한다. 표현이 없거나 INACTIVE면 RESOURCE_NOT_FOUND. 이미 완료한 표현 -> lastCompletedAt 갱신 완료 안한 표현
@@ -51,7 +51,7 @@ public class CompleteExpressionLearningUseCase {
     Long scenarioId = expression.getScenarioId();
 
     List<UserWritingExpressionCompletion> completions =
-        userWritingExpressionCompletionRepository.findAllByUserProfileIdAndScenarioId(
+        learningProgressService.findExpressionCompletions(
             userId, scenarioId); // 유저가 해당 시나리오 관련 표현들 중에서 학습 완료한 것들을 리스트로 가져옴.
 
     // completions 리스트에서, writingExpressionId == expressionId인 걸 찾아서, 첫 번째로 찾은 걸 가져와라 (없으면 없다고 해라)
@@ -62,7 +62,7 @@ public class CompleteExpressionLearningUseCase {
 
     // 1. 만약에 이미 완료한 표현 리스트에 있는 경우라면, lastCompletedAt만 갱신하고 끝내라.
     if (existingCompletion.isPresent()) {
-      existingCompletion.get().markCompletedAgain();
+      learningProgressService.completeExpression(userId, scenarioId, expressionId);
       return;
     }
 
@@ -79,8 +79,7 @@ public class CompleteExpressionLearningUseCase {
     }
 
     // 3. 잠겨있지 않으면 완료 기록을 새로 생성해서 저장한다.
-    userWritingExpressionCompletionRepository.save(
-        new UserWritingExpressionCompletion(userId, scenarioId, expressionId));
+    learningProgressService.completeExpression(userId, scenarioId, expressionId);
   }
 
   /** 해당 표현이 지금 학습할 차례가 맞는지(=unlock상태인지) 사용자 locale 기준으로 판정한다. */

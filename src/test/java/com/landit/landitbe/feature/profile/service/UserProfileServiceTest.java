@@ -1,15 +1,16 @@
 // UserProfileService의 사용자 locale 조회를 단위 검증한다.
 
-package com.landit.landitbe.feature.auth.service;
+package com.landit.landitbe.feature.profile.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.landit.landitbe.feature.auth.domain.UserProfile;
-import com.landit.landitbe.feature.auth.domain.UserProfileStatus;
-import com.landit.landitbe.feature.auth.repository.UserProfileRepository;
+import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -29,6 +30,16 @@ class UserProfileServiceTest {
   @Mock private UserProfileRepository userProfileRepository;
 
   @InjectMocks private UserProfileService userProfileService;
+
+  /** 활성 프로필 조회가 Repository 결과를 그대로 반환하는지 검증한다. */
+  @Test
+  void requireActiveReturnsActiveProfile() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
+        .thenReturn(Optional.of(userProfile));
+
+    assertThat(userProfileService.requireActive(USER_ID)).isSameAs(userProfile);
+  }
 
   /** 활성 사용자의 학습 locale(target/base)을 프로필에서 그대로 반환하는지 검증한다. */
   @Test
