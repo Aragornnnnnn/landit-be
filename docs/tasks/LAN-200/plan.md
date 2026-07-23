@@ -104,13 +104,13 @@ git commit -m "docs: LAN-200 백엔드 구조 규칙 갱신"
 - Consumes: 기존 FQCN 전체.
 - Produces: `com.landit.landitbe.feature.*`, `com.landit.landitbe.config.*`, `com.landit.landitbe.shared.*`.
 
-- [ ] **Step 1: 패키지 이동 전 기준 테스트를 확인한다**
+- [x] **Step 1: 패키지 이동 전 기준 테스트를 확인한다**
 
 Run: `./gradlew check`
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 2: 기능 및 공통 패키지를 이동하고 FQCN을 일괄 변경한다**
+- [x] **Step 2: 기능 및 공통 패키지를 이동하고 FQCN을 일괄 변경한다**
 
 ```text
 com.landit.landitbe.<feature>  → com.landit.landitbe.feature.<feature>
@@ -119,14 +119,13 @@ com.landit.landitbe.common     → com.landit.landitbe.shared
 
 메인 애플리케이션 클래스와 Flyway 실행기는 `com.landit.landitbe` 루트에 유지한다.
 
-- [ ] **Step 3: 이동 누락을 검사한다**
+- [x] **Step 3: 이동 누락을 검사한다**
 
 Run: `find src/main/java/com/landit/landitbe -mindepth 1 -maxdepth 1 -type d | sort`
 
 Expected:
 
 ```text
-src/main/java/com/landit/landitbe/config
 src/main/java/com/landit/landitbe/feature
 src/main/java/com/landit/landitbe/shared
 ```
@@ -135,13 +134,13 @@ Run: `rg -n "com\\.landit\\.landitbe\\.(app|auth|character|common|content|learni
 
 Expected: 출력 없음.
 
-- [ ] **Step 4: 컴파일과 테스트를 검증한다**
+- [x] **Step 4: 컴파일과 테스트를 검증한다**
 
 Run: `./gradlew check`
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 5: 패키지 이동을 커밋한다**
+- [x] **Step 5: 패키지 이동을 커밋한다**
 
 ```bash
 git add src/main/java src/test/java
