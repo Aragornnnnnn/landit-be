@@ -81,6 +81,6 @@ public class UserLearningExpression extends BaseTimeEntity {
   @Column(name = "session_history_message_id")
   private Long sessionHistoryMessageId;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserLearningExpression() {}
 }

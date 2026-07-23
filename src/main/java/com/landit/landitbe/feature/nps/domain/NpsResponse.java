@@ -28,10 +28,16 @@ public class NpsResponse extends BaseCreatedAtEntity {
   @Column(name = "opinion_text", columnDefinition = "text")
   private String opinionText;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected NpsResponse() {}
 
-  /** 동작을 수행한다. */
+  /**
+   * 사용자의 NPS 응답을 생성한다.
+   *
+   * @param userProfileId 응답 사용자 ID
+   * @param score NPS 점수
+   * @param opinionText 선택 의견
+   */
   public NpsResponse(Long userProfileId, int score, String opinionText) {
     this.userProfileId = userProfileId;
     this.score = score;

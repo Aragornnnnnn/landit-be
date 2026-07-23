@@ -36,6 +36,6 @@ public class UserPushToken extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private UserPushTokenStatus status;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserPushToken() {}
 }

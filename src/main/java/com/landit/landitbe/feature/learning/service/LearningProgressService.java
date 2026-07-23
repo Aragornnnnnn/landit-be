@@ -24,14 +24,26 @@ public class LearningProgressService {
   private final UserScenarioProgressRepository userScenarioProgressRepository;
   private final UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
-  /** 사용자가 특정 시나리오에서 완료한 표현 기록을 조회한다. */
+  /**
+   * 사용자가 특정 시나리오에서 완료한 표현 기록을 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @return 완료한 표현 기록 목록
+   */
   @Transactional(readOnly = true)
   public List<UserWritingExpressionCompletion> findExpressionCompletions(
       Long userId, Long scenarioId) {
     return expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(userId, scenarioId);
   }
 
-  /** 표현을 처음 완료하거나 기존 완료 시각을 갱신한다. */
+  /**
+   * 표현을 처음 완료하거나 기존 완료 시각을 갱신한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @param expressionId 표현 ID
+   */
   @Transactional
   public void completeExpression(Long userId, Long scenarioId, Long expressionId) {
     findExpressionCompletions(userId, scenarioId).stream()
@@ -44,7 +56,14 @@ public class LearningProgressService {
                     new UserWritingExpressionCompletion(userId, scenarioId, expressionId)));
   }
 
-  /** 시나리오 시작 진행도를 생성하거나 최근 시작 시각을 갱신한다. */
+  /**
+   * 시나리오 시작 진행도를 생성하거나 최근 시작 시각을 갱신한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @param targetLocale 학습 대상 locale
+   * @param startedAt 시작 시각
+   */
   @Transactional
   public void startScenario(
       Long userId, Long scenarioId, Locale targetLocale, LocalDateTime startedAt) {
@@ -57,7 +76,17 @@ public class LearningProgressService {
                     UserScenarioProgress.start(userId, scenarioId, targetLocale, startedAt)));
   }
 
-  /** 시나리오 완료 결과와 최고 성과를 갱신한다. */
+  /**
+   * 시나리오 완료 결과와 최고 성과를 갱신한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @param targetLocale 학습 대상 locale
+   * @param starRating 별점
+   * @param nativeScore 원어민 유사도 점수
+   * @param endedAt 종료 시각
+   * @throws ApiException 시작 진행도가 없을 때
+   */
   @Transactional
   public void completeScenario(
       Long userId,

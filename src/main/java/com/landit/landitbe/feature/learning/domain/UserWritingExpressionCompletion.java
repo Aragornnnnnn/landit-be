@@ -36,7 +36,7 @@ public class UserWritingExpressionCompletion {
   @Column(name = "last_completed_at", nullable = false)
   private LocalDateTime lastCompletedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserWritingExpressionCompletion() {}
 
   /** 사용자가 특정 시나리오의 표현 학습을 완료했음을 기록하는 엔티티를 CREATE한다. */

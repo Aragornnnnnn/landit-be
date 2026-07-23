@@ -51,7 +51,7 @@ public class AppVersion extends BaseCreatedAtEntity {
   @Column(name = "released_at")
   private LocalDateTime releasedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected AppVersion() {}
 
   /** 최신 앱 버전명을 반환한다. */

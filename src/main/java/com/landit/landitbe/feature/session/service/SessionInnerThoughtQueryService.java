@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -25,7 +26,16 @@ public class SessionInnerThoughtQueryService {
   private final SessionHistoryService sessionHistoryService;
   private final SessionMessageService sessionMessageService;
 
-  /** 소유한 사용자 메시지의 속마음 처리 상태와 완료 결과를 반환한다. */
+  /**
+   * 소유한 사용자 메시지의 속마음 처리 상태와 완료 결과를 반환한다.
+   *
+   * @param userId 세션 소유자 ID
+   * @param sessionId 학습 세션 ID
+   * @param messageId 사용자 메시지 ID
+   * @return 속마음 처리 상태와 완료 결과
+   * @throws SessionException 세션에 접근할 수 없거나 사용자 메시지를 찾을 수 없을 때
+   * @throws ApiException 세션 히스토리를 찾을 수 없을 때
+   */
   @Transactional
   public SessionInnerThoughtResponse get(long userId, long sessionId, long messageId) {
     learningSessionService.findOwned(userId, sessionId);

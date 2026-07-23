@@ -16,11 +16,13 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
+@Slf4j
 class SessionFeedbackCompletionService {
 
   private final LearningSessionService learningSessionService;
@@ -48,6 +50,11 @@ class SessionFeedbackCompletionService {
     saveMessageFeedbacks(context, result, summaryFeedback.getId());
     completeSessionHistory(context, learningSession);
     completeScenarioProgress(context, learningSession, result.nativeScore(), starRating);
+    log.info(
+        "session feedback completed: userId={}, sessionId={}, summaryFeedbackId={}",
+        userId,
+        context.sessionId(),
+        summaryFeedback.getId());
     return summaryFeedback.getId();
   }
 

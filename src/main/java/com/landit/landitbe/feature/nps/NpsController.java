@@ -21,7 +21,11 @@ public class NpsController implements NpsControllerDocs {
 
   private final NpsService npsService;
 
-  /** 동작을 수행한다. */
+  /**
+   * NPS 제출 흐름을 처리할 Service를 주입받는다.
+   *
+   * @param npsService NPS Service
+   */
   public NpsController(NpsService npsService) {
     this.npsService = npsService;
   }

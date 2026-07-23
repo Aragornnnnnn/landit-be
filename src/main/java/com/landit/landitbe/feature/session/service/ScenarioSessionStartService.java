@@ -21,12 +21,14 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 시나리오 세션 시작 흐름을 조율한다. */
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class ScenarioSessionStartService {
 
   private static final String PREVIOUS_SCENARIO_NOT_COMPLETED = "PREVIOUS_SCENARIO_NOT_COMPLETED";
@@ -38,7 +40,14 @@ public class ScenarioSessionStartService {
   private final SessionHistoryService sessionHistoryService;
   private final SessionMessageService sessionMessageService;
 
-  /** 선택한 시나리오로 학습 세션을 시작한다. */
+  /**
+   * 선택한 시나리오의 접근 조건을 검증하고 학습 세션을 시작한다.
+   *
+   * @param userId 세션을 시작할 사용자 ID
+   * @param scenarioId 학습할 시나리오 ID
+   * @return 생성된 세션과 첫 메시지 정보
+   * @throws ApiException 시나리오가 없거나 잠겨 있거나 시작 조건을 충족하지 못했을 때
+   */
   @Transactional
   public SessionStartResponse startScenarioSession(long userId, long scenarioId) {
     UserProfile userProfile = findActiveUser(userId);
@@ -53,7 +62,14 @@ public class ScenarioSessionStartService {
       currentMessage = saveAiOpeningMessage(learningSession.getId(), userProfile, startRow, now);
     }
 
-    return SessionStartResponse.from(learningSession, startRow, currentMessage);
+    SessionStartResponse response =
+        SessionStartResponse.from(learningSession, startRow, currentMessage);
+    log.info(
+        "scenario session started: userId={}, scenarioId={}, sessionId={}",
+        userId,
+        scenarioId,
+        learningSession.getId());
+    return response;
   }
 
   /** 세션 시작 흐름을 직렬화할 수 있도록 활성 사용자 프로필을 쓰기 잠금으로 조회한다. */

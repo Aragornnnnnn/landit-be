@@ -64,7 +64,7 @@ public class SessionHistoryMessageFeedback extends BaseTimeEntity {
   @Column(name = "benchmark_message", columnDefinition = "text")
   private String benchmarkMessage;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected SessionHistoryMessageFeedback() {}
 
   private SessionHistoryMessageFeedback(

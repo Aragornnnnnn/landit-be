@@ -6,7 +6,13 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** 사용자 메시지의 상대 역할 속마음 조회 응답을 정의한다. */
+/**
+ * 사용자 메시지의 상대 역할 속마음 조회 응답을 정의한다.
+ *
+ * @param processingStatus 속마음 처리 상태
+ * @param innerThought 상대 역할의 속마음. COMPLETED에서만 제공
+ * @param innerThoughtType 속마음 유형. COMPLETED에서만 제공
+ */
 @Schema(description = "사용자 메시지 속마음 조회 응답")
 public record SessionInnerThoughtResponse(
     @Schema(

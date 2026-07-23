@@ -66,10 +66,16 @@ public class UserProfile extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private UserProfileStatus status;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserProfile() {}
 
-  /** 동작을 수행한다. */
+  /**
+   * 기본 학습 설정을 가진 활성 사용자 프로필을 생성한다.
+   *
+   * @param email 사용자 이메일
+   * @param nickname 사용자 닉네임
+   * @param aiTutorId 기본 AI 튜터 ID
+   */
   public UserProfile(String email, String nickname, Long aiTutorId) {
     this.email = email;
     this.nickname = nickname;

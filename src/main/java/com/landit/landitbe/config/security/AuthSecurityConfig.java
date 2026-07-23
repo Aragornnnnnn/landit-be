@@ -35,7 +35,12 @@ public class AuthSecurityConfig {
   private final AuthTokenFilter authTokenFilter;
   private final AuthFailureResponseWriter failureResponseWriter;
 
-  /** 동작을 수행한다. */
+  /**
+   * 인증 필터와 실패 응답 작성기를 주입받아 보안 설정을 구성한다.
+   *
+   * @param authTokenFilter Bearer 토큰 인증 필터
+   * @param failureResponseWriter 인증 실패 응답 작성기
+   */
   public AuthSecurityConfig(
       AuthTokenFilter authTokenFilter, AuthFailureResponseWriter failureResponseWriter) {
     this.authTokenFilter = authTokenFilter;

@@ -36,7 +36,11 @@ public class LanditTokenService {
   private final TokenProperties properties;
   private final ObjectMapper objectMapper;
 
-  /** 동작을 수행한다. */
+  /**
+   * 토큰 서명 설정으로 자체 토큰 Service를 구성한다.
+   *
+   * @param properties access token과 refresh token 설정
+   */
   public LanditTokenService(TokenProperties properties) {
     this.properties = properties;
     this.objectMapper = new ObjectMapper();

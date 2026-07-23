@@ -8,9 +8,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
+import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
-import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -37,8 +37,8 @@ class LearningSessionServiceTest {
     when(repository.existsById(10L)).thenReturn(true);
 
     assertThatThrownBy(() -> service.findOwned(1L, 10L))
-        .isInstanceOf(ApiException.class)
+        .isInstanceOf(SessionException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.FORBIDDEN);
+        .isEqualTo(SessionErrorCode.FORBIDDEN);
   }
 }

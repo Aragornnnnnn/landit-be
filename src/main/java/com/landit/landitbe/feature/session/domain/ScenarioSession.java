@@ -34,7 +34,7 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "goal_completion_status", length = 20)
   private GoalCompletionStatus goalCompletionStatus;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected ScenarioSession() {}
 
   private ScenarioSession(

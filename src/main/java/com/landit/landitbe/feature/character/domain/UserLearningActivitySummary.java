@@ -52,6 +52,6 @@ public class UserLearningActivitySummary extends BaseTimeEntity {
   @Column(name = "last_activity_date")
   private LocalDate lastActivityDate;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserLearningActivitySummary() {}
 }

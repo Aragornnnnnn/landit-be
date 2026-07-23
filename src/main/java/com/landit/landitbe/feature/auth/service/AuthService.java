@@ -25,11 +25,13 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** OIDC 검증 결과를 바탕으로 사용자를 가입 또는 갱신하고 자체 토큰을 발급한다. */
 @Service
+@Slf4j
 public class AuthService {
 
   private static final String TOKEN_TYPE = "Bearer";
@@ -45,7 +47,17 @@ public class AuthService {
   private final LanditTokenService tokenService;
   private final TokenProperties tokenProperties;
 
-  /** 동작을 수행한다. */
+  /**
+   * 로그인부터 토큰 발급까지 필요한 인증 협력 객체를 주입받는다.
+   *
+   * @param userProfileService 사용자 프로필 Service
+   * @param aiTutorService AI 튜터 Service
+   * @param oauthIdentityRepository OAuth 연결 Repository
+   * @param refreshTokenRepository Refresh token Repository
+   * @param oidcTokenVerifier OIDC ID Token 검증기
+   * @param tokenService 자체 토큰 Service
+   * @param tokenProperties 자체 토큰 설정
+   */
   public AuthService(
       UserProfileService userProfileService,
       AiTutorService aiTutorService,
@@ -63,7 +75,13 @@ public class AuthService {
     this.tokenProperties = tokenProperties;
   }
 
-  /** 소셜 로그인 요청을 처리하고 자체 access token과 refresh token을 발급한다. */
+  /**
+   * 소셜 로그인 요청을 처리하고 자체 access token과 refresh token을 발급한다.
+   *
+   * @param request OIDC ID Token과 로그인 부가 정보
+   * @return 자체 토큰과 로그인 사용자 정보
+   * @throws ApiException OIDC 검증에 실패하거나 활성 AI 튜터가 없을 때
+   */
   @Transactional
   public AuthTokenResponse socialLogin(SocialLoginRequest request) {
     SocialProvider provider = SocialProvider.from(request.provider());
@@ -72,16 +90,29 @@ public class AuthService {
     UserResult userResult = findOrCreateUser(userInfo, nickname);
     IssuedTokens issuedTokens = issueTokens(userResult.userProfile());
 
-    return AuthTokenResponse.from(
-        TOKEN_TYPE,
-        issuedTokens.accessToken(),
-        tokenProperties.accessExpiresInSeconds(),
-        issuedTokens.refreshToken(),
-        tokenProperties.refreshExpiresInSeconds(),
-        userResponse(userResult));
+    AuthTokenResponse response =
+        AuthTokenResponse.from(
+            TOKEN_TYPE,
+            issuedTokens.accessToken(),
+            tokenProperties.accessExpiresInSeconds(),
+            issuedTokens.refreshToken(),
+            tokenProperties.refreshExpiresInSeconds(),
+            userResponse(userResult));
+    log.info(
+        "social login completed: userId={}, provider={}, newUser={}",
+        userResult.userProfile().getId(),
+        provider,
+        userResult.newUser());
+    return response;
   }
 
-  /** Refresh token을 회전하고 새 자체 토큰을 발급한다. */
+  /**
+   * Refresh token을 회전하고 새 자체 토큰을 발급한다.
+   *
+   * @param request 기존 Refresh token
+   * @return 새 access token과 Refresh token
+   * @throws ApiException Refresh token이 없거나 만료 또는 폐기됐을 때
+   */
   @Transactional
   public TokenRefreshResponse refresh(TokenRefreshRequest request) {
     LocalDateTime now = LocalDateTime.now();
@@ -97,23 +128,36 @@ public class AuthService {
 
     refreshToken.revoke(now);
     IssuedTokens issuedTokens = issueTokens(userProfile);
-    return TokenRefreshResponse.from(
-        TOKEN_TYPE,
-        issuedTokens.accessToken(),
-        tokenProperties.accessExpiresInSeconds(),
-        issuedTokens.refreshToken(),
-        tokenProperties.refreshExpiresInSeconds());
+    TokenRefreshResponse response =
+        TokenRefreshResponse.from(
+            TOKEN_TYPE,
+            issuedTokens.accessToken(),
+            tokenProperties.accessExpiresInSeconds(),
+            issuedTokens.refreshToken(),
+            tokenProperties.refreshExpiresInSeconds());
+    log.info("auth token refreshed: userId={}", userProfile.getId());
+    return response;
   }
 
-  /** 전달받은 refresh token을 폐기한다. */
+  /**
+   * 전달받은 Refresh token을 폐기한다.
+   *
+   * @param request 폐기할 Refresh token
+   */
   @Transactional
   public void logout(LogoutRequest request) {
     refreshTokenRepository
         .findByTokenHash(tokenService.hashToken(request.refreshToken()))
         .ifPresent(refreshToken -> refreshToken.revoke(LocalDateTime.now()));
+    log.info("logout request completed");
   }
 
-  /** 현재 사용자를 탈퇴 처리하고 활성 refresh token을 모두 폐기한다. */
+  /**
+   * 현재 사용자를 탈퇴 처리하고 활성 Refresh token을 모두 폐기한다.
+   *
+   * @param userId 탈퇴할 사용자 ID
+   * @throws ApiException 활성 사용자를 찾을 수 없을 때
+   */
   @Transactional
   public void withdraw(Long userId) {
     UserProfile userProfile = userProfileService.requireActive(userId);
@@ -122,6 +166,7 @@ public class AuthService {
         .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.ACTIVE)
         .forEach(OauthIdentity::unlink);
     userProfile.withdraw();
+    log.info("user withdrawal completed: userId={}", userId);
   }
 
   /** 소셜 제공자별 닉네임 제공 방식 차이를 프로필에 저장할 값으로 정규화한다. */

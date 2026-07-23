@@ -25,6 +25,6 @@ public class FreeTalkSession extends BaseTimeEntity {
   @Column(length = 255)
   private String title;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSession() {}
 }

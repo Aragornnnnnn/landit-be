@@ -10,7 +10,18 @@ import com.landit.landitbe.feature.session.repository.projection.ScenarioSession
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** 시나리오 세션 시작 API의 응답 구조를 정의한다. */
+/**
+ * 시나리오 세션 시작 API의 응답 구조를 정의한다.
+ *
+ * @param sessionId 생성된 학습 세션 ID
+ * @param scenarioId 시나리오 ID
+ * @param sessionType 세션 타입
+ * @param firstSpeaker 첫 발화자
+ * @param userOpeningInstruction USER first 시 사용자 시작 안내
+ * @param ttsVoice 활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null
+ * @param currentMessage AI first 시 생성된 현재 메시지
+ * @param progress 세션 진행도
+ */
 @Schema(description = "시나리오 세션 시작 응답")
 public record SessionStartResponse(
     @Schema(description = "생성된 학습 세션 ID") Long sessionId,
@@ -46,7 +57,18 @@ public record SessionStartResponse(
         SessionProgressResponse.from(startProjection));
   }
 
-  /** 내부 타입을 정의한다. */
+  /**
+   * 내부 타입을 정의한다.
+   *
+   * @param messageId 메시지 ID
+   * @param turnNumber 턴 번호
+   * @param messageSequence 세션 히스토리 안 메시지 순서
+   * @param role 발화 주체
+   * @param content 메시지 본문
+   * @param translatedContent 기준 locale 번역
+   * @param innerThought 첫 화면에 보여줄 상대 역할의 속마음
+   * @param innerThoughtType 속마음 유형
+   */
   @Schema(description = "현재 메시지 응답")
   public record CurrentMessageResponse(
       @Schema(description = "메시지 ID") Long messageId,
@@ -72,7 +94,13 @@ public record SessionStartResponse(
     }
   }
 
-  /** 내부 타입을 정의한다. */
+  /**
+   * 내부 타입을 정의한다.
+   *
+   * @param currentTurnNumber 현재 턴 번호
+   * @param totalQuestionCount 고정 질문 개수
+   * @param completed 세션 완료 여부
+   */
   @Schema(description = "세션 진행도 응답")
   public record SessionProgressResponse(
       @Schema(description = "현재 턴 번호") int currentTurnNumber,

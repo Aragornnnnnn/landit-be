@@ -4,7 +4,16 @@ package com.landit.landitbe.feature.session.client.ai;
 
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 
-/** AI 대화 생성 요청에 포함할 시나리오 컨텍스트를 담는다. */
+/**
+ * AI 대화 생성 요청에 포함할 시나리오 컨텍스트를 담는다.
+ *
+ * @param scenarioId 시나리오 ID
+ * @param title 제목
+ * @param briefing 시나리오 설명
+ * @param conversationGoal 대화 목표
+ * @param counterpartRole 상대 발화자 역할
+ * @param serviceAudience AI 서비스 대상 사용자군
+ */
 public record AiScenarioContext(
     Long scenarioId,
     String title,

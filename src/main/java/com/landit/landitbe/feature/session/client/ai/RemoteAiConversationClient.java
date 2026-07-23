@@ -39,7 +39,12 @@ public class RemoteAiConversationClient implements AiConversationClient {
   private final JsonMapper jsonMapper;
   private final AiClientProperties properties;
 
-  /** 동작을 수행한다. */
+  /**
+   * JSON 변환기와 AI 서버 설정으로 원격 클라이언트를 구성한다.
+   *
+   * @param jsonMapper AI 요청과 응답 JSON 변환기
+   * @param properties AI 서버 연결 설정
+   */
   public RemoteAiConversationClient(JsonMapper jsonMapper, AiClientProperties properties) {
     this.jsonMapper = jsonMapper;
     this.properties = properties;

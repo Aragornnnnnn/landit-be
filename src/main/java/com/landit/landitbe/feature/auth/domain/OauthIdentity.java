@@ -43,10 +43,17 @@ public class OauthIdentity extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private OauthIdentityStatus status;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected OauthIdentity() {}
 
-  /** 동작을 수행한다. */
+  /**
+   * 활성 OAuth 연결 정보를 생성한다.
+   *
+   * @param userProfile 연결할 사용자 프로필
+   * @param provider 소셜 로그인 제공자
+   * @param providerUserId 제공자가 발급한 사용자 식별자
+   * @param providerEmail 제공자에서 받은 이메일
+   */
   public OauthIdentity(
       UserProfile userProfile,
       SocialProvider provider,

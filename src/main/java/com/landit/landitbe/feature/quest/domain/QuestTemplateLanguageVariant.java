@@ -35,6 +35,6 @@ public class QuestTemplateLanguageVariant extends BaseTimeEntity {
   @Column(columnDefinition = "text")
   private String description;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected QuestTemplateLanguageVariant() {}
 }

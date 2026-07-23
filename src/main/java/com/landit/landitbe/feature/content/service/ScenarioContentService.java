@@ -16,7 +16,15 @@ public class ScenarioContentService {
 
   private final ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
 
-  /** 시나리오의 활성 고정 질문을 순서와 언어 조합으로 조회한다. */
+  /**
+   * 시나리오의 활성 고정 질문을 순서와 언어 조합으로 조회한다.
+   *
+   * @param scenarioId 시나리오 ID
+   * @param displayOrder 질문 순서
+   * @param targetLocale 학습 대상 locale
+   * @param baseLocale 기준 locale
+   * @return 조건에 맞는 질문 Projection
+   */
   public Optional<ScenarioQuestionProjection> findActiveQuestion(
       long scenarioId, int displayOrder, Locale targetLocale, Locale baseLocale) {
     return scenarioQuestionQueryRepository.findActiveQuestion(

@@ -55,7 +55,7 @@ public class UserScenarioProgress extends BaseTimeEntity {
   @Column(name = "last_played_at")
   private LocalDateTime lastPlayedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserScenarioProgress() {}
 
   private UserScenarioProgress(

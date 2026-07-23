@@ -65,7 +65,7 @@ public class LearningSession extends BaseTimeEntity {
   @Column(name = "ended_at")
   private LocalDateTime endedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected LearningSession() {}
 
   private LearningSession(

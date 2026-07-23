@@ -32,6 +32,6 @@ public class AiTutorLanguageVariant extends BaseTimeEntity {
   @Column(name = "display_name", nullable = false, length = 100)
   private String displayName;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected AiTutorLanguageVariant() {}
 }

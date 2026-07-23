@@ -28,7 +28,13 @@ public class AuthTokenFilter extends OncePerRequestFilter {
   private final UserProfileService userProfileService;
   private final AuthFailureResponseWriter failureResponseWriter;
 
-  /** 동작을 수행한다. */
+  /**
+   * 토큰 검증과 활성 사용자 확인에 필요한 협력 객체를 주입받는다.
+   *
+   * @param tokenService 자체 access token Service
+   * @param userProfileService 활성 사용자 확인 Service
+   * @param failureResponseWriter 인증 실패 응답 작성기
+   */
   public AuthTokenFilter(
       LanditTokenService tokenService,
       UserProfileService userProfileService,

@@ -445,7 +445,7 @@ git commit -m "refactor: 세션 Repository 소유 Service 통합"
 - Produces: 기능별 예상 오류와 민감정보를 제외한 상태 변경 로그.
 - Preserves: HTTP status and error response schema.
 
-- [ ] **Step 1: 기능 예외의 HTTP 변환 테스트를 작성한다**
+- [x] **Step 1: 기능 예외의 HTTP 변환 테스트를 작성한다**
 
 ```java
 @Test
@@ -457,7 +457,7 @@ void handlesSessionException() {
 }
 ```
 
-- [ ] **Step 2: 상태 변경 Service에 안전한 로그를 추가한다**
+- [x] **Step 2: 상태 변경 Service에 안전한 로그를 추가한다**
 
 ```java
 log.info("scenario session started: userId={}, scenarioId={}, sessionId={}",
@@ -466,11 +466,11 @@ log.info("scenario session started: userId={}, scenarioId={}, sessionId={}",
 
 Token, 이메일, 사용자 메시지 원문과 전체 Request Body는 기록하지 않는다.
 
-- [ ] **Step 3: 공개 API에 계약 중심 Javadoc을 작성한다**
+- [x] **Step 3: 공개 API에 계약 중심 Javadoc을 작성한다**
 
 파라미터가 있는 공개 메서드는 `@param`, 반환값이 있으면 `@return`, 호출자가 처리할 기능 예외가 있으면 `@throws`를 작성한다. record는 구성 요소별 `@param`을 작성한다.
 
-- [ ] **Step 4: Javadoc과 로그를 검사한다**
+- [x] **Step 4: Javadoc과 로그를 검사한다**
 
 Run: `./gradlew checkstyleMain checkstyleTest`
 
@@ -480,7 +480,7 @@ Run: `rg -n "log\\.(info|warn|error).*?(token|email|content|message)" src/main/j
 
 Expected: 민감 값 원문을 기록하는 로그 없음.
 
-- [ ] **Step 5: 전체 검사를 실행하고 커밋한다**
+- [x] **Step 5: 전체 검사를 실행하고 커밋한다**
 
 Run: `./gradlew check`
 

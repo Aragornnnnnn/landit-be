@@ -9,7 +9,11 @@ public final class FlywayMigrationRunner {
 
   private FlywayMigrationRunner() {}
 
-  /** 동작을 수행한다. */
+  /**
+   * 환경 변수의 데이터베이스 접속 정보로 Flyway 마이그레이션을 실행한다.
+   *
+   * @param args 실행 인자
+   */
   public static void main(String[] args) {
     Flyway.configure()
         .dataSource(requiredEnv("DB_URL"), requiredEnv("DB_USERNAME"), requiredEnv("DB_PASSWORD"))

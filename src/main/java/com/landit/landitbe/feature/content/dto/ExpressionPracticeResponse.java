@@ -6,7 +6,15 @@ import com.landit.landitbe.feature.content.domain.WritingExpression;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
-/** 원어민 표현 학습 중 추가 예문 조회 응답을 표현한다. */
+/**
+ * 원어민 표현 학습 중 추가 예문 조회 응답을 표현한다.
+ *
+ * @param targetExpressionText 타겟 표현
+ * @param baseExpressionMeaningText 타겟 표현 뜻
+ * @param usageDescription 표현 상세 설명
+ * @param practiceSentence 추가 예문 목록
+ * @param writingSentence 작문 연습에 사용할 문제. practiceSentence 중 랜덤 1개
+ */
 @Schema(description = "원어민 표현 추가 예문 조회 응답")
 public record ExpressionPracticeResponse(
     @Schema(description = "타겟 표현", example = "blow my mind") String targetExpressionText,

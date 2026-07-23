@@ -38,6 +38,6 @@ public class ReviewItemResult extends BaseCreatedAtEntity {
   @Column(name = "answer_payload", columnDefinition = "jsonb")
   private JsonNode answerPayload;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected ReviewItemResult() {}
 }

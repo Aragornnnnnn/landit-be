@@ -8,6 +8,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
+import com.landit.landitbe.feature.profile.exception.UserProfileException;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
+import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
@@ -68,6 +72,23 @@ class GlobalExceptionHandlerTests {
 
     assertError(response, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 값이 올바르지 않습니다.");
     assertThat(errorLogs()).isEmpty();
+  }
+
+  @Test
+  void sessionExceptionUsesFeatureStatusAndCode() {
+    ResponseEntity<ApiResponse<Void>> response =
+        handler.handleFeatureException(new SessionException(SessionErrorCode.SESSION_NOT_FOUND));
+
+    assertError(response, HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "세션을 찾을 수 없습니다.");
+  }
+
+  @Test
+  void userProfileExceptionUsesFeatureStatusAndCode() {
+    ResponseEntity<ApiResponse<Void>> response =
+        handler.handleFeatureException(
+            new UserProfileException(UserProfileErrorCode.INVALID_TOKEN));
+
+    assertError(response, HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", "유효하지 않은 토큰입니다.");
   }
 
   @Test

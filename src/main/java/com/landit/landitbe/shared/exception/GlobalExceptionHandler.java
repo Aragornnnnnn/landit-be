@@ -32,6 +32,18 @@ public class GlobalExceptionHandler {
         .body(ApiResponse.error(exception.getErrorCode(), exception.getMessage()));
   }
 
+  /**
+   * 기능 모듈에서 의도한 예외를 해당 오류 코드와 HTTP 상태로 변환한다.
+   *
+   * @param exception 기능 모듈 예외
+   * @return 기능별 오류 응답
+   */
+  @ExceptionHandler(FeatureException.class)
+  public ResponseEntity<ApiResponse<Void>> handleFeatureException(FeatureException exception) {
+    return ResponseEntity.status(exception.getStatus())
+        .body(ApiResponse.error(exception.getCode(), exception.getMessage()));
+  }
+
   /** 요청 본문 Bean Validation 실패를 공통 검증 오류로 변환한다. */
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValid(

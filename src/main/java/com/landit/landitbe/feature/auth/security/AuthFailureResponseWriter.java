@@ -17,7 +17,7 @@ public class AuthFailureResponseWriter {
 
   private final ObjectMapper objectMapper;
 
-  /** 동작을 수행한다. */
+  /** 인증 실패 응답을 JSON으로 직렬화할 작성기를 생성한다. */
   public AuthFailureResponseWriter() {
     this.objectMapper = new ObjectMapper();
   }

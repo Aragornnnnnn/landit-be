@@ -34,8 +34,11 @@ public class ExpressionLearningCompletionService {
   private final LearningProgressService learningProgressService;
 
   /**
-   * 표현 학습 완료를 기록한다. 표현이 없거나 INACTIVE면 RESOURCE_NOT_FOUND. 이미 완료한 표현 -> lastCompletedAt 갱신 완료 안한 표현
-   * -> 2가지 분기를 탐. 1. 잠겨있으면 EXPRESSION_LOCKED 에러, 2. 잠겨있지 않으면 완료 기록 생성후 DB에 저장.
+   * 학습 순서에 맞는 활성 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
+   *
+   * @param userId 학습 사용자 ID
+   * @param expressionId 완료할 표현 ID
+   * @throws ApiException 표현이 없거나 아직 잠겨 있을 때
    */
   @Transactional
   public void completeLearning(Long userId, Long expressionId) {
@@ -80,6 +83,7 @@ public class ExpressionLearningCompletionService {
 
     // 3. 잠겨있지 않으면 완료 기록을 새로 생성해서 저장한다.
     learningProgressService.completeExpression(userId, scenarioId, expressionId);
+    log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
 
   /** 해당 표현이 지금 학습할 차례가 맞는지(=unlock상태인지) 사용자 locale 기준으로 판정한다. */

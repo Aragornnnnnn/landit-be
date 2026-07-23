@@ -24,7 +24,11 @@ public class AuthController implements AuthControllerDocs {
 
   private final AuthService authService;
 
-  /** 동작을 수행한다. */
+  /**
+   * 인증 요청 흐름을 처리할 Service를 주입받는다.
+   *
+   * @param authService 인증 Service
+   */
   public AuthController(AuthService authService) {
     this.authService = authService;
   }

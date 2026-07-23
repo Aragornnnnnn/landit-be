@@ -1,4 +1,4 @@
-// 사용자 발화 제출과 AI 후속 메시지 저장 유스케이스를 처리한다.
+// 사용자 발화 제출과 AI 후속 메시지 저장 흐름을 처리한다.
 
 package com.landit.landitbe.feature.session.service;
 
@@ -53,7 +53,15 @@ public class SessionMessageSubmitService {
     this.taskExecutor = taskExecutor;
   }
 
-  /** 사용자 발화를 저장하고 AI 후속 메시지까지 저장한 뒤 응답한다. */
+  /**
+   * 사용자 발화를 저장하고 AI 후속 메시지 생성과 저장을 조율한다.
+   *
+   * @param userId 세션 소유자 ID
+   * @param sessionId 발화를 제출할 학습 세션 ID
+   * @param request 사용자 발화와 입력 방식
+   * @return 저장된 사용자 발화와 AI 후속 메시지
+   * @throws RuntimeException AI 생성 또는 결과 저장에 실패했을 때
+   */
   public SessionMessageSubmitResponse submitMessage(
       long userId, long sessionId, SessionMessageSubmitRequest request) {
     String content = request.normalizedContent();
@@ -75,6 +83,14 @@ public class SessionMessageSubmitService {
                   generatedMessageService.record(
                       submittedContext, generation, feedbackProcessingStatus));
       recordInnerThoughtAfterMessageGeneration(asyncGenerationRequests);
+      log.info(
+          "session message submitted: userId={}, sessionId={}, messageId={}, "
+              + "inputType={}, contentLength={}",
+          userId,
+          sessionId,
+          response.submittedMessage().messageId(),
+          inputType,
+          content.length());
       return response;
     } catch (RuntimeException exception) {
       // AI 생성이나 결과 저장 실패 시 제출 메시지를 제거해 부분 히스토리를 막는다.

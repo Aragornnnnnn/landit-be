@@ -27,6 +27,6 @@ public class UserCharacter extends BaseTimeEntity {
   @Column(name = "last_stage_up_at")
   private LocalDateTime lastStageUpAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserCharacter() {}
 }

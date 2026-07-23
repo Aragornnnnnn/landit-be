@@ -41,10 +41,16 @@ public class RefreshToken extends BaseTimeEntity {
   @Column(name = "revoked_at")
   private LocalDateTime revokedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected RefreshToken() {}
 
-  /** 동작을 수행한다. */
+  /**
+   * 활성 Refresh token 저장 정보를 생성한다.
+   *
+   * @param userProfile 토큰 소유자
+   * @param tokenHash 원문을 저장하지 않기 위한 토큰 해시
+   * @param expiresAt 토큰 만료 시각
+   */
   public RefreshToken(UserProfile userProfile, String tokenHash, LocalDateTime expiresAt) {
     this.userProfile = userProfile;
     this.tokenHash = tokenHash;

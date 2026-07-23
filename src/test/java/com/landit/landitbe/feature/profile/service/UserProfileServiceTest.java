@@ -10,10 +10,10 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
+import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.shared.domain.Locale;
-import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,8 +68,8 @@ class UserProfileServiceTest {
 
     // when & then
     assertThatThrownBy(() -> userProfileService.getUserLocale(USER_ID))
-        .isInstanceOf(ApiException.class)
+        .isInstanceOf(UserProfileException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_TOKEN);
+        .isEqualTo(UserProfileErrorCode.INVALID_TOKEN);
   }
 }

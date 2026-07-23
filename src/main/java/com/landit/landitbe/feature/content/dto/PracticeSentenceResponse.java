@@ -5,7 +5,16 @@ package com.landit.landitbe.feature.content.dto;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** 추가 예문 조회 응답의 예문 1건을 표현한다. */
+/**
+ * 추가 예문 조회 응답의 예문 1건을 표현한다.
+ *
+ * @param sentenceText 예문 텍스트
+ * @param highlightingPart 예문 중 강조 표시할 부분(타겟 표현이 활용된 구간)
+ * @param sentenceTranslation 예문 해석
+ * @param practiceQuestion 예문을 유도하는 연습 질문
+ * @param practiceQuestionTranslation 연습 질문의 해석
+ * @param imageUrl 예문 이미지 URL. 없으면 null
+ */
 @Schema(description = "추가 예문 항목")
 public record PracticeSentenceResponse(
     @Schema(description = "예문 텍스트", example = "Her voice blows my mind every time.")

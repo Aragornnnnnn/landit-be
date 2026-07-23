@@ -21,7 +21,14 @@ public class AiTutorService {
 
   private final AiTutorRepository aiTutorRepository;
 
-  /** 언어 조건에 맞는 활성 AI 튜터가 정확히 하나일 때 해당 ID를 반환한다. */
+  /**
+   * 언어 조건에 맞는 활성 AI 튜터가 정확히 하나일 때 해당 ID를 반환한다.
+   *
+   * @param accentLocale AI 튜터 억양 locale
+   * @param targetLocale 학습 대상 locale
+   * @return 유일한 활성 AI 튜터 ID
+   * @throws ApiException 활성 후보가 정확히 하나가 아닐 때
+   */
   @Transactional(readOnly = true)
   public Long requireSingleActiveTutorId(AccentLocale accentLocale, Locale targetLocale) {
     List<AiTutor> candidates =

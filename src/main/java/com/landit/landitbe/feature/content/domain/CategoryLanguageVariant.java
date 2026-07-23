@@ -32,6 +32,6 @@ public class CategoryLanguageVariant extends BaseTimeEntity {
   @Column(nullable = false, length = 100)
   private String name;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected CategoryLanguageVariant() {}
 }

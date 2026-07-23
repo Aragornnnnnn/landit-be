@@ -83,7 +83,7 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   @Column(name = "reused_expression_payload", columnDefinition = "jsonb")
   private JsonNode reusedExpressionPayload;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected SessionHistoryMessage() {}
 
   private SessionHistoryMessage(

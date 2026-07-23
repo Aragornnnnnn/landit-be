@@ -49,7 +49,7 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
   @Column(name = "summary_message", columnDefinition = "text")
   private String summaryMessage;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected SessionHistorySummaryFeedback() {}
 
   private SessionHistorySummaryFeedback(

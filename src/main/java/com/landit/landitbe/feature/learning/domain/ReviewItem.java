@@ -74,6 +74,6 @@ public class ReviewItem extends BaseTimeEntity {
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected ReviewItem() {}
 }

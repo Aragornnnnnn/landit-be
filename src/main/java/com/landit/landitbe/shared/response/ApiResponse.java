@@ -8,7 +8,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-/** 모든 API 응답을 success, data, error 형태로 감싼다. */
+/**
+ * 모든 API 응답을 success, data, error 형태로 감싼다.
+ *
+ * @param success 요청 처리 성공 여부
+ * @param data 성공 응답 데이터
+ * @param error 실패 오류 정보
+ * @param <T> 성공 응답 데이터 타입
+ */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 @Schema(description = "공통 API 응답 객체")
 public record ApiResponse<T>(
@@ -34,5 +41,16 @@ public record ApiResponse<T>(
   /** 오류 코드와 별도 메시지로 실패 응답 본문을 생성한다. */
   public static ApiResponse<Void> error(ErrorCode errorCode, String message) {
     return new ApiResponse<>(false, null, new ErrorResponse(errorCode.name(), message));
+  }
+
+  /**
+   * 기능별 오류 코드와 메시지로 실패 응답 본문을 생성한다.
+   *
+   * @param errorCode 기능별 오류 코드
+   * @param message 클라이언트에 노출할 오류 메시지
+   * @return 실패 API 응답
+   */
+  public static ApiResponse<Void> error(String errorCode, String message) {
+    return new ApiResponse<>(false, null, new ErrorResponse(errorCode, message));
   }
 }

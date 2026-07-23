@@ -52,6 +52,6 @@ public class UserQuest extends BaseTimeEntity {
   @Column(name = "reward_granted_at")
   private LocalDateTime rewardGrantedAt;
 
-  /** 동작을 수행한다. */
+  /** JPA에서 사용하는 기본 생성자다. */
   protected UserQuest() {}
 }

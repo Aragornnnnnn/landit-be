@@ -51,7 +51,11 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
   private final HttpClient httpClient;
   private final Map<SocialProvider, JsonNode> jwksCache = new ConcurrentHashMap<>();
 
-  /** 동작을 수행한다. */
+  /**
+   * OIDC 검증 설정으로 원격 토큰 검증기를 구성한다.
+   *
+   * @param properties 제공자별 OIDC 검증 설정
+   */
   public RemoteOidcTokenVerifier(OidcProperties properties) {
     this.properties = properties;
     this.objectMapper = new ObjectMapper();

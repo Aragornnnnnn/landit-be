@@ -29,7 +29,14 @@ public class SessionFeedbackService {
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final AiConversationClient aiConversationClient;
 
-  /** 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다. */
+  /**
+   * 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다.
+   *
+   * @param userId 세션 소유자 ID
+   * @param sessionId 피드백을 조회할 학습 세션 ID
+   * @return 세션 요약과 사용자 메시지별 피드백
+   * @throws ApiException AI 결과나 저장된 피드백의 정합성이 맞지 않을 때
+   */
   public SessionFeedbackResponse getOrCreate(long userId, long sessionId) {
     LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
     ExistingSummaryFeedbackContext existingSummary = context.existingSummary().orElse(null);
