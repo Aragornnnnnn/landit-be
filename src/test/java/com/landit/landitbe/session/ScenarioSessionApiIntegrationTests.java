@@ -172,6 +172,36 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void openApiDocumentsScenarioSessionStartAndEndContracts() throws Exception {
+    String scenarioSessionPath = "$.paths['/api/v1/scenarios/{scenarioId}/sessions'].post";
+    String sessionEndPath = "$.paths['/api/v1/sessions/{sessionId}/end'].patch";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(scenarioSessionPath + ".tags[0]").value("Scenario Session"))
+        .andExpect(jsonPath(scenarioSessionPath + ".summary").value("시나리오 세션 시작"))
+        .andExpect(
+            jsonPath(scenarioSessionPath + ".description")
+                .value("선택한 시나리오로 SCENARIO 타입 학습 세션을 시작한다."))
+        .andExpect(jsonPath(scenarioSessionPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(scenarioSessionPath + ".responses['201'].description").value("시작 성공"))
+        .andExpect(jsonPath(scenarioSessionPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(scenarioSessionPath + ".responses['403'].description").value("잠금 상태"))
+        .andExpect(jsonPath(scenarioSessionPath + ".responses['404'].description").value("시나리오 없음"))
+        .andExpect(jsonPath(sessionEndPath + ".tags[0]").value("Session"))
+        .andExpect(jsonPath(sessionEndPath + ".summary").value("세션 중도 종료"))
+        .andExpect(
+            jsonPath(sessionEndPath + ".description").value("진행 중인 학습 세션을 INTERRUPTED 상태로 종료한다."))
+        .andExpect(jsonPath(sessionEndPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(sessionEndPath + ".responses['200'].description").value("종료 성공"))
+        .andExpect(jsonPath(sessionEndPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(sessionEndPath + ".responses['403'].description").value("권한 없음"))
+        .andExpect(jsonPath(sessionEndPath + ".responses['404'].description").value("세션 없음"))
+        .andExpect(jsonPath(sessionEndPath + ".responses['409'].description").value("이미 완료됨"));
+  }
+
+  @Test
   void startAiFirstScenarioWithoutFirstFixedQuestionReturnsInternalServerError() throws Exception {
     JsonNode loginBody = login("ai-first-without-question@example.com");
     final String accessToken = loginBody.get("data").get("accessToken").asText();

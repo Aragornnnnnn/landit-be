@@ -80,6 +80,25 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
+  void openApiDocumentsScenarioListContract() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.tags[0]").value("Scenario"))
+        .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.summary").value("시나리오 전체 조회"))
+        .andExpect(
+            jsonPath("$.paths['/api/v1/scenarios'].get.description")
+                .value("카테고리별 시나리오 목록과 사용자별 완료 여부, 별점, 잠금 상태, 시작 메시지 미리보기를 조회한다."))
+        .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.security[0].bearerAuth").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/scenarios'].get.responses['200'].description")
+                .value("조회 성공"))
+        .andExpect(
+            jsonPath("$.paths['/api/v1/scenarios'].get.responses['401'].description")
+                .value("인증 실패"));
+  }
+
+  @Test
   void scenariosReturnOrderedProgressLockAndOpeningPreview() throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
