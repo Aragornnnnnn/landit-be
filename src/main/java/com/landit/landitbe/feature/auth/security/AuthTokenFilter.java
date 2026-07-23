@@ -1,0 +1,82 @@
+// Bearer access token을 검증해 SecurityContext에 인증 주체를 저장한다.
+
+package com.landit.landitbe.feature.auth.security;
+
+import com.landit.landitbe.feature.auth.service.LanditTokenService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+/** Bearer access token을 검증해 SecurityContext에 인증 주체를 저장한다. */
+@Component
+public class AuthTokenFilter extends OncePerRequestFilter {
+
+  private static final String BEARER_PREFIX = "Bearer ";
+
+  private final LanditTokenService tokenService;
+  private final UserProfileService userProfileService;
+  private final AuthFailureResponseWriter failureResponseWriter;
+
+  /**
+   * 토큰 검증과 활성 사용자 확인에 필요한 협력 객체를 주입받는다.
+   *
+   * @param tokenService 자체 access token Service
+   * @param userProfileService 활성 사용자 확인 Service
+   * @param failureResponseWriter 인증 실패 응답 작성기
+   */
+  public AuthTokenFilter(
+      LanditTokenService tokenService,
+      UserProfileService userProfileService,
+      AuthFailureResponseWriter failureResponseWriter) {
+    this.tokenService = tokenService;
+    this.userProfileService = userProfileService;
+    this.failureResponseWriter = failureResponseWriter;
+  }
+
+  @Override
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
+    String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+    if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
+    Long userId;
+    try {
+      userId = tokenService.parseAccessToken(authorization.substring(BEARER_PREFIX.length()));
+    } catch (ApiException exception) {
+      SecurityContextHolder.clearContext();
+      failureResponseWriter.write(response, exception.getErrorCode());
+      return;
+    }
+    if (!userProfileService.existsActive(userId)) {
+      SecurityContextHolder.clearContext();
+      failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
+      return;
+    }
+
+    AuthUserPrincipal principal = new AuthUserPrincipal(userId);
+    SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+    securityContext.setAuthentication(
+        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+    SecurityContextHolder.setContext(securityContext);
+    try {
+      filterChain.doFilter(request, response);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+}

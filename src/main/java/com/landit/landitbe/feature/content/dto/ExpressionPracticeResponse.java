@@ -1,0 +1,47 @@
+// 원어민 표현 학습 중 추가 예문 조회 응답을 표현한다.
+
+package com.landit.landitbe.feature.content.dto;
+
+import com.landit.landitbe.feature.content.domain.WritingExpression;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
+
+/**
+ * 원어민 표현 학습 중 추가 예문 조회 응답을 표현한다.
+ *
+ * @param targetExpressionText 타겟 표현
+ * @param baseExpressionMeaningText 타겟 표현 뜻
+ * @param usageDescription 표현 상세 설명
+ * @param practiceSentence 추가 예문 목록
+ * @param writingSentence 작문 연습에 사용할 문제. practiceSentence 중 랜덤 1개
+ */
+@Schema(description = "원어민 표현 추가 예문 조회 응답")
+public record ExpressionPracticeResponse(
+    @Schema(description = "타겟 표현", example = "blow my mind") String targetExpressionText,
+    @Schema(description = "타겟 표현 뜻", example = "끝내주게 놀랍다") String baseExpressionMeaningText,
+    @Schema(description = "표현 상세 설명", example = "강렬한 인상을 받았을 때 최고의 리액션이에요.")
+        String usageDescription,
+    @Schema(description = "추가 예문 목록") List<PracticeSentenceResponse> practiceSentence,
+    @Schema(description = "작문 연습에 사용할 문제. practiceSentence 중 랜덤 1개")
+        WritingSentenceResponse writingSentence) {
+
+  /**
+   * 표현 엔티티와 추가 예문을 학습 연습 응답으로 변환한다.
+   *
+   * @param expression 변환할 표현 엔티티
+   * @param practiceSentences 추가 예문 목록
+   * @param writingSentence 작문 문제
+   * @return 표현 학습 연습 응답
+   */
+  public static ExpressionPracticeResponse from(
+      WritingExpression expression,
+      List<PracticeSentenceResponse> practiceSentences,
+      WritingSentenceResponse writingSentence) {
+    return new ExpressionPracticeResponse(
+        expression.getTargetExpressionText(),
+        expression.getBaseExpressionMeaningText(),
+        expression.getUsageDescription(),
+        practiceSentences,
+        writingSentence);
+  }
+}

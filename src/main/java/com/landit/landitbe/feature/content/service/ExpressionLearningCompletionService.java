@@ -1,0 +1,100 @@
+// 원어민 표현 학습 완료 흐름를 처리한다.
+
+package com.landit.landitbe.feature.content.service;
+
+import com.landit.landitbe.feature.content.domain.WritingExpression;
+import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.service.LearningProgressService;
+import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.domain.ActiveStatus;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** 원어민 표현 학습 완료 흐름를 처리한다. */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ExpressionLearningCompletionService {
+
+  private static final String LOCKED_EXPRESSION_LOG =
+      "표현 학습 완료 실패: 아직 잠긴 표현입니다. userId={}, expressionId={}";
+
+  private final WritingExpressionRepository writingExpressionRepository;
+  private final UserProfileService userProfileService;
+  private final LearningProgressService learningProgressService;
+
+  /**
+   * 학습 순서에 맞는 활성 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
+   *
+   * @param userId 학습 사용자 ID
+   * @param expressionId 완료할 표현 ID
+   * @throws ApiException 표현이 없거나 아직 잠겨 있을 때
+   */
+  @Transactional
+  public void completeLearning(Long userId, Long expressionId) {
+    WritingExpression expression =
+        writingExpressionRepository
+            .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
+            .orElseThrow(
+                () ->
+                    new ApiException(
+                        ErrorCode
+                            .RESOURCE_NOT_FOUND)); // 해당 표현이 없거나 INACTIVE면 RESOURCE_NOT_FOUND 터트리고
+    // 끝.
+    Long scenarioId = expression.getScenarioId();
+
+    CompletedExpressionIds completedExpressionIds =
+        learningProgressService.findCompletedExpressionIds(userId, scenarioId);
+
+    // 1. 만약에 이미 완료한 표현 리스트에 있는 경우라면, lastCompletedAt만 갱신하고 끝내라.
+    if (completedExpressionIds.values().contains(expressionId)) {
+      learningProgressService.completeExpression(userId, scenarioId, expressionId);
+      return;
+    }
+
+    // 2. lock 여부 확인 -> 만약 잠겨있다면 에러를 터트린다.
+    if (!isUnlockedExpression(userId, scenarioId, expressionId, completedExpressionIds.values())) {
+      log.warn(LOCKED_EXPRESSION_LOG, userId, expressionId);
+      throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
+    }
+
+    // 3. 잠겨있지 않으면 완료 기록을 새로 생성해서 저장한다.
+    learningProgressService.completeExpression(userId, scenarioId, expressionId);
+    log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
+  }
+
+  /** 해당 표현이 지금 학습할 차례가 맞는지(=unlock상태인지) 사용자 locale 기준으로 판정한다. */
+  private boolean isUnlockedExpression(
+      Long userId, Long scenarioId, Long expressionId, Set<Long> completedExpressionIds) {
+    // 사용자의 타겟 언어, 기준 언어를 가져온다.
+    UserLocale userLocale = userProfileService.getUserLocale(userId);
+
+    // 사용자 locale 기준으로 시나리오에 속한 활성 표현들을 displayOrder 순서대로 가져온다.
+    List<WritingExpression> expressions =
+        writingExpressionRepository
+            .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
+                scenarioId,
+                userLocale.targetLocale(),
+                userLocale.baseLocale(),
+                ActiveStatus.ACTIVE);
+
+    // firstIncompleteExpressionId = 가장 첫번째 미완료 표현의 id
+    Optional<Long> firstIncompleteExpressionId =
+        expressions.stream()
+            .map(WritingExpression::getId)
+            .filter(id -> !completedExpressionIds.contains(id))
+            .findFirst();
+
+    return firstIncompleteExpressionId.isPresent()
+        && firstIncompleteExpressionId.get().equals(expressionId);
+  }
+}
