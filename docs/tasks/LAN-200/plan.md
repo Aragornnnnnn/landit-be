@@ -38,7 +38,7 @@
 - Consumes: `docs/tasks/LAN-200/design.md`의 승인된 구조.
 - Produces: 이후 모든 작업에서 적용할 패키지·Service·Javadoc 규칙.
 
-- [ ] **Step 1: 기존 4계층 규칙을 승인된 구조로 교체한다**
+- [x] **Step 1: 기존 4계층 규칙을 승인된 구조로 교체한다**
 
 ```text
 com.landit.landitbe
@@ -49,7 +49,7 @@ com.landit.landitbe
 
 `AGENTS.md`와 `docs/architecture/backend.md`에서 `api/application/domain/infrastructure` 및 UseCase·Service 구분을 제거한다. `feature.<name>` 내부 역할 패키지와 Repository 소유 Service 규칙을 기록한다.
 
-- [ ] **Step 2: Javadoc 계약을 문서화한다**
+- [x] **Step 2: Javadoc 계약을 문서화한다**
 
 ```java
 /**
@@ -67,7 +67,7 @@ public LearningSession findOwnedInProgress(long userId, long sessionId) {
 
 공개 타입과 `public`, `protected` 메서드에 요약, `@param`, `@return`, `@throws`를 작성하고 private 메서드는 의도가 불명확할 때만 Javadoc을 사용하도록 명시한다.
 
-- [ ] **Step 3: 문서 변경을 검증한다**
+- [x] **Step 3: 문서 변경을 검증한다**
 
 Run: `rg -n "api.*application.*domain.*infrastructure|UseCase와 Service 기준" AGENTS.md docs/architecture/backend.md`
 
@@ -77,7 +77,7 @@ Run: `git diff --check`
 
 Expected: 출력 없이 종료 코드 0.
 
-- [ ] **Step 4: 문서 변경을 커밋한다**
+- [x] **Step 4: 문서 변경을 커밋한다**
 
 ```bash
 git add AGENTS.md docs/architecture/backend.md docs/development/java-style.md docs/tasks/LAN-200
