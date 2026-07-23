@@ -27,10 +27,11 @@ import org.springframework.test.web.servlet.MockMvc;
 /** Grafana Cloud로 전송할 HTTP 요청과 JVM 메트릭 등록을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(ObservabilityIntegrationTests.OtlpMetricsSenderTestConfiguration.class)
 @TestPropertySource(
     properties = {
+      "APP_VERSION=be-v1.2.3",
       "management.otlp.metrics.export.enabled=true",
       "management.otlp.metrics.export.step=1h",
       "management.otlp.metrics.export.url=http://127.0.0.1:4318/v1/metrics"
@@ -80,6 +81,28 @@ class ObservabilityIntegrationTests {
     assertThat(meterRegistry.find("jvm.memory.used").meters()).isNotEmpty();
     assertThat(meterRegistry.find("jvm.gc.max.data.size").meters()).isNotEmpty();
     assertThat(meterRegistry.find("jvm.threads.live").meters()).isNotEmpty();
+  }
+
+  @Test
+  void hikariConnectionPoolMetricsAreRegistered() {
+    assertThat(meterRegistry.find("hikaricp.connections.active").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("hikaricp.connections.idle").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("hikaricp.connections.pending").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("hikaricp.connections.max").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("hikaricp.connections.timeout").meters()).isNotEmpty();
+  }
+
+  @Test
+  void tomcatThreadPoolMetricsAreRegistered() {
+    assertThat(meterRegistry.find("tomcat.threads.busy").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("tomcat.threads.current").meters()).isNotEmpty();
+    assertThat(meterRegistry.find("tomcat.threads.config.max").meters()).isNotEmpty();
+  }
+
+  @Test
+  void deploymentVersionIsAttachedToMetrics() {
+    assertThat(meterRegistry.find("jvm.memory.used").tag("service.version", "be-v1.2.3").meters())
+        .isNotEmpty();
   }
 
   @Test

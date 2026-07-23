@@ -13,6 +13,9 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
+ARG APP_VERSION=local
+ENV APP_VERSION=${APP_VERSION}
+
 COPY --from=build /workspace/build/libs/*.jar app.jar
 
 EXPOSE 8080
