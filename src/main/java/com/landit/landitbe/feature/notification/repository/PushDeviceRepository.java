@@ -69,4 +69,19 @@ public interface PushDeviceRepository extends JpaRepository<PushDevice, Long> {
       where device.expoPushToken = :expoPushToken
       """)
   Optional<PushDevice> findByExpoPushTokenForUpdate(@Param("expoPushToken") String expoPushToken);
+
+  /**
+   * 발송 직전 설치 상태를 확인하고 직렬화하기 위해 식별자로 쓰기 잠금 조회한다.
+   *
+   * @param pushDeviceId Push Device ID
+   * @return 잠긴 설치 정보
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select device
+      from PushDevice device
+      where device.id = :pushDeviceId
+      """)
+  Optional<PushDevice> findByIdForUpdate(@Param("pushDeviceId") Long pushDeviceId);
 }

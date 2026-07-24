@@ -7,12 +7,14 @@ import com.landit.landitbe.feature.notification.dto.PushDeviceSyncRequest;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncResponse;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -52,6 +54,39 @@ public class PushDeviceService {
     } catch (DataIntegrityViolationException | TransientDataAccessException exception) {
       return executeSynchronization(userProfileId, installationId, request);
     }
+  }
+
+  /**
+   * Push Device를 잠그고 현재 사용자 소유이면서 발송 가능한 설치 정보를 반환한다.
+   *
+   * <p>호출자의 발송 선점 트랜잭션에 참여하므로 반환 뒤 발송 이력을 저장할 때까지 잠금이 유지된다.
+   *
+   * @param pushDeviceId Push Device ID
+   * @param userProfileId 발송 대상 사용자 ID
+   * @return 잠금 확인된 발송 대상
+   */
+  @Transactional
+  public Optional<PushDeviceDeliveryTarget> findLockedSendableDeliveryTarget(
+      Long pushDeviceId, Long userProfileId) {
+    return pushDeviceRepository
+        .findByIdForUpdate(pushDeviceId)
+        .filter(PushDevice::isSendable)
+        .filter(pushDevice -> pushDevice.getUserProfileId().equals(userProfileId))
+        .map(
+            pushDevice ->
+                new PushDeviceDeliveryTarget(pushDevice.getId(), pushDevice.getExpoPushToken()));
+  }
+
+  /**
+   * 발송 당시 Token을 현재 소유한 Push Device를 잠그고 Token을 무효화한다.
+   *
+   * @param sentExpoPushToken 발송 당시 Expo Push Token
+   */
+  @Transactional
+  public void invalidateCurrentTokenOwner(String sentExpoPushToken) {
+    pushDeviceRepository
+        .findByExpoPushTokenForUpdate(sentExpoPushToken)
+        .ifPresent(PushDevice::invalidateToken);
   }
 
   /** 저장 충돌 뒤에도 새 트랜잭션으로 재시도할 수 있도록 동기화 작업을 실행한다. */
