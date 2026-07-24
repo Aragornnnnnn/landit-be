@@ -55,6 +55,18 @@ class DatabaseSchemaIntegrationTests {
         List.of("user_profile_id", "push_enabled", "status"));
   }
 
+  /** Expo 발송 추적에 필요한 스키마를 생성한다. */
+  @Test
+  void pushDeliverySchemaSupportsDeliveryTracking() {
+    assertTableExists("push_delivery");
+    assertColumnExists("push_delivery", "push_device_id");
+    assertColumnDefinition("push_delivery", "sent_expo_push_token", "CHARACTER VARYING", 500, "NO");
+    assertColumnExists("push_delivery", "deduplication_key");
+    assertColumnExists("push_delivery", "expo_ticket_id");
+    assertColumnExists("push_delivery", "receipt_checked_at");
+    assertTableConstraintExists("push_delivery", "uk_push_delivery_deduplication_key");
+  }
+
   @Test
   void oauthIdentityHasLookupIndexes() {
     assertIndexExists("idx_oauth_identity_provider_user");
@@ -543,6 +555,29 @@ class DatabaseSchemaIntegrationTests {
             columnName);
 
     assertThat(columnCount).as("column %s.%s", tableName, columnName).isZero();
+  }
+
+  private void assertColumnDefinition(
+      String tableName,
+      String columnName,
+      String expectedDataType,
+      int expectedMaximumLength,
+      String expectedNullable) {
+    Map<String, Object> column =
+        jdbcTemplate.queryForMap(
+            """
+            select data_type, character_maximum_length, is_nullable
+            from information_schema.columns
+            where lower(table_name) = ?
+              and lower(column_name) = ?
+            """,
+            tableName,
+            columnName);
+
+    assertThat((String) column.get("DATA_TYPE")).isEqualToIgnoringCase(expectedDataType);
+    assertThat(((Number) column.get("CHARACTER_MAXIMUM_LENGTH")).intValue())
+        .isEqualTo(expectedMaximumLength);
+    assertThat(column.get("IS_NULLABLE")).isEqualTo(expectedNullable);
   }
 
   private void assertIndexExists(String indexName) {
