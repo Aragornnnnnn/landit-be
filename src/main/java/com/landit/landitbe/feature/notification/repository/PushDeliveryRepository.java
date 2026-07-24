@@ -3,7 +3,9 @@
 package com.landit.landitbe.feature.notification.repository;
 
 import com.landit.landitbe.feature.notification.domain.PushDelivery;
+import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -20,6 +22,25 @@ public interface PushDeliveryRepository extends JpaRepository<PushDelivery, Long
    * @return 기존 발송 이력
    */
   Optional<PushDelivery> findByDeduplicationKey(String deduplicationKey);
+
+  /**
+   * 중복 방지 키 접두어와 상태에 맞는 발송 이력 ID를 조회한다.
+   *
+   * @param status 조회할 발송 상태
+   * @param deduplicationKeyPrefix 발송 이력 중복 방지 키 접두어
+   * @return 조건을 만족하는 발송 이력 ID 목록
+   */
+  @Query(
+      """
+      select delivery.id
+      from PushDelivery delivery
+      where delivery.status = :status
+        and delivery.deduplicationKey like concat(:deduplicationKeyPrefix, '%')
+      order by delivery.id
+      """)
+  List<Long> findIdsByStatusAndDeduplicationKeyPrefix(
+      @Param("status") PushDeliveryStatus status,
+      @Param("deduplicationKeyPrefix") String deduplicationKeyPrefix);
 
   /**
    * 중복 방지 키에 해당하는 발송 이력이 존재하는지 확인한다.

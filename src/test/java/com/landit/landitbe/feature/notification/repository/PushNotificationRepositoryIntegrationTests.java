@@ -1,4 +1,4 @@
-// Push Delivery Repository의 중복 방지 계약을 검증한다.
+// Push Device와 발송 이력 Repository의 조회 및 중복 방지 계약을 검증한다.
 
 package com.landit.landitbe.feature.notification.repository;
 
@@ -7,7 +7,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.domain.PushDelivery;
+import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
 import com.landit.landitbe.feature.notification.domain.PushDevice;
+import com.landit.landitbe.feature.notification.domain.PushTokenStatus;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
@@ -20,11 +22,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Push Delivery Repository의 중복 방지 계약을 검증한다. */
+/** Push Device와 발송 이력 Repository의 조회 및 중복 방지 계약을 검증한다. */
 @ActiveProfiles("test")
 @SpringBootTest
 @Transactional
-class PushDeliveryRepositoryIntegrationTests {
+class PushNotificationRepositoryIntegrationTests {
 
   private static final long USER_ID = 994001L;
   private static final UUID INSTALLATION_ID =
@@ -39,6 +41,35 @@ class PushDeliveryRepositoryIntegrationTests {
   @Autowired private PushDeviceRepository pushDeviceRepository;
 
   @Autowired private PushDeliveryRepository pushDeliveryRepository;
+
+  /** 사용자에게 속한 활성 수신 설치만 발송 대상으로 조회한다. */
+  @Test
+  void findsOnlyEnabledDevicesWithActiveToken() {
+    seedUser();
+    PushDevice sendable =
+        PushDevice.create(USER_ID, INSTALLATION_ID, AppPlatform.IOS, true, EXPO_PUSH_TOKEN);
+    PushDevice disabled =
+        PushDevice.create(
+            USER_ID,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440002"),
+            AppPlatform.ANDROID,
+            false,
+            "ExponentPushToken[disabled-token]");
+    PushDevice invalid =
+        PushDevice.create(
+            USER_ID,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440003"),
+            AppPlatform.IOS,
+            true,
+            "ExponentPushToken[invalid-token]");
+    invalid.invalidateToken();
+    pushDeviceRepository.saveAllAndFlush(java.util.List.of(sendable, disabled, invalid));
+
+    assertThat(
+            pushDeviceRepository.findAllByUserProfileIdAndPushEnabledTrueAndTokenStatus(
+                USER_ID, PushTokenStatus.ACTIVE))
+        .containsExactly(sendable);
+  }
 
   /** 같은 중복 방지 키를 가진 발송 이력은 한 건만 저장한다. */
   @Test
@@ -75,14 +106,42 @@ class PushDeliveryRepositoryIntegrationTests {
     assertThat(SENT_EXPO_PUSH_TOKEN.equals(persisted.getSentExpoPushToken())).isTrue();
   }
 
+  /** 기준 날짜의 Ticket 접수 이력만 Receipt 재예약 대상으로 식별자 순서로 조회한다. */
+  @Test
+  void findsAcceptedDeliveryIdsByReviewReminderDatePrefix() {
+    seedUser();
+    PushDevice device =
+        pushDeviceRepository.saveAndFlush(
+            PushDevice.create(USER_ID, INSTALLATION_ID, AppPlatform.IOS, true, EXPO_PUSH_TOKEN));
+    PushDelivery accepted =
+        delivery(device.getId(), "review-reminder:2026-07-24:" + USER_ID + ":accepted");
+    accepted.acceptTicket("ticket-accepted");
+    PushDelivery requested =
+        delivery(device.getId(), "review-reminder:2026-07-24:" + USER_ID + ":requested");
+    PushDelivery differentDate =
+        delivery(device.getId(), "review-reminder:2026-07-25:" + USER_ID + ":accepted");
+    differentDate.acceptTicket("ticket-different-date");
+    pushDeliveryRepository.saveAllAndFlush(java.util.List.of(accepted, requested, differentDate));
+
+    assertThat(
+            pushDeliveryRepository.findIdsByStatusAndDeduplicationKeyPrefix(
+                PushDeliveryStatus.TICKET_ACCEPTED, "review-reminder:2026-07-24:"))
+        .containsExactly(accepted.getId());
+  }
+
   /** 테스트용 푸시 발송 이력을 생성한다. */
   private PushDelivery delivery(Long pushDeviceId) {
+    return delivery(pushDeviceId, "review-reminder:2026-07-24:" + USER_ID + ":" + pushDeviceId);
+  }
+
+  /** 테스트용 푸시 발송 이력을 지정한 중복 방지 키로 생성한다. */
+  private PushDelivery delivery(Long pushDeviceId, String deduplicationKey) {
     return PushDelivery.requested(
         USER_ID,
         pushDeviceId,
         SENT_EXPO_PUSH_TOKEN,
         NotificationType.REVIEW_REMINDER,
-        "review-reminder:2026-07-24:" + USER_ID + ":" + pushDeviceId,
+        deduplicationKey,
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
         "/expressions",

@@ -17,6 +17,7 @@ import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -89,6 +90,29 @@ class PushDeliveryServiceTest {
 
     assertThat(pushDeliveryService.findReceiptTarget(PUSH_DELIVERY_ID))
         .contains(new PushReceiptTarget(PUSH_DELIVERY_ID, "ticket-1"));
+  }
+
+  /** Ticket 접수 이력의 ID를 중복 방지 키 접두어로 조회한다. */
+  @Test
+  void findsAcceptedDeliveryIdsByDeduplicationKeyPrefix() {
+    String deduplicationKeyPrefix = "review-reminder:2026-07-24:";
+    when(pushDeliveryRepository.findIdsByStatusAndDeduplicationKeyPrefix(
+            PushDeliveryStatus.TICKET_ACCEPTED, deduplicationKeyPrefix))
+        .thenReturn(List.of(PUSH_DELIVERY_ID));
+
+    assertThat(pushDeliveryService.findAcceptedDeliveryIds(deduplicationKeyPrefix))
+        .containsExactly(PUSH_DELIVERY_ID);
+  }
+
+  /** Ticket 접수 이력이 없으면 Receipt 재예약 대상도 비어 있다. */
+  @Test
+  void returnsNoAcceptedDeliveryIdsWhenRepositoryFindsNone() {
+    String deduplicationKeyPrefix = "review-reminder:2026-07-24:";
+    when(pushDeliveryRepository.findIdsByStatusAndDeduplicationKeyPrefix(
+            PushDeliveryStatus.TICKET_ACCEPTED, deduplicationKeyPrefix))
+        .thenReturn(List.of());
+
+    assertThat(pushDeliveryService.findAcceptedDeliveryIds(deduplicationKeyPrefix)).isEmpty();
   }
 
   /** Receipt 성공을 발송 완료 상태로 기록한다. */
