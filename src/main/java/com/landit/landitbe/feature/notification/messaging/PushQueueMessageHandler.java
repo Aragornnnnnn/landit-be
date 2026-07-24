@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.notification.messaging;
 
 import com.landit.landitbe.feature.notification.service.PushReceiptService;
+import com.landit.landitbe.feature.notification.service.ReviewReminderService;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -17,8 +19,11 @@ import org.springframework.stereotype.Component;
 public class PushQueueMessageHandler {
 
   private static final int SUPPORTED_VERSION = 1;
+  private static final ZoneId SEOUL_ZONE_ID = ZoneId.of("Asia/Seoul");
+  private static final String REVIEW_REMINDER_BATCH = "REVIEW_REMINDER_BATCH";
   private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
+  private final ReviewReminderService reviewReminderService;
   private final PushReceiptService pushReceiptService;
 
   /**
@@ -29,6 +34,8 @@ public class PushQueueMessageHandler {
   public void handle(PushQueueMessage message) {
     validateCommon(message);
     switch (message.messageType()) {
+      case REVIEW_REMINDER_BATCH ->
+          reviewReminderService.send(message.occurredAt().atZone(SEOUL_ZONE_ID).toLocalDate());
       case PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
       default -> throw new IllegalArgumentException("지원하지 않는 Push 메시지 유형입니다.");
     }
