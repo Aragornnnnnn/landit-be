@@ -47,6 +47,11 @@ landit:
     connect-timeout: ${LANDIT_AI_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_AI_REQUEST_TIMEOUT:60s}
     session-feedback-request-timeout: ${LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT:120s}
+  notification:
+    expo-base-url: ${LANDIT_NOTIFICATION_EXPO_BASE_URL:https://exp.host}
+    expo-access-token: ${LANDIT_NOTIFICATION_EXPO_ACCESS_TOKEN:}
+    connect-timeout: ${LANDIT_NOTIFICATION_CONNECT_TIMEOUT:5s}
+    request-timeout: ${LANDIT_NOTIFICATION_REQUEST_TIMEOUT:10s}
 
 sentry:
   dsn: ${SENTRY_DSN:}
