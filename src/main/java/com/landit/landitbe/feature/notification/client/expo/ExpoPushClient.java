@@ -8,11 +8,13 @@ import com.landit.landitbe.feature.notification.client.PushMessage;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
+import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -57,7 +59,7 @@ public class ExpoPushClient implements NotificationSender {
             "default");
     HttpResponse<String> response = post(SEND_PATH, request);
     if (isTemporaryFailure(response.statusCode())) {
-      throw new PushNotificationException("Expo Push 발송 요청이 일시적으로 실패했습니다.");
+      throw new RetryablePushNotificationException("Expo Push 발송 요청이 일시적으로 실패했습니다.");
     }
     if (!isSuccess(response.statusCode())) {
       return PushTicketResult.failed(readRequestErrorCode(response.body()));
@@ -70,7 +72,7 @@ public class ExpoPushClient implements NotificationSender {
   public PushReceiptResult getReceipt(String ticketId) {
     HttpResponse<String> response = post(RECEIPT_PATH, new ExpoReceiptRequest(List.of(ticketId)));
     if (isTemporaryFailure(response.statusCode())) {
-      throw new PushNotificationException("Expo Push Receipt 요청이 일시적으로 실패했습니다.");
+      throw new RetryablePushNotificationException("Expo Push Receipt 요청이 일시적으로 실패했습니다.");
     }
     if (!isSuccess(response.statusCode())) {
       return PushReceiptResult.failed(readRequestErrorCode(response.body()));
@@ -98,6 +100,8 @@ public class ExpoPushClient implements NotificationSender {
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
       throw new PushNotificationException("Expo Push 요청이 중단됐습니다.", exception);
+    } catch (HttpTimeoutException exception) {
+      throw new RetryablePushNotificationException("Expo Push 요청 제한시간을 초과했습니다.", exception);
     } catch (IOException | JacksonException exception) {
       throw new PushNotificationException("Expo Push 요청에 실패했습니다.", exception);
     }
@@ -187,7 +191,7 @@ public class ExpoPushClient implements NotificationSender {
 
   /** HTTP 상태가 SQS 재시도로 회복 가능한 Expo 오류인지 확인한다. */
   private boolean isTemporaryFailure(int statusCode) {
-    return statusCode == 429 || statusCode >= 500;
+    return statusCode == 429 || (statusCode >= 500 && statusCode < 600);
   }
 
   /** 설정된 Expo 기본 URL을 URI로 변환한다. */
