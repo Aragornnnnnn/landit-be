@@ -1,12 +1,12 @@
-// 일시적인 외부 Push 제공자 오류를 SQS 재시도로 전달한다.
+// 외부 Push 연동 중 발생한 오류를 호출자에게 전달한다.
 
 package com.landit.landitbe.feature.notification.client;
 
-/** 일시적인 외부 Push 제공자 오류를 SQS 재시도로 전달한다. */
+/** 외부 Push 요청의 처리 결과를 확정할 수 없거나 연동 계약을 해석할 수 없을 때 발생한다. */
 public class PushNotificationException extends RuntimeException {
 
   /**
-   * 일시적인 Push 연동 오류를 생성한다.
+   * Push 연동 오류를 생성한다.
    *
    * @param message Token 원문을 제외한 오류 설명
    */
@@ -15,7 +15,7 @@ public class PushNotificationException extends RuntimeException {
   }
 
   /**
-   * 원인이 있는 일시적인 Push 연동 오류를 생성한다.
+   * 원인이 있는 Push 연동 오류를 생성한다.
    *
    * @param message Token 원문을 제외한 오류 설명
    * @param cause 원본 예외
