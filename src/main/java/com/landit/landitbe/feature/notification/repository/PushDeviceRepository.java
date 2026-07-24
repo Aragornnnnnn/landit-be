@@ -3,7 +3,9 @@
 package com.landit.landitbe.feature.notification.repository;
 
 import com.landit.landitbe.feature.notification.domain.PushDevice;
+import com.landit.landitbe.feature.notification.domain.PushTokenStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -58,4 +60,14 @@ public interface PushDeviceRepository extends JpaRepository<PushDevice, Long> {
       where device.id = :pushDeviceId
       """)
   Optional<PushDevice> findByIdForUpdate(@Param("pushDeviceId") Long pushDeviceId);
+
+  /**
+   * 사용자의 발송 가능한 Push Device를 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param tokenStatus Expo Push Token 상태
+   * @return 알림 수신이 켜진 Push Device 목록
+   */
+  List<PushDevice> findAllByUserProfileIdAndPushEnabledTrueAndTokenStatus(
+      Long userProfileId, PushTokenStatus tokenStatus);
 }
