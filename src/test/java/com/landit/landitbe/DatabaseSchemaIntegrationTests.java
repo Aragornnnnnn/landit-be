@@ -44,6 +44,17 @@ class DatabaseSchemaIntegrationTests {
     tableNames.forEach(this::assertTableExists);
   }
 
+  /** Push Device 동기화에 필요한 스키마를 생성한다. */
+  @Test
+  void pushDeviceSchemaSupportsInstallationSynchronization() {
+    assertColumnExists("user_push_token", "installation_id");
+    assertColumnExists("user_push_token", "push_enabled");
+    assertTableConstraintExists("user_push_token", "uk_user_push_token_installation_id");
+    assertIndexColumns(
+        "idx_user_push_token_user_profile_push_enabled_status",
+        List.of("user_profile_id", "push_enabled", "status"));
+  }
+
   @Test
   void oauthIdentityHasLookupIndexes() {
     assertIndexExists("idx_oauth_identity_provider_user");
@@ -546,6 +557,23 @@ class DatabaseSchemaIntegrationTests {
             indexName);
 
     assertThat(indexCount).as("index %s", indexName).isEqualTo(1);
+  }
+
+  private void assertIndexColumns(String indexName, List<String> columnNames) {
+    List<String> actualColumnNames =
+        jdbcTemplate.queryForList(
+            """
+            select lower(column_name)
+            from information_schema.index_columns
+            where lower(index_name) = ?
+            order by ordinal_position
+            """,
+            String.class,
+            indexName);
+
+    assertThat(actualColumnNames)
+        .as("index %s columns", indexName)
+        .containsExactlyElementsOf(columnNames);
   }
 
   private void assertTableConstraintExists(String tableName, String constraintName) {
