@@ -85,7 +85,6 @@ public interface PushDeviceRepository extends JpaRepository<PushDevice, Long> {
       where device.id = :pushDeviceId
       """)
   Optional<PushDevice> findByIdForUpdate(@Param("pushDeviceId") Long pushDeviceId);
-
   /**
    * 한 사용자의 발송 가능한 Push Device를 조회한다.
    *
