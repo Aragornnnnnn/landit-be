@@ -10,12 +10,20 @@ package com.landit.landitbe.feature.notification.client;
  */
 public record PushReceiptResult(PushReceiptStatus status, String errorCode) {
 
-  /** 아직 Receipt가 생성되지 않은 결과를 반환한다. */
+  /**
+   * 아직 Receipt가 생성되지 않은 결과를 반환한다.
+   *
+   * @return Receipt 미준비 결과
+   */
   public static PushReceiptResult notReady() {
     return new PushReceiptResult(PushReceiptStatus.NOT_READY, null);
   }
 
-  /** 외부 Push 제공자가 배달을 접수한 결과를 반환한다. */
+  /**
+   * 외부 Push 제공자가 배달을 접수한 결과를 반환한다.
+   *
+   * @return 배달 완료 결과
+   */
   public static PushReceiptResult delivered() {
     return new PushReceiptResult(PushReceiptStatus.DELIVERED, null);
   }

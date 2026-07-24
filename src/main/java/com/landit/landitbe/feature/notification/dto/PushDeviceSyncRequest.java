@@ -27,14 +27,22 @@ public record PushDeviceSyncRequest(
             nullable = true)
         String expoPushToken) {
 
-  /** 알림 활성 요청에 비어 있지 않은 Expo Push Token이 포함됐는지 검증한다. */
+  /**
+   * 알림 활성 요청에 비어 있지 않은 Expo Push Token이 포함됐는지 검증한다.
+   *
+   * @return 활성 요청이 유효하면 {@code true}
+   */
   @AssertTrue
   @JsonIgnore
   public boolean isExpoPushTokenPresentWhenEnabled() {
     return !Boolean.TRUE.equals(pushEnabled) || (expoPushToken != null && !expoPushToken.isBlank());
   }
 
-  /** 빈 Expo Push Token을 null로 정규화한다. */
+  /**
+   * 빈 Expo Push Token을 null로 정규화한다.
+   *
+   * @return 정규화된 Expo Push Token
+   */
   public String normalizedExpoPushToken() {
     return expoPushToken == null || expoPushToken.isBlank() ? null : expoPushToken;
   }

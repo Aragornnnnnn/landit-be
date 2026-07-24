@@ -60,7 +60,16 @@ public class PushDevice extends BaseTimeEntity {
     synchronize(userProfileId, platform, pushEnabled, expoPushToken);
   }
 
-  /** 현재 설치 상태로 Push Device를 생성한다. */
+  /**
+   * 현재 설치 상태로 Push Device를 생성한다.
+   *
+   * @param userProfileId 현재 인증 사용자 ID
+   * @param installationId 앱 설치 ID
+   * @param platform 기기 플랫폼
+   * @param pushEnabled Landit 푸시 알림 수신 여부
+   * @param expoPushToken Expo Push Token
+   * @return 생성된 Push Device
+   */
   public static PushDevice create(
       Long userProfileId,
       UUID installationId,
@@ -70,7 +79,14 @@ public class PushDevice extends BaseTimeEntity {
     return new PushDevice(userProfileId, installationId, platform, pushEnabled, expoPushToken);
   }
 
-  /** 현재 인증 사용자와 앱이 전달한 설치 상태로 갱신한다. */
+  /**
+   * 현재 인증 사용자와 앱이 전달한 설치 상태로 갱신한다.
+   *
+   * @param userProfileId 현재 인증 사용자 ID
+   * @param platform 기기 플랫폼
+   * @param pushEnabled Landit 푸시 알림 수신 여부
+   * @param expoPushToken Expo Push Token
+   */
   public void synchronize(
       Long userProfileId, AppPlatform platform, boolean pushEnabled, String expoPushToken) {
     this.userProfileId = userProfileId;
@@ -93,7 +109,11 @@ public class PushDevice extends BaseTimeEntity {
     }
   }
 
-  /** 현재 설치가 푸시 발송 조건을 만족하는지 반환한다. */
+  /**
+   * 현재 설치가 푸시 발송 조건을 만족하는지 반환한다.
+   *
+   * @return 현재 설치가 발송 가능하면 {@code true}
+   */
   public boolean isSendable() {
     return pushEnabled && expoPushToken != null && tokenStatus == PushTokenStatus.ACTIVE;
   }

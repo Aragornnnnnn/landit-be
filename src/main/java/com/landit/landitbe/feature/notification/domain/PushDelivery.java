@@ -152,7 +152,11 @@ public class PushDelivery extends BaseTimeEntity {
     }
   }
 
-  /** 현재 발송 이력이 명시적인 일시 오류 이후 재시도를 기다리는지 반환한다. */
+  /**
+   * 현재 발송 이력이 명시적인 일시 오류 이후 재시도를 기다리는지 반환한다.
+   *
+   * @return 재시도 표식이 남아 있으면 {@code true}
+   */
   public boolean isRetryable() {
     return status == PushDeliveryStatus.REQUESTED && RETRYABLE_ERROR_CODE.equals(errorCode);
   }
