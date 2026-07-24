@@ -164,6 +164,33 @@ public class PushDelivery extends BaseTimeEntity {
     return status == PushDeliveryStatus.REQUESTED && RETRYABLE_ERROR_CODE.equals(errorCode);
   }
 
+  /** 재시도 표식을 원자적으로 소비한다.
+   *
+   * @return 현재 재시도를 선점했으면 {@code true}
+   */
+  public boolean claimRetry() {
+    if (!isRetryable()) {
+      return false;
+    }
+    errorCode = null;
+    return true;
+  }
+
+  /**
+   * 요청 상태라면 Ticket 오류를 기록한다.
+   *
+    * @param failureCode Expo Ticket 오류 코드
+    * @param checkedAt 결과 기록 시각
+   * @return Ticket 실패 상태로 전환했으면 {@code true}
+   */
+  public boolean failTicket(String failureCode, LocalDateTime checkedAt) {
+    if (status != PushDeliveryStatus.REQUESTED) {
+      return false;
+    }
+    fail(failureCode, checkedAt);
+    return true;
+  }
+
   /**
    * Ticket 접수 상태라면 Expo Receipt 배달 성공 상태로 전환한다.
    *
@@ -181,19 +208,24 @@ public class PushDelivery extends BaseTimeEntity {
   }
 
   /**
-   * 요청 또는 Ticket 접수 상태라면 Ticket 또는 Receipt 오류를 기록한다.
+   * Ticket 접수 상태라면 Receipt 오류를 기록한다.
    *
-   * @param failureCode Expo 오류 코드
-   * @param checkedAt 결과 기록 시각
-   * @return 실패 상태로 전환했으면 {@code true}
+   * @param failureCode Expo Receipt 오류 코드
+   * @param checkedAt Receipt 확인 시각
+   * @return Receipt 실패 상태로 전환했으면 {@code true}
    */
-  public boolean fail(String failureCode, LocalDateTime checkedAt) {
-    if (status != PushDeliveryStatus.REQUESTED && status != PushDeliveryStatus.TICKET_ACCEPTED) {
+  public boolean failReceipt(String failureCode, LocalDateTime checkedAt) {
+    if (status != PushDeliveryStatus.TICKET_ACCEPTED) {
       return false;
     }
+    fail(failureCode, checkedAt);
+    return true;
+  }
+
+  /** 최종 실패 상태와 오류 코드, 결과 기록 시각을 저장한다. */
+  private void fail(String failureCode, LocalDateTime checkedAt) {
     status = PushDeliveryStatus.FAILED;
     errorCode = failureCode;
     receiptCheckedAt = checkedAt;
-    return true;
   }
 }
