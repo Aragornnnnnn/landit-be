@@ -44,7 +44,7 @@ class DatabaseSchemaIntegrationTests {
     tableNames.forEach(this::assertTableExists);
   }
 
-  /** Push Device 동기화에 필요한 스키마를 생성한다. */
+  /** Push Device 설치 동기화에 필요한 스키마가 존재하는지 검증한다. */
   @Test
   void pushDeviceSchemaSupportsInstallationSynchronization() {
     assertColumnExists("user_push_token", "installation_id");
