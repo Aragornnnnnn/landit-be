@@ -124,6 +124,19 @@ EventBridge Scheduler는 다음 메시지를 매일 `Asia/Seoul` 20시에 발행
 
 백엔드는 `occurredAt`을 `Asia/Seoul`로 변환해 복습 날짜를 계산한다. 같은 Queue에서 `PUSH_RECEIPT_CHECK`도 처리하며 지원하지 않는 version이나 유형은 실패시켜 SQS 재시도와 DLQ 대상으로 남긴다.
 
+## Dev 수동 복습 리마인더 테스트 API
+
+dev에서 20시를 기다리지 않고 실제 발송 경로를 검증하기 위해 다음 테스트 전용 API를 둔다.
+
+```http
+POST /api/v1/internal/test/push/review-reminder
+Authorization: Bearer {accessToken}
+```
+
+API는 Expo를 직접 호출하지 않고 `REVIEW_REMINDER_BATCH` 메시지를 Push Queue에 즉시 발행한다. Consumer가 이후 기존 `ReviewReminderService`를 실행하므로, 기준 날짜에 `READY` 복습 항목이 있는 모든 활성 dev 사용자가 기존 배치와 동일하게 발송 대상이 된다.
+
+Controller는 `landit.notification.test-api-enabled=true`일 때만 생성한다. 기본값은 `false`이며 IaC는 dev API 컨테이너에만 `LANDIT_NOTIFICATION_TEST_API_ENABLED=true`를 주입한다. prod에는 해당 환경 변수를 주입하지 않는다. 인증되지 않은 요청은 기존 Security 설정에서 거부한다.
+
 ## 인프라와 배포
 
 IaC 작업 `019f8fd8-2ef1-7243-a11c-63c2bb3f03a4`에서 dev와 prod의 Queue, DLQ, API IAM·환경 변수, Scheduler와 CloudWatch Alarm을 구현했다.

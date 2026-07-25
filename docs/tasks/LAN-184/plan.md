@@ -200,3 +200,13 @@ try {
 - [x] 재구성한 네 브랜치에서 `./gradlew check`와 최종 `git diff --check`를 다시 실행했다.
 
 커밋 재구성 후 스택 기준은 PR1 `a6b82e2`, PR2 `bd50714`, PR3 `fec18c4`, PR4 현재 문서 커밋이다. 네 브랜치의 `./gradlew check`가 모두 통과했고, 재구성 전후 코드 트리는 동일하다. PR4의 차이는 이 커밋 재구성 기록뿐이다.
+
+### Task 11. Dev 수동 복습 리마인더 테스트 API
+
+- [x] `landit.notification.test-api-enabled` 기본값을 `false`로 추가했다.
+- [x] `POST /api/v1/internal/test/push/review-reminder`를 조건부 Controller로 추가하고, 인증된 요청이 `REVIEW_REMINDER_BATCH`를 현재 시각으로 Push Queue에 발행하게 했다.
+- [x] `PushQueuePublisher`와 `SqsPushQueuePublisher`에 즉시 배치 메시지 발행 계약을 추가했다. Receipt 확인 메시지의 900초 지연 계약은 유지했다.
+- [x] 테스트 API가 활성화됐을 때 202 응답과 SQS 메시지 계약을, 인증되지 않은 요청의 401 응답을 테스트했다.
+- [x] 테스트 API가 비활성인 기본 설정에서는 Controller가 생성되지 않음을 확인했다.
+- [x] 집중 테스트와 `./gradlew check`를 실행했다.
+- [ ] IaC에 dev 전용 `LANDIT_NOTIFICATION_TEST_API_ENABLED=true` 주입을 요청하고, prod 미주입 및 plan 결과를 확인한다.
