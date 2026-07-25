@@ -209,4 +209,4 @@ try {
 - [x] 테스트 API가 활성화됐을 때 202 응답과 SQS 메시지 계약을, 인증되지 않은 요청의 401 응답을 테스트했다.
 - [x] 테스트 API가 비활성인 기본 설정에서는 Controller가 생성되지 않음을 확인했다.
 - [x] 집중 테스트와 `./gradlew check`를 실행했다.
-- [ ] IaC에 dev 전용 `LANDIT_NOTIFICATION_TEST_API_ENABLED=true` 주입을 요청하고, prod 미주입 및 plan 결과를 확인한다.
+- [x] IaC에 dev 전용 `LANDIT_NOTIFICATION_TEST_API_ENABLED=true` 주입을 요청했다. dev만 환경 변수가 추가되고 prod에는 미주입되는 Terraform 계약·validate·plan을 확인했다. IaC commit은 `9a22e16`이며 apply는 하지 않았다. prod plan에는 범위 밖 WAF·Athena 리소스 삭제 9건이 있어 적용하지 않는다.
