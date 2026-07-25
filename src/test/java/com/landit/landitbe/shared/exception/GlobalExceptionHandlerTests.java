@@ -14,6 +14,7 @@ import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 공통 예외 핸들러의 오류 응답 매핑을 검증한다. */
@@ -92,6 +95,16 @@ class GlobalExceptionHandlerTests {
   }
 
   @Test
+  void malformedMultipartRequestUsesValidationFailedErrorWithoutErrorLog() throws Exception {
+    MultipartException exception = new MultipartException("Stream ended unexpectedly");
+
+    ResponseEntity<ApiResponse<Void>> response = resolveException(exception);
+
+    assertError(response, HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "요청 값이 올바르지 않습니다.");
+    assertThat(errorLogs()).isEmpty();
+  }
+
+  @Test
   void missingStaticResourceUsesNotFoundErrorWithoutSentryCapture() {
     NoResourceFoundException exception =
         new NoResourceFoundException(HttpMethod.GET, "/", "No static resource for request '/'.");
@@ -146,5 +159,15 @@ class GlobalExceptionHandlerTests {
 
   private List<ILoggingEvent> errorLogs() {
     return logAppender.list.stream().filter(event -> event.getLevel() == Level.ERROR).toList();
+  }
+
+  @SuppressWarnings("unchecked")
+  private ResponseEntity<ApiResponse<Void>> resolveException(Exception exception) throws Exception {
+    ExceptionHandlerMethodResolver resolver =
+        new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+    Method handlerMethod = resolver.resolveMethod(exception);
+
+    assertThat(handlerMethod).isNotNull();
+    return (ResponseEntity<ApiResponse<Void>>) handlerMethod.invoke(handler, exception);
   }
 }
