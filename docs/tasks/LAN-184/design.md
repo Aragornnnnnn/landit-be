@@ -46,14 +46,15 @@ pushEnabled == true
 ## 복습 리마인더와 전달 결과
 
 - `occurredAt`을 `Asia/Seoul` 날짜로 변환한다.
-- 해당 날짜에 `READY` 복습 항목이 있는 활성 사용자를 조회한다.
-- 사용자별 모든 발송 가능 설치로 한 번씩 보낸다.
+- 해당 날짜에 `READY` 복습 항목이 있는 활성 사용자를 Cursor 페이지로 조회한다. 한 페이지는 후보 사용자 100명이며, 활성 상태 확인도 페이지 단위로 수행한다.
+- 페이지의 모든 발송 가능 설치를 한 번에 조회하고, 사용자별 모든 설치로 한 번씩 보낸다.
 - 중복 방지 키는 `review-reminder:{date}:{userId}:{pushDeviceId}`다.
 - 제목·본문·딥링크는 `복습할 시간이에요`, `오늘의 표현을 다시 볼까요?`, `/expressions?utm_source=push&utm_medium=notification&utm_campaign=review_reminder`다.
 
-Expo 호출 전에 `push_delivery` 이력을 선점한다. 상태는 `REQUESTED → TICKET_ACCEPTED → DELIVERED`이며, Ticket 또는 Receipt 오류는 `FAILED`로 기록한다. Ticket 접수 뒤 `PUSH_RECEIPT_CHECK`를 900초 지연 발행하고, Receipt가 준비되지 않으면 최대 세 번 확인한다.
+Expo 호출 전에 설치별 `push_delivery` 이력을 선점한다. 이력은 멱등성, Ticket, Receipt를 설치별로 추적하므로 묶지 않는다. 선점된 메시지만 최대 100건씩 Expo Push API 요청 배열로 전송하고, 응답 Ticket은 요청 순서대로 각 발송 이력에 기록한다. 상태는 `REQUESTED → TICKET_ACCEPTED → DELIVERED`이며, Ticket 또는 Receipt 오류는 `FAILED`로 기록한다. Ticket 접수 뒤 `PUSH_RECEIPT_CHECK`를 900초 지연 발행하고, Receipt가 준비되지 않으면 최대 세 번 확인한다.
 
 - HTTP 429·5xx·timeout만 같은 발송 이력으로 재시도한다.
+- Expo 요청 전체의 일시 오류면 해당 요청 묶음의 모든 발송 이력을 재시도 가능 상태로 표시한다.
 - 일반 I/O, interruption, 응답 파싱 실패는 자동 재발송하지 않는다.
 - `DeviceNotRegistered`는 발송 당시 Token과 현재 Token이 같은 설치만 `INVALID`로 변경한다.
 - 배치 재전달은 기존 `TICKET_ACCEPTED` 이력의 Receipt 확인만 다시 예약하며 Expo를 다시 호출하지 않는다.

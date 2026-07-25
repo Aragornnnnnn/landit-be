@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,17 +21,28 @@ public class ReviewItemService {
   private final UserProfileService userProfileService;
 
   /**
-   * 기준 날짜에 READY 복습 문항이 있는 활성 사용자 ID를 조회한다.
+   * 기준 날짜에 READY 복습 문항이 있는 활성 사용자를 Cursor 페이지로 조회한다.
    *
    * @param reviewDate 복습 기준 날짜
-   * @return 복습 리마인더 대상 사용자 ID 목록
+   * @param afterUserProfileId 이전 페이지의 마지막 후보 사용자 ID. 첫 페이지면 {@code null}
+   * @param pageSize 한 페이지에 조회할 후보 사용자 수
+   * @return 복습 리마인더 대상 사용자 페이지
    */
   @Transactional(readOnly = true)
-  public List<Long> findReminderTargetUserIds(LocalDate reviewDate) {
-    return reviewItemRepository
-        .findDistinctUserProfileIds(reviewDate, ReviewItemStatus.READY)
-        .stream()
-        .filter(userProfileService::existsActive)
-        .toList();
+  public ReviewReminderTargetPage findReminderTargetPage(
+      LocalDate reviewDate, Long afterUserProfileId, int pageSize) {
+    List<Long> candidateUserProfileIds =
+        reviewItemRepository.findDistinctUserProfileIdsAfter(
+            reviewDate,
+            ReviewItemStatus.READY,
+            afterUserProfileId,
+            PageRequest.of(0, pageSize + 1));
+    boolean hasNext = candidateUserProfileIds.size() > pageSize;
+    List<Long> currentPageUserProfileIds =
+        candidateUserProfileIds.subList(0, Math.min(candidateUserProfileIds.size(), pageSize));
+    Long nextUserProfileId =
+        hasNext ? currentPageUserProfileIds.get(currentPageUserProfileIds.size() - 1) : null;
+    return new ReviewReminderTargetPage(
+        userProfileService.findActiveUserProfileIds(currentPageUserProfileIds), nextUserProfileId);
   }
 }

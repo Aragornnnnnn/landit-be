@@ -3,12 +3,17 @@
 package com.landit.landitbe.feature.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.learning.service.ReviewItemService;
+import com.landit.landitbe.feature.learning.service.ReviewReminderTargetPage;
 import com.landit.landitbe.feature.notification.client.NotificationSender;
 import com.landit.landitbe.feature.notification.client.PushMessage;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
@@ -18,6 +23,8 @@ import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,8 +57,11 @@ class ReviewReminderServiceTest {
   /** 각 테스트에서 사용할 복습 대상 사용자와 설치를 준비한다. */
   @BeforeEach
   void setUpReminderTarget() {
-    when(reviewItemService.findReminderTargetUserIds(REVIEW_DATE)).thenReturn(List.of(1L));
-    lenient().when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(reviewItemService.findReminderTargetPage(REVIEW_DATE, null, 100))
+        .thenReturn(new ReviewReminderTargetPage(List.of(1L), null));
+    lenient()
+        .when(pushDeviceService.findSendableDeliveryTargets(List.of(1L)))
+        .thenReturn(List.of(new PushDeviceSendTarget(1L, 2L)));
   }
 
   /** 복습 대상 사용자의 발송 가능한 설치별로 Ticket을 받고 Receipt 확인을 예약한다. */
@@ -59,8 +69,8 @@ class ReviewReminderServiceTest {
   void sendsReviewReminderAndSchedulesReceiptCheck() {
     when(pushDeliveryService.prepare(org.mockito.ArgumentMatchers.any()))
         .thenReturn(Optional.of(PREPARED_DELIVERY));
-    when(notificationSender.send(PREPARED_DELIVERY.toPushMessage()))
-        .thenReturn(PushTicketResult.accepted("ticket-1"));
+    when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage())))
+        .thenReturn(List.of(PushTicketResult.accepted("ticket-1")));
 
     reviewReminderService.send(REVIEW_DATE);
 
@@ -76,14 +86,15 @@ class ReviewReminderServiceTest {
 
     reviewReminderService.send(REVIEW_DATE);
 
-    verify(notificationSender, never()).send(org.mockito.ArgumentMatchers.any(PushMessage.class));
+    verify(notificationSender, never()).send(anyList());
     verify(pushQueuePublisher, never()).scheduleReceiptCheck(10L, 1);
   }
 
   /** Ticket 접수 이력은 Expo 재발송 없이 Receipt 확인을 다시 예약한다. */
   @Test
   void reschedulesReceiptCheckForAcceptedDeliveryWithoutResendingExpo() {
-    when(reviewItemService.findReminderTargetUserIds(REVIEW_DATE)).thenReturn(List.of());
+    when(reviewItemService.findReminderTargetPage(REVIEW_DATE, null, 100))
+        .thenReturn(new ReviewReminderTargetPage(List.of(), null));
     when(pushDeliveryService.findAcceptedDeliveryIds("review-reminder:" + REVIEW_DATE + ":"))
         .thenReturn(List.of(10L));
 
@@ -91,7 +102,7 @@ class ReviewReminderServiceTest {
 
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
     verify(pushDeliveryService, never()).prepare(org.mockito.ArgumentMatchers.any());
-    verify(notificationSender, never()).send(org.mockito.ArgumentMatchers.any(PushMessage.class));
+    verify(notificationSender, never()).send(anyList());
   }
 
   /** Ticket 접수 이력의 Receipt 예약을 현재 발송 대상 선점보다 먼저 처리한다. */
@@ -115,7 +126,8 @@ class ReviewReminderServiceTest {
     PushTicketResult rejected = PushTicketResult.failed("DeviceNotRegistered");
     when(pushDeliveryService.prepare(org.mockito.ArgumentMatchers.any()))
         .thenReturn(Optional.of(PREPARED_DELIVERY));
-    when(notificationSender.send(PREPARED_DELIVERY.toPushMessage())).thenReturn(rejected);
+    when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage())))
+        .thenReturn(List.of(rejected));
 
     reviewReminderService.send(REVIEW_DATE);
 
@@ -130,7 +142,7 @@ class ReviewReminderServiceTest {
         new RetryablePushNotificationException("Expo Push 요청이 일시적으로 실패했습니다.");
     when(pushDeliveryService.prepare(org.mockito.ArgumentMatchers.any()))
         .thenReturn(Optional.of(PREPARED_DELIVERY));
-    when(notificationSender.send(PREPARED_DELIVERY.toPushMessage())).thenThrow(failure);
+    when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenThrow(failure);
 
     assertThatThrownBy(() -> reviewReminderService.send(REVIEW_DATE)).isSameAs(failure);
     verify(pushDeliveryService).markRetryable(10L);
@@ -142,16 +154,16 @@ class ReviewReminderServiceTest {
     PushNotificationException failure = new PushNotificationException("Expo Push 요청 결과를 알 수 없습니다.");
     when(pushDeliveryService.prepare(org.mockito.ArgumentMatchers.any()))
         .thenReturn(Optional.of(PREPARED_DELIVERY));
-    when(notificationSender.send(PREPARED_DELIVERY.toPushMessage())).thenThrow(failure);
+    when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenThrow(failure);
 
     assertThatThrownBy(() -> reviewReminderService.send(REVIEW_DATE)).isSameAs(failure);
 
     verify(pushDeliveryService, never()).markRetryable(10L);
   }
 
-  /** 첫 설치 발송이 실패해도 다음 설치까지 처리한 뒤 최초 오류를 다시 전파한다. */
+  /** 한 Expo 요청의 개별 Ticket 결과를 설치별 발송 이력에 기록한다. */
   @Test
-  void continuesSendingRemainingDevicesBeforePropagatingFirstFailure() {
+  void recordsTicketResultForEachDeliveryInBatch() {
     PreparedPushDelivery secondDelivery =
         new PreparedPushDelivery(
             11L,
@@ -159,20 +171,57 @@ class ReviewReminderServiceTest {
             "복습할 시간이에요",
             "오늘의 표현을 다시 볼까요?",
             "/expressions");
-    RetryablePushNotificationException firstFailure =
-        new RetryablePushNotificationException("첫 설치의 일시 오류");
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L, 3L));
+    when(pushDeviceService.findSendableDeliveryTargets(List.of(1L)))
+        .thenReturn(List.of(new PushDeviceSendTarget(1L, 2L), new PushDeviceSendTarget(1L, 3L)));
     when(pushDeliveryService.prepare(org.mockito.ArgumentMatchers.any()))
         .thenReturn(Optional.of(PREPARED_DELIVERY), Optional.of(secondDelivery));
-    when(notificationSender.send(PREPARED_DELIVERY.toPushMessage())).thenThrow(firstFailure);
-    when(notificationSender.send(secondDelivery.toPushMessage()))
-        .thenReturn(PushTicketResult.accepted("ticket-2"));
+    when(notificationSender.send(
+            List.of(PREPARED_DELIVERY.toPushMessage(), secondDelivery.toPushMessage())))
+        .thenReturn(
+            List.of(
+                PushTicketResult.failed("DeviceNotRegistered"),
+                PushTicketResult.accepted("ticket-2")));
 
-    assertThatThrownBy(() -> reviewReminderService.send(REVIEW_DATE)).isSameAs(firstFailure);
+    reviewReminderService.send(REVIEW_DATE);
 
-    verify(pushDeliveryService).markRetryable(10L);
-    verify(notificationSender).send(secondDelivery.toPushMessage());
+    verify(pushDeliveryService)
+        .recordTicketResult(10L, PushTicketResult.failed("DeviceNotRegistered"));
     verify(pushDeliveryService).recordTicketResult(11L, PushTicketResult.accepted("ticket-2"));
     verify(pushQueuePublisher).scheduleReceiptCheck(11L, 1);
+  }
+
+  /** 100건을 초과하는 발송 이력은 Expo 요청 최대 크기에 맞춰 나누어 전송한다. */
+  @Test
+  void splitsPreparedDeliveriesAtExpoBatchLimit() {
+    List<PushDeviceSendTarget> targets =
+        LongStream.rangeClosed(1, 101)
+            .mapToObj(pushDeviceId -> new PushDeviceSendTarget(1L, pushDeviceId))
+            .toList();
+    AtomicLong deliveryId = new AtomicLong(1L);
+    when(pushDeviceService.findSendableDeliveryTargets(List.of(1L))).thenReturn(targets);
+    when(pushDeliveryService.prepare(any()))
+        .thenAnswer(
+            invocation ->
+                Optional.of(
+                    new PreparedPushDelivery(
+                        deliveryId.getAndIncrement(),
+                        "ExponentPushToken[batch-token]",
+                        "복습할 시간이에요",
+                        "오늘의 표현을 다시 볼까요?",
+                        "/expressions")));
+    when(notificationSender.send(anyList()))
+        .thenAnswer(
+            invocation -> {
+              List<PushMessage> messages = invocation.<List<PushMessage>>getArgument(0);
+              return messages.stream()
+                  .map(message -> PushTicketResult.accepted("ticket-" + message.expoPushToken()))
+                  .toList();
+            });
+
+    reviewReminderService.send(REVIEW_DATE);
+
+    verify(notificationSender, times(2)).send(anyList());
+    verify(notificationSender).send(argThat(messages -> messages.size() == 100));
+    verify(notificationSender).send(argThat(messages -> messages.size() == 1));
   }
 }

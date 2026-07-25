@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,9 @@ class ReviewItemRepositoryIntegrationTests {
     seedReviewItem(9950013L, 995001L, REVIEW_DATE.plusDays(1), 1, "READY", null);
     seedReviewItem(9950021L, 995002L, REVIEW_DATE, 1, "COMPLETED", "2026-07-24 12:00:00");
 
-    assertThat(reviewItemRepository.findDistinctUserProfileIds(REVIEW_DATE, ReviewItemStatus.READY))
+    assertThat(
+            reviewItemRepository.findDistinctUserProfileIdsAfter(
+                REVIEW_DATE, ReviewItemStatus.READY, null, PageRequest.of(0, 10)))
         .containsExactly(995001L);
   }
 

@@ -66,8 +66,9 @@ class PushNotificationRepositoryIntegrationTests {
     pushDeviceRepository.saveAllAndFlush(java.util.List.of(sendable, disabled, invalid));
 
     assertThat(
-            pushDeviceRepository.findAllByUserProfileIdAndPushEnabledTrueAndTokenStatus(
-                USER_ID, PushTokenStatus.ACTIVE))
+            pushDeviceRepository
+                .findAllByUserProfileIdInAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
+                    java.util.List.of(USER_ID), PushTokenStatus.ACTIVE))
         .containsExactly(sendable);
   }
 

@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.learning.domain.ReviewItem;
 import com.landit.landitbe.feature.learning.domain.ReviewItemStatus;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,8 +27,12 @@ public interface ReviewItemRepository extends JpaRepository<ReviewItem, Long> {
       from ReviewItem reviewItem
       where reviewItem.reviewDate = :reviewDate
         and reviewItem.status = :status
+        and (:afterUserProfileId is null or reviewItem.userProfileId > :afterUserProfileId)
       order by reviewItem.userProfileId
       """)
-  List<Long> findDistinctUserProfileIds(
-      @Param("reviewDate") LocalDate reviewDate, @Param("status") ReviewItemStatus status);
+  List<Long> findDistinctUserProfileIdsAfter(
+      @Param("reviewDate") LocalDate reviewDate,
+      @Param("status") ReviewItemStatus status,
+      @Param("afterUserProfileId") Long afterUserProfileId,
+      Pageable pageable);
 }

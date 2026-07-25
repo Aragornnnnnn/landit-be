@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.learning.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,16 +30,21 @@ class ReviewItemServiceTest {
 
   @InjectMocks private ReviewItemService reviewItemService;
 
-  /** 기준 날짜의 READY 복습 항목을 가진 활성 사용자만 반환한다. */
+  /** 기준 날짜의 READY 복습 항목을 가진 활성 사용자를 다음 페이지 Cursor와 함께 반환한다. */
   @Test
-  void findsActiveUsersWithReadyReviewItems() {
-    when(reviewItemRepository.findDistinctUserProfileIds(REVIEW_DATE, ReviewItemStatus.READY))
+  void findsActiveUsersWithReadyReviewItemsInPage() {
+    when(reviewItemRepository.findDistinctUserProfileIdsAfter(
+            org.mockito.ArgumentMatchers.eq(REVIEW_DATE),
+            org.mockito.ArgumentMatchers.eq(ReviewItemStatus.READY),
+            org.mockito.ArgumentMatchers.isNull(),
+            any()))
         .thenReturn(List.of(1L, 2L, 3L));
-    when(userProfileService.existsActive(1L)).thenReturn(true);
-    when(userProfileService.existsActive(2L)).thenReturn(false);
-    when(userProfileService.existsActive(3L)).thenReturn(true);
+    when(userProfileService.findActiveUserProfileIds(List.of(1L, 2L))).thenReturn(List.of(1L));
 
-    assertThat(reviewItemService.findReminderTargetUserIds(REVIEW_DATE)).containsExactly(1L, 3L);
-    verify(reviewItemRepository).findDistinctUserProfileIds(REVIEW_DATE, ReviewItemStatus.READY);
+    ReviewReminderTargetPage page = reviewItemService.findReminderTargetPage(REVIEW_DATE, null, 2);
+
+    assertThat(page.userProfileIds()).containsExactly(1L);
+    assertThat(page.nextUserProfileId()).isEqualTo(2L);
+    verify(userProfileService).findActiveUserProfileIds(List.of(1L, 2L));
   }
 }

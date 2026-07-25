@@ -6,7 +6,7 @@
 | --- | --- |
 | 설치 상태 | 설치 ID·Token unique, ON/OFF, `ACTIVE`·`INVALID` 상태와 소유권 이전 구현 |
 | 공개 API | `PUT /api/v1/me/push-devices/{installationId}` 구현 및 OpenAPI 반영 |
-| 발송 | `READY` 복습 대상과 발송 가능 설치 조회, Expo Ticket 발송 구현 |
+| 발송 | `READY` 복습 대상 Cursor 페이지와 페이지별 설치 일괄 조회, 설치별 이력 선점, Expo 최대 100건 묶음 Ticket 발송 구현 |
 | 신뢰성 | 발송 이력 선점, 재시도 분류, Receipt 확인·무효 Token 처리 구현 |
 | Queue | API 내부 Consumer, 동시성 2, 900초 Receipt 지연 메시지 구현 |
 | dev 검증 | 조건부 수동 복습 리마인더 테스트 API 구현 |
