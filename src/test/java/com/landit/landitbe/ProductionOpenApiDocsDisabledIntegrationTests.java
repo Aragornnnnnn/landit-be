@@ -36,6 +36,16 @@ class ProductionOpenApiDocsDisabledIntegrationTests {
   }
 
   @Test
+  void actuatorDiscoveryIsNotFound() throws Exception {
+    mockMvc.perform(get("/actuator")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void actuatorInfoIsNotFound() throws Exception {
+    mockMvc.perform(get("/actuator/info")).andExpect(status().isNotFound());
+  }
+
+  @Test
   void actuatorHealthRemainsAvailable() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
   }

@@ -92,8 +92,7 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR)
                     .permitAll()
-                    .requestMatchers(
-                        "/actuator/health", "/actuator/info", "/swagger-ui/**", "/v3/api-docs/**")
+                    .requestMatchers("/actuator/health", "/swagger-ui/**", "/v3/api-docs/**")
                     .permitAll()
                     .anyRequest()
                     .permitAll())

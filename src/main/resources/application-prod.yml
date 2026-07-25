@@ -11,3 +11,11 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+management:
+  endpoints:
+    web:
+      discovery:
+        enabled: false
+      exposure:
+        include: health
