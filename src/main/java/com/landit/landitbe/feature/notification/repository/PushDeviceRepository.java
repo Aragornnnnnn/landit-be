@@ -62,12 +62,12 @@ public interface PushDeviceRepository extends JpaRepository<PushDevice, Long> {
   Optional<PushDevice> findByIdForUpdate(@Param("pushDeviceId") Long pushDeviceId);
 
   /**
-   * 여러 사용자의 발송 가능한 Push Device를 한 번에 조회한다.
+   * 한 사용자의 발송 가능한 Push Device를 조회한다.
    *
-   * @param userProfileIds 사용자 프로필 ID 목록
+   * @param userProfileId 사용자 프로필 ID
    * @param tokenStatus Expo Push Token 상태
    * @return 알림 수신이 켜진 Push Device 목록
    */
-  List<PushDevice> findAllByUserProfileIdInAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
-      List<Long> userProfileIds, PushTokenStatus tokenStatus);
+  List<PushDevice> findAllByUserProfileIdAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
+      Long userProfileId, PushTokenStatus tokenStatus);
 }

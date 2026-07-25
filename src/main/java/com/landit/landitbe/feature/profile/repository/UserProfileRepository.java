@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.profile.repository;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import jakarta.persistence.LockModeType;
-import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -31,16 +30,4 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
 
   /** 특정 상태의 사용자 프로필 존재 여부를 PK로 확인한다. */
   boolean existsByIdAndStatus(Long id, UserProfileStatus status);
-
-  /** 여러 사용자 ID 중 지정한 상태인 ID만 조회한다. */
-  @Query(
-      """
-      select userProfile.id
-      from UserProfile userProfile
-      where userProfile.id in :userProfileIds
-        and userProfile.status = :status
-      """)
-  List<Long> findIdsByIdInAndStatus(
-      @Param("userProfileIds") List<Long> userProfileIds,
-      @Param("status") UserProfileStatus status);
 }

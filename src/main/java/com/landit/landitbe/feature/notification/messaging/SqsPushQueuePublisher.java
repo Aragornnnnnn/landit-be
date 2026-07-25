@@ -26,7 +26,7 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   private static final int MESSAGE_VERSION = 1;
   private static final int RECEIPT_DELAY_SECONDS = 900;
-  private static final String REVIEW_REMINDER_BATCH = "REVIEW_REMINDER_BATCH";
+  private static final String PUSH_SEND = "PUSH_SEND";
   private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
   private final SqsAsyncClient sqsAsyncClient;
@@ -35,16 +35,16 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   /** {@inheritDoc} */
   @Override
-  public void publishReviewReminderBatch(Instant occurredAt) {
+  public void publishNotification(PushNotificationRequest request) {
     validateConfiguration();
     PushQueueMessage message =
         new PushQueueMessage(
             MESSAGE_VERSION,
-            UUID.randomUUID().toString(),
-            REVIEW_REMINDER_BATCH,
-            occurredAt,
-            new PushQueuePayload(null, null));
-    send(message, 0, "복습 리마인더 배치 메시지 발행에 실패했습니다.");
+            request.eventId(),
+            PUSH_SEND,
+            request.occurredAt(),
+            PushQueuePayload.notification(request));
+    send(message, 0, "Push 발송 메시지 발행에 실패했습니다.");
   }
 
   /** {@inheritDoc} */
@@ -57,7 +57,7 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
             UUID.randomUUID().toString(),
             PUSH_RECEIPT_CHECK,
             Instant.now(),
-            new PushQueuePayload(pushDeliveryId, attempt));
+            PushQueuePayload.receipt(pushDeliveryId, attempt));
     send(message, properties.receiptDelaySeconds(), "Push Receipt 확인 메시지 발행에 실패했습니다.");
   }
 

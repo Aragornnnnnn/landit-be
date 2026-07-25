@@ -9,7 +9,6 @@ import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -136,20 +135,6 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public boolean existsActive(Long userId) {
     return userProfileRepository.existsByIdAndStatus(userId, UserProfileStatus.ACTIVE);
-  }
-
-  /**
-   * 후보 사용자 중 활성 상태인 사용자 ID만 한 번에 조회한다.
-   *
-   * @param userProfileIds 활성 상태를 확인할 후보 사용자 ID
-   * @return 활성 사용자 ID 목록
-   */
-  @Transactional(readOnly = true)
-  public List<Long> findActiveUserProfileIds(List<Long> userProfileIds) {
-    if (userProfileIds.isEmpty()) {
-      return List.of();
-    }
-    return userProfileRepository.findIdsByIdInAndStatus(userProfileIds, UserProfileStatus.ACTIVE);
   }
 
   /**

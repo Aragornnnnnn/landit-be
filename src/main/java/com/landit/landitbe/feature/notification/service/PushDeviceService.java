@@ -120,24 +120,19 @@ public class PushDeviceService {
   }
 
   /**
-   * 여러 사용자의 발송 가능한 Push Device를 한 번에 조회한다.
+   * 한 사용자의 발송 가능한 Push Device ID를 조회한다.
    *
-   * @param userProfileIds 사용자 프로필 ID 목록
-   * @return 발송 가능한 Push Device 대상 목록
+   * @param userProfileId 사용자 프로필 ID
+   * @return 발송 가능한 Push Device ID 목록
    */
   @Transactional(readOnly = true)
-  public List<PushDeviceSendTarget> findSendableDeliveryTargets(List<Long> userProfileIds) {
-    if (userProfileIds.isEmpty()) {
-      return List.of();
-    }
+  public List<Long> findSendableDeviceIds(Long userProfileId) {
     return pushDeviceRepository
-        .findAllByUserProfileIdInAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
-            userProfileIds, PushTokenStatus.ACTIVE)
+        .findAllByUserProfileIdAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
+            userProfileId, PushTokenStatus.ACTIVE)
         .stream()
         .filter(PushDevice::isSendable)
-        .map(
-            pushDevice ->
-                new PushDeviceSendTarget(pushDevice.getUserProfileId(), pushDevice.getId()))
+        .map(PushDevice::getId)
         .toList();
   }
 

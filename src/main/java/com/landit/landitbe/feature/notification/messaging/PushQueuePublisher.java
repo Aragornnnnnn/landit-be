@@ -2,17 +2,15 @@
 
 package com.landit.landitbe.feature.notification.messaging;
 
-import java.time.Instant;
-
-/** Receipt 확인 메시지를 Push 전용 Queue에 지연 발행하는 Port다. */
+/** 푸시 발송과 Receipt 확인 메시지를 Push 전용 Queue에 발행하는 Port다. */
 public interface PushQueuePublisher {
 
   /**
-   * 현재 시각 기준 복습 리마인더 배치 메시지를 Push 전용 Queue에 즉시 발행한다.
+   * 사용자별 푸시 발송 메시지를 Push 전용 Queue에 즉시 발행한다.
    *
-   * @param occurredAt 복습 대상 날짜를 계산할 기준 시각
+   * @param request 발송 대상과 알림 내용
    */
-  void publishReviewReminderBatch(Instant occurredAt);
+  void publishNotification(PushNotificationRequest request);
 
   /**
    * Expo Receipt 확인 메시지를 지정된 초기 지연으로 발행한다.
