@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.notification.client.PushNotificationException
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -50,7 +51,10 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
               .delaySeconds(properties.receiptDelaySeconds())
               .messageBody(jsonMapper.writeValueAsString(message))
               .build();
-      sqsAsyncClient.sendMessage(request).join();
+      sqsAsyncClient
+          .sendMessage(request)
+          .orTimeout(properties.requestTimeout().toMillis(), TimeUnit.MILLISECONDS)
+          .join();
     } catch (JacksonException | CompletionException exception) {
       throw new PushNotificationException("Push Receipt 확인 메시지 발행에 실패했습니다.", exception);
     }
