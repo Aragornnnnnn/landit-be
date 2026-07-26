@@ -89,7 +89,7 @@ class PushQueueMessageHandlerTest {
             "receipt-message-id",
             "PUSH_RECEIPT_CHECK",
             Instant.parse("2026-07-24T11:15:00Z"),
-            new PushQueuePayload(10L, 4));
+            PushQueuePayload.receipt(10L, 4));
 
     pushQueueMessageHandler.handle(message);
 
