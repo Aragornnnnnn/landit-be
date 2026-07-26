@@ -129,7 +129,11 @@ public class PushDelivery extends BaseTimeEntity {
         requestedAt);
   }
 
-  /** Expo가 접수한 Ticket ID를 기록한다. */
+  /**
+   * Expo가 접수한 Ticket ID를 기록한다.
+   *
+   * @param ticketId Expo Ticket ID
+   */
   public void acceptTicket(String ticketId) {
     expoTicketId = ticketId;
     status = PushDeliveryStatus.TICKET_ACCEPTED;
@@ -143,19 +147,32 @@ public class PushDelivery extends BaseTimeEntity {
     }
   }
 
-  /** 현재 발송 이력이 명시적인 일시 오류 이후 재시도를 기다리는지 반환한다. */
+  /**
+   * 현재 발송 이력이 명시적인 일시 오류 이후 재시도를 기다리는지 반환한다.
+   *
+   * @return 재시도 표식이 남아 있으면 {@code true}
+   */
   public boolean isRetryable() {
     return status == PushDeliveryStatus.REQUESTED && RETRYABLE_ERROR_CODE.equals(errorCode);
   }
 
-  /** Expo Receipt가 배달 성공을 확인한 상태로 전환한다. */
+  /**
+   * Expo Receipt가 배달 성공을 확인한 상태로 전환한다.
+   *
+   * @param checkedAt Receipt 확인 시각
+   */
   public void delivered(LocalDateTime checkedAt) {
     status = PushDeliveryStatus.DELIVERED;
     errorCode = null;
     receiptCheckedAt = checkedAt;
   }
 
-  /** Ticket 또는 Receipt 오류를 기록한다. */
+  /**
+   * Ticket 또는 Receipt 오류를 기록한다.
+   *
+   * @param failureCode Expo 오류 코드
+   * @param checkedAt 결과 기록 시각
+   */
   public void fail(String failureCode, LocalDateTime checkedAt) {
     status = PushDeliveryStatus.FAILED;
     errorCode = failureCode;
