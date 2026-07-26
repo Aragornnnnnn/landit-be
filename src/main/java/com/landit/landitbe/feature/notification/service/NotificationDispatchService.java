@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 public class NotificationDispatchService {
 
   private static final int EXPO_BATCH_SIZE = 100;
+  private static final String EXPO_REQUEST_UNCONFIRMED = "EXPO_REQUEST_UNCONFIRMED";
+  private static final String EXPO_TICKET_RESULT_MISMATCH = "EXPO_TICKET_RESULT_MISMATCH";
 
   private final PushDeviceService pushDeviceService;
   private final PushDeliveryService pushDeliveryService;
@@ -37,7 +39,7 @@ public class NotificationDispatchService {
   public void send(SendPushNotificationCommand command) {
     scheduleAcceptedDeliveryReceipts(command.eventId());
     List<PreparedPushDelivery> deliveries = new ArrayList<>(EXPO_BATCH_SIZE);
-    PushNotificationException firstFailure = null;
+    RetryablePushNotificationException firstFailure = null;
     for (Long pushDeviceId : pushDeviceService.findSendableDeviceIds(command.userProfileId())) {
       pushDeliveryService.prepare(prepareCommand(command, pushDeviceId)).ifPresent(deliveries::add);
       if (deliveries.size() == EXPO_BATCH_SIZE) {
@@ -61,24 +63,36 @@ public class NotificationDispatchService {
   }
 
   /** 선점된 알림 묶음을 Expo에 보내고 요청 순서대로 Ticket 결과와 Receipt 예약을 기록한다. */
-  private PushNotificationException sendPreparedDeliveries(List<PreparedPushDelivery> deliveries) {
+  private RetryablePushNotificationException sendPreparedDeliveries(
+      List<PreparedPushDelivery> deliveries) {
+    List<PushTicketResult> results;
     try {
-      List<PushTicketResult> results =
+      results =
           notificationSender.send(
               deliveries.stream().map(PreparedPushDelivery::toPushMessage).toList());
-      if (results.size() != deliveries.size()) {
-        return new PushNotificationException("Expo Push Ticket 결과 수가 요청 수와 일치하지 않습니다.");
-      }
-      for (int index = 0; index < deliveries.size(); index++) {
-        recordTicketResult(deliveries.get(index), results.get(index));
-      }
-      return null;
     } catch (RetryablePushNotificationException exception) {
       deliveries.forEach(delivery -> pushDeliveryService.markRetryable(delivery.pushDeliveryId()));
       return exception;
     } catch (PushNotificationException exception) {
-      return exception;
+      markDeliveriesFailed(deliveries, EXPO_REQUEST_UNCONFIRMED);
+      return null;
     }
+    if (results.size() != deliveries.size()) {
+      markDeliveriesFailed(deliveries, EXPO_TICKET_RESULT_MISMATCH);
+      return null;
+    }
+    for (int index = 0; index < deliveries.size(); index++) {
+      recordTicketResult(deliveries.get(index), results.get(index));
+    }
+    return null;
+  }
+
+  /** 자동 재발송하면 안 되는 Expo 요청 실패를 발송 이력에 종료 상태로 기록한다. */
+  private void markDeliveriesFailed(List<PreparedPushDelivery> deliveries, String errorCode) {
+    deliveries.forEach(
+        delivery ->
+            pushDeliveryService.recordTicketResult(
+                delivery.pushDeliveryId(), PushTicketResult.failed(errorCode)));
   }
 
   /** Ticket 결과를 발송 이력에 기록하고 접수된 알림의 Receipt 확인을 예약한다. */
@@ -90,8 +104,8 @@ public class NotificationDispatchService {
   }
 
   /** 먼저 발생한 실패를 유지해 모든 발송 대상 처리 뒤 SQS 재시도를 유도한다. */
-  private PushNotificationException retainFirstFailure(
-      PushNotificationException firstFailure, PushNotificationException failure) {
+  private RetryablePushNotificationException retainFirstFailure(
+      RetryablePushNotificationException firstFailure, RetryablePushNotificationException failure) {
     return firstFailure == null ? failure : firstFailure;
   }
 

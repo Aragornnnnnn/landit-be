@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.notification.client.NotificationSender;
 import com.landit.landitbe.feature.notification.client.PushMessage;
+import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
@@ -94,6 +95,36 @@ class NotificationDispatchServiceTest {
     assertThatThrownBy(() -> notificationDispatchService.send(COMMAND)).isSameAs(failure);
 
     verify(pushDeliveryService).markRetryable(10L);
+  }
+
+  /** Expo 수신 여부를 확정할 수 없는 오류는 재전달하지 않고 발송 이력을 종료한다. */
+  @Test
+  void marksDeliveryFailedWithoutRetryingUnconfirmedExpoFailure() {
+    PushNotificationException failure =
+        new PushNotificationException("Expo Push 응답 형식이 올바르지 않습니다.");
+    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(pushDeliveryService.prepare(any())).thenReturn(Optional.of(PREPARED_DELIVERY));
+    when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenThrow(failure);
+
+    notificationDispatchService.send(COMMAND);
+
+    verify(pushDeliveryService)
+        .recordTicketResult(10L, PushTicketResult.failed("EXPO_REQUEST_UNCONFIRMED"));
+    verify(pushDeliveryService, never()).markRetryable(10L);
+  }
+
+  /** Expo Ticket 결과 수가 요청 수와 다르면 발송 이력을 종료하고 메시지를 확인 처리한다. */
+  @Test
+  void marksDeliveryFailedWithoutRetryingTicketResultCountMismatch() {
+    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(pushDeliveryService.prepare(any())).thenReturn(Optional.of(PREPARED_DELIVERY));
+    when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenReturn(List.of());
+
+    notificationDispatchService.send(COMMAND);
+
+    verify(pushDeliveryService)
+        .recordTicketResult(10L, PushTicketResult.failed("EXPO_TICKET_RESULT_MISMATCH"));
+    verify(pushDeliveryService, never()).markRetryable(10L);
   }
 
   /** 발송 가능한 설치가 없으면 Expo를 호출하지 않는다. */
