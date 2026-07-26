@@ -15,7 +15,7 @@ import java.util.UUID;
  * @param installationId 앱 설치 ID
  * @param platform 기기 플랫폼
  * @param pushEnabled Landit 푸시 알림 수신 여부
- * @param pushTokenRegistered Expo Push Token 저장 여부
+ * @param pushTokenRegistered 활성 Expo Push Token 저장 여부. 수신 설정은 {@code pushEnabled}로 별도 판단한다.
  * @param updatedAt 마지막 동기화 시각
  */
 @Schema(description = "푸시 알림 설치 상태 동기화 결과")
@@ -23,7 +23,8 @@ public record PushDeviceSyncResponse(
     @Schema(description = "앱 설치 ID") UUID installationId,
     @Schema(description = "기기 플랫폼") AppPlatform platform,
     @Schema(description = "Landit 푸시 알림 수신 여부") boolean pushEnabled,
-    @Schema(description = "발송 가능한 Expo Push Token 등록 여부") boolean pushTokenRegistered,
+    @Schema(description = "활성 Expo Push Token 등록 여부. Landit 알림 수신 여부는 pushEnabled로 별도 판단합니다.")
+        boolean pushTokenRegistered,
     @Schema(description = "마지막 동기화 시각") LocalDateTime updatedAt) {
 
   /**

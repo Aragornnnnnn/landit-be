@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.notification.domain.PushDevice;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncRequest;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncResponse;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessException;
@@ -64,9 +65,13 @@ public class PushDeviceService {
   private PushDeviceSyncResponse synchronizeInTransaction(
       Long userProfileId, UUID installationId, PushDeviceSyncRequest request) {
     String expoPushToken = request.normalizedExpoPushToken();
+    List<PushDevice> lockedPushDevices =
+        pushDeviceRepository.findByInstallationIdOrExpoPushTokenForUpdate(
+            installationId, expoPushToken);
     PushDevice pushDevice =
-        pushDeviceRepository
-            .findByInstallationIdForUpdate(installationId)
+        lockedPushDevices.stream()
+            .filter(lockedPushDevice -> lockedPushDevice.getInstallationId().equals(installationId))
+            .findFirst()
             .orElseGet(
                 () ->
                     PushDevice.create(
@@ -76,7 +81,7 @@ public class PushDeviceService {
                         request.pushEnabled(),
                         expoPushToken));
 
-    detachTokenFromAnotherInstallation(pushDevice, expoPushToken);
+    detachTokenFromAnotherInstallation(lockedPushDevices, pushDevice, expoPushToken);
     pushDevice.synchronize(userProfileId, request.platform(), request.pushEnabled(), expoPushToken);
 
     return PushDeviceSyncResponse.from(pushDeviceRepository.saveAndFlush(pushDevice));
@@ -84,14 +89,15 @@ public class PushDeviceService {
 
   /** 같은 Expo Push Token을 사용 중인 다른 설치의 Token 연결을 해제한다. */
   private void detachTokenFromAnotherInstallation(
-      PushDevice currentPushDevice, String expoPushToken) {
+      List<PushDevice> lockedPushDevices, PushDevice currentPushDevice, String expoPushToken) {
     if (expoPushToken == null) {
       return;
     }
 
-    pushDeviceRepository
-        .findByExpoPushTokenForUpdate(expoPushToken)
+    lockedPushDevices.stream()
+        .filter(lockedPushDevice -> expoPushToken.equals(lockedPushDevice.getExpoPushToken()))
         .filter(tokenOwner -> tokenOwner != currentPushDevice)
+        .findFirst()
         .ifPresent(
             tokenOwner -> {
               tokenOwner.detachToken();

@@ -15,7 +15,7 @@ import com.landit.landitbe.feature.notification.domain.PushDevice;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncRequest;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
 import com.landit.landitbe.shared.domain.AppPlatform;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,14 +64,13 @@ class PushDeviceServiceTest {
     PushDeviceSyncRequest request =
         new PushDeviceSyncRequest(AppPlatform.IOS, true, EXPO_PUSH_TOKEN);
     AtomicInteger installationLookupCount = new AtomicInteger();
-    when(pushDeviceRepository.findByInstallationIdForUpdate(INSTALLATION_ID))
+    when(pushDeviceRepository.findByInstallationIdOrExpoPushTokenForUpdate(
+            INSTALLATION_ID, EXPO_PUSH_TOKEN))
         .thenAnswer(
             invocation ->
                 installationLookupCount.getAndIncrement() == 0
-                    ? Optional.empty()
-                    : Optional.of(existingPushDevice));
-    when(pushDeviceRepository.findByExpoPushTokenForUpdate(EXPO_PUSH_TOKEN))
-        .thenReturn(Optional.empty());
+                    ? List.of()
+                    : List.of(existingPushDevice));
     when(pushDeviceRepository.saveAndFlush(any(PushDevice.class)))
         .thenThrow(new DataIntegrityViolationException("duplicate installation"))
         .thenAnswer(this::returnSavedPushDevice);
@@ -84,7 +83,8 @@ class PushDeviceServiceTest {
     assertThat(existingPushDevice.isPushEnabled()).isTrue();
     assertThat(existingPushDevice.getExpoPushToken()).isEqualTo(EXPO_PUSH_TOKEN);
     verify(transactionManager, times(2)).getTransaction(any());
-    verify(pushDeviceRepository, times(2)).findByInstallationIdForUpdate(INSTALLATION_ID);
+    verify(pushDeviceRepository, times(2))
+        .findByInstallationIdOrExpoPushTokenForUpdate(INSTALLATION_ID, EXPO_PUSH_TOKEN);
     verify(pushDeviceRepository, times(2)).saveAndFlush(any(PushDevice.class));
   }
 
@@ -93,10 +93,9 @@ class PushDeviceServiceTest {
   void retriesSynchronizationWhenLockAcquisitionTemporarilyFails() {
     PushDeviceSyncRequest request =
         new PushDeviceSyncRequest(AppPlatform.IOS, true, EXPO_PUSH_TOKEN);
-    when(pushDeviceRepository.findByInstallationIdForUpdate(INSTALLATION_ID))
-        .thenReturn(Optional.empty());
-    when(pushDeviceRepository.findByExpoPushTokenForUpdate(EXPO_PUSH_TOKEN))
-        .thenReturn(Optional.empty());
+    when(pushDeviceRepository.findByInstallationIdOrExpoPushTokenForUpdate(
+            INSTALLATION_ID, EXPO_PUSH_TOKEN))
+        .thenReturn(List.of());
     when(pushDeviceRepository.saveAndFlush(any(PushDevice.class)))
         .thenThrow(new CannotAcquireLockException("temporary lock failure"))
         .thenAnswer(this::returnSavedPushDevice);
@@ -115,10 +114,9 @@ class PushDeviceServiceTest {
         new PushDeviceSyncRequest(AppPlatform.IOS, true, EXPO_PUSH_TOKEN);
     CannotAcquireLockException secondFailure =
         new CannotAcquireLockException("second attempt failed");
-    when(pushDeviceRepository.findByInstallationIdForUpdate(INSTALLATION_ID))
-        .thenReturn(Optional.empty());
-    when(pushDeviceRepository.findByExpoPushTokenForUpdate(EXPO_PUSH_TOKEN))
-        .thenReturn(Optional.empty());
+    when(pushDeviceRepository.findByInstallationIdOrExpoPushTokenForUpdate(
+            INSTALLATION_ID, EXPO_PUSH_TOKEN))
+        .thenReturn(List.of());
     when(pushDeviceRepository.saveAndFlush(any(PushDevice.class)))
         .thenThrow(new DataIntegrityViolationException("first attempt failed"))
         .thenThrow(secondFailure);
@@ -134,10 +132,9 @@ class PushDeviceServiceTest {
   /** 외부 트랜잭션이 있어도 첫 시도와 재시도를 각각 새 트랜잭션으로 실행한다. */
   @Test
   void usesRequiresNewForBothAttemptsInsideCallerTransaction() {
-    when(pushDeviceRepository.findByInstallationIdForUpdate(INSTALLATION_ID))
-        .thenReturn(Optional.empty());
-    when(pushDeviceRepository.findByExpoPushTokenForUpdate(EXPO_PUSH_TOKEN))
-        .thenReturn(Optional.empty());
+    when(pushDeviceRepository.findByInstallationIdOrExpoPushTokenForUpdate(
+            INSTALLATION_ID, EXPO_PUSH_TOKEN))
+        .thenReturn(List.of());
     when(pushDeviceRepository.saveAndFlush(any(PushDevice.class)))
         .thenThrow(new DataIntegrityViolationException("first attempt failed"))
         .thenAnswer(this::returnSavedPushDevice);
