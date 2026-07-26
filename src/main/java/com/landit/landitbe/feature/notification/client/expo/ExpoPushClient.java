@@ -124,9 +124,6 @@ public class ExpoPushClient implements NotificationSender {
     try {
       JsonNode root = jsonMapper.readTree(responseBody);
       JsonNode data = root.get("data");
-      if (data != null && data.isObject() && expectedTicketCount == 1) {
-        return List.of(readTicket(data));
-      }
       if (data == null || !data.isArray() || data.size() != expectedTicketCount) {
         throw malformedResponse();
       }

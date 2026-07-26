@@ -60,7 +60,7 @@ class ExpoPushClientTest {
         exchange -> {
           requestBody.set(readBody(exchange));
           authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
-          respond(exchange, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
+          respond(exchange, 200, "{\"data\":[{\"status\":\"ok\",\"id\":\"ticket-1\"}]}");
         });
 
     PushTicketResult result = send(expoPushClient("expo-access-token"));
@@ -124,7 +124,7 @@ class ExpoPushClientTest {
         SEND_PATH,
         exchange -> {
           authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
-          respond(exchange, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
+          respond(exchange, 200, "{\"data\":[{\"status\":\"ok\",\"id\":\"ticket-1\"}]}");
         });
 
     send(expoPushClient(null));
@@ -139,7 +139,7 @@ class ExpoPushClientTest {
         SEND_PATH,
         200,
         """
-        {"data":{"status":"error","details":{"error":"DeviceNotRegistered"}}}
+        {"data":[{"status":"error","details":{"error":"DeviceNotRegistered"}}]}
         """);
 
     PushTicketResult result = send(expoPushClient(null));
@@ -233,7 +233,7 @@ class ExpoPushClientTest {
         exchange -> {
           try {
             Thread.sleep(200);
-            respond(exchange, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
+            respond(exchange, 200, "{\"data\":[{\"status\":\"ok\",\"id\":\"ticket-1\"}]}");
           } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
           }
@@ -277,6 +277,15 @@ class ExpoPushClientTest {
   @Test
   void throwsNonRetryableExceptionForMalformedResponse() {
     stubResponse(SEND_PATH, 200, "{\"data\":{}}");
+
+    assertThatThrownBy(() -> send(expoPushClient(null)))
+        .isExactlyInstanceOf(PushNotificationException.class);
+  }
+
+  /** Expo Ticket 응답이 배열이 아닌 객체면 응답 형식 오류로 처리한다. */
+  @Test
+  void throwsNonRetryableExceptionForSingleObjectTicketResponse() {
+    stubResponse(SEND_PATH, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
 
     assertThatThrownBy(() -> send(expoPushClient(null)))
         .isExactlyInstanceOf(PushNotificationException.class);
