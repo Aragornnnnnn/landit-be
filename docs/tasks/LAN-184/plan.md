@@ -1,5 +1,12 @@
 # LAN-184 구현 및 검증 기록
 
+## 최종 정책 구현
+
+- `feat/LAN-184-notification-policy`는 기존 4개 스택 PR 위에서 최종 제품 정책을 구현한다. 기존 PR의 닫기·교체·강제 push는 이 브랜치의 검증과 분할 전까지 수행하지 않는다.
+- 시나리오 마지막 완료 시각 `last_cleared_at`, 사용자별 계산 결과 `user_notification_state`, 세 가지 제품 알림 유형을 추가했다.
+- `SCHEDULED_NOTIFICATION_BATCH`는 Keyset 500명 단위로 대상 선정 데이터를 조회하고, 실제 대상만 `PUSH_SEND`로 발행한다. 중간 대상 배치 Queue 메시지는 만들지 않는다.
+- 2026-07-26 현재 `./gradlew check`가 통과했다. dev Scheduler는 IaC 계약에 따라 계속 비활성화 상태다.
+
 ## 구현 결과
 
 | 영역 | 결과 |
