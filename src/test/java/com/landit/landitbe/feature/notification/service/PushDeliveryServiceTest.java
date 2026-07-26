@@ -133,7 +133,7 @@ class PushDeliveryServiceTest {
     return new PreparePushDeliveryCommand(
         USER_ID,
         PUSH_DEVICE_ID,
-        NotificationType.REVIEW_REMINDER,
+        NotificationType.REVIEW_LEARNING,
         "review-reminder:" + LocalDate.of(2026, 7, 24) + ":" + USER_ID + ":" + PUSH_DEVICE_ID,
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",

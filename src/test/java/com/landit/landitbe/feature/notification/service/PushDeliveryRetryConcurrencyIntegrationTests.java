@@ -74,7 +74,7 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
         new PreparePushDeliveryCommand(
             USER_ID,
             pushDevice.getId(),
-            NotificationType.REVIEW_REMINDER,
+            NotificationType.REVIEW_LEARNING,
             "review-reminder:"
                 + LocalDate.of(2026, 7, 24)
                 + ":"
@@ -163,7 +163,7 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
         new PreparePushDeliveryCommand(
             USER_ID,
             command.pushDeviceId(),
-            NotificationType.REVIEW_REMINDER,
+            NotificationType.REVIEW_LEARNING,
             command.deduplicationKey() + ":first-send",
             command.title(),
             command.body(),

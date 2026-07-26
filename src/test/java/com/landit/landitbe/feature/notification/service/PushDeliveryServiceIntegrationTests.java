@@ -163,7 +163,7 @@ class PushDeliveryServiceIntegrationTests {
     return new PreparePushDeliveryCommand(
         USER_ID,
         pushDevice.getId(),
-        NotificationType.REVIEW_REMINDER,
+        NotificationType.REVIEW_LEARNING,
         "review-reminder:" + reviewDate + ":" + USER_ID + ":" + pushDevice.getId(),
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
