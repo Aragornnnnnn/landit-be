@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.notification.messaging;
 
 import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.service.PushReceiptService;
+import com.landit.landitbe.feature.notification.service.ScheduledNotificationService;
 import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,9 +20,11 @@ import org.springframework.stereotype.Component;
 public class PushQueueMessageHandler {
 
   private static final int SUPPORTED_VERSION = 1;
+  private static final String SCHEDULED_NOTIFICATION_BATCH = "SCHEDULED_NOTIFICATION_BATCH";
 
   private final NotificationDispatchService notificationDispatchService;
   private final PushReceiptService pushReceiptService;
+  private final ScheduledNotificationService scheduledNotificationService;
 
   /**
    * 메시지 공통 계약과 유형별 payload를 검증한 뒤 알림 흐름을 실행한다.
@@ -29,10 +32,22 @@ public class PushQueueMessageHandler {
    * @param message Push Queue 메시지
    */
   public void handle(PushQueueMessage message) {
+    handle(message, () -> {});
+  }
+
+  /**
+   * 메시지 공통 계약과 유형별 payload를 검증한 뒤 알림 흐름을 실행한다.
+   *
+   * @param message Push Queue 메시지
+   * @param visibilityExtender 긴 배치 처리 중 SQS visibility를 연장하는 작업
+   */
+  public void handle(PushQueueMessage message, Runnable visibilityExtender) {
     validateCommon(message);
     switch (message.messageType()) {
       case PushQueueMessage.PUSH_SEND -> handlePushSend(message);
       case PushQueueMessage.PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
+      case SCHEDULED_NOTIFICATION_BATCH ->
+          scheduledNotificationService.process(message.occurredAt(), visibilityExtender);
       default -> throw new IllegalArgumentException("지원하지 않는 Push 메시지 유형입니다.");
     }
   }
