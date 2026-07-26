@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -62,23 +63,57 @@ class ExpoPushClientTest {
           respond(exchange, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
         });
 
-    PushTicketResult result = expoPushClient("expo-access-token").send(reviewReminder());
+    PushTicketResult result = send(expoPushClient("expo-access-token"));
 
     JsonNode request = jsonMapper.readTree(requestBody.get());
-    assertThat(request.propertyNames())
+    assertThat(request.isArray()).isTrue();
+    assertThat(request).hasSize(1);
+    assertThat(request.get(0).propertyNames())
         .containsExactlyInAnyOrder("to", "title", "body", "data", "sound", "channelId");
-    assertThat(request.get("to").asString()).isEqualTo("ExponentPushToken[device-token]");
-    assertThat(request.get("title").asString()).isEqualTo("복습할 시간이에요");
-    assertThat(request.get("body").asString()).isEqualTo("오늘의 표현을 다시 볼까요?");
-    assertThat(request.get("data").get("url").asString())
+    assertThat(request.get(0).get("to").asString()).isEqualTo("ExponentPushToken[device-token]");
+    assertThat(request.get(0).get("title").asString()).isEqualTo("복습할 시간이에요");
+    assertThat(request.get(0).get("body").asString()).isEqualTo("오늘의 표현을 다시 볼까요?");
+    assertThat(request.get(0).get("data").get("url").asString())
         .isEqualTo(
             "/expressions?utm_source=push&utm_medium=notification&utm_campaign=review_reminder");
-    assertThat(request.get("sound").asString()).isEqualTo("default");
-    assertThat(request.get("channelId").asString()).isEqualTo("default");
+    assertThat(request.get(0).get("sound").asString()).isEqualTo("default");
+    assertThat(request.get(0).get("channelId").asString()).isEqualTo("default");
     assertThat(authorization.get()).isEqualTo("Bearer expo-access-token");
     assertThat(result.accepted()).isTrue();
     assertThat(result.ticketId()).isEqualTo("ticket-1");
     assertThat(result.errorCode()).isNull();
+  }
+
+  /** 여러 메시지를 한 요청 배열로 보내고 요청 순서대로 Ticket 결과를 반환한다. */
+  @Test
+  void sendsPushMessagesInBatchAndMapsTicketsInRequestOrder() throws Exception {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        SEND_PATH,
+        exchange -> {
+          requestBody.set(readBody(exchange));
+          respond(
+              exchange,
+              200,
+              """
+              {"data":[
+                {"status":"ok","id":"ticket-1"},
+                {"status":"error","details":{"error":"DeviceNotRegistered"}}
+              ]}
+              """);
+        });
+
+    var results = expoPushClient(null).send(List.of(reviewReminder(), anotherReminder()));
+
+    JsonNode request = jsonMapper.readTree(requestBody.get());
+    assertThat(request.isArray()).isTrue();
+    assertThat(request).hasSize(2);
+    assertThat(request.get(0).get("to").asString()).isEqualTo("ExponentPushToken[device-token]");
+    assertThat(request.get(1).get("to").asString())
+        .isEqualTo("ExponentPushToken[another-device-token]");
+    assertThat(results)
+        .containsExactly(
+            PushTicketResult.accepted("ticket-1"), PushTicketResult.failed("DeviceNotRegistered"));
   }
 
   /** Expo Access Token이 없으면 Authorization Header를 보내지 않는다. */
@@ -92,7 +127,7 @@ class ExpoPushClientTest {
           respond(exchange, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
         });
 
-    expoPushClient(null).send(reviewReminder());
+    send(expoPushClient(null));
 
     assertThat(authorization.get()).isNull();
   }
@@ -107,7 +142,7 @@ class ExpoPushClientTest {
         {"data":{"status":"error","details":{"error":"DeviceNotRegistered"}}}
         """);
 
-    PushTicketResult result = expoPushClient(null).send(reviewReminder());
+    PushTicketResult result = send(expoPushClient(null));
 
     assertThat(result.accepted()).isFalse();
     assertThat(result.ticketId()).isNull();
@@ -169,7 +204,7 @@ class ExpoPushClientTest {
         {"errors":[{"code":"PUSH_TOO_MANY_NOTIFICATIONS"}]}
         """);
 
-    PushTicketResult result = expoPushClient(null).send(reviewReminder());
+    PushTicketResult result = send(expoPushClient(null));
 
     assertThat(result.accepted()).isFalse();
     assertThat(result.errorCode()).isEqualTo("PUSH_TOO_MANY_NOTIFICATIONS");
@@ -184,9 +219,9 @@ class ExpoPushClientTest {
         exchange ->
             respond(exchange, requestCount.getAndIncrement() == 0 ? 429 : 503, "{\"errors\":[]}"));
 
-    assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
+    assertThatThrownBy(() -> send(expoPushClient(null)))
         .isInstanceOf(RetryablePushNotificationException.class);
-    assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
+    assertThatThrownBy(() -> send(expoPushClient(null)))
         .isInstanceOf(RetryablePushNotificationException.class);
   }
 
@@ -208,7 +243,7 @@ class ExpoPushClientTest {
             () ->
                 expoPushClient(
                         "http://localhost:" + server.getAddress().getPort(), Duration.ofMillis(30))
-                    .send(reviewReminder()))
+                    .send(List.of(reviewReminder())))
         .isInstanceOf(RetryablePushNotificationException.class);
   }
 
@@ -219,8 +254,7 @@ class ExpoPushClientTest {
     server.stop(0);
     server = null;
 
-    assertThatThrownBy(
-            () -> expoPushClient(stoppedServerUrl, Duration.ofSeconds(1)).send(reviewReminder()))
+    assertThatThrownBy(() -> send(expoPushClient(stoppedServerUrl, Duration.ofSeconds(1))))
         .isExactlyInstanceOf(PushNotificationException.class);
   }
 
@@ -230,7 +264,7 @@ class ExpoPushClientTest {
     Thread.currentThread().interrupt();
 
     try {
-      assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
+      assertThatThrownBy(() -> send(expoPushClient(null)))
           .isExactlyInstanceOf(PushNotificationException.class)
           .hasCauseInstanceOf(InterruptedException.class);
       assertThat(Thread.currentThread().isInterrupted()).isTrue();
@@ -244,7 +278,7 @@ class ExpoPushClientTest {
   void throwsNonRetryableExceptionForMalformedResponse() {
     stubResponse(SEND_PATH, 200, "{\"data\":{}}");
 
-    assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
+    assertThatThrownBy(() -> send(expoPushClient(null)))
         .isExactlyInstanceOf(PushNotificationException.class);
   }
 
@@ -268,10 +302,24 @@ class ExpoPushClientTest {
     return new ExpoPushClient(jsonMapper, properties);
   }
 
+  /** 단일 메시지 테스트를 배열 기반 발송 Port로 실행한다. */
+  private PushTicketResult send(ExpoPushClient expoPushClient) {
+    return expoPushClient.send(List.of(reviewReminder())).getFirst();
+  }
+
   /** 복습 리마인더 Expo 메시지를 생성한다. */
   private PushMessage reviewReminder() {
     return new PushMessage(
         "ExponentPushToken[device-token]",
+        "복습할 시간이에요",
+        "오늘의 표현을 다시 볼까요?",
+        "/expressions?utm_source=push&utm_medium=notification&utm_campaign=review_reminder");
+  }
+
+  /** 두 번째 메시지와 Ticket 결과의 순서 대응을 확인하기 위한 알림을 생성한다. */
+  private PushMessage anotherReminder() {
+    return new PushMessage(
+        "ExponentPushToken[another-device-token]",
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
         "/expressions?utm_source=push&utm_medium=notification&utm_campaign=review_reminder");
