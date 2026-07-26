@@ -3,15 +3,19 @@
 package com.landit.landitbe.feature.notification.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
+import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -61,5 +65,25 @@ class SqsPushQueuePublisherTest {
     assertThat(body.get("occurredAt").asString()).isNotBlank();
     assertThat(body.get("payload").get("pushDeliveryId").asLong()).isEqualTo(10L);
     assertThat(body.get("payload").get("receiptAttempt").asInt()).isEqualTo(2);
+  }
+
+  /** Receipt 확인 지연 시간은 Expo Receipt 조회 계약에 맞춰 900초만 허용한다. */
+  @ParameterizedTest
+  @ValueSource(ints = {0, 899, 901})
+  void rejectsReceiptDelayThatDiffersFromFifteenMinutes(int receiptDelaySeconds) {
+    NotificationProperties properties =
+        new NotificationProperties(
+            "https://exp.host",
+            null,
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(2),
+            "https://sqs.ap-northeast-2.amazonaws.com/123/push",
+            receiptDelaySeconds);
+    SqsPushQueuePublisher publisher =
+        new SqsPushQueuePublisher(sqsAsyncClient, JsonMapper.builder().build(), properties);
+
+    assertThatThrownBy(() -> publisher.scheduleReceiptCheck(10L, 1))
+        .isInstanceOf(PushNotificationException.class)
+        .hasMessage("Push Queue 설정이 올바르지 않습니다.");
   }
 }

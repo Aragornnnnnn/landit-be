@@ -25,6 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   private static final int MESSAGE_VERSION = 1;
+  private static final int RECEIPT_DELAY_SECONDS = 900;
   private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
   private final SqsAsyncClient sqsAsyncClient;
@@ -59,8 +60,7 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
   private void validateConfiguration() {
     if (properties.queueUrl() == null
         || properties.queueUrl().isBlank()
-        || properties.receiptDelaySeconds() < 0
-        || properties.receiptDelaySeconds() > 900) {
+        || properties.receiptDelaySeconds() != RECEIPT_DELAY_SECONDS) {
       throw new PushNotificationException("Push Queue 설정이 올바르지 않습니다.");
     }
   }
