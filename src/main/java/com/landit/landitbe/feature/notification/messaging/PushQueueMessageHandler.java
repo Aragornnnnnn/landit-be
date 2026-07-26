@@ -2,7 +2,9 @@
 
 package com.landit.landitbe.feature.notification.messaging;
 
+import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.service.PushReceiptService;
+import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -17,8 +19,10 @@ import org.springframework.stereotype.Component;
 public class PushQueueMessageHandler {
 
   private static final int SUPPORTED_VERSION = 1;
+  private static final String PUSH_SEND = "PUSH_SEND";
   private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
+  private final NotificationDispatchService notificationDispatchService;
   private final PushReceiptService pushReceiptService;
 
   /**
@@ -29,9 +33,30 @@ public class PushQueueMessageHandler {
   public void handle(PushQueueMessage message) {
     validateCommon(message);
     switch (message.messageType()) {
+      case PUSH_SEND -> handlePushSend(message);
       case PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
       default -> throw new IllegalArgumentException("지원하지 않는 Push 메시지 유형입니다.");
     }
+  }
+
+  /** 사용자별 발송 payload를 검증하고 일반 푸시 발송 Service에 전달한다. */
+  private void handlePushSend(PushQueueMessage message) {
+    PushQueuePayload payload = message.payload();
+    if (payload.userProfileId() == null
+        || payload.notificationType() == null
+        || isBlank(payload.title())
+        || isBlank(payload.body())
+        || isBlank(payload.deepLink())) {
+      throw new IllegalArgumentException("Push 발송 payload가 올바르지 않습니다.");
+    }
+    notificationDispatchService.send(
+        new SendPushNotificationCommand(
+            message.messageId(),
+            payload.userProfileId(),
+            payload.notificationType(),
+            payload.title(),
+            payload.body(),
+            payload.deepLink()));
   }
 
   /** 모든 Push Queue 메시지가 만족해야 하는 공통 계약을 검증한다. */
@@ -55,5 +80,10 @@ public class PushQueueMessageHandler {
       throw new IllegalArgumentException("Push Receipt payload가 올바르지 않습니다.");
     }
     pushReceiptService.check(payload.pushDeliveryId(), payload.receiptAttempt());
+  }
+
+  /** 필수 문자열 payload가 비어 있는지 확인한다. */
+  private boolean isBlank(String value) {
+    return value == null || value.isBlank();
   }
 }

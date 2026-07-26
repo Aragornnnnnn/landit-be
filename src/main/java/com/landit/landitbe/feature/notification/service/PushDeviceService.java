@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.notification.service;
 
 import com.landit.landitbe.feature.notification.domain.PushDevice;
+import com.landit.landitbe.feature.notification.domain.PushTokenStatus;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncRequest;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncResponse;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
@@ -120,6 +121,23 @@ public class PushDeviceService {
     pushDevice.synchronize(userProfileId, request.platform(), request.pushEnabled(), expoPushToken);
 
     return PushDeviceSyncResponse.from(pushDeviceRepository.saveAndFlush(pushDevice));
+  }
+
+  /**
+   * 한 사용자의 발송 가능한 Push Device ID를 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @return 발송 가능한 Push Device ID 목록
+   */
+  @Transactional(readOnly = true)
+  public List<Long> findSendableDeviceIds(Long userProfileId) {
+    return pushDeviceRepository
+        .findAllByUserProfileIdAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
+            userProfileId, PushTokenStatus.ACTIVE)
+        .stream()
+        .filter(PushDevice::isSendable)
+        .map(PushDevice::getId)
+        .toList();
   }
 
   /** 같은 Expo Push Token을 사용 중인 다른 설치의 Token 연결을 해제한다. */
