@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 public class PushQueueMessageHandler {
 
   private static final int SUPPORTED_VERSION = 1;
-  private static final int MAX_RECEIPT_ATTEMPTS = 3;
   private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
   private final PushReceiptService pushReceiptService;
@@ -52,8 +51,7 @@ public class PushQueueMessageHandler {
   private void handleReceiptCheck(PushQueuePayload payload) {
     if (payload.pushDeliveryId() == null
         || payload.receiptAttempt() == null
-        || payload.receiptAttempt() < 1
-        || payload.receiptAttempt() > MAX_RECEIPT_ATTEMPTS) {
+        || payload.receiptAttempt() < 1) {
       throw new IllegalArgumentException("Push Receipt payload가 올바르지 않습니다.");
     }
     pushReceiptService.check(payload.pushDeliveryId(), payload.receiptAttempt());
