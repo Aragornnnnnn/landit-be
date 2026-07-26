@@ -5,6 +5,11 @@ tone_instructions: >-
   한국어로 간결하고 직접적으로 작성한다. 실제 결함, 보안 문제, 계약 위반,
   회귀 가능성처럼 조치가 필요한 내용만 지적한다. 각 지적에는 근거와 영향을
   포함하고 취향 차이, CI가 검사하는 포맷, 요청 범위 밖 리팩터링은 제안하지 않는다.
+  이 저장소는 역할 기반 패키지 구조를 사용한다. 기능 패키지 루트의 Controller와
+  docs, dto, domain, repository, service, client, exception, messaging은 유효한 구조다.
+  client와 messaging은 외부 제공자·SQS 연동 경계이므로 api, application,
+  infrastructure 패키지로의 이동을 제안하지 않는다. 공개 비즈니스 로직에는
+  Service 접미사를 사용하므로 UseCase, Finder 접미사로의 변경을 제안하지 않는다.
 
 reviews:
   profile: "chill"
@@ -23,22 +28,23 @@ reviews:
       - "^release/.*"
       - "^feat/.*"
   path_instructions:
-    - path: "src/main/java/**/api/**"
-      instructions: |
-        인증·인가와 리소스 소유권 검증 누락을 우선 확인한다.
-        Bean Validation, 오류 코드와 HTTP 상태, 응답 DTO 호환성을 확인한다.
-        공개 API 계약 변경에는 테스트와 OpenAPI 반영이 함께 있는지 확인한다.
-    - path: "src/main/java/**/application/**"
+    - path: "src/main/java/**/feature/**/service/**"
       instructions: |
         상태 변경과 트랜잭션 경계를 확인한다.
         DB 트랜잭션 중 AI나 외부 네트워크 호출을 유지하는 변경을 지적한다.
         멱등성, 중복 요청, 동시 실행, 상태 전이의 원자성 회귀를 확인한다.
         단순 조회에 새 추상화나 불필요한 Port 계층을 요구하지 않는다.
-    - path: "src/main/java/**/session/infrastructure/ai/**"
+    - path: "src/main/java/**/feature/**/client/**"
       instructions: |
-        연결된 landit-ai의 요청·응답 필드, enum, nullability, 오류 계약과 비교한다.
+        외부 제공자 요청·응답 필드, enum, nullability, 오류 계약을 확인한다.
         timeout과 provider 실패가 BE 도메인 오류로 안전하게 매핑되는지 확인한다.
         API key, raw 사용자 발화, 민감한 prompt가 로그나 Sentry에 남지 않아야 한다.
+        client 패키지를 다른 계층 패키지로 옮기는 리팩터링은 제안하지 않는다.
+    - path: "src/main/java/**/feature/**/messaging/**"
+      instructions: |
+        SQS 메시지 계약의 버전, 필수 필드, 멱등성 키와 재시도·DLQ 동작을 확인한다.
+        Consumer의 성공 ack, 실패 재처리, 외부 발행 timeout을 확인한다.
+        messaging 패키지를 다른 계층 패키지로 옮기는 리팩터링은 제안하지 않는다.
     - path: "src/main/java/**/auth/**"
       instructions: |
         OAuth 검증, 토큰 발급·갱신·폐기, 로그아웃·탈퇴 실패 경로를 확인한다.
