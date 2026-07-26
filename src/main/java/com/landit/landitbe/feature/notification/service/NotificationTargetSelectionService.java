@@ -123,7 +123,14 @@ public class NotificationTargetSelectionService {
 
   /** 현재 활성 시나리오와 사용자 언어의 활성 표현이 모두 완료됐는지 확인한다. */
   private boolean allCurrentContentCompleted(NotificationTargetSelectionInput input) {
-    if (input.scenarios().isEmpty() && input.expressions().isEmpty()) {
+    boolean hasActiveScenario =
+        input.scenarios().stream()
+            .anyMatch(
+                scenario ->
+                    scenario.categoryActive()
+                        && scenario.scenarioActive()
+                        && scenario.variantActive());
+    if (!hasActiveScenario && input.expressions().isEmpty()) {
       return false;
     }
     return input.scenarios().stream()

@@ -3,6 +3,9 @@
 package com.landit.landitbe.feature.notification.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
@@ -30,6 +33,32 @@ class PushNotificationConsumerTest {
     consumer.consume(message);
 
     verify(handler).handle(message);
+  }
+
+  /** Handler가 visibility 연장 작업을 실행하면 현재 메시지의 visibility를 300초로 연장한다. */
+  @Test
+  void extendsVisibilityWhenHandlerRunsVisibilityExtender() {
+    PushQueueMessageHandler handler = org.mockito.Mockito.mock(PushQueueMessageHandler.class);
+    Visibility visibility = org.mockito.Mockito.mock(Visibility.class);
+    PushNotificationConsumer consumer = new PushNotificationConsumer(handler);
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "message-id",
+            "SCHEDULED_NOTIFICATION_BATCH",
+            Instant.parse("2026-07-24T11:00:00Z"),
+            new PushQueuePayload(null, null));
+    doAnswer(
+            invocation -> {
+              ((Runnable) invocation.getArgument(1)).run();
+              return null;
+            })
+        .when(handler)
+        .handle(eq(message), any(Runnable.class));
+
+    consumer.consume(message, visibility);
+
+    verify(visibility).changeTo(300);
   }
 
   /** Listener는 Push Queue URL, 동시성 2, ON_SUCCESS acknowledgement를 사용한다. */

@@ -89,9 +89,9 @@ public class UserNotificationState extends BaseTimeEntity {
   }
 
   /**
-   * 계산 결과에 해당하는 알림 발행 시각을 기록한다.
+   * 계산 결과를 현재 발송 대상으로 확정한 시각을 기록한다.
    *
-   * @param sentAt Push 발송 메시지를 Queue에 발행한 시각
+   * @param sentAt Push 발송 결정을 완료한 시각
    */
   public void markSent(LocalDateTime sentAt) {
     this.status = NotificationStateStatus.SENT;

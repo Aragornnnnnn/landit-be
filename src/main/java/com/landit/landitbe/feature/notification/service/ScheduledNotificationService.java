@@ -98,19 +98,19 @@ public class ScheduledNotificationService {
           .select(page.inputs().get(userProfileId))
           .ifPresent(
               target -> {
-                UserNotificationState state =
-                    statesByUserId.computeIfAbsent(
-                        userProfileId,
-                        ignored ->
-                            UserNotificationState.ready(
-                                userProfileId,
-                                target.notificationType(),
-                                target.targetId(),
-                                latestActivityAt(page.inputs().get(userProfileId))));
-                state.refresh(
-                    target.notificationType(),
-                    target.targetId(),
-                    latestActivityAt(page.inputs().get(userProfileId)));
+                LocalDateTime latestActivityAt = latestActivityAt(page.inputs().get(userProfileId));
+                UserNotificationState state = statesByUserId.get(userProfileId);
+                if (state == null) {
+                  state =
+                      UserNotificationState.ready(
+                          userProfileId,
+                          target.notificationType(),
+                          target.targetId(),
+                          latestActivityAt);
+                  statesByUserId.put(userProfileId, state);
+                } else {
+                  state.refresh(target.notificationType(), target.targetId(), latestActivityAt);
+                }
                 ScheduledNotificationContent content = ScheduledNotificationContent.from(target);
                 commands.add(
                     new SendPushNotificationCommand(

@@ -104,4 +104,20 @@ class NotificationTargetSelectionServiceTest {
 
     assertThat(selectionService.select(input)).isEmpty();
   }
+
+  /** 비활성 시나리오만 존재하고 표현이 없으면 복습 알림을 발송하지 않는다. */
+  @Test
+  void doesNotSelectReviewLearningWhenOnlyInactiveScenariosExist() {
+    NotificationTargetSelectionInput input =
+        new NotificationTargetSelectionInput(
+            1L,
+            LocalDateTime.of(2026, 7, 26, 19, 0),
+            10L,
+            null,
+            null,
+            List.of(new ScenarioNotificationCandidate(1L, 1L, false, 10L, 1, true, true, true)),
+            List.of());
+
+    assertThat(selectionService.select(input)).isEmpty();
+  }
 }
