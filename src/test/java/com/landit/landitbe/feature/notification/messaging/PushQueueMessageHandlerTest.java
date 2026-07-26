@@ -3,11 +3,13 @@
 package com.landit.landitbe.feature.notification.messaging;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.service.PushReceiptService;
+import com.landit.landitbe.feature.notification.service.ScheduledNotificationService;
 import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,8 @@ class PushQueueMessageHandlerTest {
   @Mock private NotificationDispatchService notificationDispatchService;
 
   @Mock private PushReceiptService pushReceiptService;
+
+  @Mock private ScheduledNotificationService scheduledNotificationService;
 
   @InjectMocks private PushQueueMessageHandler pushQueueMessageHandler;
 
@@ -78,6 +82,24 @@ class PushQueueMessageHandlerTest {
     pushQueueMessageHandler.handle(message);
 
     verify(pushReceiptService).check(10L, 2);
+  }
+
+  /** EventBridge Scheduler 배치 메시지는 예정 시각을 기준으로 대상 계산 Service에 위임한다. */
+  @Test
+  void handlesScheduledNotificationBatch() {
+    Instant occurredAt = Instant.parse("2026-07-26T11:00:00Z");
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "scheduler-execution",
+            "SCHEDULED_NOTIFICATION_BATCH",
+            occurredAt,
+            new PushQueuePayload(null, null, null, null, null, null, null));
+
+    pushQueueMessageHandler.handle(message);
+
+    verify(scheduledNotificationService)
+        .process(org.mockito.ArgumentMatchers.eq(occurredAt), any());
   }
 
   /** Receipt 확인 횟수 정책은 Handler가 아닌 Receipt Service가 판단한다. */
