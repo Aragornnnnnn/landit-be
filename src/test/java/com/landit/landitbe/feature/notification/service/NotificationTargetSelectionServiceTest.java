@@ -94,4 +94,14 @@ class NotificationTargetSelectionServiceTest {
     assertThat(result.notificationType()).isEqualTo(NotificationType.REVIEW_LEARNING);
     assertThat(result.targetId()).isNull();
   }
+
+  /** 현재 사용자 언어에 활성 콘텐츠가 하나도 없으면 복습 알림을 발송하지 않는다. */
+  @Test
+  void doesNotSelectReviewLearningWhenNoActiveContentExists() {
+    NotificationTargetSelectionInput input =
+        new NotificationTargetSelectionInput(
+            1L, LocalDateTime.of(2026, 7, 26, 19, 0), 10L, null, null, List.of(), List.of());
+
+    assertThat(selectionService.select(input)).isEmpty();
+  }
 }
