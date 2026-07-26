@@ -12,10 +12,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.notification.domain.PushDevice;
+import com.landit.landitbe.feature.notification.domain.PushTokenStatus;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncRequest;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
 import com.landit.landitbe.shared.domain.AppPlatform;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -154,6 +157,40 @@ class PushDeviceServiceTest {
             TransactionDefinition.PROPAGATION_REQUIRED,
             TransactionDefinition.PROPAGATION_REQUIRES_NEW,
             TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  }
+
+  /** 여러 사용자의 발송 가능한 설치를 한 번 조회해 사용자별 설치 ID 목록으로 묶는다. */
+  @Test
+  void groupsSendableDevicesByUserProfileIdWithSingleRepositoryLookup() {
+    PushDevice firstUserDevice =
+        PushDevice.create(
+            USER_PROFILE_ID,
+            INSTALLATION_ID,
+            AppPlatform.IOS,
+            true,
+            "ExponentPushToken[first-user-device]");
+    PushDevice secondUserDevice =
+        PushDevice.create(
+            2L,
+            UUID.fromString("550e8400-e29b-41d4-a716-446655440001"),
+            AppPlatform.ANDROID,
+            true,
+            "ExponentPushToken[second-user-device]");
+    when(pushDeviceRepository
+            .findAllByUserProfileIdInAndPushEnabledTrueAndTokenStatusOrderByUserProfileIdAscIdAsc(
+                List.of(USER_PROFILE_ID, 2L), PushTokenStatus.ACTIVE))
+        .thenReturn(List.of(firstUserDevice, secondUserDevice));
+
+    Map<Long, List<Long>> deviceIdsByUserProfileId =
+        pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(USER_PROFILE_ID, 2L));
+
+    assertThat(deviceIdsByUserProfileId)
+        .containsOnlyKeys(USER_PROFILE_ID, 2L)
+        .containsEntry(USER_PROFILE_ID, Collections.singletonList(firstUserDevice.getId()))
+        .containsEntry(2L, Collections.singletonList(secondUserDevice.getId()));
+    verify(pushDeviceRepository)
+        .findAllByUserProfileIdInAndPushEnabledTrueAndTokenStatusOrderByUserProfileIdAscIdAsc(
+            List.of(USER_PROFILE_ID, 2L), PushTokenStatus.ACTIVE);
   }
 
   /** 저장된 Push Device를 Repository 반환값으로 돌려준다. */

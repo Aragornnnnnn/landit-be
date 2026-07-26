@@ -1,4 +1,4 @@
-// 한 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송한다.
+// 여러 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송한다.
 
 package com.landit.landitbe.feature.notification.service;
 
@@ -9,11 +9,12 @@ import com.landit.landitbe.feature.notification.client.RetryablePushNotification
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-/** 한 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송한다. */
+/** 여러 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송한다. */
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
@@ -37,14 +38,35 @@ public class NotificationDispatchService {
    * @param command 이벤트 식별자, 대상 사용자와 표시 내용
    */
   public void send(SendPushNotificationCommand command) {
-    scheduleAcceptedDeliveryReceipts(command.eventId());
+    sendAll(List.of(command));
+  }
+
+  /**
+   * 여러 사용자의 발송 가능한 설치를 한 번에 조회해 Expo 요청 제한에 맞춰 발송한다.
+   *
+   * @param commands 이벤트 식별자, 대상 사용자와 표시 내용 목록
+   */
+  public void sendAll(List<SendPushNotificationCommand> commands) {
+    if (commands.isEmpty()) {
+      return;
+    }
+    List<Long> userProfileIds =
+        commands.stream().map(SendPushNotificationCommand::userProfileId).distinct().toList();
+    Map<Long, List<Long>> pushDeviceIdsByUserProfileId =
+        pushDeviceService.findSendableDeviceIdsByUserProfileIds(userProfileIds);
     List<PreparedPushDelivery> deliveries = new ArrayList<>(EXPO_BATCH_SIZE);
     RetryablePushNotificationException firstFailure = null;
-    for (Long pushDeviceId : pushDeviceService.findSendableDeviceIds(command.userProfileId())) {
-      pushDeliveryService.prepare(prepareCommand(command, pushDeviceId)).ifPresent(deliveries::add);
-      if (deliveries.size() == EXPO_BATCH_SIZE) {
-        firstFailure = retainFirstFailure(firstFailure, sendPreparedDeliveries(deliveries));
-        deliveries.clear();
+    for (SendPushNotificationCommand command : commands) {
+      scheduleAcceptedDeliveryReceipts(command.eventId());
+      for (Long pushDeviceId :
+          pushDeviceIdsByUserProfileId.getOrDefault(command.userProfileId(), List.of())) {
+        pushDeliveryService
+            .prepare(prepareCommand(command, pushDeviceId))
+            .ifPresent(deliveries::add);
+        if (deliveries.size() == EXPO_BATCH_SIZE) {
+          firstFailure = retainFirstFailure(firstFailure, sendPreparedDeliveries(deliveries));
+          deliveries.clear();
+        }
       }
     }
     if (!deliveries.isEmpty()) {
@@ -55,7 +77,7 @@ public class NotificationDispatchService {
     }
   }
 
-  /** 같은 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 먼저 예약한다. */
+  /** 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다. */
   private void scheduleAcceptedDeliveryReceipts(String eventId) {
     pushDeliveryService
         .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId))

@@ -1,16 +1,16 @@
-// 매일 예약된 학습 알림 대상을 페이지 단위로 계산하고 발송 메시지를 발행한다.
+// 매일 예약된 학습 알림 대상을 페이지 단위로 계산하고 직접 발송한다.
 
 package com.landit.landitbe.feature.notification.service;
 
 import com.landit.landitbe.feature.notification.domain.UserNotificationState;
-import com.landit.landitbe.feature.notification.messaging.PushNotificationRequest;
-import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import com.landit.landitbe.feature.notification.repository.UserNotificationStateRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 매일 예약된 학습 알림 대상을 페이지 단위로 계산하고 발송 메시지를 발행한다. */
+/** 매일 예약된 학습 알림 대상을 페이지 단위로 계산하고 직접 발송한다. */
 @Service
 @ConditionalOnProperty(
     prefix = "landit.notification",
@@ -33,7 +33,7 @@ public class ScheduledNotificationService {
   private final NotificationTargetPageQueryService notificationTargetPageQueryService;
   private final NotificationTargetSelectionService notificationTargetSelectionService;
   private final UserNotificationStateRepository userNotificationStateRepository;
-  private final PushQueuePublisher pushQueuePublisher;
+  private final NotificationDispatchService notificationDispatchService;
   private final TransactionOperations pageTransactions;
 
   /**
@@ -42,26 +42,26 @@ public class ScheduledNotificationService {
    * @param notificationTargetPageQueryService 대상 계산용 일괄 조회 Service
    * @param notificationTargetSelectionService 사용자별 대상 선정 Service
    * @param userNotificationStateRepository 알림 상태 저장소
-   * @param pushQueuePublisher Push 발송 메시지 Publisher
+   * @param notificationDispatchService 페이지 단위 Push 발송 Service
    * @param transactionManager 애플리케이션 트랜잭션 관리자
    */
   public ScheduledNotificationService(
       NotificationTargetPageQueryService notificationTargetPageQueryService,
       NotificationTargetSelectionService notificationTargetSelectionService,
       UserNotificationStateRepository userNotificationStateRepository,
-      PushQueuePublisher pushQueuePublisher,
+      NotificationDispatchService notificationDispatchService,
       PlatformTransactionManager transactionManager) {
     this.notificationTargetPageQueryService = notificationTargetPageQueryService;
     this.notificationTargetSelectionService = notificationTargetSelectionService;
     this.userNotificationStateRepository = userNotificationStateRepository;
-    this.pushQueuePublisher = pushQueuePublisher;
+    this.notificationDispatchService = notificationDispatchService;
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     this.pageTransactions = transactionTemplate;
   }
 
   /**
-   * Scheduler 기준 시각으로 모든 활성 사용자를 500명씩 계산해 사용자별 발송 메시지를 발행한다.
+   * Scheduler 기준 시각으로 모든 활성 사용자를 500명씩 계산해 페이지 단위로 직접 발송한다.
    *
    * @param occurredAt EventBridge Scheduler가 지정한 예정 시각
    * @param visibilityExtender 현재 SQS 메시지의 visibility를 연장하는 작업
@@ -75,15 +75,19 @@ public class ScheduledNotificationService {
       if (page.userProfileIds().isEmpty()) {
         return;
       }
-      pageTransactions.executeWithoutResult(status -> processPage(page, occurredAt));
+      List<SendPushNotificationCommand> commands =
+          pageTransactions.execute(status -> processPage(page, occurredAt));
+      notificationDispatchService.sendAll(commands);
       visibilityExtender.run();
       lastUserProfileId = page.userProfileIds().getLast();
     }
   }
 
-  /** 한 페이지의 스냅샷을 저장하고 각 사용자에 대한 실제 발송 메시지를 발행한다. */
-  private void processPage(NotificationTargetPage page, Instant occurredAt) {
+  /** 한 페이지의 스냅샷을 저장하고 각 사용자에 대한 실제 발송 명령을 만든다. */
+  private List<SendPushNotificationCommand> processPage(
+      NotificationTargetPage page, Instant occurredAt) {
     Map<Long, UserNotificationState> statesByUserId = existingStates(page);
+    List<SendPushNotificationCommand> commands = new ArrayList<>();
     LocalDateTime now = LocalDateTime.now();
     LocalDate scheduledDate = occurredAt.atZone(KOREA_TIME_ZONE).toLocalDate();
     for (Long userProfileId : page.userProfileIds()) {
@@ -108,19 +112,19 @@ public class ScheduledNotificationService {
                     target.targetId(),
                     latestActivityAt(page.inputs().get(userProfileId)));
                 ScheduledNotificationContent content = ScheduledNotificationContent.from(target);
-                pushQueuePublisher.publishNotification(
-                    new PushNotificationRequest(
+                commands.add(
+                    new SendPushNotificationCommand(
                         eventId(scheduledDate, userProfileId, target.notificationType().name()),
                         userProfileId,
                         target.notificationType(),
                         content.title(),
                         content.body(),
-                        content.deepLink(),
-                        occurredAt));
+                        content.deepLink()));
                 state.markSent(now);
               });
     }
     userNotificationStateRepository.saveAll(statesByUserId.values());
+    return commands;
   }
 
   /** 기존 상태를 사용자 ID별로 묶어 행마다 추가 조회하지 않도록 준비한다. */

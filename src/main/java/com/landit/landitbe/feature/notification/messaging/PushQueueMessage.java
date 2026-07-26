@@ -20,6 +20,5 @@ public record PushQueueMessage(
     Instant occurredAt,
     PushQueuePayload payload) {
 
-  public static final String PUSH_SEND = "PUSH_SEND";
   public static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 }

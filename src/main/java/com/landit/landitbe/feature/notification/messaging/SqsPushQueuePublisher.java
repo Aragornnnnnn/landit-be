@@ -34,20 +34,6 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   /** {@inheritDoc} */
   @Override
-  public void publishNotification(PushNotificationRequest request) {
-    validateConfiguration();
-    PushQueueMessage message =
-        new PushQueueMessage(
-            MESSAGE_VERSION,
-            request.eventId(),
-            PushQueueMessage.PUSH_SEND,
-            request.occurredAt(),
-            PushQueuePayload.notification(request));
-    send(message, 0, "Push 발송 메시지 발행에 실패했습니다.");
-  }
-
-  /** {@inheritDoc} */
-  @Override
   public void scheduleReceiptCheck(Long pushDeliveryId, int attempt) {
     validateConfiguration();
     PushQueueMessage message =

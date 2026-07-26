@@ -7,9 +7,12 @@ import com.landit.landitbe.feature.notification.domain.PushTokenStatus;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncRequest;
 import com.landit.landitbe.feature.notification.dto.PushDeviceSyncResponse;
 import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
@@ -124,20 +127,26 @@ public class PushDeviceService {
   }
 
   /**
-   * 한 사용자의 발송 가능한 Push Device ID를 조회한다.
+   * 여러 사용자의 발송 가능한 Push Device ID를 사용자별로 한 번에 조회한다.
    *
-   * @param userProfileId 사용자 프로필 ID
-   * @return 발송 가능한 Push Device ID 목록
+   * @param userProfileIds 사용자 프로필 ID 목록
+   * @return 사용자 프로필 ID별 발송 가능한 Push Device ID 목록
    */
   @Transactional(readOnly = true)
-  public List<Long> findSendableDeviceIds(Long userProfileId) {
+  public Map<Long, List<Long>> findSendableDeviceIdsByUserProfileIds(List<Long> userProfileIds) {
+    if (userProfileIds.isEmpty()) {
+      return Map.of();
+    }
     return pushDeviceRepository
-        .findAllByUserProfileIdAndPushEnabledTrueAndTokenStatusOrderByIdAsc(
-            userProfileId, PushTokenStatus.ACTIVE)
+        .findAllByUserProfileIdInAndPushEnabledTrueAndTokenStatusOrderByUserProfileIdAscIdAsc(
+            userProfileIds, PushTokenStatus.ACTIVE)
         .stream()
         .filter(PushDevice::isSendable)
-        .map(PushDevice::getId)
-        .toList();
+        .collect(
+            Collectors.groupingBy(
+                PushDevice::getUserProfileId,
+                LinkedHashMap::new,
+                Collectors.mapping(PushDevice::getId, Collectors.toList())));
   }
 
   /** 같은 Expo Push Token을 사용 중인 다른 설치의 Token 연결을 해제한다. */

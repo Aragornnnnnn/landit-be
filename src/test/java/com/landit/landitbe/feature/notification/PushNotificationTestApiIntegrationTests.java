@@ -1,8 +1,11 @@
-// Dev 전용 복습 리마인더 테스트 API의 인증과 Queue 발행 계약을 검증한다.
+// Dev 전용 일반 푸시 테스트 API의 인증과 직접 발송 계약을 검증한다.
 
 package com.landit.landitbe.feature.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,10 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.messaging.PushNotificationRequest;
-import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
+import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
+import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -27,11 +31,11 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** Dev 전용 일반 푸시 테스트 API의 인증과 Queue 발행 계약을 검증한다. */
+/** Dev 전용 일반 푸시 테스트 API의 인증과 직접 발송 계약을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
-@Import(PushNotificationTestApiIntegrationTests.TestPushQueuePublisherConfiguration.class)
+@Import(PushNotificationTestApiIntegrationTests.TestNotificationDispatchConfiguration.class)
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
@@ -44,17 +48,17 @@ class PushNotificationTestApiIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
 
-  @Autowired private RecordingPushQueuePublisher pushQueuePublisher;
+  @Autowired private NotificationDispatchService notificationDispatchService;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  /** 각 테스트 전에 기록된 푸시 발행 요청을 비운다. */
+  /** 각 테스트 전에 직접 발송 Service의 호출 기록을 비운다. */
   @BeforeEach
-  void clearPublishedNotification() {
-    pushQueuePublisher.clear();
+  void resetNotificationDispatchService() {
+    reset(notificationDispatchService);
   }
 
-  /** 인증된 요청은 현재 사용자에게 보낼 일반 테스트 알림을 Push Queue에 즉시 발행한다. */
+  /** 인증된 요청은 현재 사용자에게 보낼 일반 테스트 알림을 즉시 발송한다. */
   @Test
   void publishesTestNotificationForAuthenticatedRequest() throws Exception {
     JsonNode loginData = login("push-test-api");
@@ -70,14 +74,16 @@ class PushNotificationTestApiIntegrationTests {
         .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.nullValue()));
 
-    PushNotificationRequest request = pushQueuePublisher.notificationRequest();
-    assertThat(request.eventId()).isNotBlank();
-    assertThat(request.userProfileId()).isEqualTo(loginData.get("user").get("userId").asLong());
-    assertThat(request.notificationType()).isEqualTo(NotificationType.TEST_NOTIFICATION);
-    assertThat(request.title()).isEqualTo("Landit 알림 테스트");
-    assertThat(request.body()).isEqualTo("푸시 알림이 정상적으로 도착했어요.");
-    assertThat(request.deepLink()).isEqualTo("/home");
-    assertThat(request.occurredAt()).isNotNull();
+    ArgumentCaptor<SendPushNotificationCommand> commandCaptor =
+        ArgumentCaptor.forClass(SendPushNotificationCommand.class);
+    verify(notificationDispatchService).send(commandCaptor.capture());
+    SendPushNotificationCommand command = commandCaptor.getValue();
+    assertThat(command.eventId()).isNotBlank();
+    assertThat(command.userProfileId()).isEqualTo(loginData.get("user").get("userId").asLong());
+    assertThat(command.notificationType()).isEqualTo(NotificationType.TEST_NOTIFICATION);
+    assertThat(command.title()).isEqualTo("Landit 알림 테스트");
+    assertThat(command.body()).isEqualTo("푸시 알림이 정상적으로 도착했어요.");
+    assertThat(command.deepLink()).isEqualTo("/home");
   }
 
   /** 인증되지 않은 요청은 dev 테스트 API를 실행할 수 없다. */
@@ -85,7 +91,7 @@ class PushNotificationTestApiIntegrationTests {
   void rejectsRequestWithoutAccessToken() throws Exception {
     mockMvc.perform(post(TEST_ENDPOINT)).andExpect(status().isUnauthorized());
 
-    assertThat(pushQueuePublisher.notificationRequest()).isNull();
+    verifyNoInteractions(notificationDispatchService);
   }
 
   /** 테스트 식별자를 사용하는 가짜 소셜 로그인으로 접근 토큰을 발급한다. */
@@ -111,40 +117,13 @@ class PushNotificationTestApiIntegrationTests {
     return body.get("data");
   }
 
-  /** 테스트에서 사용자별 푸시 발행 요청만 기록하는 Queue Publisher를 제공한다. */
-  static final class RecordingPushQueuePublisher implements PushQueuePublisher {
-
-    private PushNotificationRequest notificationRequest;
-
-    @Override
-    public void publishNotification(PushNotificationRequest request) {
-      notificationRequest = request;
-    }
-
-    @Override
-    public void scheduleReceiptCheck(Long pushDeliveryId, int attempt) {}
-
-    void clear() {
-      notificationRequest = null;
-    }
-
-    PushNotificationRequest notificationRequest() {
-      return notificationRequest;
-    }
-  }
-
-  /** 테스트용 Push Queue Publisher Bean을 등록한다. */
+  /** 테스트용 직접 발송 Service Bean을 등록한다. */
   @TestConfiguration
-  static class TestPushQueuePublisherConfiguration {
+  static class TestNotificationDispatchConfiguration {
 
     @Bean
-    RecordingPushQueuePublisher recordingPushQueuePublisher() {
-      return new RecordingPushQueuePublisher();
-    }
-
-    @Bean
-    PushQueuePublisher pushQueuePublisher(RecordingPushQueuePublisher publisher) {
-      return publisher;
+    NotificationDispatchService notificationDispatchService() {
+      return org.mockito.Mockito.mock(NotificationDispatchService.class);
     }
   }
 }

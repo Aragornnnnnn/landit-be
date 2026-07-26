@@ -1,4 +1,4 @@
-// 한 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송하는 흐름을 검증한다.
+// 여러 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송하는 흐름을 검증한다.
 
 package com.landit.landitbe.feature.notification.service;
 
@@ -19,6 +19,7 @@ import com.landit.landitbe.feature.notification.client.RetryablePushNotification
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
@@ -28,7 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** 한 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송하는 흐름을 검증한다. */
+/** 여러 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송하는 흐름을 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class NotificationDispatchServiceTest {
 
@@ -52,7 +53,8 @@ class NotificationDispatchServiceTest {
   /** 사용자의 발송 가능한 설치별 Ticket을 기록하고 Receipt 확인을 예약한다. */
   @Test
   void sendsNotificationAndSchedulesReceiptCheck() {
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L)))
+        .thenReturn(Map.of(1L, List.of(2L)));
     when(pushDeliveryService.prepare(any())).thenReturn(Optional.of(PREPARED_DELIVERY));
     when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage())))
         .thenReturn(List.of(PushTicketResult.accepted("ticket-1")));
@@ -71,15 +73,16 @@ class NotificationDispatchServiceTest {
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
   }
 
-  /** 같은 이벤트에서 이미 Ticket이 접수된 이력은 Expo 재발송 없이 Receipt만 다시 예약한다. */
+  /** 같은 사용자의 과거 알림은 제외하고 현재 이벤트의 접수 Ticket만 Receipt를 다시 예약한다. */
   @Test
-  void reschedulesAcceptedReceiptWithoutResendingExpo() {
+  void reschedulesOnlyCurrentEventAcceptedReceiptWithoutResendingExpo() {
     when(pushDeliveryService.findAcceptedDeliveryIds("push:event-1:")).thenReturn(List.of(10L));
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of());
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L))).thenReturn(Map.of());
 
     notificationDispatchService.send(COMMAND);
 
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
+    verify(pushQueuePublisher, never()).scheduleReceiptCheck(11L, 1);
     verify(notificationSender, never()).send(anyList());
   }
 
@@ -88,7 +91,8 @@ class NotificationDispatchServiceTest {
   void marksDeliveryRetryableAndPropagatesTemporaryFailure() {
     RetryablePushNotificationException failure =
         new RetryablePushNotificationException("Expo Push 요청이 일시적으로 실패했습니다.");
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L)))
+        .thenReturn(Map.of(1L, List.of(2L)));
     when(pushDeliveryService.prepare(any())).thenReturn(Optional.of(PREPARED_DELIVERY));
     when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenThrow(failure);
 
@@ -102,7 +106,8 @@ class NotificationDispatchServiceTest {
   void marksDeliveryFailedWithoutRetryingUnconfirmedExpoFailure() {
     PushNotificationException failure =
         new PushNotificationException("Expo Push 응답 형식이 올바르지 않습니다.");
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L)))
+        .thenReturn(Map.of(1L, List.of(2L)));
     when(pushDeliveryService.prepare(any())).thenReturn(Optional.of(PREPARED_DELIVERY));
     when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenThrow(failure);
 
@@ -116,7 +121,8 @@ class NotificationDispatchServiceTest {
   /** Expo Ticket 결과 수가 요청 수와 다르면 발송 이력을 종료하고 메시지를 확인 처리한다. */
   @Test
   void marksDeliveryFailedWithoutRetryingTicketResultCountMismatch() {
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of(2L));
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L)))
+        .thenReturn(Map.of(1L, List.of(2L)));
     when(pushDeliveryService.prepare(any())).thenReturn(Optional.of(PREPARED_DELIVERY));
     when(notificationSender.send(List.of(PREPARED_DELIVERY.toPushMessage()))).thenReturn(List.of());
 
@@ -130,7 +136,7 @@ class NotificationDispatchServiceTest {
   /** 발송 가능한 설치가 없으면 Expo를 호출하지 않는다. */
   @Test
   void skipsUserWithoutSendableDevice() {
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(List.of());
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L))).thenReturn(Map.of());
 
     notificationDispatchService.send(COMMAND);
 
@@ -143,7 +149,8 @@ class NotificationDispatchServiceTest {
   void splitsPreparedDeliveriesAtExpoBatchLimit() {
     List<Long> pushDeviceIds = LongStream.rangeClosed(1, 101).boxed().toList();
     AtomicLong deliveryId = new AtomicLong(1L);
-    when(pushDeviceService.findSendableDeviceIds(1L)).thenReturn(pushDeviceIds);
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L)))
+        .thenReturn(Map.of(1L, pushDeviceIds));
     when(pushDeliveryService.prepare(any()))
         .thenAnswer(
             invocation ->
@@ -168,5 +175,32 @@ class NotificationDispatchServiceTest {
     verify(notificationSender, times(2)).send(anyList());
     verify(notificationSender).send(argThat(messages -> messages.size() == 100));
     verify(notificationSender).send(argThat(messages -> messages.size() == 1));
+  }
+
+  /** 같은 페이지의 여러 사용자 설치를 모아 하나의 Expo 요청으로 전송한다. */
+  @Test
+  void batchesPreparedDeliveriesAcrossUsers() {
+    PreparedPushDelivery secondDelivery =
+        new PreparedPushDelivery(11L, "ExponentPushToken[second-token]", "두 번째 알림", "본문", "/home");
+    when(pushDeviceService.findSendableDeviceIdsByUserProfileIds(List.of(1L, 2L)))
+        .thenReturn(Map.of(1L, List.of(2L), 2L, List.of(3L)));
+    when(pushDeliveryService.prepare(any()))
+        .thenReturn(Optional.of(PREPARED_DELIVERY), Optional.of(secondDelivery));
+    when(notificationSender.send(anyList()))
+        .thenReturn(
+            List.of(PushTicketResult.accepted("ticket-1"), PushTicketResult.accepted("ticket-2")));
+    SendPushNotificationCommand secondCommand =
+        new SendPushNotificationCommand(
+            "event-2", 2L, NotificationType.TEST_NOTIFICATION, "두 번째 알림", "본문", "/home");
+
+    notificationDispatchService.sendAll(List.of(COMMAND, secondCommand));
+
+    verify(notificationSender)
+        .send(List.of(PREPARED_DELIVERY.toPushMessage(), secondDelivery.toPushMessage()));
+    verify(pushDeviceService, times(1)).findSendableDeviceIdsByUserProfileIds(List.of(1L, 2L));
+    verify(pushDeliveryService).findAcceptedDeliveryIds("push:event-1:");
+    verify(pushDeliveryService).findAcceptedDeliveryIds("push:event-2:");
+    verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
+    verify(pushQueuePublisher).scheduleReceiptCheck(11L, 1);
   }
 }
