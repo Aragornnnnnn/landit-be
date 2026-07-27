@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 컨트롤러에서 발생한 예외를 공통 API 오류 응답으로 변환한다. */
@@ -62,7 +63,8 @@ public class GlobalExceptionHandler {
   @ExceptionHandler({
     MissingServletRequestParameterException.class,
     HttpMessageNotReadableException.class,
-    MethodArgumentTypeMismatchException.class
+    MethodArgumentTypeMismatchException.class,
+    MultipartException.class
   })
   public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
     return error(ErrorCode.VALIDATION_FAILED);
