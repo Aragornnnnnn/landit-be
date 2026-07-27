@@ -115,6 +115,20 @@ class ExpressionPracticeApiIntegrationTests {
     assertThat(writingSentence.get("writingQuestion").asText()).isEqualTo("question-" + index);
     assertThat(writingSentence.get("writingQuestionTranslation").asText())
         .isEqualTo("질문해석-" + index);
+
+    // 단어 칩 배열(LAN-229)도 같은 예문의 payload 값 그대로(순서 포함) 내려오는지 확인
+    assertThat(
+            objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class))
+        .containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
+    assertThat(
+            objectMapper.convertValue(
+                writingSentence.get("writingSentenceWordChoices"), String[].class))
+        .containsExactly(
+            "chip-" + index + "-b",
+            "noise-" + index + "-1",
+            "chip-" + index + "-a",
+            "noise-" + index + "-2",
+            "noise-" + index + "-3");
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
@@ -166,28 +180,36 @@ class ExpressionPracticeApiIntegrationTests {
                     "highlightingPart": "valid-0",
                     "sentenceTranslation": "정상 예문 0",
                     "practiceQuestion": "question-0?",
-                    "practiceQuestionTranslation": "질문 0?"
+                    "practiceQuestionTranslation": "질문 0?",
+                    "sentenceWords": ["valid", "sentence", "0"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-1",
                     "highlightingPart": "valid-1",
                     "sentenceTranslation": "정상 예문 1",
                     "practiceQuestion": "question-1?",
-                    "practiceQuestionTranslation": "질문 1?"
+                    "practiceQuestionTranslation": "질문 1?",
+                    "sentenceWords": ["valid", "sentence", "1"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-2",
                     "highlightingPart": "valid-2",
                     "sentenceTranslation": "정상 예문 2",
                     "practiceQuestion": "question-2?",
-                    "practiceQuestionTranslation": "질문 2?"
+                    "practiceQuestionTranslation": "질문 2?",
+                    "sentenceWords": ["valid", "sentence", "2"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-3",
                     "highlightingPart": "valid-3",
                     "sentenceTranslation": "정상 예문 3",
                     "practiceQuestion": "question-3?",
-                    "practiceQuestionTranslation": "질문 3?"
+                    "practiceQuestionTranslation": "질문 3?",
+                    "sentenceWords": ["valid", "sentence", "3"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"]
                   },
                   {
                     "highlightingPart": "invalid",
@@ -292,10 +314,12 @@ class ExpressionPracticeApiIntegrationTests {
                       "sentenceTranslation": "예문해석-%d",
                       "practiceQuestion": "question-%d",
                       "practiceQuestionTranslation": "질문해석-%d",
-                      "imageUrl": "https://cdn.example.com/practice/%d.png"
+                      "imageUrl": "https://cdn.example.com/practice/%d.png",
+                      "sentenceWords": ["chip-%d-a", "chip-%d-b"],
+                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"]
                     }
           """
-              .formatted(i, i, i, i, i, i));
+              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return json.append("]").toString();
   }

@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
+import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
@@ -34,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpressionQueryService {
 
   /**
-   * 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서
+   * 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 문자열 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서
    * 제외한다.
    */
   private static final List<String> REQUIRED_PRACTICE_SENTENCE_KEYS =
@@ -44,6 +45,13 @@ public class ExpressionQueryService {
           "sentenceTranslation",
           "practiceQuestion",
           "practiceQuestionTranslation");
+
+  /**
+   * 추가 예문 payload에서 반드시 값이 있어야 하는 단어 배열 키 목록(작문 단어 칩 스펙, LAN-229). 키가 없거나, 배열이 아니거나, 비어 있거나, blank
+   * 원소를 담고 있으면 그 예문은 응답에서 제외한다.
+   */
+  private static final List<String> REQUIRED_PRACTICE_SENTENCE_WORD_ARRAY_KEYS =
+      List.of("sentenceWords", "sentenceWordChoices");
 
   private static final String EXPRESSION_NOT_FOUND_LOG =
       "추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}";
@@ -115,41 +123,43 @@ public class ExpressionQueryService {
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
 
-    List<PracticeSentenceResponse> extraPracticeSentences =
+    List<ParsedPracticeSentence> parsedSentences =
         parseExtraPracticeSentences(expression.getPracticeExamplesPayload(), expressionId);
-    if (extraPracticeSentences.isEmpty()) {
+    if (parsedSentences.isEmpty()) {
       log.warn(NO_VALID_PRACTICE_SENTENCE_LOG, expressionId);
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
+    List<PracticeSentenceResponse> extraPracticeSentences =
+        parsedSentences.stream().map(ParsedPracticeSentence::sentence).toList();
     return ExpressionPracticeResponse.from(
-        expression, extraPracticeSentences, pickRandomWritingSentence(extraPracticeSentences));
+        expression, extraPracticeSentences, pickRandomWritingSentence(parsedSentences));
   }
 
   /**
-   * JSONB payload(JSON 배열)를 예문 응답 목록으로 파싱한다. 필수 키가 없거나 값이 빈 불량 예문은 빈 값으로 노출하는 대신 목록에서 제외하고 경고 로그를
+   * JSONB payload(JSON 배열)를 파싱된 예문 목록으로 변환한다. 필수 키가 없거나 값이 빈 불량 예문은 빈 값으로 노출하는 대신 목록에서 제외하고 경고 로그를
    * 남긴다. imageUrl은 유일한 선택 필드라 없으면 null로 둔다.
    */
-  private List<PracticeSentenceResponse> parseExtraPracticeSentences(
+  private List<ParsedPracticeSentence> parseExtraPracticeSentences(
       JsonNode payload, Long expressionId) {
-    List<PracticeSentenceResponse> extraPracticeSentences = new ArrayList<>();
+    List<ParsedPracticeSentence> parsedSentences = new ArrayList<>();
     if (payload == null || !payload.isArray()) {
-      return extraPracticeSentences;
+      return parsedSentences;
     }
 
     for (int index = 0; index < payload.size(); index++) {
       JsonNode node = payload.get(index);
-      if (hasMissingRequiredValue(node)) {
+      if (hasMissingRequiredValue(node) || hasInvalidWordArray(node)) {
         log.warn(INVALID_PRACTICE_SENTENCE_EXCLUDED_LOG, expressionId, index);
         continue;
       }
 
-      extraPracticeSentences.add(PracticeSentenceResponse.from(node));
+      parsedSentences.add(ParsedPracticeSentence.from(node));
     }
-    return extraPracticeSentences;
+    return parsedSentences;
   }
 
-  /** 예문 노드에 필수 키가 없거나 값이 비어 있는지 확인한다. */
+  /** 예문 노드에 필수 문자열 키가 없거나 값이 비어 있는지 확인한다. */
   private boolean hasMissingRequiredValue(JsonNode node) {
     for (String requiredKey : REQUIRED_PRACTICE_SENTENCE_KEYS) {
       if (!node.hasNonNull(requiredKey) || node.get(requiredKey).asText().isBlank()) {
@@ -159,11 +169,26 @@ public class ExpressionQueryService {
     return false;
   }
 
+  /** 예문 노드의 작문용 단어 배열 키가 없거나, 배열이 아니거나, 비어 있거나, blank 원소를 담고 있는지 확인한다. */
+  private boolean hasInvalidWordArray(JsonNode node) {
+    for (String requiredKey : REQUIRED_PRACTICE_SENTENCE_WORD_ARRAY_KEYS) {
+      JsonNode arrayNode = node.get(requiredKey);
+      if (arrayNode == null || !arrayNode.isArray() || arrayNode.isEmpty()) {
+        return true;
+      }
+      for (JsonNode element : arrayNode) {
+        if (!element.isTextual() || element.asText().isBlank()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /** 예문 목록에서 랜덤으로 1개를 골라 작문 연습 문제로 변환한다. (인덱스 범위: 0 ~ 목록 길이-1) */
   private WritingSentenceResponse pickRandomWritingSentence(
-      List<PracticeSentenceResponse> extraPracticeSentences) {
-    PracticeSentenceResponse picked =
-        extraPracticeSentences.get(random.nextInt(extraPracticeSentences.size()));
+      List<ParsedPracticeSentence> parsedSentences) {
+    ParsedPracticeSentence picked = parsedSentences.get(random.nextInt(parsedSentences.size()));
 
     return WritingSentenceResponse.from(picked);
   }
