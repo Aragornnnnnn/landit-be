@@ -408,7 +408,9 @@ class ExpressionQueryServiceTest {
                     "highlightingPart": "no-image",
                     "sentenceTranslation": "이미지 없음",
                     "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?"
+                    "practiceQuestionTranslation": "질문?",
+                    "sentenceWords": ["no-image", "sentence"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "no-image", "noise-2", "noise-3"]
                   },
                   {
                     "sentenceText": "with-image sentence",
@@ -416,7 +418,9 @@ class ExpressionQueryServiceTest {
                     "sentenceTranslation": "이미지 있음",
                     "practiceQuestion": "question2?",
                     "practiceQuestionTranslation": "질문2?",
-                    "imageUrl": "https://cdn.example.com/practice/1.png"
+                    "imageUrl": "https://cdn.example.com/practice/1.png",
+                    "sentenceWords": ["with-image", "sentence"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "with-image", "noise-2", "noise-3"]
                   }
                 ]
                 """));
@@ -457,7 +461,9 @@ class ExpressionQueryServiceTest {
                     "highlightingPart": "valid-1",
                     "sentenceTranslation": "정상 예문 1",
                     "practiceQuestion": "question-1?",
-                    "practiceQuestionTranslation": "질문 1?"
+                    "practiceQuestionTranslation": "질문 1?",
+                    "sentenceWords": ["valid", "sentence", "1"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"]
                   },
                   {
                     "highlightingPart": "missing-text",
@@ -484,7 +490,9 @@ class ExpressionQueryServiceTest {
                     "highlightingPart": "valid-2",
                     "sentenceTranslation": "정상 예문 2",
                     "practiceQuestion": "question-2?",
-                    "practiceQuestionTranslation": "질문 2?"
+                    "practiceQuestionTranslation": "질문 2?",
+                    "sentenceWords": ["valid", "sentence", "2"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"]
                   }
                 ]
                 """));
@@ -500,6 +508,113 @@ class ExpressionQueryServiceTest {
     assertThat(response.practiceSentence())
         .extracting(PracticeSentenceResponse::sentenceText)
         .containsExactly("valid sentence 1", "valid sentence 2");
+
+    // then: 어떤 표현의 예문이 불량인지 warn 로그가 남는다
+    assertThat(logAppender.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage()).contains(String.valueOf(EXPRESSION_ID));
+            });
+
+    logger.detachAppender(logAppender);
+  }
+
+  /**
+   * 뽑힌 예문의 payload 단어 배열이 writingSentence의 writingSentenceWords/writingSentenceWordChoices에 순서 그대로
+   * 매핑되는지 검증한다. (LAN-229 단어 칩 스펙)
+   */
+  @Test
+  void shouldMapWordArraysFromPickedExample() {
+    // given: 예문 4개(각자 다른 단어 배열)가 payload에 담긴 표현
+    WritingExpression expression =
+        makeWritingExpressionMockWithInfo(makePracticeExamplesPayload(4));
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+
+    // when
+    ExpressionPracticeResponse response =
+        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+
+    // then: 뽑힌 예문의 인덱스(sentence-N의 끝자리)를 알아내, 그 예문의 배열과 순서까지 일치하는지 확인
+    String pickedText = response.writingSentence().writingSentenceText();
+    String index = pickedText.substring(pickedText.length() - 1);
+    assertThat(response.writingSentence().writingSentenceWords())
+        .containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
+    assertThat(response.writingSentence().writingSentenceWordChoices())
+        .containsExactly(
+            "chip-" + index + "-b",
+            "noise-" + index + "-1",
+            "chip-" + index + "-a",
+            "noise-" + index + "-2",
+            "noise-" + index + "-3");
+  }
+
+  /**
+   * 단어 배열 키가 누락됐거나, 빈 배열이거나, blank 원소를 담은 예문은 응답에서 제외되고 경고 로그가 남는지 검증한다. (LAN-229: 단어 칩을 만들 수 없는
+   * 예문이 작문 문제로 노출되는 것을 막는다)
+   */
+  @Test
+  void shouldExcludeExamplesWithInvalidWordArrays() {
+    // given: 로그 검증용 ListAppender 부착
+    Logger logger = (Logger) LoggerFactory.getLogger(ExpressionQueryService.class);
+    ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+    logAppender.start();
+    logger.addAppender(logAppender);
+
+    // given: 정상 1개 + 불량 3개(sentenceWords 누락 / sentenceWordChoices 빈 배열 / sentenceWords에 blank 원소)
+    WritingExpression expression =
+        makeWritingExpressionMockWithInfo(
+            toJson(
+                """
+                [
+                  {
+                    "sentenceText": "valid sentence",
+                    "highlightingPart": "valid",
+                    "sentenceTranslation": "정상 예문",
+                    "practiceQuestion": "question?",
+                    "practiceQuestionTranslation": "질문?",
+                    "sentenceWords": ["valid", "sentence"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "noise-3"]
+                  },
+                  {
+                    "sentenceText": "missing words sentence",
+                    "highlightingPart": "missing-words",
+                    "sentenceTranslation": "sentenceWords 키가 없음",
+                    "practiceQuestion": "question?",
+                    "practiceQuestionTranslation": "질문?",
+                    "sentenceWordChoices": ["sentence", "noise-1"]
+                  },
+                  {
+                    "sentenceText": "empty choices sentence",
+                    "highlightingPart": "empty-choices",
+                    "sentenceTranslation": "sentenceWordChoices가 빈 배열",
+                    "practiceQuestion": "question?",
+                    "practiceQuestionTranslation": "질문?",
+                    "sentenceWords": ["empty", "choices"],
+                    "sentenceWordChoices": []
+                  },
+                  {
+                    "sentenceText": "blank word sentence",
+                    "highlightingPart": "blank-word",
+                    "sentenceTranslation": "sentenceWords에 blank 원소",
+                    "practiceQuestion": "question?",
+                    "practiceQuestionTranslation": "질문?",
+                    "sentenceWords": ["blank", ""],
+                    "sentenceWordChoices": ["blank", "noise-1", "word"]
+                  }
+                ]
+                """));
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+
+    // when
+    ExpressionPracticeResponse response =
+        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+
+    // then: 불량 예문 3개는 제외되고 정상 예문 1개만 남는다
+    assertThat(response.practiceSentence()).hasSize(1);
+    assertThat(response.practiceSentence().get(0).sentenceText()).isEqualTo("valid sentence");
 
     // then: 어떤 표현의 예문이 불량인지 warn 로그가 남는다
     assertThat(logAppender.list)
@@ -571,10 +686,12 @@ class ExpressionQueryServiceTest {
                       "sentenceTranslation": "해석-%d",
                       "practiceQuestion": "question-%d",
                       "practiceQuestionTranslation": "질문해석-%d",
-                      "imageUrl": "https://cdn.example.com/practice/%d.png"
+                      "imageUrl": "https://cdn.example.com/practice/%d.png",
+                      "sentenceWords": ["chip-%d-a", "chip-%d-b"],
+                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"]
                     }
           """
-              .formatted(i, i, i, i, i, i));
+              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return toJson(json.append("]").toString());
   }
