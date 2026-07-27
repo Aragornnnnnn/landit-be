@@ -17,10 +17,11 @@
 - [x] 단위: 뽑힌 예문의 payload 배열이 순서 그대로 `writingSentence`에 매핑되는지, 불량 단어 배열 예문이 제외되는지 검증.
 - [x] 통합: 시딩 payload에 배열 추가, 응답 `writingSentenceWords`/`Choices` 검증.
 
-### Task 3: 데이터 백필 (보류 → 콘텐츠 시트 수령 후)
+### Task 3: 데이터 백필
 
-- [ ] `db/postgresql/V25__add_practice_sentence_word_arrays.sql` — 예문별 정답/오답 단어를 payload에 주입 (V19 스타일 손 작성, V22 스타일 jsonb 갱신).
-- [ ] 오답 단어 3개는 콘텐츠 시트로 제공받아 작성한다. 서버 파생(문장 분해 + 대표 예문 오답 재사용) 대신 payload 확장안을 채택한 결정 기록.
+- [x] `db/postgresql/V25__add_practice_sentence_word_arrays.sql` — 콘텐츠팀 제공 UPDATE 쿼리(83행, 예문 332개)를 기반으로 작성. 이미 `sentenceWords` 키가 있는 행은 건너뛰는 가드 포함.
+- [x] 쿼리 검증: id 1~83 전체 커버, 필수 키 완비, 선택지가 정답 단어 전부 포함 + 오답 1개 이상, 선택지 순서가 정답 순서와 다름 확인.
+- [x] 적용 방식: develop/prod 모두 배포 시 Flyway가 V25를 자동 적용한다. (수동 사전 UPDATE는 불필요하며, 실행돼 있어도 가드가 건너뛴다)
 
 ## 배포 주의
 
