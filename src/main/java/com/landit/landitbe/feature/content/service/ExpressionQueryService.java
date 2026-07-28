@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
+import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
@@ -16,6 +17,7 @@ import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
+import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.Random;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ExpressionQueryService {
+
+  private static final int FREE_TALK_EXPRESSION_CANDIDATE_LIMIT = 100;
 
   /**
    * 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 문자열 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서
@@ -134,6 +139,35 @@ public class ExpressionQueryService {
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
 
     return ExpressionLearningResponse.from(expression);
+  }
+
+  /** 프리톡 AI가 재사용할 활성 표현 후보를 제한된 개수로 조회한다. */
+  @Transactional(readOnly = true)
+  public List<ExpressionRecommendationCandidate> getActiveExpressionCandidates(
+      Locale targetLocale, Locale baseLocale) {
+    return writingExpressionRepository
+        .findByTargetLocaleAndBaseLocaleAndStatusOrderByIdAsc(
+            targetLocale,
+            baseLocale,
+            ActiveStatus.ACTIVE,
+            PageRequest.of(0, FREE_TALK_EXPRESSION_CANDIDATE_LIMIT))
+        .stream()
+        .map(
+            expression ->
+                new ExpressionRecommendationCandidate(
+                    expression.getId(),
+                    expression.getTargetExpressionText(),
+                    expression.getBaseExpressionMeaningText(),
+                    expression.getUsageSummary()))
+        .toList();
+  }
+
+  /** 프리톡 세션에 연결할 기존 표현이 활성 상태인지 검증한다. */
+  @Transactional(readOnly = true)
+  public void validateActiveExpression(Long expressionId) {
+    writingExpressionRepository
+        .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
+        .orElseThrow(() -> new ApiException(ErrorCode.AI_RESPONSE_INVALID));
   }
 
   /**

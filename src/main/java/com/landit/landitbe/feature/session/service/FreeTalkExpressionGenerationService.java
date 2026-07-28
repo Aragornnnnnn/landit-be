@@ -3,8 +3,7 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.content.domain.WritingExpression;
-import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExistingExpression;
@@ -26,7 +25,6 @@ import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
-import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
@@ -47,12 +45,16 @@ public class FreeTalkExpressionGenerationService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
-  private final WritingExpressionRepository writingExpressionRepository;
+  private final ExpressionQueryService expressionQueryService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  /** 완료된 프리톡의 표현 생성 작업을 한 번 실행한다. */
+  /**
+   * 완료된 프리톡의 표현 생성 작업을 한 번 실행한다.
+   *
+   * @param learningSessionId 표현을 생성할 완료된 학습 세션 ID
+   */
   public void generate(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
@@ -99,6 +101,16 @@ public class FreeTalkExpressionGenerationService {
     }
   }
 
+  /**
+   * 제출 실패 등으로 실행하지 못한 표현 생성 작업을 실패 상태로 전환한다.
+   *
+   * @param learningSessionId 실패로 전환할 학습 세션 ID
+   */
+  public void markFailed(long learningSessionId) {
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+    transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
+  }
+
   private GenerationContext prepare(long learningSessionId) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
@@ -118,19 +130,17 @@ public class FreeTalkExpressionGenerationService {
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.startExpressionGeneration();
     List<AiFreeTalkExistingExpression> existingExpressions =
-        writingExpressionRepository
-            .findByTargetLocaleAndBaseLocaleAndStatus(
-                learningSession.getTargetLocale(),
-                learningSession.getBaseLocale(),
-                ActiveStatus.ACTIVE)
+        expressionQueryService
+            .getActiveExpressionCandidates(
+                learningSession.getTargetLocale(), learningSession.getBaseLocale())
             .stream()
             .map(
-                expression ->
+                candidate ->
                     new AiFreeTalkExistingExpression(
-                        expression.getId(),
-                        expression.getTargetExpressionText(),
-                        expression.getBaseExpressionMeaningText(),
-                        expression.getUsageSummary()))
+                        candidate.expressionId(),
+                        candidate.targetExpressionText(),
+                        candidate.baseExpressionMeaningText(),
+                        candidate.usageSummary()))
             .toList();
     return new GenerationContext(
         learningSessionId,
@@ -189,13 +199,10 @@ public class FreeTalkExpressionGenerationService {
 
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
-    WritingExpression writingExpression =
-        writingExpressionRepository
-            .findByIdAndStatus(recommendation.existingExpressionId(), ActiveStatus.ACTIVE)
-            .orElseThrow(() -> new ApiException(ErrorCode.AI_RESPONSE_INVALID));
+    expressionQueryService.validateActiveExpression(recommendation.existingExpressionId());
     return FreeTalkSessionExpression.existing(
         context.freeTalkSessionId(),
-        writingExpression.getId(),
+        recommendation.existingExpressionId(),
         recommendation.displayOrder(),
         recommendation.contextualExample().sentenceText(),
         recommendation.contextualExample().sentenceTranslation());

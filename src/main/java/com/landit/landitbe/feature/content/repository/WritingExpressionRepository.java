@@ -7,6 +7,7 @@ import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /** 시나리오에 속한 Writing 표현을 학습 순서 기준으로 조회한다. */
@@ -26,4 +27,8 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
   /** 학습 언어와 기준 언어에 맞는 활성 Writing 표현을 조회한다. */
   List<WritingExpression> findByTargetLocaleAndBaseLocaleAndStatus(
       Locale targetLocale, Locale baseLocale, ActiveStatus status);
+
+  /** 프리톡 표현 추천에 사용할 활성 표현 후보를 생성 순서로 제한 조회한다. */
+  List<WritingExpression> findByTargetLocaleAndBaseLocaleAndStatusOrderByIdAsc(
+      Locale targetLocale, Locale baseLocale, ActiveStatus status, Pageable pageable);
 }

@@ -2,8 +2,10 @@
 
 package com.landit.landitbe.feature.session.repository;
 
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +37,15 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
           + "where session.learningSessionId = :learningSessionId")
   Optional<FreeTalkSession> findByLearningSessionIdForUpdate(
       @Param("learningSessionId") Long learningSessionId);
+
+  /**
+   * 애플리케이션 중단으로 표현 생성이 끝나지 않은 세션을 조회한다.
+   *
+   * @param expressionGenerationStatus 조회할 표현 생성 상태
+   * @return 표현 생성 시작 시각이 있는 프리톡 세션 목록
+   */
+  List<FreeTalkSession> findByExpressionGenerationStatusAndExpressionGenerationStartedAtIsNotNull(
+      ExpressionGenerationStatus expressionGenerationStatus);
 
   /**
    * 사용자가 소유한 완료 프리톡을 완료 시각 내림차순으로 조회한다.

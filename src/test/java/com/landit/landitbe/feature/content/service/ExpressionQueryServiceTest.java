@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
+import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
@@ -43,6 +44,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 
 /** ExpressionQueryService의 완료/잠김 계산, 학습 시작 상세 조회, 추가 예문 조회를 단위 검증한다. */
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +63,25 @@ class ExpressionQueryServiceTest {
   @Mock private LearningProgressService learningProgressService;
 
   @InjectMocks private ExpressionQueryService expressionQueryService;
+
+  @Test
+  void returnsBoundedActiveCandidatesForFreeTalkReuse() {
+    WritingExpression expression = mock(WritingExpression.class);
+    when(expression.getId()).thenReturn(101L);
+    when(expression.getTargetExpressionText()).thenReturn("target-101");
+    when(expression.getBaseExpressionMeaningText()).thenReturn("base-101");
+    when(expression.getUsageSummary()).thenReturn("제안에 동의할 때 사용");
+    when(writingExpressionRepository.findByTargetLocaleAndBaseLocaleAndStatusOrderByIdAsc(
+            eq(Locale.EN), eq(Locale.KR), eq(ActiveStatus.ACTIVE), eq(PageRequest.of(0, 100))))
+        .thenReturn(List.of(expression));
+
+    List<ExpressionRecommendationCandidate> candidates =
+        expressionQueryService.getActiveExpressionCandidates(Locale.EN, Locale.KR);
+
+    assertThat(candidates)
+        .containsExactly(
+            new ExpressionRecommendationCandidate(101L, "target-101", "base-101", "제안에 동의할 때 사용"));
+  }
 
   @Test
   void shouldUnlockOnlyEarliestIncompleteExpression() {
