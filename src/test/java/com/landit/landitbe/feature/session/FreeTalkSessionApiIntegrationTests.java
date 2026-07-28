@@ -1,4 +1,4 @@
-// 프리톡 주제 조회와 세션 시작 API의 외부 계약과 저장 경계를 검증한다.
+// 프리톡 주제 조회, 세션 시작, 발화 제출과 종료 결정 API의 외부 계약과 저장 경계를 검증한다.
 
 package com.landit.landitbe.feature.session;
 
@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -543,6 +544,24 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(firstStatus.get(5, TimeUnit.SECONDS)).isEqualTo(200);
   }
 
+  @Test
+  void completesWhenServerCalculatedSpeakingTimeReachesLimit() throws Exception {
+    String accessToken =
+        login("free-talk-server-time-limit@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 180000, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+  }
+
   private long startUserFirstSession(String accessToken) throws Exception {
     MvcResult result =
         mockMvc
@@ -656,12 +675,12 @@ class FreeTalkSessionApiIntegrationTests {
     private AiFreeTalkOpeningRequest lastOpeningRequest;
     private boolean openingTransactionActive;
     private boolean failOpening;
-    private boolean turnTransactionActive;
-    private boolean failTurn;
-    private boolean exitIntentDetected;
-    private int turnCallCount;
-    private CountDownLatch turnStarted = new CountDownLatch(1);
-    private CountDownLatch turnRelease = new CountDownLatch(0);
+    private volatile boolean turnTransactionActive;
+    private volatile boolean failTurn;
+    private volatile boolean exitIntentDetected;
+    private final AtomicInteger turnCallCount = new AtomicInteger();
+    private volatile CountDownLatch turnStarted = new CountDownLatch(1);
+    private volatile CountDownLatch turnRelease = new CountDownLatch(0);
 
     @Override
     public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
@@ -677,10 +696,12 @@ class FreeTalkSessionApiIntegrationTests {
     @Override
     public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
       turnTransactionActive = TransactionSynchronizationManager.isActualTransactionActive();
-      turnCallCount++;
+      turnCallCount.incrementAndGet();
       turnStarted.countDown();
       try {
-        turnRelease.await(5, TimeUnit.SECONDS);
+        if (!turnRelease.await(5, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("AI 턴 대기가 시간 초과되었습니다.");
+        }
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
         throw new IllegalStateException(exception);
@@ -718,7 +739,7 @@ class FreeTalkSessionApiIntegrationTests {
       turnTransactionActive = false;
       failTurn = false;
       exitIntentDetected = false;
-      turnCallCount = 0;
+      turnCallCount.set(0);
       turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(0);
     }
@@ -760,7 +781,7 @@ class FreeTalkSessionApiIntegrationTests {
     }
 
     int turnCallCount() {
-      return turnCallCount;
+      return turnCallCount.get();
     }
   }
 }

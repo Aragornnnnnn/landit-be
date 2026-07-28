@@ -110,7 +110,10 @@ public class FreeTalkSubmittedMessageService {
         userMessage.getId(),
         request.clientMessageId(),
         request.utteranceDurationMs(),
-        request.timeLimitReached(),
+        request.timeLimitReached()
+            || freeTalkSession.getAccumulatedSpeakingDurationMs()
+                    + request.utteranceDurationMs()
+                >= SPEAKING_TIME_LIMIT_MS,
         freeTalkSession.getStartMode() == FreeTalkStartMode.USER_FIRST
             && messages.stream()
                     .filter(message -> message.getRole() == ConversationSpeaker.USER)
@@ -218,6 +221,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public DecisionReservation reserveDecision(
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
+    final LearningSession learningSession = requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
     SessionHistory history =
         sessionHistoryRepository
@@ -227,7 +231,6 @@ public class FreeTalkSubmittedMessageService {
         sessionHistoryMessageRepository
             .findByIdAndSessionHistoryId(submittedMessageId, history.getId())
             .orElseThrow(() -> new ApiException(ErrorCode.CONFLICT));
-    final LearningSession learningSession = requireOwnedSession(userId, learningSessionId);
     if (session.getConversationStatus() != FreeTalkConversationStatus.AWAITING_EXIT_DECISION
         || !Long.valueOf(submittedMessageId).equals(session.getPendingUserMessageId())
         || session.getProcessingClientMessageId() != null) {
@@ -335,9 +338,14 @@ public class FreeTalkSubmittedMessageService {
       long learningSessionId, long historyId, long userMessageId) {
     LearningSession learningSession = requireOwnedSessionWithoutUser(learningSessionId);
     FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
-    SessionHistory history = sessionHistoryRepository.findById(historyId).orElseThrow();
+    SessionHistory history =
+        sessionHistoryRepository
+            .findById(historyId)
+            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     SessionHistoryMessage userMessage =
-        sessionHistoryMessageRepository.findById(userMessageId).orElseThrow();
+        sessionHistoryMessageRepository
+            .findById(userMessageId)
+            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     return new ManagedRecords(learningSessionId, learningSession, session, history, userMessage);
   }
 
@@ -355,7 +363,9 @@ public class FreeTalkSubmittedMessageService {
   }
 
   private LearningSession requireOwnedSessionWithoutUser(long learningSessionId) {
-    return learningSessionRepository.findById(learningSessionId).orElseThrow();
+    return learningSessionRepository
+        .findById(learningSessionId)
+        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
   }
 
   private FreeTalkSession requireFreeTalkForUpdate(long learningSessionId) {
