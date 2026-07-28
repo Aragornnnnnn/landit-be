@@ -90,6 +90,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/sessions/*/end")
                     .authenticated()
+                    .requestMatchers("/api/v1/free-talk/**")
+                    .authenticated()
                     .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR)
                     .permitAll()
                     .requestMatchers("/actuator/health", "/swagger-ui/**", "/v3/api-docs/**")
