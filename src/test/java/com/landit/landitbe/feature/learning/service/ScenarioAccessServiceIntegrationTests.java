@@ -3,13 +3,22 @@
 package com.landit.landitbe.feature.learning.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.landit.landitbe.shared.domain.Locale;
+import java.time.LocalDateTime;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 사용자 시나리오 복습 권한의 보유 여부, 목록 조회와 중복 완료 처리를 검증한다. */
@@ -20,6 +29,7 @@ class ScenarioAccessServiceIntegrationTests {
 
   private static final long USER_ID = 992001L;
   private static final long SCENARIO_ID = 992101L;
+  private static final LocalDateTime GRANTED_AT = LocalDateTime.of(2026, 7, 28, 12, 0);
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -30,14 +40,50 @@ class ScenarioAccessServiceIntegrationTests {
     seedUserProfile(USER_ID);
     seedScenario(SCENARIO_ID);
 
-    scenarioAccessService.grantAccess(USER_ID, SCENARIO_ID, Locale.EN);
-    scenarioAccessService.grantAccess(USER_ID, SCENARIO_ID, Locale.EN);
+    scenarioAccessService.grantAccess(USER_ID, SCENARIO_ID, Locale.EN, GRANTED_AT);
+    scenarioAccessService.grantAccess(USER_ID, SCENARIO_ID, Locale.EN, GRANTED_AT.plusMinutes(1));
 
     assertThat(scenarioAccessService.hasAccess(USER_ID, SCENARIO_ID, Locale.EN)).isTrue();
     assertThat(scenarioAccessService.hasAccess(USER_ID, SCENARIO_ID, Locale.KR)).isFalse();
     assertThat(scenarioAccessService.findAccessibleScenarioIds(USER_ID, Locale.EN))
         .containsExactly(SCENARIO_ID);
     assertThat(accessCount()).isEqualTo(1);
+    assertThat(grantedAt()).isEqualTo(GRANTED_AT);
+  }
+
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void grantsAccessIdempotentlyInConcurrentTransactions() throws Exception {
+    long concurrentUserId = 992002L;
+    long concurrentScenarioId = 992102L;
+    seedUserProfile(concurrentUserId);
+    seedScenario(concurrentScenarioId);
+
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    Callable<Void> grantAccess =
+        () -> {
+          ready.countDown();
+          assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+          scenarioAccessService.grantAccess(
+              concurrentUserId, concurrentScenarioId, Locale.EN, GRANTED_AT);
+          return null;
+        };
+
+    try {
+      Future<Void> first = executorService.submit(grantAccess);
+      Future<Void> second = executorService.submit(grantAccess);
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+
+      assertThatCode(() -> first.get(10, TimeUnit.SECONDS)).doesNotThrowAnyException();
+      assertThatCode(() -> second.get(10, TimeUnit.SECONDS)).doesNotThrowAnyException();
+    } finally {
+      executorService.shutdownNow();
+    }
+
+    assertThat(accessCount(concurrentUserId, concurrentScenarioId)).isEqualTo(1);
   }
 
   private void seedUserProfile(long userId) {
@@ -75,6 +121,10 @@ class ScenarioAccessServiceIntegrationTests {
   }
 
   private int accessCount() {
+    return accessCount(USER_ID, SCENARIO_ID);
+  }
+
+  private int accessCount(long userId, long scenarioId) {
     Integer count =
         jdbcTemplate.queryForObject(
             """
@@ -85,8 +135,22 @@ class ScenarioAccessServiceIntegrationTests {
               and target_locale = 'EN'
             """,
             Integer.class,
-            USER_ID,
-            SCENARIO_ID);
+            userId,
+            scenarioId);
     return count == null ? 0 : count;
+  }
+
+  private LocalDateTime grantedAt() {
+    return jdbcTemplate.queryForObject(
+        """
+        select granted_at
+        from user_scenario_access
+        where user_profile_id = ?
+          and scenario_id = ?
+          and target_locale = 'EN'
+        """,
+        LocalDateTime.class,
+        USER_ID,
+        SCENARIO_ID);
   }
 }

@@ -14,6 +14,7 @@ CREATE TABLE user_scenario_access (
     user_profile_id BIGINT NOT NULL,
     scenario_id BIGINT NOT NULL,
     target_locale VARCHAR(35) NOT NULL,
+    granted_at TIMESTAMP(6) NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT uk_user_scenario_access_user_scenario_locale

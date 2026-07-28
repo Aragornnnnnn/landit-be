@@ -13,6 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
 import lombok.Getter;
 
 /** 사용자가 완료로 획득한 시나리오 복습 권한을 저장한다. */
@@ -40,13 +41,18 @@ public class UserScenarioAccess extends BaseTimeEntity {
   @Column(name = "target_locale", nullable = false, length = 35)
   private Locale targetLocale;
 
+  @Column(name = "granted_at", nullable = false)
+  private LocalDateTime grantedAt;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected UserScenarioAccess() {}
 
-  private UserScenarioAccess(Long userProfileId, Long scenarioId, Locale targetLocale) {
+  private UserScenarioAccess(
+      Long userProfileId, Long scenarioId, Locale targetLocale, LocalDateTime grantedAt) {
     this.userProfileId = userProfileId;
     this.scenarioId = scenarioId;
     this.targetLocale = targetLocale;
+    this.grantedAt = grantedAt;
   }
 
   /**
@@ -55,9 +61,11 @@ public class UserScenarioAccess extends BaseTimeEntity {
    * @param userProfileId 사용자 프로필 ID
    * @param scenarioId 완료한 시나리오 ID
    * @param targetLocale 학습 대상 언어
+   * @param grantedAt 복습 권한을 얻은 시각
    * @return 생성한 시나리오 복습 권한
    */
-  public static UserScenarioAccess grant(Long userProfileId, Long scenarioId, Locale targetLocale) {
-    return new UserScenarioAccess(userProfileId, scenarioId, targetLocale);
+  public static UserScenarioAccess grant(
+      Long userProfileId, Long scenarioId, Locale targetLocale, LocalDateTime grantedAt) {
+    return new UserScenarioAccess(userProfileId, scenarioId, targetLocale, grantedAt);
   }
 }

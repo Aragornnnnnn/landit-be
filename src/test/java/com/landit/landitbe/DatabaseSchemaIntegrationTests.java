@@ -236,6 +236,7 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("user_scenario_access", "user_profile_id");
     assertColumnExists("user_scenario_access", "scenario_id");
     assertColumnExists("user_scenario_access", "target_locale");
+    assertColumnExists("user_scenario_access", "granted_at");
     assertTableConstraintExists(
         "user_scenario_access", "uk_user_scenario_access_user_scenario_locale");
     assertTableConstraintExists("user_scenario_access", "fk_user_scenario_access_user_profile_id");

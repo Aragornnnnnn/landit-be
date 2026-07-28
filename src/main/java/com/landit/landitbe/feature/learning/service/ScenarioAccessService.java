@@ -4,7 +4,9 @@ package com.landit.landitbe.feature.learning.service;
 
 import com.landit.landitbe.feature.learning.domain.UserScenarioAccess;
 import com.landit.landitbe.feature.learning.repository.UserScenarioAccessRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.Locale;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ScenarioAccessService {
 
   private final UserScenarioAccessRepository userScenarioAccessRepository;
+  private final UserProfileService userProfileService;
 
   /**
    * 사용자가 대상 언어의 특정 시나리오 복습 권한을 보유하는지 확인한다.
@@ -53,13 +56,16 @@ public class ScenarioAccessService {
    * @param userProfileId 사용자 프로필 ID
    * @param scenarioId 완료한 시나리오 ID
    * @param targetLocale 학습 대상 언어
+   * @param grantedAt 복습 권한을 얻은 시각
    */
   @Transactional
-  public void grantAccess(Long userProfileId, Long scenarioId, Locale targetLocale) {
+  public void grantAccess(
+      Long userProfileId, Long scenarioId, Locale targetLocale, LocalDateTime grantedAt) {
+    userProfileService.requireActiveForUpdate(userProfileId);
     if (hasAccess(userProfileId, scenarioId, targetLocale)) {
       return;
     }
     userScenarioAccessRepository.save(
-        UserScenarioAccess.grant(userProfileId, scenarioId, targetLocale));
+        UserScenarioAccess.grant(userProfileId, scenarioId, targetLocale, grantedAt));
   }
 }
