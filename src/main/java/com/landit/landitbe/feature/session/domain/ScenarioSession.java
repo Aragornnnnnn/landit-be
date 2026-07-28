@@ -27,6 +27,9 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "scenario_language_variant_id", nullable = false)
   private Long scenarioLanguageVariantId;
 
+  @Column(name = "daily_scenario_schedule_id")
+  private Long dailyScenarioScheduleId;
+
   @Column(name = "user_opening_instruction_snapshot", columnDefinition = "text")
   private String userOpeningInstructionSnapshot;
 

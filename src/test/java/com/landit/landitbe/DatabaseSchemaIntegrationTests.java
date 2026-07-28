@@ -221,6 +221,32 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("session_history_message", "chk_session_message_feedback_status");
   }
 
+  @DisplayName("일일 시나리오 일정과 사용자 복습 권한의 고유 제약을 추가한다.")
+  @Test
+  void dailyScenarioScheduleAndUserScenarioAccessConstraintsAreApplied() {
+    assertTableExists("daily_scenario_schedule");
+    assertColumnExists("daily_scenario_schedule", "service_date");
+    assertColumnExists("daily_scenario_schedule", "scenario_id");
+    assertTableConstraintExists(
+        "daily_scenario_schedule", "uk_daily_scenario_schedule_service_date");
+    assertTableConstraintExists(
+        "daily_scenario_schedule", "fk_daily_scenario_schedule_scenario_id");
+
+    assertTableExists("user_scenario_access");
+    assertColumnExists("user_scenario_access", "user_profile_id");
+    assertColumnExists("user_scenario_access", "scenario_id");
+    assertColumnExists("user_scenario_access", "target_locale");
+    assertTableConstraintExists(
+        "user_scenario_access", "uk_user_scenario_access_user_scenario_locale");
+    assertTableConstraintExists("user_scenario_access", "fk_user_scenario_access_user_profile_id");
+    assertTableConstraintExists("user_scenario_access", "fk_user_scenario_access_scenario_id");
+
+    assertColumnExists("scenario_session", "daily_scenario_schedule_id");
+    assertNullableColumn("scenario_session", "daily_scenario_schedule_id");
+    assertTableConstraintExists(
+        "scenario_session", "fk_scenario_session_daily_scenario_schedule_id");
+  }
+
   @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")
   @Test
   void postgresqlMigrationNormalizesPracticeExamplesPayloadKeys() throws Exception {
@@ -532,6 +558,22 @@ class DatabaseSchemaIntegrationTests {
             columnName);
 
     assertThat(columnCount).as("column %s.%s", tableName, columnName).isZero();
+  }
+
+  private void assertNullableColumn(String tableName, String columnName) {
+    String nullable =
+        jdbcTemplate.queryForObject(
+            """
+            select is_nullable
+            from information_schema.columns
+            where lower(table_name) = ?
+              and lower(column_name) = ?
+            """,
+            String.class,
+            tableName,
+            columnName);
+
+    assertThat(nullable).as("column %s.%s is nullable", tableName, columnName).isEqualTo("YES");
   }
 
   private void assertIndexExists(String indexName) {
