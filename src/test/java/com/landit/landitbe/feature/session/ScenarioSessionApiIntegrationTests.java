@@ -2017,6 +2017,38 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void startPreviousDayScenarioIsRejectedAtNextMidnight() throws Exception {
+    mutableClock.setInstant(Instant.parse("2026-07-28T14:59:59Z"));
+    JsonNode loginBody = login("previous-day-at-midnight@example.com");
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1016, 1, "ACTIVE", "전날 시나리오");
+    seedScenario(2016, 1016, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3016,
+        2016,
+        "전날 시나리오",
+        "전날 시나리오",
+        "전날 시나리오",
+        "먼저 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    scheduleTodayScenario(2016);
+    mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/scenarios/2016/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("SCENARIO_LOCKED"))
+        .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
+  }
+
+  @Test
   void startTodayScenarioRecordsDailySchedule() throws Exception {
     JsonNode loginBody = login("today-scenario@example.com");
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -2103,6 +2135,7 @@ class ScenarioSessionApiIntegrationTests {
             Integer.class,
             startedSession.sessionId());
     assertThat(endedAtCount).isEqualTo(1);
+    assertThat(hasScenarioAccess(startedSession.userId(), 2006)).isFalse();
   }
 
   @Test

@@ -25,12 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 시나리오 목록 조회 결과를 사용자별 응답 형태로 조립한다. */
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class ScenarioQueryService {
 
   private static final String CATEGORY_LOCK_REASON = "현재 사용할 수 없는 카테고리입니다.";
@@ -104,6 +106,15 @@ public class ScenarioQueryService {
     if (inactive(scenarioRow.categoryStatus())
         || inactive(scenarioRow.scenarioStatus())
         || inactive(scenarioRow.variantStatus())) {
+      if (scenarioRow.scenarioId().equals(todayScenarioId)) {
+        log.warn(
+            "daily scenario schedule references inactive content: scenarioId={}, "
+                + "categoryStatus={}, scenarioStatus={}, variantStatus={}",
+            scenarioRow.scenarioId(),
+            scenarioRow.categoryStatus(),
+            scenarioRow.scenarioStatus(),
+            scenarioRow.variantStatus());
+      }
       return ScenarioAvailabilityStatus.LOCKED;
     }
     if (accessibleScenarioIds.contains(scenarioRow.scenarioId())) {

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,9 +17,12 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -36,6 +40,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @SpringBootTest
 @Import(ScenarioListApiIntegrationTests.FixedClockConfiguration.class)
+@ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
@@ -133,6 +138,26 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(false))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].expiresAt").value(nullValue()));
+  }
+
+  @Test
+  void scenariosWarnWhenTodayScheduleReferencesInactiveContent(CapturedOutput output)
+      throws Exception {
+    JsonNode loginResponseBody = login();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(null);
+    insertDailyScenarioSchedule(203, "2026-07-28");
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.categories[1].scenarios[0].scenarioId").value(203))
+        .andExpect(
+            jsonPath("$.data.categories[1].scenarios[0].availabilityStatus").value("LOCKED"));
+
+    assertThat(output.getOut())
+        .contains("daily scenario schedule references inactive content: scenarioId=203");
   }
 
   @Test
