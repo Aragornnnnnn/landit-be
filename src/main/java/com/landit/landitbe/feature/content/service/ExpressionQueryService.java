@@ -132,12 +132,17 @@ public class ExpressionQueryService {
 
   /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다. */
   @Transactional(readOnly = true)
+  public ExpressionLearningResponse getExpressionForLearning(Long userId, Long expressionId) {
+    return ExpressionLearningResponse.from(requireAccessibleExpression(userId, expressionId));
+  }
+
+  /** 기존 내부 호출과 단위 테스트를 위한 공용 표현 조회다. */
+  @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
     WritingExpression expression =
         writingExpressionRepository
             .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-
     return ExpressionLearningResponse.from(expression);
   }
 
@@ -146,7 +151,7 @@ public class ExpressionQueryService {
   public List<ExpressionRecommendationCandidate> getActiveExpressionCandidates(
       Locale targetLocale, Locale baseLocale) {
     return writingExpressionRepository
-        .findByTargetLocaleAndBaseLocaleAndStatusOrderByIdAsc(
+        .findByTargetLocaleAndBaseLocaleAndStatusAndOwnerUserProfileIdIsNullOrderByIdAsc(
             targetLocale,
             baseLocale,
             ActiveStatus.ACTIVE,
@@ -175,6 +180,13 @@ public class ExpressionQueryService {
    * 던진다.
    */
   @Transactional(readOnly = true)
+  public ExpressionPracticeResponse getExtraPracticeExamples(Long userId, Long expressionId) {
+    WritingExpression expression = requireAccessibleExpression(userId, expressionId);
+    return practiceResponse(expression, expressionId);
+  }
+
+  /** 기존 내부 호출과 단위 테스트를 위한 공용 표현 연습 조회다. */
+  @Transactional(readOnly = true)
   public ExpressionPracticeResponse getExtraPracticeExamples(Long expressionId) {
     WritingExpression expression =
         writingExpressionRepository
@@ -184,6 +196,11 @@ public class ExpressionQueryService {
                   log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
+    return practiceResponse(expression, expressionId);
+  }
+
+  private ExpressionPracticeResponse practiceResponse(
+      WritingExpression expression, Long expressionId) {
 
     List<ParsedPracticeSentence> parsedSentences =
         parseExtraPracticeSentences(expression.getPracticeExamplesPayload(), expressionId);
@@ -196,6 +213,21 @@ public class ExpressionQueryService {
         parsedSentences.stream().map(ParsedPracticeSentence::sentence).toList();
     return ExpressionPracticeResponse.from(
         expression, extraPracticeSentences, pickRandomWritingSentence(parsedSentences));
+  }
+
+  private WritingExpression requireAccessibleExpression(Long userId, Long expressionId) {
+    WritingExpression expression =
+        writingExpressionRepository
+            .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
+            .orElseThrow(
+                () -> {
+                  log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
+                  return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+                });
+    if (expression.isOwnedByAnother(userId)) {
+      throw new ApiException(ErrorCode.FORBIDDEN);
+    }
+    return expression;
   }
 
   /**

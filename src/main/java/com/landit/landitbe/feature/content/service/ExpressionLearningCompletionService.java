@@ -4,7 +4,9 @@ package com.landit.landitbe.feature.content.service;
 
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -31,6 +33,7 @@ public class ExpressionLearningCompletionService {
   private final WritingExpressionRepository writingExpressionRepository;
   private final UserProfileService userProfileService;
   private final LearningProgressService learningProgressService;
+  private final UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
   /**
    * 학습 순서에 맞는 활성 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
@@ -51,6 +54,13 @@ public class ExpressionLearningCompletionService {
                             .RESOURCE_NOT_FOUND)); // 해당 표현이 없거나 INACTIVE면 RESOURCE_NOT_FOUND 터트리고
     // 끝.
     Long scenarioId = expression.getScenarioId();
+    if (expression.isOwnedByAnother(userId)) {
+      throw new ApiException(ErrorCode.FORBIDDEN);
+    }
+    if (scenarioId == null) {
+      completeFreeTalkExpression(userId, expressionId);
+      return;
+    }
 
     CompletedExpressionIds completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId);
@@ -70,6 +80,16 @@ public class ExpressionLearningCompletionService {
     // 3. 잠겨있지 않으면 완료 기록을 새로 생성해서 저장한다.
     learningProgressService.completeExpression(userId, scenarioId, expressionId);
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
+  }
+
+  private void completeFreeTalkExpression(Long userId, Long expressionId) {
+    expressionCompletionRepository
+        .findByUserProfileIdAndWritingExpressionId(userId, expressionId)
+        .ifPresentOrElse(
+            UserWritingExpressionCompletion::markCompletedAgain,
+            () ->
+                expressionCompletionRepository.save(
+                    new UserWritingExpressionCompletion(userId, null, expressionId)));
   }
 
   /** 해당 표현이 지금 학습할 차례가 맞는지(=unlock상태인지) 사용자 locale 기준으로 판정한다. */

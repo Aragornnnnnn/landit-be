@@ -31,4 +31,9 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
   /** 프리톡 표현 추천에 사용할 활성 표현 후보를 생성 순서로 제한 조회한다. */
   List<WritingExpression> findByTargetLocaleAndBaseLocaleAndStatusOrderByIdAsc(
       Locale targetLocale, Locale baseLocale, ActiveStatus status, Pageable pageable);
+
+  /** 프리톡 추천에 사용할 공용 표현 후보만 조회한다. */
+  List<WritingExpression>
+      findByTargetLocaleAndBaseLocaleAndStatusAndOwnerUserProfileIdIsNullOrderByIdAsc(
+          Locale targetLocale, Locale baseLocale, ActiveStatus status, Pageable pageable);
 }

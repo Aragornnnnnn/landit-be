@@ -3,6 +3,9 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
+import com.landit.landitbe.feature.content.domain.WritingExpression;
+import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
@@ -25,6 +28,7 @@ import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
+import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
@@ -45,6 +49,7 @@ public class FreeTalkExpressionGenerationService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
+  private final WritingExpressionRepository writingExpressionRepository;
   private final ExpressionQueryService expressionQueryService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
@@ -67,8 +72,8 @@ public class FreeTalkExpressionGenerationService {
               .recommendExpressions(
                   new AiFreeTalkExpressionRecommendationsRequest(
                       context.learningSessionId(),
-                      context.targetLocale(),
-                      context.baseLocale(),
+                      context.targetLocale().name(),
+                      context.baseLocale().name(),
                       context.history(),
                       context.existingExpressions()))
               .recommendations();
@@ -90,8 +95,8 @@ public class FreeTalkExpressionGenerationService {
                   .generateExpressionLearningContent(
                       new AiFreeTalkExpressionLearningContentRequest(
                           context.learningSessionId(),
-                          context.targetLocale(),
-                          context.baseLocale(),
+                          context.targetLocale().name(),
+                          context.baseLocale().name(),
                           newExpressions))
                   .expressions();
       transactionTemplate.executeWithoutResult(
@@ -145,8 +150,9 @@ public class FreeTalkExpressionGenerationService {
     return new GenerationContext(
         learningSessionId,
         freeTalkSession.getId(),
-        learningSession.getTargetLocale().name(),
-        learningSession.getBaseLocale().name(),
+        learningSession.getUserProfileId(),
+        learningSession.getTargetLocale(),
+        learningSession.getBaseLocale(),
         sessionHistoryMessageRepository
             .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
             .stream()
@@ -200,7 +206,7 @@ public class FreeTalkExpressionGenerationService {
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
     expressionQueryService.validateActiveExpression(recommendation.existingExpressionId());
-    return FreeTalkSessionExpression.existing(
+    return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),
         recommendation.existingExpressionId(),
         recommendation.displayOrder(),
@@ -217,19 +223,39 @@ public class FreeTalkExpressionGenerationService {
     if (content == null) {
       throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
-    return FreeTalkSessionExpression.generated(
+    WritingExpression generatedExpression =
+        writingExpressionRepository.save(
+            WritingExpression.freeTalkGenerated(
+                context.userProfileId(),
+                context.targetLocale(),
+                context.baseLocale(),
+                new FreeTalkGeneratedExpressionContent(
+                    content.targetExpressionText(),
+                    content.baseExpressionMeaningText(),
+                    content.usageSummary(),
+                    content.usageDescription(),
+                    content.representativeQuestionText(),
+                    content.representativeQuestionTranslation(),
+                    content.representativeSentenceText(),
+                    content.representativeSentenceTranslation(),
+                    content.representativeSentenceWords(),
+                    content.representativeSentenceWordChoices(),
+                    content.representativeImageUrl(),
+                    objectMapper.valueToTree(content.practiceExamples()))));
+    return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),
+        generatedExpression.getId(),
         recommendation.displayOrder(),
         recommendation.contextualExample().sentenceText(),
-        recommendation.contextualExample().sentenceTranslation(),
-        objectMapper.valueToTree(content));
+        recommendation.contextualExample().sentenceTranslation());
   }
 
   private record GenerationContext(
       long learningSessionId,
       long freeTalkSessionId,
-      String targetLocale,
-      String baseLocale,
+      long userProfileId,
+      Locale targetLocale,
+      Locale baseLocale,
       List<AiConversationHistoryMessage> history,
       List<AiFreeTalkExistingExpression> existingExpressions) {}
 }

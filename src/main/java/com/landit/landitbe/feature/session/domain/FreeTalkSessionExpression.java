@@ -2,20 +2,14 @@
 
 package com.landit.landitbe.feature.session.domain;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.Getter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /** 프리톡 세션별 개인화 예문과 표현 노출 순서를 저장한다. */
 @Getter
@@ -29,12 +23,8 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
   @Column(name = "free_talk_session_id", nullable = false)
   private Long freeTalkSessionId;
 
-  @Column(name = "writing_expression_id")
+  @Column(name = "writing_expression_id", nullable = false)
   private Long writingExpressionId;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "source_type", nullable = false, length = 20)
-  private FreeTalkExpressionSourceType sourceType;
 
   @Column(name = "display_order", nullable = false)
   private int displayOrder;
@@ -45,18 +35,11 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
   @Column(name = "personalized_example_translation", nullable = false, columnDefinition = "text")
   private String personalizedExampleTranslation;
 
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "generated_content_payload", columnDefinition = "jsonb")
-  private JsonNode generatedContentPayload;
-
-  @Column(name = "completed_at")
-  private LocalDateTime completedAt;
-
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSessionExpression() {}
 
   /**
-   * 기존 Writing 표현을 직접 참조하는 세션 표현을 생성한다.
+   * Writing 표현을 프리톡 세션에 연결한다.
    *
    * @param freeTalkSessionId 연결할 프리톡 세션 ID
    * @param writingExpressionId 재사용할 Writing 표현 ID
@@ -65,7 +48,7 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
    * @param personalizedExampleTranslation 개인화 예문의 기준 언어 번역
    * @return 기존 표현을 참조하는 세션 표현
    */
-  public static FreeTalkSessionExpression existing(
+  public static FreeTalkSessionExpression link(
       Long freeTalkSessionId,
       Long writingExpressionId,
       int displayOrder,
@@ -74,56 +57,9 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
     FreeTalkSessionExpression expression = new FreeTalkSessionExpression();
     expression.freeTalkSessionId = freeTalkSessionId;
     expression.writingExpressionId = writingExpressionId;
-    expression.sourceType = FreeTalkExpressionSourceType.EXISTING;
     expression.displayOrder = displayOrder;
     expression.personalizedExampleText = personalizedExampleText;
     expression.personalizedExampleTranslation = personalizedExampleTranslation;
     return expression;
-  }
-
-  /**
-   * AI가 생성한 학습 콘텐츠를 보유하는 세션 표현을 생성한다.
-   *
-   * @param freeTalkSessionId 연결할 프리톡 세션 ID
-   * @param displayOrder 세션 안의 노출 순서
-   * @param personalizedExampleText 대화 맥락에 맞춘 학습 언어 예문
-   * @param personalizedExampleTranslation 개인화 예문의 기준 언어 번역
-   * @param generatedContentPayload AI가 생성한 학습 콘텐츠 JSON
-   * @return 신규 표현 학습 콘텐츠를 보유하는 세션 표현
-   */
-  public static FreeTalkSessionExpression generated(
-      Long freeTalkSessionId,
-      int displayOrder,
-      String personalizedExampleText,
-      String personalizedExampleTranslation,
-      JsonNode generatedContentPayload) {
-    FreeTalkSessionExpression expression = new FreeTalkSessionExpression();
-    expression.freeTalkSessionId = freeTalkSessionId;
-    expression.sourceType = FreeTalkExpressionSourceType.NEW;
-    expression.displayOrder = displayOrder;
-    expression.personalizedExampleText = personalizedExampleText;
-    expression.personalizedExampleTranslation = personalizedExampleTranslation;
-    expression.generatedContentPayload = generatedContentPayload;
-    return expression;
-  }
-
-  /**
-   * 학습 완료 시각을 최초 한 번만 기록한다.
-   *
-   * @param completedAt 기록할 학습 완료 시각
-   */
-  public void complete(LocalDateTime completedAt) {
-    if (this.completedAt == null) {
-      this.completedAt = completedAt;
-    }
-  }
-
-  /**
-   * 학습 완료 여부를 반환한다.
-   *
-   * @return 완료 시각이 기록됐으면 {@code true}
-   */
-  public boolean isCompleted() {
-    return completedAt != null;
   }
 }

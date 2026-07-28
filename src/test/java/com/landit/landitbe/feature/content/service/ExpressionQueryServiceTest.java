@@ -71,8 +71,9 @@ class ExpressionQueryServiceTest {
     when(expression.getTargetExpressionText()).thenReturn("target-101");
     when(expression.getBaseExpressionMeaningText()).thenReturn("base-101");
     when(expression.getUsageSummary()).thenReturn("제안에 동의할 때 사용");
-    when(writingExpressionRepository.findByTargetLocaleAndBaseLocaleAndStatusOrderByIdAsc(
-            eq(Locale.EN), eq(Locale.KR), eq(ActiveStatus.ACTIVE), eq(PageRequest.of(0, 100))))
+    when(writingExpressionRepository
+            .findByTargetLocaleAndBaseLocaleAndStatusAndOwnerUserProfileIdIsNullOrderByIdAsc(
+                eq(Locale.EN), eq(Locale.KR), eq(ActiveStatus.ACTIVE), eq(PageRequest.of(0, 100))))
         .thenReturn(List.of(expression));
 
     List<ExpressionRecommendationCandidate> candidates =

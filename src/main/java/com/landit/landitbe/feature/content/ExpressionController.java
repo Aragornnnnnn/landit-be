@@ -40,16 +40,18 @@ public class ExpressionController implements ExpressionControllerDocs {
   @Override
   @GetMapping("/api/v1/expressions/{expressionId}/learning-start")
   public ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
-      @PathVariable Long expressionId) {
-    return ApiResponse.success(expressionQueryService.getExpressionForLearning(expressionId));
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
+    return ApiResponse.success(
+        expressionQueryService.getExpressionForLearning(principal.userId(), expressionId));
   }
 
   /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/expressions/{expressionId}/practice")
   public ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
-      @PathVariable Long expressionId) {
-    return ApiResponse.success(expressionQueryService.getExtraPracticeExamples(expressionId));
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
+    return ApiResponse.success(
+        expressionQueryService.getExtraPracticeExamples(principal.userId(), expressionId));
   }
 
   /** {@inheritDoc} */
