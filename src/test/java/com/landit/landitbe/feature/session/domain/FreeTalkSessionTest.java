@@ -29,6 +29,8 @@ class FreeTalkSessionTest {
     session.completeByUserExit();
 
     assertThat(session.getConversationStatus()).isEqualTo(FreeTalkConversationStatus.COMPLETED);
+    assertThat(session.getExpressionGenerationStatus())
+        .isEqualTo(ExpressionGenerationStatus.PREPARING);
   }
 
   /** 종료 확인 대기 세션도 사용자의 종료 확정으로 완료된다. */
