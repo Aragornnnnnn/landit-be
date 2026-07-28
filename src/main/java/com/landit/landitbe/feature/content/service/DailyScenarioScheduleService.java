@@ -10,12 +10,14 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 서울 서비스 날짜를 기준으로 일일 시나리오 일정과 다음 갱신 시각을 계산한다. */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DailyScenarioScheduleService {
 
   private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
@@ -30,11 +32,24 @@ public class DailyScenarioScheduleService {
    */
   @Transactional(readOnly = true)
   public TodaySchedule findTodaySchedule() {
-    Instant evaluatedAt = clock.instant();
+    return findAt(clock.instant());
+  }
+
+  /**
+   * 평가 시각의 서울 서비스 날짜에 해당하는 일정과 다음 서비스 날짜 시작 시각을 조회한다.
+   *
+   * @param evaluatedAt 정책을 평가할 시각
+   * @return 해당 날짜 일정과 다음 날 자정 시각
+   */
+  @Transactional(readOnly = true)
+  public TodaySchedule findAt(Instant evaluatedAt) {
     LocalDate serviceDate = evaluatedAt.atZone(SERVICE_ZONE_ID).toLocalDate();
     Instant nextDayStart = serviceDate.plusDays(1).atStartOfDay(SERVICE_ZONE_ID).toInstant();
     Optional<DailyScenarioSchedule> schedule =
         dailyScenarioScheduleRepository.findByServiceDate(serviceDate);
+    if (schedule.isEmpty()) {
+      log.warn("daily scenario schedule is missing: serviceDate={}", serviceDate);
+    }
     return new TodaySchedule(schedule, nextDayStart);
   }
 

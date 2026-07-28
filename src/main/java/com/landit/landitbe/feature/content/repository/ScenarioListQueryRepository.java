@@ -41,7 +41,6 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
                 tv.model,
                 tv.providerVoiceId,
                 tv.gender,
-                usp.status,
                 usp.bestStarRating
             )
             FROM UserProfile up

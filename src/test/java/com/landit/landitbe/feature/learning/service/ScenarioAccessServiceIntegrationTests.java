@@ -72,8 +72,8 @@ class ScenarioAccessServiceIntegrationTests {
         };
 
     try {
-      Future<Void> first = executorService.submit(grantAccess);
-      Future<Void> second = executorService.submit(grantAccess);
+      final Future<Void> first = executorService.submit(grantAccess);
+      final Future<Void> second = executorService.submit(grantAccess);
       assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
       start.countDown();
 

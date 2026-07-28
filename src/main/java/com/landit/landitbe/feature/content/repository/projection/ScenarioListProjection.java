@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.content.repository.projection;
 import com.landit.landitbe.feature.content.domain.ScenarioDifficulty;
 import com.landit.landitbe.feature.content.domain.TtsVoiceGender;
 import com.landit.landitbe.feature.content.domain.TtsVoiceProvider;
-import com.landit.landitbe.feature.learning.domain.UserScenarioProgressStatus;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
@@ -37,7 +36,6 @@ import java.math.BigDecimal;
  * @param ttsVoiceModel TTS 음성 모델
  * @param providerVoiceId TTS 제공자 음성 ID
  * @param ttsVoiceGender TTS 음성 성별
- * @param progressStatus 학습 진행 상태
  * @param bestStarRating 최고 별점
  */
 public record ScenarioListProjection(
@@ -64,5 +62,4 @@ public record ScenarioListProjection(
     String ttsVoiceModel,
     String providerVoiceId,
     TtsVoiceGender ttsVoiceGender,
-    UserScenarioProgressStatus progressStatus,
     BigDecimal bestStarRating) {}

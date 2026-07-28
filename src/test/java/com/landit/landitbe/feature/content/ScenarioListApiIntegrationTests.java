@@ -10,12 +10,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,6 +35,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
+@Import(ScenarioListApiIntegrationTests.FixedClockConfiguration.class)
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
@@ -50,6 +58,8 @@ class ScenarioListApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario_session");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
+    jdbcTemplate.update("DELETE FROM user_scenario_access");
+    jdbcTemplate.update("DELETE FROM daily_scenario_schedule");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
     jdbcTemplate.update("DELETE FROM writing_expression");
     jdbcTemplate.update("DELETE FROM user_scenario_progress");
@@ -80,6 +90,52 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
+  void scenariosExposeTodayStatusAndIgnoreLegacyProgress() throws Exception {
+    JsonNode loginResponseBody = login();
+    final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(userId);
+    insertDailyScenarioSchedule(202, "2026-07-28");
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioId").value(202))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].starRating").value(nullValue()))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].expiresAt")
+                .value("2026-07-29T00:00:00+09:00"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
+  }
+
+  @Test
+  void scenariosExposeGrantedAccessAsCleared() throws Exception {
+    JsonNode loginResponseBody = login();
+    final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(null);
+    insertScenarioAccess(userId, 201);
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("CLEARED"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(true))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].expiresAt").value(nullValue()));
+  }
+
+  @Test
   void openApiDocumentsScenarioListContract() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -88,7 +144,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.summary").value("시나리오 전체 조회"))
         .andExpect(
             jsonPath("$.paths['/api/v1/scenarios'].get.description")
-                .value("카테고리별 시나리오 목록과 사용자별 완료 여부, 별점, 잠금 상태, 시작 메시지 미리보기를 조회한다."))
+                .value("카테고리별 시나리오 목록과 사용자별 일일 접근 상태, 시작 기한, 별점, 시작 메시지 미리보기를 조회한다."))
         .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.security[0].bearerAuth").exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/scenarios'].get.responses['200'].description")
@@ -99,11 +155,12 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
-  void scenariosReturnOrderedProgressLockAndOpeningPreview() throws Exception {
+  void scenariosReturnOrderedAccessStatusAndOpeningPreview() throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
     seedScenarioListData(userId);
+    insertScenarioAccess(userId, 202);
 
     mockMvc
         .perform(
@@ -128,9 +185,12 @@ class ScenarioListApiIntegrationTests {
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].thumbnailUrl")
                 .value("https://cdn.landit.com/ai.png"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("CLEARED"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].lockReason").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].expiresAt").value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessage")
                 .value("What is your favorite food?"))
@@ -160,29 +220,11 @@ class ScenarioListApiIntegrationTests {
                 .value("FEMALE"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].firstSpeaker").value("USER"))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.aiOpeningMessage")
-                .value(nullValue()))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.aiOpeningMessageTranslation")
-                .value(nullValue()))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.userOpeningInstruction")
-                .value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.innerThought")
-                .value(nullValue()))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.innerThoughtType")
-                .value(nullValue()))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoice.providerVoiceId")
-                .value("en-US-Ethan:MAI-Voice-2"))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].openingPreview.ttsVoice.gender")
-                .value("MALE"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()))
         .andExpect(jsonPath("$.data.categories[1].categoryId").value(100))
         .andExpect(jsonPath("$.data.categories[1].scenarios[0].locked").value(true))
         .andExpect(jsonPath("$.data.categories[1].scenarios[0].lockReason").isNotEmpty())
@@ -195,9 +237,10 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
-  void scenariosLockNextScenarioUntilPreviousScenarioIsCleared() throws Exception {
+  void scenariosDoNotUsePreviousScenarioCompletionToUnlockTodayScenario() throws Exception {
     JsonNode loginResponseBody = login();
     seedScenarioListData(null);
+    insertDailyScenarioSchedule(201, "2026-07-28");
 
     mockMvc
         .perform(
@@ -207,18 +250,17 @@ class ScenarioListApiIntegrationTests {
                     "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].lockReason")
-                .value("PREVIOUS_SCENARIO_NOT_COMPLETED"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").exists());
   }
 
   @Test
   void scenariosReturnNullTtsVoiceWhenVoiceIsInactiveOrMissing() throws Exception {
     final JsonNode loginResponseBody = login();
+    final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     long inactiveVoiceId = insertTtsVoice(990200, "test-inactive-voice", "INACTIVE");
     insertCategory(110, 1, "ACTIVE", "비활성 음성");
     insertScenario(210, 110, 1, "AI", "EASY", "ACTIVE", null);
@@ -228,6 +270,8 @@ class ScenarioListApiIntegrationTests {
     insertScenario(211, 111, 1, "USER", "EASY", "ACTIVE", null);
     insertScenarioVariant(
         211, "미설정 음성 시나리오", "음성을 설정하지 않았습니다.", "미설정 음성 응답을 확인한다.", "먼저 말해보세요.", null, "ACTIVE");
+    insertScenarioAccess(userId, 210);
+    insertScenarioAccess(userId, 211);
 
     mockMvc
         .perform(
@@ -316,6 +360,28 @@ class ScenarioListApiIntegrationTests {
           """,
           clearedUserId);
     }
+  }
+
+  private void insertDailyScenarioSchedule(long scenarioId, String serviceDate) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO daily_scenario_schedule (service_date, scenario_id, created_at, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        serviceDate,
+        scenarioId);
+  }
+
+  private void insertScenarioAccess(long userId, long scenarioId) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_scenario_access (
+            user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at
+        )
+        VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userId,
+        scenarioId);
   }
 
   private void insertScenarioQuestion(
@@ -494,5 +560,15 @@ class ScenarioListApiIntegrationTests {
         providerVoiceId,
         status);
     return id;
+  }
+
+  @TestConfiguration
+  static class FixedClockConfiguration {
+
+    @Bean
+    @Primary
+    Clock testClock() {
+      return Clock.fixed(Instant.parse("2026-07-28T14:00:00Z"), ZoneOffset.UTC);
+    }
   }
 }
