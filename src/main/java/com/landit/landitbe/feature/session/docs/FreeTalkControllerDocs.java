@@ -7,6 +7,8 @@ import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkSessionDetailResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -74,7 +76,6 @@ public interface FreeTalkControllerDocs {
   ResponseEntity<ApiResponse<FreeTalkSessionStartResponse>> startSession(
       AuthUserPrincipal principal, FreeTalkSessionStartRequest request);
 
-<<<<<<< HEAD
   /**
    * 사용자 발화를 제출해 AI 후속 메시지 또는 종료 확인 상태를 받는다.
    *
@@ -142,15 +143,16 @@ public interface FreeTalkControllerDocs {
         responseCode = "503",
         description = "AI 생성 실패")
   })
-=======
-  /** 사용자 발화를 제출해 AI 후속 메시지 또는 종료 확인 상태를 받는다. */
-  @Operation(summary = "프리톡 발화 제출", security = @SecurityRequirement(name = "bearerAuth"))
-  ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> submitMessage(
-      AuthUserPrincipal principal, long sessionId, FreeTalkMessageSubmitRequest request);
-
-  /** 종료 의사 확인 창에서 사용자가 선택한 결과를 처리한다. */
-  @Operation(summary = "프리톡 종료 의사 결정", security = @SecurityRequirement(name = "bearerAuth"))
->>>>>>> d9aa74e6 (feat: 프리톡 발화와 종료 API 추가)
   ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> decideExit(
       AuthUserPrincipal principal, long sessionId, FreeTalkExitDecisionRequest request);
+
+  /** 완료된 지난 프리톡 목록을 최신순 페이지로 조회한다. */
+  @Operation(summary = "지난 프리톡 목록 조회", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkSessionListResponse>> getSessions(
+      AuthUserPrincipal principal, int page, int size);
+
+  /** 완료된 지난 프리톡의 전체 대화를 조회한다. */
+  @Operation(summary = "지난 프리톡 상세 조회", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkSessionDetailResponse>> getSession(
+      AuthUserPrincipal principal, long sessionId);
 }
