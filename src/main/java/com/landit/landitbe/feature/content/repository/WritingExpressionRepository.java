@@ -22,4 +22,8 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
 
   /** 특정 상태의 Writing 표현을 PK로 조회한다. (INACTIVE로 내려간 콘텐츠를 걸러내는 단건 조회용) */
   Optional<WritingExpression> findByIdAndStatus(Long id, ActiveStatus status);
+
+  /** 학습 언어와 기준 언어에 맞는 활성 Writing 표현을 조회한다. */
+  List<WritingExpression> findByTargetLocaleAndBaseLocaleAndStatus(
+      Locale targetLocale, Locale baseLocale, ActiveStatus status);
 }
