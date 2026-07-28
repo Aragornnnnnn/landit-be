@@ -18,7 +18,12 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Free Talk", description = "프리톡 세션 API")
 public interface FreeTalkControllerDocs {
 
-  /** 활성 프리톡 추천 주제를 노출 순서대로 조회한다. */
+  /**
+   * 활성 프리톡 추천 주제를 노출 순서대로 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @return 활성 추천 주제 목록
+   */
   @Operation(
       summary = "프리톡 추천 주제 조회",
       description = "활성 상태의 프리톡 추천 주제를 노출 순서대로 조회한다.",
@@ -33,7 +38,13 @@ public interface FreeTalkControllerDocs {
   })
   ResponseEntity<ApiResponse<List<FreeTalkTopicResponse>>> getTopics(AuthUserPrincipal principal);
 
-  /** AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다. */
+  /**
+   * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.
+   *
+   * @param principal 인증된 사용자
+   * @param request 세션 시작 방식과 선택 주제
+   * @return 생성된 프리톡 세션
+   */
   @Operation(
       summary = "프리톡 세션 시작",
       description = "AI 선시작 또는 사용자 선시작 프리톡 세션을 생성한다.",
