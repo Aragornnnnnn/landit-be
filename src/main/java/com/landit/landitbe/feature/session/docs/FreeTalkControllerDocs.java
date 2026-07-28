@@ -3,7 +3,10 @@
 package com.landit.landitbe.feature.session.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -70,4 +73,14 @@ public interface FreeTalkControllerDocs {
   })
   ResponseEntity<ApiResponse<FreeTalkSessionStartResponse>> startSession(
       AuthUserPrincipal principal, FreeTalkSessionStartRequest request);
+
+  /** 사용자 발화를 제출해 AI 후속 메시지 또는 종료 확인 상태를 받는다. */
+  @Operation(summary = "프리톡 발화 제출", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> submitMessage(
+      AuthUserPrincipal principal, long sessionId, FreeTalkMessageSubmitRequest request);
+
+  /** 종료 의사 확인 창에서 사용자가 선택한 결과를 처리한다. */
+  @Operation(summary = "프리톡 종료 의사 결정", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> decideExit(
+      AuthUserPrincipal principal, long sessionId, FreeTalkExitDecisionRequest request);
 }
