@@ -23,7 +23,14 @@ public class FreeTalkExpressionRetryService {
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
 
-  /** 사용자가 소유한 실패 세션의 표현 생성을 재시도 상태로 전환한다. */
+  /**
+   * 사용자가 소유한 실패 세션의 표현 생성을 재시도 상태로 전환한다.
+   *
+   * @param userId 재시도를 요청한 사용자 ID
+   * @param learningSessionId 재시도할 학습 세션 ID
+   * @return 재시도 요청 뒤의 표현 생성 상태
+   * @throws ApiException 세션이 없거나 소유하지 않았거나 재시도할 수 없는 상태일 때
+   */
   @Transactional
   public FreeTalkExpressionRetryResponse retry(long userId, long learningSessionId) {
     LearningSession learningSession =

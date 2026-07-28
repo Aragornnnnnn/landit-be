@@ -176,7 +176,11 @@ public class FreeTalkSession extends BaseTimeEntity {
     expressionGenerationStatus = ExpressionGenerationStatus.PREPARING;
   }
 
-  /** 표현 생성 작업을 실행 중으로 선점한다. */
+  /**
+   * 표현 생성 작업을 실행 중으로 선점한다.
+   *
+   * @throws IllegalStateException 완료된 프리톡의 준비 상태가 아닐 때
+   */
   public void startExpressionGeneration() {
     if (conversationStatus != FreeTalkConversationStatus.COMPLETED
         || expressionGenerationStatus != ExpressionGenerationStatus.PREPARING) {
@@ -185,19 +189,23 @@ public class FreeTalkSession extends BaseTimeEntity {
     expressionGenerationStartedAt = LocalDateTime.now();
   }
 
-  /** 표현 생성 결과가 준비됐음을 기록한다. */
+  /** 표현 생성 결과가 준비됐음을 기록하고 실행 시작 시각을 비운다. */
   public void completeExpressionGeneration() {
     expressionGenerationStatus = ExpressionGenerationStatus.READY;
     expressionGenerationStartedAt = null;
   }
 
-  /** 표현 생성 실패 상태를 기록한다. */
+  /** 표현 생성 실패 상태를 기록하고 실행 시작 시각을 비운다. */
   public void failExpressionGeneration() {
     expressionGenerationStatus = ExpressionGenerationStatus.FAILED;
     expressionGenerationStartedAt = null;
   }
 
-  /** 실패한 표현 생성 작업을 다시 준비 상태로 전환한다. */
+  /**
+   * 실패한 표현 생성 작업을 다시 준비 상태로 전환한다.
+   *
+   * @throws IllegalStateException 완료된 프리톡의 실패 상태가 아닐 때
+   */
   public void retryExpressionGeneration() {
     if (conversationStatus != FreeTalkConversationStatus.COMPLETED
         || expressionGenerationStatus != ExpressionGenerationStatus.FAILED) {

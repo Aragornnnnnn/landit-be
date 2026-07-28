@@ -55,7 +55,16 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSessionExpression() {}
 
-  /** 기존 Writing 표현을 직접 참조하는 세션 표현을 생성한다. */
+  /**
+   * 기존 Writing 표현을 직접 참조하는 세션 표현을 생성한다.
+   *
+   * @param freeTalkSessionId 연결할 프리톡 세션 ID
+   * @param writingExpressionId 재사용할 Writing 표현 ID
+   * @param displayOrder 세션 안의 노출 순서
+   * @param personalizedExampleText 대화 맥락에 맞춘 학습 언어 예문
+   * @param personalizedExampleTranslation 개인화 예문의 기준 언어 번역
+   * @return 기존 표현을 참조하는 세션 표현
+   */
   public static FreeTalkSessionExpression existing(
       Long freeTalkSessionId,
       Long writingExpressionId,
@@ -72,7 +81,16 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
     return expression;
   }
 
-  /** AI가 생성한 학습 콘텐츠를 보유하는 세션 표현을 생성한다. */
+  /**
+   * AI가 생성한 학습 콘텐츠를 보유하는 세션 표현을 생성한다.
+   *
+   * @param freeTalkSessionId 연결할 프리톡 세션 ID
+   * @param displayOrder 세션 안의 노출 순서
+   * @param personalizedExampleText 대화 맥락에 맞춘 학습 언어 예문
+   * @param personalizedExampleTranslation 개인화 예문의 기준 언어 번역
+   * @param generatedContentPayload AI가 생성한 학습 콘텐츠 JSON
+   * @return 신규 표현 학습 콘텐츠를 보유하는 세션 표현
+   */
   public static FreeTalkSessionExpression generated(
       Long freeTalkSessionId,
       int displayOrder,
@@ -89,14 +107,22 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
     return expression;
   }
 
-  /** 학습 완료 시각을 기록한다. */
+  /**
+   * 학습 완료 시각을 최초 한 번만 기록한다.
+   *
+   * @param completedAt 기록할 학습 완료 시각
+   */
   public void complete(LocalDateTime completedAt) {
     if (this.completedAt == null) {
       this.completedAt = completedAt;
     }
   }
 
-  /** 학습 완료 여부를 반환한다. */
+  /**
+   * 학습 완료 여부를 반환한다.
+   *
+   * @return 완료 시각이 기록됐으면 {@code true}
+   */
   public boolean isCompleted() {
     return completedAt != null;
   }
