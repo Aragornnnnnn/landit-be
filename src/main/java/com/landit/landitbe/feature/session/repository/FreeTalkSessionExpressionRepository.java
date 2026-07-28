@@ -20,6 +20,16 @@ public interface FreeTalkSessionExpressionRepository
       Long freeTalkSessionId);
 
   /**
+   * 여러 세션에 연결된 표현을 세션과 노출 순서대로 일괄 조회한다.
+   *
+   * @param freeTalkSessionIds 프리톡 세션 ID 목록
+   * @return 세션별 맞춤 표현 목록
+   */
+  List<FreeTalkSessionExpression>
+      findByFreeTalkSessionIdInOrderByFreeTalkSessionIdAscDisplayOrderAsc(
+          List<Long> freeTalkSessionIds);
+
+  /**
    * 세션에 연결된 모든 맞춤 표현을 삭제한다.
    *
    * @param freeTalkSessionId 프리톡 세션 ID
