@@ -128,9 +128,10 @@ flowchart LR
 
 상태는 다음 우선순위로 계산한다.
 
-1. 사용자·시나리오·학습 언어에 맞는 `user_scenario_access`가 있으면 `CLEARED`.
-2. 접근 권한이 없고 오늘 일정에 배정된 활성 시나리오이면 `TODAY`.
-3. 나머지는 `LOCKED`.
+1. 카테고리, 시나리오 또는 언어 variant가 비활성이면 `LOCKED`.
+2. 사용자·시나리오·학습 언어에 맞는 `user_scenario_access`가 있으면 `CLEARED`.
+3. 접근 권한이 없고 오늘 일정에 배정된 시나리오이면 `TODAY`.
+4. 나머지는 `LOCKED`.
 
 기존 응답 필드는 새 상태와 일관되게 계산한다.
 
