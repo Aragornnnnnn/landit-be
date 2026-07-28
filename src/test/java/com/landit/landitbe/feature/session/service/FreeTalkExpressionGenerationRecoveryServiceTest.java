@@ -24,8 +24,8 @@ class FreeTalkExpressionGenerationRecoveryServiceTest {
     FreeTalkSession interruptedSession =
         FreeTalkSession.start(10L, 20L, FreeTalkStartMode.AI_FIRST);
     interruptedSession.completeByTimeLimit();
-    when(freeTalkSessionRepository
-            .findByExpressionGenerationStatus(ExpressionGenerationStatus.PREPARING))
+    when(freeTalkSessionRepository.findByExpressionGenerationStatus(
+            ExpressionGenerationStatus.PREPARING))
         .thenReturn(List.of(interruptedSession));
     FreeTalkExpressionGenerationRecoveryService recoveryService =
         new FreeTalkExpressionGenerationRecoveryService(freeTalkSessionRepository);

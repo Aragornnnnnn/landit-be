@@ -208,7 +208,8 @@ public class FreeTalkExpressionGenerationService {
     boolean isRecommendationCandidate =
         context.existingExpressions().stream()
             .anyMatch(
-                candidate -> candidate.expressionId().equals(recommendation.existingExpressionId()));
+                candidate ->
+                    candidate.expressionId().equals(recommendation.existingExpressionId()));
     if (!isRecommendationCandidate) {
       throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
@@ -248,9 +249,7 @@ public class FreeTalkExpressionGenerationService {
                     content.representativeImageUrl(),
                     objectMapper.valueToTree(content.practiceExamples()))));
     return FreeTalkSessionExpression.link(
-        context.freeTalkSessionId(),
-        generatedExpression.getId(),
-        recommendation.displayOrder());
+        context.freeTalkSessionId(), generatedExpression.getId(), recommendation.displayOrder());
   }
 
   private record GenerationContext(
