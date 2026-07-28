@@ -194,4 +194,11 @@ git diff --check
 
 ## 구현 결과
 
-구현이 끝난 뒤 실제 검증 결과와 설계에서 달라진 점만 이 절에 기록한다.
+- 완료 커밋은 `d0bf464`, `55ecbde`, `9875b25`, `858fcea`, `c635fdf`다.
+- `daily_scenario_schedule`, `user_scenario_access`, `scenario_session.daily_scenario_schedule_id`를 추가했고, 기존 진행·히스토리 데이터는 변경하거나 백필하지 않았다.
+- 목록은 `CLEARED`, `TODAY`, `LOCKED` 상태와 `TODAY`의 다음 서울 자정 `expiresAt`을 반환한다. 기존 순차 잠금과 기존 완료 이력은 새 접근 상태 계산에서 제외했다.
+- 세션 시작은 권한이 있으면 복습으로, 없으면 요청 시각의 오늘 일정과 일치할 때만 일일 세션으로 생성한다. 일일 세션 완료 시에만 복습 권한을 멱등 생성한다.
+- `DailyScenarioScheduleServiceTest`에서 23시 59분 59초와 다음 날 00시의 서울 날짜 전환을, `ScenarioSessionApiIntegrationTests`에서 23시 59분 59초 시작 후 자정 완료 권한 부여를 검증했다.
+- `ScenarioAccessServiceIntegrationTests`에서 서로 다른 트랜잭션의 동시 권한 부여가 한 건으로 수렴함을 검증했다.
+- 최종 검증은 `git diff --check`와 `./gradlew check`가 모두 성공했다.
+- 설계와 다른 구현은 없으며, 관리자 일정 관리·결제·알림·세션 복원·장기 진행 세션 정리는 범위 밖으로 유지했다.
