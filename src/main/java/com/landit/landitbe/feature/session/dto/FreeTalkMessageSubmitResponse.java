@@ -8,7 +8,16 @@ import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 
-/** 프리톡 발화 처리 결과와 진행 상태를 반환한다. */
+/**
+ * 프리톡 발화 처리 결과와 진행 상태를 반환한다.
+ *
+ * @param sessionId 프리톡 학습 세션 ID
+ * @param title 대화에서 추론하거나 선택한 세션 제목
+ * @param turnStatus 이번 발화 처리 결과 상태
+ * @param submittedMessage 저장된 사용자 발화 정보
+ * @param nextMessage 계속 대화할 때 생성된 AI 후속 메시지
+ * @param progress 누적 발화 시간과 세션 진행 상태
+ */
 public record FreeTalkMessageSubmitResponse(
     Long sessionId,
     String title,
@@ -17,7 +26,16 @@ public record FreeTalkMessageSubmitResponse(
     NextMessageResponse nextMessage,
     ProgressResponse progress) {
 
-  /** 사용자가 제출한 발화의 응답 표현이다. */
+  /**
+   * 사용자가 제출한 발화의 응답 표현이다.
+   *
+   * @param messageId 메시지 ID
+   * @param turnNumber 대화 턴 번호
+   * @param messageSequence 세션 내 메시지 순서
+   * @param role 메시지 화자 역할
+   * @param innerThought AI가 생성한 속마음
+   * @param innerThoughtType 속마음 상태 유형
+   */
   public record SubmittedMessageResponse(
       Long messageId,
       int turnNumber,
@@ -25,7 +43,12 @@ public record FreeTalkMessageSubmitResponse(
       String role,
       String innerThought,
       InnerThoughtType innerThoughtType) {
-    /** 세션 메시지 엔티티를 응답 값으로 변환한다. */
+    /**
+     * 세션 메시지 엔티티를 응답 값으로 변환한다.
+     *
+     * @param message 변환할 사용자 메시지
+     * @return 사용자 발화 응답
+     */
     public static SubmittedMessageResponse from(SessionHistoryMessage message) {
       return new SubmittedMessageResponse(
           message.getId(),
@@ -37,7 +60,17 @@ public record FreeTalkMessageSubmitResponse(
     }
   }
 
-  /** AI 후속 발화의 응답 표현이다. */
+  /**
+   * AI 후속 발화의 응답 표현이다.
+   *
+   * @param messageId 메시지 ID
+   * @param turnNumber 대화 턴 번호
+   * @param messageSequence 세션 내 메시지 순서
+   * @param role 메시지 화자 역할
+   * @param content AI 발화 원문
+   * @param translatedContent AI 발화 번역문
+   * @param emotion 캐릭터 감정 상태
+   */
   public record NextMessageResponse(
       Long messageId,
       int turnNumber,
@@ -46,7 +79,12 @@ public record FreeTalkMessageSubmitResponse(
       String content,
       String translatedContent,
       CharacterEmotion emotion) {
-    /** 세션 메시지 엔티티를 응답 값으로 변환한다. */
+    /**
+     * 세션 메시지 엔티티를 응답 값으로 변환한다.
+     *
+     * @param message 변환할 AI 메시지
+     * @return AI 후속 메시지 응답
+     */
     public static NextMessageResponse from(SessionHistoryMessage message) {
       return new NextMessageResponse(
           message.getId(),
@@ -59,7 +97,13 @@ public record FreeTalkMessageSubmitResponse(
     }
   }
 
-  /** 프리톡 진행 상태의 응답 표현이다. */
+  /**
+   * 프리톡 진행 상태의 응답 표현이다.
+   *
+   * @param sessionStatus 현재 프리톡 대화 상태
+   * @param accumulatedSpeakingDurationMs 누적 사용자 발화 시간 밀리초
+   * @param speakingTimeLimitMs 서버가 적용하는 발화 시간 제한 밀리초
+   */
   public record ProgressResponse(
       FreeTalkConversationStatus sessionStatus,
       long accumulatedSpeakingDurationMs,
