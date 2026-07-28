@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessag
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
@@ -94,7 +95,8 @@ public class FreeTalkSubmittedMessageService {
           null,
           FreeTalkConversationStatus.AWAITING_EXIT_DECISION,
           speakingDurationUntil(messages, userMessage.getMessageSequence()),
-          userId);
+          userId,
+          session.getExpressionGenerationStatus());
     }
     SessionHistoryMessage nextMessage =
         userMessageIndex + 1 < messages.size()
@@ -116,7 +118,8 @@ public class FreeTalkSubmittedMessageService {
         nextMessage,
         replayedStatus,
         speakingDurationUntil(messages, userMessage.getMessageSequence()),
-        userId);
+        userId,
+        session.getExpressionGenerationStatus());
   }
 
   /** 종료 확인이 완료된 같은 사용자 메시지의 결과를 다시 구성한다. */
@@ -172,7 +175,8 @@ public class FreeTalkSubmittedMessageService {
         nextMessage,
         replayedStatus,
         speakingDurationUntil(messages, userMessage.getMessageSequence()),
-        userId);
+        userId,
+        session.getExpressionGenerationStatus());
   }
 
   /**
@@ -683,7 +687,8 @@ public class FreeTalkSubmittedMessageService {
             session.getAccumulatedSpeakingDurationMs(),
             SPEAKING_TIME_LIMIT_MS,
             dailyUsage.usedSpeakingDurationMs(),
-            dailyUsage.remainingMs()));
+            dailyUsage.remainingMs(),
+            session.getExpressionGenerationStatus()));
   }
 
   private FreeTalkMessageSubmitResponse replayResponse(
@@ -694,7 +699,8 @@ public class FreeTalkSubmittedMessageService {
       SessionHistoryMessage aiMessage,
       FreeTalkConversationStatus conversationStatus,
       long accumulatedSpeakingDurationMs,
-      long userId) {
+      long userId,
+      ExpressionGenerationStatus expressionGenerationStatus) {
     FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.usage(userId);
     return new FreeTalkMessageSubmitResponse(
@@ -708,7 +714,8 @@ public class FreeTalkSubmittedMessageService {
             accumulatedSpeakingDurationMs,
             SPEAKING_TIME_LIMIT_MS,
             dailyUsage.usedSpeakingDurationMs(),
-            dailyUsage.remainingMs()));
+            dailyUsage.remainingMs(),
+            expressionGenerationStatus));
   }
 
   /**
