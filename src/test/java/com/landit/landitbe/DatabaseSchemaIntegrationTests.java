@@ -332,7 +332,6 @@ class DatabaseSchemaIntegrationTests {
                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """))
         .isInstanceOf(DataIntegrityViolationException.class);
-
   }
 
   @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")
