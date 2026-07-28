@@ -24,6 +24,9 @@ public interface SessionHistoryMessageRepository
   /** 세션 히스토리에 속한 특정 메시지를 조회한다. */
   Optional<SessionHistoryMessage> findByIdAndSessionHistoryId(Long id, Long sessionHistoryId);
 
+  /** 세션 히스토리에 같은 클라이언트 메시지 ID가 이미 저장됐는지 확인한다. */
+  boolean existsBySessionHistoryIdAndClientMessageId(Long sessionHistoryId, String clientMessageId);
+
   /** 세션 히스토리에서 특정 발화 주체의 메시지 수를 반환한다. */
   long countBySessionHistoryIdAndRole(Long sessionHistoryId, ConversationSpeaker role);
 

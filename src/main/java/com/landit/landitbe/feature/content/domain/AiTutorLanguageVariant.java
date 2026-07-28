@@ -12,8 +12,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 /** AI 튜터의 기준 언어별 표시 이름을 저장한다. */
+@Getter
 @Entity
 @Table(name = "ai_tutor_language_variant")
 public class AiTutorLanguageVariant extends BaseTimeEntity {
