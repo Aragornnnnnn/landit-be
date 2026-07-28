@@ -246,6 +246,24 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void rejectsRecommendationMissingRequiredTextOrContextualExample() throws Exception {
+    registerRawResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        200,
+        successResponse(
+            "{\"recommendations\":[{"
+                + "\"displayOrder\":1,\"sourceType\":\"EXISTING\","
+                + "\"existingExpressionId\":7,\"targetExpressionText\":\" \","
+                + "\"baseExpressionMeaningText\":\"좋아, 그거 하자\","
+                + "\"usageSummary\":\"제안에 동의할 때 사용\","
+                + "\"contextualExample\":null}]}"));
+
+    assertGenerationError(
+        () -> remoteClient().recommendExpressions(recommendationsRequest()),
+        ErrorCode.AI_RESPONSE_INVALID);
+  }
+
+  @Test
   void acceptsExistingRecommendationMetadataValidatedByAiServer() throws Exception {
     registerRawResponse(
         "/api/v1/free-talk/expression-recommendations",

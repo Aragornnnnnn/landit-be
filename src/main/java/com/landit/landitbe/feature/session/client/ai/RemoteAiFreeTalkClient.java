@@ -288,7 +288,11 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       int expectedDisplayOrder) {
     if (recommendation == null
         || recommendation.displayOrder() != expectedDisplayOrder
-        || recommendation.sourceType() == null) {
+        || recommendation.sourceType() == null
+        || blank(recommendation.targetExpressionText())
+        || blank(recommendation.baseExpressionMeaningText())
+        || blank(recommendation.usageSummary())
+        || invalidContextualExample(recommendation.contextualExample())) {
       return true;
     }
     if (recommendation.sourceType() == FreeTalkExpressionSourceType.NEW) {
@@ -306,11 +310,23 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       AiFreeTalkLearningExpression requestedExpression) {
     return content == null
         || requestedExpression == null
+        || blank(content.targetExpressionText())
+        || blank(content.baseExpressionMeaningText())
+        || blank(content.usageSummary())
+        || blank(requestedExpression.targetExpressionText())
+        || blank(requestedExpression.baseExpressionMeaningText())
+        || blank(requestedExpression.usageSummary())
         || !requestedExpression.targetExpressionText().equals(content.targetExpressionText())
         || !requestedExpression
             .baseExpressionMeaningText()
             .equals(content.baseExpressionMeaningText())
         || !requestedExpression.usageSummary().equals(content.usageSummary());
+  }
+
+  private static boolean invalidContextualExample(AiFreeTalkContextualExample contextualExample) {
+    return contextualExample == null
+        || blank(contextualExample.sentenceText())
+        || blank(contextualExample.sentenceTranslation());
   }
 
   private static boolean blank(String value) {
