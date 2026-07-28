@@ -43,7 +43,14 @@ public class FreeTalkSessionService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
 
-  /** 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다. */
+  /**
+   * 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다.
+   *
+   * @param userId 세션을 시작할 사용자 ID
+   * @param request 시작 방식과 선택 주제
+   * @return 외부 AI 호출에 사용할 시작 레코드
+   * @throws ApiException 요청, 사용자, 주제 또는 AI 상대 설정이 유효하지 않을 때
+   */
   @Transactional
   public StartedFreeTalkSession createStart(long userId, FreeTalkSessionStartRequest request) {
     validateStartRequest(request);
@@ -94,7 +101,13 @@ public class FreeTalkSessionService {
             partner.ttsVoiceGender()));
   }
 
-  /** AI opening 생성 결과를 별도 트랜잭션에서 첫 AI 메시지로 저장한다. */
+  /**
+   * AI opening 생성 결과를 별도 트랜잭션에서 첫 AI 메시지로 저장한다.
+   *
+   * @param startedSession 생성 직후의 프리톡 시작 레코드
+   * @param openingResult AI가 생성한 첫 메시지
+   * @return 저장된 첫 AI 메시지 응답
+   */
   @Transactional
   public CurrentMessageResponse saveOpening(
       StartedFreeTalkSession startedSession, AiFreeTalkOpeningResult openingResult) {
@@ -110,7 +123,11 @@ public class FreeTalkSessionService {
     return CurrentMessageResponse.from(openingMessage);
   }
 
-  /** AI opening 실패 뒤 시작 중 생성한 모든 레코드를 삭제한다. */
+  /**
+   * AI opening 실패 뒤 시작 중 생성한 모든 레코드를 삭제한다.
+   *
+   * @param learningSessionId 삭제할 학습 세션 ID
+   */
   @Transactional
   public void deleteStart(long learningSessionId) {
     sessionHistoryRepository
@@ -169,7 +186,21 @@ public class FreeTalkSessionService {
     return userProfile.getAiTutorId();
   }
 
-  /** 외부 AI 호출과 응답 생성에 필요한 시작 레코드 정보다. */
+  /**
+   * 외부 AI 호출과 응답 생성에 필요한 시작 레코드 정보다.
+   *
+   * @param learningSessionId 생성된 학습 세션 ID
+   * @param sessionHistoryId 생성된 세션 히스토리 ID
+   * @param startMode 첫 발화 주체
+   * @param topicId 선택한 주제 ID
+   * @param title 대화 제목
+   * @param topicPromptDescription AI에 전달할 주제 설명
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param partnerDisplayName AI 상대 이름
+   * @param accentLocale AI 상대의 억양 locale
+   * @param ttsVoice AI 상대의 TTS 음성
+   */
   public record StartedFreeTalkSession(
       Long learningSessionId,
       Long sessionHistoryId,

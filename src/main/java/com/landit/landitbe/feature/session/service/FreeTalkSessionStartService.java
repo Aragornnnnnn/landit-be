@@ -22,7 +22,14 @@ public class FreeTalkSessionStartService {
   private final FreeTalkSessionService freeTalkSessionService;
   private final AiFreeTalkClient aiFreeTalkClient;
 
-  /** AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다. */
+  /**
+   * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.
+   *
+   * @param userId 세션을 시작할 사용자 ID
+   * @param request 시작 방식과 선택 주제
+   * @return 생성된 프리톡 세션 시작 응답
+   * @throws com.landit.landitbe.shared.exception.ApiException 요청 또는 AI 생성 결과가 유효하지 않을 때
+   */
   public FreeTalkSessionStartResponse startFreeTalkSession(
       long userId, FreeTalkSessionStartRequest request) {
     StartedFreeTalkSession startedSession = freeTalkSessionService.createStart(userId, request);
