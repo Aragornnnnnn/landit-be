@@ -5,10 +5,13 @@ package com.landit.landitbe.feature.content.repository;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 /** 시나리오에 속한 Writing 표현을 학습 순서 기준으로 조회한다. */
 public interface WritingExpressionRepository extends JpaRepository<WritingExpression, Long> {
@@ -36,6 +39,19 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
    * @return 조건에 맞는 표현의 Optional
    */
   Optional<WritingExpression> findByIdAndStatus(Long id, ActiveStatus status);
+
+  /**
+   * 표현 완료 이력을 원자적으로 처리하기 위해 활성 표현을 잠금 조회한다.
+   *
+   * @param id 표현 ID
+   * @param status 조회할 활성 상태
+   * @return 잠금을 획득한 표현. 없으면 빈 Optional
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "select expression from WritingExpression expression "
+          + "where expression.id = :id and expression.status = :status")
+  Optional<WritingExpression> findByIdAndStatusForUpdate(Long id, ActiveStatus status);
 
   /**
    * 학습 언어와 기준 언어에 맞는 활성 Writing 표현을 조회한다.

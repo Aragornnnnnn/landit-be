@@ -63,6 +63,18 @@ class LearningProgressServiceTest {
     verify(expressionCompletionRepository, never()).save(any());
   }
 
+  /** 프리톡처럼 순서와 무관한 완료도 동일한 표현 완료 이력을 사용한다. */
+  @Test
+  void savesCompletionWithoutScenarioOrder() {
+    when(expressionCompletionRepository.findByUserProfileIdAndWritingExpressionId(
+            USER_ID, EXPRESSION_ID))
+        .thenReturn(Optional.empty());
+
+    learningProgressService.completeExpressionWithoutOrderLock(USER_ID, SCENARIO_ID, EXPRESSION_ID);
+
+    verify(expressionCompletionRepository).save(any(UserWritingExpressionCompletion.class));
+  }
+
   /** 다른 기능에는 학습 완료 엔티티 대신 완료한 표현 ID record를 반환한다. */
   @Test
   void returnsCompletedExpressionIds() {

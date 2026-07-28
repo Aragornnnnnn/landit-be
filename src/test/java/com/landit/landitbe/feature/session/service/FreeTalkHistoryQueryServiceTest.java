@@ -59,8 +59,6 @@ class FreeTalkHistoryQueryServiceTest {
         org.mockito.Mockito.mock(FreeTalkSessionExpression.class);
     when(sessionExpression.getWritingExpressionId()).thenReturn(300L);
     when(sessionExpression.getDisplayOrder()).thenReturn(1);
-    when(sessionExpression.getPersonalizedExampleText()).thenReturn("We made up for it.");
-    when(sessionExpression.getPersonalizedExampleTranslation()).thenReturn("우리는 만회했어.");
     WritingExpression historicalExpression = org.mockito.Mockito.mock(WritingExpression.class);
     when(historicalExpression.getId()).thenReturn(300L);
     when(historicalExpression.getTargetExpressionText()).thenReturn("make up for");

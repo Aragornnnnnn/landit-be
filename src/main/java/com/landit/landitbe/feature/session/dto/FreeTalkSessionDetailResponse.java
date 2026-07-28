@@ -60,11 +60,10 @@ public record FreeTalkSessionDetailResponse(
   /**
    * 세션별 맞춤 표현의 요약이다.
    *
-   * @param sessionExpressionId 세션 표현 ID
+   * @param expressionId 공통 원어민 표현 ID
    * @param displayOrder 세션 내 노출 순서
    * @param targetExpressionText 학습 언어 표현
    * @param baseExpressionMeaningText 기준 언어 표현 뜻
-   * @param contextualExample 이번 대화 맥락 예문
    * @param completed 현재 사용자의 표현 학습 완료 여부
    */
   public record Expression(
@@ -72,14 +71,5 @@ public record FreeTalkSessionDetailResponse(
       int displayOrder,
       String targetExpressionText,
       String baseExpressionMeaningText,
-      ContextualExample contextualExample,
       boolean completed) {}
-
-  /**
-   * 이번 프리톡에 맞춘 텍스트 예문이다.
-   *
-   * @param sentenceText 학습 언어 예문
-   * @param sentenceTranslation 기준 언어 번역문
-   */
-  public record ContextualExample(String sentenceText, String sentenceTranslation) {}
 }

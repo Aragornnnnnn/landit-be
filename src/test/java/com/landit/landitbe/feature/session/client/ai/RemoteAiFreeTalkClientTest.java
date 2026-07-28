@@ -318,8 +318,7 @@ class RemoteAiFreeTalkClientTest {
                 + "\"displayOrder\":1,\"sourceType\":\"EXISTING\","
                 + "\"existingExpressionId\":7,\"targetExpressionText\":\" \","
                 + "\"baseExpressionMeaningText\":\"좋아, 그거 하자\","
-                + "\"usageSummary\":\"제안에 동의할 때 사용\","
-                + "\"contextualExample\":null}]}"));
+                + "\"usageSummary\":\"제안에 동의할 때 사용\"}]}"));
 
     assertGenerationError(
         () -> remoteClient().recommendExpressions(recommendationsRequest()),

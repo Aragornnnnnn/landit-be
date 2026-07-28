@@ -46,7 +46,14 @@ public class FreeTalkHistoryQueryService {
   private final WritingExpressionRepository writingExpressionRepository;
   private final UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
-  /** 완료 프리톡을 최신순 페이지로 조회한다. */
+  /**
+   * 완료 프리톡을 최신순 페이지로 조회한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 페이지 크기
+   * @return 완료된 프리톡 목록
+   */
   @Transactional(readOnly = true)
   public FreeTalkSessionListResponse getSessions(long userId, int page, int size) {
     Page<FreeTalkSession> sessions =
@@ -77,7 +84,14 @@ public class FreeTalkHistoryQueryService {
     return new FreeTalkSessionListResponse(items, page, size, sessions.hasNext());
   }
 
-  /** 사용자가 소유한 완료 프리톡의 상세 대화와 표현을 조회한다. */
+  /**
+   * 사용자가 소유한 완료 프리톡의 상세 대화와 표현을 조회한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @return 지난 프리톡 상세 정보
+   * @throws ApiException 세션이 없거나 소유자가 아니거나 아직 완료되지 않았을 때
+   */
   @Transactional(readOnly = true)
   public FreeTalkSessionDetailResponse getSession(long userId, long learningSessionId) {
     CompletedSession completedSession = requireCompleted(userId, learningSessionId);
@@ -222,9 +236,6 @@ public class FreeTalkHistoryQueryService {
                       sessionExpression.getDisplayOrder(),
                       expression.targetExpressionText(),
                       expression.baseExpressionMeaningText(),
-                      new FreeTalkSessionDetailResponse.ContextualExample(
-                          sessionExpression.getPersonalizedExampleText(),
-                          sessionExpression.getPersonalizedExampleTranslation()),
                       completedExpressionIds.contains(sessionExpression.getWritingExpressionId()));
                 })
             .toList();

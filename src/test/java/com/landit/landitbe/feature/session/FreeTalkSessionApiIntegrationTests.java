@@ -98,12 +98,19 @@ class FreeTalkSessionApiIntegrationTests {
     awaitPendingExpressionGeneration();
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
+    jdbcTemplate.update(
+        "DELETE FROM user_writing_expression_completion "
+            + "WHERE writing_expression_id IN (994103, 994104)");
     jdbcTemplate.update("DELETE FROM free_talk_session");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE owner_user_profile_id IS NOT NULL");
     jdbcTemplate.update("DELETE FROM free_talk_topic");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994104");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994103");
+    jdbcTemplate.update("DELETE FROM scenario WHERE id = 994102");
+    jdbcTemplate.update("DELETE FROM category WHERE id = 994101");
   }
 
   private void awaitPendingExpressionGeneration() {
@@ -641,18 +648,33 @@ class FreeTalkSessionApiIntegrationTests {
             post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"freeTalkSessionId\":%d}".formatted(link.freeTalkSessionId())))
+                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isEmpty());
+
+    Object firstCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM user_writing_expression_completion "
+                + "WHERE writing_expression_id = ?",
+            Object.class,
+            link.expressionId());
 
     mockMvc
         .perform(
             post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"freeTalkSessionId\":%d}".formatted(link.freeTalkSessionId())))
+                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isEmpty());
+
+    Object repeatedCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM user_writing_expression_completion "
+                + "WHERE writing_expression_id = ?",
+            Object.class,
+            link.expressionId());
+    assertThat(repeatedCompletedAt).isEqualTo(firstCompletedAt);
 
     assertThat(
             jdbcTemplate.queryForObject(
@@ -942,16 +964,12 @@ class FreeTalkSessionApiIntegrationTests {
         ownerUserProfileId,
         practiceExamples(null).toString());
     freeTalkSessionExpressionRepository.saveAndFlush(
-        FreeTalkSessionExpression.link(
-            freeTalkSessionId,
-            expressionId,
-            1,
-            "We could have really hit it off.",
-            "우리는 정말 죽이 잘 맞을 수도 있었어요."));
-    return new FreeTalkExpressionLink(freeTalkSessionId, expressionId);
+        FreeTalkSessionExpression.link(freeTalkSessionId, expressionId, 1));
+    return new FreeTalkExpressionLink(learningSessionId, freeTalkSessionId, expressionId);
   }
 
-  private record FreeTalkExpressionLink(long freeTalkSessionId, long expressionId) {}
+  private record FreeTalkExpressionLink(
+      long learningSessionId, long freeTalkSessionId, long expressionId) {}
 
   private long completeSession(long learningSessionId) {
     jdbcTemplate.update(

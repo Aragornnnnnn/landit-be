@@ -74,11 +74,12 @@ public interface ExpressionControllerDocs {
    *
    * @param principal 인증된 사용자
    * @param expressionId 완료할 표현 ID
+   * @param request 프리톡 학습 맥락. 시나리오 학습이면 null
    * @return 빈 객체를 담은 성공 응답
    */
   @Operation(
       summary = "원어민 표현 학습 완료",
-      description = "표현 학습 완료를 기록하고 다음 표현 잠금 정책을 갱신한다.",
+      description = "시나리오 학습은 순차 잠금을 적용하고, 프리톡 학습은 세션 연결을 검증한 뒤 완료를 기록한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<Map<String, Object>> finishLearning(
       AuthUserPrincipal principal, Long expressionId, ExpressionLearningFinishRequest request);
