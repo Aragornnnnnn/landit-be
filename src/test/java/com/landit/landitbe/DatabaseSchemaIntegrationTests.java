@@ -18,6 +18,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StreamUtils;
 
 @ActiveProfiles("test")
@@ -270,21 +271,25 @@ class DatabaseSchemaIntegrationTests {
 
   @DisplayName("V26은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
   @Test
+  @Transactional
   void v26EnforcesPendingMessageForeignKeyAndClientMessageUniqueness() {
+    Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
     jdbcTemplate.update(
         """
         insert into user_profile (id, nickname, target_locale, base_locale, current_level,
             ai_tutor_id, push_permission_status, status, created_at, updated_at)
-        values (992001, 'free-talk-schema-user', 'EN', 'KR', 1, 1, 'NOT_DETERMINED',
+        values (992001, 'free-talk-schema-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED',
             'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """);
+        """,
+        aiTutorId);
     jdbcTemplate.update(
         """
         insert into learning_session (id, user_profile_id, session_type, ai_tutor_id,
             target_locale, base_locale, input_mode, status, started_at, created_at, updated_at)
-        values (992002, 992001, 'FREE_TALK', 1, 'EN', 'KR', 'MIXED', 'IN_PROGRESS',
+        values (992002, 992001, 'FREE_TALK', ?, 'EN', 'KR', 'MIXED', 'IN_PROGRESS',
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """);
+        """,
+        aiTutorId);
     jdbcTemplate.update(
         """
         insert into free_talk_session (id, learning_session_id, start_mode, conversation_status,
@@ -328,11 +333,6 @@ class DatabaseSchemaIntegrationTests {
                     """))
         .isInstanceOf(DataIntegrityViolationException.class);
 
-    jdbcTemplate.update("delete from free_talk_session where id = 992003");
-    jdbcTemplate.update("delete from session_history_message where id = 992005");
-    jdbcTemplate.update("delete from session_history where id = 992004");
-    jdbcTemplate.update("delete from learning_session where id = 992002");
-    jdbcTemplate.update("delete from user_profile where id = 992001");
   }
 
   @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")
