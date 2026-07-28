@@ -53,7 +53,15 @@ public class ScenarioSession extends BaseTimeEntity {
     this.goalCompletionStatus = goalCompletionStatus;
   }
 
-  /** 새 시나리오 세션 보조 정보를 생성한다. */
+  /**
+   * 새 시나리오 세션 보조 정보를 생성한다.
+   *
+   * @param learningSessionId 연결할 학습 세션 ID
+   * @param scenarioLanguageVariantId 시작한 시나리오 언어 variant ID
+   * @param dailyScenarioScheduleId 일일 배정으로 시작한 일정 ID, 복습 접근으로 시작하면 null
+   * @param userOpeningInstructionSnapshot 사용자 선톡 시작 안내 스냅샷
+   * @return 생성된 시나리오 세션 보조 정보
+   */
   public static ScenarioSession start(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
@@ -67,7 +75,11 @@ public class ScenarioSession extends BaseTimeEntity {
         GoalCompletionStatus.NOT_STARTED);
   }
 
-  /** 일일 배정 시나리오로 시작한 세션인지 반환한다. */
+  /**
+   * 일일 배정 시나리오로 시작한 세션인지 반환한다.
+   *
+   * @return 오늘 배정된 일정에 연결되어 시작했으면 true
+   */
   public boolean hasDailyScenarioSchedule() {
     return dailyScenarioScheduleId != null;
   }

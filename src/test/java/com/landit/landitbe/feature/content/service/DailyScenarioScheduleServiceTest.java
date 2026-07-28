@@ -41,6 +41,21 @@ class DailyScenarioScheduleServiceTest {
   }
 
   @Test
+  void returnsEmptyScheduleAndNextMidnightWhenTodayIsNotScheduled() {
+    when(dailyScenarioScheduleRepository.findByServiceDate(LocalDate.of(2026, 7, 28)))
+        .thenReturn(Optional.empty());
+    DailyScenarioScheduleService service =
+        new DailyScenarioScheduleService(
+            dailyScenarioScheduleRepository,
+            Clock.fixed(Instant.parse("2026-07-28T14:59:59Z"), ZoneOffset.UTC));
+
+    DailyScenarioScheduleService.TodaySchedule result = service.findTodaySchedule();
+
+    assertThat(result.schedule()).isEmpty();
+    assertThat(result.nextDayStart()).isEqualTo(Instant.parse("2026-07-28T15:00:00Z"));
+  }
+
+  @Test
   void changesTodayAtSeoulMidnight() {
     DailyScenarioSchedule schedule =
         DailyScenarioSchedule.schedule(LocalDate.of(2026, 7, 29), 101L);
