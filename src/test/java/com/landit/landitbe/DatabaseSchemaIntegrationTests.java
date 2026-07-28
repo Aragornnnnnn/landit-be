@@ -272,6 +272,23 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
+  @DisplayName("V27 migration은 프리톡 표현 생성과 학습 저장 구조를 추가한다.")
+  @Test
+  void v27AddsFreeTalkExpressionLearningStorage() {
+    assertTableExists("free_talk_session_expression");
+    assertTableDoesNotExist("free_talk_expression");
+    assertTableDoesNotExist("user_free_talk_expression_completion");
+    assertColumnExists("free_talk_session", "expression_generation_status");
+    assertColumnExists("free_talk_session", "expression_generation_started_at");
+    assertColumnExists("free_talk_session_expression", "writing_expression_id");
+    assertColumnExists("free_talk_session_expression", "generated_content_payload");
+    assertColumnExists("free_talk_session_expression", "completed_at");
+    assertTableConstraintExists(
+        "free_talk_session", "chk_free_talk_session_expression_generation_status");
+    assertTableConstraintExists(
+        "free_talk_session_expression", "chk_free_talk_session_expression_source");
+  }
+
   @DisplayName("V27은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
   @Test
   @Transactional
