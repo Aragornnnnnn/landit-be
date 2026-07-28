@@ -16,6 +16,10 @@ import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,8 +41,16 @@ public class FreeTalkHistoryQueryService {
   public FreeTalkSessionListResponse getSessions(long userId, int page, int size) {
     Page<FreeTalkSession> sessions =
         freeTalkSessionRepository.findCompletedByUserProfileId(userId, PageRequest.of(page, size));
+    Map<Long, LearningSession> learningSessionsById =
+        learningSessionRepository
+            .findAllById(
+                sessions.getContent().stream().map(FreeTalkSession::getLearningSessionId).toList())
+            .stream()
+            .collect(Collectors.toMap(LearningSession::getId, Function.identity()));
     List<FreeTalkSessionListResponse.Item> items =
-        sessions.getContent().stream().map(this::toListItem).toList();
+        sessions.getContent().stream()
+            .map(session -> toListItem(session, learningSessionsById))
+            .toList();
     return new FreeTalkSessionListResponse(items, page, size, sessions.hasNext());
   }
 
@@ -77,9 +89,10 @@ public class FreeTalkHistoryQueryService {
         messages);
   }
 
-  private FreeTalkSessionListResponse.Item toListItem(FreeTalkSession session) {
+  private FreeTalkSessionListResponse.Item toListItem(
+      FreeTalkSession session, Map<Long, LearningSession> learningSessionsById) {
     LearningSession learningSession =
-        learningSessionRepository.findById(session.getLearningSessionId()).orElseThrow();
+        Optional.ofNullable(learningSessionsById.get(session.getLearningSessionId())).orElseThrow();
     return new FreeTalkSessionListResponse.Item(
         learningSession.getId(),
         session.getTitle(),
