@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
@@ -203,4 +204,9 @@ public interface FreeTalkControllerDocs {
   ResponseEntity<ApiResponse<FreeTalkSessionDetailResponse>> getSession(
       AuthUserPrincipal principal,
       @Parameter(description = "조회할 프리톡 학습 세션 ID", example = "123") long sessionId);
+
+  /** 실패한 맞춤 표현 생성 작업을 다시 시작한다. */
+  @Operation(summary = "맞춤 표현 생성 재시도", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkExpressionRetryResponse>> retryExpressions(
+      AuthUserPrincipal principal, long sessionId);
 }
