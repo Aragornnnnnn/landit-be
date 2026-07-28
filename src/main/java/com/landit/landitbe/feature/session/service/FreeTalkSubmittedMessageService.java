@@ -111,8 +111,7 @@ public class FreeTalkSubmittedMessageService {
         request.clientMessageId(),
         request.utteranceDurationMs(),
         request.timeLimitReached()
-            || freeTalkSession.getAccumulatedSpeakingDurationMs()
-                    + request.utteranceDurationMs()
+            || freeTalkSession.getAccumulatedSpeakingDurationMs() + request.utteranceDurationMs()
                 >= SPEAKING_TIME_LIMIT_MS,
         freeTalkSession.getStartMode() == FreeTalkStartMode.USER_FIRST
             && messages.stream()

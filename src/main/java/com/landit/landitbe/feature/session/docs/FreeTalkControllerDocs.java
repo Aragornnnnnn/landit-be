@@ -87,11 +87,21 @@ public interface FreeTalkControllerDocs {
       description = "사용자 발화를 저장하고 AI 후속 메시지, 종료 확인 또는 시간 제한 종료를 반환한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "처리 성공"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "세션 소유자 아님"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "세션 없음"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "중복 또는 처리 중인 발화"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "AI 생성 실패")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "처리 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "세션 소유자 아님"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "세션 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "중복 또는 처리 중인 발화"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "503",
+        description = "AI 생성 실패")
   })
   ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> submitMessage(
       AuthUserPrincipal principal, long sessionId, FreeTalkMessageSubmitRequest request);
@@ -109,11 +119,21 @@ public interface FreeTalkControllerDocs {
       description = "종료를 확정하면 마무리 메시지와 함께 세션을 완료하고, 취소하면 대화를 계속한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "처리 성공"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "세션 소유자 아님"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "세션 없음"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "종료 확인 상태 불일치"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "AI 생성 실패")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "처리 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "세션 소유자 아님"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "세션 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "종료 확인 상태 불일치"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "503",
+        description = "AI 생성 실패")
   })
   ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> decideExit(
       AuthUserPrincipal principal, long sessionId, FreeTalkExitDecisionRequest request);
