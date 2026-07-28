@@ -409,7 +409,8 @@ public class FreeTalkSubmittedMessageService {
         new ProgressResponse(
             session.getConversationStatus(),
             session.getAccumulatedSpeakingDurationMs(),
-            SPEAKING_TIME_LIMIT_MS));
+            SPEAKING_TIME_LIMIT_MS,
+            session.getExpressionGenerationStatus()));
   }
 
   /** AI 호출 전에 저장한 사용자 발화와 대화 문맥이다. */

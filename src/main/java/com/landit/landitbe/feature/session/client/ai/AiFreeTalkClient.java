@@ -28,4 +28,22 @@ public interface AiFreeTalkClient {
    * @return 생성된 마무리 메시지와 속마음
    */
   AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request);
+
+  /**
+   * 완료된 프리톡에 맞는 학습 표현을 추천한다.
+   *
+   * @param request 완료 대화와 기존 표현 후보
+   * @return 추천된 표현 목록
+   */
+  AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+      AiFreeTalkExpressionRecommendationsRequest request);
+
+  /**
+   * 새 프리톡 표현의 학습 데이터를 생성한다.
+   *
+   * @param request 학습 데이터가 필요한 신규 표현 목록
+   * @return 생성된 표현별 학습 데이터
+   */
+  AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
+      AiFreeTalkExpressionLearningContentRequest request);
 }

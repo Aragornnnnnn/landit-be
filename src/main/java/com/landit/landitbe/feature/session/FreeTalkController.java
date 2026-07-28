@@ -3,8 +3,11 @@
 package com.landit.landitbe.feature.session;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.session.docs.FreeTalkControllerDocs;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionLearningResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionDetailResponse;
@@ -12,6 +15,9 @@ import com.landit.landitbe.feature.session.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkTopicResponse;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionGenerationDispatcher;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionLearningService;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionRetryService;
 import com.landit.landitbe.feature.session.service.FreeTalkHistoryQueryService;
 import com.landit.landitbe.feature.session.service.FreeTalkMessageService;
 import com.landit.landitbe.feature.session.service.FreeTalkSessionStartService;
@@ -19,6 +25,7 @@ import com.landit.landitbe.feature.session.service.FreeTalkTopicService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +46,9 @@ public class FreeTalkController implements FreeTalkControllerDocs {
   private final FreeTalkSessionStartService freeTalkSessionStartService;
   private final FreeTalkMessageService freeTalkMessageService;
   private final FreeTalkHistoryQueryService freeTalkHistoryQueryService;
+  private final FreeTalkExpressionRetryService freeTalkExpressionRetryService;
+  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
+  private final FreeTalkExpressionLearningService freeTalkExpressionLearningService;
 
   /** {@inheritDoc} */
   @Override
@@ -105,5 +115,50 @@ public class FreeTalkController implements FreeTalkControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
     return ResponseEntity.ok(
         ApiResponse.success(freeTalkHistoryQueryService.getSession(principal.userId(), sessionId)));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/free-talk/sessions/{sessionId}/expressions/retry")
+  public ResponseEntity<ApiResponse<FreeTalkExpressionRetryResponse>> retryExpressions(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
+    FreeTalkExpressionRetryResponse response =
+        freeTalkExpressionRetryService.retry(principal.userId(), sessionId);
+    expressionGenerationDispatcher.dispatch(sessionId);
+    return ApiResponse.success(HttpStatus.ACCEPTED, response);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/free-talk/expressions/{sessionExpressionId}/learning-start")
+  public ResponseEntity<ApiResponse<FreeTalkExpressionLearningResponse>> getExpressionLearning(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable long sessionExpressionId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            freeTalkExpressionLearningService.getLearningContent(
+                principal.userId(), sessionExpressionId)));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/free-talk/expressions/{sessionExpressionId}/practice")
+  public ResponseEntity<ApiResponse<ExpressionPracticeResponse>> getExpressionPractice(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable long sessionExpressionId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            freeTalkExpressionLearningService.getPractice(
+                principal.userId(), sessionExpressionId)));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/free-talk/expressions/{sessionExpressionId}/learning-finish")
+  public ResponseEntity<ApiResponse<Map<String, Object>>> finishExpressionLearning(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable long sessionExpressionId) {
+    freeTalkExpressionLearningService.complete(principal.userId(), sessionExpressionId);
+    return ResponseEntity.ok(ApiResponse.success(Map.of()));
   }
 }

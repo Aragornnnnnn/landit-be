@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.session.dto;
 
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.domain.ExpressionLearningStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,5 +16,9 @@ public record FreeTalkSessionListResponse(List<Item> items, int page, int size, 
       String title,
       LocalDateTime startedAt,
       LocalDateTime completedAt,
-      long userSpeakingDurationMs) {}
+      long userSpeakingDurationMs,
+      ExpressionGenerationStatus expressionGenerationStatus,
+      ExpressionLearningStatus expressionLearningStatus,
+      int expressionCount,
+      int completedExpressionCount) {}
 }

@@ -14,13 +14,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.FreeTalkExpression;
+import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
+import com.landit.landitbe.feature.session.repository.FreeTalkExpressionRepository;
+import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -59,6 +69,10 @@ class FreeTalkSessionApiIntegrationTests {
 
   @Autowired private FakeAiFreeTalkClient fakeAiFreeTalkClient;
 
+  @Autowired private FreeTalkExpressionRepository freeTalkExpressionRepository;
+
+  @Autowired private FreeTalkSessionExpressionRepository freeTalkSessionExpressionRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeEach
@@ -73,11 +87,17 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void cleanUpDatabase() {
+    jdbcTemplate.update("DELETE FROM user_free_talk_expression_completion");
+    jdbcTemplate.update("DELETE FROM free_talk_session_expression");
+    jdbcTemplate.update("DELETE FROM free_talk_expression");
     jdbcTemplate.update("DELETE FROM free_talk_session");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
     jdbcTemplate.update("DELETE FROM free_talk_topic");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994103");
+    jdbcTemplate.update("DELETE FROM scenario WHERE id = 994102");
+    jdbcTemplate.update("DELETE FROM category WHERE id = 994101");
   }
 
   @Test
@@ -295,6 +315,8 @@ class FreeTalkSessionApiIntegrationTests {
   void openApiDocumentsTopicAndSessionStartContracts() throws Exception {
     String topicsPath = "$.paths['/api/v1/free-talk/topics'].get";
     String sessionsPath = "$.paths['/api/v1/free-talk/sessions'].post";
+    String expressionPath =
+        "$.paths['/api/v1/free-talk/expressions/{sessionExpressionId}/learning-start'].get";
 
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -308,7 +330,11 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionsPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(sessionsPath + ".responses['404'].description").value("주제 없음"))
         .andExpect(jsonPath(sessionsPath + ".responses['502'].description").value("AI 응답 오류"))
-        .andExpect(jsonPath(sessionsPath + ".responses['503'].description").value("AI 생성 실패"));
+        .andExpect(jsonPath(sessionsPath + ".responses['503'].description").value("AI 생성 실패"))
+        .andExpect(jsonPath(expressionPath + ".security[0].bearerAuth").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.FreeTalkExpressionLearningResponse.properties.completed")
+                .exists());
   }
 
   @Test
@@ -410,7 +436,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void endDecisionAndTimeLimitCompleteTheSession() throws Exception {
+  void endDecisionAndTimeLimitCompleteTheSessionWithPreparingStatus() throws Exception {
     String accessToken =
         login("free-talk-complete@example.com").get("data").get("accessToken").asText();
     long exitSessionId = startUserFirstSession(accessToken);
@@ -427,7 +453,8 @@ class FreeTalkSessionApiIntegrationTests {
                         .formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
-        .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
+        .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.progress.expressionGenerationStatus").value("PREPARING"));
 
     fakeAiFreeTalkClient.reset();
     long timeLimitSessionId = startUserFirstSession(accessToken);
@@ -440,7 +467,127 @@ class FreeTalkSessionApiIntegrationTests {
                     messageRequest(UUID.randomUUID().toString(), "One last thing.", 180000, true)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
-        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000))
+        .andExpect(jsonPath("$.data.progress.expressionGenerationStatus").value("PREPARING"));
+  }
+
+  @Test
+  void learnsAndCompletesNewFreeTalkExpressionWithoutImages() throws Exception {
+    JsonNode loginBody = login("free-talk-new-expression@example.com");
+    final long userId = loginBody.at("/data/user/userId").asLong();
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    long sessionExpressionId = seedNewExpressionForCompletedSession(learningSessionId);
+    String otherToken =
+        login("free-talk-expression-other@example.com").at("/data/accessToken").asText();
+
+    mockMvc
+        .perform(
+            get(
+                    "/api/v1/free-talk/expressions/{sessionExpressionId}/learning-start",
+                    sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+
+    mockMvc
+        .perform(
+            get(
+                    "/api/v1/free-talk/expressions/{sessionExpressionId}/learning-start",
+                    sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sessionExpressionId").value(sessionExpressionId))
+        .andExpect(jsonPath("$.data.targetExpressionText").value("hit it off"))
+        .andExpect(jsonPath("$.data.representativeSentenceWords.length()").value(6))
+        .andExpect(jsonPath("$.data.representativeImageUrl").value(nullValue()))
+        .andExpect(jsonPath("$.data.completed").value(false));
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/expressions/{sessionExpressionId}/practice", sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
+        .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              post(
+                      "/api/v1/free-talk/expressions/{sessionExpressionId}/learning-finish",
+                      sessionExpressionId)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM user_free_talk_expression_completion
+                WHERE user_profile_id = ?
+                """,
+                Integer.class,
+                userId))
+        .isEqualTo(1);
+
+    mockMvc
+        .perform(
+            get(
+                    "/api/v1/free-talk/expressions/{sessionExpressionId}/learning-start",
+                    sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.completed").value(true));
+  }
+
+  @Test
+  void newFreeTalkPracticeExcludesInvalidExamples() throws Exception {
+    JsonNode loginBody = login("free-talk-invalid-practice@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    long sessionExpressionId =
+        seedNewExpressionForCompletedSession(learningSessionId, practiceExamplesWithInvalidEntry());
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/expressions/{sessionExpressionId}/practice", sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(1))
+        .andExpect(jsonPath("$.data.practiceSentence[0].sentenceText").value("Valid sentence."));
+  }
+
+  @Test
+  void reusesWritingExpressionLearningContentForExistingExpression() throws Exception {
+    JsonNode loginBody = login("free-talk-existing-expression@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    long sessionExpressionId = seedExistingExpressionForCompletedSession(learningSessionId);
+
+    mockMvc
+        .perform(
+            get(
+                    "/api/v1/free-talk/expressions/{sessionExpressionId}/learning-start",
+                    sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetExpressionText").value("make up for"))
+        .andExpect(
+            jsonPath("$.data.representativeImageUrl").value("https://cdn/representative.png"))
+        .andExpect(jsonPath("$.data.completed").value(false));
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/expressions/{sessionExpressionId}/practice", sessionExpressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+        .andExpect(
+            jsonPath("$.data.practiceSentence[0].imageUrl").value("https://cdn/practice.png"));
   }
 
   @Test
@@ -608,6 +755,166 @@ class FreeTalkSessionApiIntegrationTests {
         .formatted(clientMessageId, content, utteranceDurationMs, timeLimitReached);
   }
 
+  private long seedNewExpressionForCompletedSession(long learningSessionId) throws Exception {
+    return seedNewExpressionForCompletedSession(learningSessionId, practiceExamples(null));
+  }
+
+  private long seedNewExpressionForCompletedSession(
+      long learningSessionId, JsonNode practiceExamples) throws Exception {
+    FreeTalkExpression expression =
+        freeTalkExpressionRepository.saveAndFlush(
+            FreeTalkExpression.newExpression(
+                Locale.EN,
+                Locale.KR,
+                "hit it off",
+                "죽이 잘 맞다",
+                "처음 만난 사람과 잘 통할 때 사용한다.",
+                "서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.",
+                "How was meeting your new teammate?",
+                "새 팀원을 만나 보니 어땠어?",
+                "We really hit it off.",
+                "우리는 정말 죽이 잘 맞았어.",
+                objectMapper.readTree("[\"We\", \"really\", \"hit\", \"it\", \"off\", \".\"]"),
+                objectMapper.readTree(
+                    "[\"hit\", \"We\", \"miss\", \"off\", \"it\", \"really\", \".\"]"),
+                null,
+                practiceExamples));
+    return connectExpressionToCompletedSession(learningSessionId, expression.getId());
+  }
+
+  private long seedExistingExpressionForCompletedSession(long learningSessionId) throws Exception {
+    long writingExpressionId = seedWritingExpression();
+    FreeTalkExpression expression =
+        freeTalkExpressionRepository.saveAndFlush(
+            FreeTalkExpression.existingExpression(
+                writingExpressionId,
+                Locale.EN,
+                Locale.KR,
+                "make up for",
+                "만회하다",
+                "부족했던 부분을 보완할 때 사용한다."));
+    return connectExpressionToCompletedSession(learningSessionId, expression.getId());
+  }
+
+  private long connectExpressionToCompletedSession(
+      long learningSessionId, long freeTalkExpressionId) {
+    jdbcTemplate.update(
+        """
+        UPDATE learning_session
+        SET status = 'COMPLETED', ended_at = CURRENT_TIMESTAMP,
+            ended_by = 'USER', completion_reason = 'USER_ENDED'
+        WHERE id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        UPDATE free_talk_session
+        SET conversation_status = 'COMPLETED', expression_generation_status = 'READY'
+        WHERE learning_session_id = ?
+        """,
+        learningSessionId);
+    long freeTalkSessionId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
+            Long.class,
+            learningSessionId);
+    return freeTalkSessionExpressionRepository
+        .saveAndFlush(
+            FreeTalkSessionExpression.create(
+                freeTalkSessionId,
+                freeTalkExpressionId,
+                1,
+                "We could have really hit it off.",
+                "우리는 정말 죽이 잘 맞을 수도 있었어요."))
+        .getId();
+  }
+
+  private JsonNode practiceExamples(String imageUrl) throws Exception {
+    String imageProperty = imageUrl == null ? "" : ",\"imageUrl\":\"" + imageUrl + "\"";
+    String example =
+        """
+        {
+          "sentenceText": "They hit it off right away.",
+          "sentenceWords": ["They", "hit", "it", "off", "right", "away", "."],
+          "highlightingPart": "hit it off",
+          "practiceQuestion": "How did the introduction go?",
+          "sentenceTranslation": "그들은 바로 죽이 잘 맞았어.",
+          "sentenceWordChoices": ["hit", "They", "miss", "it", "off", "right", "away", "."],
+          "practiceQuestionTranslation": "소개는 어땠어?"%s
+        }
+        """
+            .formatted(imageProperty);
+    return objectMapper.readTree("[" + String.join(",", Collections.nCopies(4, example)) + "]");
+  }
+
+  private JsonNode practiceExamplesWithInvalidEntry() throws Exception {
+    return objectMapper.readTree(
+        """
+        [
+          {
+            "sentenceText": "Valid sentence.",
+            "sentenceWords": ["Valid", "sentence", "."],
+            "highlightingPart": "Valid",
+            "practiceQuestion": "Is this valid?",
+            "sentenceTranslation": "정상 문장.",
+            "sentenceWordChoices": ["sentence", "Valid", "."],
+            "practiceQuestionTranslation": "이 문장은 정상이야?"
+          },
+          {
+            "sentenceText": "Missing words.",
+            "highlightingPart": "Missing",
+            "practiceQuestion": "Are words missing?",
+            "sentenceTranslation": "단어 배열이 빠진 문장.",
+            "sentenceWordChoices": ["Missing", "words", "."],
+            "practiceQuestionTranslation": "단어 배열이 빠졌어?"
+          }
+        ]
+        """);
+  }
+
+  private long seedWritingExpression() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (994101, 994101, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario (
+            id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+            display_order, status, created_at, updated_at
+        )
+        VALUES (
+            994102, 994101, 'friend', 'NORMAL', 'AI', 1,
+            994102, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            display_order, target_expression_text, base_expression_meaning_text, usage_summary,
+            usage_description, representative_question_text, representative_question_translation,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            representative_image_url, practice_examples_payload, status, created_at, updated_at
+        )
+        VALUES (
+            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1,
+            'make up for', '만회하다', '부족했던 부분을 보완한다.',
+            '부족하거나 잘못된 일을 다른 행동으로 보완할 때 쓴다.',
+            'How will you fix it?', '어떻게 만회할 거야?',
+            'I will make up for it.', '내가 만회할게.',
+            ARRAY['I', 'will', 'make', 'up', 'for', 'it', '.'],
+            ARRAY['make', 'I', 'it', 'up', 'for', 'will', '.'],
+            'https://cdn/representative.png',
+            ? FORMAT JSON, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        practiceExamples("https://cdn/practice.png").toString());
+    return 994103L;
+  }
+
   private JsonNode login(String email) throws Exception {
     String nonce = UUID.randomUUID().toString();
     MvcResult result =
@@ -709,6 +1016,18 @@ class FreeTalkSessionApiIntegrationTests {
           CharacterEmotion.HAPPY,
           "즐거운 시간을 보냈나 봐.",
           com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
+    }
+
+    @Override
+    public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+        AiFreeTalkExpressionRecommendationsRequest request) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
+        AiFreeTalkExpressionLearningContentRequest request) {
+      throw new UnsupportedOperationException();
     }
 
     void reset() {

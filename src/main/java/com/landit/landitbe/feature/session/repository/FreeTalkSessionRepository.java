@@ -2,8 +2,11 @@
 
 package com.landit.landitbe.feature.session.repository;
 
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,4 +42,8 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
       """)
   Page<FreeTalkSession> findCompletedByUserProfileId(
       @Param("userProfileId") Long userProfileId, Pageable pageable);
+
+  /** 장시간 멈춘 표현 생성 작업을 복구 대상으로 조회한다. */
+  List<FreeTalkSession> findByExpressionGenerationStatusAndExpressionGenerationStartedAtBefore(
+      ExpressionGenerationStatus status, LocalDateTime threshold);
 }

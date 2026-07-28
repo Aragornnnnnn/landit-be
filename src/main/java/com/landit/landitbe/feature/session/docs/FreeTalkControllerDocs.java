@@ -3,7 +3,10 @@
 package com.landit.landitbe.feature.session.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionLearningResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionDetailResponse;
@@ -17,6 +20,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.ResponseEntity;
 
 /** 프리톡 주제 조회와 세션 시작 API의 OpenAPI 문서를 정의한다. */
@@ -81,8 +85,28 @@ public interface FreeTalkControllerDocs {
   ResponseEntity<ApiResponse<FreeTalkSessionListResponse>> getSessions(
       AuthUserPrincipal principal, int page, int size);
 
-  /** 완료된 지난 프리톡의 전체 대화를 조회한다. */
+  /** 완료된 지난 프리톡의 전체 대화와 맞춤 표현 상태를 조회한다. */
   @Operation(summary = "지난 프리톡 상세 조회", security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<ApiResponse<FreeTalkSessionDetailResponse>> getSession(
       AuthUserPrincipal principal, long sessionId);
+
+  /** 실패한 맞춤 표현 생성 작업을 다시 시작한다. */
+  @Operation(summary = "맞춤 표현 생성 재시도", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkExpressionRetryResponse>> retryExpressions(
+      AuthUserPrincipal principal, long sessionId);
+
+  /** 프리톡 맞춤 표현의 학습 시작 콘텐츠와 완료 여부를 조회한다. */
+  @Operation(summary = "프리톡 맞춤 표현 학습 시작", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<FreeTalkExpressionLearningResponse>> getExpressionLearning(
+      AuthUserPrincipal principal, long sessionExpressionId);
+
+  /** 프리톡 맞춤 표현의 추가 예문과 작문 문제를 조회한다. */
+  @Operation(summary = "프리톡 맞춤 표현 연습 조회", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<ExpressionPracticeResponse>> getExpressionPractice(
+      AuthUserPrincipal principal, long sessionExpressionId);
+
+  /** 프리톡 맞춤 표현 학습을 완료한다. */
+  @Operation(summary = "프리톡 맞춤 표현 학습 완료", security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<ApiResponse<Map<String, Object>>> finishExpressionLearning(
+      AuthUserPrincipal principal, long sessionExpressionId);
 }

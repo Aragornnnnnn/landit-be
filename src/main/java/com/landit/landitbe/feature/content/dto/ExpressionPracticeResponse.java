@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.content.dto;
 
-import com.landit.landitbe.feature.content.domain.WritingExpression;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -23,25 +22,4 @@ public record ExpressionPracticeResponse(
         String usageDescription,
     @Schema(description = "추가 예문 목록") List<PracticeSentenceResponse> practiceSentence,
     @Schema(description = "작문 연습에 사용할 문제. practiceSentence 중 랜덤 1개")
-        WritingSentenceResponse writingSentence) {
-
-  /**
-   * 표현 엔티티와 추가 예문을 학습 연습 응답으로 변환한다.
-   *
-   * @param expression 변환할 표현 엔티티
-   * @param practiceSentences 추가 예문 목록
-   * @param writingSentence 작문 문제
-   * @return 표현 학습 연습 응답
-   */
-  public static ExpressionPracticeResponse from(
-      WritingExpression expression,
-      List<PracticeSentenceResponse> practiceSentences,
-      WritingSentenceResponse writingSentence) {
-    return new ExpressionPracticeResponse(
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
-        expression.getUsageDescription(),
-        practiceSentences,
-        writingSentence);
-  }
-}
+        WritingSentenceResponse writingSentence) {}

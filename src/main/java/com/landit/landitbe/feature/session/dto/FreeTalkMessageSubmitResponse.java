@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.session.dto;
 
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
@@ -63,5 +64,6 @@ public record FreeTalkMessageSubmitResponse(
   public record ProgressResponse(
       FreeTalkConversationStatus sessionStatus,
       long accumulatedSpeakingDurationMs,
-      long speakingTimeLimitMs) {}
+      long speakingTimeLimitMs,
+      ExpressionGenerationStatus expressionGenerationStatus) {}
 }

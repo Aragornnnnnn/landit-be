@@ -123,8 +123,23 @@ public class ExpressionQueryService {
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
 
+    return buildPracticeResponse(
+        expressionId,
+        expression.getTargetExpressionText(),
+        expression.getBaseExpressionMeaningText(),
+        expression.getUsageDescription(),
+        expression.getPracticeExamplesPayload());
+  }
+
+  /** 저장 위치와 관계없이 동일한 검증 규칙으로 표현 연습 응답을 만든다. */
+  public ExpressionPracticeResponse buildPracticeResponse(
+      Long expressionId,
+      String targetExpressionText,
+      String baseExpressionMeaningText,
+      String usageDescription,
+      JsonNode practiceExamplesPayload) {
     List<ParsedPracticeSentence> parsedSentences =
-        parseExtraPracticeSentences(expression.getPracticeExamplesPayload(), expressionId);
+        parseExtraPracticeSentences(practiceExamplesPayload, expressionId);
     if (parsedSentences.isEmpty()) {
       log.warn(NO_VALID_PRACTICE_SENTENCE_LOG, expressionId);
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
@@ -132,8 +147,12 @@ public class ExpressionQueryService {
 
     List<PracticeSentenceResponse> extraPracticeSentences =
         parsedSentences.stream().map(ParsedPracticeSentence::sentence).toList();
-    return ExpressionPracticeResponse.from(
-        expression, extraPracticeSentences, pickRandomWritingSentence(parsedSentences));
+    return new ExpressionPracticeResponse(
+        targetExpressionText,
+        baseExpressionMeaningText,
+        usageDescription,
+        extraPracticeSentences,
+        pickRandomWritingSentence(parsedSentences));
   }
 
   /**

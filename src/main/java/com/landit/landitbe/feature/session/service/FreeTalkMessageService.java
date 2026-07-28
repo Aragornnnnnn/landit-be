@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
+import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
@@ -21,6 +22,7 @@ public class FreeTalkMessageService {
 
   private final FreeTalkSubmittedMessageService submittedMessageService;
   private final AiFreeTalkClient aiFreeTalkClient;
+  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
 
   /** 사용자 발화를 처리하고 AI 후속 메시지 또는 종료 확인 상태를 반환한다. */
   public FreeTalkMessageSubmitResponse submit(
@@ -29,10 +31,13 @@ public class FreeTalkMessageService {
         submittedMessageService.reserve(userId, learningSessionId, request);
     try {
       if (reservation.timeLimitReached()) {
-        return submittedMessageService.finalizeTimeLimit(
-            reservation,
-            aiFreeTalkClient.generateClosing(
-                closingRequest(reservation, AiFreeTalkClosingReason.TIME_LIMIT_REACHED)));
+        FreeTalkMessageSubmitResponse response =
+            submittedMessageService.finalizeTimeLimit(
+                reservation,
+                aiFreeTalkClient.generateClosing(
+                    closingRequest(reservation, AiFreeTalkClosingReason.TIME_LIMIT_REACHED)));
+        dispatchIfCompleted(response);
+        return response;
       }
       return submittedMessageService.finalizeTurn(
           reservation,
@@ -51,10 +56,14 @@ public class FreeTalkMessageService {
             userId, learningSessionId, request.submittedMessageId(), request.decision());
     try {
       if (reservation.decision() == FreeTalkExitDecision.END) {
-        return submittedMessageService.finalizeEnd(
-            reservation,
-            aiFreeTalkClient.generateClosing(
-                closingRequestForDecision(reservation, AiFreeTalkClosingReason.USER_CONFIRMED)));
+        FreeTalkMessageSubmitResponse response =
+            submittedMessageService.finalizeEnd(
+                reservation,
+                aiFreeTalkClient.generateClosing(
+                    closingRequestForDecision(
+                        reservation, AiFreeTalkClosingReason.USER_CONFIRMED)));
+        dispatchIfCompleted(response);
+        return response;
       }
       return submittedMessageService.finalizeContinue(
           reservation,
@@ -82,6 +91,12 @@ public class FreeTalkMessageService {
         reservation.firstUserTurn(),
         reservation.topic(),
         reservation.history());
+  }
+
+  private void dispatchIfCompleted(FreeTalkMessageSubmitResponse response) {
+    if (response.turnStatus() == FreeTalkTurnStatus.COMPLETED) {
+      expressionGenerationDispatcher.dispatch(response.sessionId());
+    }
   }
 
   private AiFreeTalkClosingRequest closingRequest(
