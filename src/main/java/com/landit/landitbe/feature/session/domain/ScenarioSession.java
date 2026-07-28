@@ -43,10 +43,12 @@ public class ScenarioSession extends BaseTimeEntity {
   private ScenarioSession(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
+      Long dailyScenarioScheduleId,
       String userOpeningInstructionSnapshot,
       GoalCompletionStatus goalCompletionStatus) {
     this.learningSessionId = learningSessionId;
     this.scenarioLanguageVariantId = scenarioLanguageVariantId;
+    this.dailyScenarioScheduleId = dailyScenarioScheduleId;
     this.userOpeningInstructionSnapshot = userOpeningInstructionSnapshot;
     this.goalCompletionStatus = goalCompletionStatus;
   }
@@ -55,12 +57,19 @@ public class ScenarioSession extends BaseTimeEntity {
   public static ScenarioSession start(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
+      Long dailyScenarioScheduleId,
       String userOpeningInstructionSnapshot) {
     return new ScenarioSession(
         learningSessionId,
         scenarioLanguageVariantId,
+        dailyScenarioScheduleId,
         userOpeningInstructionSnapshot,
         GoalCompletionStatus.NOT_STARTED);
+  }
+
+  /** 일일 배정 시나리오로 시작한 세션인지 반환한다. */
+  public boolean hasDailyScenarioSchedule() {
+    return dailyScenarioScheduleId != null;
   }
 
   /** AI가 판단한 시나리오 목표 달성 상태를 갱신한다. */

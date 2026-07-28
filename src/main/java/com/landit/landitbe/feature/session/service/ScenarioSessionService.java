@@ -6,12 +6,10 @@ import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionLockProjection;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,18 +34,6 @@ public class ScenarioSessionService {
     return startQueryRepository
         .findStartRow(userId, scenarioId)
         .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
-  }
-
-  /**
-   * 직전 시나리오 잠금 상태를 조회한다.
-   *
-   * @param userId 사용자 ID
-   * @param scenarioId 시작할 시나리오 ID
-   * @return 직전 시나리오 잠금 상태
-   */
-  public Optional<ScenarioSessionLockProjection> findPreviousScenarioLock(
-      long userId, long scenarioId) {
-    return startQueryRepository.findPreviousScenarioLockRow(userId, scenarioId);
   }
 
   /**

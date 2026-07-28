@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.session.repository;
 
 import com.landit.landitbe.feature.content.domain.Scenario;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionLockProjection;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -59,36 +58,5 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
             WHERE up.id = :userId
       """)
   Optional<ScenarioSessionStartProjection> findStartRow(
-      @Param("userId") long userId, @Param("scenarioId") long scenarioId);
-
-  /** 시작할 시나리오의 직전 displayOrder 시나리오 완료 상태를 조회한다. */
-  @Query(
-      """
-            SELECT new com.landit.landitbe.feature.session.repository.projection.ScenarioSessionLockProjection(
-                previousScenario.id,
-                usp.status
-            )
-            FROM UserProfile up
-            JOIN Scenario currentScenario
-              ON currentScenario.id = :scenarioId
-            JOIN Scenario previousScenario
-              ON previousScenario.categoryId = currentScenario.categoryId
-             AND previousScenario.displayOrder = (
-                SELECT MAX(candidate.displayOrder)
-                FROM Scenario candidate
-                JOIN ScenarioLanguageVariant candidateVariant
-                  ON candidateVariant.scenarioId = candidate.id
-                 AND candidateVariant.targetLocale = up.targetLocale
-                 AND candidateVariant.baseLocale = up.baseLocale
-                WHERE candidate.categoryId = currentScenario.categoryId
-                  AND candidate.displayOrder < currentScenario.displayOrder
-             )
-            LEFT JOIN UserScenarioProgress usp
-              ON usp.userProfileId = up.id
-             AND usp.scenarioId = previousScenario.id
-             AND usp.targetLocale = up.targetLocale
-            WHERE up.id = :userId
-      """)
-  Optional<ScenarioSessionLockProjection> findPreviousScenarioLockRow(
       @Param("userId") long userId, @Param("scenarioId") long scenarioId);
 }

@@ -32,6 +32,8 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +71,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
     })
 class ScenarioSessionApiIntegrationTests {
 
+  private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
+
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -87,6 +91,8 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario_session");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
+    jdbcTemplate.update("DELETE FROM user_scenario_access");
+    jdbcTemplate.update("DELETE FROM daily_scenario_schedule");
     jdbcTemplate.update("DELETE FROM user_scenario_progress");
     jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
     jdbcTemplate.update("DELETE FROM scenario_question");
@@ -124,6 +130,7 @@ class ScenarioSessionApiIntegrationTests {
         "GOOD",
         ttsVoiceId("en-US-Harper:MAI-Voice-2"),
         "ACTIVE");
+    scheduleTodayScenario(2001);
 
     MvcResult result =
         mockMvc
@@ -223,6 +230,7 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update(
         "DELETE FROM scenario_question_language_variant WHERE scenario_question_id = ?", 102002L);
     jdbcTemplate.update("DELETE FROM scenario_question WHERE id = ?", 102002L);
+    scheduleTodayScenario(2002);
 
     mockMvc
         .perform(
@@ -1762,6 +1770,7 @@ class ScenarioSessionApiIntegrationTests {
         null,
         ttsVoiceId("en-US-Ethan:MAI-Voice-2"),
         "ACTIVE");
+    scheduleTodayScenario(2002);
 
     MvcResult result =
         mockMvc
@@ -1825,6 +1834,7 @@ class ScenarioSessionApiIntegrationTests {
         null,
         insertTtsVoice(990201, "test-session-inactive-voice", "INACTIVE"),
         "ACTIVE");
+    scheduleTodayScenario(2011);
 
     mockMvc
         .perform(
@@ -1843,6 +1853,7 @@ class ScenarioSessionApiIntegrationTests {
     seedScenario(2010, 1010, 1, "USER", "ACTIVE", 2);
     seedScenarioVariant(
         3010, 2010, "동시 시작", "동시 시작", "동시 시작", "먼저 말해보세요.", null, null, null, null, null, "ACTIVE");
+    scheduleTodayScenario(2010);
 
     CountDownLatch ready = new CountDownLatch(2);
     CountDownLatch start = new CountDownLatch(1);
@@ -1929,7 +1940,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
-  void startScenarioRejectsPreviousScenarioNotCleared() throws Exception {
+  void startScenarioDoesNotRequirePreviousScenarioToBeCleared() throws Exception {
     JsonNode loginBody = login("locked-scenario@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
     seedCategory(1004, 1, "ACTIVE", "순차 카테고리");
@@ -1939,6 +1950,7 @@ class ScenarioSessionApiIntegrationTests {
     seedScenario(2005, 1004, 2, "AI", "ACTIVE", 2);
     seedScenarioVariant(
         3005, 2005, "두번째", "두번째", "두번째", null, "Second", "두번째", null, null, null, "ACTIVE");
+    scheduleTodayScenario(2005);
 
     mockMvc
         .perform(
@@ -1946,9 +1958,90 @@ class ScenarioSessionApiIntegrationTests {
                 .header(
                     HttpHeaders.AUTHORIZATION,
                     "Bearer " + loginBody.get("data").get("accessToken").asText()))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void startScenarioRejectsScenarioThatIsNotTodayOrCleared() throws Exception {
+    JsonNode loginBody = login("not-today@example.com");
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1013, 1, "ACTIVE", "오늘 아님");
+    seedScenario(2013, 1013, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3013, 2013, "오늘 아님", "오늘 아님", "오늘 아님", "먼저 말해보세요.", null, null, null, null, null, "ACTIVE");
+
+    mockMvc
+        .perform(
+            post("/api/v1/scenarios/2013/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.error.code").value("SCENARIO_LOCKED"))
-        .andExpect(jsonPath("$.error.message").value("PREVIOUS_SCENARIO_NOT_COMPLETED"));
+        .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
+  }
+
+  @Test
+  void startTodayScenarioRecordsDailySchedule() throws Exception {
+    JsonNode loginBody = login("today-scenario@example.com");
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1014, 1, "ACTIVE", "오늘 시나리오");
+    seedScenario(2014, 1014, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3014,
+        2014,
+        "오늘 시나리오",
+        "오늘 시나리오",
+        "오늘 시나리오",
+        "먼저 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    scheduleTodayScenario(2014);
+
+    long sessionId = startScenario(accessToken, 2014);
+
+    assertThat(dailyScenarioScheduleId(sessionId)).isNotNull();
+  }
+
+  @Test
+  void startGrantedScenarioDoesNotRecordDailySchedule() throws Exception {
+    JsonNode loginBody = login("granted-scenario@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1015, 1, "ACTIVE", "복습 시나리오");
+    seedScenario(2015, 1015, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3015,
+        2015,
+        "복습 시나리오",
+        "복습 시나리오",
+        "복습 시나리오",
+        "먼저 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    grantScenarioAccess(userId, 2015);
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/2015/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+
+    assertThat(dailyScenarioScheduleId(sessionId)).isNull();
   }
 
   @Test
@@ -2048,6 +2141,7 @@ class ScenarioSessionApiIntegrationTests {
         null,
         null,
         "ACTIVE");
+    scheduleTodayScenario(scenarioId);
 
     MvcResult result =
         mockMvc
@@ -2087,6 +2181,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private long startScenario(String accessToken, long scenarioId) throws Exception {
+    scheduleTodayScenario(scenarioId);
     MvcResult result =
         mockMvc
             .perform(
@@ -2099,6 +2194,38 @@ class ScenarioSessionApiIntegrationTests {
         .get("data")
         .get("sessionId")
         .asLong();
+  }
+
+  private void scheduleTodayScenario(long scenarioId) {
+    LocalDate serviceDate = LocalDate.now(SERVICE_ZONE_ID);
+    int updatedCount =
+        jdbcTemplate.update(
+            "UPDATE daily_scenario_schedule SET scenario_id = ? WHERE service_date = ?",
+            scenarioId,
+            serviceDate);
+    if (updatedCount == 0) {
+      jdbcTemplate.update(
+          """
+          INSERT INTO daily_scenario_schedule (
+              service_date, scenario_id, created_at, updated_at
+          )
+          VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          """,
+          serviceDate,
+          scenarioId);
+    }
+  }
+
+  private void grantScenarioAccess(long userId, long scenarioId) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_scenario_access (
+            user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at
+        )
+        VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userId,
+        scenarioId);
   }
 
   private boolean awaitMessageFeedbackStatus(long messageId, String expectedStatus)
@@ -2387,6 +2514,13 @@ class ScenarioSessionApiIntegrationTests {
             sessionId);
     assertThat(scenarioSession.get("SCENARIO_LANGUAGE_VARIANT_ID")).isEqualTo(variantId);
     assertThat(scenarioSession.get("GOAL_COMPLETION_STATUS")).isEqualTo("NOT_STARTED");
+  }
+
+  private Long dailyScenarioScheduleId(long sessionId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT daily_scenario_schedule_id FROM scenario_session WHERE learning_session_id = ?",
+        Long.class,
+        sessionId);
   }
 
   private void assertScenarioSessionGoalStatus(long sessionId, String goalCompletionStatus) {
