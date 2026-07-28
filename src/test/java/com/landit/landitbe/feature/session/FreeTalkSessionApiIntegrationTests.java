@@ -14,6 +14,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
@@ -880,6 +884,18 @@ class FreeTalkSessionApiIntegrationTests {
     public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
       return new AiFreeTalkClosingResult(
           "It was great talking with you!", "이야기해서 즐거웠어!", CharacterEmotion.HAPPY);
+    }
+
+    @Override
+    public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+        AiFreeTalkExpressionRecommendationsRequest request) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
+        AiFreeTalkExpressionLearningContentRequest request) {
+      throw new UnsupportedOperationException();
     }
 
     void reset() {

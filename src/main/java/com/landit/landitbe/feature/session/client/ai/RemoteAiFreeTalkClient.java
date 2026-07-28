@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session.client.ai;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -14,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -29,6 +31,10 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static final String TURN_PATH = "/api/v1/free-talk/turn";
   private static final String INNER_THOUGHT_PATH = "/api/v1/free-talk/inner-thought";
   private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
+  private static final String EXPRESSION_RECOMMENDATIONS_PATH =
+      "/api/v1/free-talk/expression-recommendations";
+  private static final String EXPRESSION_LEARNING_CONTENT_PATH =
+      "/api/v1/free-talk/expression-learning-content";
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -68,6 +74,24 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
     return post(CLOSING_PATH, request, RemoteClosingResponse.class).toResult();
+  }
+
+  @Override
+  public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+      AiFreeTalkExpressionRecommendationsRequest request) {
+    return post(
+            EXPRESSION_RECOMMENDATIONS_PATH, request, RemoteExpressionRecommendationsResponse.class)
+        .toResult(request);
+  }
+
+  @Override
+  public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
+      AiFreeTalkExpressionLearningContentRequest request) {
+    return post(
+            EXPRESSION_LEARNING_CONTENT_PATH,
+            request,
+            RemoteExpressionLearningContentResponse.class)
+        .toResult(request);
   }
 
   private <T> T post(String path, Object payload, Class<T> responseType) {
@@ -200,6 +224,93 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       }
       return new AiFreeTalkClosingResult(aiMessage, translatedMessage, emotion);
     }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteExpressionRecommendationsResponse(
+      List<AiFreeTalkExpressionRecommendation> recommendations) {
+
+    private AiFreeTalkExpressionRecommendationsResult toResult(
+        AiFreeTalkExpressionRecommendationsRequest request) {
+      if (recommendations == null
+          || recommendations.isEmpty()
+          || recommendations.size() > 3
+          || request.existingExpressions() == null
+          || hasInvalidRecommendation(recommendations, request.existingExpressions())) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiFreeTalkExpressionRecommendationsResult(recommendations);
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteExpressionLearningContentResponse(
+      List<AiFreeTalkExpressionLearningContent> expressions) {
+
+    private AiFreeTalkExpressionLearningContentResult toResult(
+        AiFreeTalkExpressionLearningContentRequest request) {
+      if (expressions == null
+          || expressions.isEmpty()
+          || request.expressions() == null
+          || expressions.size() != request.expressions().size()
+          || hasInvalidLearningContent(expressions, request.expressions())) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiFreeTalkExpressionLearningContentResult(expressions);
+    }
+  }
+
+  private static boolean hasInvalidRecommendation(
+      List<AiFreeTalkExpressionRecommendation> recommendations,
+      List<AiFreeTalkExistingExpression> existingExpressions) {
+    for (int index = 0; index < recommendations.size(); index++) {
+      if (invalidRecommendation(recommendations.get(index), existingExpressions, index + 1)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasInvalidLearningContent(
+      List<AiFreeTalkExpressionLearningContent> expressions,
+      List<AiFreeTalkLearningExpression> requestedExpressions) {
+    for (int index = 0; index < expressions.size(); index++) {
+      if (invalidLearningContent(expressions.get(index), requestedExpressions.get(index))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean invalidRecommendation(
+      AiFreeTalkExpressionRecommendation recommendation,
+      List<AiFreeTalkExistingExpression> existingExpressions,
+      int expectedDisplayOrder) {
+    if (recommendation == null
+        || recommendation.displayOrder() != expectedDisplayOrder
+        || recommendation.sourceType() == null) {
+      return true;
+    }
+    if (recommendation.sourceType() == FreeTalkExpressionSourceType.NEW) {
+      return recommendation.existingExpressionId() != null;
+    }
+    return recommendation.existingExpressionId() == null
+        || existingExpressions.stream()
+            .noneMatch(
+                expression ->
+                    expression.expressionId().equals(recommendation.existingExpressionId()));
+  }
+
+  private static boolean invalidLearningContent(
+      AiFreeTalkExpressionLearningContent content,
+      AiFreeTalkLearningExpression requestedExpression) {
+    return content == null
+        || requestedExpression == null
+        || !requestedExpression.targetExpressionText().equals(content.targetExpressionText())
+        || !requestedExpression
+            .baseExpressionMeaningText()
+            .equals(content.baseExpressionMeaningText())
+        || !requestedExpression.usageSummary().equals(content.usageSummary());
   }
 
   private static boolean blank(String value) {
