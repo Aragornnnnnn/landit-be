@@ -240,7 +240,17 @@ public class ExpressionQueryService {
         expression.getPracticeExamplesPayload());
   }
 
-  /** 저장 위치와 관계없이 동일한 검증 규칙으로 표현 연습 응답을 만든다. */
+  /**
+   * 저장 위치와 관계없이 동일한 검증 규칙으로 표현 연습 응답을 만든다.
+   *
+   * @param expressionId 로그와 오류 추적에 사용할 표현 ID
+   * @param targetExpressionText 학습 언어 표현
+   * @param baseExpressionMeaningText 기준 언어 뜻
+   * @param usageDescription 상세 용법 설명
+   * @param practiceExamplesPayload 추가 예문 JSON 배열
+   * @return 유효한 추가 예문과 작문 문제를 포함한 연습 응답
+   * @throws ApiException 유효한 추가 예문이 하나도 없을 때
+   */
   public ExpressionPracticeResponse buildPracticeResponse(
       Long expressionId,
       String targetExpressionText,

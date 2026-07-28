@@ -37,7 +37,14 @@ public class FreeTalkExpressionLearningService {
   private final ExpressionQueryService expressionQueryService;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  /** 맞춤 표현의 학습 시작 콘텐츠와 사용자 완료 여부를 조회한다. */
+  /**
+   * 맞춤 표현의 학습 시작 콘텐츠와 사용자 완료 여부를 조회한다.
+   *
+   * @param userId 조회를 요청한 사용자 ID
+   * @param sessionExpressionId 조회할 프리톡 세션 표현 ID
+   * @return 맞춤 표현 학습 시작 콘텐츠와 완료 여부
+   * @throws ApiException 표현이 없거나 접근할 수 없는 상태일 때
+   */
   @Transactional(readOnly = true)
   public FreeTalkExpressionLearningResponse getLearningContent(
       long userId, long sessionExpressionId) {
@@ -53,7 +60,14 @@ public class FreeTalkExpressionLearningService {
         sessionExpressionId, generatedContent(expression), expression.isCompleted());
   }
 
-  /** 맞춤 표현의 추가 예문과 작문 문제를 조회한다. */
+  /**
+   * 맞춤 표현의 추가 예문과 작문 문제를 조회한다.
+   *
+   * @param userId 조회를 요청한 사용자 ID
+   * @param sessionExpressionId 조회할 프리톡 세션 표현 ID
+   * @return 맞춤 표현의 추가 예문과 작문 문제
+   * @throws ApiException 표현이 없거나 접근할 수 없는 상태일 때
+   */
   @Transactional(readOnly = true)
   public ExpressionPracticeResponse getPractice(long userId, long sessionExpressionId) {
     FreeTalkSessionExpression expression = requireAccessible(userId, sessionExpressionId);
@@ -69,7 +83,13 @@ public class FreeTalkExpressionLearningService {
         objectMapper.valueToTree(content.practiceExamples()));
   }
 
-  /** 맞춤 표현 학습을 완료한다. 이미 완료한 표현이면 기존 기록을 유지한다. */
+  /**
+   * 맞춤 표현 학습을 완료한다. 이미 완료한 표현이면 기존 기록을 유지한다.
+   *
+   * @param userId 완료를 요청한 사용자 ID
+   * @param sessionExpressionId 완료할 프리톡 세션 표현 ID
+   * @throws ApiException 표현이 없거나 접근할 수 없는 상태일 때
+   */
   @Transactional
   public void complete(long userId, long sessionExpressionId) {
     requireAccessible(userId, sessionExpressionId).complete(LocalDateTime.now());
