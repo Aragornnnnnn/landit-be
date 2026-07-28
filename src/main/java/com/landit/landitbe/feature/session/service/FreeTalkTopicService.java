@@ -17,7 +17,11 @@ public class FreeTalkTopicService {
 
   private final FreeTalkTopicRepository freeTalkTopicRepository;
 
-  /** 활성 프리톡 주제를 노출 순서대로 반환한다. */
+  /**
+   * 활성 프리톡 주제를 노출 순서대로 반환한다.
+   *
+   * @return 활성 추천 주제 응답 목록
+   */
   @Transactional(readOnly = true)
   public List<FreeTalkTopicResponse> getActiveTopics() {
     return freeTalkTopicRepository

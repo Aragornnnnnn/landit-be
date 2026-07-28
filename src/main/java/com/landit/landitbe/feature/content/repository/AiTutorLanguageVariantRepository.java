@@ -11,6 +11,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AiTutorLanguageVariantRepository
     extends JpaRepository<AiTutorLanguageVariant, Long> {
 
-  /** AI 튜터와 기준 언어가 일치하는 표시 이름을 조회한다. */
+  /**
+   * AI 튜터와 기준 언어가 일치하는 표시 이름을 조회한다.
+   *
+   * @param aiTutorId AI 튜터 ID
+   * @param baseLocale 사용자 기준 언어
+   * @return 일치하는 언어별 표시 이름, 없으면 빈 Optional
+   */
   Optional<AiTutorLanguageVariant> findByAiTutorIdAndBaseLocale(Long aiTutorId, Locale baseLocale);
 }

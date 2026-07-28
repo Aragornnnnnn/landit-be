@@ -72,7 +72,11 @@ public class FreeTalkSession extends BaseTimeEntity {
     return new FreeTalkSession(learningSessionId, topicId, startMode);
   }
 
-  /** AI 선시작 프리톡의 선택 주제명을 세션 제목으로 기록한다. */
+  /**
+   * AI 선시작 프리톡의 선택 주제명을 세션 제목으로 기록한다.
+   *
+   * @param title 저장할 세션 제목
+   */
   public void assignTitle(String title) {
     this.title = title;
   }
@@ -87,13 +91,23 @@ public class FreeTalkSession extends BaseTimeEntity {
     conversationStatus = FreeTalkConversationStatus.AWAITING_EXIT_DECISION;
   }
 
-  /** 종료 의사 확인 대상 사용자 메시지를 기록한다. */
+  /**
+   * 종료 의사 확인 대상 사용자 메시지를 기록한다.
+   *
+   * @param pendingUserMessageId 종료 확인 대상 사용자 메시지 ID
+   * @throws IllegalStateException 진행 중 상태가 아닐 때
+   */
   public void awaitExitDecision(long pendingUserMessageId) {
     awaitExitDecision();
     this.pendingUserMessageId = pendingUserMessageId;
   }
 
-  /** 외부 AI 처리 중인 사용자 발화 ID를 기록한다. */
+  /**
+   * 외부 AI 처리 중인 사용자 발화 ID를 기록한다.
+   *
+   * @param clientMessageId 처리 중인 클라이언트 메시지 ID
+   * @throws IllegalStateException 이미 다른 메시지를 처리 중일 때
+   */
   public void startProcessing(String clientMessageId) {
     if (processingClientMessageId != null) {
       throw new IllegalStateException("처리 중인 사용자 메시지가 있습니다.");
