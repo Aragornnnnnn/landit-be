@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.learning.domain.UserScenarioAccess;
 import com.landit.landitbe.feature.learning.repository.UserScenarioAccessRepository;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.Locale;
+import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,7 @@ public class ScenarioAccessService {
    * @param scenarioId 완료한 시나리오 ID
    * @param targetLocale 학습 대상 언어
    * @param grantedAt 복습 권한을 얻은 시각
+   * @throws ApiException 사용자 프로필이 없거나 비활성 상태일 때
    */
   @Transactional
   public void grantAccess(
