@@ -102,15 +102,7 @@ public class WritingExpression extends BaseTimeEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected WritingExpression() {}
 
-  /**
-   * 프리톡에서 생성한 사용자 전용 학습 표현을 만든다.
-   *
-   * @param ownerUserProfileId 표현을 소유할 사용자 ID
-   * @param targetLocale 학습 언어 locale
-   * @param baseLocale 기준 언어 locale
-   * @param content 생성한 학습 콘텐츠
-   * @return 활성 상태의 사용자 전용 표현
-   */
+  /** 프리톡에서 생성한 사용자 전용 학습 표현을 만든다. */
   public static WritingExpression freeTalkGenerated(
       Long ownerUserProfileId,
       Locale targetLocale,

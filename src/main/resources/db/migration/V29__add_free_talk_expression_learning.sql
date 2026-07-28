@@ -21,6 +21,8 @@ CREATE TABLE free_talk_session_expression (
     free_talk_session_id BIGINT NOT NULL,
     writing_expression_id BIGINT NOT NULL,
     display_order INTEGER NOT NULL,
+    personalized_example_text TEXT NOT NULL,
+    personalized_example_translation TEXT NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT uk_free_talk_session_expression_order UNIQUE (free_talk_session_id, display_order),
