@@ -291,8 +291,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         || recommendation.sourceType() == null
         || blank(recommendation.targetExpressionText())
         || blank(recommendation.baseExpressionMeaningText())
-        || blank(recommendation.usageSummary())
-        || invalidContextualExample(recommendation.contextualExample())) {
+        || blank(recommendation.usageSummary())) {
       return true;
     }
     if (recommendation.sourceType() == FreeTalkExpressionSourceType.NEW) {
@@ -321,12 +320,6 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
             .baseExpressionMeaningText()
             .equals(content.baseExpressionMeaningText())
         || !requestedExpression.usageSummary().equals(content.usageSummary());
-  }
-
-  private static boolean invalidContextualExample(AiFreeTalkContextualExample contextualExample) {
-    return contextualExample == null
-        || blank(contextualExample.sentenceText())
-        || blank(contextualExample.sentenceTranslation());
   }
 
   private static boolean blank(String value) {

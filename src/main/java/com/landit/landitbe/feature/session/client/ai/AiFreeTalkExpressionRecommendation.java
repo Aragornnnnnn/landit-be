@@ -13,7 +13,6 @@ import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
  * @param targetExpressionText 학습 언어 표현
  * @param baseExpressionMeaningText 기준 언어 뜻
  * @param usageSummary 짧은 용법 설명
- * @param contextualExample 이번 대화에 맞춘 예문
  */
 public record AiFreeTalkExpressionRecommendation(
     int displayOrder,
@@ -21,5 +20,4 @@ public record AiFreeTalkExpressionRecommendation(
     Long existingExpressionId,
     String targetExpressionText,
     String baseExpressionMeaningText,
-    String usageSummary,
-    AiFreeTalkContextualExample contextualExample) {}
+    String usageSummary) {}

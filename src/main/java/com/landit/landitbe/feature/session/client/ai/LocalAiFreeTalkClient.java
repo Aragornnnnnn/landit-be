@@ -63,9 +63,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
                 null,
                 "I'm up for that",
                 "좋아, 그거 하자",
-                "상대의 제안에 흔쾌히 동의할 때 사용",
-                new AiFreeTalkContextualExample(
-                    "I'm up for hiking this weekend.", "이번 주말에 등산하는 거 좋아."))));
+                "상대의 제안에 흔쾌히 동의할 때 사용")));
   }
 
   @Override

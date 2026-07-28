@@ -22,8 +22,7 @@ public class FreeTalkExpressionGenerationRecoveryService {
   @Transactional
   public void recoverInterruptedGenerations() {
     freeTalkSessionRepository
-        .findByExpressionGenerationStatusAndExpressionGenerationStartedAtIsNotNull(
-            ExpressionGenerationStatus.PREPARING)
+        .findByExpressionGenerationStatus(ExpressionGenerationStatus.PREPARING)
         .forEach(session -> session.failExpressionGeneration());
   }
 }

@@ -16,11 +16,23 @@ public interface UserWritingExpressionCompletionRepository
   List<UserWritingExpressionCompletion> findAllByUserProfileIdAndScenarioId(
       Long userProfileId, Long scenarioId);
 
-  /** 사용자가 특정 표현을 완료한 이력을 조회한다. */
+  /**
+   * 사용자가 특정 표현을 완료한 이력을 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param writingExpressionId 표현 ID
+   * @return 완료 이력. 없으면 빈 Optional
+   */
   Optional<UserWritingExpressionCompletion> findByUserProfileIdAndWritingExpressionId(
       Long userProfileId, Long writingExpressionId);
 
-  /** 사용자가 특정 표현 목록에서 완료한 이력을 한 번에 조회한다. */
+  /**
+   * 사용자가 특정 표현 목록에서 완료한 이력을 한 번에 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param writingExpressionIds 표현 ID 목록
+   * @return 완료 이력 목록
+   */
   List<UserWritingExpressionCompletion> findAllByUserProfileIdAndWritingExpressionIdIn(
       Long userProfileId, Collection<Long> writingExpressionIds);
 }

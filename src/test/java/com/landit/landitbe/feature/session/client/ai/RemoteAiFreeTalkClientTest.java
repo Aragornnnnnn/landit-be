@@ -70,7 +70,7 @@ class RemoteAiFreeTalkClientTest {
         "/api/v1/free-talk/expression-recommendations",
         requests,
         """
-            {"success":true,"data":{"recommendations":[{"displayOrder":1,"sourceType":"EXISTING","existingExpressionId":7,"targetExpressionText":"I'm up for that","baseExpressionMeaningText":"좋아, 그거 하자","usageSummary":"제안에 동의할 때 사용","contextualExample":{"sentenceText":"I'm up for hiking.","sentenceTranslation":"등산하는 거 좋아."}}]},"error":null}
+            {"success":true,"data":{"recommendations":[{"displayOrder":1,"sourceType":"EXISTING","existingExpressionId":7,"targetExpressionText":"I'm up for that","baseExpressionMeaningText":"좋아, 그거 하자","usageSummary":"제안에 동의할 때 사용"}]},"error":null}
         """);
     registerJsonResponse(
         "/api/v1/free-talk/expression-learning-content",
@@ -453,11 +453,7 @@ class RemoteAiFreeTalkClientTest {
         "  \"existingExpressionId\": %d,".formatted(expressionId),
         "  \"targetExpressionText\": \"%s\",".formatted(targetExpressionText),
         "  \"baseExpressionMeaningText\": \"%s\",".formatted(meaning),
-        "  \"usageSummary\": \"%s\",".formatted(usageSummary),
-        "  \"contextualExample\": {",
-        "    \"sentenceText\": \"I'm up for hiking.\",",
-        "    \"sentenceTranslation\": \"등산하는 거 좋아.\"",
-        "  }",
+        "  \"usageSummary\": \"%s\"".formatted(usageSummary),
         "}");
   }
 

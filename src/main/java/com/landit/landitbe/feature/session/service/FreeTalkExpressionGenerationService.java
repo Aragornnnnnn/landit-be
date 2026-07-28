@@ -62,16 +62,16 @@ public class FreeTalkExpressionGenerationService {
    */
   public void generate(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-    GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
-    if (context == null) {
-      return;
-    }
     try {
+      GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
+      if (context == null) {
+        return;
+      }
       List<AiFreeTalkExpressionRecommendation> recommendations =
           aiFreeTalkClient
               .recommendExpressions(
                   new AiFreeTalkExpressionRecommendationsRequest(
-                      context.learningSessionId(),
+                      context.freeTalkSessionId(),
                       context.targetLocale().name(),
                       context.baseLocale().name(),
                       context.history(),
@@ -94,7 +94,7 @@ public class FreeTalkExpressionGenerationService {
               : aiFreeTalkClient
                   .generateExpressionLearningContent(
                       new AiFreeTalkExpressionLearningContentRequest(
-                          context.learningSessionId(),
+                          context.freeTalkSessionId(),
                           context.targetLocale().name(),
                           context.baseLocale().name(),
                           newExpressions))
@@ -205,13 +205,18 @@ public class FreeTalkExpressionGenerationService {
 
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
+    boolean isRecommendationCandidate =
+        context.existingExpressions().stream()
+            .anyMatch(
+                candidate -> candidate.expressionId().equals(recommendation.existingExpressionId()));
+    if (!isRecommendationCandidate) {
+      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+    }
     expressionQueryService.validateActiveExpression(recommendation.existingExpressionId());
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),
         recommendation.existingExpressionId(),
-        recommendation.displayOrder(),
-        recommendation.contextualExample().sentenceText(),
-        recommendation.contextualExample().sentenceTranslation());
+        recommendation.displayOrder());
   }
 
   private FreeTalkSessionExpression generatedSessionExpression(
@@ -245,9 +250,7 @@ public class FreeTalkExpressionGenerationService {
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),
         generatedExpression.getId(),
-        recommendation.displayOrder(),
-        recommendation.contextualExample().sentenceText(),
-        recommendation.contextualExample().sentenceTranslation());
+        recommendation.displayOrder());
   }
 
   private record GenerationContext(
