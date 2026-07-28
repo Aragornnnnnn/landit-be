@@ -32,6 +32,8 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -72,6 +74,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class ScenarioSessionApiIntegrationTests {
 
   private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
+  private static final Instant DEFAULT_TEST_INSTANT = Instant.parse("2026-07-28T14:00:00Z");
 
   @Autowired private MockMvc mockMvc;
 
@@ -79,10 +82,13 @@ class ScenarioSessionApiIntegrationTests {
 
   @Autowired private FakeAiConversationClient fakeAiConversationClient;
 
+  @Autowired private MutableClock mutableClock;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeEach
   void setUp() {
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
     jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
@@ -1036,6 +1042,36 @@ class ScenarioSessionApiIntegrationTests {
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
     assertThat(hasScenarioAccess(userId, 2102)).isTrue();
+  }
+
+  @Test
+  void dailyScenarioStartedBeforeMidnightGrantsAccessWhenCompletedAfterMidnight() throws Exception {
+    mutableClock.setInstant(Instant.parse("2026-07-28T14:59:59Z"));
+    JsonNode loginBody = login("daily-completion-after-midnight@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1123, 1, "ACTIVE", "자정 완료");
+    seedScenario(2123, 1123, 1, "AI", "ACTIVE", 1);
+    seedScenarioVariant(
+        3123,
+        2123,
+        "자정 완료",
+        "자정 완료",
+        "자정 완료",
+        null,
+        "What food do you like?",
+        "어떤 음식을 좋아해?",
+        null,
+        null,
+        null,
+        "ACTIVE");
+
+    long sessionId = startScenario(accessToken, 2123);
+    mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
+    submitMessage(accessToken, sessionId, "I like pizza.");
+
+    assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
+    assertThat(hasScenarioAccess(userId, 2123)).isTrue();
   }
 
   @Test
@@ -2198,7 +2234,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private void scheduleTodayScenario(long scenarioId) {
-    LocalDate serviceDate = LocalDate.now(SERVICE_ZONE_ID);
+    LocalDate serviceDate = LocalDate.ofInstant(mutableClock.instant(), SERVICE_ZONE_ID);
     int updatedCount =
         jdbcTemplate.update(
             "UPDATE daily_scenario_schedule SET scenario_id = ? WHERE service_date = ?",
@@ -2691,6 +2727,40 @@ class ScenarioSessionApiIntegrationTests {
     @Primary
     FakeAiConversationClient fakeAiConversationClient() {
       return new FakeAiConversationClient();
+    }
+
+    @Bean
+    @Primary
+    MutableClock mutableClock() {
+      return new MutableClock(DEFAULT_TEST_INSTANT);
+    }
+  }
+
+  private static class MutableClock extends Clock {
+
+    private volatile Instant instant;
+
+    private MutableClock(Instant instant) {
+      this.instant = instant;
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return SERVICE_ZONE_ID;
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return Clock.fixed(instant, zone);
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
+    }
+
+    private void setInstant(Instant instant) {
+      this.instant = instant;
     }
   }
 
