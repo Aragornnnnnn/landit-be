@@ -254,69 +254,18 @@ class DatabaseSchemaIntegrationTests {
   @DisplayName("V27 migration은 프리톡 표현 생성과 학습 저장 구조를 추가한다.")
   @Test
   void v27AddsFreeTalkExpressionLearningStorage() {
-    assertTableExists("free_talk_expression");
     assertTableExists("free_talk_session_expression");
-    assertTableExists("user_free_talk_expression_completion");
+    assertTableDoesNotExist("free_talk_expression");
+    assertTableDoesNotExist("user_free_talk_expression_completion");
     assertColumnExists("free_talk_session", "expression_generation_status");
     assertColumnExists("free_talk_session", "expression_generation_started_at");
+    assertColumnExists("free_talk_session_expression", "writing_expression_id");
+    assertColumnExists("free_talk_session_expression", "generated_content_payload");
+    assertColumnExists("free_talk_session_expression", "completed_at");
     assertTableConstraintExists(
         "free_talk_session", "chk_free_talk_session_expression_generation_status");
-    assertTableConstraintExists("free_talk_expression", "chk_free_talk_expression_source");
-  }
-
-  @DisplayName("V27 프리톡 표현 source 제약은 기존과 신규 콘텐츠 조합만 허용한다.")
-  @Test
-  void v27RestrictsFreeTalkExpressionSourceAndContent() {
-    jdbcTemplate.update(
-        """
-        insert into free_talk_expression (
-            source_type, target_locale, base_locale, target_expression_text,
-            base_expression_meaning_text, usage_summary, usage_description,
-            representative_question_text, representative_question_translation,
-            representative_sentence_text, representative_sentence_translation,
-            representative_sentence_words, representative_sentence_word_choices,
-            practice_examples_payload, created_at, updated_at
-        ) values (
-            'NEW', 'EN', 'KR', 'new expression', '새 표현', 'summary', 'description',
-            'question', '질문', 'sentence', '문장', CAST('["sentence"]' AS jsonb),
-            CAST('["sentence", "choice"]' AS jsonb), CAST('[]' AS jsonb),
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        )
-        """);
-
-    assertThatThrownBy(
-            () ->
-                jdbcTemplate.update(
-                    """
-                    insert into free_talk_expression (
-                        source_type, target_locale, base_locale, target_expression_text,
-                        base_expression_meaning_text, usage_summary, created_at, updated_at
-                    ) values (
-                        'EXISTING', 'EN', 'KR', 'invalid existing', '잘못된 기존 표현', 'summary',
-                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                    )
-                    """))
-        .isInstanceOf(DataIntegrityViolationException.class);
-
-    assertThatThrownBy(
-            () ->
-                jdbcTemplate.update(
-                    """
-                    insert into free_talk_expression (
-                        source_type, target_locale, base_locale, target_expression_text,
-                        base_expression_meaning_text, usage_summary, usage_description,
-                        representative_question_text, representative_question_translation,
-                        representative_sentence_text, representative_sentence_translation,
-                        representative_sentence_words, representative_sentence_word_choices,
-                        practice_examples_payload, created_at, updated_at
-                    ) values (
-                        'NEW', 'EN', 'KR', 'invalid new', '잘못된 신규 표현', 'summary', NULL,
-                        'question', '질문', 'sentence', '문장', CAST('["sentence"]' AS jsonb),
-                        CAST('["sentence"]' AS jsonb), CAST('[]' AS jsonb),
-                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                    )
-                    """))
-        .isInstanceOf(DataIntegrityViolationException.class);
+    assertTableConstraintExists(
+        "free_talk_session_expression", "chk_free_talk_session_expression_source");
   }
 
   @DisplayName("V26은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")

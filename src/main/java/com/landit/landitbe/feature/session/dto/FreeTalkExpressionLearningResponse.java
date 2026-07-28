@@ -2,11 +2,9 @@
 
 package com.landit.landitbe.feature.session.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpression;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContent;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.util.ArrayList;
 import java.util.List;
 
 /** 프리톡 맞춤 표현 학습 시작 응답과 완료 상태를 표현한다. */
@@ -44,26 +42,20 @@ public record FreeTalkExpressionLearningResponse(
   }
 
   /** AI가 생성한 신규 표현 학습 콘텐츠를 프리톡 응답으로 변환한다. */
-  public static FreeTalkExpressionLearningResponse fromNew(
-      Long sessionExpressionId, FreeTalkExpression expression, boolean completed) {
+  public static FreeTalkExpressionLearningResponse fromGenerated(
+      Long sessionExpressionId, AiFreeTalkExpressionLearningContent content, boolean completed) {
     return new FreeTalkExpressionLearningResponse(
         sessionExpressionId,
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
-        expression.getUsageDescription(),
-        expression.getRepresentativeQuestionText(),
-        expression.getRepresentativeQuestionTranslation(),
-        expression.getRepresentativeSentenceText(),
-        expression.getRepresentativeSentenceTranslation(),
-        toStringList(expression.getRepresentativeSentenceWords()),
-        toStringList(expression.getRepresentativeSentenceWordChoices()),
-        expression.getRepresentativeImageUrl(),
+        content.targetExpressionText(),
+        content.baseExpressionMeaningText(),
+        content.usageDescription(),
+        content.representativeQuestionText(),
+        content.representativeQuestionTranslation(),
+        content.representativeSentenceText(),
+        content.representativeSentenceTranslation(),
+        content.representativeSentenceWords(),
+        content.representativeSentenceWordChoices(),
+        content.representativeImageUrl(),
         completed);
-  }
-
-  private static List<String> toStringList(JsonNode arrayNode) {
-    List<String> values = new ArrayList<>();
-    arrayNode.forEach(value -> values.add(value.asText()));
-    return List.copyOf(values);
   }
 }

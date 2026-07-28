@@ -23,11 +23,8 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpression;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
-import com.landit.landitbe.feature.session.repository.FreeTalkExpressionRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
-import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.Collections;
@@ -69,8 +66,6 @@ class FreeTalkSessionApiIntegrationTests {
 
   @Autowired private FakeAiFreeTalkClient fakeAiFreeTalkClient;
 
-  @Autowired private FreeTalkExpressionRepository freeTalkExpressionRepository;
-
   @Autowired private FreeTalkSessionExpressionRepository freeTalkSessionExpressionRepository;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -87,9 +82,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void cleanUpDatabase() {
-    jdbcTemplate.update("DELETE FROM user_free_talk_expression_completion");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
-    jdbcTemplate.update("DELETE FROM free_talk_expression");
     jdbcTemplate.update("DELETE FROM free_talk_session");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
@@ -474,7 +467,6 @@ class FreeTalkSessionApiIntegrationTests {
   @Test
   void learnsAndCompletesNewFreeTalkExpressionWithoutImages() throws Exception {
     JsonNode loginBody = login("free-talk-new-expression@example.com");
-    final long userId = loginBody.at("/data/user/userId").asLong();
     String accessToken = loginBody.at("/data/accessToken").asText();
     long learningSessionId = startUserFirstSession(accessToken);
     long sessionExpressionId = seedNewExpressionForCompletedSession(learningSessionId);
@@ -527,11 +519,11 @@ class FreeTalkSessionApiIntegrationTests {
             jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
-                FROM user_free_talk_expression_completion
-                WHERE user_profile_id = ?
+                FROM free_talk_session_expression
+                WHERE id = ? AND completed_at IS NOT NULL
                 """,
                 Integer.class,
-                userId))
+                sessionExpressionId))
         .isEqualTo(1);
 
     mockMvc
@@ -761,43 +753,50 @@ class FreeTalkSessionApiIntegrationTests {
 
   private long seedNewExpressionForCompletedSession(
       long learningSessionId, JsonNode practiceExamples) throws Exception {
-    FreeTalkExpression expression =
-        freeTalkExpressionRepository.saveAndFlush(
-            FreeTalkExpression.newExpression(
-                Locale.EN,
-                Locale.KR,
-                "hit it off",
-                "죽이 잘 맞다",
-                "처음 만난 사람과 잘 통할 때 사용한다.",
-                "서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.",
-                "How was meeting your new teammate?",
-                "새 팀원을 만나 보니 어땠어?",
-                "We really hit it off.",
-                "우리는 정말 죽이 잘 맞았어.",
-                objectMapper.readTree("[\"We\", \"really\", \"hit\", \"it\", \"off\", \".\"]"),
-                objectMapper.readTree(
-                    "[\"hit\", \"We\", \"miss\", \"off\", \"it\", \"really\", \".\"]"),
-                null,
-                practiceExamples));
-    return connectExpressionToCompletedSession(learningSessionId, expression.getId());
+    var content = objectMapper.createObjectNode();
+    content.put("targetExpressionText", "hit it off");
+    content.put("baseExpressionMeaningText", "죽이 잘 맞다");
+    content.put("usageSummary", "처음 만난 사람과 잘 통할 때 사용한다.");
+    content.put("usageDescription", "서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.");
+    content.put("representativeQuestionText", "How was meeting your new teammate?");
+    content.put("representativeQuestionTranslation", "새 팀원을 만나 보니 어땠어?");
+    content.put("representativeSentenceText", "We really hit it off.");
+    content.put("representativeSentenceTranslation", "우리는 정말 죽이 잘 맞았어.");
+    content.set(
+        "representativeSentenceWords",
+        objectMapper.readTree("[\"We\", \"really\", \"hit\", \"it\", \"off\", \".\"]"));
+    content.set(
+        "representativeSentenceWordChoices",
+        objectMapper.readTree("[\"hit\", \"We\", \"miss\", \"off\", \"it\", \"really\", \".\"]"));
+    content.putNull("representativeImageUrl");
+    content.set("practiceExamples", practiceExamples);
+    long freeTalkSessionId = completeSession(learningSessionId);
+    return freeTalkSessionExpressionRepository
+        .saveAndFlush(
+            FreeTalkSessionExpression.generated(
+                freeTalkSessionId,
+                1,
+                "We could have really hit it off.",
+                "우리는 정말 죽이 잘 맞을 수도 있었어요.",
+                content))
+        .getId();
   }
 
   private long seedExistingExpressionForCompletedSession(long learningSessionId) throws Exception {
     long writingExpressionId = seedWritingExpression();
-    FreeTalkExpression expression =
-        freeTalkExpressionRepository.saveAndFlush(
-            FreeTalkExpression.existingExpression(
+    long freeTalkSessionId = completeSession(learningSessionId);
+    return freeTalkSessionExpressionRepository
+        .saveAndFlush(
+            FreeTalkSessionExpression.existing(
+                freeTalkSessionId,
                 writingExpressionId,
-                Locale.EN,
-                Locale.KR,
-                "make up for",
-                "만회하다",
-                "부족했던 부분을 보완할 때 사용한다."));
-    return connectExpressionToCompletedSession(learningSessionId, expression.getId());
+                1,
+                "We could have made up for it.",
+                "우리는 그것을 만회할 수도 있었어요."))
+        .getId();
   }
 
-  private long connectExpressionToCompletedSession(
-      long learningSessionId, long freeTalkExpressionId) {
+  private long completeSession(long learningSessionId) {
     jdbcTemplate.update(
         """
         UPDATE learning_session
@@ -818,15 +817,7 @@ class FreeTalkSessionApiIntegrationTests {
             "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
             Long.class,
             learningSessionId);
-    return freeTalkSessionExpressionRepository
-        .saveAndFlush(
-            FreeTalkSessionExpression.create(
-                freeTalkSessionId,
-                freeTalkExpressionId,
-                1,
-                "We could have really hit it off.",
-                "우리는 정말 죽이 잘 맞을 수도 있었어요."))
-        .getId();
+    return freeTalkSessionId;
   }
 
   private JsonNode practiceExamples(String imageUrl) throws Exception {

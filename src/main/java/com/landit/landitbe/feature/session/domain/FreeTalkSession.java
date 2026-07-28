@@ -183,13 +183,6 @@ public class FreeTalkSession extends BaseTimeEntity {
     expressionGenerationStatus = ExpressionGenerationStatus.PREPARING;
   }
 
-  /** 유실된 표현 생성 작업의 선점 시각을 초기화한다. */
-  public void recoverExpressionGeneration() {
-    if (expressionGenerationStatus == ExpressionGenerationStatus.PREPARING) {
-      expressionGenerationStartedAt = null;
-    }
-  }
-
   /**
    * 사용자 발화 시간을 누적한다.
    *

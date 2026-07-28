@@ -15,21 +15,18 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecomme
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkLearningExpression;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpression;
 import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
-import com.landit.landitbe.feature.session.repository.FreeTalkExpressionRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.domain.ActiveStatus;
-import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
@@ -49,7 +46,6 @@ public class FreeTalkExpressionGenerationService {
   private final LearningSessionRepository learningSessionRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
-  private final FreeTalkExpressionRepository expressionRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final WritingExpressionRepository writingExpressionRepository;
   private final AiFreeTalkClient aiFreeTalkClient;
@@ -101,17 +97,6 @@ public class FreeTalkExpressionGenerationService {
     } catch (RuntimeException exception) {
       transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
     }
-  }
-
-  /** 유실된 선점 상태를 초기화하고 표현 생성을 다시 실행한다. */
-  public void recoverAndGenerate(long learningSessionId) {
-    new TransactionTemplate(transactionManager)
-        .executeWithoutResult(
-            status ->
-                freeTalkSessionRepository
-                    .findByLearningSessionIdForUpdate(learningSessionId)
-                    .ifPresent(FreeTalkSession::recoverExpressionGeneration));
-    generate(learningSessionId);
   }
 
   private GenerationContext prepare(long learningSessionId) {
@@ -185,17 +170,10 @@ public class FreeTalkExpressionGenerationService {
                     AiFreeTalkExpressionLearningContent::targetExpressionText, content -> content));
     sessionExpressionRepository.deleteByFreeTalkSessionId(context.freeTalkSessionId());
     for (AiFreeTalkExpressionRecommendation recommendation : recommendations) {
-      FreeTalkExpression expression =
-          recommendation.sourceType() == FreeTalkExpressionSourceType.EXISTING
-              ? existingExpression(recommendation)
-              : newExpression(context, recommendation, contentsByText);
       sessionExpressionRepository.save(
-          FreeTalkSessionExpression.create(
-              context.freeTalkSessionId(),
-              expression.getId(),
-              recommendation.displayOrder(),
-              recommendation.contextualExample().sentenceText(),
-              recommendation.contextualExample().sentenceTranslation()));
+          recommendation.sourceType() == FreeTalkExpressionSourceType.EXISTING
+              ? existingSessionExpression(context, recommendation)
+              : generatedSessionExpression(context, recommendation, contentsByText));
     }
     freeTalkSession.completeExpressionGeneration();
   }
@@ -209,26 +187,21 @@ public class FreeTalkExpressionGenerationService {
         .ifPresent(FreeTalkSession::failExpressionGeneration);
   }
 
-  private FreeTalkExpression existingExpression(AiFreeTalkExpressionRecommendation recommendation) {
+  private FreeTalkSessionExpression existingSessionExpression(
+      GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
     WritingExpression writingExpression =
         writingExpressionRepository
             .findByIdAndStatus(recommendation.existingExpressionId(), ActiveStatus.ACTIVE)
             .orElseThrow(() -> new ApiException(ErrorCode.AI_RESPONSE_INVALID));
-    return expressionRepository
-        .findByWritingExpressionId(writingExpression.getId())
-        .orElseGet(
-            () ->
-                expressionRepository.save(
-                    FreeTalkExpression.existingExpression(
-                        writingExpression.getId(),
-                        writingExpression.getTargetLocale(),
-                        writingExpression.getBaseLocale(),
-                        writingExpression.getTargetExpressionText(),
-                        writingExpression.getBaseExpressionMeaningText(),
-                        writingExpression.getUsageSummary())));
+    return FreeTalkSessionExpression.existing(
+        context.freeTalkSessionId(),
+        writingExpression.getId(),
+        recommendation.displayOrder(),
+        recommendation.contextualExample().sentenceText(),
+        recommendation.contextualExample().sentenceTranslation());
   }
 
-  private FreeTalkExpression newExpression(
+  private FreeTalkSessionExpression generatedSessionExpression(
       GenerationContext context,
       AiFreeTalkExpressionRecommendation recommendation,
       Map<String, AiFreeTalkExpressionLearningContent> contentsByText) {
@@ -237,22 +210,12 @@ public class FreeTalkExpressionGenerationService {
     if (content == null) {
       throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
-    return expressionRepository.save(
-        FreeTalkExpression.newExpression(
-            Locale.valueOf(context.targetLocale()),
-            Locale.valueOf(context.baseLocale()),
-            content.targetExpressionText(),
-            content.baseExpressionMeaningText(),
-            content.usageSummary(),
-            content.usageDescription(),
-            content.representativeQuestionText(),
-            content.representativeQuestionTranslation(),
-            content.representativeSentenceText(),
-            content.representativeSentenceTranslation(),
-            objectMapper.valueToTree(content.representativeSentenceWords()),
-            objectMapper.valueToTree(content.representativeSentenceWordChoices()),
-            content.representativeImageUrl(),
-            objectMapper.valueToTree(content.practiceExamples())));
+    return FreeTalkSessionExpression.generated(
+        context.freeTalkSessionId(),
+        recommendation.displayOrder(),
+        recommendation.contextualExample().sentenceText(),
+        recommendation.contextualExample().sentenceTranslation(),
+        objectMapper.valueToTree(content));
   }
 
   private record GenerationContext(

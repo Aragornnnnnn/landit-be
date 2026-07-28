@@ -24,9 +24,4 @@ public class FreeTalkExpressionGenerationDispatcher {
   public void dispatch(long learningSessionId) {
     taskExecutor.execute(() -> generationService.generate(learningSessionId));
   }
-
-  /** 유실된 작업의 선점 상태를 초기화한 뒤 비동기로 다시 제출한다. */
-  public void dispatchRecovery(long learningSessionId) {
-    taskExecutor.execute(() -> generationService.recoverAndGenerate(learningSessionId));
-  }
 }

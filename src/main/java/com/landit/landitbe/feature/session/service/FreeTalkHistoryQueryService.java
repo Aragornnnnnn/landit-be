@@ -2,10 +2,12 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.WritingExpression;
+import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.ExpressionLearningStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpression;
+import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -13,20 +15,15 @@ import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionDetailResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionListResponse;
-import com.landit.landitbe.feature.session.repository.FreeTalkExpressionRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.UserFreeTalkExpressionCompletionRepository;
+import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -43,8 +40,7 @@ public class FreeTalkHistoryQueryService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
-  private final FreeTalkExpressionRepository expressionRepository;
-  private final UserFreeTalkExpressionCompletionRepository completionRepository;
+  private final WritingExpressionRepository writingExpressionRepository;
 
   /** 완료 프리톡을 최신순 페이지로 조회한다. */
   @Transactional(readOnly = true)
@@ -52,7 +48,7 @@ public class FreeTalkHistoryQueryService {
     Page<FreeTalkSession> sessions =
         freeTalkSessionRepository.findCompletedByUserProfileId(userId, PageRequest.of(page, size));
     List<FreeTalkSessionListResponse.Item> items =
-        sessions.getContent().stream().map(session -> toListItem(userId, session)).toList();
+        sessions.getContent().stream().map(this::toListItem).toList();
     return new FreeTalkSessionListResponse(items, page, size, sessions.hasNext());
   }
 
@@ -65,7 +61,7 @@ public class FreeTalkHistoryQueryService {
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
-    ExpressionProgress progress = expressionProgress(userId, session.getId());
+    ExpressionProgress progress = expressionProgress(session);
     List<FreeTalkSessionDetailResponse.Message> messages =
         sessionHistoryMessageRepository
             .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
@@ -95,10 +91,10 @@ public class FreeTalkHistoryQueryService {
         progress.expressions());
   }
 
-  private FreeTalkSessionListResponse.Item toListItem(long userId, FreeTalkSession session) {
+  private FreeTalkSessionListResponse.Item toListItem(FreeTalkSession session) {
     LearningSession learningSession =
         learningSessionRepository.findById(session.getLearningSessionId()).orElseThrow();
-    ExpressionProgress progress = expressionProgress(userId, session.getId());
+    ExpressionProgress progress = expressionProgress(session);
     return new FreeTalkSessionListResponse.Item(
         learningSession.getId(),
         session.getTitle(),
@@ -130,49 +126,26 @@ public class FreeTalkHistoryQueryService {
     return new CompletedSession(learningSession, freeTalkSession);
   }
 
-  private ExpressionProgress expressionProgress(long userId, long freeTalkSessionId) {
-    ExpressionGenerationStatus generationStatus =
-        freeTalkSessionRepository
-            .findById(freeTalkSessionId)
-            .orElseThrow()
-            .getExpressionGenerationStatus();
-    if (generationStatus != ExpressionGenerationStatus.READY) {
+  private ExpressionProgress expressionProgress(FreeTalkSession session) {
+    if (session.getExpressionGenerationStatus() != ExpressionGenerationStatus.READY) {
       return ExpressionProgress.empty();
     }
     List<FreeTalkSessionExpression> sessionExpressions =
-        sessionExpressionRepository.findByFreeTalkSessionIdOrderByDisplayOrderAsc(
-            freeTalkSessionId);
-    Map<Long, FreeTalkExpression> expressionsById =
-        expressionRepository
-            .findAllById(
-                sessionExpressions.stream()
-                    .map(FreeTalkSessionExpression::getFreeTalkExpressionId)
-                    .toList())
-            .stream()
-            .collect(
-                java.util.stream.Collectors.toMap(FreeTalkExpression::getId, Function.identity()));
-    Set<Long> completedExpressionIds =
-        new HashSet<>(
-            completionRepository
-                .findByUserProfileIdAndFreeTalkExpressionIdIn(userId, expressionsById.keySet())
-                .stream()
-                .map(completion -> completion.getFreeTalkExpressionId())
-                .toList());
+        sessionExpressionRepository.findByFreeTalkSessionIdOrderByDisplayOrderAsc(session.getId());
     List<FreeTalkSessionDetailResponse.Expression> expressions =
         sessionExpressions.stream()
             .map(
                 sessionExpression -> {
-                  FreeTalkExpression expression =
-                      expressionsById.get(sessionExpression.getFreeTalkExpressionId());
+                  ExpressionSummary expression = expressionSummary(sessionExpression);
                   return new FreeTalkSessionDetailResponse.Expression(
                       sessionExpression.getId(),
                       sessionExpression.getDisplayOrder(),
-                      expression.getTargetExpressionText(),
-                      expression.getBaseExpressionMeaningText(),
+                      expression.targetExpressionText(),
+                      expression.baseExpressionMeaningText(),
                       new FreeTalkSessionDetailResponse.ContextualExample(
                           sessionExpression.getPersonalizedExampleText(),
                           sessionExpression.getPersonalizedExampleTranslation()),
-                      completedExpressionIds.contains(expression.getId()));
+                      sessionExpression.isCompleted());
                 })
             .toList();
     int completedCount =
@@ -189,8 +162,24 @@ public class FreeTalkHistoryQueryService {
     return new ExpressionProgress(learningStatus, expressions.size(), completedCount, expressions);
   }
 
+  private ExpressionSummary expressionSummary(FreeTalkSessionExpression sessionExpression) {
+    if (sessionExpression.getSourceType() == FreeTalkExpressionSourceType.EXISTING) {
+      WritingExpression expression =
+          writingExpressionRepository
+              .findByIdAndStatus(sessionExpression.getWritingExpressionId(), ActiveStatus.ACTIVE)
+              .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+      return new ExpressionSummary(
+          expression.getTargetExpressionText(), expression.getBaseExpressionMeaningText());
+    }
+    return new ExpressionSummary(
+        sessionExpression.getGeneratedContentPayload().path("targetExpressionText").asText(),
+        sessionExpression.getGeneratedContentPayload().path("baseExpressionMeaningText").asText());
+  }
+
   private record CompletedSession(
       LearningSession learningSession, FreeTalkSession freeTalkSession) {}
+
+  private record ExpressionSummary(String targetExpressionText, String baseExpressionMeaningText) {}
 
   private record ExpressionProgress(
       ExpressionLearningStatus learningStatus,
