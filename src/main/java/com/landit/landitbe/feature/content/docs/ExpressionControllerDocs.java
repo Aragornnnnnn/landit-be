@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.content.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
@@ -79,5 +80,6 @@ public interface ExpressionControllerDocs {
       summary = "원어민 표현 학습 완료",
       description = "표현 학습 완료를 기록하고 다음 표현 잠금 정책을 갱신한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  ApiResponse<Map<String, Object>> finishLearning(AuthUserPrincipal principal, Long expressionId);
+  ApiResponse<Map<String, Object>> finishLearning(
+      AuthUserPrincipal principal, Long expressionId, ExpressionLearningFinishRequest request);
 }

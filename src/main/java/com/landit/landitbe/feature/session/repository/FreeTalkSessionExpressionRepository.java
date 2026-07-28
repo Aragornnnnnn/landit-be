@@ -29,6 +29,10 @@ public interface FreeTalkSessionExpressionRepository
       findByFreeTalkSessionIdInOrderByFreeTalkSessionIdAscDisplayOrderAsc(
           List<Long> freeTalkSessionIds);
 
+  /** 프리톡 세션이 특정 표현을 실제로 추천했는지 확인한다. */
+  boolean existsByFreeTalkSessionIdAndWritingExpressionId(
+      Long freeTalkSessionId, Long writingExpressionId);
+
   /**
    * 세션에 연결된 모든 맞춤 표현을 삭제한다.
    *

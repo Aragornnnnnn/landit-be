@@ -29,8 +29,11 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
+import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
+import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -73,6 +76,8 @@ class FreeTalkSessionApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private FreeTalkSessionExpressionRepository freeTalkSessionExpressionRepository;
 
   @Autowired private FakeAiFreeTalkClient fakeAiFreeTalkClient;
 
@@ -598,6 +603,70 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void completesPrivateFreeTalkExpressionThroughCommonLearningApi() throws Exception {
+    JsonNode loginBody = login("free-talk-new-expression@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
+    String otherToken =
+        login("free-talk-expression-other@example.com").at("/data/accessToken").asText();
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetExpressionText").value("hit it off"))
+        .andExpect(jsonPath("$.data.representativeSentenceWords.length()").value(6))
+        .andExpect(jsonPath("$.data.representativeImageUrl").value(nullValue()));
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
+        .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"freeTalkSessionId\":%d}".formatted(link.freeTalkSessionId())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isEmpty());
+
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"freeTalkSessionId\":%d}".formatted(link.freeTalkSessionId())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isEmpty());
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM user_writing_expression_completion
+                WHERE writing_expression_id = ?
+                """,
+                Integer.class,
+                link.expressionId()))
+        .isEqualTo(1);
+  }
+
+  @Test
   void rejectsForeignMissingCompletedAndAwaitingSessions() throws Exception {
     JsonNode ownerLogin = login("free-talk-owner@example.com");
     String ownerToken = ownerLogin.get("data").get("accessToken").asText();
@@ -836,6 +905,162 @@ class FreeTalkSessionApiIntegrationTests {
     return ("{\"clientMessageId\":\"%s\",\"content\":\"%s\",\"inputType\":\"VOICE\","
             + "\"utteranceDurationMs\":%d,\"timeLimitReached\":%s}")
         .formatted(clientMessageId, content, utteranceDurationMs, timeLimitReached);
+  }
+
+  private FreeTalkExpressionLink seedNewExpressionForCompletedSession(long learningSessionId)
+      throws Exception {
+    long freeTalkSessionId = completeSession(learningSessionId);
+    long ownerUserProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT user_profile_id FROM learning_session WHERE id = ?",
+            Long.class,
+            learningSessionId);
+    long expressionId = 994104L;
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, owner_user_profile_id, expression_type, usage_frequency_level,
+            target_locale, base_locale, display_order, target_expression_text,
+            base_expression_meaning_text, usage_summary, usage_description,
+            representative_question_text, representative_question_translation,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            representative_image_url, practice_examples_payload, status, created_at, updated_at
+        )
+        VALUES (
+            ?, NULL, ?, 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
+            '죽이 잘 맞다', '처음 만난 사람과 잘 통할 때 사용한다.',
+            '서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.',
+            'How was meeting your new teammate?', '새 팀원을 만나 보니 어땠어?',
+            'We really hit it off.', '우리는 정말 죽이 잘 맞았어.',
+            ARRAY['We', 'really', 'hit', 'it', 'off', '.'],
+            ARRAY['hit', 'We', 'miss', 'off', 'it', 'really', '.'],
+            NULL, ? FORMAT JSON, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        expressionId,
+        ownerUserProfileId,
+        practiceExamples(null).toString());
+    freeTalkSessionExpressionRepository.saveAndFlush(
+        FreeTalkSessionExpression.link(
+            freeTalkSessionId,
+            expressionId,
+            1,
+            "We could have really hit it off.",
+            "우리는 정말 죽이 잘 맞을 수도 있었어요."));
+    return new FreeTalkExpressionLink(freeTalkSessionId, expressionId);
+  }
+
+  private record FreeTalkExpressionLink(long freeTalkSessionId, long expressionId) {}
+
+  private long completeSession(long learningSessionId) {
+    jdbcTemplate.update(
+        """
+        UPDATE learning_session
+        SET status = 'COMPLETED', ended_at = CURRENT_TIMESTAMP,
+            ended_by = 'USER', completion_reason = 'USER_ENDED'
+        WHERE id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        UPDATE free_talk_session
+        SET conversation_status = 'COMPLETED', expression_generation_status = 'READY'
+        WHERE learning_session_id = ?
+        """,
+        learningSessionId);
+    long freeTalkSessionId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
+            Long.class,
+            learningSessionId);
+    return freeTalkSessionId;
+  }
+
+  private JsonNode practiceExamples(String imageUrl) throws Exception {
+    String imageProperty = imageUrl == null ? "" : ",\"imageUrl\":\"" + imageUrl + "\"";
+    String example =
+        """
+        {
+          "sentenceText": "They hit it off right away.",
+          "sentenceWords": ["They", "hit", "it", "off", "right", "away", "."],
+          "highlightingPart": "hit it off",
+          "practiceQuestion": "How did the introduction go?",
+          "sentenceTranslation": "그들은 바로 죽이 잘 맞았어.",
+          "sentenceWordChoices": ["hit", "They", "miss", "it", "off", "right", "away", "."],
+          "practiceQuestionTranslation": "소개는 어땠어?"%s
+        }
+        """
+            .formatted(imageProperty);
+    return objectMapper.readTree("[" + String.join(",", Collections.nCopies(4, example)) + "]");
+  }
+
+  private JsonNode practiceExamplesWithInvalidEntry() throws Exception {
+    return objectMapper.readTree(
+        """
+        [
+          {
+            "sentenceText": "Valid sentence.",
+            "sentenceWords": ["Valid", "sentence", "."],
+            "highlightingPart": "Valid",
+            "practiceQuestion": "Is this valid?",
+            "sentenceTranslation": "정상 문장.",
+            "sentenceWordChoices": ["sentence", "Valid", "."],
+            "practiceQuestionTranslation": "이 문장은 정상이야?"
+          },
+          {
+            "sentenceText": "Missing words.",
+            "highlightingPart": "Missing",
+            "practiceQuestion": "Are words missing?",
+            "sentenceTranslation": "단어 배열이 빠진 문장.",
+            "sentenceWordChoices": ["Missing", "words", "."],
+            "practiceQuestionTranslation": "단어 배열이 빠졌어?"
+          }
+        ]
+        """);
+  }
+
+  private long seedWritingExpression() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (994101, 994101, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario (
+            id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+            display_order, status, created_at, updated_at
+        )
+        VALUES (
+            994102, 994101, 'friend', 'NORMAL', 'AI', 1,
+            994102, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            display_order, target_expression_text, base_expression_meaning_text, usage_summary,
+            usage_description, representative_question_text, representative_question_translation,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            representative_image_url, practice_examples_payload, status, created_at, updated_at
+        )
+        VALUES (
+            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1,
+            'make up for', '만회하다', '부족했던 부분을 보완한다.',
+            '부족하거나 잘못된 일을 다른 행동으로 보완할 때 쓴다.',
+            'How will you fix it?', '어떻게 만회할 거야?',
+            'I will make up for it.', '내가 만회할게.',
+            ARRAY['I', 'will', 'make', 'up', 'for', 'it', '.'],
+            ARRAY['make', 'I', 'it', 'up', 'for', 'will', '.'],
+            'https://cdn/representative.png',
+            ? FORMAT JSON, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        practiceExamples("https://cdn/practice.png").toString());
+    return 994103L;
   }
 
   private JsonNode login(String email) throws Exception {

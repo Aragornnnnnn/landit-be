@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -44,6 +44,7 @@ class FreeTalkHistoryQueryServiceTest {
   @Mock private SessionHistoryMessageRepository sessionHistoryMessageRepository;
   @Mock private FreeTalkSessionExpressionRepository sessionExpressionRepository;
   @Mock private WritingExpressionRepository writingExpressionRepository;
+  @Mock private UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
   @InjectMocks private FreeTalkHistoryQueryService historyQueryService;
 
@@ -56,8 +57,6 @@ class FreeTalkHistoryQueryServiceTest {
     when(history.getId()).thenReturn(1_000L);
     FreeTalkSessionExpression sessionExpression =
         org.mockito.Mockito.mock(FreeTalkSessionExpression.class);
-    when(sessionExpression.getId()).thenReturn(500L);
-    when(sessionExpression.getSourceType()).thenReturn(FreeTalkExpressionSourceType.EXISTING);
     when(sessionExpression.getWritingExpressionId()).thenReturn(300L);
     when(sessionExpression.getDisplayOrder()).thenReturn(1);
     when(sessionExpression.getPersonalizedExampleText()).thenReturn("We made up for it.");
@@ -76,6 +75,9 @@ class FreeTalkHistoryQueryServiceTest {
         .thenReturn(List.of(sessionExpression));
     when(writingExpressionRepository.findAllById(List.of(300L)))
         .thenReturn(List.of(historicalExpression));
+    when(expressionCompletionRepository.findAllByUserProfileIdAndWritingExpressionIdIn(
+            1L, List.of(300L)))
+        .thenReturn(List.of());
 
     FreeTalkSessionDetailResponse response = historyQueryService.getSession(1L, 10L);
 

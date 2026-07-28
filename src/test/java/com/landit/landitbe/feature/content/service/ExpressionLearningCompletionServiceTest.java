@@ -17,10 +17,20 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
+import com.landit.landitbe.feature.session.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
+import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -53,6 +63,14 @@ class ExpressionLearningCompletionServiceTest {
   @Mock private UserProfileService userProfileService;
 
   @Mock private LearningProgressService learningProgressService;
+
+  @Mock private UserWritingExpressionCompletionRepository expressionCompletionRepository;
+
+  @Mock private FreeTalkSessionRepository freeTalkSessionRepository;
+
+  @Mock private LearningSessionRepository learningSessionRepository;
+
+  @Mock private FreeTalkSessionExpressionRepository sessionExpressionRepository;
 
   @InjectMocks private ExpressionLearningCompletionService expressionLearningCompletionService;
 
@@ -154,6 +172,39 @@ class ExpressionLearningCompletionServiceTest {
             });
 
     logger.detachAppender(logAppender);
+  }
+
+  /** 프리톡에서 추천한 시나리오 표현은 원래 시나리오 순서와 무관하게 완료할 수 있다. */
+  @Test
+  void shouldCompleteScenarioExpressionFromFreeTalkWithoutOrderLock() {
+    long freeTalkSessionId = 901L;
+    WritingExpression expression = expressionInScenario();
+    FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
+    LearningSession learningSession = mock(LearningSession.class);
+    when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(freeTalkSessionRepository.findById(freeTalkSessionId))
+        .thenReturn(Optional.of(freeTalkSession));
+    when(freeTalkSession.getLearningSessionId()).thenReturn(701L);
+    when(freeTalkSession.getConversationStatus()).thenReturn(FreeTalkConversationStatus.COMPLETED);
+    when(freeTalkSession.getExpressionGenerationStatus())
+        .thenReturn(ExpressionGenerationStatus.READY);
+    when(learningSessionRepository.findById(701L)).thenReturn(Optional.of(learningSession));
+    when(learningSession.getUserProfileId()).thenReturn(USER_ID);
+    when(learningSession.getStatus()).thenReturn(LearningSessionStatus.COMPLETED);
+    when(sessionExpressionRepository.existsByFreeTalkSessionIdAndWritingExpressionId(
+            freeTalkSessionId, LOCKED_EXPRESSION_ID))
+        .thenReturn(true);
+    when(expressionCompletionRepository.findByUserProfileIdAndWritingExpressionId(
+            USER_ID, LOCKED_EXPRESSION_ID))
+        .thenReturn(Optional.empty());
+
+    expressionLearningCompletionService.completeLearning(
+        USER_ID, LOCKED_EXPRESSION_ID, freeTalkSessionId);
+
+    verify(expressionCompletionRepository).save(any(UserWritingExpressionCompletion.class));
+    verify(learningProgressService, never())
+        .completeExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
   }
 
   // ===== 헬퍼 =====

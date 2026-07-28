@@ -68,7 +68,7 @@ public record FreeTalkSessionDetailResponse(
    * @param completed 현재 사용자의 표현 학습 완료 여부
    */
   public record Expression(
-      Long sessionExpressionId,
+      Long expressionId,
       int displayOrder,
       String targetExpressionText,
       String baseExpressionMeaningText,

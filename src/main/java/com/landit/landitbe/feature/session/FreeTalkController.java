@@ -21,6 +21,7 @@ import com.landit.landitbe.feature.session.service.FreeTalkSessionStartService;
 import com.landit.landitbe.feature.session.service.FreeTalkTopicService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

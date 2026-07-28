@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.content;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.content.docs.ExpressionControllerDocs;
+import com.landit.landitbe.feature.content.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
@@ -17,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다. */
@@ -58,8 +60,11 @@ public class ExpressionController implements ExpressionControllerDocs {
   @Override
   @PostMapping("/api/v1/expressions/{expressionId}/learning-finish")
   public ApiResponse<Map<String, Object>> finishLearning(
-      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
-    expressionLearningCompletionService.completeLearning(principal.userId(), expressionId);
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable Long expressionId,
+      @RequestBody(required = false) ExpressionLearningFinishRequest request) {
+    expressionLearningCompletionService.completeLearning(
+        principal.userId(), expressionId, request == null ? null : request.freeTalkSessionId());
     return ApiResponse.success(Map.of());
   }
 }
