@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
@@ -10,6 +11,7 @@ import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,8 @@ class GeneratedMessageService {
   private final LearningSessionService learningSessionService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionMessageService sessionMessageService;
+  private final ScenarioAccessService scenarioAccessService;
+  private final Clock clock;
 
   /** AI 생성 결과를 저장하고 사용자에게 반환할 메시지 제출 응답을 만든다. */
   SessionMessageSubmitResponse record(
@@ -42,7 +46,10 @@ class GeneratedMessageService {
     SessionHistoryMessage nextMessage =
         saveAiMessage(submittedMessage, generation.aiMessage(), generation.translatedMessage());
     if (generation.completed()) {
-      learningSession.completeBySystem(generation.completionReason(), LocalDateTime.now());
+      LocalDateTime completedAt = LocalDateTime.now(clock);
+      learningSession.completeBySystem(generation.completionReason(), completedAt);
+      grantScenarioAccessIfDailySession(
+          learningSession, scenarioSession, submittedContext, completedAt);
     }
     return SessionMessageSubmitResponse.from(
         submittedContext.sessionId(),
@@ -51,6 +58,22 @@ class GeneratedMessageService {
         nextMessage,
         submittedContext.scenarioContext().totalQuestionCount(),
         generation.completed());
+  }
+
+  /** 일일 배정으로 시작한 세션을 완료하면 해당 시나리오의 복습 권한을 부여한다. */
+  private void grantScenarioAccessIfDailySession(
+      LearningSession learningSession,
+      ScenarioSession scenarioSession,
+      SubmittedMessageContext submittedContext,
+      LocalDateTime completedAt) {
+    if (!scenarioSession.hasDailyScenarioSchedule()) {
+      return;
+    }
+    scenarioAccessService.grantAccess(
+        learningSession.getUserProfileId(),
+        submittedContext.scenarioContext().scenarioId(),
+        learningSession.getTargetLocale(),
+        completedAt);
   }
 
   private ScenarioSession findScenarioSession(long sessionId) {

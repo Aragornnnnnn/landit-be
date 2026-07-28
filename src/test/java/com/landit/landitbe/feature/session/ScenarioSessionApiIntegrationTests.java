@@ -1035,6 +1035,7 @@ class ScenarioSessionApiIntegrationTests {
     assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
+    assertThat(hasScenarioAccess(userId, 2102)).isTrue();
   }
 
   @Test
@@ -2226,6 +2227,22 @@ class ScenarioSessionApiIntegrationTests {
         """,
         userId,
         scenarioId);
+  }
+
+  private boolean hasScenarioAccess(long userId, long scenarioId) {
+    Integer accessCount =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM user_scenario_access
+            WHERE user_profile_id = ?
+              AND scenario_id = ?
+              AND target_locale = 'EN'
+            """,
+            Integer.class,
+            userId,
+            scenarioId);
+    return accessCount != null && accessCount == 1;
   }
 
   private boolean awaitMessageFeedbackStatus(long messageId, String expectedStatus)
