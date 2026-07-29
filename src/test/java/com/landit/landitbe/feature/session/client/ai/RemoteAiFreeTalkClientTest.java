@@ -272,23 +272,12 @@ class RemoteAiFreeTalkClientTest {
 
   private AiFreeTalkOpeningRequest openingRequest() {
     return new AiFreeTalkOpeningRequest(
-        300L,
-        "EN",
-        "KR",
-        new AiFreeTalkTopic(2L, "주말 계획", "Ask about the user's weekend plans."));
+        300L, "EN", "KR", new AiFreeTalkTopic(2L, "주말 계획", "Ask about the user's weekend plans."));
   }
 
   private AiFreeTalkTurnRequest turnRequest() {
     return new AiFreeTalkTurnRequest(
-        300L,
-        3002L,
-        1,
-        "EN",
-        "KR",
-        AiFreeTalkResponseMode.NORMAL,
-        true,
-        null,
-        history());
+        300L, 3002L, 1, "EN", "KR", AiFreeTalkResponseMode.NORMAL, true, null, history());
   }
 
   private AiFreeTalkClosingRequest closingRequest() {

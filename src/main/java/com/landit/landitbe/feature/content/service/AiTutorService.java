@@ -39,5 +39,4 @@ public class AiTutorService {
     }
     return candidates.getFirst().getId();
   }
-
 }
