@@ -46,21 +46,25 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     this.httpClient = HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
     return post(OPENING_PATH, request, RemoteOpeningResponse.class).toResult();
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
     return post(TURN_PATH, request, RemoteTurnResponse.class).toResult();
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
     return post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class).toResult();
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
     return post(CLOSING_PATH, request, RemoteClosingResponse.class).toResult();

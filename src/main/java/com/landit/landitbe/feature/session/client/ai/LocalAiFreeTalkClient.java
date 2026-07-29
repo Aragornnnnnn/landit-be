@@ -15,12 +15,14 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class LocalAiFreeTalkClient implements AiFreeTalkClient {
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
     return new AiFreeTalkOpeningResult(
         "What would you like to talk about today?", "오늘은 무슨 이야기를 하고 싶어?", CharacterEmotion.HAPPY);
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
     return new AiFreeTalkTurnResult(
@@ -31,12 +33,14 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         CharacterEmotion.HAPPY);
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
     return new AiFreeTalkInnerThoughtResult(
         "사용자가 대화를 자연스럽게 이어가고 있다.", com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
     return new AiFreeTalkClosingResult(
