@@ -377,7 +377,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void exitDetectionStoresOnlyTheUserMessageAndRejectsRepeatedDecision() throws Exception {
+  void exitDetectionStoresOnlyTheUserMessageAndReplaysRepeatedDecision() throws Exception {
     String accessToken =
         login("free-talk-exit@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
@@ -394,6 +394,8 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
             .andExpect(jsonPath("$.data.nextMessage").value(nullValue()))
+            .andExpect(
+                jsonPath("$.data.submittedMessage.innerThoughtProcessingStatus").value(nullValue()))
             .andExpect(jsonPath("$.data.progress.sessionStatus").value("AWAITING_EXIT_DECISION"))
             .andReturn();
     long submittedMessageId =
@@ -419,8 +421,9 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(decisionRequest))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"));
 
     mockMvc
         .perform(
@@ -429,8 +432,8 @@ class FreeTalkSessionApiIntegrationTests {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(exitRequest))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
-        .andExpect(jsonPath("$.data.nextMessage").value(nullValue()));
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.nextMessage.role").value("AI"));
 
     mockMvc
         .perform(
@@ -442,6 +445,55 @@ class FreeTalkSessionApiIntegrationTests {
                         .formatted(submittedMessageId)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+  }
+
+  @Test
+  void resumesExpiredMessageReservationForTheSameClientMessageId() throws Exception {
+    String accessToken =
+        login("free-talk-stale-reservation@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    long historyId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM session_history WHERE learning_session_id = ?", Long.class, sessionId);
+    String clientMessageId = UUID.randomUUID().toString();
+    jdbcTemplate.update(
+        """
+        INSERT INTO session_history_message (
+            session_history_id, message_sequence, turn_number, role, content, client_message_id,
+            utterance_duration_ms, input_type, created_at, updated_at
+        )
+        VALUES (?, 1, 1, 'USER', 'I went hiking with friends.', ?, 1200, 'VOICE',
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        historyId,
+        clientMessageId);
+    jdbcTemplate.update(
+        """
+        UPDATE free_talk_session
+        SET processing_client_message_id = ?,
+            updated_at = DATEADD('SECOND', -91, CURRENT_TIMESTAMP)
+        WHERE learning_session_id = ?
+        """,
+        clientMessageId,
+        sessionId);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(clientMessageId, "I went hiking with friends.", 1200, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(1))
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(1200));
+
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(2);
   }
 
   @Test

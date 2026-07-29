@@ -79,6 +79,12 @@ public class FreeTalkMessageService {
   /** 종료 의사 확인에 대한 사용자의 선택을 처리한다. */
   public FreeTalkMessageSubmitResponse decideExit(
       long userId, long learningSessionId, FreeTalkExitDecisionRequest request) {
+    FreeTalkMessageSubmitResponse replayedResponse =
+        submittedMessageService.findCompletedDecisionResponse(
+            userId, learningSessionId, request.submittedMessageId(), request.decision());
+    if (replayedResponse != null) {
+      return replayedResponse;
+    }
     FreeTalkSubmittedMessageService.DecisionReservation reservation =
         submittedMessageService.reserveDecision(
             userId, learningSessionId, request.submittedMessageId(), request.decision());

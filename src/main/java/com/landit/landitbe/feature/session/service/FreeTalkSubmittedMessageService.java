@@ -39,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FreeTalkSubmittedMessageService {
 
   private static final long SPEAKING_TIME_LIMIT_MS = 180_000L;
+  private static final long PROCESSING_TIMEOUT_SECONDS = 90;
 
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
@@ -52,6 +53,7 @@ public class FreeTalkSubmittedMessageService {
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
     requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
+    clearExpiredProcessing(session);
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
@@ -63,7 +65,7 @@ public class FreeTalkSubmittedMessageService {
     if (userMessage == null) {
       return null;
     }
-    if (request.clientMessageId().equals(session.getProcessingClientMessageId())) {
+    if (session.getProcessingClientMessageId() != null) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
     List<SessionHistoryMessage> messages =
@@ -72,7 +74,7 @@ public class FreeTalkSubmittedMessageService {
     int userMessageIndex = indexOfMessage(messages, userMessage.getId());
     FreeTalkTurnStatus storedTurnStatus = userMessage.getFreeTalkTurnStatus();
     if (storedTurnStatus == null) {
-      throw new ApiException(ErrorCode.CONFLICT);
+      return null;
     }
     if (storedTurnStatus == FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED) {
       return replayResponse(
@@ -106,20 +108,72 @@ public class FreeTalkSubmittedMessageService {
         speakingDurationUntil(messages, userMessage.getMessageSequence()));
   }
 
+  /** 종료 확인이 완료된 같은 사용자 메시지의 결과를 다시 구성한다. */
+  @Transactional
+  public FreeTalkMessageSubmitResponse findCompletedDecisionResponse(
+      long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
+    requireOwnedSession(userId, learningSessionId);
+    FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
+    clearExpiredProcessing(session);
+    if (session.getProcessingClientMessageId() != null) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    SessionHistory history =
+        sessionHistoryRepository
+            .findByLearningSessionId(learningSessionId)
+            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+    SessionHistoryMessage userMessage =
+        sessionHistoryMessageRepository
+            .findByIdAndSessionHistoryId(submittedMessageId, history.getId())
+            .orElseThrow(() -> new ApiException(ErrorCode.CONFLICT));
+    FreeTalkTurnStatus storedTurnStatus = userMessage.getFreeTalkTurnStatus();
+    if (storedTurnStatus != FreeTalkTurnStatus.CONTINUE
+        && storedTurnStatus != FreeTalkTurnStatus.COMPLETED) {
+      return null;
+    }
+    if ((storedTurnStatus == FreeTalkTurnStatus.CONTINUE
+            && decision != FreeTalkExitDecision.CONTINUE)
+        || (storedTurnStatus == FreeTalkTurnStatus.COMPLETED
+            && decision != FreeTalkExitDecision.END)) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    List<SessionHistoryMessage> messages =
+        sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
+            history.getId());
+    int userMessageIndex = indexOfMessage(messages, userMessage.getId());
+    SessionHistoryMessage nextMessage =
+        userMessageIndex + 1 < messages.size()
+                && messages.get(userMessageIndex + 1).getRole() == ConversationSpeaker.AI
+            ? messages.get(userMessageIndex + 1)
+            : null;
+    if (nextMessage == null) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    FreeTalkConversationStatus replayedStatus =
+        storedTurnStatus == FreeTalkTurnStatus.COMPLETED
+            ? FreeTalkConversationStatus.COMPLETED
+            : FreeTalkConversationStatus.IN_PROGRESS;
+    return replayResponse(
+        learningSessionId,
+        session.getTitle(),
+        storedTurnStatus,
+        userMessage,
+        nextMessage,
+        replayedStatus,
+        speakingDurationUntil(messages, userMessage.getMessageSequence()));
+  }
+
   /** 사용자 발화를 저장하고 외부 AI 호출에 필요한 예약 정보를 만든다. */
   @Transactional
   public Reservation reserve(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
     final LearningSession learningSession = requireOwnedSession(userId, learningSessionId);
     FreeTalkSession freeTalkSession = requireFreeTalkForUpdate(learningSessionId);
+    clearExpiredProcessing(freeTalkSession);
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
-    if (sessionHistoryMessageRepository.existsBySessionHistoryIdAndClientMessageId(
-        history.getId(), request.clientMessageId())) {
-      throw new ApiException(ErrorCode.CONFLICT);
-    }
     if (!learningSession.isInProgress()
         || freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED) {
       throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
@@ -132,6 +186,31 @@ public class FreeTalkSubmittedMessageService {
     List<SessionHistoryMessage> messages =
         sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
             history.getId());
+    SessionHistoryMessage existingMessage =
+        messages.stream()
+            .filter(message -> request.clientMessageId().equals(message.getClientMessageId()))
+            .findFirst()
+            .orElse(null);
+    if (existingMessage != null) {
+      if (existingMessage.getFreeTalkTurnStatus() != null) {
+        throw new ApiException(ErrorCode.CONFLICT);
+      }
+      freeTalkSession.startProcessing(request.clientMessageId());
+      return reservation(
+          learningSession,
+          freeTalkSession,
+          history,
+          existingMessage,
+          messages,
+          request.timeLimitReached());
+    }
+    if (messages.stream()
+        .anyMatch(
+            message ->
+                message.getRole() == ConversationSpeaker.USER
+                    && message.getFreeTalkTurnStatus() == null)) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
     int userTurnNumber = nextUserTurnNumber(messages);
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository.save(
@@ -145,6 +224,22 @@ public class FreeTalkSubmittedMessageService {
                 request.utteranceDurationMs()));
     freeTalkSession.startProcessing(request.clientMessageId());
     messages.add(userMessage);
+    return reservation(
+        learningSession,
+        freeTalkSession,
+        history,
+        userMessage,
+        messages,
+        request.timeLimitReached());
+  }
+
+  private Reservation reservation(
+      LearningSession learningSession,
+      FreeTalkSession freeTalkSession,
+      SessionHistory history,
+      SessionHistoryMessage userMessage,
+      List<SessionHistoryMessage> messages,
+      boolean timeLimitReached) {
     AiFreeTalkTopic topic =
         freeTalkSession.getTopicId() == null
             ? new AiFreeTalkTopic(null, freeTalkSession.getTitle(), null)
@@ -158,14 +253,15 @@ public class FreeTalkSubmittedMessageService {
                             topicValue.getPromptDescription()))
                 .orElse(new AiFreeTalkTopic(null, freeTalkSession.getTitle(), null));
     return new Reservation(
-        learningSessionId,
+        learningSession.getId(),
         freeTalkSession.getId(),
         history.getId(),
         userMessage.getId(),
-        request.clientMessageId(),
-        request.utteranceDurationMs(),
-        request.timeLimitReached()
-            || freeTalkSession.getAccumulatedSpeakingDurationMs() + request.utteranceDurationMs()
+        userMessage.getClientMessageId(),
+        userMessage.getUtteranceDurationMs(),
+        timeLimitReached
+            || freeTalkSession.getAccumulatedSpeakingDurationMs()
+                    + userMessage.getUtteranceDurationMs()
                 >= SPEAKING_TIME_LIMIT_MS,
         freeTalkSession.getStartMode() == FreeTalkStartMode.USER_FIRST
             && messages.stream()
@@ -278,6 +374,7 @@ public class FreeTalkSubmittedMessageService {
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
     final LearningSession learningSession = requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
+    clearExpiredProcessing(session);
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
@@ -314,6 +411,7 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
+    records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.CONTINUE);
     records.userMessage().prepareInnerThought();
     if (result.inferredTitle() != null && records.freeTalkSession().getTitle() == null) {
       records.freeTalkSession().assignTitle(result.inferredTitle());
@@ -344,6 +442,7 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
+    records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     records.userMessage().prepareInnerThought();
     final SessionHistoryMessage aiMessage =
         sessionHistoryMessageRepository.save(
@@ -425,6 +524,10 @@ public class FreeTalkSubmittedMessageService {
         .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
   }
 
+  private void clearExpiredProcessing(FreeTalkSession session) {
+    session.clearProcessingIfExpired(LocalDateTime.now().minusSeconds(PROCESSING_TIMEOUT_SECONDS));
+  }
+
   private int nextUserTurnNumber(List<SessionHistoryMessage> messages) {
     if (messages.isEmpty()) {
       return 1;
@@ -484,7 +587,7 @@ public class FreeTalkSubmittedMessageService {
         learningSessionId,
         session.getTitle(),
         turnStatus,
-        SubmittedMessageResponse.replayPreparingFrom(userMessage),
+        SubmittedMessageResponse.from(userMessage),
         aiMessage == null ? null : NextMessageResponse.from(aiMessage),
         new ProgressResponse(
             session.getConversationStatus(),
