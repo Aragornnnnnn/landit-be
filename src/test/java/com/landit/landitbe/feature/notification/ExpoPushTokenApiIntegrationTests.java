@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.notification;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,7 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.notification.dto.ExpoPushTokenUpdateRequest;
+import com.landit.landitbe.feature.notification.service.ExpoPushTokenService;
+import com.landit.landitbe.shared.domain.AppPlatform;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +48,8 @@ class ExpoPushTokenApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private ExpoPushTokenService expoPushTokenService;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -146,6 +160,69 @@ class ExpoPushTokenApiIntegrationTests {
         .andExpect(status().isUnauthorized());
   }
 
+  /** APNs나 FCM 형식의 Token은 Expo Push Token으로 저장할 수 없다. */
+  @Test
+  void rejectsNonExpoPushToken() throws Exception {
+    String accessToken = login("expo-push-token-invalid-format");
+    String nativePushToken = "native-apns-or-fcm-token";
+
+    mockMvc
+        .perform(
+            put("/api/v1/me/expo-push-token")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "platform":"IOS",
+                      "expoPushToken":"%s",
+                      "enabled":true
+                    }
+                    """
+                        .formatted(nativePushToken)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+    assertThat(tokenCount(nativePushToken)).isZero();
+  }
+
+  /** 같은 신규 Token의 동시 PUT 요청은 모두 성공하고 하나의 행만 저장한다. */
+  @Test
+  void handlesConcurrentUpsertsIdempotently() throws Exception {
+    String userKey = "expo-push-token-concurrent-owner";
+    login(userKey);
+    Long userProfileId = userProfileId(userKey);
+    String expoPushToken = "ExponentPushToken[concurrent-upsert]";
+    ExpoPushTokenUpdateRequest request =
+        new ExpoPushTokenUpdateRequest(AppPlatform.IOS, expoPushToken, true);
+    int requestCount = 8;
+    CountDownLatch ready = new CountDownLatch(requestCount);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(requestCount);
+    List<Future<Void>> futures = new ArrayList<>();
+
+    try {
+      for (int index = 0; index < requestCount; index++) {
+        futures.add(
+            executor.submit(
+                () -> {
+                  ready.countDown();
+                  start.await();
+                  expoPushTokenService.update(userProfileId, request);
+                  return null;
+                }));
+      }
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      futures.forEach(future -> assertThatCode(future::get).doesNotThrowAnyException());
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertThat(tokenCount(expoPushToken)).isEqualTo(1);
+    assertTokenStatus(expoPushToken, "ACTIVE");
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
@@ -206,5 +283,19 @@ class ExpoPushTokenApiIntegrationTests {
             String.class,
             expoPushToken);
     org.assertj.core.api.Assertions.assertThat(actualPlatform).isEqualTo(expectedPlatform);
+  }
+
+  /** 테스트 사용자의 프로필 ID를 조회한다. */
+  private Long userProfileId(String userKey) {
+    return jdbcTemplate.queryForObject(
+        "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
+  }
+
+  /** 지정한 Expo Push Token 값의 저장 행 수를 조회한다. */
+  private Integer tokenCount(String expoPushToken) {
+    return jdbcTemplate.queryForObject(
+        "select count(*) from user_push_token where expo_push_token = ?",
+        Integer.class,
+        expoPushToken);
   }
 }
