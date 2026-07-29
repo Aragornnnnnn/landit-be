@@ -55,6 +55,12 @@ class RemoteAiFreeTalkClientTest {
             {"success":true,"data":{"userExitIntentDetected":false,"inferredTitle":"주말 이야기","aiMessage":"That sounds fun.","translatedMessage":"재밌겠다.","emotion":"HAPPY","innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD"},"error":null}
         """);
     registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        requests,
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD"},"error":null}
+        """);
+    registerJsonResponse(
         "/api/v1/free-talk/closing",
         requests,
         """
@@ -64,16 +70,20 @@ class RemoteAiFreeTalkClientTest {
 
     AiFreeTalkOpeningResult opening = client.generateOpening(openingRequest());
     AiFreeTalkTurnResult turn = client.generateTurn(turnRequest());
+    AiFreeTalkInnerThoughtResult innerThought = client.generateInnerThought(innerThoughtRequest());
     AiFreeTalkClosingResult closing = client.generateClosing(closingRequest());
 
     assertThat(requests.get("/api/v1/free-talk/opening").get("topic").get("topicId").asLong())
         .isEqualTo(2L);
     assertThat(requests.get("/api/v1/free-talk/turn").get("responseMode").asString())
         .isEqualTo("NORMAL");
+    assertThat(requests.get("/api/v1/free-talk/opening").has("partnerDisplayName")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("partnerDisplayName")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/closing").has("partnerDisplayName")).isFalse();
     assertThat(requests.get("/api/v1/free-talk/closing").get("closingReason").asString())
         .isEqualTo("USER_CONFIRMED");
     assertThat(opening.emotion()).isEqualTo(CharacterEmotion.HAPPY);
-    assertThat(turn.innerThoughtType().name()).isEqualTo("GOOD");
+    assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
     assertThat(closing.translatedMessage()).isEqualTo("이야기해서 좋았어.");
   }
 
@@ -290,6 +300,10 @@ class RemoteAiFreeTalkClientTest {
         AiFreeTalkClosingReason.USER_CONFIRMED,
         new AiFreeTalkTopic(null, "주말 이야기", null),
         history());
+  }
+
+  private AiFreeTalkInnerThoughtRequest innerThoughtRequest() {
+    return new AiFreeTalkInnerThoughtRequest(300L, 3002L, 1, "EN", "KR", null, history());
   }
 
   private List<AiConversationHistoryMessage> history() {

@@ -39,6 +39,9 @@ public record SessionInnerThoughtResponse(
    */
   public static SessionInnerThoughtResponse from(SessionHistoryMessage message) {
     ProcessingStatus status = message.getInnerThoughtProcessingStatus();
+    if (status == null) {
+      return new SessionInnerThoughtResponse(null, null, null);
+    }
     if (status != ProcessingStatus.COMPLETED) {
       return new SessionInnerThoughtResponse(status.name(), null, null);
     }

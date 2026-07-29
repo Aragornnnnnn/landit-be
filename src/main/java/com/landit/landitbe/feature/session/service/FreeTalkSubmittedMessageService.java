@@ -2,8 +2,6 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.service.AiTutorService;
-import com.landit.landitbe.feature.content.service.AiTutorService.FreeTalkPartner;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
@@ -47,7 +45,66 @@ public class FreeTalkSubmittedMessageService {
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
-  private final AiTutorService aiTutorService;
+
+  /** 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다. */
+  @Transactional
+  public FreeTalkMessageSubmitResponse findCompletedResponse(
+      long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
+    requireOwnedSession(userId, learningSessionId);
+    FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
+    SessionHistory history =
+        sessionHistoryRepository
+            .findByLearningSessionId(learningSessionId)
+            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+    SessionHistoryMessage userMessage =
+        sessionHistoryMessageRepository
+            .findBySessionHistoryIdAndClientMessageId(history.getId(), request.clientMessageId())
+            .orElse(null);
+    if (userMessage == null) {
+      return null;
+    }
+    if (request.clientMessageId().equals(session.getProcessingClientMessageId())) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    List<SessionHistoryMessage> messages =
+        sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
+            history.getId());
+    int userMessageIndex = indexOfMessage(messages, userMessage.getId());
+    FreeTalkTurnStatus storedTurnStatus = userMessage.getFreeTalkTurnStatus();
+    if (storedTurnStatus == null) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    if (storedTurnStatus == FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED) {
+      return replayResponse(
+          learningSessionId,
+          session.getTitle(),
+          FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED,
+          userMessage,
+          null,
+          FreeTalkConversationStatus.AWAITING_EXIT_DECISION,
+          speakingDurationUntil(messages, userMessage.getMessageSequence()));
+    }
+    SessionHistoryMessage nextMessage =
+        userMessageIndex + 1 < messages.size()
+                && messages.get(userMessageIndex + 1).getRole() == ConversationSpeaker.AI
+            ? messages.get(userMessageIndex + 1)
+            : null;
+    if (nextMessage == null) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    FreeTalkConversationStatus replayedStatus =
+        storedTurnStatus == FreeTalkTurnStatus.COMPLETED
+            ? FreeTalkConversationStatus.COMPLETED
+            : FreeTalkConversationStatus.IN_PROGRESS;
+    return replayResponse(
+        learningSessionId,
+        session.getTitle(),
+        storedTurnStatus,
+        userMessage,
+        nextMessage,
+        replayedStatus,
+        speakingDurationUntil(messages, userMessage.getMessageSequence()));
+  }
 
   /** 사용자 발화를 저장하고 외부 AI 호출에 필요한 예약 정보를 만든다. */
   @Transactional
@@ -88,9 +145,6 @@ public class FreeTalkSubmittedMessageService {
                 request.utteranceDurationMs()));
     freeTalkSession.startProcessing(request.clientMessageId());
     messages.add(userMessage);
-    FreeTalkPartner partner =
-        aiTutorService.requireFreeTalkPartner(
-            learningSession.getAiTutorId(), learningSession.getBaseLocale());
     AiFreeTalkTopic topic =
         freeTalkSession.getTopicId() == null
             ? new AiFreeTalkTopic(null, freeTalkSession.getTitle(), null)
@@ -120,7 +174,6 @@ public class FreeTalkSubmittedMessageService {
                 == 1,
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
-        partner,
         topic,
         historyMessages(messages));
   }
@@ -138,6 +191,7 @@ public class FreeTalkSubmittedMessageService {
     }
     FreeTalkMessageSubmitResponse response;
     if (result.userExitIntentDetected()) {
+      userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED);
       session.awaitExitDecision(userMessage.getId());
       session.clearProcessing();
       response =
@@ -148,7 +202,8 @@ public class FreeTalkSubmittedMessageService {
               userMessage,
               null);
     } else {
-      userMessage.recordInnerThought(result.innerThought(), result.innerThoughtType());
+      userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.CONTINUE);
+      userMessage.prepareInnerThought();
       SessionHistoryMessage aiMessage =
           sessionHistoryMessageRepository.save(
               SessionHistoryMessage.freeTalkAi(
@@ -178,7 +233,8 @@ public class FreeTalkSubmittedMessageService {
     FreeTalkSession session = records.freeTalkSession();
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
-    userMessage.recordInnerThought(result.innerThought(), result.innerThoughtType());
+    userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
+    userMessage.prepareInnerThought();
     session.completeByTimeLimit();
     session.clearProcessing();
     records.learningSession().completeFreeTalkByTimeLimit(LocalDateTime.now());
@@ -236,9 +292,6 @@ public class FreeTalkSubmittedMessageService {
       throw new ApiException(ErrorCode.CONFLICT);
     }
     session.startProcessing("decision-" + submittedMessageId);
-    FreeTalkPartner partner =
-        aiTutorService.requireFreeTalkPartner(
-            learningSession.getAiTutorId(), learningSession.getBaseLocale());
     AiFreeTalkTopic topic = new AiFreeTalkTopic(session.getTopicId(), session.getTitle(), null);
     return new DecisionReservation(
         learningSessionId,
@@ -248,7 +301,6 @@ public class FreeTalkSubmittedMessageService {
         decision,
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
-        partner,
         topic,
         historyMessages(
             sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
@@ -262,7 +314,7 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
-    records.userMessage().recordInnerThought(result.innerThought(), result.innerThoughtType());
+    records.userMessage().prepareInnerThought();
     if (result.inferredTitle() != null && records.freeTalkSession().getTitle() == null) {
       records.freeTalkSession().assignTitle(result.inferredTitle());
     }
@@ -292,7 +344,7 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
-    records.userMessage().recordInnerThought(result.innerThought(), result.innerThoughtType());
+    records.userMessage().prepareInnerThought();
     final SessionHistoryMessage aiMessage =
         sessionHistoryMessageRepository.save(
             SessionHistoryMessage.freeTalkAi(
@@ -383,6 +435,25 @@ public class FreeTalkSubmittedMessageService {
         : latest.getTurnNumber() + 1;
   }
 
+  private int indexOfMessage(List<SessionHistoryMessage> messages, long messageId) {
+    for (int index = 0; index < messages.size(); index++) {
+      if (Long.valueOf(messageId).equals(messages.get(index).getId())) {
+        return index;
+      }
+    }
+    throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
+  }
+
+  private long speakingDurationUntil(List<SessionHistoryMessage> messages, int messageSequence) {
+    return messages.stream()
+        .filter(message -> message.getRole() == ConversationSpeaker.USER)
+        .filter(message -> message.getMessageSequence() <= messageSequence)
+        .map(SessionHistoryMessage::getUtteranceDurationMs)
+        .filter(duration -> duration != null)
+        .mapToLong(Long::longValue)
+        .sum();
+  }
+
   private int nextSequence(long historyId) {
     return sessionHistoryMessageRepository
             .findBySessionHistoryIdOrderByMessageSequenceAsc(historyId)
@@ -413,12 +484,30 @@ public class FreeTalkSubmittedMessageService {
         learningSessionId,
         session.getTitle(),
         turnStatus,
-        SubmittedMessageResponse.from(userMessage),
+        SubmittedMessageResponse.replayPreparingFrom(userMessage),
         aiMessage == null ? null : NextMessageResponse.from(aiMessage),
         new ProgressResponse(
             session.getConversationStatus(),
             session.getAccumulatedSpeakingDurationMs(),
             SPEAKING_TIME_LIMIT_MS));
+  }
+
+  private FreeTalkMessageSubmitResponse replayResponse(
+      long learningSessionId,
+      String title,
+      FreeTalkTurnStatus turnStatus,
+      SessionHistoryMessage userMessage,
+      SessionHistoryMessage aiMessage,
+      FreeTalkConversationStatus conversationStatus,
+      long accumulatedSpeakingDurationMs) {
+    return new FreeTalkMessageSubmitResponse(
+        learningSessionId,
+        title,
+        turnStatus,
+        SubmittedMessageResponse.from(userMessage),
+        aiMessage == null ? null : NextMessageResponse.from(aiMessage),
+        new ProgressResponse(
+            conversationStatus, accumulatedSpeakingDurationMs, SPEAKING_TIME_LIMIT_MS));
   }
 
   /** AI 호출 전에 저장한 사용자 발화와 대화 문맥이다. */
@@ -433,7 +522,6 @@ public class FreeTalkSubmittedMessageService {
       boolean firstUserTurn,
       String targetLocale,
       String baseLocale,
-      FreeTalkPartner partner,
       AiFreeTalkTopic topic,
       List<AiConversationHistoryMessage> history) {}
 
@@ -446,7 +534,6 @@ public class FreeTalkSubmittedMessageService {
       FreeTalkExitDecision decision,
       String targetLocale,
       String baseLocale,
-      FreeTalkPartner partner,
       AiFreeTalkTopic topic,
       List<AiConversationHistoryMessage> history) {}
 

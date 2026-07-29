@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session.dto;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
+import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 
@@ -35,6 +36,7 @@ public record FreeTalkMessageSubmitResponse(
    * @param role 메시지 화자 역할
    * @param innerThought AI가 생성한 속마음
    * @param innerThoughtType 속마음 상태 유형
+   * @param innerThoughtProcessingStatus 속마음 비동기 처리 상태
    */
   public record SubmittedMessageResponse(
       Long messageId,
@@ -42,7 +44,8 @@ public record FreeTalkMessageSubmitResponse(
       int messageSequence,
       String role,
       String innerThought,
-      InnerThoughtType innerThoughtType) {
+      InnerThoughtType innerThoughtType,
+      ProcessingStatus innerThoughtProcessingStatus) {
     /**
      * 세션 메시지 엔티티를 응답 값으로 변환한다.
      *
@@ -56,7 +59,20 @@ public record FreeTalkMessageSubmitResponse(
           message.getMessageSequence(),
           message.getRole().name(),
           message.getInnerThought(),
-          message.getInnerThoughtType());
+          message.getInnerThoughtType(),
+          message.getInnerThoughtProcessingStatus());
+    }
+
+    /** 최초 응답과 같은 비동기 속마음 준비 상태를 다시 구성한다. */
+    public static SubmittedMessageResponse replayPreparingFrom(SessionHistoryMessage message) {
+      return new SubmittedMessageResponse(
+          message.getId(),
+          message.getTurnNumber(),
+          message.getMessageSequence(),
+          message.getRole().name(),
+          null,
+          null,
+          ProcessingStatus.PREPARING);
     }
   }
 

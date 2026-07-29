@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.session.client.ai;
 
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
-import com.landit.landitbe.shared.domain.InnerThoughtType;
 
 /**
  * 프리톡 마무리 AI 메시지 생성 결과를 담는다.
@@ -11,12 +10,6 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
  * @param aiMessage 학습 언어 마무리 메시지
  * @param translatedMessage 기준 언어 번역
  * @param emotion AI 상대의 현재 감정
- * @param innerThought 마지막 사용자 발화에 대한 속마음
- * @param innerThoughtType 속마음 유형
  */
 public record AiFreeTalkClosingResult(
-    String aiMessage,
-    String translatedMessage,
-    CharacterEmotion emotion,
-    String innerThought,
-    InnerThoughtType innerThoughtType) {}
+    String aiMessage, String translatedMessage, CharacterEmotion emotion) {}

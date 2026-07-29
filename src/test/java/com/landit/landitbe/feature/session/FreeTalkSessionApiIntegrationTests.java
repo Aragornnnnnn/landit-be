@@ -14,6 +14,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
@@ -120,7 +122,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void startAiFirstSessionPersistsOpeningAndUsesHarperContextWithoutTransaction() throws Exception {
+  void startAiFirstSessionPersistsOpeningWithoutTutorCharacterContext() throws Exception {
     seedTopic(1101, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
     JsonNode loginBody = login("free-talk-ai-first@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
@@ -154,7 +156,6 @@ class FreeTalkSessionApiIntegrationTests {
             .get("sessionId")
             .asLong();
     assertThat(fakeAiFreeTalkClient.lastOpeningRequest().sessionId()).isEqualTo(sessionId);
-    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().partnerDisplayName()).isEqualTo("Harper");
     assertThat(fakeAiFreeTalkClient.lastOpeningRequest().topic().topicId()).isEqualTo(1101);
     assertThat(fakeAiFreeTalkClient.openingTransactionActive()).isFalse();
     assertThat(
@@ -313,36 +314,59 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void submitsNormalUserFirstTurnAndRejectsDuplicateClientMessageId() throws Exception {
+  void replaysCompletedTurnForDuplicateClientMessageId() throws Exception {
     String accessToken =
         login("free-talk-message@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
     String clientMessageId = UUID.randomUUID().toString();
     String request = messageRequest(clientMessageId, "I went hiking with friends.", 4200, false);
 
-    mockMvc
-        .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.title").value("Hiking with friends"))
-        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
-        .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
-        .andExpect(jsonPath("$.data.submittedMessage.innerThought").value("즐거운 시간을 보냈나 봐."))
-        .andExpect(jsonPath("$.data.nextMessage.role").value("AI"))
-        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(4200))
-        .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"));
+    MvcResult firstResult =
+        mockMvc
+            .perform(
+                post(messagePath(sessionId))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("Hiking with friends"))
+            .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+            .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
+            .andExpect(
+                jsonPath("$.data.submittedMessage.innerThoughtProcessingStatus").value("PREPARING"))
+            .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
+            .andExpect(jsonPath("$.data.nextMessage.role").value("AI"))
+            .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(4200))
+            .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"))
+            .andReturn();
 
-    mockMvc
-        .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+    MvcResult replayedResult =
+        mockMvc
+            .perform(
+                post(messagePath(sessionId))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+            .andReturn();
+
+    assertThat(
+            objectMapper
+                .readTree(firstResult.getResponse().getContentAsByteArray())
+                .at("/data/submittedMessage/messageId"))
+        .isEqualTo(
+            objectMapper
+                .readTree(replayedResult.getResponse().getContentAsByteArray())
+                .at("/data/submittedMessage/messageId"));
+    assertThat(
+            objectMapper
+                .readTree(firstResult.getResponse().getContentAsByteArray())
+                .at("/data/nextMessage/messageId"))
+        .isEqualTo(
+            objectMapper
+                .readTree(replayedResult.getResponse().getContentAsByteArray())
+                .at("/data/nextMessage/messageId"));
 
     assertThat(fakeAiFreeTalkClient.turnTransactionActive()).isFalse();
     assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
@@ -358,15 +382,15 @@ class FreeTalkSessionApiIntegrationTests {
         login("free-talk-exit@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
     fakeAiFreeTalkClient.detectExitIntent();
+    String exitRequest =
+        messageRequest(UUID.randomUUID().toString(), "I should go now.", 1200, false);
     MvcResult detected =
         mockMvc
             .perform(
                 post(messagePath(sessionId))
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        messageRequest(
-                            UUID.randomUUID().toString(), "I should go now.", 1200, false)))
+                    .content(exitRequest))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
             .andExpect(jsonPath("$.data.nextMessage").value(nullValue()))
@@ -397,6 +421,16 @@ class FreeTalkSessionApiIntegrationTests {
                 .content(decisionRequest))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(exitRequest))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
+        .andExpect(jsonPath("$.data.nextMessage").value(nullValue()));
 
     mockMvc
         .perform(
@@ -710,26 +744,27 @@ class FreeTalkSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       if (exitIntentDetected && request.responseMode().name().equals("NORMAL")) {
-        return new AiFreeTalkTurnResult(true, null, null, null, null, null, null);
+        return new AiFreeTalkTurnResult(true, null, null, null, null);
       }
       return new AiFreeTalkTurnResult(
           false,
           request.isFirstUserTurn() ? "Hiking with friends" : null,
           "That sounds fun! Where are you going next?",
           "재밌겠다! 다음에는 어디로 갈 거야?",
-          CharacterEmotion.HAPPY,
-          "즐거운 시간을 보냈나 봐.",
-          com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
+          CharacterEmotion.HAPPY);
+    }
+
+    @Override
+    public AiFreeTalkInnerThoughtResult generateInnerThought(
+        AiFreeTalkInnerThoughtRequest request) {
+      return new AiFreeTalkInnerThoughtResult(
+          "즐거운 시간을 보냈나 봐.", com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
     }
 
     @Override
     public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
       return new AiFreeTalkClosingResult(
-          "It was great talking with you!",
-          "이야기해서 즐거웠어!",
-          CharacterEmotion.HAPPY,
-          "즐거운 시간을 보냈나 봐.",
-          com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
+          "It was great talking with you!", "이야기해서 즐거웠어!", CharacterEmotion.HAPPY);
     }
 
     void reset() {

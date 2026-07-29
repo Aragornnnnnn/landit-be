@@ -27,6 +27,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   private static final String OPENING_PATH = "/api/v1/free-talk/opening";
   private static final String TURN_PATH = "/api/v1/free-talk/turn";
+  private static final String INNER_THOUGHT_PATH = "/api/v1/free-talk/inner-thought";
   private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
 
   private final HttpClient httpClient;
@@ -53,6 +54,11 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
     return post(TURN_PATH, request, RemoteTurnResponse.class).toResult();
+  }
+
+  @Override
+  public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
+    return post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class).toResult();
   }
 
   @Override
@@ -144,9 +150,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String inferredTitle,
       String aiMessage,
       String translatedMessage,
-      CharacterEmotion emotion,
-      String innerThought,
-      InnerThoughtType innerThoughtType) {
+      CharacterEmotion emotion) {
 
     private AiFreeTalkTurnResult toResult() {
       if (userExitIntentDetected == null
@@ -158,50 +162,39 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiFreeTalkTurnResult(
-          userExitIntentDetected,
-          inferredTitle,
-          aiMessage,
-          translatedMessage,
-          emotion,
-          innerThought,
-          innerThoughtType);
+          userExitIntentDetected, inferredTitle, aiMessage, translatedMessage, emotion);
     }
 
     private boolean hasMissingGeneratedField() {
-      return blank(aiMessage)
-          || blank(translatedMessage)
-          || emotion == null
-          || blank(innerThought)
-          || innerThoughtType == null;
+      return blank(aiMessage) || blank(translatedMessage) || emotion == null;
     }
 
     private boolean hasGeneratedField() {
-      return aiMessage != null
-          || translatedMessage != null
-          || emotion != null
-          || innerThought != null
-          || innerThoughtType != null;
+      return aiMessage != null || translatedMessage != null || emotion != null;
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteInnerThoughtResponse(
+      String innerThought, InnerThoughtType innerThoughtType) {
+
+    private AiFreeTalkInnerThoughtResult toResult() {
+      if (blank(innerThought) || innerThoughtType == null) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiFreeTalkInnerThoughtResult(innerThought, innerThoughtType);
     }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteClosingResponse(
-      String aiMessage,
-      String translatedMessage,
-      CharacterEmotion emotion,
-      String innerThought,
-      InnerThoughtType innerThoughtType) {
+      String aiMessage, String translatedMessage, CharacterEmotion emotion) {
 
     private AiFreeTalkClosingResult toResult() {
-      if (blank(aiMessage)
-          || blank(translatedMessage)
-          || emotion == null
-          || blank(innerThought)
-          || innerThoughtType == null) {
+      if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiFreeTalkClosingResult(
-          aiMessage, translatedMessage, emotion, innerThought, innerThoughtType);
+      return new AiFreeTalkClosingResult(aiMessage, translatedMessage, emotion);
     }
   }
 

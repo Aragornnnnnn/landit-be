@@ -54,6 +54,10 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   private Long utteranceDurationMs;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "free_talk_turn_status", length = 40)
+  private FreeTalkTurnStatus freeTalkTurnStatus;
+
+  @Enumerated(EnumType.STRING)
   @Column(length = 20)
   private CharacterEmotion emotion;
 
@@ -247,6 +251,16 @@ public class SessionHistoryMessage extends BaseTimeEntity {
     this.innerThought = innerThought;
     this.innerThoughtType = innerThoughtType;
     this.innerThoughtProcessingStatus = ProcessingStatus.COMPLETED;
+  }
+
+  /** 프리톡 속마음의 비동기 생성을 준비 상태로 표시한다. */
+  public void prepareInnerThought() {
+    innerThoughtProcessingStatus = ProcessingStatus.PREPARING;
+  }
+
+  /** 프리톡 사용자 발화의 최초 처리 결과 상태를 기록한다. */
+  public void recordFreeTalkTurnStatus(FreeTalkTurnStatus freeTalkTurnStatus) {
+    this.freeTalkTurnStatus = freeTalkTurnStatus;
   }
 
   /** 생성에 실패한 속마음의 처리 상태를 기록한다. */
