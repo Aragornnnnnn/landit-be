@@ -226,9 +226,7 @@ public class FreeTalkExpressionGenerationService {
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),
         recommendation.existingExpressionId(),
-        recommendation.displayOrder(),
-        recommendation.contextualExample().sentenceText(),
-        recommendation.contextualExample().sentenceTranslation());
+        recommendation.displayOrder());
   }
 
   // 신규 표현의 학습 콘텐츠를 저장하고 세션 연결 엔티티를 생성한다.
@@ -260,11 +258,7 @@ public class FreeTalkExpressionGenerationService {
                 content.representativeImageUrl(),
                 objectMapper.valueToTree(content.practiceExamples())));
     return FreeTalkSessionExpression.link(
-        context.freeTalkSessionId(),
-        generatedExpression.getId(),
-        recommendation.displayOrder(),
-        recommendation.contextualExample().sentenceText(),
-        recommendation.contextualExample().sentenceTranslation());
+        context.freeTalkSessionId(), generatedExpression.getId(), recommendation.displayOrder());
   }
 
   private record GenerationContext(
