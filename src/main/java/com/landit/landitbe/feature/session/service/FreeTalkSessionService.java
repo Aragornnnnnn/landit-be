@@ -180,8 +180,7 @@ public class FreeTalkSessionService {
   }
 
   private FreeTalkPartner requirePartner(UserProfile userProfile) {
-    return aiTutorService.requireFreeTalkPartner(
-        requireAiTutorId(userProfile), userProfile.getBaseLocale());
+    return aiTutorService.requireFreeTalkPartner(requireAiTutorId(userProfile));
   }
 
   private Long requireAiTutorId(UserProfile userProfile) {

@@ -239,9 +239,9 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("scenario_session", "daily_scenario_schedule_id");
   }
 
-  @DisplayName("V26 migration은 프리톡 저장 구조와 Harper 기본 데이터를 추가한다.")
+  @DisplayName("V26 migration은 프리톡 저장 구조와 초기 주제를 추가한다.")
   @Test
-  void v26AddsFreeTalkStorageStructureAndHarperSeed() {
+  void v26AddsFreeTalkStorageStructureAndTopicSeed() {
     assertTableExists("free_talk_topic");
     assertTableDoesNotExist("free_talk_turn_result");
     assertColumnDoesNotExist("ai_tutor", "free_talk_tts_voice_id");
@@ -257,7 +257,7 @@ class DatabaseSchemaIntegrationTests {
                 "select display_name from free_talk_topic order by display_order", String.class))
         .containsExactly("오늘 하루 얘기", "주말 계획", "요즘 빠진 것", "스포츠", "고민 상담");
 
-    Integer harperTutorCount =
+    Integer defaultTutorLabelCount =
         jdbcTemplate.queryForObject(
             """
             select count(*)
@@ -266,10 +266,10 @@ class DatabaseSchemaIntegrationTests {
             where tutor.accent_locale = 'EN_US'
               and tutor.target_locale = 'EN'
               and variant.base_locale = 'KR'
-              and variant.display_name = 'Harper'
+              and variant.display_name = '미국 영어 튜터'
             """,
             Integer.class);
-    assertThat(harperTutorCount).isEqualTo(1);
+    assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
   @DisplayName("V26은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
@@ -488,7 +488,7 @@ class DatabaseSchemaIntegrationTests {
               and tutor.target_locale = 'EN'
               and tutor.status = 'ACTIVE'
               and variant.base_locale = 'KR'
-              and variant.display_name = 'Harper'
+              and variant.display_name = '미국 영어 튜터'
             """,
             Integer.class);
     assertThat(koreanVariantCount).isEqualTo(1);
