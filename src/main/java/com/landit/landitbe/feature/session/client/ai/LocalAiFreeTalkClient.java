@@ -41,8 +41,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
-    return new AiFreeTalkInnerThoughtResult(
-        "사용자가 대화를 자연스럽게 이어가고 있다.", InnerThoughtType.GOOD);
+    return new AiFreeTalkInnerThoughtResult("사용자가 대화를 자연스럽게 이어가고 있다.", InnerThoughtType.GOOD);
   }
 
   /** {@inheritDoc} */

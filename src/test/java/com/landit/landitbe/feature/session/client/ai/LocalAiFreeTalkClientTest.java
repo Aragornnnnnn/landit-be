@@ -64,7 +64,7 @@ class LocalAiFreeTalkClientTest {
                   .hasSizeGreaterThan(example.sentenceWords().size())
                   .isNotEqualTo(example.sentenceWords());
               assertThat(example.sentenceText()).contains(example.highlightingPart());
-             });
+            });
   }
 
   private AiFreeTalkTurnRequest turnRequest() {
