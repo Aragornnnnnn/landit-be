@@ -291,11 +291,37 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
   }
 
-  @DisplayName("V28 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
+  @DisplayName("V29 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
   @Test
-  void v28ConvertsUserPushTokenToExpoPushToken() {
+  void v29ConvertsUserPushTokenToExpoPushToken() {
     assertColumnExists("user_push_token", "expo_push_token");
     assertColumnDoesNotExist("user_push_token", "token");
+  }
+
+  @DisplayName("V29 migration은 기존 활성 Push Token을 폐기한다.")
+  @Test
+  void v29RevokesExistingActivePushTokens() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "28");
+    insertAiTutor(migrationJdbcTemplate, 990301L, "ACTIVE");
+    insertUserProfile(migrationJdbcTemplate, 990302L, 990301L);
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO user_push_token (
+            id, user_profile_id, platform, token, status, created_at, updated_at
+        )
+        VALUES (990303, 990302, 'IOS', 'existing-push-token', 'ACTIVE',
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+
+    migrateToLatestVersion(databaseUrl);
+
+    String status =
+        migrationJdbcTemplate.queryForObject(
+            "SELECT status FROM user_push_token WHERE id = 990303", String.class);
+    assertThat(status).isEqualTo("REVOKED");
   }
 
   @DisplayName("V27은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
