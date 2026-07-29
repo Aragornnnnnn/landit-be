@@ -19,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AiTutorService {
 
-  private static final String FREE_TALK_PARTNER_DISPLAY_NAME = "Harper";
-
   private final AiTutorRepository aiTutorRepository;
 
   /**
@@ -42,28 +40,4 @@ public class AiTutorService {
     return candidates.getFirst().getId();
   }
 
-  /**
-   * 프리톡 AI 요청에 필요한 상대 이름과 억양을 조회한다.
-   *
-   * @param aiTutorId 사용할 AI 튜터 ID
-   * @return AI 상대 이름과 억양
-   * @throws ApiException 활성 튜터가 없을 때
-   */
-  @Transactional(readOnly = true)
-  public FreeTalkPartner requireFreeTalkPartner(Long aiTutorId) {
-    AiTutor aiTutor =
-        aiTutorRepository
-            .findById(aiTutorId)
-            .filter(tutor -> tutor.getStatus() == ActiveStatus.ACTIVE)
-            .orElseThrow(() -> new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED));
-    return new FreeTalkPartner(FREE_TALK_PARTNER_DISPLAY_NAME, aiTutor.getAccentLocale().name());
-  }
-
-  /**
-   * 프리톡에 사용할 AI 상대의 이름과 억양이다.
-   *
-   * @param displayName 튜터 언어별 표시명과 분리된 프리톡 상대 이름
-   * @param accentLocale AI 상대의 억양 locale
-   */
-  public record FreeTalkPartner(String displayName, String accentLocale) {}
 }

@@ -12,8 +12,6 @@ import java.util.List;
  * @param submittedTurnNumber 마지막 사용자 메시지 턴 번호
  * @param targetLocale 학습 언어
  * @param baseLocale 기준 언어
- * @param partnerDisplayName 대화 상대 표시 이름
- * @param accentLocale 대화 상대 억양 locale
  * @param closingReason 마무리 메시지 생성 사유
  * @param topic 저장된 프리톡 주제
  * @param conversationHistory 누적 대화 메시지
@@ -24,8 +22,6 @@ public record AiFreeTalkClosingRequest(
     int submittedTurnNumber,
     String targetLocale,
     String baseLocale,
-    String partnerDisplayName,
-    String accentLocale,
     AiFreeTalkClosingReason closingReason,
     AiFreeTalkTopic topic,
     List<AiConversationHistoryMessage> conversationHistory) {}

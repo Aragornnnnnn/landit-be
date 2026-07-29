@@ -5,8 +5,6 @@ package com.landit.landitbe.feature.session.service;
 import com.landit.landitbe.feature.content.domain.TtsVoiceGender;
 import com.landit.landitbe.feature.content.domain.TtsVoiceProvider;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
-import com.landit.landitbe.feature.content.service.AiTutorService;
-import com.landit.landitbe.feature.content.service.AiTutorService.FreeTalkPartner;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
@@ -45,7 +43,6 @@ public class FreeTalkSessionService {
           TtsVoiceGender.FEMALE);
 
   private final UserProfileService userProfileService;
-  private final AiTutorService aiTutorService;
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
@@ -65,7 +62,6 @@ public class FreeTalkSessionService {
     validateStartRequest(request);
     UserProfile userProfile = userProfileService.requireActiveForUpdate(userId);
     FreeTalkTopic topic = findTopic(request);
-    FreeTalkPartner partner = requirePartner(userProfile);
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
         learningSessionRepository.save(
@@ -101,8 +97,6 @@ public class FreeTalkSessionService {
         topic == null ? null : topic.getPromptDescription(),
         userProfile.getTargetLocale().name(),
         userProfile.getBaseLocale().name(),
-        partner.displayName(),
-        partner.accentLocale(),
         FREE_TALK_TTS_VOICE);
   }
 
@@ -179,10 +173,6 @@ public class FreeTalkSessionService {
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
-  private FreeTalkPartner requirePartner(UserProfile userProfile) {
-    return aiTutorService.requireFreeTalkPartner(requireAiTutorId(userProfile));
-  }
-
   private Long requireAiTutorId(UserProfile userProfile) {
     if (Objects.isNull(userProfile.getAiTutorId())) {
       throw new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
@@ -201,8 +191,6 @@ public class FreeTalkSessionService {
    * @param topicPromptDescription AI에 전달할 주제 설명
    * @param targetLocale 학습 대상 언어
    * @param baseLocale 사용자 기준 언어
-   * @param partnerDisplayName AI 상대 이름
-   * @param accentLocale AI 상대의 억양 locale
    * @param ttsVoice AI 상대의 TTS 음성
    */
   public record StartedFreeTalkSession(
@@ -214,7 +202,5 @@ public class FreeTalkSessionService {
       String topicPromptDescription,
       String targetLocale,
       String baseLocale,
-      String partnerDisplayName,
-      String accentLocale,
       TtsVoiceResponse ttsVoice) {}
 }

@@ -32,8 +32,6 @@ class LocalAiFreeTalkClientTest {
         1,
         "EN",
         "KR",
-        "Harper",
-        "EN_US",
         AiFreeTalkResponseMode.NORMAL,
         true,
         null,

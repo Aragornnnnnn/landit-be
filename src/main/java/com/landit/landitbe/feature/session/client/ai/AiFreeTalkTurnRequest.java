@@ -12,8 +12,6 @@ import java.util.List;
  * @param submittedTurnNumber 처리할 사용자 메시지 턴 번호
  * @param targetLocale 학습 언어
  * @param baseLocale 기준 언어
- * @param partnerDisplayName 대화 상대 표시 이름
- * @param accentLocale 대화 상대 억양 locale
  * @param responseMode 응답 생성 방식
  * @param isFirstUserTurn 사용자 선시작의 첫 발화 여부
  * @param topic 선택했거나 추론된 주제
@@ -25,8 +23,6 @@ public record AiFreeTalkTurnRequest(
     int submittedTurnNumber,
     String targetLocale,
     String baseLocale,
-    String partnerDisplayName,
-    String accentLocale,
     AiFreeTalkResponseMode responseMode,
     boolean isFirstUserTurn,
     AiFreeTalkTopic topic,

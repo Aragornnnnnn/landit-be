@@ -53,8 +53,6 @@ public class FreeTalkSessionStartService {
         startedSession.learningSessionId(),
         startedSession.targetLocale(),
         startedSession.baseLocale(),
-        startedSession.partnerDisplayName(),
-        startedSession.accentLocale(),
         new AiFreeTalkTopic(
             startedSession.topicId(),
             startedSession.title(),

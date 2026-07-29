@@ -275,8 +275,6 @@ class RemoteAiFreeTalkClientTest {
         300L,
         "EN",
         "KR",
-        "Harper",
-        "EN_US",
         new AiFreeTalkTopic(2L, "주말 계획", "Ask about the user's weekend plans."));
   }
 
@@ -287,8 +285,6 @@ class RemoteAiFreeTalkClientTest {
         1,
         "EN",
         "KR",
-        "Harper",
-        "EN_US",
         AiFreeTalkResponseMode.NORMAL,
         true,
         null,
@@ -302,8 +298,6 @@ class RemoteAiFreeTalkClientTest {
         1,
         "EN",
         "KR",
-        "Harper",
-        "EN_US",
         AiFreeTalkClosingReason.USER_CONFIRMED,
         new AiFreeTalkTopic(null, "주말 이야기", null),
         history());
