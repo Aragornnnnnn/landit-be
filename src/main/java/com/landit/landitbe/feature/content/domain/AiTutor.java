@@ -38,9 +38,6 @@ public class AiTutor extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 
-  @Column(name = "free_talk_tts_voice_id")
-  private Long freeTalkTtsVoiceId;
-
   /** JPA에서 사용하는 기본 생성자다. */
   protected AiTutor() {}
 }

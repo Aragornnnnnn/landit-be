@@ -244,6 +244,7 @@ class DatabaseSchemaIntegrationTests {
   void v26AddsFreeTalkStorageStructureAndHarperSeed() {
     assertTableExists("free_talk_topic");
     assertTableDoesNotExist("free_talk_turn_result");
+    assertColumnDoesNotExist("ai_tutor", "free_talk_tts_voice_id");
     assertColumnExists("free_talk_session", "topic_id");
     assertColumnExists("free_talk_session", "processing_client_message_id");
     assertColumnExists("session_history_message", "client_message_id");
@@ -261,11 +262,9 @@ class DatabaseSchemaIntegrationTests {
             """
             select count(*)
             from ai_tutor tutor
-            join tts_voice voice on voice.id = tutor.free_talk_tts_voice_id
             join ai_tutor_language_variant variant on variant.ai_tutor_id = tutor.id
             where tutor.accent_locale = 'EN_US'
               and tutor.target_locale = 'EN'
-              and voice.provider_voice_id = 'en-US-Harper:MAI-Voice-2'
               and variant.base_locale = 'KR'
               and variant.display_name = 'Harper'
             """,

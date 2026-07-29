@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.TtsVoiceGender;
+import com.landit.landitbe.feature.content.domain.TtsVoiceProvider;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.content.service.AiTutorService;
 import com.landit.landitbe.feature.content.service.AiTutorService.FreeTalkPartner;
@@ -34,6 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Service
 public class FreeTalkSessionService {
+
+  private static final TtsVoiceResponse FREE_TALK_TTS_VOICE =
+      TtsVoiceResponse.from(
+          TtsVoiceProvider.OPENROUTER,
+          "microsoft/mai-voice-2",
+          "en-US-Harper:MAI-Voice-2",
+          TtsVoiceGender.FEMALE);
 
   private final UserProfileService userProfileService;
   private final AiTutorService aiTutorService;
@@ -94,11 +103,7 @@ public class FreeTalkSessionService {
         userProfile.getBaseLocale().name(),
         partner.displayName(),
         partner.accentLocale(),
-        TtsVoiceResponse.from(
-            partner.ttsVoiceProvider(),
-            partner.ttsVoiceModel(),
-            partner.ttsVoiceProviderVoiceId(),
-            partner.ttsVoiceGender()));
+        FREE_TALK_TTS_VOICE);
   }
 
   /**

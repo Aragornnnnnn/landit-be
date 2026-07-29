@@ -1,28 +1,4 @@
 -- 프리톡 세션, 턴 결과 저장 구조와 초기 주제를 추가한다.
-ALTER TABLE ai_tutor ADD COLUMN free_talk_tts_voice_id BIGINT;
-ALTER TABLE ai_tutor ADD CONSTRAINT fk_ai_tutor_free_talk_tts_voice_id
-    FOREIGN KEY (free_talk_tts_voice_id) REFERENCES tts_voice (id);
-
-UPDATE ai_tutor
-SET free_talk_tts_voice_id = (
-    SELECT id FROM tts_voice
-    WHERE provider = 'OPENROUTER'
-      AND model = 'microsoft/mai-voice-2'
-      AND provider_voice_id = 'en-US-Harper:MAI-Voice-2'
-)
-WHERE id = (
-    SELECT variant.ai_tutor_id
-    FROM ai_tutor_language_variant variant
-    JOIN ai_tutor tutor ON tutor.id = variant.ai_tutor_id
-    WHERE tutor.accent_locale = 'EN_US'
-      AND tutor.target_locale = 'EN'
-      AND tutor.status = 'ACTIVE'
-      AND variant.base_locale = 'KR'
-      AND variant.display_name = '미국 영어 튜터'
-    ORDER BY tutor.id
-    LIMIT 1
-);
-
 UPDATE ai_tutor_language_variant
 SET display_name = 'Harper'
 WHERE ai_tutor_id = (
