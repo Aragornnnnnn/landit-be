@@ -9,7 +9,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.regex.Pattern;
 
-/** Expo Push Token의 등록 상태 변경 요청을 검증한다. */
+/**
+ * Expo Push Token의 등록 상태 변경 요청을 검증한다.
+ *
+ * @param platform 앱 플랫폼
+ * @param expoPushToken Expo Push Token 값
+ * @param enabled 활성화 여부
+ */
 public record ExpoPushTokenUpdateRequest(
     @NotNull AppPlatform platform,
     @NotBlank @Size(max = 500) String expoPushToken,
