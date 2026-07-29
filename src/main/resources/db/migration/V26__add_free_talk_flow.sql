@@ -52,9 +52,9 @@ CREATE TABLE free_talk_topic (
 
 INSERT INTO free_talk_topic (display_name, prompt_description, display_order, status, created_at, updated_at)
 VALUES
-    ('오늘 뭐 했지', '오늘 있었던 일과 그때 느낀 감정을 가볍게 묻는다.', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('오늘 하루 얘기', '오늘 있었던 일과 그때 느낀 감정을 가볍게 묻는다.', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('주말 계획', '다가오는 주말의 계획과 기대하는 일을 묻는다.', 2, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('영화 뭐 봤지', '최근 본 영화나 영상 콘텐츠와 감상을 묻는다.', 3, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+    ('요즘 빠진 것', '요즘 즐기거나 관심 있게 보는 것과 그 이유를 가볍게 묻는다.', 3, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('스포츠', '즐겨 보거나 직접 하는 스포츠에 관해 묻는다.', 4, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
     ('고민 상담', '사용자의 최근 고민을 듣고 자연스럽게 공감하며 대화한다.', 5, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 

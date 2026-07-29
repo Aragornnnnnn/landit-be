@@ -251,6 +251,10 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("session_history_message", "emotion");
     assertTableConstraintExists("free_talk_session", "fk_free_talk_session_topic_id");
     assertTableConstraintExists("session_history_message", "uk_session_history_message_client_id");
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select display_name from free_talk_topic order by display_order", String.class))
+        .containsExactly("오늘 하루 얘기", "주말 계획", "요즘 빠진 것", "스포츠", "고민 상담");
 
     Integer harperTutorCount =
         jdbcTemplate.queryForObject(
