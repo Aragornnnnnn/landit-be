@@ -39,7 +39,15 @@ public class FreeTalkMessageService {
     this.taskExecutor = taskExecutor;
   }
 
-  /** 사용자 발화를 처리하고 AI 후속 메시지 또는 종료 확인 상태를 반환한다. */
+  /**
+   * 사용자 발화를 처리하고 AI 후속 메시지 또는 종료 확인 상태를 반환한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param request 사용자 발화 요청
+   * @return 저장된 사용자 발화와 AI 처리 결과
+   * @throws com.landit.landitbe.shared.exception.ApiException 세션 접근, 처리 상태 또는 AI 생성에 실패할 때
+   */
   public FreeTalkMessageSubmitResponse submit(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
     FreeTalkMessageSubmitResponse replayedResponse =
@@ -76,7 +84,15 @@ public class FreeTalkMessageService {
     }
   }
 
-  /** 종료 의사 확인에 대한 사용자의 선택을 처리한다. */
+  /**
+   * 종료 의사 확인에 대한 사용자의 선택을 처리한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param request 종료 또는 계속 대화 결정 요청
+   * @return 저장된 사용자 발화와 AI 처리 결과
+   * @throws com.landit.landitbe.shared.exception.ApiException 세션 접근, 처리 상태 또는 AI 생성에 실패할 때
+   */
   public FreeTalkMessageSubmitResponse decideExit(
       long userId, long learningSessionId, FreeTalkExitDecisionRequest request) {
     FreeTalkMessageSubmitResponse replayedResponse =
@@ -202,10 +218,18 @@ public class FreeTalkMessageService {
           .whenCompleteAsync(
               (result, exception) -> {
                 if (exception == null) {
-                  sessionMessageService.completeInnerThought(
-                      request.submittedMessageId(),
-                      result.innerThought(),
-                      result.innerThoughtType());
+                  try {
+                    sessionMessageService.completeInnerThought(
+                        request.submittedMessageId(),
+                        result.innerThought(),
+                        result.innerThoughtType());
+                  } catch (RuntimeException persistenceException) {
+                    log.warn(
+                        "프리톡 속마음 저장에 실패했습니다. messageId={}",
+                        request.submittedMessageId(),
+                        persistenceException);
+                    sessionMessageService.failInnerThought(request.submittedMessageId());
+                  }
                   return;
                 }
                 log.warn(

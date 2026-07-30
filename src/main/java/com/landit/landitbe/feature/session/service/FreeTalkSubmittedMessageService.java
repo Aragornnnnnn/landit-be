@@ -329,6 +329,7 @@ public class FreeTalkSubmittedMessageService {
       Reservation reservation, AiFreeTalkTurnResult result) {
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
+    requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
     if (result.inferredTitle() != null && session.getTitle() == null) {
@@ -378,6 +379,7 @@ public class FreeTalkSubmittedMessageService {
       Reservation reservation, AiFreeTalkClosingResult result) {
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
+    requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
     userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
@@ -475,6 +477,8 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
+    requireProcessingOwner(
+        records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.CONTINUE);
     records.userMessage().prepareInnerThought();
     if (result.inferredTitle() != null && records.freeTalkSession().getTitle() == null) {
@@ -507,6 +511,8 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
+    requireProcessingOwner(
+        records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     records.userMessage().prepareInnerThought();
     final SessionHistoryMessage aiMessage =
@@ -542,6 +548,10 @@ public class FreeTalkSubmittedMessageService {
   public void compensateDecision(DecisionReservation reservation) {
     freeTalkSessionRepository
         .findByLearningSessionIdForUpdate(reservation.learningSessionId())
+        .filter(
+            session ->
+                decisionProcessingClientMessageId(reservation)
+                    .equals(session.getProcessingClientMessageId()))
         .ifPresent(FreeTalkSession::clearProcessing);
   }
 
@@ -588,6 +598,16 @@ public class FreeTalkSubmittedMessageService {
     return freeTalkSessionRepository
         .findByLearningSessionIdForUpdate(learningSessionId)
         .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+  }
+
+  private void requireProcessingOwner(FreeTalkSession session, String processingClientMessageId) {
+    if (!processingClientMessageId.equals(session.getProcessingClientMessageId())) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+  }
+
+  private String decisionProcessingClientMessageId(DecisionReservation reservation) {
+    return "decision-" + reservation.userMessageId();
   }
 
   private void clearExpiredProcessing(FreeTalkSession session) {
