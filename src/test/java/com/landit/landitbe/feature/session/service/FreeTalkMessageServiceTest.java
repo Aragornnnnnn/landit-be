@@ -38,8 +38,6 @@ class FreeTalkMessageServiceTest {
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
       mock(FreeTalkExpressionGenerationDispatcher.class);
   private final TaskExecutor directExecutor = Runnable::run;
-  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
-      mock(FreeTalkExpressionGenerationDispatcher.class);
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
           submittedMessageService,
