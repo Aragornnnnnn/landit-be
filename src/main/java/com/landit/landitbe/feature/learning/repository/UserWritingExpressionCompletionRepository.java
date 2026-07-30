@@ -26,6 +26,7 @@ public interface UserWritingExpressionCompletionRepository
   List<UserWritingExpressionCompletion> findAllByUserProfileIdAndWritingExpressionIdIn(
       Long userProfileId, Collection<Long> writingExpressionIds);
 
+  /** 특정 출처에서 완료한 표현 목록을 한 번에 조회한다. */
   List<UserWritingExpressionCompletion>
       findAllByUserProfileIdAndWritingExpressionIdInAndLearningSource(
           Long userProfileId,
