@@ -34,6 +34,7 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -89,6 +90,8 @@ class ScenarioSessionApiIntegrationTests {
   void setUp() {
     mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
+    jdbcTemplate.update("DELETE FROM user_daily_activity");
+    jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
     jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
     jdbcTemplate.update("DELETE FROM session_history_artifact");
@@ -1036,6 +1039,16 @@ class ScenarioSessionApiIntegrationTests {
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
     assertThat(hasScenarioAccess(userId, 2102)).isTrue();
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/streak/calendar?year=%d&month=%d"
+                    .formatted(LocalDate.now().getYear(), LocalDate.now().getMonthValue()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.currentStreakDays").value(1))
+        .andExpect(jsonPath("$.data.activeToday").value(true))
+        .andExpect(jsonPath("$.data.activeDates[0]").value(LocalDate.now().toString()));
   }
 
   @Test
