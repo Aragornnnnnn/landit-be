@@ -19,6 +19,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
@@ -82,6 +83,40 @@ class ExpressionQueryServiceTest {
     assertThat(candidates)
         .containsExactly(
             new ExpressionRecommendationCandidate(101L, "target-101", "base-101", "제안에 동의할 때 사용"));
+  }
+
+  @Test
+  void savesGeneratedFreeTalkExpressionThroughContentService() {
+    WritingExpression savedExpression = mock(WritingExpression.class);
+    when(writingExpressionRepository.save(any(WritingExpression.class)))
+        .thenReturn(savedExpression);
+
+    WritingExpression result =
+        expressionQueryService.saveFreeTalkGeneratedExpression(
+            USER_ID,
+            Locale.EN,
+            Locale.KR,
+            new FreeTalkGeneratedExpressionContent(
+                "I'm up for that",
+                "좋아, 그거 하자",
+                "제안에 동의할 때 사용",
+                "제안에 편하게 동의할 때 사용합니다.",
+                null,
+                null,
+                "I'm up for that.",
+                "좋아, 그렇게 하자.",
+                List.of("I'm", "up", "for", "that"),
+                List.of("that", "I'm", "up", "for", "to"),
+                null,
+                toJson("[]")));
+
+    assertThat(result).isSameAs(savedExpression);
+    verify(writingExpressionRepository)
+        .save(
+            org.mockito.ArgumentMatchers.argThat(
+                expression ->
+                    expression.getTargetExpressionText().equals("I'm up for that")
+                        && expression.getOwnerUserProfileId().equals(USER_ID)));
   }
 
   @Test

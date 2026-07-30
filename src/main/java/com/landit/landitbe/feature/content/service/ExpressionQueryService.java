@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
@@ -191,6 +192,25 @@ public class ExpressionQueryService {
                     expression.getBaseExpressionMeaningText(),
                     expression.getUsageSummary()))
         .toList();
+  }
+
+  /**
+   * 프리톡에서 생성한 사용자 전용 표현을 저장한다.
+   *
+   * @param userProfileId 표현을 소유할 사용자 ID
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @param content 저장할 생성 표현 콘텐츠
+   * @return 저장된 사용자 전용 표현
+   */
+  @Transactional
+  public WritingExpression saveFreeTalkGeneratedExpression(
+      Long userProfileId,
+      Locale targetLocale,
+      Locale baseLocale,
+      FreeTalkGeneratedExpressionContent content) {
+    return writingExpressionRepository.save(
+        WritingExpression.freeTalkGenerated(userProfileId, targetLocale, baseLocale, content));
   }
 
   /**

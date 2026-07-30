@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.session.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
-import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
@@ -49,7 +48,6 @@ public class FreeTalkExpressionGenerationService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
-  private final WritingExpressionRepository writingExpressionRepository;
   private final ExpressionQueryService expressionQueryService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
@@ -230,24 +228,23 @@ public class FreeTalkExpressionGenerationService {
       throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
     WritingExpression generatedExpression =
-        writingExpressionRepository.save(
-            WritingExpression.freeTalkGenerated(
-                context.userProfileId(),
-                context.targetLocale(),
-                context.baseLocale(),
-                new FreeTalkGeneratedExpressionContent(
-                    content.targetExpressionText(),
-                    content.baseExpressionMeaningText(),
-                    content.usageSummary(),
-                    content.usageDescription(),
-                    content.representativeQuestionText(),
-                    content.representativeQuestionTranslation(),
-                    content.representativeSentenceText(),
-                    content.representativeSentenceTranslation(),
-                    content.representativeSentenceWords(),
-                    content.representativeSentenceWordChoices(),
-                    content.representativeImageUrl(),
-                    objectMapper.valueToTree(content.practiceExamples()))));
+        expressionQueryService.saveFreeTalkGeneratedExpression(
+            context.userProfileId(),
+            context.targetLocale(),
+            context.baseLocale(),
+            new FreeTalkGeneratedExpressionContent(
+                content.targetExpressionText(),
+                content.baseExpressionMeaningText(),
+                content.usageSummary(),
+                content.usageDescription(),
+                content.representativeQuestionText(),
+                content.representativeQuestionTranslation(),
+                content.representativeSentenceText(),
+                content.representativeSentenceTranslation(),
+                content.representativeSentenceWords(),
+                content.representativeSentenceWordChoices(),
+                content.representativeImageUrl(),
+                objectMapper.valueToTree(content.practiceExamples())));
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(), generatedExpression.getId(), recommendation.displayOrder());
   }
