@@ -63,7 +63,12 @@ public record FreeTalkMessageSubmitResponse(
           message.getInnerThoughtProcessingStatus());
     }
 
-    /** 최초 응답과 같은 비동기 속마음 준비 상태를 다시 구성한다. */
+    /**
+     * 최초 응답과 같은 비동기 속마음 준비 상태를 다시 구성한다.
+     *
+     * @param message 준비 상태로 재구성할 사용자 메시지
+     * @return 속마음 처리가 준비 중인 사용자 발화 응답
+     */
     public static SubmittedMessageResponse replayPreparingFrom(SessionHistoryMessage message) {
       return new SubmittedMessageResponse(
           message.getId(),

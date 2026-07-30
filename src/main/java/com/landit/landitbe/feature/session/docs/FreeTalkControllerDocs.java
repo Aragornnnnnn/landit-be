@@ -91,6 +91,9 @@ public interface FreeTalkControllerDocs {
         responseCode = "200",
         description = "처리 성공"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
         description = "세션 소유자 아님"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -122,6 +125,9 @@ public interface FreeTalkControllerDocs {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
         description = "처리 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
         description = "세션 소유자 아님"),

@@ -297,9 +297,14 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void openApiDocumentsTopicAndSessionStartContracts() throws Exception {
+  void openApiDocumentsFreeTalkContracts() throws Exception {
     String topicsPath = "$.paths['/api/v1/free-talk/topics'].get";
     String sessionsPath = "$.paths['/api/v1/free-talk/sessions'].post";
+    String messagesPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}/messages'].post";
+    String exitDecisionPath =
+        "$.paths['/api/v1/free-talk/sessions/{sessionId}/exit-decision'].post";
+    String innerThoughtProcessingStatusPath =
+        "$.components.schemas.SessionInnerThoughtResponse.properties.processingStatus";
 
     mockMvc
         .perform(get("/v3/api-docs"))
@@ -313,7 +318,14 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionsPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(sessionsPath + ".responses['404'].description").value("주제 없음"))
         .andExpect(jsonPath(sessionsPath + ".responses['502'].description").value("AI 응답 오류"))
-        .andExpect(jsonPath(sessionsPath + ".responses['503'].description").value("AI 생성 실패"));
+        .andExpect(jsonPath(sessionsPath + ".responses['503'].description").value("AI 생성 실패"))
+        .andExpect(jsonPath(messagesPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(
+            jsonPath(innerThoughtProcessingStatusPath + ".description")
+                .value("속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null"));
   }
 
   @Test
