@@ -21,7 +21,11 @@ public class FreeTalkExpressionGenerationDispatcher {
     this.taskExecutor = taskExecutor;
   }
 
-  /** 표현 생성 작업을 비동기로 제출한다. */
+  /**
+   * 표현 생성 작업을 비동기로 제출한다.
+   *
+   * @param learningSessionId 생성할 표현이 연결된 학습 세션 ID
+   */
   public void dispatch(long learningSessionId) {
     try {
       taskExecutor.execute(() -> generationService.generate(learningSessionId));

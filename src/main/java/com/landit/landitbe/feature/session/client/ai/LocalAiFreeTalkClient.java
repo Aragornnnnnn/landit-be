@@ -51,6 +51,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         "It was nice talking with you.", "이야기해서 좋았어.", CharacterEmotion.NEUTRAL);
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
       AiFreeTalkExpressionRecommendationsRequest request) {
@@ -65,6 +66,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
                 "상대의 제안에 흔쾌히 동의할 때 사용")));
   }
 
+  /** {@inheritDoc} */
   @Override
   public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
       AiFreeTalkExpressionLearningContentRequest request) {

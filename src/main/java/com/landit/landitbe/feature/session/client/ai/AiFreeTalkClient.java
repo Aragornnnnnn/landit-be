@@ -48,6 +48,7 @@ public interface AiFreeTalkClient {
    *
    * @param request 완료 대화와 기존 표현 후보
    * @return 추천된 표현 목록
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
    */
   AiFreeTalkExpressionRecommendationsResult recommendExpressions(
       AiFreeTalkExpressionRecommendationsRequest request);
@@ -57,6 +58,7 @@ public interface AiFreeTalkClient {
    *
    * @param request 학습 데이터가 필요한 신규 표현 목록
    * @return 생성된 표현별 학습 데이터
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
    */
   AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
       AiFreeTalkExpressionLearningContentRequest request);

@@ -139,7 +139,12 @@ public class WritingExpression extends BaseTimeEntity {
     return expression;
   }
 
-  /** 사용자 전용 표현을 다른 사용자가 조회하려는지 확인한다. */
+  /**
+   * 사용자 전용 표현을 다른 사용자가 조회하려는지 확인한다.
+   *
+   * @param userProfileId 표현을 조회하려는 사용자 ID
+   * @return 다른 사용자의 전용 표현이면 true
+   */
   public boolean isOwnedByAnother(Long userProfileId) {
     return ownerUserProfileId != null && !ownerUserProfileId.equals(userProfileId);
   }

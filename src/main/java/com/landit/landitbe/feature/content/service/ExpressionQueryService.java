@@ -72,7 +72,14 @@ public class ExpressionQueryService {
   private final WritingExpressionRepository writingExpressionRepository;
   private final LearningProgressService learningProgressService;
 
-  /** 시나리오별 Writing 표현 목록을 사용자 locale 기준 학습 순서대로 조회하고 완료 여부를 반영한다. */
+  /**
+   * 시나리오별 Writing 표현 목록을 사용자 locale 기준 학습 순서대로 조회하고 완료 여부를 반영한다.
+   *
+   * @param userId 표현 목록을 조회할 사용자 ID
+   * @param scenarioId 표현이 속한 시나리오 ID
+   * @return 사용자 완료 이력과 잠금 상태를 반영한 표현 목록
+   * @throws ApiException 시나리오가 존재하지 않을 때
+   */
   @Transactional(readOnly = true)
   public List<ExpressionResponse> getExpressionsPerScenario(Long userId, Long scenarioId) {
     scenarioService.validateExists(scenarioId);
@@ -130,13 +137,26 @@ public class ExpressionQueryService {
     return new ExpressionProgress(expressions.size(), completedExpressionCount);
   }
 
-  /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다. */
+  /**
+   * 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다.
+   *
+   * @param userId 표현을 조회할 사용자 ID
+   * @param expressionId 학습을 시작할 표현 ID
+   * @return 학습 화면에 필요한 표현 상세 정보
+   * @throws ApiException 표현이 없거나 비활성 상태일 때, 다른 사용자의 전용 표현일 때
+   */
   @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long userId, Long expressionId) {
     return ExpressionLearningResponse.from(requireAccessibleExpression(userId, expressionId));
   }
 
-  /** 기존 내부 호출과 단위 테스트를 위한 공용 표현 조회다. */
+  /**
+   * 기존 내부 호출과 단위 테스트를 위한 공용 표현 조회다.
+   *
+   * @param expressionId 조회할 표현 ID
+   * @return 학습 화면에 필요한 표현 상세 정보
+   * @throws ApiException 표현이 없거나 비활성 상태일 때
+   */
   @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
     WritingExpression expression =
@@ -146,7 +166,13 @@ public class ExpressionQueryService {
     return ExpressionLearningResponse.from(expression);
   }
 
-  /** 프리톡 AI가 재사용할 활성 표현 후보를 제한된 개수로 조회한다. */
+  /**
+   * 프리톡 AI가 재사용할 활성 표현 후보를 제한된 개수로 조회한다.
+   *
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @return 공용 활성 표현 후보 목록
+   */
   @Transactional(readOnly = true)
   public List<ExpressionRecommendationCandidate> getActiveExpressionCandidates(
       Locale targetLocale, Locale baseLocale) {
@@ -167,7 +193,12 @@ public class ExpressionQueryService {
         .toList();
   }
 
-  /** 프리톡 세션에 연결할 기존 표현이 활성 상태인지 검증한다. */
+  /**
+   * 프리톡 세션에 연결할 기존 표현이 활성 상태인지 검증한다.
+   *
+   * @param expressionId 프리톡에 연결할 표현 ID
+   * @throws ApiException 표현이 없거나 비활성 상태일 때
+   */
   @Transactional(readOnly = true)
   public void validateActiveExpression(Long expressionId) {
     writingExpressionRepository
@@ -178,6 +209,11 @@ public class ExpressionQueryService {
   /**
    * 학습 중인 표현의 추가 예문 목록과 작문 문제(랜덤 1개)를 조회한다. 표현이 없거나 INACTIVE거나 예문이 비어 있으면 RESOURCE_NOT_FOUND 예외를
    * 던진다.
+   *
+   * @param userId 표현을 조회할 사용자 ID
+   * @param expressionId 연습할 표현 ID
+   * @return 추가 예문과 무작위 작문 문제
+   * @throws ApiException 표현이 없거나 비활성 상태일 때, 다른 사용자의 전용 표현일 때, 유효한 추가 예문이 없을 때
    */
   @Transactional(readOnly = true)
   public ExpressionPracticeResponse getExtraPracticeExamples(Long userId, Long expressionId) {
@@ -185,7 +221,13 @@ public class ExpressionQueryService {
     return practiceResponse(expression, expressionId);
   }
 
-  /** 기존 내부 호출과 단위 테스트를 위한 공용 표현 연습 조회다. */
+  /**
+   * 기존 내부 호출과 단위 테스트를 위한 공용 표현 연습 조회다.
+   *
+   * @param expressionId 연습할 표현 ID
+   * @return 추가 예문과 무작위 작문 문제
+   * @throws ApiException 표현이 없거나 비활성 상태일 때, 유효한 추가 예문이 없을 때
+   */
   @Transactional(readOnly = true)
   public ExpressionPracticeResponse getExtraPracticeExamples(Long expressionId) {
     WritingExpression expression =
