@@ -80,7 +80,7 @@ public class AppVersionService {
   public AdminAppVersionResponse update(
       Long adminUserProfileId, AppPlatform platform, AdminAppVersionUpdateRequest request) {
     validateVersionRange(request.versionName(), request.minimumSupportedVersionName());
-    AppVersion appVersion = require(platform);
+    AppVersion appVersion = requireForUpdate(platform);
     String beforeValue = auditValue(appVersion);
     appVersion.update(
         request.versionName(),
@@ -100,10 +100,10 @@ public class AppVersionService {
     return AdminAppVersionResponse.from(appVersion);
   }
 
-  /** 플랫폼의 단일 앱 버전 정책을 조회한다. */
-  private AppVersion require(AppPlatform platform) {
+  /** 플랫폼의 단일 앱 버전 정책을 비관적 잠금으로 조회한다. */
+  private AppVersion requireForUpdate(AppPlatform platform) {
     return appVersionRepository
-        .findByPlatform(platform)
+        .findByPlatformForUpdate(platform)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "앱 버전 정책을 찾을 수 없습니다."));
   }
 

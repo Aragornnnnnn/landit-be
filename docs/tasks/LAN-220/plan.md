@@ -15,6 +15,7 @@
 - 현재 버전이 최소 지원 버전 미만이면 `FORCE`, 최신 버전 미만이면 `SOFT`, 그 외에는 `NONE`을 반환한다.
 - `minimum_supported_build_number`를 `minimum_supported_version_name`으로 교체한다.
 - 관리자 수정 감사 기록에는 변경 전후 정책 값을 저장한다.
+- `admin_account` 초기 허용 목록은 migration에서 임의로 시드하지 않는다. 운영 배포 전에 승인된 기존 사용자 한 명 이상을 별도 승인 절차로 등록한다.
 - 푸시 발송, 사용자 검색, 날짜별 시나리오 관리, 관리자 계정 관리, 감사 기록 조회, MDC·Sentry 추적은 이번 범위에서 제외한다.
 
 ## API
@@ -33,6 +34,18 @@
    - 검증. `1.0.0`, `1.1.0`, `1.3.0`, `1.3.1` 요청이 각각 정책에 맞는 `FORCE`, `SOFT`, `NONE`, `NONE`을 반환한다.
 3. 관리자 API를 목록·플랫폼 수정만 남기고 감사 기록을 갱신한다.
    - 검증. 등록·활성화 경로가 OpenAPI에서 사라지고, 관리자 수정이 공개 확인 API에 즉시 반영된다.
+
+## 운영 준비
+
+관리자 허용 목록에는 실제로 승인된 기존 사용자만 등록한다. 배포 전에 운영자가 승인한 이메일을 사용해 아래 SQL을 실행한다.
+
+```sql
+INSERT INTO admin_account (user_profile_id, created_at)
+SELECT id, CURRENT_TIMESTAMP
+FROM user_profile
+WHERE email = :approved_admin_email
+ON CONFLICT (user_profile_id) DO NOTHING;
+```
 
 ## 검증 명령
 

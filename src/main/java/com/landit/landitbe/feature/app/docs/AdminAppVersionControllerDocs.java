@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.app.dto.AdminAppVersionResponse;
 import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.shared.domain.AppPlatform;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,6 +33,7 @@ public interface AdminAppVersionControllerDocs {
    * @param platform 수정할 앱 플랫폼
    * @param request 앱 버전 정책 수정 요청
    * @return 수정된 앱 버전 정책
+   * @throws ApiException 정책이 없거나 최소 지원 버전이 최신 버전보다 높을 때
    */
   @Operation(summary = "관리자 앱 버전 정책 수정", security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<AdminAppVersionResponse> update(

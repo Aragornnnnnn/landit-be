@@ -90,10 +90,14 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("app_version", "minimum_supported_build_number");
     assertTableConstraintExists("app_version", "uk_app_version_platform");
 
-    assertThatThrownBy(() -> insertAppVersionForConstraintTest("IOS", 0))
+    assertThatThrownBy(() -> insertAppVersionForConstraintTest("IOS", "1.0.0", "1.0.0", 0))
         .isInstanceOf(DataIntegrityViolationException.class);
-    insertAppVersionForConstraintTest("IOS", 1);
-    assertThatThrownBy(() -> insertAppVersionForConstraintTest("IOS", 2))
+    assertThatThrownBy(() -> insertAppVersionForConstraintTest("ANDROID", "1.0", "1.0.0", 1))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThatThrownBy(() -> insertAppVersionForConstraintTest("ANDROID", "1.0.0", "minimum", 1))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    insertAppVersionForConstraintTest("IOS", "1.0.0", "1.0.0", 1);
+    assertThatThrownBy(() -> insertAppVersionForConstraintTest("IOS", "1.1.0", "1.0.0", 2))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
@@ -108,6 +112,17 @@ class DatabaseSchemaIntegrationTests {
             "DROP INDEX IF EXISTS uk_app_version_active_platform",
             "minimum_supported_version_name",
             "CONSTRAINT uk_app_version_platform UNIQUE (platform)");
+  }
+
+  @DisplayName("DB별 migration은 앱 버전명의 Major.Minor.Patch 형식을 강제한다.")
+  @Test
+  void appVersionNameFormatMigrationsUseDatabaseSpecificRegularExpressions() throws Exception {
+    String h2MigrationSql = readMigrationSql("db/h2/V33__enforce_app_version_name_format.sql");
+    String postgresqlMigrationSql =
+        readMigrationSql("db/postgresql/V33__enforce_app_version_name_format.sql");
+
+    assertThat(h2MigrationSql).contains("REGEXP '^[0-9]+\\.[0-9]+\\.[0-9]+$'");
+    assertThat(postgresqlMigrationSql).contains("~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'");
   }
 
   @DisplayName("NPS 테이블 교체는 이미 적용된 V4가 아니라 V6 migration에서 처리한다.")
@@ -615,6 +630,10 @@ class DatabaseSchemaIntegrationTests {
                 "select minimum_supported_version_name from app_version where platform = 'IOS'",
                 String.class))
         .isEqualTo("0.9.0");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select version_name from app_version where platform = 'IOS'", String.class))
+        .isEqualTo("1.0.0");
   }
 
   /** V32 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다. */
@@ -639,7 +658,7 @@ class DatabaseSchemaIntegrationTests {
   private void migrateToVersion(String databaseUrl, String targetVersion) {
     Flyway.configure()
         .dataSource(databaseUrl, "sa", "")
-        .locations("classpath:db/migration")
+        .locations("classpath:db/migration", "classpath:db/h2")
         .target(targetVersion)
         .load()
         .migrate();
@@ -648,7 +667,7 @@ class DatabaseSchemaIntegrationTests {
   private void migrateToLatestVersion(String databaseUrl) {
     Flyway.configure()
         .dataSource(databaseUrl, "sa", "")
-        .locations("classpath:db/migration")
+        .locations("classpath:db/migration", "classpath:db/h2")
         .load()
         .migrate();
   }
@@ -708,7 +727,8 @@ class DatabaseSchemaIntegrationTests {
         "SELECT ai_tutor_id FROM user_profile WHERE id = ?", Long.class, userProfileId);
   }
 
-  private void insertAppVersionForConstraintTest(String platform, long buildNumber) {
+  private void insertAppVersionForConstraintTest(
+      String platform, String versionName, String minimumSupportedVersionName, long buildNumber) {
     jdbcTemplate.update(
         """
         INSERT INTO app_version (
@@ -717,12 +737,14 @@ class DatabaseSchemaIntegrationTests {
             released_at, created_at
         )
         VALUES (
-            ?, '1.0.0', '1.0.0', ?,
+            ?, ?, ?, ?,
             '강제 업데이트', '업데이트 권장', NULL, FALSE,
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         """,
         platform,
+        versionName,
+        minimumSupportedVersionName,
         buildNumber);
   }
 
