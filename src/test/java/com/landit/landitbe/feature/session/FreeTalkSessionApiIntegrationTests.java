@@ -90,6 +90,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void cleanUpDatabase() {
+    awaitPendingExpressionGeneration();
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
     jdbcTemplate.update("DELETE FROM free_talk_session");
@@ -98,6 +99,25 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM learning_session");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE owner_user_profile_id IS NOT NULL");
     jdbcTemplate.update("DELETE FROM free_talk_topic");
+  }
+
+  private void awaitPendingExpressionGeneration() {
+    for (int attempt = 0; attempt < 50; attempt++) {
+      Integer pendingCount =
+          jdbcTemplate.queryForObject(
+              "SELECT COUNT(*) FROM free_talk_session "
+                  + "WHERE expression_generation_status = 'PREPARING'",
+              Integer.class);
+      if (pendingCount == null || pendingCount == 0) {
+        return;
+      }
+      try {
+        Thread.sleep(20L);
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("프리톡 표현 생성 종료를 기다리는 중 인터럽트되었습니다.", exception);
+      }
+    }
   }
 
   @Test
