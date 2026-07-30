@@ -1,4 +1,4 @@
-// 관리자 앱 버전 정책 API의 권한, 등록, 활성 전환, 감사 기록을 검증한다.
+// 관리자 앱 버전 정책 조회와 플랫폼별 수정을 검증한다.
 
 package com.landit.landitbe.feature.app;
 
@@ -24,7 +24,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** 관리자 앱 버전 정책 API의 권한, 등록, 활성 전환, 감사 기록을 검증한다. */
+/** 관리자 앱 버전 정책 조회와 플랫폼별 수정을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -59,11 +59,11 @@ class AdminAppVersionApiIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
-  /** 관리자는 iOS와 Android 앱 버전 정책 목록을 조회할 수 있다. */
+  /** 관리자는 iOS와 Android의 단일 버전 정책을 조회할 수 있다. */
   @Test
-  void listsAppVersionPoliciesForAdmin() throws Exception {
-    insertPolicy("IOS", "1.0.0", 10, 8, true);
-    insertPolicy("ANDROID", "2.0.0", 20, 18, true);
+  void listsSinglePolicyForEachPlatform() throws Exception {
+    insertPolicy("IOS", "1.0.0", "1.0.0", 10);
+    insertPolicy("ANDROID", "2.0.0", "1.8.0", 20);
     String adminAccessToken = loginAdmin("admin-app-version-list", "관리자");
 
     mockMvc
@@ -72,161 +72,97 @@ class AdminAppVersionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.length()").value(2))
-        .andExpect(jsonPath("$.data[?(@.platform == 'IOS')].buildNumber").value(10))
-        .andExpect(jsonPath("$.data[?(@.platform == 'ANDROID')].buildNumber").value(20));
+        .andExpect(
+            jsonPath("$.data[?(@.platform == 'IOS')].minimumSupportedVersionName").value("1.0.0"))
+        .andExpect(
+            jsonPath("$.data[?(@.platform == 'ANDROID')].minimumSupportedVersionName")
+                .value("1.8.0"));
   }
 
-  /** 관리자는 정책을 등록하고 같은 플랫폼의 기존 활성 정책을 새 정책으로 전환한다. */
+  /** 관리자는 플랫폼을 기준으로 단일 정책과 감사 기록을 함께 수정한다. */
   @Test
-  void createsAndActivatesAppVersionWithAuditLog() throws Exception {
-    insertPolicy("IOS", "1.0.0", 10, 8, true);
-    String adminAccessToken = loginAdmin("admin-app-version-admin", "관리자");
-
-    MvcResult createResult =
-        mockMvc
-            .perform(
-                post("/api/v1/admin/app-versions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(requestBody()))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.platform").value("IOS"))
-            .andExpect(jsonPath("$.data.active").value(false))
-            .andReturn();
-    long appVersionId =
-        objectMapper
-            .readTree(createResult.getResponse().getContentAsByteArray())
-            .get("data")
-            .get("appVersionId")
-            .asLong();
-
-    mockMvc
-        .perform(
-            post("/api/v1/admin/app-versions/{appVersionId}/activate", appVersionId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.active").value(true));
-
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "10"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.latestBuildNumber").value(11));
-
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "select count(*) from app_version where platform = 'IOS' and active = true",
-                Long.class))
-        .isEqualTo(1L);
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "select count(*) from admin_audit_log where action = 'APP_VERSION_ACTIVATED'",
-                Long.class))
-        .isEqualTo(1L);
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "select before_value from admin_audit_log where action = 'APP_VERSION_ACTIVATED' "
-                    + "and target_id = ? order by id desc limit 1",
-                String.class,
-                appVersionId))
-        .contains("active=false");
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "select after_value from admin_audit_log where action = 'APP_VERSION_ACTIVATED' "
-                    + "and target_id = ? order by id desc limit 1",
-                String.class,
-                appVersionId))
-        .contains("active=true");
-  }
-
-  /** 관리자 수정은 정책의 모든 변경값과 감사 기록의 전후 값을 함께 반영한다. */
-  @Test
-  void updatesAppVersionAndRecordsBeforeAndAfterValues() throws Exception {
-    insertPolicy("ANDROID", "1.0.0", 10, 8, true);
-    Long appVersionId =
-        jdbcTemplate.queryForObject(
-            "select id from app_version where platform = 'ANDROID' and build_number = 10",
-            Long.class);
+  void updatesPlatformPolicyAndRecordsBeforeAndAfterValues() throws Exception {
+    insertPolicy("ANDROID", "1.0.0", "1.0.0", 10);
     String adminAccessToken = loginAdmin("admin-app-version-update", "관리자");
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/app-versions/{appVersionId}", appVersionId)
+            patch("/api/v1/admin/app-versions/{platform}", "ANDROID")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "versionName":"1.1.0",
-                      "buildNumber":11,
-                      "minimumSupportedBuildNumber":9,
-                      "forceUpdateReason":"필수 업데이트",
-                      "softUpdateReason":"권장 업데이트",
-                      "releaseNote":"안정성 개선",
-                      "releasedAt":"2026-07-30T09:00:00"
-                    }
-                    """))
+                .content(requestBody("1.2.0", "1.1.0", 11)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.versionName").value("1.1.0"))
-        .andExpect(jsonPath("$.data.buildNumber").value(11))
-        .andExpect(jsonPath("$.data.minimumSupportedBuildNumber").value(9))
-        .andExpect(jsonPath("$.data.forceUpdateReason").value("필수 업데이트"))
-        .andExpect(jsonPath("$.data.softUpdateReason").value("권장 업데이트"))
-        .andExpect(jsonPath("$.data.releaseNote").value("안정성 개선"))
-        .andExpect(jsonPath("$.data.releasedAt").value("2026-07-30T09:00:00"));
+        .andExpect(jsonPath("$.data.versionName").value("1.2.0"))
+        .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.1.0"))
+        .andExpect(jsonPath("$.data.buildNumber").value(11));
+
+    mockMvc
+        .perform(
+            get("/api/v1/app-versions/check")
+                .param("platform", "ANDROID")
+                .param("versionName", "1.0.0")
+                .param("buildNumber", "10"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updateType").value("FORCE"));
 
     assertThat(
             jdbcTemplate.queryForObject(
                 "select before_value from admin_audit_log where action = 'APP_VERSION_UPDATED' "
-                    + "and target_id = ? order by id desc limit 1",
-                String.class,
-                appVersionId))
-        .contains("versionName=1.0.0", "buildNumber=10", "minimumSupportedBuildNumber=8");
+                    + "order by id desc limit 1",
+                String.class))
+        .contains("versionName=1.0.0", "minimumSupportedVersionName=1.0.0");
     assertThat(
             jdbcTemplate.queryForObject(
                 "select after_value from admin_audit_log where action = 'APP_VERSION_UPDATED' "
-                    + "and target_id = ? order by id desc limit 1",
-                String.class,
-                appVersionId))
-        .contains("versionName=1.1.0", "buildNumber=11", "minimumSupportedBuildNumber=9");
+                    + "order by id desc limit 1",
+                String.class))
+        .contains("versionName=1.2.0", "minimumSupportedVersionName=1.1.0");
   }
 
-  /** 관리자 앱 버전 등록은 1보다 작은 빌드 번호를 요청 오류로 거절한다. */
+  /** 최소 지원 버전이 최신 버전보다 높으면 정책 수정을 거절한다. */
   @Test
-  void rejectsInvalidBuildNumberBeforeDatabaseWrite() throws Exception {
+  void rejectsPolicyWithMinimumVersionHigherThanLatestVersion() throws Exception {
+    insertPolicy("IOS", "1.0.0", "1.0.0", 10);
     String adminAccessToken = loginAdmin("admin-app-version-invalid", "관리자");
 
     mockMvc
         .perform(
-            post("/api/v1/admin/app-versions")
+            patch("/api/v1/admin/app-versions/{platform}", "IOS")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "versionName":"1.0.0",
-                      "buildNumber":0,
-                      "minimumSupportedBuildNumber":0,
-                      "releasedAt":"2026-07-29T10:00:00"
-                    }
-                    """))
+                .content(requestBody("1.1.0", "1.2.0", 11)))
         .andExpect(status().isBadRequest());
   }
 
-  /** 관리자 앱 버전 API는 OpenAPI 문서에 노출된다. */
+  /** Major.Minor.Patch 형식이 아닌 관리자 버전명은 정책 수정을 거절한다. */
   @Test
-  void documentsAdminAppVersionApis() throws Exception {
+  void rejectsPolicyWithInvalidVersionName() throws Exception {
+    insertPolicy("IOS", "1.0.0", "1.0.0", 10);
+    String adminAccessToken = loginAdmin("admin-app-version-format", "관리자");
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/app-versions/{platform}", "IOS")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody("1.1", "1.0.0", 11)))
+        .andExpect(status().isBadRequest());
+  }
+
+  /** 등록과 활성 전환 경로는 관리자 OpenAPI에 노출되지 않는다. */
+  @Test
+  void documentsOnlyListAndPlatformUpdateApis() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/admin/app-versions'].get.summary").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/admin/app-versions'].post.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/app-versions'].post").doesNotExist())
         .andExpect(
-            jsonPath("$.paths['/api/v1/admin/app-versions/{appVersionId}'].patch.summary").exists())
+            jsonPath("$.paths['/api/v1/admin/app-versions/{platform}'].patch.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/app-versions/{appVersionId}']").doesNotExist())
         .andExpect(
-            jsonPath("$.paths['/api/v1/admin/app-versions/{appVersionId}/activate'].post.summary")
-                .exists());
+            jsonPath("$.paths['/api/v1/admin/app-versions/{appVersionId}/activate']")
+                .doesNotExist());
   }
 
   /** 테스트 식별자와 이름으로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
@@ -267,33 +203,33 @@ class AdminAppVersionApiIntegrationTests {
     return accessToken;
   }
 
-  /** 활성 여부가 지정된 기존 앱 버전 정책을 추가한다. */
+  /** 플랫폼별 단일 앱 버전 정책을 추가한다. */
   private void insertPolicy(
-      String platform,
-      String versionName,
-      long buildNumber,
-      long minimumSupportedBuildNumber,
-      boolean active) {
+      String platform, String versionName, String minimumSupportedVersionName, long buildNumber) {
     jdbcTemplate.update(
         """
         insert into app_version (
-            platform, version_name, build_number, minimum_supported_build_number, active, released_at,
+            platform, version_name, minimum_supported_version_name, build_number, active, released_at,
             created_at
         )
-        values (?, ?, ?, ?, ?, current_timestamp, current_timestamp)
+        values (?, ?, ?, ?, true, current_timestamp, current_timestamp)
         """,
         platform,
         versionName,
-        buildNumber,
-        minimumSupportedBuildNumber,
-        active);
+        minimumSupportedVersionName,
+        buildNumber);
   }
 
-  /** 새 앱 버전 정책 등록 요청 본문을 만든다. */
-  private String requestBody() {
-    return "{\"platform\":\"IOS\",\"versionName\":\"1.1.0\",\"buildNumber\":11,"
-        + "\"minimumSupportedBuildNumber\":9,\"forceUpdateReason\":\"강제 업데이트\","
-        + "\"softUpdateReason\":\"권장 업데이트\",\"releaseNote\":\"개선 사항\","
-        + "\"releasedAt\":\"2026-07-29T10:00:00\"}";
+  /** 관리자 정책 수정 요청 본문을 만든다. */
+  private String requestBody(
+      String versionName, String minimumSupportedVersionName, long buildNumber) {
+    return ("{\"versionName\":\"%s\","
+            + "\"minimumSupportedVersionName\":\"%s\","
+            + "\"buildNumber\":%d,"
+            + "\"forceUpdateReason\":\"필수 업데이트\","
+            + "\"softUpdateReason\":\"권장 업데이트\","
+            + "\"releaseNote\":\"안정성 개선\","
+            + "\"releasedAt\":\"2026-07-30T09:00:00\"}")
+        .formatted(versionName, minimumSupportedVersionName, buildNumber);
   }
 }

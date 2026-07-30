@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * @param platform 앱 플랫폼
  * @param versionName 사용자에게 표시할 버전명
  * @param buildNumber 최신 앱 빌드 번호
- * @param minimumSupportedBuildNumber 최소 지원 앱 빌드 번호
+ * @param minimumSupportedVersionName 최소 지원 앱 버전명
  * @param forceUpdateReason 강제 업데이트 안내 사유
  * @param softUpdateReason 권장 업데이트 안내 사유
  * @param releaseNote 릴리스 노트
@@ -25,7 +25,7 @@ public record AdminAppVersionResponse(
     AppPlatform platform,
     String versionName,
     long buildNumber,
-    long minimumSupportedBuildNumber,
+    String minimumSupportedVersionName,
     String forceUpdateReason,
     String softUpdateReason,
     String releaseNote,
@@ -44,7 +44,7 @@ public record AdminAppVersionResponse(
         appVersion.getPlatform(),
         appVersion.getVersionName(),
         appVersion.getBuildNumber(),
-        appVersion.getMinimumSupportedBuildNumber(),
+        appVersion.getMinimumSupportedVersionName(),
         appVersion.getForceUpdateReason(),
         appVersion.getSoftUpdateReason(),
         appVersion.getReleaseNote(),

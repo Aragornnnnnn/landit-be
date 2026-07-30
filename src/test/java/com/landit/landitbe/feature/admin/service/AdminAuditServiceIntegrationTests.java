@@ -48,11 +48,11 @@ class AdminAuditServiceIntegrationTests {
 
     adminAuditService.record(
         adminUserProfileId,
-        AdminAction.APP_VERSION_CREATED,
+        AdminAction.APP_VERSION_UPDATED,
         "APP_VERSION",
-        "120",
-        null,
-        "{\"platform\":\"IOS\",\"buildNumber\":120}");
+        "IOS",
+        "{\"versionName\":\"1.0.0\"}",
+        "{\"versionName\":\"1.1.0\"}");
 
     Map<String, Object> auditLog =
         jdbcTemplate.queryForMap(
@@ -64,11 +64,11 @@ class AdminAuditServiceIntegrationTests {
             adminUserProfileId);
     assertThat(auditLog)
         .containsEntry("ADMIN_USER_PROFILE_ID", adminUserProfileId)
-        .containsEntry("ACTION", "APP_VERSION_CREATED")
+        .containsEntry("ACTION", "APP_VERSION_UPDATED")
         .containsEntry("TARGET_TYPE", "APP_VERSION")
-        .containsEntry("TARGET_ID", "120")
-        .containsEntry("BEFORE_VALUE", null)
-        .containsEntry("AFTER_VALUE", "{\"platform\":\"IOS\",\"buildNumber\":120}");
+        .containsEntry("TARGET_ID", "IOS")
+        .containsEntry("BEFORE_VALUE", "{\"versionName\":\"1.0.0\"}")
+        .containsEntry("AFTER_VALUE", "{\"versionName\":\"1.1.0\"}");
   }
 
   /** 인증 정보가 포함된 감사 값은 저장하지 않는다. */
@@ -80,9 +80,9 @@ class AdminAuditServiceIntegrationTests {
             () ->
                 adminAuditService.record(
                     adminUserProfileId,
-                    AdminAction.APP_VERSION_CREATED,
+                    AdminAction.APP_VERSION_UPDATED,
                     "APP_VERSION",
-                    "120",
+                    "IOS",
                     null,
                     "Bearer never-store-this"))
         .isInstanceOf(IllegalArgumentException.class);
@@ -90,9 +90,9 @@ class AdminAuditServiceIntegrationTests {
             () ->
                 adminAuditService.record(
                     adminUserProfileId,
-                    AdminAction.APP_VERSION_CREATED,
+                    AdminAction.APP_VERSION_UPDATED,
                     "Bearer never-store-this",
-                    "120",
+                    "IOS",
                     null,
                     null))
         .isInstanceOf(IllegalArgumentException.class);
