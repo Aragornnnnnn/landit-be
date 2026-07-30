@@ -24,7 +24,7 @@ public interface ScenarioSessionControllerDocs {
    */
   @Operation(
       summary = "시나리오 세션 시작",
-      description = "선택한 시나리오로 SCENARIO 타입 학습 세션을 시작한다.",
+      description = "현재 제공 중인 시나리오 또는 복습 권한이 있는 시나리오로 SCENARIO 타입 학습 세션을 시작한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

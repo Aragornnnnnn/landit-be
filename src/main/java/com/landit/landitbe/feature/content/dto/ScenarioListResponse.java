@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.content.dto;
 
+import com.landit.landitbe.feature.content.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.domain.ScenarioAvailabilityStatus;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -83,10 +83,10 @@ public record ScenarioListResponse(
    * @param firstSpeaker 첫 발화자
    * @param thumbnailUrl 시나리오 썸네일 URL
    * @param availabilityStatus 사용자별 시나리오 접근 상태
+   * @param dailyScenarioType 오늘 시나리오의 신규·재도전 구분
    * @param completed 사용자 시나리오 완료 여부
    * @param locked 시나리오 잠금 여부
    * @param lockReason 시나리오 잠금 사유
-   * @param expiresAt 오늘 시나리오 시작 가능 기한
    * @param openingPreview 잠기지 않은 시나리오의 시작 메시지 미리보기
    */
   @Schema(description = "시나리오 응답")
@@ -101,10 +101,10 @@ public record ScenarioListResponse(
       @Schema(description = "첫 발화자") String firstSpeaker,
       @Schema(description = "시나리오 썸네일 URL") String thumbnailUrl,
       @Schema(description = "사용자별 시나리오 접근 상태") ScenarioAvailabilityStatus availabilityStatus,
+      @Schema(description = "오늘 시나리오의 신규·재도전 구분") DailyScenarioType dailyScenarioType,
       @Schema(description = "사용자 시나리오 완료 여부") boolean completed,
       @Schema(description = "시나리오 잠금 여부") boolean locked,
       @Schema(description = "시나리오 잠금 사유") String lockReason,
-      @Schema(description = "오늘 시나리오 시작 가능 기한") OffsetDateTime expiresAt,
       @Schema(description = "잠기지 않은 시나리오의 시작 메시지 미리보기") OpeningPreviewResponse openingPreview) {
 
     /**
@@ -112,14 +112,14 @@ public record ScenarioListResponse(
      *
      * @param projection 시나리오 조회 Projection
      * @param availabilityStatus 사용자별 시나리오 접근 상태
-     * @param expiresAt 오늘 시나리오 시작 가능 기한
+     * @param dailyScenarioType 오늘 시나리오의 신규·재도전 구분
      * @param lockReason 시나리오 잠금 사유
      * @return 시나리오 응답
      */
     public static ScenarioResponse from(
         ScenarioListProjection projection,
         ScenarioAvailabilityStatus availabilityStatus,
-        OffsetDateTime expiresAt,
+        DailyScenarioType dailyScenarioType,
         String lockReason,
         OpeningPreviewResponse openingPreview) {
       boolean completed = availabilityStatus == ScenarioAvailabilityStatus.CLEARED;
@@ -135,10 +135,10 @@ public record ScenarioListResponse(
           projection.firstSpeaker().name(),
           projection.thumbnailUrl(),
           availabilityStatus,
+          availabilityStatus == ScenarioAvailabilityStatus.TODAY ? dailyScenarioType : null,
           completed,
           locked,
           lockReason,
-          availabilityStatus == ScenarioAvailabilityStatus.TODAY ? expiresAt : null,
           openingPreview);
     }
   }

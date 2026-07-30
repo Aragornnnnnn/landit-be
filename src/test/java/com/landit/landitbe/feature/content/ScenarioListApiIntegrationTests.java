@@ -2,27 +2,24 @@
 
 package com.landit.landitbe.feature.content;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -40,7 +37,6 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @SpringBootTest
 @Import(ScenarioListApiIntegrationTests.FixedClockConfiguration.class)
-@ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
@@ -52,10 +48,13 @@ class ScenarioListApiIntegrationTests {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  @Autowired private MutableClock mutableClock;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeEach
   void setUp() {
+    mutableClock.setInstant(Instant.parse("2026-07-28T14:00:00Z"));
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
     jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
     jdbcTemplate.update("DELETE FROM session_history_artifact");
@@ -64,7 +63,6 @@ class ScenarioListApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
     jdbcTemplate.update("DELETE FROM user_scenario_access");
-    jdbcTemplate.update("DELETE FROM daily_scenario_schedule");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
     jdbcTemplate.update("DELETE FROM writing_expression");
     jdbcTemplate.update("DELETE FROM user_scenario_progress");
@@ -95,12 +93,11 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
-  void scenariosExposeTodayStatusAndIgnoreLegacyProgress() throws Exception {
+  void scenariosExposeFirstUnclearedScenarioAsNewAndIgnoreLegacyProgress() throws Exception {
     JsonNode loginResponseBody = login();
     final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
     seedScenarioListData(userId);
-    insertDailyScenarioSchedule(202, "2026-07-28");
 
     mockMvc
         .perform(
@@ -108,16 +105,81 @@ class ScenarioListApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioId").value(202))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("NEW"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].starRating").value(nullValue()))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].expiresAt")
-                .value("2026-07-29T00:00:00+09:00"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].expiresAt").doesNotExist())
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
+  }
+
+  @Test
+  void scenariosExposePreviousDayUncompletedSessionAsRetry() throws Exception {
+    JsonNode loginResponseBody = login();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(null);
+
+    MvcResult startResult =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/202/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(startResult.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+    jdbcTemplate.update(
+        "UPDATE learning_session SET started_at = TIMESTAMP '2026-07-27 10:00:00' WHERE id = ?",
+        sessionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("RETRY"));
+  }
+
+  @Test
+  void scenariosExposePreviousDayInterruptedSessionAsRetry() throws Exception {
+    mutableClock.setInstant(Instant.parse("2026-07-27T14:00:00Z"));
+    JsonNode loginResponseBody = login();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(null);
+
+    MvcResult startResult =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/202/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(startResult.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+    mockMvc
+        .perform(
+            patch("/api/v1/sessions/%d/end".formatted(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk());
+    mutableClock.setInstant(Instant.parse("2026-07-28T14:00:00Z"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("RETRY"));
   }
 
   @Test
@@ -137,27 +199,8 @@ class ScenarioListApiIntegrationTests {
             jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("CLEARED"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].expiresAt").value(nullValue()));
-  }
-
-  @Test
-  void scenariosWarnWhenTodayScheduleReferencesInactiveContent(CapturedOutput output)
-      throws Exception {
-    JsonNode loginResponseBody = login();
-    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
-    seedScenarioListData(null);
-    insertDailyScenarioSchedule(203, "2026-07-28");
-
-    mockMvc
-        .perform(
-            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.categories[1].scenarios[0].scenarioId").value(203))
         .andExpect(
-            jsonPath("$.data.categories[1].scenarios[0].availabilityStatus").value("LOCKED"));
-
-    assertThat(output.getOut())
-        .contains("daily scenario schedule references inactive content: scenarioId=203");
+            jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value(nullValue()));
   }
 
   @Test
@@ -169,7 +212,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.summary").value("시나리오 전체 조회"))
         .andExpect(
             jsonPath("$.paths['/api/v1/scenarios'].get.description")
-                .value("카테고리별 시나리오 목록과 사용자별 일일 접근 상태, 시작 기한, 별점, 시작 메시지 미리보기를 조회한다."))
+                .value("카테고리별 시나리오 목록과 사용자별 일일 접근 상태, 신규·재도전 구분, 별점, 시작 메시지 미리보기를 조회한다."))
         .andExpect(jsonPath("$.paths['/api/v1/scenarios'].get.security[0].bearerAuth").exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/scenarios'].get.responses['200'].description")
@@ -215,7 +258,8 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].lockReason").value(nullValue()))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].expiresAt").value(nullValue()))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessage")
                 .value("What is your favorite food?"))
@@ -246,6 +290,8 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value(nullValue()))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].firstSpeaker").value("USER"))
@@ -262,10 +308,11 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
-  void scenariosDoNotUsePreviousScenarioCompletionToUnlockTodayScenario() throws Exception {
+  void scenariosExposeNextScenarioOnTheDayAfterCompletion() throws Exception {
     JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     seedScenarioListData(null);
-    insertDailyScenarioSchedule(201, "2026-07-28");
+    insertScenarioAccess(userId, 202);
 
     mockMvc
         .perform(
@@ -274,12 +321,22 @@ class ScenarioListApiIntegrationTests {
                     HttpHeaders.AUTHORIZATION,
                     "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(true))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("CLEARED"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"));
+
+    mutableClock.setInstant(Instant.parse("2026-07-29T14:00:00Z"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios")
+                .header(
+                    HttpHeaders.AUTHORIZATION,
+                    "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("TODAY"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").exists());
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value("NEW"));
   }
 
   @Test
@@ -387,23 +444,13 @@ class ScenarioListApiIntegrationTests {
     }
   }
 
-  private void insertDailyScenarioSchedule(long scenarioId, String serviceDate) {
-    jdbcTemplate.update(
-        """
-        INSERT INTO daily_scenario_schedule (service_date, scenario_id, created_at, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """,
-        serviceDate,
-        scenarioId);
-  }
-
   private void insertScenarioAccess(long userId, long scenarioId) {
     jdbcTemplate.update(
         """
         INSERT INTO user_scenario_access (
             user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at
         )
-        VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 'EN', TIMESTAMP '2026-07-28 10:00:00', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         userId,
         scenarioId);
@@ -592,8 +639,38 @@ class ScenarioListApiIntegrationTests {
 
     @Bean
     @Primary
-    Clock testClock() {
-      return Clock.fixed(Instant.parse("2026-07-28T14:00:00Z"), ZoneOffset.UTC);
+    MutableClock testClock() {
+      return new MutableClock(Instant.parse("2026-07-28T14:00:00Z"), ZoneOffset.UTC);
+    }
+  }
+
+  static class MutableClock extends java.time.Clock {
+
+    private Instant instant;
+    private final ZoneId zoneId;
+
+    MutableClock(Instant instant, ZoneId zoneId) {
+      this.instant = instant;
+      this.zoneId = zoneId;
+    }
+
+    void setInstant(Instant instant) {
+      this.instant = instant;
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return zoneId;
+    }
+
+    @Override
+    public java.time.Clock withZone(ZoneId zone) {
+      return new MutableClock(instant, zone);
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
     }
   }
 }

@@ -27,9 +27,6 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "scenario_language_variant_id", nullable = false)
   private Long scenarioLanguageVariantId;
 
-  @Column(name = "daily_scenario_schedule_id")
-  private Long dailyScenarioScheduleId;
-
   @Column(name = "user_opening_instruction_snapshot", columnDefinition = "text")
   private String userOpeningInstructionSnapshot;
 
@@ -43,12 +40,10 @@ public class ScenarioSession extends BaseTimeEntity {
   private ScenarioSession(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
-      Long dailyScenarioScheduleId,
       String userOpeningInstructionSnapshot,
       GoalCompletionStatus goalCompletionStatus) {
     this.learningSessionId = learningSessionId;
     this.scenarioLanguageVariantId = scenarioLanguageVariantId;
-    this.dailyScenarioScheduleId = dailyScenarioScheduleId;
     this.userOpeningInstructionSnapshot = userOpeningInstructionSnapshot;
     this.goalCompletionStatus = goalCompletionStatus;
   }
@@ -58,30 +53,18 @@ public class ScenarioSession extends BaseTimeEntity {
    *
    * @param learningSessionId 연결할 학습 세션 ID
    * @param scenarioLanguageVariantId 시작한 시나리오 언어 variant ID
-   * @param dailyScenarioScheduleId 일일 배정으로 시작한 일정 ID, 복습 접근으로 시작하면 null
    * @param userOpeningInstructionSnapshot 사용자 선톡 시작 안내 스냅샷
    * @return 생성된 시나리오 세션 보조 정보
    */
   public static ScenarioSession start(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
-      Long dailyScenarioScheduleId,
       String userOpeningInstructionSnapshot) {
     return new ScenarioSession(
         learningSessionId,
         scenarioLanguageVariantId,
-        dailyScenarioScheduleId,
         userOpeningInstructionSnapshot,
         GoalCompletionStatus.NOT_STARTED);
-  }
-
-  /**
-   * 일일 배정 시나리오로 시작한 세션인지 반환한다.
-   *
-   * @return 오늘 배정된 일정에 연결되어 시작했으면 true
-   */
-  public boolean hasDailyScenarioSchedule() {
-    return dailyScenarioScheduleId != null;
   }
 
   /** AI가 판단한 시나리오 목표 달성 상태를 갱신한다. */

@@ -22,7 +22,7 @@ public interface ScenarioControllerDocs {
    */
   @Operation(
       summary = "시나리오 전체 조회",
-      description = "카테고리별 시나리오 목록과 사용자별 일일 접근 상태, 시작 기한, 별점, 시작 메시지 미리보기를 조회한다.",
+      description = "카테고리별 시나리오 목록과 사용자별 일일 접근 상태, 신규·재도전 구분, 별점, 시작 메시지 미리보기를 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

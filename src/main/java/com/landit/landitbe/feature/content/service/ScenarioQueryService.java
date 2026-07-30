@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.content.service;
 
-import com.landit.landitbe.feature.content.domain.DailyScenarioSchedule;
+import com.landit.landitbe.feature.content.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.domain.ScenarioAvailabilityStatus;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.CategoryResponse;
@@ -17,31 +17,26 @@ import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 시나리오 목록 조회 결과를 사용자별 응답 형태로 조립한다. */
 @RequiredArgsConstructor
 @Service
-@Slf4j
 public class ScenarioQueryService {
 
   private static final String CATEGORY_LOCK_REASON = "현재 사용할 수 없는 카테고리입니다.";
   private static final String SCENARIO_LOCK_REASON = "현재 사용할 수 없는 시나리오입니다.";
   private static final String DAILY_SCENARIO_NOT_AVAILABLE = "DAILY_SCENARIO_NOT_AVAILABLE";
-  private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
 
   private final ScenarioListQueryRepository scenarioListQueryRepository;
-  private final DailyScenarioScheduleService dailyScenarioScheduleService;
+  private final ScenarioProgressionService scenarioProgressionService;
   private final ScenarioAccessService scenarioAccessService;
   private final UserProfileService userProfileService;
   private final Clock clock;
@@ -50,25 +45,21 @@ public class ScenarioQueryService {
   @Transactional(readOnly = true)
   public ScenarioListResponse getScenarioList(long userId) {
     Instant evaluatedAt = clock.instant();
-    DailyScenarioScheduleService.TodaySchedule todaySchedule =
-        dailyScenarioScheduleService.findAt(evaluatedAt);
     UserLocale userLocale = userProfileService.getUserLocale(userId);
     Set<Long> accessibleScenarioIds =
         Set.copyOf(
             scenarioAccessService.findAccessibleScenarioIds(userId, userLocale.targetLocale()));
     List<ScenarioListProjection> scenarioRows =
         scenarioListQueryRepository.findScenarioList(userId);
+    ScenarioProgressionService.CurrentScenario currentScenario =
+        scenarioProgressionService
+            .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
+            .orElse(null);
     return ScenarioListResponse.from(
         categoryGroups(scenarioRows).stream()
             .map(
                 categoryGroup ->
-                    categoryGroup.asCategoryResponse(
-                        accessibleScenarioIds,
-                        todaySchedule
-                            .schedule()
-                            .map(DailyScenarioSchedule::getScenarioId)
-                            .orElse(null),
-                        expiresAt(todaySchedule.nextDayStart())))
+                    categoryGroup.asCategoryResponse(accessibleScenarioIds, currentScenario))
             .toList());
   }
 
@@ -88,42 +79,44 @@ public class ScenarioQueryService {
   private static ScenarioResponse toScenarioResponse(
       ScenarioListProjection scenarioRow,
       Set<Long> accessibleScenarioIds,
-      Long todayScenarioId,
-      OffsetDateTime expiresAt) {
+      ScenarioProgressionService.CurrentScenario currentScenario) {
     ScenarioAvailabilityStatus availabilityStatus =
-        availabilityStatus(scenarioRow, accessibleScenarioIds, todayScenarioId);
+        availabilityStatus(scenarioRow, accessibleScenarioIds, currentScenario);
     return ScenarioResponse.from(
         scenarioRow,
         availabilityStatus,
-        expiresAt,
+        dailyScenarioType(scenarioRow, currentScenario),
         lockReason(scenarioRow, availabilityStatus),
         openingPreview(scenarioRow, availabilityStatus));
   }
 
-  /** 콘텐츠 활성 상태와 접근 권한, 오늘 일정 순으로 시나리오 접근 상태를 계산한다. */
+  /** 콘텐츠 활성 상태와 접근 권한, 현재 제공 시나리오 순으로 시나리오 접근 상태를 계산한다. */
   private static ScenarioAvailabilityStatus availabilityStatus(
-      ScenarioListProjection scenarioRow, Set<Long> accessibleScenarioIds, Long todayScenarioId) {
+      ScenarioListProjection scenarioRow,
+      Set<Long> accessibleScenarioIds,
+      ScenarioProgressionService.CurrentScenario currentScenario) {
     if (inactive(scenarioRow.categoryStatus())
         || inactive(scenarioRow.scenarioStatus())
         || inactive(scenarioRow.variantStatus())) {
-      if (scenarioRow.scenarioId().equals(todayScenarioId)) {
-        log.warn(
-            "daily scenario schedule references inactive content: scenarioId={}, "
-                + "categoryStatus={}, scenarioStatus={}, variantStatus={}",
-            scenarioRow.scenarioId(),
-            scenarioRow.categoryStatus(),
-            scenarioRow.scenarioStatus(),
-            scenarioRow.variantStatus());
-      }
       return ScenarioAvailabilityStatus.LOCKED;
     }
     if (accessibleScenarioIds.contains(scenarioRow.scenarioId())) {
       return ScenarioAvailabilityStatus.CLEARED;
     }
-    if (scenarioRow.scenarioId().equals(todayScenarioId)) {
+    if (currentScenario != null && scenarioRow.scenarioId().equals(currentScenario.scenarioId())) {
       return ScenarioAvailabilityStatus.TODAY;
     }
     return ScenarioAvailabilityStatus.LOCKED;
+  }
+
+  /** 오늘 시나리오에만 신규·재도전 구분을 반환한다. */
+  private static DailyScenarioType dailyScenarioType(
+      ScenarioListProjection scenarioRow,
+      ScenarioProgressionService.CurrentScenario currentScenario) {
+    if (currentScenario == null || !scenarioRow.scenarioId().equals(currentScenario.scenarioId())) {
+      return null;
+    }
+    return currentScenario.type();
   }
 
   /** 잠금된 시나리오의 콘텐츠 상태와 일일 접근 사유를 결정한다. */
@@ -159,11 +152,6 @@ public class ScenarioQueryService {
     return status != ActiveStatus.ACTIVE;
   }
 
-  /** 다음 서울 자정을 API 응답용 offset datetime으로 변환한다. */
-  private static OffsetDateTime expiresAt(Instant nextDayStart) {
-    return nextDayStart.atZone(SERVICE_ZONE_ID).toOffsetDateTime();
-  }
-
   private record CategoryGroup(
       Long categoryId,
       String categoryName,
@@ -190,11 +178,12 @@ public class ScenarioQueryService {
 
     /** 누적한 시나리오에 일일 접근 규칙을 적용해 카테고리 응답을 만든다. */
     private CategoryResponse asCategoryResponse(
-        Set<Long> accessibleScenarioIds, Long todayScenarioId, OffsetDateTime expiresAt) {
+        Set<Long> accessibleScenarioIds,
+        ScenarioProgressionService.CurrentScenario currentScenario) {
       List<ScenarioResponse> scenarios = new ArrayList<>();
       for (ScenarioListProjection scenarioRow : scenarioRows) {
         ScenarioResponse scenario =
-            toScenarioResponse(scenarioRow, accessibleScenarioIds, todayScenarioId, expiresAt);
+            toScenarioResponse(scenarioRow, accessibleScenarioIds, currentScenario);
         scenarios.add(scenario);
       }
       return CategoryResponse.from(

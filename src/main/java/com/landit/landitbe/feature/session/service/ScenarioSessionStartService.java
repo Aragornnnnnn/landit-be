@@ -2,8 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.domain.DailyScenarioSchedule;
-import com.landit.landitbe.feature.content.service.DailyScenarioScheduleService;
+import com.landit.landitbe.feature.content.service.ScenarioProgressionService;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
@@ -40,7 +39,7 @@ public class ScenarioSessionStartService {
   private final UserProfileService userProfileService;
   private final LearningProgressService learningProgressService;
   private final ScenarioAccessService scenarioAccessService;
-  private final DailyScenarioScheduleService dailyScenarioScheduleService;
+  private final ScenarioProgressionService scenarioProgressionService;
   private final LearningSessionService learningSessionService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionHistoryService sessionHistoryService;
@@ -61,13 +60,11 @@ public class ScenarioSessionStartService {
     UserProfile userProfile = findActiveUser(userId);
     ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId);
     assertContentActive(startRow);
-    Long dailyScenarioScheduleId =
-        resolveDailyScenarioScheduleId(userProfile, startRow.scenarioId(), startedInstant);
+    assertCurrentScenarioOrReplay(userProfile, startRow.scenarioId(), startedInstant);
 
     LocalDateTime now = LocalDateTime.ofInstant(startedInstant, SERVICE_ZONE_ID);
     ensureProgress(userProfile, startRow, now);
-    LearningSession learningSession =
-        createLearningSession(userId, userProfile, startRow, dailyScenarioScheduleId, now);
+    LearningSession learningSession = createLearningSession(userId, userProfile, startRow, now);
     CurrentMessageResponse currentMessage = null;
     if (startRow.firstSpeaker() == ConversationSpeaker.AI) {
       currentMessage = saveAiOpeningMessage(learningSession.getId(), userProfile, startRow, now);
@@ -113,20 +110,17 @@ public class ScenarioSessionStartService {
     }
   }
 
-  /** 복습 권한이 없으면 해당 시각의 오늘 배정 시나리오인지 확인해 일정을 연결한다. */
-  private Long resolveDailyScenarioScheduleId(
+  /** 복습 권한이 없으면 해당 시각에 사용자에게 제공된 시나리오인지 확인한다. */
+  private void assertCurrentScenarioOrReplay(
       UserProfile userProfile, Long scenarioId, Instant startedInstant) {
     if (scenarioAccessService.hasAccess(
         userProfile.getId(), scenarioId, userProfile.getTargetLocale())) {
-      return null;
+      return;
     }
-    return dailyScenarioScheduleService
-        .findAt(startedInstant)
-        .schedule()
-        .filter(schedule -> schedule.getScenarioId().equals(scenarioId))
-        .map(DailyScenarioSchedule::getId)
-        .orElseThrow(
-            () -> new ApiException(ErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE));
+    if (!scenarioProgressionService.isCurrentScenario(
+        userProfile.getId(), scenarioId, userProfile.getTargetLocale(), startedInstant)) {
+      throw new ApiException(ErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE);
+    }
   }
 
   /** 최초 시작과 재시도를 같은 흐름으로 처리하되, 기존 완료 성과는 유지한다. */
@@ -141,7 +135,6 @@ public class ScenarioSessionStartService {
       long userId,
       UserProfile userProfile,
       ScenarioSessionStartProjection startRow,
-      Long dailyScenarioScheduleId,
       LocalDateTime startedAt) {
     LearningSession learningSession =
         learningSessionService.save(
@@ -155,7 +148,6 @@ public class ScenarioSessionStartService {
         ScenarioSession.start(
             learningSession.getId(),
             startRow.variantId(),
-            dailyScenarioScheduleId,
             startRow.firstSpeaker() == ConversationSpeaker.USER
                 ? startRow.userOpeningInstruction()
                 : null));

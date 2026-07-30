@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.learning.repository.UserScenarioAccessReposit
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,36 @@ public class ScenarioAccessService {
         .stream()
         .map(UserScenarioAccess::getScenarioId)
         .toList();
+  }
+
+  /**
+   * 사용자가 해당 날짜에 새 복습 권한을 얻었는지 확인한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @param date 확인할 날짜
+   * @return 해당 날짜에 새 복습 권한을 얻었으면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean hasAccessGrantedOn(Long userProfileId, Locale targetLocale, LocalDate date) {
+    return userScenarioAccessRepository.existsGrantedOn(
+        userProfileId, targetLocale, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+  }
+
+  /**
+   * 이전 날짜에 시작했지만 완료하지 못한 시나리오 세션이 있는지 확인한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param scenarioId 시나리오 ID
+   * @param targetLocale 학습 대상 언어
+   * @param date 오늘 날짜
+   * @return 이전 날짜의 미완료 세션이 있으면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean hasUncompletedSessionBefore(
+      Long userProfileId, Long scenarioId, Locale targetLocale, LocalDate date) {
+    return userScenarioAccessRepository.existsUncompletedSessionBefore(
+        userProfileId, scenarioId, targetLocale, date.atStartOfDay());
   }
 
   /**

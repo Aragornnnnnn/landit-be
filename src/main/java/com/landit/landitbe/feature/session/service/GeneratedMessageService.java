@@ -48,8 +48,7 @@ class GeneratedMessageService {
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
       learningSession.completeBySystem(generation.completionReason(), completedAt);
-      grantScenarioAccessIfDailySession(
-          learningSession, scenarioSession, submittedContext, completedAt);
+      grantScenarioAccess(learningSession, submittedContext, completedAt);
     }
     return SessionMessageSubmitResponse.from(
         submittedContext.sessionId(),
@@ -60,15 +59,11 @@ class GeneratedMessageService {
         generation.completed());
   }
 
-  /** 일일 배정으로 시작한 세션을 완료하면 해당 시나리오의 복습 권한을 부여한다. */
-  private void grantScenarioAccessIfDailySession(
+  /** 시나리오 세션을 정상 완료하면 해당 시나리오의 복습 권한을 멱등하게 부여한다. */
+  private void grantScenarioAccess(
       LearningSession learningSession,
-      ScenarioSession scenarioSession,
       SubmittedMessageContext submittedContext,
       LocalDateTime completedAt) {
-    if (!scenarioSession.hasDailyScenarioSchedule()) {
-      return;
-    }
     scenarioAccessService.grantAccess(
         learningSession.getUserProfileId(),
         submittedContext.scenarioContext().scenarioId(),
