@@ -35,6 +35,8 @@ class FreeTalkMessageServiceTest {
       mock(FreeTalkSubmittedMessageService.class);
   private final AiFreeTalkClient aiFreeTalkClient = mock(AiFreeTalkClient.class);
   private final SessionMessageService sessionMessageService = mock(SessionMessageService.class);
+  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
+      mock(FreeTalkExpressionGenerationDispatcher.class);
   private final TaskExecutor directExecutor = Runnable::run;
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
       mock(FreeTalkExpressionGenerationDispatcher.class);
