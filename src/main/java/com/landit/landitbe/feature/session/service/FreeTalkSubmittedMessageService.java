@@ -48,7 +48,15 @@ public class FreeTalkSubmittedMessageService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
-  /** 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다. */
+  /**
+   * 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param request 재전송된 사용자 발화 요청
+   * @return 저장된 처리 결과. 이전 발화가 없거나 아직 완료되지 않았으면 null
+   * @throws ApiException 세션이 없거나 소유자가 다르거나 처리 상태가 충돌할 때
+   */
   @Transactional
   public FreeTalkMessageSubmitResponse findCompletedResponse(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
@@ -167,26 +175,23 @@ public class FreeTalkSubmittedMessageService {
         userId);
   }
 
-  /** 사용자 발화를 저장하고 외부 AI 호출에 필요한 예약 정보를 만든다. */
+  /**
+   * 사용자 발화를 저장하고 외부 AI 호출에 필요한 예약 정보를 만든다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param request 사용자 발화 요청
+   * @return 외부 AI 호출과 후속 확정에 사용할 예약 정보
+   * @throws ApiException 세션이 없거나 소유자가 다르거나 완료·처리 중 상태일 때
+   */
   @Transactional
   public Reservation reserve(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
     final LearningSession learningSession = requireOwnedSession(userId, learningSessionId);
     FreeTalkSession freeTalkSession = requireFreeTalkForUpdate(learningSessionId);
     clearExpiredProcessing(freeTalkSession);
-    SessionHistory history =
-        sessionHistoryRepository
-            .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
-    if (!learningSession.isInProgress()
-        || freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED) {
-      throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
-    }
-    if (freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.AWAITING_EXIT_DECISION
-        || freeTalkSession.getProcessingClientMessageId() != null) {
-      throw new ApiException(ErrorCode.CONFLICT);
-    }
-
+    SessionHistory history = requireHistory(learningSessionId);
+    validateReservable(learningSession, freeTalkSession);
     List<SessionHistoryMessage> messages =
         sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
             history.getId());
@@ -196,20 +201,59 @@ public class FreeTalkSubmittedMessageService {
             .findFirst()
             .orElse(null);
     if (existingMessage != null) {
-      if (existingMessage.getFreeTalkTurnStatus() != null) {
-        throw new ApiException(ErrorCode.CONFLICT);
-      }
-      freeTalkSession.startProcessing(request.clientMessageId());
-      FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
-          dailySpeakingUsageService.usage(userId);
-      return reservation(
-          learningSession,
-          freeTalkSession,
-          history,
-          existingMessage,
-          messages,
-          dailyUsage.remainingMs() == 0);
+      return reserveExistingMessage(
+          userId, request, learningSession, freeTalkSession, history, existingMessage, messages);
     }
+    return reserveNewMessage(userId, request, learningSession, freeTalkSession, history, messages);
+  }
+
+  private SessionHistory requireHistory(long learningSessionId) {
+    return sessionHistoryRepository
+        .findByLearningSessionId(learningSessionId)
+        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+  }
+
+  private void validateReservable(
+      LearningSession learningSession, FreeTalkSession freeTalkSession) {
+    if (!learningSession.isInProgress()
+        || freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED) {
+      throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
+    }
+    if (freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.AWAITING_EXIT_DECISION
+        || freeTalkSession.getProcessingClientMessageId() != null) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+  }
+
+  private Reservation reserveExistingMessage(
+      long userId,
+      FreeTalkMessageSubmitRequest request,
+      LearningSession learningSession,
+      FreeTalkSession freeTalkSession,
+      SessionHistory history,
+      SessionHistoryMessage existingMessage,
+      List<SessionHistoryMessage> messages) {
+    if (existingMessage.getFreeTalkTurnStatus() != null) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    freeTalkSession.startProcessing(request.clientMessageId());
+    boolean shouldCloseAfterMessage = dailySpeakingUsageService.usage(userId).remainingMs() == 0;
+    return reservation(
+        learningSession,
+        freeTalkSession,
+        history,
+        existingMessage,
+        messages,
+        shouldCloseAfterMessage);
+  }
+
+  private Reservation reserveNewMessage(
+      long userId,
+      FreeTalkMessageSubmitRequest request,
+      LearningSession learningSession,
+      FreeTalkSession freeTalkSession,
+      SessionHistory history,
+      List<SessionHistoryMessage> messages) {
     if (messages.stream()
         .anyMatch(
             message ->
@@ -379,7 +423,16 @@ public class FreeTalkSubmittedMessageService {
     }
   }
 
-  /** 종료 확인 처리에 필요한 기존 예약과 세션 상태를 잠금 조회한다. */
+  /**
+   * 종료 확인 처리에 필요한 기존 예약과 세션 상태를 잠금 조회한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param submittedMessageId 종료 확인 대상 사용자 메시지 ID
+   * @param decision 사용자가 선택한 종료 확인 결과
+   * @return 외부 AI 호출과 후속 확정에 사용할 종료 결정 예약 정보
+   * @throws ApiException 세션이 없거나 소유자가 다르거나 종료 확인 상태가 유효하지 않을 때
+   */
   @Transactional
   public DecisionReservation reserveDecision(
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
