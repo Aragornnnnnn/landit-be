@@ -79,8 +79,10 @@ public class ScenarioAccessService {
   public Optional<ScenarioAccessHistory> findAccessGrantedOn(
       Long userProfileId, Locale targetLocale, LocalDate date) {
     return userScenarioAccessRepository
-        .findFirstGrantedOn(
+        .findAllGrantedOn(
             userProfileId, targetLocale, date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+        .stream()
+        .findFirst()
         .map(access -> new ScenarioAccessHistory(access.getScenarioId(), access.getGrantedAt()));
   }
 

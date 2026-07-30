@@ -42,7 +42,7 @@ public class DailyScenarioQueryService {
    * @param userId 사용자 ID
    * @param date 조회 날짜
    * @return 날짜별 시나리오 조회 응답
-   * @throws ApiException 미래 날짜를 조회할 때
+   * @throws ApiException 미래 날짜이거나 사용자·시나리오 정보를 찾을 수 없을 때
    */
   @Transactional(readOnly = true)
   public DailyScenarioResponse getDailyScenario(long userId, LocalDate date) {

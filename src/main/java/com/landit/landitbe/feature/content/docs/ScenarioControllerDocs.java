@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.content.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.content.dto.DailyScenarioResponse;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +22,7 @@ public interface ScenarioControllerDocs {
    * @param principal 인증된 사용자 정보
    * @param date 조회 날짜
    * @return 날짜별 시나리오 조회 응답
+   * @throws ApiException 미래 날짜이거나 사용자·시나리오 정보를 찾을 수 없을 때
    */
   @Operation(
       summary = "날짜별 시나리오 조회",
@@ -30,6 +32,9 @@ public interface ScenarioControllerDocs {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
         description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "날짜 누락·형식 오류 또는 미래 날짜"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "401",
         description = "인증 실패")

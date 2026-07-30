@@ -152,6 +152,26 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
+  void dailyScenarioReturnsEarliestCompletionWhenMultipleScenariosWereClearedOnTheSameDate()
+      throws Exception {
+    JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    seedDailyScenarios();
+    insertScenarioAccess(userId, 100, "2026-07-27 10:00:00");
+    insertScenarioAccess(userId, 101, "2026-07-27 12:00:00");
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios/daily")
+                .queryParam("date", "2026-07-27")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.scenario.scenarioId").value(100))
+        .andExpect(jsonPath("$.data.scenario.completedAt").value("2026-07-27T10:00:00+09:00"));
+  }
+
+  @Test
   void dailyScenarioReturnsClearedScenarioWhenCompletedToday() throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
@@ -223,6 +243,27 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
+  void dailyScenarioRequiresAuthentication() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/scenarios/daily").queryParam("date", "2026-07-28"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+  }
+
+  @Test
+  void dailyScenarioRejectsMissingDate() throws Exception {
+    JsonNode loginResponseBody = login();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios/daily")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+  }
+
+  @Test
   void scenarioListApiIsRemoved() throws Exception {
     JsonNode loginResponseBody = login();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
@@ -233,6 +274,22 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
+  @Test
+  void openApiDocumentsDailyScenarioContractAndRemovedListPath() throws Exception {
+    String dailyScenarioPath = "$.paths['/api/v1/scenarios/daily'].get";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(dailyScenarioPath + ".summary").value("날짜별 시나리오 조회"))
+        .andExpect(jsonPath(dailyScenarioPath + ".parameters[0].name").value("date"))
+        .andExpect(jsonPath(dailyScenarioPath + ".parameters[0].required").value(true))
+        .andExpect(jsonPath(dailyScenarioPath + ".responses['200']").exists())
+        .andExpect(jsonPath(dailyScenarioPath + ".responses['400']").exists())
+        .andExpect(jsonPath(dailyScenarioPath + ".responses['401']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/scenarios']").doesNotExist());
   }
 
   private JsonNode login() throws Exception {

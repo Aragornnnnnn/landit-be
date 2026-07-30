@@ -22,7 +22,7 @@ public class ScenarioController implements ScenarioControllerDocs {
 
   private final DailyScenarioQueryService dailyScenarioQueryService;
 
-  /** 인증된 사용자의 오늘 배정 시나리오 또는 과거 최초 완료 이력을 조회한다. */
+  /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/scenarios/daily")
   public ApiResponse<DailyScenarioResponse> getDailyScenario(
