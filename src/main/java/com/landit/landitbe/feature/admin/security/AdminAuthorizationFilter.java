@@ -37,14 +37,27 @@ public class AdminAuthorizationFilter extends OncePerRequestFilter {
     this.failureResponseWriter = failureResponseWriter;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * 관리자 API가 아닌 요청은 이 필터의 권한 검사를 건너뛰도록 결정한다.
+   *
+   * @param request 검사할 HTTP 요청
+   * @return 관리자 API 요청이면 {@code false}, 그 외 요청이면 {@code true}
+   */
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
     String requestUri = request.getRequestURI();
     return !requestUri.equals(ADMIN_API_PATH) && !requestUri.startsWith(ADMIN_API_PATH + "/");
   }
 
-  /** {@inheritDoc} */
+  /**
+   * 인증 사용자의 관리자 허용 여부를 확인하고 허용되지 않은 요청을 차단한다.
+   *
+   * @param request 검사할 HTTP 요청
+   * @param response 접근 거부 응답을 작성할 HTTP 응답
+   * @param filterChain 권한 확인 후 요청을 전달할 필터 체인
+   * @throws ServletException 다음 필터 처리 중 Servlet 오류가 발생했을 때
+   * @throws IOException 응답 작성 또는 다음 필터 처리 중 입출력 오류가 발생했을 때
+   */
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
