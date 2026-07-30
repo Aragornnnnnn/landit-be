@@ -15,10 +15,20 @@ import org.springframework.data.repository.query.Param;
 /** 플랫폼별 활성 앱 버전 정책을 조회한다. */
 public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
 
-  /** 관리자 목록 화면에 표시할 앱 버전 정책을 플랫폼·빌드 순으로 조회한다. */
+  /**
+   * 관리자 목록 화면에 표시할 앱 버전 정책을 플랫폼·빌드 순으로 조회한다.
+   *
+   * @return 플랫폼 오름차순과 빌드 번호 내림차순으로 정렬된 정책 목록
+   */
   List<AppVersion> findAllByOrderByPlatformAscBuildNumberDesc();
 
-  /** 같은 플랫폼·빌드 번호 정책의 존재 여부를 조회한다. */
+  /**
+   * 같은 플랫폼·빌드 번호 정책의 존재 여부를 조회한다.
+   *
+   * @param platform 앱 플랫폼
+   * @param buildNumber 앱 빌드 번호
+   * @return 같은 플랫폼과 빌드 번호의 정책이 있으면 {@code true}
+   */
   boolean existsByPlatformAndBuildNumber(AppPlatform platform, long buildNumber);
 
   /**

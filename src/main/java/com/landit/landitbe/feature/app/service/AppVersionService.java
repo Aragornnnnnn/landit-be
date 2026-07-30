@@ -25,14 +25,26 @@ public class AppVersionService {
   private final AppVersionRepository appVersionRepository;
   private final AdminAuditService adminAuditService;
 
-  /** 앱 버전 Repository와 관리자 감사 Service를 주입받는다. */
+  /**
+   * 앱 버전 Repository와 관리자 감사 Service를 주입받는다.
+   *
+   * @param appVersionRepository 앱 버전 정책 Repository
+   * @param adminAuditService 관리자 감사 기록 Service
+   */
   public AppVersionService(
       AppVersionRepository appVersionRepository, AdminAuditService adminAuditService) {
     this.appVersionRepository = appVersionRepository;
     this.adminAuditService = adminAuditService;
   }
 
-  /** 플랫폼별 활성 정책을 기준으로 앱 업데이트 필요 수준을 반환한다. */
+  /**
+   * 플랫폼별 활성 정책을 기준으로 앱 업데이트 필요 수준을 반환한다.
+   *
+   * @param platform 앱 플랫폼
+   * @param currentBuildNumber 현재 앱 빌드 번호
+   * @return 앱 업데이트 필요 수준과 활성 정책 정보
+   * @throws ApiException 활성 앱 버전 정책이 설정되지 않았을 때
+   */
   @Transactional(readOnly = true)
   public AppVersionCheckResponse check(AppPlatform platform, long currentBuildNumber) {
     AppVersion policy =
@@ -43,7 +55,11 @@ public class AppVersionService {
     return AppVersionCheckResponse.from(policy, updateType, reason(updateType, policy));
   }
 
-  /** 관리자 화면에 표시할 전체 앱 버전 정책 목록을 반환한다. */
+  /**
+   * 관리자 화면에 표시할 전체 앱 버전 정책 목록을 반환한다.
+   *
+   * @return 플랫폼과 빌드 번호 순으로 정렬된 앱 버전 정책 목록
+   */
   @Transactional(readOnly = true)
   public List<AdminAppVersionResponse> list() {
     return appVersionRepository.findAllByOrderByPlatformAscBuildNumberDesc().stream()
@@ -51,7 +67,14 @@ public class AppVersionService {
         .toList();
   }
 
-  /** 관리자 입력으로 비활성 앱 버전 정책을 등록한다. */
+  /**
+   * 관리자 입력으로 비활성 앱 버전 정책을 등록한다.
+   *
+   * @param adminUserProfileId 작업을 수행한 관리자 사용자 프로필 ID
+   * @param request 앱 버전 정책 등록 요청
+   * @return 등록된 비활성 앱 버전 정책
+   * @throws ApiException 빌드 번호 범위가 유효하지 않거나 같은 정책이 이미 있을 때
+   */
   @Transactional
   public AdminAppVersionResponse create(
       Long adminUserProfileId, AdminAppVersionCreateRequest request) {
@@ -81,7 +104,15 @@ public class AppVersionService {
     return AdminAppVersionResponse.from(appVersion);
   }
 
-  /** 관리자 입력으로 앱 버전 정책을 수정한다. */
+  /**
+   * 관리자 입력으로 앱 버전 정책을 수정한다.
+   *
+   * @param adminUserProfileId 작업을 수행한 관리자 사용자 프로필 ID
+   * @param appVersionId 수정할 앱 버전 정책 ID
+   * @param request 앱 버전 정책 수정 요청
+   * @return 수정된 앱 버전 정책
+   * @throws ApiException 정책이 없거나 빌드 번호 범위 또는 중복 정책이 유효하지 않을 때
+   */
   @Transactional
   public AdminAppVersionResponse update(
       Long adminUserProfileId, Long appVersionId, AdminAppVersionUpdateRequest request) {
@@ -111,7 +142,14 @@ public class AppVersionService {
     return AdminAppVersionResponse.from(appVersion);
   }
 
-  /** 대상 정책을 활성화하고 같은 플랫폼의 기존 활성 정책을 비활성화한다. */
+  /**
+   * 대상 정책을 활성화하고 같은 플랫폼의 기존 활성 정책을 비활성화한다.
+   *
+   * @param adminUserProfileId 작업을 수행한 관리자 사용자 프로필 ID
+   * @param appVersionId 활성화할 앱 버전 정책 ID
+   * @return 활성화된 앱 버전 정책
+   * @throws ApiException 대상 앱 버전 정책이 없을 때
+   */
   @Transactional
   public AdminAppVersionResponse activate(Long adminUserProfileId, Long appVersionId) {
     AppVersion appVersion = require(appVersionId);
@@ -165,6 +203,7 @@ public class AppVersionService {
     };
   }
 
+  /** 감사 기록에 저장할 앱 버전 정책 스냅샷을 만든다. */
   private String auditValue(AppVersion appVersion) {
     return "platform="
         + appVersion.getPlatform()

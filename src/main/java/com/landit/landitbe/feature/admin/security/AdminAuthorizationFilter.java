@@ -37,12 +37,14 @@ public class AdminAuthorizationFilter extends OncePerRequestFilter {
     this.failureResponseWriter = failureResponseWriter;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
     String requestUri = request.getRequestURI();
     return !requestUri.equals(ADMIN_API_PATH) && !requestUri.startsWith(ADMIN_API_PATH + "/");
   }
 
+  /** {@inheritDoc} */
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

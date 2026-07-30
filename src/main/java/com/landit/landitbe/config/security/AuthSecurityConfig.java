@@ -41,6 +41,7 @@ public class AuthSecurityConfig {
    * 인증 필터와 실패 응답 작성기를 주입받아 보안 설정을 구성한다.
    *
    * @param authTokenFilter Bearer 토큰 인증 필터
+   * @param adminAuthorizationFilter 관리자 API 권한 필터
    * @param failureResponseWriter 인증 실패 응답 작성기
    */
   public AuthSecurityConfig(

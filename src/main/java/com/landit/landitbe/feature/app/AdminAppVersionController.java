@@ -26,7 +26,11 @@ public class AdminAppVersionController implements AdminAppVersionControllerDocs 
 
   private final AppVersionService appVersionService;
 
-  /** 관리자 앱 버전 정책 Service를 주입받는다. */
+  /**
+   * 관리자 앱 버전 정책 Service를 주입받는다.
+   *
+   * @param appVersionService 앱 버전 정책 Service
+   */
   public AdminAppVersionController(AppVersionService appVersionService) {
     this.appVersionService = appVersionService;
   }

@@ -54,7 +54,19 @@ public class AppVersion extends BaseCreatedAtEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected AppVersion() {}
 
-  /** 관리자 입력값으로 앱 버전 정책을 생성한다. */
+  /**
+   * 관리자 입력값으로 앱 버전 정책을 생성한다.
+   *
+   * @param platform 앱 플랫폼
+   * @param versionName 사용자에게 표시할 버전명
+   * @param buildNumber 최신 앱 빌드 번호
+   * @param minimumSupportedBuildNumber 최소 지원 앱 빌드 번호
+   * @param forceUpdateReason 강제 업데이트 안내 사유
+   * @param softUpdateReason 권장 업데이트 안내 사유
+   * @param releaseNote 릴리스 노트
+   * @param releasedAt 출시 시각
+   * @return 비활성 상태로 생성된 앱 버전 정책
+   */
   public static AppVersion create(
       AppPlatform platform,
       String versionName,
@@ -77,7 +89,17 @@ public class AppVersion extends BaseCreatedAtEntity {
     return appVersion;
   }
 
-  /** 관리자 입력값으로 앱 버전 정책의 표시·업데이트 기준을 변경한다. */
+  /**
+   * 관리자 입력값으로 앱 버전 정책의 표시·업데이트 기준을 변경한다.
+   *
+   * @param versionName 사용자에게 표시할 버전명
+   * @param buildNumber 최신 앱 빌드 번호
+   * @param minimumSupportedBuildNumber 최소 지원 앱 빌드 번호
+   * @param forceUpdateReason 강제 업데이트 안내 사유
+   * @param softUpdateReason 권장 업데이트 안내 사유
+   * @param releaseNote 릴리스 노트
+   * @param releasedAt 출시 시각
+   */
   public void update(
       String versionName,
       long buildNumber,
@@ -124,52 +146,92 @@ public class AppVersion extends BaseCreatedAtEntity {
     this.releasedAt = releasedAt;
   }
 
-  /** 정책 ID를 반환한다. */
+  /**
+   * 정책 ID를 반환한다.
+   *
+   * @return 앱 버전 정책 ID
+   */
   public Long getId() {
     return id;
   }
 
-  /** 앱 플랫폼을 반환한다. */
+  /**
+   * 앱 플랫폼을 반환한다.
+   *
+   * @return 앱 플랫폼
+   */
   public AppPlatform getPlatform() {
     return platform;
   }
 
-  /** 릴리스 노트를 반환한다. */
+  /**
+   * 릴리스 노트를 반환한다.
+   *
+   * @return 릴리스 노트
+   */
   public String getReleaseNote() {
     return releaseNote;
   }
 
-  /** 활성 정책 여부를 반환한다. */
+  /**
+   * 활성 정책 여부를 반환한다.
+   *
+   * @return 활성 정책이면 {@code true}
+   */
   public boolean isActive() {
     return active;
   }
 
-  /** 최신 앱 버전명을 반환한다. */
+  /**
+   * 최신 앱 버전명을 반환한다.
+   *
+   * @return 사용자에게 표시할 버전명
+   */
   public String getVersionName() {
     return versionName;
   }
 
-  /** 최신 앱 빌드 번호를 반환한다. */
+  /**
+   * 최신 앱 빌드 번호를 반환한다.
+   *
+   * @return 최신 앱 빌드 번호
+   */
   public long getBuildNumber() {
     return buildNumber;
   }
 
-  /** 서버가 허용하는 최소 빌드 번호를 반환한다. */
+  /**
+   * 서버가 허용하는 최소 빌드 번호를 반환한다.
+   *
+   * @return 최소 지원 앱 빌드 번호
+   */
   public long getMinimumSupportedBuildNumber() {
     return minimumSupportedBuildNumber;
   }
 
-  /** 강제 업데이트 안내 사유를 반환한다. */
+  /**
+   * 강제 업데이트 안내 사유를 반환한다.
+   *
+   * @return 강제 업데이트 안내 사유
+   */
   public String getForceUpdateReason() {
     return forceUpdateReason;
   }
 
-  /** 권장 업데이트 안내 사유를 반환한다. */
+  /**
+   * 권장 업데이트 안내 사유를 반환한다.
+   *
+   * @return 권장 업데이트 안내 사유
+   */
   public String getSoftUpdateReason() {
     return softUpdateReason;
   }
 
-  /** 최신 버전 릴리스 시각을 반환한다. */
+  /**
+   * 최신 버전 릴리스 시각을 반환한다.
+   *
+   * @return 출시 시각
+   */
   public LocalDateTime getReleasedAt() {
     return releasedAt;
   }
