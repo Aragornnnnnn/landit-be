@@ -44,11 +44,16 @@ public class StreakService {
     var existingActivity =
         userDailyActivityRepository.findByUserProfileIdAndActivityDate(userId, activityDate);
     if (existingActivity.isPresent()) {
-      existingActivity.get().completeSession();
-      return;
+      UserDailyActivity dailyActivity = existingActivity.get();
+      boolean alreadyActive = dailyActivity.isActiveDay();
+      dailyActivity.completeSession();
+      if (alreadyActive) {
+        return;
+      }
+    } else {
+      userDailyActivityRepository.save(UserDailyActivity.startActiveDay(userId, activityDate));
     }
 
-    userDailyActivityRepository.save(UserDailyActivity.startActiveDay(userId, activityDate));
     UserLearningActivitySummary summary =
         summaryRepository
             .findById(userId)

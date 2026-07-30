@@ -86,7 +86,7 @@ public class UserLearningActivitySummary extends BaseTimeEntity {
    * @param activityDate 새 활동 날짜
    */
   public void recordActiveDay(LocalDate activityDate) {
-    if (activityDate.equals(lastActivityDate)) {
+    if (lastActivityDate != null && !activityDate.isAfter(lastActivityDate)) {
       return;
     }
     if (lastActivityDate != null && lastActivityDate.equals(activityDate.minusDays(1))) {

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
@@ -45,6 +46,7 @@ public interface StreakControllerDocs {
    * @param year 조회 연도
    * @param month 조회 월
    * @return 월별 스트릭 달력 API 응답
+   * @throws ConstraintViolationException year 또는 month가 허용 범위를 벗어난 경우
    */
   @Operation(
       summary = "월별 스트릭 달력 조회",

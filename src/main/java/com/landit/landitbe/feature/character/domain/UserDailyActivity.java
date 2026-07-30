@@ -74,5 +74,6 @@ public class UserDailyActivity extends BaseTimeEntity {
   /** 같은 날짜에 정상 완료한 대화 횟수를 증가시킨다. */
   public void completeSession() {
     completedSessionCount++;
+    activeDay = true;
   }
 }

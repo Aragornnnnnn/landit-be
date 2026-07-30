@@ -25,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** StreakService의 날짜별 활동 기록과 스트릭 계산을 검증한다. */
 @ExtendWith(MockitoExtension.class)
@@ -79,6 +80,25 @@ class StreakServiceTest {
 
     assertThat(dailyActivity.getCompletedSessionCount()).isEqualTo(2);
     verifyNoInteractions(summaryRepository);
+  }
+
+  @Test
+  void activatesInactiveDayAndRecordsStreakOnNormalCompletion() {
+    LocalDate activityDate = LocalDate.now(KOREA_ZONE_ID);
+    UserDailyActivity dailyActivity = UserDailyActivity.startActiveDay(USER_ID, activityDate);
+    ReflectionTestUtils.setField(dailyActivity, "activeDay", false);
+    UserLearningActivitySummary summary = UserLearningActivitySummary.initialize(USER_ID);
+    when(userDailyActivityRepository.findByUserProfileIdAndActivityDate(USER_ID, activityDate))
+        .thenReturn(Optional.of(dailyActivity));
+    when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
+
+    streakService.recordCompletedConversation(
+        USER_ID, SessionType.SCENARIO, activityDate.atTime(18, 0));
+
+    assertThat(dailyActivity.isActiveDay()).isTrue();
+    assertThat(dailyActivity.getCompletedSessionCount()).isEqualTo(2);
+    assertThat(summary.getCurrentStreakDays()).isEqualTo(1);
+    assertThat(summary.getLastActivityDate()).isEqualTo(activityDate);
   }
 
   /** 어제 활동한 사용자가 오늘 완료하면 현재 스트릭이 하루 연장된다. */
