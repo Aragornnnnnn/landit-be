@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +22,13 @@ public class FreeTalkDailySpeakingUsageService {
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
   private final FreeTalkDailySpeakingUsageRepository repository;
+  private final UserProfileService userProfileService;
 
   /** KST 당일 사용량을 잠금 처리하며 새 발화를 한 번 예약한다. */
   @Transactional
   public DailySpeakingUsage reserve(long userId, long utteranceDurationMs) {
     LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    userProfileService.requireActiveForUpdate(userId);
     FreeTalkDailySpeakingUsage usage =
         repository
             .findByUserProfileIdAndUsageDateForUpdate(userId, usageDate)

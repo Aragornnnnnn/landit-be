@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +13,7 @@ import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -24,8 +26,9 @@ class FreeTalkDailySpeakingUsageServiceTest {
 
   private final FreeTalkDailySpeakingUsageRepository repository =
       mock(FreeTalkDailySpeakingUsageRepository.class);
+  private final UserProfileService userProfileService = mock(UserProfileService.class);
   private final FreeTalkDailySpeakingUsageService service =
-      new FreeTalkDailySpeakingUsageService(repository);
+      new FreeTalkDailySpeakingUsageService(repository, userProfileService);
 
   /** 59초 사용 뒤 3초 발화는 전체를 예약하고 남은 시간을 0으로 제한한다. */
   @Test
@@ -70,5 +73,19 @@ class FreeTalkDailySpeakingUsageServiceTest {
     assertThat(previousUsage.getUsedSpeakingDurationMs()).isEqualTo(60_000L);
     assertThat(currentUsage.getUsedSpeakingDurationMs()).isEqualTo(3_000L);
     verify(repository).findByUserProfileIdAndUsageDateForUpdate(1L, usageDate);
+  }
+
+  /** 같은 사용자의 첫 일일 행 생성도 사용자 잠금 안에서 직렬화한다. */
+  @Test
+  void locksUserBeforeCreatingFirstDailyUsage() {
+    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    when(repository.findByUserProfileIdAndUsageDateForUpdate(1L, usageDate))
+        .thenReturn(Optional.empty());
+    when(repository.save(any(FreeTalkDailySpeakingUsage.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.reserve(1L, 1_000L);
+
+    verify(userProfileService).requireActiveForUpdate(1L);
   }
 }
