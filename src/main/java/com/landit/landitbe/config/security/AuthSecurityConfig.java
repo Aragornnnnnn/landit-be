@@ -78,7 +78,7 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/nps")
                     .authenticated()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/scenarios")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/daily")
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions")
                     .authenticated()

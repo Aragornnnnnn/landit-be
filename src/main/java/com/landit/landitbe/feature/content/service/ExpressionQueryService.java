@@ -97,6 +97,34 @@ public class ExpressionQueryService {
         .toList();
   }
 
+  /**
+   * 날짜별 시나리오 화면에 표시할 표현 학습 진행도를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @return 활성 표현 전체 수와 완료 표현 수
+   */
+  @Transactional(readOnly = true)
+  public ExpressionProgress getExpressionProgress(Long userId, Long scenarioId) {
+    UserLocale userLocale = userProfileService.getUserLocale(userId);
+    List<WritingExpression> expressions =
+        writingExpressionRepository
+            .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
+                scenarioId,
+                userLocale.targetLocale(),
+                userLocale.baseLocale(),
+                ActiveStatus.ACTIVE);
+    Set<Long> completedExpressionIds =
+        learningProgressService.findCompletedExpressionIds(userId, scenarioId).values();
+    int completedExpressionCount =
+        (int)
+            expressions.stream()
+                .map(WritingExpression::getId)
+                .filter(completedExpressionIds::contains)
+                .count();
+    return new ExpressionProgress(expressions.size(), completedExpressionCount);
+  }
+
   /** 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다. */
   @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
@@ -219,4 +247,12 @@ public class ExpressionQueryService {
 
     return ExpressionResponse.from(expression, completed, locked);
   }
+
+  /**
+   * 시나리오에 속한 활성 표현 수와 사용자의 완료 표현 수를 담는다.
+   *
+   * @param expressionCount 활성 표현 수
+   * @param completedExpressionCount 완료한 활성 표현 수
+   */
+  public record ExpressionProgress(int expressionCount, int completedExpressionCount) {}
 }

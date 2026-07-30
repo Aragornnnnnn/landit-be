@@ -30,15 +30,18 @@
 
 ## API 계약
 
-`GET /api/v1/scenarios`는 `CLEARED`, `TODAY`, `LOCKED` 상태를 유지한다.
+기존 `GET /api/v1/scenarios` 전체 목록 API는 제거한다. `GET /api/v1/scenarios/daily?date=yyyy-MM-dd`만 제공한다.
 
-- `CLEARED`는 새 복습 권한이 있는 시나리오다.
-- `TODAY`는 현재 순서의 새 학습 시나리오다.
-- `LOCKED`는 아직 차례가 아닌 시나리오거나 비활성 콘텐츠다.
-- `TODAY`에만 `dailyScenarioType`을 반환한다. 값은 `NEW`, `RETRY`다.
-- 시나리오를 놓쳐도 만료되지 않으므로 `expiresAt`은 제거한다.
+- `date`는 필수이며 `Asia/Seoul` 기준 오늘 또는 과거 날짜만 허용한다. 미래 날짜는 `400 INVALID_REQUEST`다.
+- 오늘 조회는 먼저 오늘 최초 완료한 시나리오를 조회한다. 완료 이력이 없으면 현재 순서의 미완료 시나리오를 반환한다.
+- 과거 조회는 해당 날짜에 `user_scenario_access.granted_at`이 생성된 최초 완료 시나리오만 반환한다. 이력이 없으면 `playable=false`, `scenario=null`이다.
+- `scenario`가 있으면 `dailyScenarioType`은 항상 `NEW`, `RETRY`, `CLEARED` 중 하나다. 과거와 오늘의 완료 이력은 `CLEARED`다.
+- 완료 시나리오는 복습 가능하므로 `playable=true`다. 오늘의 미완료 시나리오도 `playable=true`다.
+- `completedAt`은 `user_scenario_access.granted_at`, `starRating`은 `user_scenario_progress.best_star_rating`을 사용한다.
+- `expressionCount`는 사용자 언어 조합의 활성 Writing 표현 수이며, `completedExpressionCount`는 그중 사용자가 완료한 고유 표현 수다.
+- 복습 완료는 새로운 날짜별 이력을 만들지 않는다. 기존 `user_scenario_progress` 이력만으로는 과거 이력을 만들지 않는다.
 
-`POST /api/v1/scenarios/{scenarioId}/sessions`는 복습 권한이 있거나 현재 `TODAY`인 시나리오만 허용한다.
+`POST /api/v1/scenarios/{scenarioId}/sessions`는 복습 권한이 있거나 현재 사용자에게 제공 중인 시나리오만 허용한다.
 
 `POST /api/v1/sessions/{sessionId}/messages`에서 정상 완료되면 접근 권한을 생성한다. 중도 종료와 미완료 세션은 접근 권한을 생성하지 않는다.
 

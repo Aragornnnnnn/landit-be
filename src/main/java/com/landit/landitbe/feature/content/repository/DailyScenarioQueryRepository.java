@@ -1,42 +1,36 @@
-// 시나리오 목록 화면에 필요한 읽기 전용 JPA 조회를 정의한다.
+// 날짜별 시나리오 조회에 필요한 단건 콘텐츠를 조회한다.
 
 package com.landit.landitbe.feature.content.repository;
 
 import com.landit.landitbe.feature.content.domain.Scenario;
-import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
-import java.util.List;
+import com.landit.landitbe.feature.content.repository.projection.DailyScenarioProjection;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** 시나리오 목록 화면에 필요한 읽기 전용 JPA 조회를 정의한다. */
+/** 날짜별 시나리오 조회에 필요한 단건 콘텐츠를 조회한다. */
 @Repository
-public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Long> {
+public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Long> {
 
   /**
-   * 사용자 기본 언어 조합에 해당하는 목록 데이터를 조회한다. Entity 연관관계가 없는 FK는 명시적으로 join한다.
+   * 사용자 언어 설정에 맞는 시나리오 단건 정보를 조회한다.
    *
    * @param userId 사용자 ID
-   * @return 사용자 언어 조합에 맞는 시나리오 목록 데이터
+   * @param scenarioId 시나리오 ID
+   * @return 사용자 언어 설정에 맞는 시나리오 단건 정보
    */
   @Query(
       """
-            SELECT new com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection(
-                c.id,
-                clv.name,
-                c.displayOrder,
-                c.status,
+            SELECT new com.landit.landitbe.feature.content.repository.projection.DailyScenarioProjection(
                 s.id,
-                s.displayOrder,
                 slv.title,
                 slv.briefing,
                 slv.conversationGoal,
+                s.thumbnailUrl,
                 s.difficulty,
                 s.firstSpeaker,
-                s.thumbnailUrl,
-                s.status,
-                slv.status,
                 openingQuestionVariant.questionText,
                 openingQuestionVariant.questionTranslation,
                 slv.userOpeningInstruction,
@@ -49,12 +43,8 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
                 usp.bestStarRating
             )
             FROM UserProfile up
-            JOIN CategoryLanguageVariant clv
-              ON clv.baseLocale = up.baseLocale
-            JOIN Category c
-              ON c.id = clv.categoryId
             JOIN Scenario s
-              ON s.categoryId = c.id
+              ON s.id = :scenarioId
             JOIN ScenarioLanguageVariant slv
               ON slv.scenarioId = s.id
              AND slv.targetLocale = up.targetLocale
@@ -76,7 +66,7 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
              AND usp.scenarioId = s.id
              AND usp.targetLocale = up.targetLocale
             WHERE up.id = :userId
-            ORDER BY c.displayOrder ASC, s.displayOrder ASC
       """)
-  List<ScenarioListProjection> findScenarioList(@Param("userId") long userId);
+  Optional<DailyScenarioProjection> findDailyScenario(
+      @Param("userId") long userId, @Param("scenarioId") long scenarioId);
 }

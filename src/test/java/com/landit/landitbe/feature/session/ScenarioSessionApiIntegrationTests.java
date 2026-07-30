@@ -97,6 +97,8 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
     jdbcTemplate.update("DELETE FROM user_scenario_access");
+    jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
+    jdbcTemplate.update("DELETE FROM writing_expression");
     jdbcTemplate.update("DELETE FROM user_scenario_progress");
     jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
     jdbcTemplate.update("DELETE FROM scenario_question");

@@ -10,6 +10,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,23 @@ public class ScenarioAccessService {
   }
 
   /**
+   * 사용자가 특정 날짜에 최초 획득한 시나리오 복습 권한을 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @param date 조회 날짜
+   * @return 해당 날짜에 최초 완료한 시나리오 이력
+   */
+  @Transactional(readOnly = true)
+  public Optional<ScenarioAccessHistory> findAccessGrantedOn(
+      Long userProfileId, Locale targetLocale, LocalDate date) {
+    return userScenarioAccessRepository
+        .findFirstGrantedOn(
+            userProfileId, targetLocale, date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+        .map(access -> new ScenarioAccessHistory(access.getScenarioId(), access.getGrantedAt()));
+  }
+
+  /**
    * 이전 날짜에 시작했지만 완료하지 못한 시나리오 세션이 있는지 확인한다.
    *
    * @param userProfileId 사용자 프로필 ID
@@ -101,4 +119,12 @@ public class ScenarioAccessService {
     userScenarioAccessRepository.save(
         UserScenarioAccess.grant(userProfileId, scenarioId, targetLocale, grantedAt));
   }
+
+  /**
+   * 날짜별 시나리오 이력 조회에 필요한 최초 복습 권한 정보를 담는다.
+   *
+   * @param scenarioId 최초 완료한 시나리오 ID
+   * @param grantedAt 최초 완료 시각
+   */
+  public record ScenarioAccessHistory(Long scenarioId, LocalDateTime grantedAt) {}
 }

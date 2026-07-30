@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.learning.domain.UserScenarioAccess;
 import com.landit.landitbe.shared.domain.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,6 +34,31 @@ public interface UserScenarioAccessRepository extends JpaRepository<UserScenario
    */
   List<UserScenarioAccess> findAllByUserProfileIdAndTargetLocaleOrderByScenarioIdAsc(
       Long userProfileId, Locale targetLocale);
+
+  /**
+   * 사용자가 특정 날짜에 최초 획득한 복습 권한을 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @param dayStart 날짜 시작 시각
+   * @param nextDayStart 다음 날짜 시작 시각
+   * @return 해당 날짜의 최초 복습 권한
+   */
+  @Query(
+      """
+            SELECT access
+            FROM UserScenarioAccess access
+            WHERE access.userProfileId = :userProfileId
+              AND access.targetLocale = :targetLocale
+              AND access.grantedAt >= :dayStart
+              AND access.grantedAt < :nextDayStart
+            ORDER BY access.grantedAt ASC
+      """)
+  Optional<UserScenarioAccess> findFirstGrantedOn(
+      @Param("userProfileId") Long userProfileId,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("dayStart") LocalDateTime dayStart,
+      @Param("nextDayStart") LocalDateTime nextDayStart);
 
   /**
    * 사용자가 해당 날짜에 새 복습 권한을 얻었는지 확인한다.
