@@ -40,7 +40,7 @@ public class ExpressionLearningCompletionService {
    *
    * @param userId 학습 사용자 ID
    * @param expressionId 완료할 표현 ID
-   * @throws ApiException 표현이 없거나 아직 잠겨 있을 때
+   * @throws ApiException 표현이 없거나 아직 잠겨 있거나 다른 사용자의 전용 표현일 때
    */
   @Transactional
   public void completeLearning(Long userId, Long expressionId) {

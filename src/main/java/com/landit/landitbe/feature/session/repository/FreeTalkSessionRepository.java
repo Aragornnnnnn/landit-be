@@ -39,10 +39,10 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
       @Param("learningSessionId") Long learningSessionId);
 
   /**
-   * 애플리케이션 중단으로 표현 생성이 끝나지 않은 세션을 조회한다.
+   * 지정한 표현 생성 상태의 프리톡 세션을 조회한다.
    *
    * @param expressionGenerationStatus 조회할 표현 생성 상태
-   * @return 준비 중인 프리톡 세션 목록
+   * @return 지정한 상태의 프리톡 세션 목록
    */
   List<FreeTalkSession> findByExpressionGenerationStatus(
       ExpressionGenerationStatus expressionGenerationStatus);

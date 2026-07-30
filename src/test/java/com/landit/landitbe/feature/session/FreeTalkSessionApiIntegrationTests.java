@@ -319,6 +319,8 @@ class FreeTalkSessionApiIntegrationTests {
     String messagesPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}/messages'].post";
     String exitDecisionPath =
         "$.paths['/api/v1/free-talk/sessions/{sessionId}/exit-decision'].post";
+    String pastSessionsPath = "$.paths['/api/v1/free-talk/sessions'].get";
+    String pastSessionDetailPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}'].get";
     String innerThoughtProcessingStatusPath =
         "$.components.schemas.SessionInnerThoughtResponse.properties.processingStatus";
 
@@ -339,6 +341,13 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(pastSessionsPath + ".responses['400'].description").value("요청 오류"))
+        .andExpect(jsonPath(pastSessionsPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(
+            jsonPath(pastSessionDetailPath + ".responses['403'].description").value("세션 소유자 아님"))
+        .andExpect(
+            jsonPath(pastSessionDetailPath + ".responses['404'].description")
+                .value("완료된 프리톡 세션 없음"))
         .andExpect(
             jsonPath(innerThoughtProcessingStatusPath + ".description")
                 .value("속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null"));

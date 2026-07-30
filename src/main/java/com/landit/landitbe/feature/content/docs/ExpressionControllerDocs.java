@@ -43,6 +43,7 @@ public interface ExpressionControllerDocs {
   /**
    * 선택한 표현의 학습 상세를 조회한다.
    *
+   * @param principal 인증된 사용자
    * @param expressionId 학습할 표현 ID
    * @return 표현 학습 시작 상세
    */
@@ -56,6 +57,7 @@ public interface ExpressionControllerDocs {
   /**
    * 선택한 표현의 추가 예문과 작문 문제를 조회한다.
    *
+   * @param principal 인증된 사용자
    * @param expressionId 학습 중인 표현 ID
    * @return 추가 예문과 작문 문제
    */
