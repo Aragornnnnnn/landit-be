@@ -65,7 +65,7 @@ public class LearningProgressService {
   }
 
   /**
-   * 시나리오 순서와 관계없이 표현 완료 이력을 생성하거나 마지막 완료 시각을 갱신한다.
+   * 프리톡 출처의 표현 완료 이력을 생성하거나 마지막 완료 시각을 갱신한다.
    *
    * @param userId 사용자 ID
    * @param scenarioId 표현이 연결된 시나리오 ID. 프리톡 개인 표현이면 null

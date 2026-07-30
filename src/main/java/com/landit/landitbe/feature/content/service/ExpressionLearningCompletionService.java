@@ -85,7 +85,7 @@ public class ExpressionLearningCompletionService {
     CompletedExpressionIds completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId);
 
-    // 이미 완료한 표현은 마지막 완료 시각만 갱신한다.
+    // 이미 완료한 표현은 최초 완료 시각을 유지하고 마지막 완료 시각만 갱신한다.
     if (completedExpressionIds.values().contains(expressionId)) {
       learningProgressService.completeExpression(userId, scenarioId, expressionId);
       return;
@@ -97,7 +97,7 @@ public class ExpressionLearningCompletionService {
       throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
     }
 
-    // 잠금이 해제된 표현의 완료 이력을 저장한다.
+    // 현재 학습 순서의 표현 완료 이력을 생성한다.
     learningProgressService.completeExpression(userId, scenarioId, expressionId);
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
