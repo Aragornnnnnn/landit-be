@@ -27,7 +27,7 @@
 **Interfaces:**
 - Produces: `recordCompletedConversation(long userId, SessionType sessionType, LocalDateTime completedAt)`, `getCurrentStreak(long userId)`, `getCalendar(long userId, YearMonth yearMonth)`.
 
-- [ ] Write failing tests for first day, yesterday 연속, 같은 날 재완료, 공백 뒤 재시작, 월 범위 조회와 만료된 조회값.
+- [x] Write failing tests for first day, yesterday 연속, 같은 날 재완료, 공백 뒤 재시작, 월 범위 조회와 만료된 조회값.
 
 ```java
 @Test
@@ -38,9 +38,9 @@ void recordsOnlyOneActiveDayForSameDate() {
 }
 ```
 
-- [ ] Add entity factories and state-change methods, repositories for 사용자·날짜 단건 조회와 월 범위 조회, and `StreakService`.
-- [ ] Create or update the daily row and summary in the caller transaction. The completion flow owns the user-profile lock order.
-- [ ] Run `./gradlew test --tests '*StreakServiceTest'` and commit the domain slice.
+- [x] Add entity factories and state-change methods, repositories for 사용자·날짜 단건 조회와 월 범위 조회, and `StreakService`.
+- [x] Create or update the daily row and summary in the caller transaction. The completion flow owns the user-profile lock order.
+- [x] Run `./gradlew test --tests '*StreakServiceTest'` and commit the domain slice.
 
 ### Task 2: 스트릭 조회 HTTP API
 
@@ -51,7 +51,7 @@ void recordsOnlyOneActiveDayForSameDate() {
 **Interfaces:**
 - Produces: `GET /api/v1/me/streak` and `GET /api/v1/me/streak/calendar?year={year}&month={month}`.
 
-- [ ] Write failing MockMvc tests for 인증 실패, 기본값, 월별 날짜 정렬, `month` 범위 오류와 OpenAPI 경로.
+- [x] Write failing MockMvc tests for 인증 실패, 기본값, 월별 날짜 정렬, `month` 범위 오류와 OpenAPI 경로.
 
 ```java
 mockMvc.perform(get("/api/v1/me/streak/calendar?year=2026&month=13"))
@@ -59,8 +59,8 @@ mockMvc.perform(get("/api/v1/me/streak/calendar?year=2026&month=13"))
     .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
 ```
 
-- [ ] Add controller, DTO and OpenAPI documentation. Validate `year >= 1` and `1 <= month <= 12`.
-- [ ] Run `./gradlew test --tests '*StreakApiIntegrationTests'` and commit the HTTP slice.
+- [x] Add controller, DTO and OpenAPI documentation. Validate `year >= 1` and `1 <= month <= 12`.
+- [x] Run `./gradlew test --tests '*StreakApiIntegrationTests'` and commit the HTTP slice.
 
 ### Task 3: 시나리오 완료 연결과 회귀 검증
 
@@ -72,7 +72,7 @@ mockMvc.perform(get("/api/v1/me/streak/calendar?year=2026&month=13"))
 - Consumes: `StreakService.recordCompletedConversation(...)`.
 - Produces: `sessionCompleted=true` 응답 뒤 스트릭 달력에서 오늘 완료를 조회할 수 있는 계약.
 
-- [ ] Write a failing 완료 흐름 테스트 that posts the last message, waits for `sessionCompleted=true`, then queries the calendar and expects today in `activeDates`.
+- [x] Write a failing 완료 흐름 테스트 that posts the last message, waits for `sessionCompleted=true`, then queries the calendar and expects today in `activeDates`.
 
 ```java
 submitLastMessage(sessionId).andExpect(jsonPath("$.data.sessionCompleted").value(true));
@@ -80,6 +80,10 @@ mockMvc.perform(get("/api/v1/me/streak/calendar?year=2026&month=7").header(AUTHO
     .andExpect(jsonPath("$.data.activeDates[0]").value("2026-07-30"));
 ```
 
-- [ ] Acquire the profile lock before `GeneratedMessageService` locks the learning session. On a completed generation, call `StreakService` after `completeBySystem` in the same `TransactionTemplate`.
-- [ ] Run the affected session and streak tests, then run `./gradlew check`.
-- [ ] Review the diff, update this plan with actual verification, and commit the integration slice.
+- [x] Acquire the profile lock before `GeneratedMessageService` locks the learning session. On a completed generation, call `StreakService` after `completeBySystem` in the same `TransactionTemplate`.
+- [x] Run the affected session and streak tests, then run `./gradlew check`.
+- [x] Review the diff, update this plan with actual verification, and commit the integration slice.
+
+## Verification
+
+- `./gradlew check` 통과.
