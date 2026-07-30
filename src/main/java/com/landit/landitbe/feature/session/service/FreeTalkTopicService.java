@@ -33,7 +33,12 @@ public class FreeTalkTopicService {
         .toList();
   }
 
-  /** 활성 주제와 KST 당일의 남은 사용자 발화 시간을 반환한다. */
+  /**
+   * 활성 주제와 KST 당일의 남은 사용자 발화 시간을 반환한다.
+   *
+   * @param userId 사용자 ID
+   * @return 활성 주제와 일일 발화 사용량을 담은 메인 화면 응답
+   */
   @Transactional(readOnly = true)
   public FreeTalkMainResponse getMain(long userId) {
     FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =

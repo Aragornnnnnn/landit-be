@@ -57,6 +57,7 @@ public class FreeTalkSessionService {
    * @param request 시작 방식과 선택 주제
    * @return 외부 AI 호출에 사용할 시작 레코드
    * @throws ApiException 요청, 사용자, 주제 또는 AI 상대 설정이 유효하지 않을 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 당일 발화 한도를 모두 사용했을 때
    */
   @Transactional
   public StartedFreeTalkSession createStart(long userId, FreeTalkSessionStartRequest request) {

@@ -24,13 +24,23 @@ public class FreeTalkDailySpeakingUsageService {
   private final FreeTalkDailySpeakingUsageRepository repository;
   private final UserProfileService userProfileService;
 
-  /** KST 당일의 남은 발화 시간을 조회한다. */
+  /**
+   * KST 당일의 남은 발화 시간을 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @return 당일 남은 사용자 발화 시간 밀리초
+   */
   @Transactional(readOnly = true)
   public long remainingMs(long userId) {
     return usage(userId).remainingMs();
   }
 
-  /** KST 당일의 사용 시간과 남은 시간을 조회한다. */
+  /**
+   * KST 당일의 사용 시간과 남은 시간을 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @return 당일 사용 시간과 남은 시간을 담은 요약
+   */
   @Transactional(readOnly = true)
   public DailySpeakingUsage usage(long userId) {
     LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
@@ -42,7 +52,12 @@ public class FreeTalkDailySpeakingUsageService {
         .orElse(new DailySpeakingUsage(0L, DAILY_SPEAKING_LIMIT_MS));
   }
 
-  /** KST 당일에 새 프리톡 세션을 시작할 수 있는지 확인한다. */
+  /**
+   * KST 당일에 새 프리톡 세션을 시작할 수 있는지 확인한다.
+   *
+   * @param userId 사용자 ID
+   * @throws SessionException 당일 발화 한도를 모두 사용했을 때
+   */
   @Transactional(readOnly = true)
   public void requireRemaining(long userId) {
     if (remainingMs(userId) == 0) {
@@ -50,7 +65,15 @@ public class FreeTalkDailySpeakingUsageService {
     }
   }
 
-  /** KST 당일 사용량을 잠금 처리하며 새 발화를 한 번 예약한다. */
+  /**
+   * KST 당일 사용량을 잠금 처리하며 새 발화를 한 번 예약한다.
+   *
+   * @param userId 사용자 ID
+   * @param utteranceDurationMs 예약할 사용자 발화 시간 밀리초
+   * @return 예약 후 당일 사용 시간과 남은 시간 요약
+   * @throws SessionException 당일 발화 한도를 이미 모두 사용했을 때
+   * @throws IllegalArgumentException 발화 시간이 음수이거나 누적값이 long 범위를 넘을 때
+   */
   @Transactional
   public DailySpeakingUsage reserve(long userId, long utteranceDurationMs) {
     LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);

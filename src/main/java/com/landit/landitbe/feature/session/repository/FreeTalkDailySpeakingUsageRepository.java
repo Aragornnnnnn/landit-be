@@ -16,7 +16,13 @@ import org.springframework.data.repository.query.Param;
 public interface FreeTalkDailySpeakingUsageRepository
     extends JpaRepository<FreeTalkDailySpeakingUsage, DailyUsageId> {
 
-  /** 사용자와 날짜의 사용량을 발화 예약용으로 잠금 조회한다. */
+  /**
+   * 사용자와 날짜의 사용량을 발화 예약용으로 잠금 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param usageDate 조회할 KST 날짜
+   * @return 해당 날짜의 사용량. 아직 생성되지 않았으면 빈 값
+   */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       "select usage from FreeTalkDailySpeakingUsage usage "
@@ -24,7 +30,13 @@ public interface FreeTalkDailySpeakingUsageRepository
   Optional<FreeTalkDailySpeakingUsage> findByUserProfileIdAndUsageDateForUpdate(
       @Param("userProfileId") long userProfileId, @Param("usageDate") LocalDate usageDate);
 
-  /** 사용자와 날짜의 사용량을 조회한다. */
+  /**
+   * 사용자와 날짜의 사용량을 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param usageDate 조회할 KST 날짜
+   * @return 해당 날짜의 사용량. 아직 생성되지 않았으면 빈 값
+   */
   Optional<FreeTalkDailySpeakingUsage> findByIdUserProfileIdAndIdUsageDate(
       long userProfileId, LocalDate usageDate);
 }

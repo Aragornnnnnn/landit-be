@@ -30,6 +30,7 @@ public class FreeTalkSessionStartService {
    * @param request 시작 방식과 선택 주제
    * @return 생성된 프리톡 세션 시작 응답
    * @throws com.landit.landitbe.shared.exception.ApiException 요청 또는 AI 생성 결과가 유효하지 않을 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 당일 발화 한도를 모두 사용했을 때
    */
   public FreeTalkSessionStartResponse startFreeTalkSession(
       long userId, FreeTalkSessionStartRequest request) {
