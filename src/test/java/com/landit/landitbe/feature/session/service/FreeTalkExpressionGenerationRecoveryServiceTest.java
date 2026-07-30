@@ -34,5 +34,6 @@ class FreeTalkExpressionGenerationRecoveryServiceTest {
 
     assertThat(interruptedSession.getExpressionGenerationStatus())
         .isEqualTo(ExpressionGenerationStatus.FAILED);
+    assertThat(interruptedSession.getExpressionGenerationStartedAt()).isNull();
   }
 }

@@ -76,6 +76,13 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     return post(CLOSING_PATH, request, RemoteClosingResponse.class).toResult();
   }
 
+  /**
+   * 프리톡 대화에서 학습할 표현을 추천한다.
+   *
+   * @param request 표현 추천 요청
+   * @return 검증된 표현 추천 결과
+   * @throws ApiException 원격 AI 호출 또는 응답 검증에 실패했을 때
+   */
   @Override
   public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
       AiFreeTalkExpressionRecommendationsRequest request) {
@@ -84,6 +91,13 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         .toResult(request);
   }
 
+  /**
+   * 신규 표현의 학습 콘텐츠를 생성한다.
+   *
+   * @param request 학습 콘텐츠 생성 요청
+   * @return 검증된 학습 콘텐츠 결과
+   * @throws ApiException 원격 AI 호출 또는 응답 검증에 실패했을 때
+   */
   @Override
   public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
       AiFreeTalkExpressionLearningContentRequest request) {
