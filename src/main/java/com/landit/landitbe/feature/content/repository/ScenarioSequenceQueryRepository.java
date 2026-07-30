@@ -14,10 +14,10 @@ import org.springframework.stereotype.Repository;
 public interface ScenarioSequenceQueryRepository extends JpaRepository<Scenario, Long> {
 
   /**
-   * 사용자 학습 언어에 맞는 시나리오 ID를 노출 순서대로 조회한다.
+   * 사용자 학습 언어에 맞는 시나리오 ID를 ID 오름차순으로 조회한다.
    *
    * @param userId 사용자 ID
-   * @return 카테고리와 시나리오 노출 순서로 정렬한 시나리오 ID 목록
+   * @return 시나리오 ID 오름차순으로 정렬한 시나리오 ID 목록
    */
   @Query(
       """
@@ -37,7 +37,7 @@ public interface ScenarioSequenceQueryRepository extends JpaRepository<Scenario,
              AND slv.baseLocale = up.baseLocale
              AND slv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             WHERE up.id = :userId
-            ORDER BY c.displayOrder ASC, s.displayOrder ASC
+            ORDER BY s.id ASC
       """)
-  List<Long> findScenarioIdsInDisplayOrder(@Param("userId") long userId);
+  List<Long> findScenarioIdsInIdOrder(@Param("userId") long userId);
 }

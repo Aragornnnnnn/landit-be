@@ -93,7 +93,7 @@ class ScenarioListApiIntegrationTests {
   }
 
   @Test
-  void scenariosExposeFirstUnclearedScenarioAsNewAndIgnoreLegacyProgress() throws Exception {
+  void scenariosExposeLowestIdUnclearedScenarioAsNewAndIgnoreLegacyProgress() throws Exception {
     JsonNode loginResponseBody = login();
     final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
@@ -104,16 +104,16 @@ class ScenarioListApiIntegrationTests {
             get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioId").value(202))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("NEW"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].starRating").value(nullValue()))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].expiresAt").doesNotExist())
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("LOCKED"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").value(true))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].openingPreview").value(nullValue()))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value("NEW"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].expiresAt").doesNotExist());
   }
 
   @Test
@@ -197,7 +197,7 @@ class ScenarioListApiIntegrationTests {
     MvcResult startResult =
         mockMvc
             .perform(
-                post("/api/v1/scenarios/202/sessions")
+                post("/api/v1/scenarios/201/sessions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
             .andExpect(status().isCreated())
             .andReturn();
@@ -215,8 +215,8 @@ class ScenarioListApiIntegrationTests {
         .perform(
             get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("RETRY"));
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value("RETRY"));
   }
 
   @Test
@@ -229,7 +229,7 @@ class ScenarioListApiIntegrationTests {
     MvcResult startResult =
         mockMvc
             .perform(
-                post("/api/v1/scenarios/202/sessions")
+                post("/api/v1/scenarios/201/sessions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
             .andExpect(status().isCreated())
             .andReturn();
@@ -250,8 +250,8 @@ class ScenarioListApiIntegrationTests {
         .perform(
             get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("RETRY"));
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value("RETRY"));
   }
 
   @Test
@@ -384,7 +384,7 @@ class ScenarioListApiIntegrationTests {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     seedScenarioListData(null);
-    insertScenarioAccess(userId, 202);
+    insertScenarioAccess(userId, 201);
 
     mockMvc
         .perform(
@@ -393,10 +393,9 @@ class ScenarioListApiIntegrationTests {
                     HttpHeaders.AUTHORIZATION,
                     "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("LOCKED"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("CLEARED"))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"));
+            jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("CLEARED"));
 
     mutableClock.setInstant(Instant.parse("2026-07-29T14:00:00Z"));
 
@@ -407,8 +406,8 @@ class ScenarioListApiIntegrationTests {
                     HttpHeaders.AUTHORIZATION,
                     "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("TODAY"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value("NEW"));
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("TODAY"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("NEW"));
   }
 
   @Test

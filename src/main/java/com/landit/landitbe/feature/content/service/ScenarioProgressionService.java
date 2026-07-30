@@ -36,7 +36,7 @@ public class ScenarioProgressionService {
   @Transactional(readOnly = true)
   public Optional<CurrentScenario> findCurrentScenario(
       long userId, Locale targetLocale, Instant evaluatedAt) {
-    List<Long> scenarioIds = scenarioSequenceQueryRepository.findScenarioIdsInDisplayOrder(userId);
+    List<Long> scenarioIds = scenarioSequenceQueryRepository.findScenarioIdsInIdOrder(userId);
     Set<Long> accessibleScenarioIds =
         Set.copyOf(scenarioAccessService.findAccessibleScenarioIds(userId, targetLocale));
     Optional<Long> firstUnclearedScenarioId =
