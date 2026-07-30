@@ -3,6 +3,7 @@
 package com.landit.landitbe.config.security;
 
 import com.landit.landitbe.config.web.CorsProperties;
+import com.landit.landitbe.feature.admin.security.AdminAuthorizationFilter;
 import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
 import com.landit.landitbe.feature.auth.security.AuthTokenFilter;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -33,6 +34,7 @@ public class AuthSecurityConfig {
   private static final boolean CORS_ALLOW_CREDENTIALS = true;
 
   private final AuthTokenFilter authTokenFilter;
+  private final AdminAuthorizationFilter adminAuthorizationFilter;
   private final AuthFailureResponseWriter failureResponseWriter;
 
   /**
@@ -42,8 +44,11 @@ public class AuthSecurityConfig {
    * @param failureResponseWriter 인증 실패 응답 작성기
    */
   public AuthSecurityConfig(
-      AuthTokenFilter authTokenFilter, AuthFailureResponseWriter failureResponseWriter) {
+      AuthTokenFilter authTokenFilter,
+      AdminAuthorizationFilter adminAuthorizationFilter,
+      AuthFailureResponseWriter failureResponseWriter) {
     this.authTokenFilter = authTokenFilter;
+    this.adminAuthorizationFilter = adminAuthorizationFilter;
     this.failureResponseWriter = failureResponseWriter;
   }
 
@@ -68,6 +73,8 @@ public class AuthSecurityConfig {
                 registry
                     .requestMatchers(HttpMethod.GET, "/api/v1/app-versions/check")
                     .permitAll()
+                    .requestMatchers("/api/v1/admin/**")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/**")
                     .permitAll()
                     .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/me")
@@ -101,6 +108,7 @@ public class AuthSecurityConfig {
                     .anyRequest()
                     .permitAll())
         .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(adminAuthorizationFilter, AuthTokenFilter.class)
         .build();
   }
 
