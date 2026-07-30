@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Pattern;
  * @param content 사용자 발화 원문
  * @param inputType 사용자 발화 입력 방식
  * @param utteranceDurationMs 이번 사용자 발화 시간 밀리초
- * @param timeLimitReached 클라이언트 타이머의 제한 도달 신호이며 서버 누적 시간 판정과 함께 사용한다
+ * @param timeLimitReached 이전 클라이언트와의 호환을 위해 받지만 서버 종료 판단에는 사용하지 않는 값
  */
 public record FreeTalkMessageSubmitRequest(
     @NotBlank
