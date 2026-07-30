@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +24,24 @@ public class FreeTalkDailySpeakingUsageService {
   private final FreeTalkDailySpeakingUsageRepository repository;
   private final UserProfileService userProfileService;
 
+  /** KST 당일의 남은 발화 시간을 조회한다. */
+  @Transactional(readOnly = true)
+  public long remainingMs(long userId) {
+    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    return repository
+        .findByIdUserProfileIdAndIdUsageDate(userId, usageDate)
+        .map(this::remainingForUsage)
+        .orElse(DAILY_SPEAKING_LIMIT_MS);
+  }
+
+  /** KST 당일에 새 프리톡 세션을 시작할 수 있는지 확인한다. */
+  @Transactional(readOnly = true)
+  public void requireRemaining(long userId) {
+    if (remainingMs(userId) == 0) {
+      throw new SessionException(SessionErrorCode.FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED);
+    }
+  }
+
   /** KST 당일 사용량을 잠금 처리하며 새 발화를 한 번 예약한다. */
   @Transactional
   public DailySpeakingUsage reserve(long userId, long utteranceDurationMs) {
@@ -34,18 +52,18 @@ public class FreeTalkDailySpeakingUsageService {
             .findByUserProfileIdAndUsageDateForUpdate(userId, usageDate)
             .orElseGet(
                 () -> repository.save(FreeTalkDailySpeakingUsage.create(userId, usageDate, 0L)));
-    if (remainingMs(usage.getUsedSpeakingDurationMs()) == 0) {
+    if (remainingForUsedDurationMs(usage.getUsedSpeakingDurationMs()) == 0) {
       throw new SessionException(SessionErrorCode.FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED);
     }
     usage.reserve(utteranceDurationMs);
-    return new DailySpeakingUsage(usage.getUsedSpeakingDurationMs(), remainingMs(usage));
+    return new DailySpeakingUsage(usage.getUsedSpeakingDurationMs(), remainingForUsage(usage));
   }
 
-  private long remainingMs(FreeTalkDailySpeakingUsage usage) {
-    return remainingMs(usage.getUsedSpeakingDurationMs());
+  private long remainingForUsage(FreeTalkDailySpeakingUsage usage) {
+    return remainingForUsedDurationMs(usage.getUsedSpeakingDurationMs());
   }
 
-  private long remainingMs(long usedSpeakingDurationMs) {
+  private long remainingForUsedDurationMs(long usedSpeakingDurationMs) {
     return Math.max(0L, DAILY_SPEAKING_LIMIT_MS - usedSpeakingDurationMs);
   }
 

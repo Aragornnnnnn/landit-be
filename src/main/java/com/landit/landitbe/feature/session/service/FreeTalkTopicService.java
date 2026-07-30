@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkTopicResponse;
 import com.landit.landitbe.feature.session.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.shared.domain.ActiveStatus;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FreeTalkTopicService {
 
   private final FreeTalkTopicRepository freeTalkTopicRepository;
+  private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
   /**
    * 활성 프리톡 주제를 노출 순서대로 반환한다.
@@ -29,5 +31,12 @@ public class FreeTalkTopicService {
         .stream()
         .map(FreeTalkTopicResponse::from)
         .toList();
+  }
+
+  /** 활성 주제와 KST 당일의 남은 사용자 발화 시간을 반환한다. */
+  @Transactional(readOnly = true)
+  public FreeTalkMainResponse getMain(long userId) {
+    return FreeTalkMainResponse.of(
+        getActiveTopics(), dailySpeakingUsageService.remainingMs(userId));
   }
 }

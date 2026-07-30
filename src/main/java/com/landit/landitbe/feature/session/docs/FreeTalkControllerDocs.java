@@ -3,15 +3,14 @@
 package com.landit.landitbe.feature.session.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
-import com.landit.landitbe.feature.session.dto.FreeTalkTopicResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 
 /** 프리톡 주제 조회와 세션 시작 API의 OpenAPI 문서를 정의한다. */
@@ -36,7 +35,7 @@ public interface FreeTalkControllerDocs {
         responseCode = "401",
         description = "인증 실패")
   })
-  ResponseEntity<ApiResponse<List<FreeTalkTopicResponse>>> getTopics(AuthUserPrincipal principal);
+  ResponseEntity<ApiResponse<FreeTalkMainResponse>> getTopics(AuthUserPrincipal principal);
 
   /**
    * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.

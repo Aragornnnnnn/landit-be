@@ -24,12 +24,12 @@ public record FreeTalkSessionStartResponse(
     @Schema(description = "세션 타입", example = "FREE_TALK") String sessionType,
     @Schema(description = "첫 발화 주체") String startMode,
     @Schema(description = "AI 선시작 주제명. 사용자 선시작은 null") String title,
-    @Schema(description = "사용자 누적 발화 시간 제한 밀리초", example = "180000") long speakingTimeLimitMs,
+    @Schema(description = "사용자 일일 발화 시간 제한 밀리초", example = "60000") long speakingTimeLimitMs,
     @Schema(description = "프리톡 AI 상대의 TTS 음성") TtsVoiceResponse ttsVoice,
     @Schema(description = "AI 선시작의 첫 AI 메시지. 사용자 선시작은 null")
         CurrentMessageResponse currentMessage) {
 
-  private static final long SPEAKING_TIME_LIMIT_MS = 180_000L;
+  private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
 
   /**
    * 생성된 프리톡 세션을 공개 응답으로 변환한다.

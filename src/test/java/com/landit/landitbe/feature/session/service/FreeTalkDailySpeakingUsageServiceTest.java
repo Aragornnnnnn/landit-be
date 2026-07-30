@@ -9,11 +9,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -87,5 +87,15 @@ class FreeTalkDailySpeakingUsageServiceTest {
     service.reserve(1L, 1_000L);
 
     verify(userProfileService).requireActiveForUpdate(1L);
+  }
+
+  /** 아직 발화 이력이 없으면 하루 전체 시간을 남은 시간으로 반환한다. */
+  @Test
+  void returnsEntireDailyLimitWhenUsageDoesNotExist() {
+    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    when(repository.findByIdUserProfileIdAndIdUsageDate(1L, usageDate))
+        .thenReturn(Optional.empty());
+
+    assertThat(service.remainingMs(1L)).isEqualTo(60_000L);
   }
 }

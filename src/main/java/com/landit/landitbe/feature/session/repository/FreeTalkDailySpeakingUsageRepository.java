@@ -23,4 +23,8 @@ public interface FreeTalkDailySpeakingUsageRepository
           + "where usage.id.userProfileId = :userProfileId and usage.id.usageDate = :usageDate")
   Optional<FreeTalkDailySpeakingUsage> findByUserProfileIdAndUsageDateForUpdate(
       @Param("userProfileId") long userProfileId, @Param("usageDate") LocalDate usageDate);
+
+  /** 사용자와 날짜의 사용량을 조회한다. */
+  Optional<FreeTalkDailySpeakingUsage> findByIdUserProfileIdAndIdUsageDate(
+      long userProfileId, LocalDate usageDate);
 }

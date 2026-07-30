@@ -4,14 +4,13 @@ package com.landit.landitbe.feature.session;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.docs.FreeTalkControllerDocs;
+import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
-import com.landit.landitbe.feature.session.dto.FreeTalkTopicResponse;
 import com.landit.landitbe.feature.session.service.FreeTalkSessionStartService;
 import com.landit.landitbe.feature.session.service.FreeTalkTopicService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +31,9 @@ public class FreeTalkController implements FreeTalkControllerDocs {
   /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/free-talk/topics")
-  public ResponseEntity<ApiResponse<List<FreeTalkTopicResponse>>> getTopics(
+  public ResponseEntity<ApiResponse<FreeTalkMainResponse>> getTopics(
       @AuthenticationPrincipal AuthUserPrincipal principal) {
-    return ResponseEntity.ok(ApiResponse.success(freeTalkTopicService.getActiveTopics()));
+    return ResponseEntity.ok(ApiResponse.success(freeTalkTopicService.getMain(principal.userId())));
   }
 
   /** {@inheritDoc} */

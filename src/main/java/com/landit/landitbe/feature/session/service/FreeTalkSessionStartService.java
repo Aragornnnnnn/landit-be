@@ -21,6 +21,7 @@ public class FreeTalkSessionStartService {
 
   private final FreeTalkSessionService freeTalkSessionService;
   private final AiFreeTalkClient aiFreeTalkClient;
+  private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
   /**
    * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.
@@ -32,6 +33,7 @@ public class FreeTalkSessionStartService {
    */
   public FreeTalkSessionStartResponse startFreeTalkSession(
       long userId, FreeTalkSessionStartRequest request) {
+    dailySpeakingUsageService.requireRemaining(userId);
     StartedFreeTalkSession startedSession = freeTalkSessionService.createStart(userId, request);
     if (startedSession.startMode() == FreeTalkStartMode.USER_FIRST) {
       return response(startedSession, null);
