@@ -326,6 +326,15 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         || blank(content.targetExpressionText())
         || blank(content.baseExpressionMeaningText())
         || blank(content.usageSummary())
+        || blank(content.usageDescription())
+        || blank(content.representativeSentenceText())
+        || blank(content.representativeSentenceTranslation())
+        || content.representativeSentenceWords() == null
+        || content.representativeSentenceWords().isEmpty()
+        || content.representativeSentenceWordChoices() == null
+        || content.representativeSentenceWordChoices().isEmpty()
+        || content.practiceExamples() == null
+        || content.practiceExamples().isEmpty()
         || blank(requestedExpression.targetExpressionText())
         || blank(requestedExpression.baseExpressionMeaningText())
         || blank(requestedExpression.usageSummary())

@@ -320,6 +320,21 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void rejectsLearningContentWithMissingRequiredFields() throws Exception {
+    String validContent = learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1);
+
+    assertInvalidLearningContent(validContent.replace("친근한 제안에 동의할 때 사용합니다.", " "));
+    assertInvalidLearningContent(validContent.replace("I'm up for that.", " "));
+    assertInvalidLearningContent(validContent.replace("좋아, 그거 하자.", " "));
+    assertInvalidLearningContent(
+        validContent.replace("[\"I'm\", \"up\", \"for\", \"that\"]", "[]"));
+    assertInvalidLearningContent(
+        validContent.replace("[\"that\", \"I'm\", \"up\", \"for\", \"to\"]", "[]"));
+    assertInvalidLearningContent(
+        learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 0));
+  }
+
+  @Test
   void rejectsLearningContentWithDifferentExpressionCount() throws Exception {
     registerRawResponse(
         "/api/v1/free-talk/expression-learning-content",
@@ -367,6 +382,19 @@ class RemoteAiFreeTalkClientTest {
         .isInstanceOfSatisfying(
             ApiException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo(expectedErrorCode));
+  }
+
+  private void assertInvalidLearningContent(String contentData) throws Exception {
+    registerRawResponse(
+        "/api/v1/free-talk/expression-learning-content", 200, successResponse(contentData));
+
+    try {
+      assertGenerationError(
+          () -> remoteClient().generateExpressionLearningContent(learningContentRequest()),
+          ErrorCode.AI_RESPONSE_INVALID);
+    } finally {
+      server.removeContext("/api/v1/free-talk/expression-learning-content");
+    }
   }
 
   private void registerJsonResponse(String path, Map<String, JsonNode> requests, String response)
