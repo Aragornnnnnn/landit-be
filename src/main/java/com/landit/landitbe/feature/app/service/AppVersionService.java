@@ -152,9 +152,20 @@ public class AppVersionService {
    */
   @Transactional
   public AdminAppVersionResponse activate(Long adminUserProfileId, Long appVersionId) {
-    AppVersion appVersion = require(appVersionId);
+    AppPlatform platform =
+        appVersionRepository
+            .findPlatformById(appVersionId)
+            .orElseThrow(
+                () -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "앱 버전 정책을 찾을 수 없습니다."));
+    List<AppVersion> lockedPolicies = appVersionRepository.findAllByPlatformForUpdate(platform);
+    AppVersion appVersion =
+        lockedPolicies.stream()
+            .filter(policy -> policy.getId().equals(appVersionId))
+            .findFirst()
+            .orElseThrow(
+                () -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "앱 버전 정책을 찾을 수 없습니다."));
     String beforeValue = auditValue(appVersion);
-    appVersionRepository.findAllByPlatformForUpdate(appVersion.getPlatform()).stream()
+    lockedPolicies.stream()
         .filter(AppVersion::isActive)
         .filter(activePolicy -> !activePolicy.getId().equals(appVersionId))
         .forEach(AppVersion::deactivate);

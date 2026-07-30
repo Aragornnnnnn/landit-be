@@ -40,6 +40,15 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
   Optional<AppVersion> findByPlatformAndActiveTrue(AppPlatform platform);
 
   /**
+   * 앱 버전 정책 ID로 플랫폼만 조회한다.
+   *
+   * @param appVersionId 앱 버전 정책 ID
+   * @return 정책이 존재하면 해당 앱 플랫폼
+   */
+  @Query("select version.platform from AppVersion version where version.id = :appVersionId")
+  Optional<AppPlatform> findPlatformById(@Param("appVersionId") Long appVersionId);
+
+  /**
    * 같은 플랫폼의 모든 정책을 쓰기 잠금으로 조회한다.
    *
    * @param platform 앱 플랫폼
