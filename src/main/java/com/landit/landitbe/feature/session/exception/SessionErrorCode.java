@@ -10,7 +10,8 @@ public enum SessionErrorCode {
   RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
   FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
   SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 세션입니다."),
-  SESSION_NOT_COMPLETED(HttpStatus.CONFLICT, "완료되지 않은 세션입니다.");
+  SESSION_NOT_COMPLETED(HttpStatus.CONFLICT, "완료되지 않은 세션입니다."),
+  FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "오늘의 프리톡 발화 시간을 모두 사용했습니다.");
 
   private final HttpStatus status;
   private final String message;

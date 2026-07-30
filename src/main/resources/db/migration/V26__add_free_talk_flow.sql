@@ -42,3 +42,12 @@ ALTER TABLE session_history_message ADD CONSTRAINT chk_session_history_message_f
     (utterance_duration_ms IS NULL OR utterance_duration_ms >= 0)
     AND (emotion IS NULL OR emotion IN ('NEUTRAL', 'HAPPY', 'SURPRISED', 'SAD', 'ANGRY'))
 );
+
+CREATE TABLE free_talk_daily_speaking_usage (
+    user_profile_id BIGINT NOT NULL,
+    usage_date DATE NOT NULL,
+    used_speaking_duration_ms BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_profile_id, usage_date),
+    CONSTRAINT fk_free_talk_daily_speaking_usage_user_profile_id FOREIGN KEY (user_profile_id) REFERENCES user_profile (id),
+    CONSTRAINT chk_free_talk_daily_speaking_usage_duration CHECK (used_speaking_duration_ms >= 0)
+);
