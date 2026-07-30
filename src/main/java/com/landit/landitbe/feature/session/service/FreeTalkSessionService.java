@@ -48,6 +48,7 @@ public class FreeTalkSessionService {
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
   /**
    * 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다.
@@ -61,6 +62,7 @@ public class FreeTalkSessionService {
   public StartedFreeTalkSession createStart(long userId, FreeTalkSessionStartRequest request) {
     validateStartRequest(request);
     UserProfile userProfile = userProfileService.requireActiveForUpdate(userId);
+    dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
