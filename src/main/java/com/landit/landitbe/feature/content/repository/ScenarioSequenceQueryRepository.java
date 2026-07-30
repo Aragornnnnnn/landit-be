@@ -23,12 +23,19 @@ public interface ScenarioSequenceQueryRepository extends JpaRepository<Scenario,
       """
             SELECT s.id
             FROM UserProfile up
-            JOIN Scenario s ON 1 = 1
-            JOIN Category c ON c.id = s.categoryId
+            JOIN CategoryLanguageVariant clv
+              ON clv.baseLocale = up.baseLocale
+            JOIN Category c
+              ON c.id = clv.categoryId
+             AND c.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
+            JOIN Scenario s
+              ON s.categoryId = c.id
+             AND s.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             JOIN ScenarioLanguageVariant slv
               ON slv.scenarioId = s.id
              AND slv.targetLocale = up.targetLocale
              AND slv.baseLocale = up.baseLocale
+             AND slv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             WHERE up.id = :userId
             ORDER BY c.displayOrder ASC, s.displayOrder ASC
       """)
