@@ -45,6 +45,24 @@ class DatabaseSchemaIntegrationTests {
     tableNames.forEach(this::assertTableExists);
   }
 
+  /** 관리자 허용 목록과 쓰기 감사 로그에 필요한 스키마를 생성한다. */
+  @Test
+  void adminAccountAndAuditLogSchemaSupportsAdminAuthorizationAndAudit() {
+    assertTableExists("admin_account");
+    assertColumnExists("admin_account", "user_profile_id");
+    assertTableConstraintExists("admin_account", "uk_admin_account_user_profile_id");
+    assertTableConstraintExists("admin_account", "fk_admin_account_user_profile_id");
+
+    assertTableExists("admin_audit_log");
+    assertColumnExists("admin_audit_log", "admin_user_profile_id");
+    assertColumnExists("admin_audit_log", "action");
+    assertColumnExists("admin_audit_log", "target_type");
+    assertColumnExists("admin_audit_log", "target_id");
+    assertColumnExists("admin_audit_log", "before_value");
+    assertColumnExists("admin_audit_log", "after_value");
+    assertTableConstraintExists("admin_audit_log", "fk_admin_audit_log_admin_user_profile_id");
+  }
+
   @Test
   void oauthIdentityHasLookupIndexes() {
     assertIndexExists("idx_oauth_identity_provider_user");
