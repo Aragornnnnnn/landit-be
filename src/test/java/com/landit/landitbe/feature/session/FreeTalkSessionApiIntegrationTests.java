@@ -76,6 +76,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void cleanUpDatabase() {
+    jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
@@ -97,11 +98,13 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.length()").value(2))
-        .andExpect(jsonPath("$.data[0].topicId").value(1001))
-        .andExpect(jsonPath("$.data[0].displayName").value("첫 번째"))
-        .andExpect(jsonPath("$.data[0].displayOrder").value(1))
-        .andExpect(jsonPath("$.data[1].topicId").value(1002));
+        .andExpect(jsonPath("$.data.dailySpeakingTimeLimitMs").value(60000))
+        .andExpect(jsonPath("$.data.remainingSpeakingTimeMs").value(60000))
+        .andExpect(jsonPath("$.data.topics.length()").value(2))
+        .andExpect(jsonPath("$.data.topics[0].topicId").value(1001))
+        .andExpect(jsonPath("$.data.topics[0].displayName").value("첫 번째"))
+        .andExpect(jsonPath("$.data.topics[0].displayOrder").value(1))
+        .andExpect(jsonPath("$.data.topics[1].topicId").value(1002));
   }
 
   @Test
@@ -139,7 +142,7 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
             .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
-            .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(180000))
+            .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
             .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
             .andExpect(
                 jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
@@ -566,10 +569,12 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void compensatesUserMessageAndMarkerWhenAiTurnFails() throws Exception {
+  void preservesUserMessageAndDailyUsageWhenAiTurnFails() throws Exception {
     String accessToken =
         login("free-talk-compensation@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
+    String clientMessageId = UUID.randomUUID().toString();
+    String request = messageRequest(clientMessageId, "This should fail.", 700, false);
     fakeAiFreeTalkClient.failTurn();
 
     mockMvc
@@ -577,15 +582,14 @@ class FreeTalkSessionApiIntegrationTests {
             post(messagePath(sessionId))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    messageRequest(UUID.randomUUID().toString(), "This should fail.", 700, false)))
+                .content(request))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
 
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_message", Integer.class))
-        .isZero();
+        .isEqualTo(1);
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT accumulated_speaking_duration_ms FROM free_talk_session "
@@ -600,6 +604,24 @@ class FreeTalkSessionApiIntegrationTests {
                 String.class,
                 sessionId))
         .isNull();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isEqualTo(700L);
+
+    fakeAiFreeTalkClient.reset();
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isEqualTo(700L);
   }
 
   @Test
@@ -631,7 +653,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void completesWhenServerCalculatedSpeakingTimeReachesLimit() throws Exception {
+  void completesAfterLastUtteranceCrossesDailySpeakingLimit() throws Exception {
     String accessToken =
         login("free-talk-server-time-limit@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
@@ -642,10 +664,20 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 180000, false)))
+                    messageRequest(UUID.randomUUID().toString(), "Almost done.", 59000, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 3000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
-        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(62000));
   }
 
   private long startUserFirstSession(String accessToken) throws Exception {

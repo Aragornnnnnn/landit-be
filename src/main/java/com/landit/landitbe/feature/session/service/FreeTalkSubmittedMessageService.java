@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkSubmittedMessageService {
 
-  private static final long SPEAKING_TIME_LIMIT_MS = 180_000L;
+  private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
   private static final long PROCESSING_TIMEOUT_SECONDS = 90;
 
   private final LearningSessionRepository learningSessionRepository;
@@ -46,6 +46,7 @@ public class FreeTalkSubmittedMessageService {
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
   /** 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다. */
   @Transactional
@@ -202,7 +203,7 @@ public class FreeTalkSubmittedMessageService {
           history,
           existingMessage,
           messages,
-          request.timeLimitReached());
+          request.timeLimitReached() || dailySpeakingUsageService.remainingMs(userId) == 0);
     }
     if (messages.stream()
         .anyMatch(
@@ -212,6 +213,8 @@ public class FreeTalkSubmittedMessageService {
       throw new ApiException(ErrorCode.CONFLICT);
     }
     int userTurnNumber = nextUserTurnNumber(messages);
+    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+        dailySpeakingUsageService.reserve(userId, request.utteranceDurationMs());
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository.save(
             SessionHistoryMessage.freeTalkUser(
@@ -230,7 +233,7 @@ public class FreeTalkSubmittedMessageService {
         history,
         userMessage,
         messages,
-        request.timeLimitReached());
+        request.timeLimitReached() || dailyUsage.remainingMs() == 0);
   }
 
   private Reservation reservation(
@@ -239,7 +242,7 @@ public class FreeTalkSubmittedMessageService {
       SessionHistory history,
       SessionHistoryMessage userMessage,
       List<SessionHistoryMessage> messages,
-      boolean timeLimitReached) {
+      boolean shouldCloseAfterMessage) {
     AiFreeTalkTopic topic =
         freeTalkSession.getTopicId() == null
             ? new AiFreeTalkTopic(null, freeTalkSession.getTitle(), null)
@@ -259,10 +262,7 @@ public class FreeTalkSubmittedMessageService {
         userMessage.getId(),
         userMessage.getClientMessageId(),
         userMessage.getUtteranceDurationMs(),
-        timeLimitReached
-            || freeTalkSession.getAccumulatedSpeakingDurationMs()
-                    + userMessage.getUtteranceDurationMs()
-                >= SPEAKING_TIME_LIMIT_MS,
+        shouldCloseAfterMessage,
         freeTalkSession.getStartMode() == FreeTalkStartMode.USER_FIRST
             && messages.stream()
                     .filter(message -> message.getRole() == ConversationSpeaker.USER)
@@ -354,7 +354,7 @@ public class FreeTalkSubmittedMessageService {
         records.learningSessionId(), session, FreeTalkTurnStatus.COMPLETED, userMessage, aiMessage);
   }
 
-  /** AI 호출 실패 시 이번 요청에서 예약한 메시지와 처리 표시를 되돌린다. */
+  /** AI 호출 실패 시 처리 표시만 되돌리고 사용자 발화 시간은 보존한다. */
   @Transactional
   public void compensate(Reservation reservation) {
     FreeTalkSession session =
@@ -365,7 +365,6 @@ public class FreeTalkSubmittedMessageService {
         && reservation.clientMessageId().equals(session.getProcessingClientMessageId())) {
       session.clearProcessing();
     }
-    sessionHistoryMessageRepository.deleteById(reservation.userMessageId());
   }
 
   /** 종료 확인 처리에 필요한 기존 예약과 세션 상태를 잠금 조회한다. */
