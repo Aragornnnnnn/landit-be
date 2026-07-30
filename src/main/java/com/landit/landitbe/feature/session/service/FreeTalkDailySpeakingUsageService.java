@@ -27,11 +27,19 @@ public class FreeTalkDailySpeakingUsageService {
   /** KST 당일의 남은 발화 시간을 조회한다. */
   @Transactional(readOnly = true)
   public long remainingMs(long userId) {
+    return usage(userId).remainingMs();
+  }
+
+  /** KST 당일의 사용 시간과 남은 시간을 조회한다. */
+  @Transactional(readOnly = true)
+  public DailySpeakingUsage usage(long userId) {
     LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
     return repository
         .findByIdUserProfileIdAndIdUsageDate(userId, usageDate)
-        .map(this::remainingForUsage)
-        .orElse(DAILY_SPEAKING_LIMIT_MS);
+        .map(
+            usage ->
+                new DailySpeakingUsage(usage.getUsedSpeakingDurationMs(), remainingForUsage(usage)))
+        .orElse(new DailySpeakingUsage(0L, DAILY_SPEAKING_LIMIT_MS));
   }
 
   /** KST 당일에 새 프리톡 세션을 시작할 수 있는지 확인한다. */
