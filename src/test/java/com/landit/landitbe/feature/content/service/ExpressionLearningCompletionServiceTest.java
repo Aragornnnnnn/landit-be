@@ -204,8 +204,7 @@ class ExpressionLearningCompletionServiceTest {
         USER_ID, LOCKED_EXPRESSION_ID, learningSessionId);
 
     verify(learningProgressService)
-        .completeExpressionWithoutOrderLock(
-            USER_ID, expression.getScenarioId(), LOCKED_EXPRESSION_ID);
+        .completeFreeTalkExpression(USER_ID, expression.getScenarioId(), LOCKED_EXPRESSION_ID);
     verify(writingExpressionRepository)
         .findByIdAndStatusForUpdate(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
     verify(learningProgressService, never())

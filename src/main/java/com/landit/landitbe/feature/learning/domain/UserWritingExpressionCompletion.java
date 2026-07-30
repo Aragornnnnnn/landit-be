@@ -4,6 +4,8 @@ package com.landit.landitbe.feature.learning.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -30,6 +32,10 @@ public class UserWritingExpressionCompletion {
   @Column(name = "writing_expression_id", nullable = false)
   private Long writingExpressionId;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "learning_source", nullable = false)
+  private ExpressionLearningSource learningSource;
+
   @Column(name = "completed_at", nullable = false)
   private LocalDateTime completedAt;
 
@@ -42,10 +48,20 @@ public class UserWritingExpressionCompletion {
   /** 사용자가 특정 시나리오의 표현 학습을 완료했음을 기록하는 엔티티를 CREATE한다. */
   public UserWritingExpressionCompletion(
       Long userProfileId, Long scenarioId, Long writingExpressionId) {
+    this(userProfileId, scenarioId, writingExpressionId, ExpressionLearningSource.SCENARIO);
+  }
+
+  /** 사용자가 특정 출처에서 표현 학습을 완료했음을 기록하는 엔티티를 CREATE한다. */
+  public UserWritingExpressionCompletion(
+      Long userProfileId,
+      Long scenarioId,
+      Long writingExpressionId,
+      ExpressionLearningSource learningSource) {
     final LocalDateTime now = LocalDateTime.now();
     this.userProfileId = userProfileId;
     this.scenarioId = scenarioId;
     this.writingExpressionId = writingExpressionId;
+    this.learningSource = learningSource;
     this.completedAt = now;
     this.lastCompletedAt = now;
   }

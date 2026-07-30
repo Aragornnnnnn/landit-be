@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.service;
 
+import com.landit.landitbe.feature.learning.domain.ExpressionLearningSource;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
@@ -28,7 +29,8 @@ public class LearningProgressService {
   /** 특정 시나리오에서 완료한 표현 엔티티를 기능 내부에서 조회한다. */
   private List<UserWritingExpressionCompletion> findExpressionCompletions(
       Long userId, Long scenarioId) {
-    return expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(userId, scenarioId);
+    return expressionCompletionRepository.findAllByUserProfileIdAndScenarioIdAndLearningSource(
+        userId, scenarioId, ExpressionLearningSource.SCENARIO);
   }
 
   /**
@@ -70,14 +72,16 @@ public class LearningProgressService {
    * @param expressionId 표현 ID
    */
   @Transactional
-  public void completeExpressionWithoutOrderLock(Long userId, Long scenarioId, Long expressionId) {
+  public void completeFreeTalkExpression(Long userId, Long scenarioId, Long expressionId) {
     expressionCompletionRepository
-        .findByUserProfileIdAndWritingExpressionId(userId, expressionId)
+        .findByUserProfileIdAndWritingExpressionIdAndLearningSource(
+            userId, expressionId, ExpressionLearningSource.FREE_TALK)
         .ifPresentOrElse(
             UserWritingExpressionCompletion::markCompletedAgain,
             () ->
                 expressionCompletionRepository.save(
-                    new UserWritingExpressionCompletion(userId, scenarioId, expressionId)));
+                    new UserWritingExpressionCompletion(
+                        userId, scenarioId, expressionId, ExpressionLearningSource.FREE_TALK)));
   }
 
   /**

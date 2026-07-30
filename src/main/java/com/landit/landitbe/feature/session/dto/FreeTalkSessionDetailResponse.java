@@ -71,5 +71,6 @@ public record FreeTalkSessionDetailResponse(
       int displayOrder,
       String targetExpressionText,
       String baseExpressionMeaningText,
-      boolean completed) {}
+      boolean completed,
+      LocalDateTime lastCompletedAt) {}
 }

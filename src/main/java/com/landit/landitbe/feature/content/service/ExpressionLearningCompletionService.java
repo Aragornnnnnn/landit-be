@@ -75,7 +75,7 @@ public class ExpressionLearningCompletionService {
     }
     if (freeTalkSessionId != null) {
       validateFreeTalkCompletion(userId, freeTalkSessionId, expressionId);
-      completeWithoutOrderLock(userId, scenarioId, expressionId);
+      completeFreeTalkExpression(userId, scenarioId, expressionId);
       return;
     }
     if (scenarioId == null) {
@@ -102,12 +102,12 @@ public class ExpressionLearningCompletionService {
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
 
-  // 표현의 완료 이력을 순서 잠금 없이 생성하거나 완료 시각을 갱신한다.
-  private void completeWithoutOrderLock(Long userId, Long scenarioId, Long expressionId) {
+  // 프리톡 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
+  private void completeFreeTalkExpression(Long userId, Long scenarioId, Long expressionId) {
     writingExpressionRepository
         .findByIdAndStatusForUpdate(expressionId, ActiveStatus.ACTIVE)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    learningProgressService.completeExpressionWithoutOrderLock(userId, scenarioId, expressionId);
+    learningProgressService.completeFreeTalkExpression(userId, scenarioId, expressionId);
   }
 
   private void validateFreeTalkCompletion(Long userId, Long freeTalkSessionId, Long expressionId) {

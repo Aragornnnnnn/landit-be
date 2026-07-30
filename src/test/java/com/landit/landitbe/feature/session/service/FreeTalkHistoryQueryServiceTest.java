@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.learning.domain.ExpressionLearningSource;
+import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
@@ -73,15 +75,23 @@ class FreeTalkHistoryQueryServiceTest {
         .thenReturn(List.of(sessionExpression));
     when(writingExpressionRepository.findAllById(List.of(300L)))
         .thenReturn(List.of(historicalExpression));
+    LocalDateTime scenarioCompletedAt = LocalDateTime.of(2026, 7, 29, 10, 0);
+    UserWritingExpressionCompletion scenarioCompletion =
+        org.mockito.Mockito.mock(UserWritingExpressionCompletion.class);
+    when(scenarioCompletion.getWritingExpressionId()).thenReturn(300L);
+    when(scenarioCompletion.getLearningSource()).thenReturn(ExpressionLearningSource.SCENARIO);
+    when(scenarioCompletion.getLastCompletedAt()).thenReturn(scenarioCompletedAt);
     when(expressionCompletionRepository.findAllByUserProfileIdAndWritingExpressionIdIn(
             1L, List.of(300L)))
-        .thenReturn(List.of());
+        .thenReturn(List.of(scenarioCompletion));
 
     FreeTalkSessionDetailResponse response = historyQueryService.getSession(1L, 10L);
 
     assertThat(response.expressions())
         .extracting(FreeTalkSessionDetailResponse.Expression::targetExpressionText)
         .containsExactly("make up for");
+    assertThat(response.expressions().getFirst().completed()).isFalse();
+    assertThat(response.expressions().getFirst().lastCompletedAt()).isEqualTo(scenarioCompletedAt);
   }
 
   /** 목록 조회는 페이지의 세션과 표현을 일괄 조회한다. */
