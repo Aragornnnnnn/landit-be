@@ -33,8 +33,8 @@ public class AppVersion extends BaseCreatedAtEntity {
   @Column(name = "build_number", nullable = false)
   private long buildNumber;
 
-  @Column(name = "minimum_supported_build_number", nullable = false)
-  private long minimumSupportedBuildNumber;
+  @Column(name = "minimum_supported_version_name", nullable = false, length = 30)
+  private String minimumSupportedVersionName;
 
   @Column(name = "force_update_reason", length = 500)
   private String forceUpdateReason;
@@ -55,46 +55,11 @@ public class AppVersion extends BaseCreatedAtEntity {
   protected AppVersion() {}
 
   /**
-   * 관리자 입력값으로 앱 버전 정책을 생성한다.
-   *
-   * @param platform 앱 플랫폼
-   * @param versionName 사용자에게 표시할 버전명
-   * @param buildNumber 최신 앱 빌드 번호
-   * @param minimumSupportedBuildNumber 최소 지원 앱 빌드 번호
-   * @param forceUpdateReason 강제 업데이트 안내 사유
-   * @param softUpdateReason 권장 업데이트 안내 사유
-   * @param releaseNote 릴리스 노트
-   * @param releasedAt 출시 시각
-   * @return 비활성 상태로 생성된 앱 버전 정책
-   */
-  public static AppVersion create(
-      AppPlatform platform,
-      String versionName,
-      long buildNumber,
-      long minimumSupportedBuildNumber,
-      String forceUpdateReason,
-      String softUpdateReason,
-      String releaseNote,
-      LocalDateTime releasedAt) {
-    AppVersion appVersion = new AppVersion();
-    appVersion.platform = platform;
-    appVersion.apply(
-        versionName,
-        buildNumber,
-        minimumSupportedBuildNumber,
-        forceUpdateReason,
-        softUpdateReason,
-        releaseNote,
-        releasedAt);
-    return appVersion;
-  }
-
-  /**
    * 관리자 입력값으로 앱 버전 정책의 표시·업데이트 기준을 변경한다.
    *
    * @param versionName 사용자에게 표시할 버전명
    * @param buildNumber 최신 앱 빌드 번호
-   * @param minimumSupportedBuildNumber 최소 지원 앱 빌드 번호
+   * @param minimumSupportedVersionName 최소 지원 앱 버전명
    * @param forceUpdateReason 강제 업데이트 안내 사유
    * @param softUpdateReason 권장 업데이트 안내 사유
    * @param releaseNote 릴리스 노트
@@ -103,7 +68,7 @@ public class AppVersion extends BaseCreatedAtEntity {
   public void update(
       String versionName,
       long buildNumber,
-      long minimumSupportedBuildNumber,
+      String minimumSupportedVersionName,
       String forceUpdateReason,
       String softUpdateReason,
       String releaseNote,
@@ -111,35 +76,25 @@ public class AppVersion extends BaseCreatedAtEntity {
     apply(
         versionName,
         buildNumber,
-        minimumSupportedBuildNumber,
+        minimumSupportedVersionName,
         forceUpdateReason,
         softUpdateReason,
         releaseNote,
         releasedAt);
   }
 
-  /** 플랫폼에서 현재 정책만 활성화할 수 있도록 상태를 전환한다. */
-  public void activate() {
-    active = true;
-  }
-
-  /** 다른 정책 활성화 전에 현재 활성 상태를 해제한다. */
-  public void deactivate() {
-    active = false;
-  }
-
   /** 관리자 입력값을 엔티티 필드에 반영한다. */
   private void apply(
       String versionName,
       long buildNumber,
-      long minimumSupportedBuildNumber,
+      String minimumSupportedVersionName,
       String forceUpdateReason,
       String softUpdateReason,
       String releaseNote,
       LocalDateTime releasedAt) {
     this.versionName = versionName;
     this.buildNumber = buildNumber;
-    this.minimumSupportedBuildNumber = minimumSupportedBuildNumber;
+    this.minimumSupportedVersionName = minimumSupportedVersionName;
     this.forceUpdateReason = forceUpdateReason;
     this.softUpdateReason = softUpdateReason;
     this.releaseNote = releaseNote;
@@ -201,12 +156,12 @@ public class AppVersion extends BaseCreatedAtEntity {
   }
 
   /**
-   * 서버가 허용하는 최소 빌드 번호를 반환한다.
+   * 서버가 허용하는 최소 앱 버전명을 반환한다.
    *
-   * @return 최소 지원 앱 빌드 번호
+   * @return 최소 지원 앱 버전명
    */
-  public long getMinimumSupportedBuildNumber() {
-    return minimumSupportedBuildNumber;
+  public String getMinimumSupportedVersionName() {
+    return minimumSupportedVersionName;
   }
 
   /**

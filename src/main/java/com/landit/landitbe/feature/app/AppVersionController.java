@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.app.service.AppVersionService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +27,9 @@ public class AppVersionController implements AppVersionControllerDocs {
   @Override
   @GetMapping("/api/v1/app-versions/check")
   public ApiResponse<AppVersionCheckResponse> check(
-      @RequestParam AppPlatform platform, @RequestParam @Min(1) long buildNumber) {
-    return ApiResponse.success(appVersionService.check(platform, buildNumber));
+      @RequestParam AppPlatform platform,
+      @RequestParam @Pattern(regexp = "\\d+\\.\\d+\\.\\d+") String versionName,
+      @RequestParam @Min(1) long buildNumber) {
+    return ApiResponse.success(appVersionService.check(platform, versionName));
   }
 }

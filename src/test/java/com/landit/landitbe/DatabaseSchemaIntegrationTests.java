@@ -82,26 +82,31 @@ class DatabaseSchemaIntegrationTests {
             "CREATE UNIQUE INDEX uk_user_quest_active_user");
   }
 
-  @DisplayName("앱 버전 정책은 유효한 빌드 번호 범위만 저장한다.")
+  @DisplayName("앱 버전 정책은 플랫폼별 한 건과 유효한 빌드 번호를 유지한다.")
   @Test
-  void appVersionBuildConstraintRejectsInvalidRanges() {
-    assertThatThrownBy(() -> insertAppVersionForConstraintTest(0, 0))
+  void appVersionPolicySchemaUsesSinglePlatformRecord() {
+    assertColumnExists("app_version", "minimum_supported_version_name");
+    assertColumnDoesNotExist("app_version", "minimum_supported_build_number");
+    assertTableConstraintExists("app_version", "uk_app_version_platform");
+
+    assertThatThrownBy(() -> insertAppVersionForConstraintTest("IOS", 0))
         .isInstanceOf(DataIntegrityViolationException.class);
-    assertThatThrownBy(() -> insertAppVersionForConstraintTest(18, 19))
+    insertAppVersionForConstraintTest("IOS", 1);
+    assertThatThrownBy(() -> insertAppVersionForConstraintTest("IOS", 2))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
-  @DisplayName("PostgreSQL 전용 migration에 플랫폼별 활성 정책 partial unique index가 정의되어 있다.")
+  @DisplayName("앱 버전 정책 migration은 활성 정책 partial unique index를 제거한다.")
   @Test
-  void postgresqlMigrationDefinesSingleActiveAppVersionIndex() throws Exception {
+  void appVersionPolicyMigrationUsesPlatformUniqueConstraint() throws Exception {
     String migrationSql =
-        readMigrationSql("db/postgresql/V17__enforce_single_active_app_version.sql");
+        readMigrationSql("db/migration/V30__change_app_version_to_single_platform_policy.sql");
 
     assertThat(migrationSql)
         .contains(
-            "CREATE UNIQUE INDEX uk_app_version_active_platform",
-            "ON app_version (platform)",
-            "WHERE active = TRUE");
+            "DROP INDEX IF EXISTS uk_app_version_active_platform",
+            "minimum_supported_version_name",
+            "CONSTRAINT uk_app_version_platform UNIQUE (platform)");
   }
 
   @DisplayName("NPS 테이블 교체는 이미 적용된 V4가 아니라 V6 migration에서 처리한다.")
@@ -588,6 +593,29 @@ class DatabaseSchemaIntegrationTests {
     assertThat(userAiTutorId(migrationJdbcTemplate, 990202L)).isEqualTo(990102L);
   }
 
+  /** V30 migration은 비활성 이력을 제거하고 활성 정책의 최소 지원 버전명을 초기화한다. */
+  @Test
+  void v30MigrationKeepsSingleActivePolicyAndBackfillsMinimumSupportedVersionName() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "29");
+    insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "1.0.0", 10, 8, true);
+    insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "0.9.0", 9, 8, false);
+
+    migrateToLatestVersion(databaseUrl);
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select count(*) from app_version where platform = 'IOS'", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select minimum_supported_version_name from app_version where platform = 'IOS'",
+                String.class))
+        .isEqualTo("1.0.0");
+  }
+
   private String migrationTestDatabaseUrl() {
     return "jdbc:h2:mem:lan100-v14-"
         + UUID.randomUUID()
@@ -623,6 +651,29 @@ class DatabaseSchemaIntegrationTests {
         status);
   }
 
+  /** V30 이전 스키마에 활성 여부가 다른 앱 버전 정책을 추가한다. */
+  private void insertLegacyAppVersionPolicy(
+      JdbcTemplate migrationJdbcTemplate,
+      String platform,
+      String versionName,
+      long buildNumber,
+      long minimumSupportedBuildNumber,
+      boolean active) {
+    migrationJdbcTemplate.update(
+        """
+        insert into app_version (
+            platform, version_name, build_number, minimum_supported_build_number, active,
+            released_at, created_at
+        )
+        values (?, ?, ?, ?, ?, current_timestamp, current_timestamp)
+        """,
+        platform,
+        versionName,
+        buildNumber,
+        minimumSupportedBuildNumber,
+        active);
+  }
+
   private void insertUserProfile(
       JdbcTemplate migrationJdbcTemplate, long userProfileId, Long aiTutorId) {
     migrationJdbcTemplate.update(
@@ -643,23 +694,22 @@ class DatabaseSchemaIntegrationTests {
         "SELECT ai_tutor_id FROM user_profile WHERE id = ?", Long.class, userProfileId);
   }
 
-  private void insertAppVersionForConstraintTest(
-      long buildNumber, long minimumSupportedBuildNumber) {
+  private void insertAppVersionForConstraintTest(String platform, long buildNumber) {
     jdbcTemplate.update(
         """
         INSERT INTO app_version (
-            platform, version_name, build_number, minimum_supported_build_number,
+            platform, version_name, minimum_supported_version_name, build_number,
             force_update_reason, soft_update_reason, release_note, active,
             released_at, created_at
         )
         VALUES (
-            'IOS', 'constraint-test', ?, ?,
+            ?, '1.0.0', '1.0.0', ?,
             '강제 업데이트', '업데이트 권장', NULL, FALSE,
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         """,
-        buildNumber,
-        minimumSupportedBuildNumber);
+        platform,
+        buildNumber);
   }
 
   private void assertTableExists(String tableName) {
