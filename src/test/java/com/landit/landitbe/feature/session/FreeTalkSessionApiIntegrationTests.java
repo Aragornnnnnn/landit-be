@@ -340,6 +340,8 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
             .andExpect(jsonPath("$.data.nextMessage.role").value("AI"))
             .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(4200))
+            .andExpect(jsonPath("$.data.progress.usedSpeakingTimeMs").value(4200))
+            .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(55800))
             .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"))
             .andReturn();
 
@@ -678,6 +680,23 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(62000));
+  }
+
+  @Test
+  void ignoresClientTimeLimitSignalWhileDailySpeakingTimeRemains() throws Exception {
+    String accessToken =
+        login("free-talk-client-time-limit@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(messageRequest(UUID.randomUUID().toString(), "Keep talking.", 1000, true)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(59000));
   }
 
   private long startUserFirstSession(String accessToken) throws Exception {

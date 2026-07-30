@@ -117,11 +117,15 @@ public record FreeTalkMessageSubmitResponse(
    * 프리톡 진행 상태의 응답 표현이다.
    *
    * @param sessionStatus 현재 프리톡 대화 상태
-   * @param accumulatedSpeakingDurationMs 누적 사용자 발화 시간 밀리초
-   * @param speakingTimeLimitMs 서버가 적용하는 발화 시간 제한 밀리초
+   * @param accumulatedSpeakingDurationMs 현재 세션의 누적 사용자 발화 시간 밀리초
+   * @param speakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
+   * @param usedSpeakingTimeMs KST 당일 사용한 사용자 발화 시간 밀리초
+   * @param remainingSpeakingTimeMs KST 당일 남은 사용자 발화 시간 밀리초
    */
   public record ProgressResponse(
       FreeTalkConversationStatus sessionStatus,
       long accumulatedSpeakingDurationMs,
-      long speakingTimeLimitMs) {}
+      long speakingTimeLimitMs,
+      long usedSpeakingTimeMs,
+      long remainingSpeakingTimeMs) {}
 }

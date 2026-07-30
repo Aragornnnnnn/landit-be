@@ -85,7 +85,8 @@ public class FreeTalkSubmittedMessageService {
           userMessage,
           null,
           FreeTalkConversationStatus.AWAITING_EXIT_DECISION,
-          speakingDurationUntil(messages, userMessage.getMessageSequence()));
+          speakingDurationUntil(messages, userMessage.getMessageSequence()),
+          userId);
     }
     SessionHistoryMessage nextMessage =
         userMessageIndex + 1 < messages.size()
@@ -106,7 +107,8 @@ public class FreeTalkSubmittedMessageService {
         userMessage,
         nextMessage,
         replayedStatus,
-        speakingDurationUntil(messages, userMessage.getMessageSequence()));
+        speakingDurationUntil(messages, userMessage.getMessageSequence()),
+        userId);
   }
 
   /** 종료 확인이 완료된 같은 사용자 메시지의 결과를 다시 구성한다. */
@@ -161,7 +163,8 @@ public class FreeTalkSubmittedMessageService {
         userMessage,
         nextMessage,
         replayedStatus,
-        speakingDurationUntil(messages, userMessage.getMessageSequence()));
+        speakingDurationUntil(messages, userMessage.getMessageSequence()),
+        userId);
   }
 
   /** 사용자 발화를 저장하고 외부 AI 호출에 필요한 예약 정보를 만든다. */
@@ -197,13 +200,15 @@ public class FreeTalkSubmittedMessageService {
         throw new ApiException(ErrorCode.CONFLICT);
       }
       freeTalkSession.startProcessing(request.clientMessageId());
+      FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+          dailySpeakingUsageService.usage(userId);
       return reservation(
           learningSession,
           freeTalkSession,
           history,
           existingMessage,
           messages,
-          request.timeLimitReached() || dailySpeakingUsageService.remainingMs(userId) == 0);
+          dailyUsage.remainingMs() == 0);
     }
     if (messages.stream()
         .anyMatch(
@@ -233,7 +238,7 @@ public class FreeTalkSubmittedMessageService {
         history,
         userMessage,
         messages,
-        request.timeLimitReached() || dailyUsage.remainingMs() == 0);
+        dailyUsage.remainingMs() == 0);
   }
 
   private Reservation reservation(
@@ -296,7 +301,8 @@ public class FreeTalkSubmittedMessageService {
               session,
               FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED,
               userMessage,
-              null);
+              null,
+              records.learningSession().getUserProfileId());
     } else {
       userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.CONTINUE);
       userMessage.prepareInnerThought();
@@ -316,7 +322,8 @@ public class FreeTalkSubmittedMessageService {
               session,
               FreeTalkTurnStatus.CONTINUE,
               userMessage,
-              aiMessage);
+              aiMessage,
+              records.learningSession().getUserProfileId());
     }
     return response;
   }
@@ -351,7 +358,12 @@ public class FreeTalkSubmittedMessageService {
                 result.translatedMessage(),
                 result.emotion()));
     return response(
-        records.learningSessionId(), session, FreeTalkTurnStatus.COMPLETED, userMessage, aiMessage);
+        records.learningSessionId(),
+        session,
+        FreeTalkTurnStatus.COMPLETED,
+        userMessage,
+        aiMessage,
+        records.learningSession().getUserProfileId());
   }
 
   /** AI 호출 실패 시 처리 표시만 되돌리고 사용자 발화 시간은 보존한다. */
@@ -431,7 +443,8 @@ public class FreeTalkSubmittedMessageService {
         records.freeTalkSession(),
         FreeTalkTurnStatus.CONTINUE,
         records.userMessage(),
-        aiMessage);
+        aiMessage,
+        records.learningSession().getUserProfileId());
   }
 
   /** 종료 확정의 AI 마무리 메시지를 저장하고 세션을 완료한다. */
@@ -467,7 +480,8 @@ public class FreeTalkSubmittedMessageService {
         records.freeTalkSession(),
         FreeTalkTurnStatus.COMPLETED,
         records.userMessage(),
-        aiMessage);
+        aiMessage,
+        records.learningSession().getUserProfileId());
   }
 
   /** 종료 확인의 AI 호출 실패 뒤 처리 표시만 되돌린다. */
@@ -581,7 +595,10 @@ public class FreeTalkSubmittedMessageService {
       FreeTalkSession session,
       FreeTalkTurnStatus turnStatus,
       SessionHistoryMessage userMessage,
-      SessionHistoryMessage aiMessage) {
+      SessionHistoryMessage aiMessage,
+      long userId) {
+    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+        dailySpeakingUsageService.usage(userId);
     return new FreeTalkMessageSubmitResponse(
         learningSessionId,
         session.getTitle(),
@@ -591,7 +608,9 @@ public class FreeTalkSubmittedMessageService {
         new ProgressResponse(
             session.getConversationStatus(),
             session.getAccumulatedSpeakingDurationMs(),
-            SPEAKING_TIME_LIMIT_MS));
+            SPEAKING_TIME_LIMIT_MS,
+            dailyUsage.usedSpeakingDurationMs(),
+            dailyUsage.remainingMs()));
   }
 
   private FreeTalkMessageSubmitResponse replayResponse(
@@ -601,7 +620,10 @@ public class FreeTalkSubmittedMessageService {
       SessionHistoryMessage userMessage,
       SessionHistoryMessage aiMessage,
       FreeTalkConversationStatus conversationStatus,
-      long accumulatedSpeakingDurationMs) {
+      long accumulatedSpeakingDurationMs,
+      long userId) {
+    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+        dailySpeakingUsageService.usage(userId);
     return new FreeTalkMessageSubmitResponse(
         learningSessionId,
         title,
@@ -609,10 +631,29 @@ public class FreeTalkSubmittedMessageService {
         SubmittedMessageResponse.from(userMessage),
         aiMessage == null ? null : NextMessageResponse.from(aiMessage),
         new ProgressResponse(
-            conversationStatus, accumulatedSpeakingDurationMs, SPEAKING_TIME_LIMIT_MS));
+            conversationStatus,
+            accumulatedSpeakingDurationMs,
+            SPEAKING_TIME_LIMIT_MS,
+            dailyUsage.usedSpeakingDurationMs(),
+            dailyUsage.remainingMs()));
   }
 
-  /** AI 호출 전에 저장한 사용자 발화와 대화 문맥이다. */
+  /**
+   * AI 호출 전에 저장한 사용자 발화와 대화 문맥이다.
+   *
+   * @param learningSessionId 학습 세션 ID
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @param historyId 세션 히스토리 ID
+   * @param userMessageId 저장된 사용자 메시지 ID
+   * @param clientMessageId 중복 요청을 식별하는 클라이언트 메시지 ID
+   * @param utteranceDurationMs 이번 사용자 발화 시간 밀리초
+   * @param dailyLimitReached 이번 발화 예약 후 일일 한도에 도달했는지 여부
+   * @param firstUserTurn 사용자 선시작 세션의 첫 사용자 턴인지 여부
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param topic 프리톡 주제
+   * @param history AI에 전달할 대화 기록
+   */
   public record Reservation(
       long learningSessionId,
       long freeTalkSessionId,
@@ -620,14 +661,26 @@ public class FreeTalkSubmittedMessageService {
       long userMessageId,
       String clientMessageId,
       long utteranceDurationMs,
-      boolean timeLimitReached,
+      boolean dailyLimitReached,
       boolean firstUserTurn,
       String targetLocale,
       String baseLocale,
       AiFreeTalkTopic topic,
       List<AiConversationHistoryMessage> history) {}
 
-  /** 종료 확인 전에 저장한 사용자 메시지와 대화 문맥이다. */
+  /**
+   * 종료 확인 전에 저장한 사용자 메시지와 대화 문맥이다.
+   *
+   * @param learningSessionId 학습 세션 ID
+   * @param historyId 세션 히스토리 ID
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @param userMessageId 종료 의사가 감지된 사용자 메시지 ID
+   * @param decision 사용자가 선택한 종료 여부
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param topic 프리톡 주제
+   * @param history AI에 전달할 대화 기록
+   */
   public record DecisionReservation(
       long learningSessionId,
       long historyId,

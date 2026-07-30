@@ -51,7 +51,7 @@ public class FreeTalkMessageService {
         submittedMessageService.reserve(userId, learningSessionId, request);
     try {
       FreeTalkMessageSubmitResponse response;
-      if (reservation.timeLimitReached()) {
+      if (reservation.dailyLimitReached()) {
         response =
             submittedMessageService.finalizeTimeLimit(
                 reservation,
