@@ -571,6 +571,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+    assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
   }
 
   @Test
