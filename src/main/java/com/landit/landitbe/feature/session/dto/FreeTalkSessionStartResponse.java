@@ -14,7 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param sessionType 세션 타입
  * @param startMode 첫 발화 주체
  * @param title 대화 제목
- * @param speakingTimeLimitMs 사용자 발화 시간 제한 밀리초
+ * @param speakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
  * @param ttsVoice AI 상대의 TTS 음성
  * @param currentMessage AI 선시작의 첫 메시지
  */

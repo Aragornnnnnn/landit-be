@@ -75,6 +75,11 @@ public class FreeTalkDailySpeakingUsageService {
     return Math.max(0L, DAILY_SPEAKING_LIMIT_MS - usedSpeakingDurationMs);
   }
 
-  /** 예약 후 누적 발화 시간과 남은 시간을 반환한다. */
+  /**
+   * 예약 후 일일 누적 발화 시간과 남은 시간을 반환한다.
+   *
+   * @param usedSpeakingDurationMs KST 당일 사용한 사용자 발화 시간 밀리초
+   * @param remainingMs KST 당일 남은 사용자 발화 시간 밀리초
+   */
   public record DailySpeakingUsage(long usedSpeakingDurationMs, long remainingMs) {}
 }
