@@ -145,7 +145,8 @@ class StreakServiceTest {
     UserDailyActivity secondActivity =
         UserDailyActivity.startActiveDay(USER_ID, LocalDate.of(2026, 7, 18));
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
-    when(userDailyActivityRepository.findFirstByUserProfileIdOrderByActivityDateAsc(USER_ID))
+    when(userDailyActivityRepository.findFirstByUserProfileIdAndActiveDayTrueOrderByActivityDateAsc(
+            USER_ID))
         .thenReturn(Optional.of(firstActivity));
     when(userDailyActivityRepository.countByUserProfileIdAndActiveDayTrue(USER_ID)).thenReturn(2L);
     when(userDailyActivityRepository.findAllActiveInDateRange(

@@ -102,6 +102,36 @@ class StreakApiIntegrationTests {
         .andExpect(jsonPath("$.data.activeDates[1]").value("2026-07-18"));
   }
 
+  /** 비활성 일별 활동은 스트릭 시작일로 사용하지 않는다. */
+  @Test
+  void calendarIgnoresInactiveDayForStreakStartedDate() throws Exception {
+    LoginResult login = login();
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_daily_activity (
+            user_profile_id,
+            activity_date,
+            completed_session_count,
+            completed_review_count,
+            study_seconds,
+            review_all_correct_reward_xp,
+            active_day,
+            created_at,
+            updated_at)
+        VALUES (?, '2026-07-01', 0, 0, 0, 0, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        login.userId());
+    streakService.recordCompletedConversation(
+        login.userId(), SessionType.SCENARIO, LocalDate.of(2026, 7, 12).atTime(12, 0));
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/streak/calendar?year=2026&month=7")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.streakStartedDate").value("2026-07-12"));
+  }
+
   /** 월 범위를 벗어난 요청은 공통 검증 오류를 반환한다. */
   @Test
   void calendarRejectsOutOfRangeMonth() throws Exception {

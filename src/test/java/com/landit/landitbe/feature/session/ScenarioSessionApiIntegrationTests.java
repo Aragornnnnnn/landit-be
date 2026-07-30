@@ -1039,16 +1039,17 @@ class ScenarioSessionApiIntegrationTests {
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
     assertThat(hasScenarioAccess(userId, 2102)).isTrue();
+    LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
     mockMvc
         .perform(
             get("/api/v1/me/streak/calendar?year=%d&month=%d"
-                    .formatted(LocalDate.now().getYear(), LocalDate.now().getMonthValue()))
+                    .formatted(today.getYear(), today.getMonthValue()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.currentStreakDays").value(1))
         .andExpect(jsonPath("$.data.activeToday").value(true))
-        .andExpect(jsonPath("$.data.activeDates[0]").value(LocalDate.now().toString()));
+        .andExpect(jsonPath("$.data.activeDates[0]").value(today.toString()));
   }
 
   @Test

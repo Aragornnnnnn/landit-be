@@ -24,12 +24,13 @@ public interface UserDailyActivityRepository extends JpaRepository<UserDailyActi
       Long userProfileId, LocalDate activityDate);
 
   /**
-   * 사용자의 최초 활동일을 조회한다.
+   * 사용자의 최초 활성 학습일을 조회한다.
    *
    * @param userProfileId 사용자 프로필 ID
-   * @return 최초 활동. 없으면 빈 값
+   * @return 최초 활성 학습일. 없으면 빈 값
    */
-  Optional<UserDailyActivity> findFirstByUserProfileIdOrderByActivityDateAsc(Long userProfileId);
+  Optional<UserDailyActivity> findFirstByUserProfileIdAndActiveDayTrueOrderByActivityDateAsc(
+      Long userProfileId);
 
   /**
    * 사용자의 활성 학습일 수를 조회한다.
