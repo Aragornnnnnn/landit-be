@@ -327,6 +327,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         || blank(content.baseExpressionMeaningText())
         || blank(content.usageSummary())
         || blank(content.usageDescription())
+        || invalidOptionalRepresentativeQuestion(content)
         || blank(content.representativeSentenceText())
         || blank(content.representativeSentenceTranslation())
         || content.representativeSentenceWords() == null
@@ -343,6 +344,14 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
             .baseExpressionMeaningText()
             .equals(content.baseExpressionMeaningText())
         || !requestedExpression.usageSummary().equals(content.usageSummary());
+  }
+
+  private static boolean invalidOptionalRepresentativeQuestion(
+      AiFreeTalkExpressionLearningContent content) {
+    return (content.representativeQuestionText() != null
+            || content.representativeQuestionTranslation() != null)
+        && (blank(content.representativeQuestionText())
+            || blank(content.representativeQuestionTranslation()));
   }
 
   private static boolean blank(String value) {

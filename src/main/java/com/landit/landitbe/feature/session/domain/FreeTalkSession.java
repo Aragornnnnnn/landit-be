@@ -183,7 +183,8 @@ public class FreeTalkSession extends BaseTimeEntity {
    */
   public void startExpressionGeneration() {
     if (conversationStatus != FreeTalkConversationStatus.COMPLETED
-        || expressionGenerationStatus != ExpressionGenerationStatus.PREPARING) {
+        || expressionGenerationStatus != ExpressionGenerationStatus.PREPARING
+        || expressionGenerationStartedAt != null) {
       throw new IllegalStateException("표현 생성 작업을 시작할 수 없는 상태입니다.");
     }
     expressionGenerationStartedAt = LocalDateTime.now();

@@ -324,6 +324,8 @@ class RemoteAiFreeTalkClientTest {
     String validContent = learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1);
 
     assertInvalidLearningContent(validContent.replace("친근한 제안에 동의할 때 사용합니다.", " "));
+    assertInvalidLearningContent(validContent.replace("Want to go hiking?", " "));
+    assertInvalidLearningContent(validContent.replace("등산 갈래?", " "));
     assertInvalidLearningContent(validContent.replace("I'm up for that.", " "));
     assertInvalidLearningContent(validContent.replace("좋아, 그거 하자.", " "));
     assertInvalidLearningContent(
