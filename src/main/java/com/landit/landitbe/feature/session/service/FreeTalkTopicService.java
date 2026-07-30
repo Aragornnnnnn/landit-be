@@ -36,6 +36,9 @@ public class FreeTalkTopicService {
   /** 활성 주제와 KST 당일의 남은 사용자 발화 시간을 반환한다. */
   @Transactional(readOnly = true)
   public FreeTalkMainResponse getMain(long userId) {
-    return FreeTalkMainResponse.of(getActiveTopics(), dailySpeakingUsageService.usage(userId));
+    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+        dailySpeakingUsageService.usage(userId);
+    return FreeTalkMainResponse.of(
+        getActiveTopics(), dailyUsage.usedSpeakingDurationMs(), dailyUsage.remainingMs());
   }
 }
