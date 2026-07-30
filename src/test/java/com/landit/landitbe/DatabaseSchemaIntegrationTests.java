@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,7 +101,7 @@ class DatabaseSchemaIntegrationTests {
   @Test
   void appVersionPolicyMigrationUsesPlatformUniqueConstraint() throws Exception {
     String migrationSql =
-        readMigrationSql("db/migration/V30__change_app_version_to_single_platform_policy.sql");
+        readMigrationSql("db/migration/V32__change_app_version_to_single_platform_policy.sql");
 
     assertThat(migrationSql)
         .contains(
@@ -593,15 +594,15 @@ class DatabaseSchemaIntegrationTests {
     assertThat(userAiTutorId(migrationJdbcTemplate, 990202L)).isEqualTo(990102L);
   }
 
-  /** V30 migration은 비활성 이력을 제거하고 활성 정책의 최소 지원 버전명을 초기화한다. */
+  /** V32 migration은 비활성 이력을 제거하고 기존 최소 지원 기준에 해당하는 버전명을 보존한다. */
   @Test
-  void v30MigrationKeepsSingleActivePolicyAndBackfillsMinimumSupportedVersionName() {
+  void v32MigrationKeepsSingleActivePolicyAndMapsMinimumSupportedVersionName() {
     String databaseUrl = migrationTestDatabaseUrl();
     JdbcTemplate migrationJdbcTemplate =
         new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
-    migrateToVersion(databaseUrl, "29");
+    migrateToVersion(databaseUrl, "30");
     insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "1.0.0", 10, 8, true);
-    insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "0.9.0", 9, 8, false);
+    insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "0.9.0", 8, 8, false);
 
     migrateToLatestVersion(databaseUrl);
 
@@ -613,7 +614,20 @@ class DatabaseSchemaIntegrationTests {
             migrationJdbcTemplate.queryForObject(
                 "select minimum_supported_version_name from app_version where platform = 'IOS'",
                 String.class))
-        .isEqualTo("1.0.0");
+        .isEqualTo("0.9.0");
+  }
+
+  /** V32 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다. */
+  @Test
+  void v32MigrationFailsWhenMinimumSupportedBuildCannotBeMapped() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "30");
+    insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "1.0.0", 10, 8, true);
+
+    assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
+        .isInstanceOf(FlywayException.class);
   }
 
   private String migrationTestDatabaseUrl() {
@@ -651,7 +665,7 @@ class DatabaseSchemaIntegrationTests {
         status);
   }
 
-  /** V30 이전 스키마에 활성 여부가 다른 앱 버전 정책을 추가한다. */
+  /** V32 이전 스키마에 활성 여부가 다른 앱 버전 정책을 추가한다. */
   private void insertLegacyAppVersionPolicy(
       JdbcTemplate migrationJdbcTemplate,
       String platform,
