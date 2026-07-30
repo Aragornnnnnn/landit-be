@@ -9,10 +9,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import lombok.Getter;
 
 /** 사용자별 누적 학습 통계와 스트릭 상태를 저장한다. */
 @Entity
 @Table(name = "user_learning_activity_summary")
+@Getter
 public class UserLearningActivitySummary extends BaseTimeEntity {
 
   @Id
@@ -54,4 +56,45 @@ public class UserLearningActivitySummary extends BaseTimeEntity {
 
   /** JPA에서 사용하는 기본 생성자다. */
   protected UserLearningActivitySummary() {}
+
+  private UserLearningActivitySummary(Long userProfileId) {
+    this.userProfileId = userProfileId;
+    this.totalSessionCount = 0;
+    this.completedScenarioCount = 0;
+    this.completedFreeTalkCount = 0;
+    this.completedReviewCount = 0;
+    this.totalTurnCount = 0;
+    this.totalStudySeconds = 0;
+    this.learnedExpressionCount = 0;
+    this.currentStreakDays = 0;
+    this.longestStreakDays = 0;
+  }
+
+  /**
+   * 스트릭을 처음 기록할 사용자의 요약 행을 생성한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @return 초기화한 학습 활동 요약
+   */
+  public static UserLearningActivitySummary initialize(Long userProfileId) {
+    return new UserLearningActivitySummary(userProfileId);
+  }
+
+  /**
+   * 새로운 활동일을 반영해 현재·최장 스트릭과 마지막 활동일을 갱신한다.
+   *
+   * @param activityDate 새 활동 날짜
+   */
+  public void recordActiveDay(LocalDate activityDate) {
+    if (activityDate.equals(lastActivityDate)) {
+      return;
+    }
+    if (lastActivityDate != null && lastActivityDate.equals(activityDate.minusDays(1))) {
+      currentStreakDays++;
+    } else {
+      currentStreakDays = 1;
+    }
+    longestStreakDays = Math.max(longestStreakDays, currentStreakDays);
+    lastActivityDate = activityDate;
+  }
 }
