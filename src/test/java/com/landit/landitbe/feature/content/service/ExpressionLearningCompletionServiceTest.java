@@ -211,6 +211,65 @@ class ExpressionLearningCompletionServiceTest {
         .completeExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
   }
 
+  /** 다른 사용자의 프리톡 세션으로 표현 완료를 시도하면 FORBIDDEN 예외를 던지고 완료 기록을 남기지 않는다. */
+  @Test
+  void shouldRejectFreeTalkCompletionForAnotherUser() {
+    long learningSessionId = 701L;
+    FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
+    LearningSession learningSession = mock(LearningSession.class);
+    WritingExpression expression = expressionInScenario();
+    when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(freeTalkSessionRepository.findByLearningSessionId(learningSessionId))
+        .thenReturn(Optional.of(freeTalkSession));
+    when(freeTalkSession.getLearningSessionId()).thenReturn(learningSessionId);
+    when(learningSessionRepository.findById(learningSessionId))
+        .thenReturn(Optional.of(learningSession));
+    when(learningSession.getUserProfileId()).thenReturn(USER_ID + 1);
+
+    assertThatThrownBy(
+            () ->
+                expressionLearningCompletionService.completeLearning(
+                    USER_ID, LOCKED_EXPRESSION_ID, learningSessionId))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.FORBIDDEN);
+
+    verify(learningProgressService, never())
+        .completeFreeTalkExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
+  }
+
+  /** 완료되지 않은 프리톡 세션의 표현 완료를 시도하면 RESOURCE_NOT_FOUND 예외를 던진다. */
+  @Test
+  void shouldRejectFreeTalkCompletionForIncompleteSession() {
+    long learningSessionId = 701L;
+    FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
+    LearningSession learningSession = mock(LearningSession.class);
+    WritingExpression expression = expressionInScenario();
+    when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(freeTalkSessionRepository.findByLearningSessionId(learningSessionId))
+        .thenReturn(Optional.of(freeTalkSession));
+    when(freeTalkSession.getLearningSessionId()).thenReturn(learningSessionId);
+    when(freeTalkSession.getConversationStatus())
+        .thenReturn(FreeTalkConversationStatus.IN_PROGRESS);
+    when(learningSessionRepository.findById(learningSessionId))
+        .thenReturn(Optional.of(learningSession));
+    when(learningSession.getUserProfileId()).thenReturn(USER_ID);
+    when(learningSession.getStatus()).thenReturn(LearningSessionStatus.COMPLETED);
+
+    assertThatThrownBy(
+            () ->
+                expressionLearningCompletionService.completeLearning(
+                    USER_ID, LOCKED_EXPRESSION_ID, learningSessionId))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+
+    verify(learningProgressService, never())
+        .completeFreeTalkExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
+  }
+
   // ===== 헬퍼 =====
 
   /** "표현이 존재하고(ACTIVE) 사용자가 이 시나리오에서 완료한 표현이 없다"는 상황을 만든다. */
