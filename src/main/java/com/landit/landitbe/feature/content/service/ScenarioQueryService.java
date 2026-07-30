@@ -41,7 +41,12 @@ public class ScenarioQueryService {
   private final UserProfileService userProfileService;
   private final Clock clock;
 
-  /** 인증된 사용자의 시나리오 목록 응답을 조회한다. */
+  /**
+   * 인증된 사용자의 시나리오 목록 응답을 조회한다.
+   *
+   * @param userId 인증된 사용자 ID
+   * @return 사용자별 진행 상태가 반영된 시나리오 전체 조회 응답
+   */
   @Transactional(readOnly = true)
   public ScenarioListResponse getScenarioList(long userId) {
     Instant evaluatedAt = clock.instant();
