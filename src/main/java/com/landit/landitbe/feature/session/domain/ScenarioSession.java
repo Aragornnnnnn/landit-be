@@ -67,7 +67,11 @@ public class ScenarioSession extends BaseTimeEntity {
         GoalCompletionStatus.NOT_STARTED);
   }
 
-  /** AI가 판단한 시나리오 목표 달성 상태를 갱신한다. */
+  /**
+   * AI가 판단한 시나리오 목표 달성 상태를 갱신한다.
+   *
+   * @param goalCompletionStatus 갱신할 목표 달성 상태
+   */
   public void updateGoalCompletionStatus(GoalCompletionStatus goalCompletionStatus) {
     this.goalCompletionStatus = goalCompletionStatus;
   }

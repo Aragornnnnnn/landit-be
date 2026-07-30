@@ -12,7 +12,13 @@ import org.springframework.data.repository.query.Param;
 /** 시나리오 세션 시작에 필요한 콘텐츠와 잠금 정보를 조회한다. */
 public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scenario, Long> {
 
-  /** 사용자 언어 설정에 맞는 시나리오 시작 정보를 조회한다. */
+  /**
+   * 사용자 언어 설정에 맞는 시나리오 시작 정보를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @return 사용자 언어 설정에 맞는 시나리오 시작 정보
+   */
   @Query(
       """
             SELECT new com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection(
