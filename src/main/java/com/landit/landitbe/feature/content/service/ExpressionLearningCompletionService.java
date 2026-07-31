@@ -81,6 +81,9 @@ public class ExpressionLearningCompletionService {
     if (scenarioId == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
+    writingExpressionRepository
+        .findByIdAndStatusForUpdate(expressionId, ActiveStatus.ACTIVE)
+        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
 
     CompletedExpressionIds completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId);

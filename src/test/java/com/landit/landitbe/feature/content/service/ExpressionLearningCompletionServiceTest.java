@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.content.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -93,9 +95,9 @@ class ExpressionLearningCompletionServiceTest {
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
-  /** 해금된(미완료 중 학습 순서가 가장 앞선) 표현을 완료하면 완료 기록을 올바른 값으로 저장한다. */
+  /** 해금된 표현은 완료 이력을 조회하고 갱신하기 전에 잠금 조회한다. */
   @Test
-  void shouldSaveCompletionForUnlockedExpression() {
+  void shouldLockUnlockedExpressionBeforeReadingCompletionHistory() {
     // given: 아무것도 완료하지 않은 사용자 + 학습 순서 201→202→203인 시나리오
     givenExpressionAndNoUserCompletion();
     givenUserLocaleExpressionList(
@@ -106,8 +108,14 @@ class ExpressionLearningCompletionServiceTest {
     // when: 첫 번째(해금된) 표현을 완료하면
     expressionLearningCompletionService.completeLearning(USER_ID, UNLOCKED_EXPRESSION_ID);
 
-    // then: 완료 기록이 사용자/시나리오/표현 ID를 담아 저장된다
-    verify(learningProgressService)
+    // then: 완료 이력을 확인하고 갱신하기 전에 표현 잠금을 획득한다
+    InOrder inOrder = inOrder(writingExpressionRepository, learningProgressService);
+    inOrder
+        .verify(writingExpressionRepository)
+        .findByIdAndStatusForUpdate(UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
+    inOrder.verify(learningProgressService).findCompletedExpressionIds(USER_ID, SCENARIO_ID);
+    inOrder
+        .verify(learningProgressService)
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
@@ -117,6 +125,9 @@ class ExpressionLearningCompletionServiceTest {
     // given: 표현이 존재하고, 사용자가 이미 그 표현을 완료한 상태
     WritingExpression expression = expressionInScenario();
     when(writingExpressionRepository.findByIdAndStatus(UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(writingExpressionRepository.findByIdAndStatusForUpdate(
+            UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
     when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
         .thenReturn(new CompletedExpressionIds(Set.of(UNLOCKED_EXPRESSION_ID)));
@@ -278,6 +289,11 @@ class ExpressionLearningCompletionServiceTest {
 
     when(writingExpressionRepository.findByIdAndStatus(
             any(), org.mockito.ArgumentMatchers.eq(ActiveStatus.ACTIVE)))
+        .thenReturn(Optional.of(expression));
+    lenient()
+        .when(
+            writingExpressionRepository.findByIdAndStatusForUpdate(
+                any(), org.mockito.ArgumentMatchers.eq(ActiveStatus.ACTIVE)))
         .thenReturn(Optional.of(expression));
     when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
         .thenReturn(new CompletedExpressionIds(Set.of()));
