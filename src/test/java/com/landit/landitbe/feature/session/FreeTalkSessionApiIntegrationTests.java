@@ -98,9 +98,7 @@ class FreeTalkSessionApiIntegrationTests {
     awaitPendingExpressionGeneration();
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
-    jdbcTemplate.update(
-        "DELETE FROM user_writing_expression_completion "
-            + "WHERE writing_expression_id IN (994103, 994104)");
+    jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
     jdbcTemplate.update("DELETE FROM free_talk_session");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
