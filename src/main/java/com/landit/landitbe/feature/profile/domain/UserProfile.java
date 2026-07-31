@@ -66,6 +66,10 @@ public class UserProfile extends BaseTimeEntity {
   @Column(nullable = false, length = 20)
   private UserProfileStatus status;
 
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private UserRole role;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected UserProfile() {}
 
@@ -85,6 +89,7 @@ public class UserProfile extends BaseTimeEntity {
     this.aiTutorId = aiTutorId;
     this.pushPermissionStatus = PushPermissionStatus.NOT_DETERMINED;
     this.status = UserProfileStatus.ACTIVE;
+    this.role = UserRole.USER;
   }
 
   /** 소셜 제공자에서 받은 최신 프로필 정보로 갱신한다. */

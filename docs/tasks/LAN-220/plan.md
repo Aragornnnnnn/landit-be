@@ -4,7 +4,7 @@
 
 ## 범위와 결정
 
-- 기존 Landit 소셜 로그인과 `admin_account` 허용 목록으로 `/api/v1/admin/**` 접근을 제한한다.
+- 기존 Landit 소셜 로그인과 `user_profile.role`로 `/api/v1/admin/**` 접근을 제한한다.
 - iOS와 Android는 각각 `app_version` 레코드 한 건만 유지한다.
 - 기존 `app_version` 테이블을 유지하며 `active`는 현재 정책 레코드에 `true`로 유지한다.
 - 버전 정책 등록과 활성 정책 전환 API는 제공하지 않는다.
@@ -15,7 +15,7 @@
 - 현재 버전이 최소 지원 버전 미만이면 `FORCE`, 최신 버전 미만이면 `SOFT`, 그 외에는 `NONE`을 반환한다.
 - `minimum_supported_build_number`를 `minimum_supported_version_name`으로 교체한다.
 - 관리자 수정 감사 기록에는 변경 전후 정책 값을 저장한다.
-- `admin_account` 초기 허용 목록은 migration에서 임의로 시드하지 않는다. 운영 배포 전에 승인된 기존 사용자 한 명 이상을 별도 승인 절차로 등록한다.
+- 관리자 역할은 migration에서 임의로 부여하지 않는다. 운영 배포 전에 승인된 기존 사용자 한 명 이상에게 별도 승인 절차로 `ADMIN` 역할을 부여한다.
 - 푸시 발송, 사용자 검색, 날짜별 시나리오 관리, 관리자 계정 관리, 감사 기록 조회, MDC·Sentry 추적은 이번 범위에서 제외한다.
 
 ## API
@@ -37,14 +37,12 @@
 
 ## 운영 준비
 
-관리자 허용 목록에는 실제로 승인된 기존 사용자만 등록한다. 배포 전에 운영자가 승인한 이메일을 사용해 아래 SQL을 실행한다.
+관리자 역할은 실제로 승인된 기존 사용자에게만 부여한다. 배포 전에 운영자가 승인한 이메일을 사용해 아래 SQL을 실행한다.
 
 ```sql
-INSERT INTO admin_account (user_profile_id, created_at)
-SELECT id, CURRENT_TIMESTAMP
-FROM user_profile
-WHERE email = :approved_admin_email
-ON CONFLICT (user_profile_id) DO NOTHING;
+UPDATE user_profile
+SET role = 'ADMIN'
+WHERE email = :approved_admin_email;
 ```
 
 ## 검증 명령

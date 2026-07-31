@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.profile.service;
 
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
@@ -135,6 +136,19 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public boolean existsActive(Long userId) {
     return userProfileRepository.existsByIdAndStatus(userId, UserProfileStatus.ACTIVE);
+  }
+
+  /**
+   * 활성 사용자 프로필이 관리자 역할을 가졌는지 확인한다.
+   *
+   * @param userId 확인할 사용자 프로필 ID
+   * @return 활성 관리자 프로필이면 {@code true}
+   */
+  @Transactional(readOnly = true)
+  public boolean isAdmin(Long userId) {
+    return userId != null
+        && userProfileRepository.existsByIdAndStatusAndRole(
+            userId, UserProfileStatus.ACTIVE, UserRole.ADMIN);
   }
 
   /**

@@ -191,15 +191,13 @@ class AdminAppVersionApiIntegrationTests {
         .asText();
   }
 
-  /** 테스트 사용자를 로그인시키고 관리자 허용 목록에 추가한다. */
+  /** 테스트 사용자를 로그인시키고 관리자 역할을 부여한다. */
   private String loginAdmin(String userKey, String nickname) throws Exception {
     String accessToken = login(userKey, nickname);
     Long userProfileId =
         jdbcTemplate.queryForObject(
             "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
-    jdbcTemplate.update(
-        "insert into admin_account (user_profile_id, created_at) values (?, current_timestamp)",
-        userProfileId);
+    jdbcTemplate.update("update user_profile set role = 'ADMIN' where id = ?", userProfileId);
     return accessToken;
   }
 

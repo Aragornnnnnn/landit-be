@@ -1,4 +1,4 @@
-// 관리자 허용 목록에 따른 API 접근 제어를 통합 검증한다.
+// 사용자 역할에 따른 관리자 API 접근 제어를 통합 검증한다.
 
 package com.landit.landitbe.feature.admin;
 
@@ -20,7 +20,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** 관리자 허용 목록에 따른 API 접근 제어를 통합 검증한다. */
+/** 사용자 역할에 따른 관리자 API 접근 제어를 통합 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -37,7 +37,7 @@ class AdminAuthorizationIntegrationTests {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  /** 관리자 허용 목록에 없는 일반 로그인 사용자는 관리자 경로에 접근할 수 없다. */
+  /** 관리자 역할이 아닌 일반 로그인 사용자는 관리자 경로에 접근할 수 없다. */
   @Test
   void rejectsAuthenticatedNonAdminFromAdminPath() throws Exception {
     String accessToken = login("admin-access-denied");
@@ -48,7 +48,7 @@ class AdminAuthorizationIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
-  /** 관리자 허용 목록에 없는 일반 로그인 사용자는 정확한 관리자 루트에도 접근할 수 없다. */
+  /** 관리자 역할이 아닌 일반 로그인 사용자는 정확한 관리자 루트에도 접근할 수 없다. */
   @Test
   void rejectsAuthenticatedNonAdminFromExactAdminRootPath() throws Exception {
     String accessToken = login("admin-root-access-denied");
@@ -58,15 +58,13 @@ class AdminAuthorizationIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
-  /** 관리자 허용 목록에 등록된 사용자는 관리자 경로의 다음 처리 단계까지 도달한다. */
+  /** 관리자 역할을 가진 사용자는 관리자 경로의 다음 처리 단계까지 도달한다. */
   @Test
   void allowsRegisteredAdminToReachAdminPath() throws Exception {
     String userKey = "admin-access-allowed";
     String accessToken = login(userKey);
     Long userProfileId = userProfileId(userKey);
-    jdbcTemplate.update(
-        "insert into admin_account (user_profile_id, created_at) values (?, current_timestamp)",
-        userProfileId);
+    jdbcTemplate.update("update user_profile set role = 'ADMIN' where id = ?", userProfileId);
 
     mockMvc
         .perform(
