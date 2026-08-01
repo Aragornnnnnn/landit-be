@@ -282,6 +282,8 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("free_talk_session", "expression_generation_started_at");
     assertColumnExists("free_talk_session_expression", "writing_expression_id");
     assertColumnExists("writing_expression", "owner_user_profile_id");
+    assertNullableColumn("writing_expression", "scenario_id");
+    assertNullableColumn("user_writing_expression_completion", "scenario_id");
     assertColumnDoesNotExist("free_talk_session_expression", "generated_content_payload");
     assertColumnDoesNotExist("free_talk_session_expression", "completed_at");
     assertTableConstraintExists(

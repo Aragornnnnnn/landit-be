@@ -309,7 +309,7 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
-  void rejectsRecommendationMissingRequiredTextOrContextualExample() throws Exception {
+  void rejectsRecommendationMissingRequiredText() throws Exception {
     registerRawResponse(
         "/api/v1/free-talk/expression-recommendations",
         200,

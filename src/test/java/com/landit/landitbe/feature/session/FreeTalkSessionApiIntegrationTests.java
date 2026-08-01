@@ -102,7 +102,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void awaitPendingExpressionGeneration() {
-    for (int attempt = 0; attempt < 50; attempt++) {
+    for (int attempt = 0; attempt < 100; attempt++) {
       Integer pendingCount =
           jdbcTemplate.queryForObject(
               "SELECT COUNT(*) FROM free_talk_session "
@@ -112,13 +112,14 @@ class FreeTalkSessionApiIntegrationTests {
         return;
       }
       try {
-        Thread.sleep(20L);
+        Thread.sleep(50L);
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
         String message = "프리톡 표현 생성 종료를 기다리는 중 인터럽트되었습니다.";
         throw new IllegalStateException(message, exception);
       }
     }
+    throw new IllegalStateException("프리톡 표현 생성이 제한 시간 안에 종료되지 않았습니다.");
   }
 
   @Test
