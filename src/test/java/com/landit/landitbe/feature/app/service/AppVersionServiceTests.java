@@ -44,7 +44,8 @@ class AppVersionServiceTests {
 
   /** 유효한 관리자 앱 버전 정책 수정 요청을 만든다. */
   private AdminAppVersionUpdateRequest updateRequest() {
+    LocalDateTime releasedAt = LocalDateTime.of(2026, 7, 31, 10, 0);
     return new AdminAppVersionUpdateRequest(
-        "1.1.0", 11, "1.0.0", "강제 업데이트", "권장 업데이트", "릴리스 노트", LocalDateTime.of(2026, 7, 31, 10, 0));
+        "1.1.0", 11, "1.0.0", "강제 업데이트", "권장 업데이트", "릴리스 노트", releasedAt);
   }
 }
