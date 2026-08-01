@@ -82,6 +82,7 @@ public class ExpressionLearningCompletionService {
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
 
+  // 프리톡 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
   private void completeFreeTalkExpression(Long userId, Long expressionId) {
     expressionCompletionRepository
         .findByUserProfileIdAndWritingExpressionId(userId, expressionId)

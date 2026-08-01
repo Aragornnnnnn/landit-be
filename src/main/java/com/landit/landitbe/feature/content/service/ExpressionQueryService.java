@@ -227,6 +227,7 @@ public class ExpressionQueryService {
     return practiceResponse(expression, expressionId);
   }
 
+  // 표현의 유효한 예문을 학습 응답으로 변환한다.
   private ExpressionPracticeResponse practiceResponse(
       WritingExpression expression, Long expressionId) {
 
@@ -243,6 +244,7 @@ public class ExpressionQueryService {
         expression, extraPracticeSentences, pickRandomWritingSentence(parsedSentences));
   }
 
+  // 사용자가 접근할 수 있는 활성 표현을 조회한다.
   private WritingExpression requireAccessibleExpression(Long userId, Long expressionId) {
     WritingExpression expression =
         writingExpressionRepository

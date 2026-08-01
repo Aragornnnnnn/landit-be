@@ -588,6 +588,7 @@ public class FreeTalkSubmittedMessageService {
         .ifPresent(FreeTalkSession::clearProcessing);
   }
 
+  // 저장된 사용자 메시지 바로 다음의 AI 메시지를 조회한다.
   private SessionHistoryMessage requireNextAiMessage(
       List<SessionHistoryMessage> messages, int userMessageIndex) {
     if (userMessageIndex + 1 >= messages.size()) {
@@ -600,6 +601,7 @@ public class FreeTalkSubmittedMessageService {
     return nextMessage;
   }
 
+  // 저장된 턴 상태를 멱등 응답에 사용할 대화 상태로 변환한다.
   private FreeTalkConversationStatus replayedConversationStatus(
       FreeTalkTurnStatus storedTurnStatus) {
     return storedTurnStatus == FreeTalkTurnStatus.COMPLETED

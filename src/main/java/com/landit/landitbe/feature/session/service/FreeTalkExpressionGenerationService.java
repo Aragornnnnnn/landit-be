@@ -122,6 +122,7 @@ public class FreeTalkExpressionGenerationService {
     transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
   }
 
+  // 완료된 프리톡의 표현 생성 작업을 선점하고 AI 요청 문맥을 준비한다.
   private GenerationContext prepare(long learningSessionId) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
@@ -181,6 +182,7 @@ public class FreeTalkExpressionGenerationService {
         existingExpressions);
   }
 
+  // AI 추천 결과를 세션 표현으로 저장하고 생성 상태를 완료한다.
   private void persistReady(
       GenerationContext context,
       List<AiFreeTalkExpressionRecommendation> recommendations,
@@ -207,6 +209,7 @@ public class FreeTalkExpressionGenerationService {
     freeTalkSession.completeExpressionGeneration();
   }
 
+  // 진행 중인 표현 생성 작업을 실패 상태로 전환한다.
   private void fail(long learningSessionId) {
     freeTalkSessionRepository
         .findByLearningSessionIdForUpdate(learningSessionId)
@@ -216,6 +219,7 @@ public class FreeTalkExpressionGenerationService {
         .ifPresent(FreeTalkSession::failExpressionGeneration);
   }
 
+  // 기존 표현 추천을 검증하고 세션 연결 엔티티로 변환한다.
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
     boolean isRecommendationCandidate =
@@ -233,6 +237,7 @@ public class FreeTalkExpressionGenerationService {
         recommendation.displayOrder());
   }
 
+  // 신규 표현의 학습 콘텐츠를 저장하고 세션 연결 엔티티를 생성한다.
   private FreeTalkSessionExpression generatedSessionExpression(
       GenerationContext context,
       AiFreeTalkExpressionRecommendation recommendation,

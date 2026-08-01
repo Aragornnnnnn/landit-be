@@ -150,6 +150,7 @@ public class FreeTalkMessageService {
         reservation.history());
   }
 
+  // 완료 응답이면 맞춤 표현 생성 작업을 제출한다.
   private void dispatchIfCompleted(FreeTalkMessageSubmitResponse response) {
     if (response.turnStatus() == FreeTalkTurnStatus.COMPLETED) {
       expressionGenerationDispatcher.dispatch(response.sessionId());

@@ -74,6 +74,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         request.expressions().stream().map(this::learningContent).toList());
   }
 
+  // 요청한 표현을 로컬 테스트용 학습 콘텐츠로 변환한다.
   private AiFreeTalkExpressionLearningContent learningContent(
       AiFreeTalkLearningExpression expression) {
     return new AiFreeTalkExpressionLearningContent(
@@ -107,6 +108,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
                 "내 친구들 만날래?")));
   }
 
+  // 로컬 테스트용 추가 연습 예문을 생성한다.
   private AiFreeTalkExpressionPracticeExample practiceExample(
       String sentence, String question, String translation, String questionTranslation) {
     List<String> words = List.of(sentence.replace(".", "").split(" "));
@@ -121,6 +123,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         questionTranslation);
   }
 
+  // 로컬 테스트용 단어 선택지를 결정적으로 섞는다.
   private List<String> shuffledWordChoices(List<String> words) {
     List<String> choices = new ArrayList<>(words);
     Collections.rotate(choices, 1);

@@ -178,6 +178,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private record RemoteOpeningResponse(
       String aiMessage, String translatedMessage, CharacterEmotion emotion) {
 
+    // 원격 첫 발화 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkOpeningResult toResult() {
       if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -194,6 +195,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String translatedMessage,
       CharacterEmotion emotion) {
 
+    // 원격 후속 발화 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkTurnResult toResult() {
       if (userExitIntentDetected == null
           || (!userExitIntentDetected && hasMissingGeneratedField())) {
@@ -220,6 +222,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private record RemoteInnerThoughtResponse(
       String innerThought, InnerThoughtType innerThoughtType) {
 
+    // 원격 속마음 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkInnerThoughtResult toResult() {
       if (blank(innerThought) || innerThoughtType == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -232,6 +235,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private record RemoteClosingResponse(
       String aiMessage, String translatedMessage, CharacterEmotion emotion) {
 
+    // 원격 마무리 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkClosingResult toResult() {
       if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -244,6 +248,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private record RemoteExpressionRecommendationsResponse(
       List<AiFreeTalkExpressionRecommendation> recommendations) {
 
+    // 원격 표현 추천 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkExpressionRecommendationsResult toResult(
         AiFreeTalkExpressionRecommendationsRequest request) {
       if (recommendations == null
@@ -261,6 +266,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private record RemoteExpressionLearningContentResponse(
       List<AiFreeTalkExpressionLearningContent> expressions) {
 
+    // 원격 학습 콘텐츠 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkExpressionLearningContentResult toResult(
         AiFreeTalkExpressionLearningContentRequest request) {
       if (expressions == null
@@ -274,6 +280,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
   }
 
+  // 추천 목록에 순서나 출처가 잘못된 표현이 있는지 확인한다.
   private static boolean hasInvalidRecommendation(
       List<AiFreeTalkExpressionRecommendation> recommendations,
       List<AiFreeTalkExistingExpression> existingExpressions) {
@@ -285,6 +292,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     return false;
   }
 
+  // 생성된 학습 콘텐츠 목록에 유효하지 않은 항목이 있는지 확인한다.
   private static boolean hasInvalidLearningContent(
       List<AiFreeTalkExpressionLearningContent> expressions,
       List<AiFreeTalkLearningExpression> requestedExpressions) {
@@ -296,6 +304,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     return false;
   }
 
+  // 개별 추천 표현의 필수 값과 기존 표현 참조를 검증한다.
   private static boolean invalidRecommendation(
       AiFreeTalkExpressionRecommendation recommendation,
       List<AiFreeTalkExistingExpression> existingExpressions,
@@ -318,6 +327,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
                     expression.expressionId().equals(recommendation.existingExpressionId()));
   }
 
+  // 생성된 학습 콘텐츠가 요청과 일치하는 유효한 결과인지 검증한다.
   private static boolean invalidLearningContent(
       AiFreeTalkExpressionLearningContent content,
       AiFreeTalkLearningExpression requestedExpression) {
@@ -327,6 +337,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     return missingLearningContent(content) || differsFromRequest(content, requestedExpression);
   }
 
+  // 생성된 학습 콘텐츠에 필수 값이 빠졌는지 확인한다.
   private static boolean missingLearningContent(AiFreeTalkExpressionLearningContent content) {
     return blank(content.targetExpressionText())
         || blank(content.baseExpressionMeaningText())
@@ -343,6 +354,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         || content.practiceExamples().isEmpty();
   }
 
+  // 생성된 표현의 핵심 값이 요청한 표현과 다른지 확인한다.
   private static boolean differsFromRequest(
       AiFreeTalkExpressionLearningContent content,
       AiFreeTalkLearningExpression requestedExpression) {
@@ -356,6 +368,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         || !requestedExpression.usageSummary().equals(content.usageSummary());
   }
 
+  // 선택 질문의 원문과 번역이 함께 제공됐는지 검증한다.
   private static boolean invalidOptionalRepresentativeQuestion(
       AiFreeTalkExpressionLearningContent content) {
     return (content.representativeQuestionText() != null
