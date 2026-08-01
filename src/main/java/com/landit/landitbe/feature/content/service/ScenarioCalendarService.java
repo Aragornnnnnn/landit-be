@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.Clock;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -51,11 +52,13 @@ public class ScenarioCalendarService {
   @Transactional(readOnly = true)
   public ScenarioCalendarResponse getCalendar(
       long userId, ScenarioCalendarType type, LocalDate date) {
-    LocalDate today = clock.instant().atZone(SERVICE_ZONE_ID).toLocalDate();
+    Instant evaluatedAt = clock.instant();
+    LocalDate today = evaluatedAt.atZone(SERVICE_ZONE_ID).toLocalDate();
     LocalDate baseDate = date != null ? date : today;
 
     LocalDate windowStart = windowStart(type, baseDate);
     int windowDays = windowDays(type, baseDate);
+    CalendarWindow window = new CalendarWindow(windowStart, windowDays, today, evaluatedAt);
     // 창 마지막 날의 다음 날이다. granted_at이 시각이라 자정 경계 비교(< 다음 날 00:00)에 그대로 쓴다.
     LocalDate windowEndExclusive = windowStart.plusDays(windowDays);
 
@@ -71,8 +74,7 @@ public class ScenarioCalendarService {
         scenarioAccessService
             .findFirstCompletionDate(userId, userLocale.targetLocale())
             .orElse(null),
-        calendarDays(
-            userId, userLocale, windowStart, windowDays, today, completedScenarioIdsByDate));
+        calendarDays(userId, userLocale, window, completedScenarioIdsByDate));
   }
 
   /** 창의 시작 날짜를 계산한다. WEEK은 기준 날짜가 속한 주의 일요일, MONTH은 그 달 1일이다. */
@@ -122,16 +124,14 @@ public class ScenarioCalendarService {
   private List<CalendarDayResponse> calendarDays(
       long userId,
       UserLocale userLocale,
-      LocalDate windowStart,
-      int windowDays,
-      LocalDate today,
+      CalendarWindow window,
       Map<LocalDate, Long> completedScenarioIdsByDate) {
     Map<Long, String> thumbnailUrlsByScenarioId =
         thumbnailUrlsByScenarioId(completedScenarioIdsByDate.values().stream().toList());
 
     List<CalendarDayResponse> days = new ArrayList<>();
-    for (int dayOffset = 0; dayOffset < windowDays; dayOffset++) {
-      LocalDate cellDate = windowStart.plusDays(dayOffset);
+    for (int dayOffset = 0; dayOffset < window.days(); dayOffset++) {
+      LocalDate cellDate = window.start().plusDays(dayOffset);
 
       Long completedScenarioId = completedScenarioIdsByDate.get(cellDate);
       if (completedScenarioId != null) {
@@ -141,9 +141,10 @@ public class ScenarioCalendarService {
         continue;
       }
 
-      if (cellDate.equals(today)) {
+      if (cellDate.equals(window.today())) {
         days.add(
-            CalendarDayResponse.uncompletedToday(cellDate, assignedScenarioId(userId, userLocale)));
+            CalendarDayResponse.uncompletedToday(
+                cellDate, assignedScenarioId(userId, userLocale, window.evaluatedAt())));
         continue;
       }
 
@@ -154,9 +155,9 @@ public class ScenarioCalendarService {
   }
 
   /** 오늘 배정된 시나리오 ID를 조회한다. 모든 시나리오를 완료했으면 null이다. */
-  private Long assignedScenarioId(long userId, UserLocale userLocale) {
+  private Long assignedScenarioId(long userId, UserLocale userLocale, Instant evaluatedAt) {
     return scenarioProgressionService
-        .findCurrentScenario(userId, userLocale.targetLocale(), clock.instant())
+        .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
         .map(ScenarioProgressionService.CurrentScenario::scenarioId)
         .orElse(null);
   }
@@ -175,4 +176,7 @@ public class ScenarioCalendarService {
 
     return thumbnailUrls;
   }
+
+  /** 한 요청에서 동일한 평가 시각을 사용하는 캘린더 창이다. */
+  private record CalendarWindow(LocalDate start, int days, LocalDate today, Instant evaluatedAt) {}
 }

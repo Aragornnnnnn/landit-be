@@ -44,8 +44,7 @@ public interface ScenarioControllerDocs {
   })
   ApiResponse<DailyScenarioResponse> getDailyScenario(
       AuthUserPrincipal principal,
-      @Parameter(description = "조회 날짜", example = "2026-07-30", required = true)
-          LocalDate date);
+      @Parameter(description = "조회 날짜", example = "2026-07-30", required = true) LocalDate date);
 
   /**
    * 인증된 사용자의 주·월 단위 시나리오 캘린더를 조회한다.
