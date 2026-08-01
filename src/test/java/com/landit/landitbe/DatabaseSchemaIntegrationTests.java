@@ -239,9 +239,9 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("scenario_session", "daily_scenario_schedule_id");
   }
 
-  @DisplayName("V26 migration은 프리톡 저장 구조와 초기 주제를 추가한다.")
+  @DisplayName("V27 migration은 프리톡 저장 구조와 초기 주제를 추가한다.")
   @Test
-  void v26AddsFreeTalkStorageStructureAndTopicSeed() {
+  void v27AddsFreeTalkStorageStructureAndTopicSeed() {
     assertTableExists("free_talk_topic");
     assertTableDoesNotExist("free_talk_turn_result");
     assertColumnDoesNotExist("ai_tutor", "free_talk_tts_voice_id");
@@ -272,10 +272,10 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
-  @DisplayName("V26은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
+  @DisplayName("V27은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
   @Test
   @Transactional
-  void v26EnforcesPendingMessageForeignKeyAndClientMessageUniqueness() {
+  void v27EnforcesPendingMessageForeignKeyAndClientMessageUniqueness() {
     Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
     jdbcTemplate.update(
         """
