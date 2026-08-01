@@ -1606,8 +1606,6 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(status().isOk());
 
     assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
-    assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
-    assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
     Long messageId =
         jdbcTemplate.queryForObject(
             """
@@ -1620,6 +1618,8 @@ class ScenarioSessionApiIntegrationTests {
             Long.class,
             sessionId);
     assertThat(awaitMessageFeedbackStatus(messageId, "FAILED")).isTrue();
+    assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
+    assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
     Integer messageCount =
         jdbcTemplate.queryForObject(
             """
