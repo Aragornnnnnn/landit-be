@@ -74,7 +74,7 @@ public class ExpressionQueryService {
   private final LearningProgressService learningProgressService;
 
   /**
-   * 시나리오별 Writing 표현 목록을 사용자 locale 기준 학습 순서대로 조회하고 완료 여부를 반영한다.
+   * 사용자 locale에 맞는 시나리오 표현을 학습 순서대로 조회하고 완료 여부를 반영한다.
    *
    * @param userId 표현 목록을 조회할 사용자 ID
    * @param scenarioId 표현이 속한 시나리오 ID
@@ -139,7 +139,9 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 학습을 시작할 표현의 상세 정보를 조회한다. 표현이 없거나 INACTIVE(내려간 콘텐츠)면 RESOURCE_NOT_FOUND 예외를 던진다.
+   * 학습할 표현의 상세 정보를 조회한다.
+   *
+   * <p>표현이 없거나 비활성 상태면 {@link ErrorCode#RESOURCE_NOT_FOUND} 예외를 던진다.
    *
    * @param userId 표현을 조회할 사용자 ID
    * @param expressionId 학습을 시작할 표현 ID
@@ -217,7 +219,7 @@ public class ExpressionQueryService {
    * @param userId 표현을 조회할 사용자 ID
    * @param expressionId 연습할 표현 ID
    * @return 추가 예문과 무작위 작문 문제
-   * @throws ApiException 표현이 없거나 비활성 상태일 때, 다른 사용자의 전용 표현일 때, 유효한 추가 예문이 없을 때
+   * @throws ApiException 표현이 없거나 접근할 수 없거나 유효한 추가 예문이 없을 때
    */
   @Transactional(readOnly = true)
   public ExpressionPracticeResponse getExtraPracticeExamples(Long userId, Long expressionId) {

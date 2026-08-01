@@ -28,7 +28,7 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
           Long scenarioId, Locale targetLocale, Locale baseLocale, ActiveStatus status);
 
   /**
-   * 특정 상태의 Writing 표현을 PK로 조회한다. (INACTIVE로 내려간 콘텐츠를 걸러내는 단건 조회용)
+   * 특정 상태의 Writing 표현을 PK로 조회한다.
    *
    * @param id Writing 표현 ID
    * @param status 조회할 콘텐츠 상태
