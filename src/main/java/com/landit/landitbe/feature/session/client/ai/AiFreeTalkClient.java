@@ -26,10 +26,19 @@ public interface AiFreeTalkClient {
   AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request);
 
   /**
+   * 사용자 발화에 대한 상대 역할의 속마음을 생성한다.
+   *
+   * @param request 사용자 발화와 누적 대화 정보
+   * @return 생성된 속마음과 속마음 유형
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request);
+
+  /**
    * 프리톡의 마지막 AI 메시지를 생성한다.
    *
    * @param request 종료 사유와 누적 대화 정보
-   * @return 생성된 마무리 메시지와 속마음
+   * @return 생성된 마무리 메시지
    * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
    */
   AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request);

@@ -21,8 +21,8 @@ class LocalAiFreeTalkClientTest {
     assertThat(turn.aiMessage()).isNotBlank();
     assertThat(turn.translatedMessage()).isNotBlank();
     assertThat(turn.emotion()).isNotNull();
-    assertThat(turn.innerThought()).isNotBlank();
-    assertThat(turn.innerThoughtType()).isNotNull();
+    assertThat(client.generateInnerThought(innerThoughtRequest()).innerThought()).isNotBlank();
+    assertThat(client.generateInnerThought(innerThoughtRequest()).innerThoughtType()).isNotNull();
   }
 
   private AiFreeTalkTurnRequest turnRequest() {
@@ -34,6 +34,19 @@ class LocalAiFreeTalkClientTest {
         "KR",
         AiFreeTalkResponseMode.NORMAL,
         true,
+        null,
+        List.of(
+            new AiConversationHistoryMessage(
+                3002L, 1, "USER", "I'm going hiking with friends.", null)));
+  }
+
+  private AiFreeTalkInnerThoughtRequest innerThoughtRequest() {
+    return new AiFreeTalkInnerThoughtRequest(
+        300L,
+        3002L,
+        1,
+        "EN",
+        "KR",
         null,
         List.of(
             new AiConversationHistoryMessage(

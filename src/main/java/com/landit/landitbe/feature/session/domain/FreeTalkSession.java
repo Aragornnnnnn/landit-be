@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.Getter;
 
 /** 프리톡 세션에만 필요한 정보를 저장한다. */
@@ -118,6 +119,15 @@ public class FreeTalkSession extends BaseTimeEntity {
   /** 외부 AI 처리 완료 또는 보상 후 처리 중인 사용자 발화 ID를 지운다. */
   public void clearProcessing() {
     processingClientMessageId = null;
+  }
+
+  /** 만료된 외부 AI 처리 표시를 지운다. */
+  public boolean clearProcessingIfExpired(LocalDateTime expirationTime) {
+    if (processingClientMessageId == null || getUpdatedAt().isAfter(expirationTime)) {
+      return false;
+    }
+    clearProcessing();
+    return true;
   }
 
   /**

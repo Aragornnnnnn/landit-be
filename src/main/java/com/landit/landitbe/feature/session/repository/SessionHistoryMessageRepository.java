@@ -33,6 +33,10 @@ public interface SessionHistoryMessageRepository
    */
   boolean existsBySessionHistoryIdAndClientMessageId(Long sessionHistoryId, String clientMessageId);
 
+  /** 세션 히스토리에서 클라이언트 메시지 ID로 기존 사용자 발화를 조회한다. */
+  Optional<SessionHistoryMessage> findBySessionHistoryIdAndClientMessageId(
+      Long sessionHistoryId, String clientMessageId);
+
   /** 세션 히스토리에서 특정 발화 주체의 메시지 수를 반환한다. */
   long countBySessionHistoryIdAndRole(Long sessionHistoryId, ConversationSpeaker role);
 

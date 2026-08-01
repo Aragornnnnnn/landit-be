@@ -9,14 +9,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /**
  * 사용자 메시지의 상대 역할 속마음 조회 응답을 정의한다.
  *
- * @param processingStatus 속마음 처리 상태
+ * @param processingStatus 속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null
  * @param innerThought 상대 역할의 속마음. COMPLETED에서만 제공
  * @param innerThoughtType 속마음 유형. COMPLETED에서만 제공
  */
 @Schema(description = "사용자 메시지 속마음 조회 응답")
 public record SessionInnerThoughtResponse(
     @Schema(
-            description = "속마음 처리 상태",
+            description = "속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null",
             allowableValues = {"PREPARING", "COMPLETED", "FAILED"})
         String processingStatus,
     @Schema(description = "상대 역할의 속마음. COMPLETED에서만 제공") String innerThought,
@@ -39,6 +39,9 @@ public record SessionInnerThoughtResponse(
    */
   public static SessionInnerThoughtResponse from(SessionHistoryMessage message) {
     ProcessingStatus status = message.getInnerThoughtProcessingStatus();
+    if (status == null) {
+      return new SessionInnerThoughtResponse(null, null, null);
+    }
     if (status != ProcessingStatus.COMPLETED) {
       return new SessionInnerThoughtResponse(status.name(), null, null);
     }
