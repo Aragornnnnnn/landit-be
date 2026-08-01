@@ -108,7 +108,11 @@ public class AppVersionService {
   private AppVersion requireForUpdate(AppPlatform platform) {
     return appVersionRepository
         .findByPlatformForUpdate(platform)
-        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "앱 버전 정책을 찾을 수 없습니다."));
+        .orElseThrow(
+            () -> {
+              String message = "앱 버전 정책을 찾을 수 없습니다.";
+              return new ApiException(ErrorCode.RESOURCE_NOT_FOUND, message);
+            });
   }
 
   /** 최소 지원 버전이 최신 버전보다 높지 않은지 검증한다. */
@@ -116,7 +120,8 @@ public class AppVersionService {
     if (AppVersionName.parse(minimumSupportedVersionName)
             .compareTo(AppVersionName.parse(versionName))
         > 0) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST, "최소 지원 버전은 최신 버전보다 높을 수 없습니다.");
+      String message = "최소 지원 버전은 최신 버전보다 높을 수 없습니다.";
+      throw new ApiException(ErrorCode.INVALID_REQUEST, message);
     }
   }
 

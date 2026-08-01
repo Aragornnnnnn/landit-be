@@ -26,7 +26,7 @@ public interface AppVersionControllerDocs {
    * @return 플랫폼별 업데이트 정책 응답
    * @throws ApiException 플랫폼 앱 버전 정책이 설정되지 않았을 때
    */
-  @Operation(summary = "앱 버전 업데이트 확인", description = "플랫폼 정책과 현재 버전을 비교해 업데이트 수준을 반환한다.")
+  @Operation(summary = "앱 버전 업데이트 확인")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
