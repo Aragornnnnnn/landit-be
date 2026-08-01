@@ -272,9 +272,9 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
-  @DisplayName("V28 migration은 프리톡 생성 표현을 공통 학습 콘텐츠로 저장한다.")
+  @DisplayName("V29 migration은 프리톡 생성 표현을 공통 학습 콘텐츠로 저장한다.")
   @Test
-  void v28AddsFreeTalkExpressionLearningStorage() {
+  void v29AddsFreeTalkExpressionLearningStorage() {
     assertTableExists("free_talk_session_expression");
     assertTableDoesNotExist("free_talk_expression");
     assertTableDoesNotExist("user_free_talk_expression_completion");
