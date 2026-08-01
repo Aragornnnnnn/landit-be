@@ -44,8 +44,13 @@ public record AppVersionCheckResponse(
 
   /** 앱 업데이트가 필수인지, 선택인지, 불필요한지를 구분한다. */
   public enum UpdateType {
+    /** 강제 업데이트가 필요하다. */
     FORCE,
+
+    /** 선택 업데이트를 권장한다. */
     SOFT,
+
+    /** 업데이트가 필요하지 않다. */
     NONE
   }
 }

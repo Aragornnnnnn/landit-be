@@ -606,7 +606,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(userAiTutorId(migrationJdbcTemplate, 990202L)).isEqualTo(990102L);
   }
 
-  /** V34 migration은 비활성 이력을 제거하고 기존 최소 지원 기준에 해당하는 버전명을 보존한다. */
+  /** V34 migration이 활성 정책의 최소 지원 버전명을 보존하는지 검증한다. */
   @Test
   void v34MigrationKeepsSingleActivePolicyAndMapsMinimumSupportedVersionName() {
     String databaseUrl = migrationTestDatabaseUrl();
