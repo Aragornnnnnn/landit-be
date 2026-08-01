@@ -321,9 +321,14 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static boolean invalidLearningContent(
       AiFreeTalkExpressionLearningContent content,
       AiFreeTalkLearningExpression requestedExpression) {
-    return content == null
-        || requestedExpression == null
-        || blank(content.targetExpressionText())
+    if (content == null || requestedExpression == null) {
+      return true;
+    }
+    return missingLearningContent(content) || differsFromRequest(content, requestedExpression);
+  }
+
+  private static boolean missingLearningContent(AiFreeTalkExpressionLearningContent content) {
+    return blank(content.targetExpressionText())
         || blank(content.baseExpressionMeaningText())
         || blank(content.usageSummary())
         || blank(content.usageDescription())
@@ -335,8 +340,13 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         || content.representativeSentenceWordChoices() == null
         || content.representativeSentenceWordChoices().isEmpty()
         || content.practiceExamples() == null
-        || content.practiceExamples().isEmpty()
-        || blank(requestedExpression.targetExpressionText())
+        || content.practiceExamples().isEmpty();
+  }
+
+  private static boolean differsFromRequest(
+      AiFreeTalkExpressionLearningContent content,
+      AiFreeTalkLearningExpression requestedExpression) {
+    return blank(requestedExpression.targetExpressionText())
         || blank(requestedExpression.baseExpressionMeaningText())
         || blank(requestedExpression.usageSummary())
         || !requestedExpression.targetExpressionText().equals(content.targetExpressionText())

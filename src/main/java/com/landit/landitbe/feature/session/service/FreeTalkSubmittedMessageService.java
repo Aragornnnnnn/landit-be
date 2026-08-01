@@ -61,6 +61,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse findCompletedResponse(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
+    // 요청 사용자의 세션과 저장된 사용자 메시지를 확인한다.
     requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
     clearExpiredProcessing(session);
@@ -98,34 +99,35 @@ public class FreeTalkSubmittedMessageService {
           userId,
           session.getExpressionGenerationStatus());
     }
-    SessionHistoryMessage nextMessage =
-        userMessageIndex + 1 < messages.size()
-                && messages.get(userMessageIndex + 1).getRole() == ConversationSpeaker.AI
-            ? messages.get(userMessageIndex + 1)
-            : null;
-    if (nextMessage == null) {
-      throw new ApiException(ErrorCode.CONFLICT);
-    }
-    FreeTalkConversationStatus replayedStatus =
-        storedTurnStatus == FreeTalkTurnStatus.COMPLETED
-            ? FreeTalkConversationStatus.COMPLETED
-            : FreeTalkConversationStatus.IN_PROGRESS;
+
+    // 저장된 다음 AI 메시지와 완료 당시의 대화 상태로 응답을 복원한다.
+    SessionHistoryMessage nextMessage = requireNextAiMessage(messages, userMessageIndex);
     return replayResponse(
         learningSessionId,
         session.getTitle(),
         storedTurnStatus,
         userMessage,
         nextMessage,
-        replayedStatus,
+        replayedConversationStatus(storedTurnStatus),
         speakingDurationUntil(messages, userMessage.getMessageSequence()),
         userId,
         session.getExpressionGenerationStatus());
   }
 
-  /** 종료 확인이 완료된 같은 사용자 메시지의 결과를 다시 구성한다. */
+  /**
+   * 종료 확인이 완료된 사용자 메시지의 처리 결과를 다시 구성한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param submittedMessageId 종료 확인 대상 사용자 메시지 ID
+   * @param decision 재전송된 종료 확인 결과
+   * @return 저장된 처리 결과. 아직 종료 확인이 완료되지 않았으면 null
+   * @throws ApiException 세션이 없거나 소유자가 다르거나 저장된 결정과 충돌할 때
+   */
   @Transactional
   public FreeTalkMessageSubmitResponse findCompletedDecisionResponse(
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
+    // 요청 사용자의 세션과 종료 확인 대상 메시지를 확인한다.
     requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = requireFreeTalkForUpdate(learningSessionId);
     clearExpiredProcessing(session);
@@ -151,29 +153,20 @@ public class FreeTalkSubmittedMessageService {
             && decision != FreeTalkExitDecision.END)) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+
+    // 저장된 다음 AI 메시지와 완료 당시의 대화 상태로 응답을 복원한다.
     List<SessionHistoryMessage> messages =
         sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
             history.getId());
     int userMessageIndex = indexOfMessage(messages, userMessage.getId());
-    SessionHistoryMessage nextMessage =
-        userMessageIndex + 1 < messages.size()
-                && messages.get(userMessageIndex + 1).getRole() == ConversationSpeaker.AI
-            ? messages.get(userMessageIndex + 1)
-            : null;
-    if (nextMessage == null) {
-      throw new ApiException(ErrorCode.CONFLICT);
-    }
-    FreeTalkConversationStatus replayedStatus =
-        storedTurnStatus == FreeTalkTurnStatus.COMPLETED
-            ? FreeTalkConversationStatus.COMPLETED
-            : FreeTalkConversationStatus.IN_PROGRESS;
+    SessionHistoryMessage nextMessage = requireNextAiMessage(messages, userMessageIndex);
     return replayResponse(
         learningSessionId,
         session.getTitle(),
         storedTurnStatus,
         userMessage,
         nextMessage,
-        replayedStatus,
+        replayedConversationStatus(storedTurnStatus),
         speakingDurationUntil(messages, userMessage.getMessageSequence()),
         userId,
         session.getExpressionGenerationStatus());
@@ -327,7 +320,14 @@ public class FreeTalkSubmittedMessageService {
         historyMessages(messages));
   }
 
-  /** 일반 AI 턴 또는 종료 의사 감지 결과를 저장한다. */
+  /**
+   * 일반 AI 턴 또는 종료 의사 감지 결과를 저장한다.
+   *
+   * @param reservation 사용자 발화 저장 단계에서 만든 예약 정보
+   * @param result AI가 생성한 후속 응답과 종료 의사 감지 결과
+   * @return 저장된 사용자·AI 메시지와 현재 진행 상태
+   * @throws ApiException 예약한 요청과 현재 처리 중인 요청이 다를 때
+   */
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeTurn(
       Reservation reservation, AiFreeTalkTurnResult result) {
@@ -377,7 +377,14 @@ public class FreeTalkSubmittedMessageService {
     return response;
   }
 
-  /** 시간 제한 마무리 결과를 저장하고 세션을 완료한다. */
+  /**
+   * 시간 제한 마무리 결과를 저장하고 세션을 완료한다.
+   *
+   * @param reservation 사용자 발화 저장 단계에서 만든 예약 정보
+   * @param result AI가 생성한 마무리 응답
+   * @return 저장된 사용자·AI 메시지와 완료 상태
+   * @throws ApiException 예약한 요청과 현재 처리 중인 요청이 다를 때
+   */
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeTimeLimit(
       Reservation reservation, AiFreeTalkClosingResult result) {
@@ -416,7 +423,11 @@ public class FreeTalkSubmittedMessageService {
         records.learningSession().getUserProfileId());
   }
 
-  /** AI 호출 실패 시 처리 표시만 되돌리고 사용자 발화 시간은 보존한다. */
+  /**
+   * AI 호출 실패 시 처리 표시만 되돌리고 사용자 발화 시간은 보존한다.
+   *
+   * @param reservation 실패한 AI 호출의 예약 정보
+   */
   @Transactional
   public void compensate(Reservation reservation) {
     FreeTalkSession session =
@@ -474,7 +485,14 @@ public class FreeTalkSubmittedMessageService {
                 history.getId())));
   }
 
-  /** 종료 확인을 취소한 AI 턴을 저장한다. */
+  /**
+   * 종료 확인을 취소한 AI 턴을 저장한다.
+   *
+   * @param reservation 종료 확인 단계에서 만든 예약 정보
+   * @param result AI가 생성한 후속 응답
+   * @return 저장된 사용자·AI 메시지와 계속 상태
+   * @throws ApiException 예약한 요청과 현재 처리 중인 요청이 다를 때
+   */
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeContinue(
       DecisionReservation reservation, AiFreeTalkTurnResult result) {
@@ -508,7 +526,14 @@ public class FreeTalkSubmittedMessageService {
         records.learningSession().getUserProfileId());
   }
 
-  /** 종료 확정의 AI 마무리 메시지를 저장하고 세션을 완료한다. */
+  /**
+   * 종료 확정의 AI 마무리 메시지를 저장하고 세션을 완료한다.
+   *
+   * @param reservation 종료 확인 단계에서 만든 예약 정보
+   * @param result AI가 생성한 마무리 응답
+   * @return 저장된 사용자·AI 메시지와 완료 상태
+   * @throws ApiException 예약한 요청과 현재 처리 중인 요청이 다를 때
+   */
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeEnd(
       DecisionReservation reservation, AiFreeTalkClosingResult result) {
@@ -547,7 +572,11 @@ public class FreeTalkSubmittedMessageService {
         records.learningSession().getUserProfileId());
   }
 
-  /** 종료 확인의 AI 호출 실패 뒤 처리 표시만 되돌린다. */
+  /**
+   * 종료 확인의 AI 호출 실패 뒤 처리 표시만 되돌린다.
+   *
+   * @param reservation 실패한 종료 확인 AI 호출의 예약 정보
+   */
   @Transactional
   public void compensateDecision(DecisionReservation reservation) {
     freeTalkSessionRepository
@@ -557,6 +586,25 @@ public class FreeTalkSubmittedMessageService {
                 decisionProcessingClientMessageId(reservation)
                     .equals(session.getProcessingClientMessageId()))
         .ifPresent(FreeTalkSession::clearProcessing);
+  }
+
+  private SessionHistoryMessage requireNextAiMessage(
+      List<SessionHistoryMessage> messages, int userMessageIndex) {
+    if (userMessageIndex + 1 >= messages.size()) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    SessionHistoryMessage nextMessage = messages.get(userMessageIndex + 1);
+    if (nextMessage.getRole() != ConversationSpeaker.AI) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    return nextMessage;
+  }
+
+  private FreeTalkConversationStatus replayedConversationStatus(
+      FreeTalkTurnStatus storedTurnStatus) {
+    return storedTurnStatus == FreeTalkTurnStatus.COMPLETED
+        ? FreeTalkConversationStatus.COMPLETED
+        : FreeTalkConversationStatus.IN_PROGRESS;
   }
 
   private ManagedRecords managedRecords(Reservation reservation) {

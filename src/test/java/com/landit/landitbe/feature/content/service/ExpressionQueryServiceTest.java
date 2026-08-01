@@ -207,7 +207,7 @@ class ExpressionQueryServiceTest {
 
     // when: getExpressionForLearning()를 호출하면
     ExpressionLearningResponse response =
-        expressionQueryService.getExpressionForLearning(EXPRESSION_ID);
+        expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID);
 
     // then: 응답에 표현 상세 정보가 담겨서 반환된다.
     assertThat(response.expressionId()).isEqualTo(EXPRESSION_ID);
@@ -238,7 +238,8 @@ class ExpressionQueryServiceTest {
 
     // when & then : 존재않는 표현 id로 getExpressionForLearning()를 호출하면 ApiException이 발생하고, errorCode가
     // RESOURCE_NOT_FOUND인지 검증
-    assertThatThrownBy(() -> expressionQueryService.getExpressionForLearning(EXPRESSION_ID))
+    assertThatThrownBy(
+            () -> expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
@@ -329,7 +330,8 @@ class ExpressionQueryServiceTest {
         .thenReturn(Optional.empty());
 
     // when & then: RESOURCE_NOT_FOUND 예외가 발생한다
-    assertThatThrownBy(() -> expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID))
+    assertThatThrownBy(
+            () -> expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
@@ -356,7 +358,7 @@ class ExpressionQueryServiceTest {
 
     // when
     ExpressionPracticeResponse response =
-        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
 
     // then: 표현 정보가 매핑된다
     assertThat(response.targetExpressionText()).isEqualTo("blow my mind");
@@ -405,7 +407,7 @@ class ExpressionQueryServiceTest {
     for (int i = 0; i < 100; i++) {
       pickedSentences.add(
           expressionQueryService
-              .getExtraPracticeExamples(EXPRESSION_ID)
+              .getExtraPracticeExamples(USER_ID, EXPRESSION_ID)
               .writingSentence()
               .writingSentenceText());
     }
@@ -429,7 +431,7 @@ class ExpressionQueryServiceTest {
     // when & then: 50회 호출해도 IndexOutOfBounds 없이, 항상 2개 예문 중 하나가 뽑힌다
     for (int i = 0; i < 50; i++) {
       ExpressionPracticeResponse response =
-          expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+          expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
       List<String> sentenceTexts =
           response.practiceSentence().stream().map(PracticeSentenceResponse::sentenceText).toList();
       assertThat(sentenceTexts).contains(response.writingSentence().writingSentenceText());
@@ -445,7 +447,8 @@ class ExpressionQueryServiceTest {
         .thenReturn(Optional.of(expression));
 
     // when & then
-    assertThatThrownBy(() -> expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID))
+    assertThatThrownBy(
+            () -> expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
@@ -486,7 +489,7 @@ class ExpressionQueryServiceTest {
 
     // when
     ExpressionPracticeResponse response =
-        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
 
     // then: 없는 쪽은 null, 있는 쪽은 값 그대로
     assertThat(response.practiceSentence().get(0).imageUrl()).isNull();
@@ -558,7 +561,7 @@ class ExpressionQueryServiceTest {
 
     // when
     ExpressionPracticeResponse response =
-        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
 
     // then: 불량 예문 3개는 제외되고 정상 예문 2개만 남는다
     assertThat(response.practiceSentence()).hasSize(2);
@@ -591,7 +594,7 @@ class ExpressionQueryServiceTest {
 
     // when
     ExpressionPracticeResponse response =
-        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
 
     // then: 뽑힌 예문의 인덱스(sentence-N의 끝자리)를 알아내, 그 예문의 배열과 순서까지 일치하는지 확인
     String pickedText = response.writingSentence().writingSentenceText();
@@ -667,7 +670,7 @@ class ExpressionQueryServiceTest {
 
     // when
     ExpressionPracticeResponse response =
-        expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID);
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
 
     // then: 불량 예문 3개는 제외되고 정상 예문 1개만 남는다
     assertThat(response.practiceSentence()).hasSize(1);
@@ -701,7 +704,8 @@ class ExpressionQueryServiceTest {
         .thenReturn(Optional.of(expression));
 
     // when & then
-    assertThatThrownBy(() -> expressionQueryService.getExtraPracticeExamples(EXPRESSION_ID))
+    assertThatThrownBy(
+            () -> expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);

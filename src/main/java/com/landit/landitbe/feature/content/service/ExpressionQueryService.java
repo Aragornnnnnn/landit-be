@@ -152,22 +152,6 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 기존 내부 호출과 단위 테스트를 위한 공용 표현 조회다.
-   *
-   * @param expressionId 조회할 표현 ID
-   * @return 학습 화면에 필요한 표현 상세 정보
-   * @throws ApiException 표현이 없거나 비활성 상태일 때
-   */
-  @Transactional(readOnly = true)
-  public ExpressionLearningResponse getExpressionForLearning(Long expressionId) {
-    WritingExpression expression =
-        writingExpressionRepository
-            .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
-            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    return ExpressionLearningResponse.from(expression);
-  }
-
-  /**
    * 프리톡 AI가 재사용할 활성 표현 후보를 제한된 개수로 조회한다.
    *
    * @param targetLocale 학습 언어 locale
@@ -238,26 +222,6 @@ public class ExpressionQueryService {
   @Transactional(readOnly = true)
   public ExpressionPracticeResponse getExtraPracticeExamples(Long userId, Long expressionId) {
     WritingExpression expression = requireAccessibleExpression(userId, expressionId);
-    return practiceResponse(expression, expressionId);
-  }
-
-  /**
-   * 기존 내부 호출과 단위 테스트를 위한 공용 표현 연습 조회다.
-   *
-   * @param expressionId 연습할 표현 ID
-   * @return 추가 예문과 무작위 작문 문제
-   * @throws ApiException 표현이 없거나 비활성 상태일 때, 유효한 추가 예문이 없을 때
-   */
-  @Transactional(readOnly = true)
-  public ExpressionPracticeResponse getExtraPracticeExamples(Long expressionId) {
-    WritingExpression expression =
-        writingExpressionRepository
-            .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
-            .orElseThrow(
-                () -> {
-                  log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
-                  return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
-                });
     return practiceResponse(expression, expressionId);
   }
 

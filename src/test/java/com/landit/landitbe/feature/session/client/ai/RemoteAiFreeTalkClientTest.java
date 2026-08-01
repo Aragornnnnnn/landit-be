@@ -66,27 +66,12 @@ class RemoteAiFreeTalkClientTest {
         """
             {"success":true,"data":{"aiMessage":"It was nice talking with you.","translatedMessage":"이야기해서 좋았어.","emotion":"NEUTRAL","innerThought":"대화를 잘 마무리했다.","innerThoughtType":"NORMAL"},"error":null}
         """);
-    registerJsonResponse(
-        "/api/v1/free-talk/expression-recommendations",
-        requests,
-        """
-            {"success":true,"data":{"recommendations":[{"displayOrder":1,"sourceType":"EXISTING","existingExpressionId":7,"targetExpressionText":"I'm up for that","baseExpressionMeaningText":"좋아, 그거 하자","usageSummary":"제안에 동의할 때 사용"}]},"error":null}
-        """);
-    registerJsonResponse(
-        "/api/v1/free-talk/expression-learning-content",
-        requests,
-        successResponse(learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 4)));
-
     RemoteAiFreeTalkClient client = remoteClient();
 
     AiFreeTalkOpeningResult opening = client.generateOpening(openingRequest());
     AiFreeTalkTurnResult turn = client.generateTurn(turnRequest());
     AiFreeTalkInnerThoughtResult innerThought = client.generateInnerThought(innerThoughtRequest());
     AiFreeTalkClosingResult closing = client.generateClosing(closingRequest());
-    AiFreeTalkExpressionRecommendationsResult recommendations =
-        client.recommendExpressions(recommendationsRequest());
-    AiFreeTalkExpressionLearningContentResult learningContent =
-        client.generateExpressionLearningContent(learningContentRequest());
 
     assertThat(requests.get("/api/v1/free-talk/opening").get("topic").get("topicId").asLong())
         .isEqualTo(2L);
@@ -97,6 +82,44 @@ class RemoteAiFreeTalkClientTest {
     assertThat(requests.get("/api/v1/free-talk/closing").has("partnerDisplayName")).isFalse();
     assertThat(requests.get("/api/v1/free-talk/closing").get("closingReason").asString())
         .isEqualTo("USER_CONFIRMED");
+    assertThat(opening.emotion()).isEqualTo(CharacterEmotion.HAPPY);
+    assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
+    assertThat(closing.translatedMessage()).isEqualTo("이야기해서 좋았어.");
+  }
+
+  @Test
+  void postsExpressionContractsAndMapsSuccessfulResponses() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        requests,
+        """
+            {
+              "success": true,
+              "data": {
+                "recommendations": [{
+                  "displayOrder": 1,
+                  "sourceType": "EXISTING",
+                  "existingExpressionId": 7,
+                  "targetExpressionText": "I'm up for that",
+                  "baseExpressionMeaningText": "좋아, 그거 하자",
+                  "usageSummary": "제안에 동의할 때 사용"
+                }]
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/expression-learning-content",
+        requests,
+        successResponse(learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 4)));
+
+    RemoteAiFreeTalkClient client = remoteClient();
+    AiFreeTalkExpressionRecommendationsResult recommendations =
+        client.recommendExpressions(recommendationsRequest());
+    AiFreeTalkExpressionLearningContentResult learningContent =
+        client.generateExpressionLearningContent(learningContentRequest());
+
     assertThat(
             requests
                 .get("/api/v1/free-talk/expression-recommendations")
@@ -113,9 +136,6 @@ class RemoteAiFreeTalkClientTest {
                 .get("targetExpressionText")
                 .asString())
         .isEqualTo("I'm up for that");
-    assertThat(opening.emotion()).isEqualTo(CharacterEmotion.HAPPY);
-    assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
-    assertThat(closing.translatedMessage()).isEqualTo("이야기해서 좋았어.");
     assertThat(recommendations.recommendations()).hasSize(1);
     assertThat(learningContent.expressions().getFirst().practiceExamples()).hasSize(4);
   }
