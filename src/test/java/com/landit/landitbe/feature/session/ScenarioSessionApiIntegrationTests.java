@@ -980,8 +980,6 @@ class ScenarioSessionApiIntegrationTests {
   @Test
   void submitMessageCompletesSessionWithClosingMessageWhenNextQuestionDoesNotExist()
       throws Exception {
-    LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
-    mutableClock.setInstant(today.atTime(12, 0).atZone(SERVICE_ZONE_ID).toInstant());
     JsonNode loginBody = login("max-turn-submit@example.com");
     final long userId = loginBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1041,12 +1039,19 @@ class ScenarioSessionApiIntegrationTests {
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
     assertThat(hasScenarioAccess(userId, 2102)).isTrue();
+  }
+
+  @Test
+  void completingScenarioRecordsTodayAsStreakActivity() throws Exception {
+    LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
+    mutableClock.setInstant(today.atTime(12, 0).atZone(SERVICE_ZONE_ID).toInstant());
+    StartedSession session = startCompletedAiFirstSession("streak-scenario-completion@example.com");
 
     mockMvc
         .perform(
             get("/api/v1/me/streak/calendar?year=%d&month=%d"
                     .formatted(today.getYear(), today.getMonthValue()))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.currentStreakDays").value(1))
         .andExpect(jsonPath("$.data.activeToday").value(true))

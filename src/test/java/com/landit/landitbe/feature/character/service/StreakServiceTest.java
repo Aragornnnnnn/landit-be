@@ -13,7 +13,6 @@ import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
-import com.landit.landitbe.feature.session.domain.SessionType;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -50,8 +49,7 @@ class StreakServiceTest {
     UserLearningActivitySummary persistedSummary = UserLearningActivitySummary.initialize(USER_ID);
     when(summaryRepository.save(any())).thenReturn(persistedSummary);
 
-    streakService.recordCompletedConversation(
-        USER_ID, SessionType.SCENARIO, activityDate.atTime(12, 0));
+    streakService.recordCompletedConversation(USER_ID, activityDate.atTime(12, 0));
 
     ArgumentCaptor<UserDailyActivity> dailyActivityCaptor =
         ArgumentCaptor.forClass(UserDailyActivity.class);
@@ -75,8 +73,7 @@ class StreakServiceTest {
     when(userDailyActivityRepository.findByUserProfileIdAndActivityDate(USER_ID, activityDate))
         .thenReturn(Optional.of(dailyActivity));
 
-    streakService.recordCompletedConversation(
-        USER_ID, SessionType.SCENARIO, activityDate.atTime(18, 0));
+    streakService.recordCompletedConversation(USER_ID, activityDate.atTime(18, 0));
 
     assertThat(dailyActivity.getCompletedSessionCount()).isEqualTo(2);
     verifyNoInteractions(summaryRepository);
@@ -92,8 +89,7 @@ class StreakServiceTest {
         .thenReturn(Optional.of(dailyActivity));
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
 
-    streakService.recordCompletedConversation(
-        USER_ID, SessionType.SCENARIO, activityDate.atTime(18, 0));
+    streakService.recordCompletedConversation(USER_ID, activityDate.atTime(18, 0));
 
     assertThat(dailyActivity.isActiveDay()).isTrue();
     assertThat(dailyActivity.getCompletedSessionCount()).isEqualTo(2);
@@ -113,8 +109,7 @@ class StreakServiceTest {
         .thenReturn(Optional.empty());
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
 
-    streakService.recordCompletedConversation(
-        USER_ID, SessionType.FREE_TALK, activityDate.atTime(12, 0));
+    streakService.recordCompletedConversation(USER_ID, activityDate.atTime(12, 0));
 
     assertThat(summary.getCurrentStreakDays()).isEqualTo(7);
     assertThat(summary.getLongestStreakDays()).isEqualTo(7);
@@ -132,8 +127,7 @@ class StreakServiceTest {
         .thenReturn(Optional.empty());
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
 
-    streakService.recordCompletedConversation(
-        USER_ID, SessionType.SCENARIO, activityDate.atTime(12, 0));
+    streakService.recordCompletedConversation(USER_ID, activityDate.atTime(12, 0));
 
     assertThat(summary.getCurrentStreakDays()).isEqualTo(1);
     assertThat(summary.getLongestStreakDays()).isEqualTo(3);

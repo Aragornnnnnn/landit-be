@@ -25,15 +25,15 @@
 - Test: `src/test/java/com/landit/landitbe/feature/character/service/StreakServiceTest.java`
 
 **Interfaces:**
-- Produces: `recordCompletedConversation(long userId, SessionType sessionType, LocalDateTime completedAt)`, `getCurrentStreak(long userId)`, `getCalendar(long userId, YearMonth yearMonth)`.
+- Produces: `recordCompletedConversation(long userId, LocalDateTime completedAt)`, `getCurrentStreak(long userId)`, `getCalendar(long userId, YearMonth yearMonth)`.
 
 - [x] Write failing tests for first day, yesterday 연속, 같은 날 재완료, 공백 뒤 재시작, 월 범위 조회와 만료된 조회값.
 
 ```java
 @Test
 void recordsOnlyOneActiveDayForSameDate() {
-  service.recordCompletedConversation(USER_ID, SessionType.SCENARIO, TODAY_AT_NOON);
-  service.recordCompletedConversation(USER_ID, SessionType.SCENARIO, TODAY_AT_EVENING);
+  service.recordCompletedConversation(USER_ID, TODAY_AT_NOON);
+  service.recordCompletedConversation(USER_ID, TODAY_AT_EVENING);
   assertThat(service.getCalendar(USER_ID, YearMonth.from(TODAY)).totalActiveDays()).isEqualTo(1);
 }
 ```

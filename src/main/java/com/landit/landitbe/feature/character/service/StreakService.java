@@ -6,13 +6,11 @@ import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
-import com.landit.landitbe.feature.session.domain.SessionType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,16 +28,15 @@ public class StreakService {
   /**
    * 정상 완료한 대화를 해당 날짜의 스트릭 활동으로 기록한다.
    *
-   * <p>호출자는 같은 트랜잭션에서 학습 세션 잠금보다 먼저 사용자 프로필 쓰기 잠금을 획득해야 같은 사용자의 완료 기록을 직렬화할 수 있다.
+   * <p>호출자는 같은 트랜잭션에서 학습 세션 잠금보다 먼저 사용자 프로필 쓰기 잠금을 획득해야 한다.
+   *
+   * <p>이 잠금 순서로 같은 사용자의 완료 기록을 직렬화한다.
    *
    * @param userId 사용자 ID
-   * @param sessionType 정상 완료한 세션 유형
    * @param completedAt Asia/Seoul 기준 세션 완료 시각
    */
   @Transactional
-  public void recordCompletedConversation(
-      long userId, SessionType sessionType, LocalDateTime completedAt) {
-    Objects.requireNonNull(sessionType);
+  public void recordCompletedConversation(long userId, LocalDateTime completedAt) {
     LocalDate activityDate = completedAt.toLocalDate();
     var existingActivity =
         userDailyActivityRepository.findByUserProfileIdAndActivityDate(userId, activityDate);
@@ -100,15 +97,21 @@ public class StreakService {
             .stream()
             .map(UserDailyActivity::getActivityDate)
             .toList();
-    return new StreakCalendar(
-        currentStreak.currentStreakDays(),
-        currentStreak.activeToday(),
+    LocalDate streakStartedDate =
         userDailyActivityRepository
             .findFirstByUserProfileIdAndActiveDayTrueOrderByActivityDateAsc(userId)
             .map(UserDailyActivity::getActivityDate)
-            .orElse(null),
-        summary == null ? 0 : summary.getLongestStreakDays(),
-        Math.toIntExact(userDailyActivityRepository.countByUserProfileIdAndActiveDayTrue(userId)),
+            .orElse(null);
+    int longestStreakDays = summary == null ? 0 : summary.getLongestStreakDays();
+    int totalActiveDays =
+        Math.toIntExact(userDailyActivityRepository.countByUserProfileIdAndActiveDayTrue(userId));
+
+    return new StreakCalendar(
+        currentStreak.currentStreakDays(),
+        currentStreak.activeToday(),
+        streakStartedDate,
+        longestStreakDays,
+        totalActiveDays,
         activeDates);
   }
 

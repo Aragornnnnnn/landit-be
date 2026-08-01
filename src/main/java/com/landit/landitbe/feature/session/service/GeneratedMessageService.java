@@ -51,8 +51,7 @@ class GeneratedMessageService {
       LocalDateTime completedAt = LocalDateTime.now(clock);
       learningSession.completeBySystem(generation.completionReason(), completedAt);
       grantScenarioAccess(learningSession, submittedContext, completedAt);
-      streakService.recordCompletedConversation(
-          learningSession.getUserProfileId(), learningSession.getSessionType(), completedAt);
+      streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
     }
     return SessionMessageSubmitResponse.from(
         submittedContext.sessionId(),

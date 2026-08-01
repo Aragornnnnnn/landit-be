@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.character.service.StreakService;
-import com.landit.landitbe.feature.session.domain.SessionType;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,9 +82,9 @@ class StreakApiIntegrationTests {
   void calendarReturnsRequestedMonthActiveDates() throws Exception {
     LoginResult login = login();
     streakService.recordCompletedConversation(
-        login.userId(), SessionType.SCENARIO, LocalDate.of(2026, 7, 12).atTime(12, 0));
+        login.userId(), LocalDate.of(2026, 7, 12).atTime(12, 0));
     streakService.recordCompletedConversation(
-        login.userId(), SessionType.FREE_TALK, LocalDate.of(2026, 7, 18).atTime(12, 0));
+        login.userId(), LocalDate.of(2026, 7, 18).atTime(12, 0));
 
     mockMvc
         .perform(
@@ -122,7 +121,7 @@ class StreakApiIntegrationTests {
         """,
         login.userId());
     streakService.recordCompletedConversation(
-        login.userId(), SessionType.SCENARIO, LocalDate.of(2026, 7, 12).atTime(12, 0));
+        login.userId(), LocalDate.of(2026, 7, 12).atTime(12, 0));
 
     mockMvc
         .perform(
