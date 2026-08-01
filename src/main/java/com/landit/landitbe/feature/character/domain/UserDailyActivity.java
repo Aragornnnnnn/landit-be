@@ -50,6 +50,7 @@ public class UserDailyActivity extends BaseTimeEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected UserDailyActivity() {}
 
+  // 사용자의 첫 완료 활동이 반영된 일별 활동을 초기화한다.
   private UserDailyActivity(Long userProfileId, LocalDate activityDate) {
     this.userProfileId = userProfileId;
     this.activityDate = activityDate;

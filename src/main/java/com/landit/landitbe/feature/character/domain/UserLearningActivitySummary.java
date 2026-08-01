@@ -57,6 +57,7 @@ public class UserLearningActivitySummary extends BaseTimeEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected UserLearningActivitySummary() {}
 
+  // 스트릭 기록을 시작할 사용자의 학습 요약을 초기화한다.
   private UserLearningActivitySummary(Long userProfileId) {
     this.userProfileId = userProfileId;
     this.totalSessionCount = 0;

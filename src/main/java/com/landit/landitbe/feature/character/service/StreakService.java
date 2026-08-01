@@ -123,6 +123,7 @@ public class StreakService {
    */
   public record CurrentStreak(int currentStreakDays, boolean activeToday) {
 
+    // 저장된 마지막 활동일을 기준으로 현재 유효 스트릭을 계산한다.
     private static CurrentStreak from(UserLearningActivitySummary summary, LocalDate today) {
       LocalDate lastActivityDate = summary.getLastActivityDate();
       if (lastActivityDate == null || lastActivityDate.isBefore(today.minusDays(1))) {
