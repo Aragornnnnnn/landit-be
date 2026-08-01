@@ -119,7 +119,7 @@ class ExpressionLearningCompletionServiceTest {
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
-  /** 이미 완료한 표현을 다시 완료 요청하면(멱등) 예외 없이 정상 종료하고 새 기록을 저장하지 않는다. last_completed_at 필드만 갱신된다. */
+  /** 이미 완료한 표현을 다시 완료하면 새 기록을 만들지 않고 마지막 완료 시각만 갱신한다. */
   @Test
   void shouldUpdateLastCompletedAtForRepeatedCompletion() {
     // given: 표현이 존재하고, 사용자가 이미 그 표현을 완료한 상태
@@ -140,18 +140,12 @@ class ExpressionLearningCompletionServiceTest {
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
-  /** 아직 잠긴(미완료 중 학습 순서가 앞선 표현이 남은) 표현을 완료하려 하면 EXPRESSION_LOCKED 예외 + 경고 로그, 저장 없음. */
+  /** 아직 잠긴 표현의 완료 요청은 경고를 남기고 저장 없이 거부한다. */
   @Test
   void shouldLogAndThrowWhenExpressionIsLocked() {
     // given: 로그 검증용 ListAppender 부착
-    Logger logger =
-        (Logger)
-            LoggerFactory.getLogger(
-                ExpressionLearningCompletionService
-                    .class); // "ExpressionLearningCompletionService 클래스가 로그를 찍을 때 쓰는 그 Logger"
-    // 인스턴스를
-    // 가져오는 역할.
-    ListAppender<ILoggingEvent> logAppender = new ListAppender<>(); // 찍히는 로그를 리스트에 차곡차곡 저장해주는 역할.
+    Logger logger = (Logger) LoggerFactory.getLogger(ExpressionLearningCompletionService.class);
+    ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
     logAppender.start();
     logger.addAppender(logAppender);
 

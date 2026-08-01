@@ -608,7 +608,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void completesPrivateFreeTalkExpressionThroughCommonLearningApi() throws Exception {
+  void rejectsAnotherUsersPrivateFreeTalkExpression() throws Exception {
     JsonNode loginBody = login("free-talk-new-expression@example.com");
     String accessToken = loginBody.at("/data/accessToken").asText();
     long learningSessionId = startUserFirstSession(accessToken);
@@ -622,6 +622,14 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+  }
+
+  @Test
+  void returnsPrivateFreeTalkExpressionLearningContent() throws Exception {
+    JsonNode loginBody = login("free-talk-learning-content@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
 
     mockMvc
         .perform(
@@ -640,15 +648,16 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
         .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
         .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+  }
 
-    mockMvc
-        .perform(
-            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").isEmpty());
+  @Test
+  void completesPrivateFreeTalkExpressionIdempotently() throws Exception {
+    JsonNode loginBody = login("free-talk-learning-finish@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
+
+    finishExpression(accessToken, link);
 
     Object firstCompletedAt =
         jdbcTemplate.queryForObject(
@@ -657,14 +666,7 @@ class FreeTalkSessionApiIntegrationTests {
             Object.class,
             link.expressionId());
 
-    mockMvc
-        .perform(
-            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").isEmpty());
+    finishExpression(accessToken, link);
 
     Object repeatedCompletedAt =
         jdbcTemplate.queryForObject(
@@ -964,6 +966,17 @@ class FreeTalkSessionApiIntegrationTests {
     freeTalkSessionExpressionRepository.saveAndFlush(
         FreeTalkSessionExpression.link(freeTalkSessionId, expressionId, 1));
     return new FreeTalkExpressionLink(learningSessionId, freeTalkSessionId, expressionId);
+  }
+
+  private void finishExpression(String accessToken, FreeTalkExpressionLink link) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isEmpty());
   }
 
   private record FreeTalkExpressionLink(

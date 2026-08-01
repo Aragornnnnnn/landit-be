@@ -24,6 +24,8 @@ import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepos
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -214,7 +216,7 @@ public class FreeTalkHistoryQueryService {
             expression ->
                 expressionsByFreeTalkSessionId
                     .computeIfAbsent(
-                        expression.getFreeTalkSessionId(), ignored -> new java.util.ArrayList<>())
+                        expression.getFreeTalkSessionId(), ignored -> new ArrayList<>())
                     .add(expression));
     return expressionsByFreeTalkSessionId;
   }
@@ -243,21 +245,9 @@ public class FreeTalkHistoryQueryService {
     List<FreeTalkSessionDetailResponse.Expression> expressions =
         sessionExpressions.stream()
             .map(
-                sessionExpression -> {
-                  ExpressionSummary expression =
-                      expressionSummary(sessionExpression, writingExpressionsById);
-                  return new FreeTalkSessionDetailResponse.Expression(
-                      sessionExpression.getWritingExpressionId(),
-                      sessionExpression.getDisplayOrder(),
-                      expression.targetExpressionText(),
-                      expression.baseExpressionMeaningText(),
-                      completionLookup
-                          .freeTalkCompletedExpressionIds()
-                          .contains(sessionExpression.getWritingExpressionId()),
-                      completionLookup
-                          .lastCompletedAtByExpressionId()
-                          .get(sessionExpression.getWritingExpressionId()));
-                })
+                sessionExpression ->
+                    toExpressionResponse(
+                        sessionExpression, writingExpressionsById, completionLookup))
             .toList();
 
     int completedCount =
@@ -266,26 +256,36 @@ public class FreeTalkHistoryQueryService {
                 .filter(FreeTalkSessionDetailResponse.Expression::completed)
                 .count());
 
-    // 완료 개수만으로 프리톡 표현 학습의 전체 진행 상태를 결정한다.
-    ExpressionLearningStatus learningStatus =
-        completedCount == 0
-            ? ExpressionLearningStatus.NOT_STARTED
-            : completedCount == expressions.size()
-                ? ExpressionLearningStatus.COMPLETED
-                : ExpressionLearningStatus.IN_PROGRESS;
+    ExpressionLearningStatus learningStatus = learningStatus(completedCount, expressions.size());
     return new ExpressionProgress(learningStatus, expressions.size(), completedCount, expressions);
   }
 
-  private ExpressionSummary expressionSummary(
+  private FreeTalkSessionDetailResponse.Expression toExpressionResponse(
       FreeTalkSessionExpression sessionExpression,
-      Map<Long, WritingExpression> writingExpressionsById) {
-    WritingExpression expression =
-        writingExpressionsById.get(sessionExpression.getWritingExpressionId());
+      Map<Long, WritingExpression> writingExpressionsById,
+      ExpressionCompletionLookup completionLookup) {
+    long expressionId = sessionExpression.getWritingExpressionId();
+    WritingExpression expression = writingExpressionsById.get(expressionId);
     if (expression == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
-    return new ExpressionSummary(
-        expression.getTargetExpressionText(), expression.getBaseExpressionMeaningText());
+    return new FreeTalkSessionDetailResponse.Expression(
+        expressionId,
+        sessionExpression.getDisplayOrder(),
+        expression.getTargetExpressionText(),
+        expression.getBaseExpressionMeaningText(),
+        completionLookup.freeTalkCompletedExpressionIds().contains(expressionId),
+        completionLookup.lastCompletedAtByExpressionId().get(expressionId));
+  }
+
+  private ExpressionLearningStatus learningStatus(int completedCount, int expressionCount) {
+    if (completedCount == 0) {
+      return ExpressionLearningStatus.NOT_STARTED;
+    }
+    if (completedCount == expressionCount) {
+      return ExpressionLearningStatus.COMPLETED;
+    }
+    return ExpressionLearningStatus.IN_PROGRESS;
   }
 
   private ExpressionCompletionLookup expressionCompletionLookup(
@@ -299,7 +299,7 @@ public class FreeTalkHistoryQueryService {
         expressionCompletionRepository.findAllByUserProfileIdAndWritingExpressionIdIn(
             userId, expressionIds);
     Set<Long> freeTalkCompletedExpressionIds = new HashSet<>();
-    Map<Long, java.time.LocalDateTime> lastCompletedAtByExpressionId = new HashMap<>();
+    Map<Long, LocalDateTime> lastCompletedAtByExpressionId = new HashMap<>();
     completions.forEach(
         completion -> {
           if (completion.getLearningSource() == ExpressionLearningSource.FREE_TALK) {
@@ -317,11 +317,9 @@ public class FreeTalkHistoryQueryService {
   private record CompletedSession(
       LearningSession learningSession, FreeTalkSession freeTalkSession) {}
 
-  private record ExpressionSummary(String targetExpressionText, String baseExpressionMeaningText) {}
-
   private record ExpressionCompletionLookup(
       Set<Long> freeTalkCompletedExpressionIds,
-      Map<Long, java.time.LocalDateTime> lastCompletedAtByExpressionId) {
+      Map<Long, LocalDateTime> lastCompletedAtByExpressionId) {
     static ExpressionCompletionLookup empty() {
       return new ExpressionCompletionLookup(Set.of(), Map.of());
     }
