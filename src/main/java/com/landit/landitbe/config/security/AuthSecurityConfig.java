@@ -80,6 +80,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/daily")
                     .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/calendar")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/scenarios/*/sessions")
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/messages")

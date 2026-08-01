@@ -1,11 +1,14 @@
-// 시나리오 목록 조회 API 요청을 받아 공통 응답으로 반환한다.
+// 시나리오 조회 API 요청을 받아 공통 응답으로 반환한다.
 
 package com.landit.landitbe.feature.content;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.content.docs.ScenarioControllerDocs;
+import com.landit.landitbe.feature.content.domain.ScenarioCalendarType;
 import com.landit.landitbe.feature.content.dto.DailyScenarioResponse;
+import com.landit.landitbe.feature.content.dto.ScenarioCalendarResponse;
 import com.landit.landitbe.feature.content.service.DailyScenarioQueryService;
+import com.landit.landitbe.feature.content.service.ScenarioCalendarService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ScenarioController implements ScenarioControllerDocs {
 
   private final DailyScenarioQueryService dailyScenarioQueryService;
+  private final ScenarioCalendarService scenarioCalendarService;
 
   /** {@inheritDoc} */
   @Override
@@ -30,5 +34,15 @@ public class ScenarioController implements ScenarioControllerDocs {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
     return ApiResponse.success(
         dailyScenarioQueryService.getDailyScenario(principal.userId(), date));
+  }
+
+  /** 인증된 사용자의 주·월 단위 시나리오 캘린더를 조회한다. */
+  @Override
+  @GetMapping("/api/v1/scenarios/calendar")
+  public ApiResponse<ScenarioCalendarResponse> getCalendar(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @RequestParam ScenarioCalendarType type,
+      @RequestParam(required = false) LocalDate date) {
+    return ApiResponse.success(scenarioCalendarService.getCalendar(principal.userId(), type, date));
   }
 }

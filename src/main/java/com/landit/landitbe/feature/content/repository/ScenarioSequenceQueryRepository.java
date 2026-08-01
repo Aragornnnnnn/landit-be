@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.content.repository;
 
 import com.landit.landitbe.feature.content.domain.Scenario;
+import com.landit.landitbe.feature.content.repository.projection.ScenarioThumbnailProjection;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -40,4 +42,22 @@ public interface ScenarioSequenceQueryRepository extends JpaRepository<Scenario,
             ORDER BY s.id ASC
       """)
   List<Long> findScenarioIdsInIdOrder(@Param("userId") long userId);
+
+  /**
+   * 시나리오 ID 목록의 썸네일 URL을 조회한다. 완료 이력 표시가 목적이므로 활성 상태는 필터링하지 않는다.
+   *
+   * @param scenarioIds 시나리오 ID 목록
+   * @return 시나리오 ID와 썸네일 URL projection 목록
+   */
+  @Query(
+      """
+            SELECT new com.landit.landitbe.feature.content.repository.projection.ScenarioThumbnailProjection(
+                s.id,
+                s.thumbnailUrl
+            )
+            FROM Scenario s
+            WHERE s.id IN :scenarioIds
+      """)
+  List<ScenarioThumbnailProjection> findThumbnailsByScenarioIds(
+      @Param("scenarioIds") Collection<Long> scenarioIds);
 }
