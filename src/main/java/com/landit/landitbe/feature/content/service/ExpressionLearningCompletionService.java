@@ -116,6 +116,7 @@ public class ExpressionLearningCompletionService {
     learningProgressService.completeFreeTalkExpression(userId, scenarioId, expressionId);
   }
 
+  // 완료 요청이 사용자의 완료 프리톡에서 추천된 표현인지 검증한다.
   private void validateFreeTalkCompletion(Long userId, Long freeTalkSessionId, Long expressionId) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository

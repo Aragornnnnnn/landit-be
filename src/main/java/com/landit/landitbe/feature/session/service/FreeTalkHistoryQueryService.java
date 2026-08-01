@@ -199,6 +199,7 @@ public class FreeTalkHistoryQueryService {
     return new CompletedSession(learningSession, freeTalkSession);
   }
 
+  // 학습 세션 목록을 ID 기준 조회 맵으로 변환한다.
   private Map<Long, LearningSession> learningSessionsById(List<Long> learningSessionIds) {
     Map<Long, LearningSession> learningSessionsById = new HashMap<>();
     learningSessionRepository
@@ -207,6 +208,7 @@ public class FreeTalkHistoryQueryService {
     return learningSessionsById;
   }
 
+  // 추천 표현을 프리톡 세션 ID별로 그룹화한다.
   private Map<Long, List<FreeTalkSessionExpression>> expressionsByFreeTalkSessionId(
       List<Long> freeTalkSessionIds) {
     Map<Long, List<FreeTalkSessionExpression>> expressionsByFreeTalkSessionId = new HashMap<>();
@@ -221,6 +223,7 @@ public class FreeTalkHistoryQueryService {
     return expressionsByFreeTalkSessionId;
   }
 
+  // 세션 추천 표현에 연결된 원어민 표현을 ID 기준으로 조회한다.
   private Map<Long, WritingExpression> writingExpressionsById(
       List<FreeTalkSessionExpression> sessionExpressions) {
     List<Long> expressionIds =
@@ -232,6 +235,7 @@ public class FreeTalkHistoryQueryService {
     return expressionsById;
   }
 
+  // 추천 표현과 완료 이력을 결합해 세션의 학습 진행 상태를 계산한다.
   private ExpressionProgress expressionProgress(
       FreeTalkSession session,
       List<FreeTalkSessionExpression> sessionExpressions,
@@ -260,6 +264,7 @@ public class FreeTalkHistoryQueryService {
     return new ExpressionProgress(learningStatus, expressions.size(), completedCount, expressions);
   }
 
+  // 세션 추천 표현을 완료 이력이 포함된 상세 응답으로 변환한다.
   private FreeTalkSessionDetailResponse.Expression toExpressionResponse(
       FreeTalkSessionExpression sessionExpression,
       Map<Long, WritingExpression> writingExpressionsById,
@@ -278,6 +283,7 @@ public class FreeTalkHistoryQueryService {
         completionLookup.lastCompletedAtByExpressionId().get(expressionId));
   }
 
+  // 완료 개수와 전체 표현 개수로 학습 상태를 결정한다.
   private ExpressionLearningStatus learningStatus(int completedCount, int expressionCount) {
     if (completedCount == 0) {
       return ExpressionLearningStatus.NOT_STARTED;
@@ -288,6 +294,7 @@ public class FreeTalkHistoryQueryService {
     return ExpressionLearningStatus.IN_PROGRESS;
   }
 
+  // 추천 표현의 프리톡 완료 여부와 최근 학습 시각을 조회한다.
   private ExpressionCompletionLookup expressionCompletionLookup(
       long userId, List<FreeTalkSessionExpression> sessionExpressions) {
     List<Long> expressionIds =
