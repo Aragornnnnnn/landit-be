@@ -70,14 +70,17 @@ public class ExpressionLearningCompletionService {
             .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     Long scenarioId = expression.getScenarioId();
+
     if (expression.isOwnedByAnother(userId)) {
       throw new ApiException(ErrorCode.FORBIDDEN);
     }
+
     if (freeTalkSessionId != null) {
       validateFreeTalkCompletion(userId, freeTalkSessionId, expressionId);
       completeFreeTalkExpression(userId, scenarioId, expressionId);
       return;
     }
+
     if (scenarioId == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }

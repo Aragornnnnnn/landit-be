@@ -61,6 +61,8 @@ public class FreeTalkHistoryQueryService {
     Page<FreeTalkSession> sessions =
         freeTalkSessionRepository.findCompletedByUserProfileId(userId, PageRequest.of(page, size));
     List<FreeTalkSession> freeTalkSessions = sessions.getContent();
+
+    // 페이지에 포함된 세션·표현·완료 이력을 일괄 조회해 반복 쿼리를 피한다.
     Map<Long, LearningSession> learningSessionsById =
         learningSessionsById(
             freeTalkSessions.stream().map(FreeTalkSession::getLearningSessionId).toList());
@@ -73,6 +75,8 @@ public class FreeTalkHistoryQueryService {
         writingExpressionsById(sessionExpressions);
     ExpressionCompletionLookup completionLookup =
         expressionCompletionLookup(userId, sessionExpressions);
+
+    // 일괄 조회한 데이터를 세션별 목록 응답으로 조립한다.
     List<FreeTalkSessionListResponse.Item> items =
         freeTalkSessions.stream()
             .map(
@@ -99,10 +103,13 @@ public class FreeTalkHistoryQueryService {
   public FreeTalkSessionDetailResponse getSession(long userId, long learningSessionId) {
     CompletedSession completedSession = requireCompleted(userId, learningSessionId);
     FreeTalkSession session = completedSession.freeTalkSession();
+
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+
+    // 추천 표현과 사용자의 완료 이력을 결합해 현재 학습 진행 상태를 계산한다.
     List<FreeTalkSessionExpression> sessionExpressions =
         sessionExpressionRepository.findByFreeTalkSessionIdOrderByDisplayOrderAsc(session.getId());
     ExpressionProgress progress =
@@ -111,6 +118,8 @@ public class FreeTalkHistoryQueryService {
             sessionExpressions,
             writingExpressionsById(sessionExpressions),
             expressionCompletionLookup(userId, sessionExpressions));
+
+    // 대화 메시지는 저장 순서대로 API 응답 형태로 변환한다.
     List<FreeTalkSessionDetailResponse.Message> messages =
         sessionHistoryMessageRepository
             .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
@@ -128,6 +137,7 @@ public class FreeTalkHistoryQueryService {
                         message.getInnerThought(),
                         message.getInnerThoughtType()))
             .toList();
+
     return new FreeTalkSessionDetailResponse(
         learningSessionId,
         session.getTitle(),
@@ -228,6 +238,8 @@ public class FreeTalkHistoryQueryService {
     if (session.getExpressionGenerationStatus() != ExpressionGenerationStatus.READY) {
       return ExpressionProgress.empty();
     }
+
+    // 추천 표현 본문과 출처별 완료 이력을 노출 순서대로 결합한다.
     List<FreeTalkSessionDetailResponse.Expression> expressions =
         sessionExpressions.stream()
             .map(
@@ -247,11 +259,14 @@ public class FreeTalkHistoryQueryService {
                           .get(sessionExpression.getWritingExpressionId()));
                 })
             .toList();
+
     int completedCount =
         Math.toIntExact(
             expressions.stream()
                 .filter(FreeTalkSessionDetailResponse.Expression::completed)
                 .count());
+
+    // 완료 개수만으로 프리톡 표현 학습의 전체 진행 상태를 결정한다.
     ExpressionLearningStatus learningStatus =
         completedCount == 0
             ? ExpressionLearningStatus.NOT_STARTED
