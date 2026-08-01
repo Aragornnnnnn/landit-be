@@ -61,10 +61,13 @@ public class FreeTalkExpressionGenerationService {
   public void generate(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     try {
+      // 중복 실행을 막는 상태 전이는 짧은 트랜잭션에서 먼저 확정한다.
       GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
       if (context == null) {
         return;
       }
+
+      // 전체 대화와 기존 표현 후보를 바탕으로 이번 프리톡에 적합한 표현을 추천한다.
       List<AiFreeTalkExpressionRecommendation> recommendations =
           aiFreeTalkClient
               .recommendExpressions(
@@ -75,6 +78,8 @@ public class FreeTalkExpressionGenerationService {
                       context.history(),
                       context.existingExpressions()))
               .recommendations();
+
+      // 새로 추천된 표현에만 기존 표현 학습 API에서 사용할 콘텐츠를 추가 생성한다.
       List<AiFreeTalkLearningExpression> newExpressions =
           recommendations.stream()
               .filter(
@@ -97,9 +102,12 @@ public class FreeTalkExpressionGenerationService {
                           context.baseLocale().name(),
                           newExpressions))
                   .expressions();
+
+      // 모든 외부 호출이 끝난 뒤 추천 결과를 한 트랜잭션으로 저장한다.
       transactionTemplate.executeWithoutResult(
           status -> persistReady(context, recommendations, learningContents));
     } catch (RuntimeException exception) {
+      // 부분 결과를 남기지 않고 재시도할 수 있도록 실패 상태만 기록한다.
       transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
     }
   }
@@ -121,17 +129,22 @@ public class FreeTalkExpressionGenerationService {
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     LearningSession learningSession =
         learningSessionRepository.findById(learningSessionId).orElseThrow();
+
+    // 완료된 프리톡에서 아직 실행되지 않은 PREPARING 작업만 선점한다.
     if (learningSession.getStatus() != LearningSessionStatus.COMPLETED
         || freeTalkSession.getConversationStatus() != FreeTalkConversationStatus.COMPLETED
         || freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.PREPARING
         || freeTalkSession.getExpressionGenerationStartedAt() != null) {
       return null;
     }
+
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.startExpressionGeneration();
+
+    // 추천 AI가 재사용 여부를 판단할 수 있도록 활성 표현 후보를 변환한다.
     List<AiFreeTalkExistingExpression> existingExpressions =
         expressionQueryService
             .getActiveExpressionCandidates(
@@ -145,6 +158,8 @@ public class FreeTalkExpressionGenerationService {
                         candidate.baseExpressionMeaningText(),
                         candidate.usageSummary()))
             .toList();
+
+    // 트랜잭션 밖 AI 호출에 필요한 값만 불변 컨텍스트로 반환한다.
     return new GenerationContext(
         learningSessionId,
         freeTalkSession.getId(),
