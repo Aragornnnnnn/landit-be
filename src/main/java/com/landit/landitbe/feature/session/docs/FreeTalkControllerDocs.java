@@ -7,10 +7,13 @@ import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkSessionDetailResponse;
+import com.landit.landitbe.feature.session.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -143,4 +146,61 @@ public interface FreeTalkControllerDocs {
   })
   ResponseEntity<ApiResponse<FreeTalkMessageSubmitResponse>> decideExit(
       AuthUserPrincipal principal, long sessionId, FreeTalkExitDecisionRequest request);
+
+  /**
+   * 완료된 지난 프리톡 목록을 완료 시각 최신순으로 페이지 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 한 페이지에 조회할 프리톡 수 (1~50)
+   * @return 완료된 프리톡 목록과 페이지 정보
+   */
+  @Operation(
+      summary = "지난 프리톡 목록 조회",
+      description = "인증된 사용자의 완료된 프리톡을 완료 시각 최신순으로 페이지 조회한다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "400",
+        description = "페이지 번호 또는 크기 오류"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패")
+  })
+  ResponseEntity<ApiResponse<FreeTalkSessionListResponse>> getSessions(
+      AuthUserPrincipal principal,
+      @Parameter(description = "0부터 시작하는 페이지 번호", example = "0") int page,
+      @Parameter(description = "페이지 크기 (1~50)", example = "20") int size);
+
+  /**
+   * 완료된 지난 프리톡의 세션 정보와 전체 대화를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 조회할 프리톡 학습 세션 ID
+   * @return 프리톡 세션 정보와 전체 대화 메시지
+   */
+  @Operation(
+      summary = "지난 프리톡 상세 조회",
+      description = "인증된 사용자가 완료한 프리톡의 세션 정보와 전체 대화를 조회한다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "세션 소유자 아님"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "완료된 프리톡 세션 없음")
+  })
+  ResponseEntity<ApiResponse<FreeTalkSessionDetailResponse>> getSession(
+      AuthUserPrincipal principal,
+      @Parameter(description = "조회할 프리톡 학습 세션 ID", example = "123") long sessionId);
 }
