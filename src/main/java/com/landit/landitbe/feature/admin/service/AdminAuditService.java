@@ -58,18 +58,21 @@ public class AdminAuditService {
             adminUserProfileId, action, targetType, targetId, beforeValue, afterValue));
   }
 
+  // 필수 ID 값이 존재하는지 검증한다.
   private void requirePresent(Long value, String fieldName) {
     if (value == null) {
       throw new IllegalArgumentException(fieldName + " must not be null");
     }
   }
 
+  // 필수 문자열 값이 비어 있지 않은지 검증한다.
   private void requireText(String value, String fieldName) {
     if (value == null || value.isBlank()) {
       throw new IllegalArgumentException(fieldName + " must not be blank");
     }
   }
 
+  // 감사 로그 값에 인증 관련 민감정보가 포함됐는지 검사한다.
   private void rejectSensitiveValue(String value) {
     if (value == null) {
       return;

@@ -43,6 +43,7 @@ public class AdminAuditLog extends BaseCreatedAtEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected AdminAuditLog() {}
 
+  // 검증된 관리자 작업 정보를 감사 로그 엔티티로 초기화한다.
   private AdminAuditLog(
       Long adminUserProfileId,
       AdminAction action,
