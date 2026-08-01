@@ -16,7 +16,7 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
   /**
    * 활성 Writing 표현을 시나리오와 로케일 기준 표시 순서로 조회한다.
    *
-   * <p>표시 순서는 로케일별로 관리하므로 로케일 조건 없이는 학습 순서가 달라질 수 있다.
+   * <p>표시 순서는 로케일별이므로 로케일 조건 없이는 학습 순서가 달라질 수 있다.
    *
    * @param scenarioId 표현이 속한 시나리오 ID
    * @param targetLocale 학습 언어 locale

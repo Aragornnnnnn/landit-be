@@ -264,7 +264,7 @@ public class ExpressionQueryService {
   /**
    * JSONB 배열 payload를 파싱된 예문 목록으로 변환한다.
    *
-   * <p>필수 값이 없는 예문은 제외하고 경고를 남긴다. {@code imageUrl}은 없으면 {@code null}로 둔다.
+   * <p>필수 값이 없는 예문은 제외한다. {@code imageUrl}은 없으면 {@code null}로 둔다.
    */
   private List<ParsedPracticeSentence> parseExtraPracticeSentences(
       JsonNode payload, Long expressionId) {

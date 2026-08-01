@@ -115,7 +115,8 @@ class FreeTalkSessionApiIntegrationTests {
         Thread.sleep(20L);
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
-        throw new IllegalStateException("프리톡 표현 생성 종료를 기다리는 중 인터럽트되었습니다.", exception);
+        String message = "프리톡 표현 생성 종료를 기다리는 중 인터럽트되었습니다.";
+        throw new IllegalStateException(message, exception);
       }
     }
   }

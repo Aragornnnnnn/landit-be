@@ -25,6 +25,10 @@ import tools.jackson.databind.json.JsonMapper;
 /** 원격 프리톡 AI 클라이언트의 HTTP 계약과 오류 변환을 검증한다. */
 class RemoteAiFreeTalkClientTest {
 
+  private static final String EXPRESSION_TEXT = "I'm up for that";
+  private static final String EXPRESSION_MEANING = "좋아, 그거 하자";
+  private static final String EXPRESSION_USAGE = "제안에 동의할 때 사용";
+
   private final JsonMapper jsonMapper = JsonMapper.builder().build();
   private HttpServer server;
 
@@ -142,7 +146,8 @@ class RemoteAiFreeTalkClientTest {
     registerJsonResponse(
         "/api/v1/free-talk/expression-learning-content",
         requests,
-        successResponse(learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 4)));
+        successResponse(
+            learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 4)));
 
     RemoteAiFreeTalkClient client = remoteClient();
     AiFreeTalkExpressionRecommendationsResult recommendations =
@@ -342,9 +347,9 @@ class RemoteAiFreeTalkClientTest {
         200,
         successResponse(
             "{\"recommendations\":["
-                + recommendationData(7L, "I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1)
+                + recommendationData(7L, EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 1)
                 + ","
-                + recommendationData(7L, "I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1)
+                + recommendationData(7L, EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 1)
                 + "]}"));
 
     assertGenerationError(
@@ -357,7 +362,8 @@ class RemoteAiFreeTalkClientTest {
     registerRawResponse(
         "/api/v1/free-talk/expression-learning-content",
         200,
-        successResponse(learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1)));
+        successResponse(
+            learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 1)));
 
     AiFreeTalkExpressionLearningContentResult result =
         remoteClient().generateExpressionLearningContent(learningContentRequest());
@@ -370,7 +376,8 @@ class RemoteAiFreeTalkClientTest {
     registerRawResponse(
         "/api/v1/free-talk/expression-learning-content",
         200,
-        successResponse(learningContentData("I am up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 4)));
+        successResponse(
+            learningContentData("I am up for that", EXPRESSION_MEANING, EXPRESSION_USAGE, 4)));
 
     assertGenerationError(
         () -> remoteClient().generateExpressionLearningContent(learningContentRequest()),
@@ -379,7 +386,8 @@ class RemoteAiFreeTalkClientTest {
 
   @Test
   void rejectsLearningContentWithMissingRequiredFields() throws Exception {
-    String validContent = learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1);
+    String validContent =
+        learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 1);
 
     assertInvalidLearningContent(validContent.replace("친근한 제안에 동의할 때 사용합니다.", " "));
     assertInvalidLearningContent(validContent.replace("Want to go hiking?", " "));
@@ -391,7 +399,7 @@ class RemoteAiFreeTalkClientTest {
     assertInvalidLearningContent(
         validContent.replace("[\"that\", \"I'm\", \"up\", \"for\", \"to\"]", "[]"));
     assertInvalidLearningContent(
-        learningContentData("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 0));
+        learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 0));
   }
 
   @Test
@@ -620,7 +628,8 @@ class RemoteAiFreeTalkClientTest {
         "KR",
         history(),
         List.of(
-            new AiFreeTalkExistingExpression(7L, "I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용")));
+            new AiFreeTalkExistingExpression(
+                7L, EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE)));
   }
 
   private AiFreeTalkExpressionLearningContentRequest learningContentRequest() {
@@ -628,7 +637,9 @@ class RemoteAiFreeTalkClientTest {
         300L,
         "EN",
         "KR",
-        List.of(new AiFreeTalkLearningExpression("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용")));
+        List.of(
+            new AiFreeTalkLearningExpression(
+                EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE)));
   }
 
   private List<AiConversationHistoryMessage> history() {
