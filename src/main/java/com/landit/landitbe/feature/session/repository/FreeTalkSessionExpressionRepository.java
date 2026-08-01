@@ -29,7 +29,13 @@ public interface FreeTalkSessionExpressionRepository
       findByFreeTalkSessionIdInOrderByFreeTalkSessionIdAscDisplayOrderAsc(
           List<Long> freeTalkSessionIds);
 
-  /** 프리톡 세션이 특정 표현을 실제로 추천했는지 확인한다. */
+  /**
+   * 프리톡 세션이 특정 표현을 추천했는지 확인한다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @param writingExpressionId Writing 표현 ID
+   * @return 세션에서 추천한 표현이면 {@code true}
+   */
   boolean existsByFreeTalkSessionIdAndWritingExpressionId(
       Long freeTalkSessionId, Long writingExpressionId);
 

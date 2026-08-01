@@ -1,4 +1,4 @@
-// 원어민 표현 학습 완료 흐름의 완료 기록 생성, 멱등 처리, 잠금/미존재 예외를 단위 검증한다.
+// 원어민 표현 학습 완료와 예외 흐름을 단위 검증한다.
 
 package com.landit.landitbe.feature.content.service;
 
@@ -46,7 +46,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
-/** 원어민 표현 학습 완료 흐름의 완료 기록 생성, 멱등 처리, 잠금/미존재 예외를 단위 검증한다. */
+/** 원어민 표현 학습 완료와 예외 흐름을 단위 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class ExpressionLearningCompletionServiceTest {
 
@@ -75,7 +75,7 @@ class ExpressionLearningCompletionServiceTest {
 
   @InjectMocks private ExpressionLearningCompletionService expressionLearningCompletionService;
 
-  /** 없는(또는 INACTIVE) 표현을 완료하려 하면 RESOURCE_NOT_FOUND 예외를 던지고 아무것도 저장하지 않는다. */
+  /** 존재하지 않거나 비활성인 표현은 완료 이력을 저장하지 않는다. */
   @Test
   void shouldThrowWhenExpressionNotFound() {
     // given: 해당 ID의 활성 표현이 없음
@@ -119,7 +119,7 @@ class ExpressionLearningCompletionServiceTest {
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
-  /** 이미 완료한 표현을 다시 완료하면 새 기록을 만들지 않고 마지막 완료 시각만 갱신한다. */
+  /** 이미 완료한 표현은 새 기록 없이 마지막 완료 시각만 갱신한다. */
   @Test
   void shouldUpdateLastCompletedAtForRepeatedCompletion() {
     // given: 표현이 존재하고, 사용자가 이미 그 표현을 완료한 상태
@@ -135,7 +135,7 @@ class ExpressionLearningCompletionServiceTest {
     // when: 같은 표현을 다시 완료해도
     expressionLearningCompletionService.completeLearning(USER_ID, UNLOCKED_EXPRESSION_ID);
 
-    // then: 새 완료 기록은 저장되지 않고(멱등), 기존 기록의 마지막 완료 시각만 갱신된다 (복습 시각 기록)
+    // then: 새 기록 없이 기존 완료 시각만 갱신한다.
     verify(learningProgressService)
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
@@ -178,7 +178,7 @@ class ExpressionLearningCompletionServiceTest {
     logger.detachAppender(logAppender);
   }
 
-  /** 프리톡에서 추천한 시나리오 표현은 원래 시나리오 순서와 무관하게 완료할 수 있다. */
+  /** 프리톡 추천 표현은 시나리오 학습 순서와 관계없이 완료한다. */
   @Test
   void shouldCompleteScenarioExpressionFromFreeTalkWithoutOrderLock() {
     long learningSessionId = 701L;
@@ -216,7 +216,7 @@ class ExpressionLearningCompletionServiceTest {
         .completeExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
   }
 
-  /** 다른 사용자의 프리톡 세션으로 표현 완료를 시도하면 FORBIDDEN 예외를 던지고 완료 기록을 남기지 않는다. */
+  /** 다른 사용자의 프리톡 세션으로는 표현을 완료할 수 없다. */
   @Test
   void shouldRejectFreeTalkCompletionForAnotherUser() {
     long learningSessionId = 701L;
@@ -277,7 +277,7 @@ class ExpressionLearningCompletionServiceTest {
 
   // ===== 헬퍼 =====
 
-  /** "표현이 존재하고(ACTIVE) 사용자가 이 시나리오에서 완료한 표현이 없다"는 상황을 만든다. */
+  /** 활성 표현이 있고 사용자의 완료 이력은 없는 상태를 만든다. */
   private void givenExpressionAndNoUserCompletion() {
     WritingExpression expression = expressionInScenario();
 
@@ -293,7 +293,7 @@ class ExpressionLearningCompletionServiceTest {
         .thenReturn(new CompletedExpressionIds(Set.of()));
   }
 
-  /** 사용자 locale(EN/KR) 기준으로 이 시나리오의 표현 목록(학습 순서)이 이렇게 조회된다고 스터빙한다. */
+  /** 사용자 로케일에 맞는 시나리오 표현 목록을 스터빙한다. */
   private void givenUserLocaleExpressionList(WritingExpression... expressions) {
     when(userProfileService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(TARGET_LOCALE, BASE_LOCALE));
@@ -314,9 +314,7 @@ class ExpressionLearningCompletionServiceTest {
   private WritingExpression orderedExpression(Long id) {
     WritingExpression expression = mock(WritingExpression.class);
     // 해금 판정의 findFirst()가 첫 원소에서 멈추면 뒤 mock의 getId는 호출되지 않으므로,
-    lenient()
-        .when(expression.getId())
-        .thenReturn(id); // lenient = 이 스터빙은 이번 테스트에서 호출이 안 돼도 괜찮으니까, 안 쓰인다고 에러 내지 마라
+    lenient().when(expression.getId()).thenReturn(id); // 테스트마다 사용 여부가 달라 lenient로 설정한다.
     return expression;
   }
 }
