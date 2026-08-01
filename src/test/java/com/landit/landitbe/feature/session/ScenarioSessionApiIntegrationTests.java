@@ -980,6 +980,8 @@ class ScenarioSessionApiIntegrationTests {
   @Test
   void submitMessageCompletesSessionWithClosingMessageWhenNextQuestionDoesNotExist()
       throws Exception {
+    LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
+    mutableClock.setInstant(today.atTime(12, 0).atZone(SERVICE_ZONE_ID).toInstant());
     JsonNode loginBody = login("max-turn-submit@example.com");
     final long userId = loginBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1039,7 +1041,6 @@ class ScenarioSessionApiIntegrationTests {
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
     assertThat(hasScenarioAccess(userId, 2102)).isTrue();
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
     mockMvc
         .perform(
