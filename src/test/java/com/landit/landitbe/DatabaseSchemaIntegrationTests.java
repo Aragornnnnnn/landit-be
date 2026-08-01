@@ -291,20 +291,20 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
   }
 
-  @DisplayName("V31 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
+  @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
   @Test
-  void v31ConvertsUserPushTokenToExpoPushToken() {
+  void v32ConvertsUserPushTokenToExpoPushToken() {
     assertColumnExists("user_push_token", "expo_push_token");
     assertColumnDoesNotExist("user_push_token", "token");
   }
 
-  @DisplayName("V31 migration은 기존 활성 Push Token을 폐기한다.")
+  @DisplayName("V32 migration은 기존 활성 Push Token을 폐기한다.")
   @Test
-  void v31RevokesExistingActivePushTokens() {
+  void v32RevokesExistingActivePushTokens() {
     String databaseUrl = migrationTestDatabaseUrl();
     JdbcTemplate migrationJdbcTemplate =
         new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
-    migrateToVersion(databaseUrl, "30");
+    migrateToVersion(databaseUrl, "31");
     insertAiTutor(migrationJdbcTemplate, 990301L, "ACTIVE");
     insertUserProfile(migrationJdbcTemplate, 990302L, 990301L);
     migrationJdbcTemplate.update(
