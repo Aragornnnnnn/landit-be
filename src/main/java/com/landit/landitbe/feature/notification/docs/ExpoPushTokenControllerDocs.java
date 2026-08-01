@@ -24,7 +24,7 @@ public interface ExpoPushTokenControllerDocs {
    */
   @Operation(
       summary = "Expo Push Token 상태 변경",
-      description = "enabled 값에 따라 현재 사용자의 Expo Push Token을 등록·갱신하거나 비활성화합니다.",
+      description = "현재 사용자의 Expo Push Token을 등록·갱신하거나 비활성화합니다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
