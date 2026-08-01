@@ -73,25 +73,6 @@ public class AppVersion extends BaseCreatedAtEntity {
       String softUpdateReason,
       String releaseNote,
       LocalDateTime releasedAt) {
-    apply(
-        versionName,
-        buildNumber,
-        minimumSupportedVersionName,
-        forceUpdateReason,
-        softUpdateReason,
-        releaseNote,
-        releasedAt);
-  }
-
-  /** 관리자 입력값을 엔티티 필드에 반영한다. */
-  private void apply(
-      String versionName,
-      long buildNumber,
-      String minimumSupportedVersionName,
-      String forceUpdateReason,
-      String softUpdateReason,
-      String releaseNote,
-      LocalDateTime releasedAt) {
     this.versionName = versionName;
     this.buildNumber = buildNumber;
     this.minimumSupportedVersionName = minimumSupportedVersionName;

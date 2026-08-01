@@ -144,23 +144,17 @@ public class AppVersionService {
 
   /** 감사 기록에 저장할 앱 버전 정책 스냅샷을 만든다. */
   private String auditValue(AppVersion appVersion) {
-    return "platform="
-        + appVersion.getPlatform()
-        + ",versionName="
-        + appVersion.getVersionName()
-        + ",buildNumber="
-        + appVersion.getBuildNumber()
-        + ",minimumSupportedVersionName="
-        + appVersion.getMinimumSupportedVersionName()
-        + ",forceUpdateReason="
-        + appVersion.getForceUpdateReason()
-        + ",softUpdateReason="
-        + appVersion.getSoftUpdateReason()
-        + ",releaseNote="
-        + appVersion.getReleaseNote()
-        + ",active="
-        + appVersion.isActive()
-        + ",releasedAt="
-        + appVersion.getReleasedAt();
+    return ("platform=%s,versionName=%s,buildNumber=%s,minimumSupportedVersionName=%s,"
+            + "forceUpdateReason=%s,softUpdateReason=%s,releaseNote=%s,active=%s,releasedAt=%s")
+        .formatted(
+            appVersion.getPlatform(),
+            appVersion.getVersionName(),
+            appVersion.getBuildNumber(),
+            appVersion.getMinimumSupportedVersionName(),
+            appVersion.getForceUpdateReason(),
+            appVersion.getSoftUpdateReason(),
+            appVersion.getReleaseNote(),
+            appVersion.isActive(),
+            appVersion.getReleasedAt());
   }
 }
