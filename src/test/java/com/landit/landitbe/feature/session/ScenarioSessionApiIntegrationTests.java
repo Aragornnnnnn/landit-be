@@ -32,6 +32,9 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -69,16 +72,22 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
     })
 class ScenarioSessionApiIntegrationTests {
 
+  private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
+  private static final Instant DEFAULT_TEST_INSTANT = Instant.parse("2026-07-28T14:00:00Z");
+
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private FakeAiConversationClient fakeAiConversationClient;
 
+  @Autowired private MutableClock mutableClock;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeEach
   void setUp() {
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
     jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
@@ -87,6 +96,7 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario_session");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
+    jdbcTemplate.update("DELETE FROM user_scenario_access");
     jdbcTemplate.update("DELETE FROM user_scenario_progress");
     jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
     jdbcTemplate.update("DELETE FROM scenario_question");
@@ -124,7 +134,6 @@ class ScenarioSessionApiIntegrationTests {
         "GOOD",
         ttsVoiceId("en-US-Harper:MAI-Voice-2"),
         "ACTIVE");
-
     MvcResult result =
         mockMvc
             .perform(
@@ -183,7 +192,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(scenarioSessionPath + ".summary").value("시나리오 세션 시작"))
         .andExpect(
             jsonPath(scenarioSessionPath + ".description")
-                .value("선택한 시나리오로 SCENARIO 타입 학습 세션을 시작한다."))
+                .value("현재 제공 중인 시나리오 또는 복습 권한이 있는 시나리오로 SCENARIO 타입 학습 세션을 시작한다."))
         .andExpect(jsonPath(scenarioSessionPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(scenarioSessionPath + ".responses['201'].description").value("시작 성공"))
         .andExpect(jsonPath(scenarioSessionPath + ".responses['401'].description").value("인증 실패"))
@@ -223,7 +232,6 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update(
         "DELETE FROM scenario_question_language_variant WHERE scenario_question_id = ?", 102002L);
     jdbcTemplate.update("DELETE FROM scenario_question WHERE id = ?", 102002L);
-
     mockMvc
         .perform(
             post("/api/v1/scenarios/2002/sessions")
@@ -1027,6 +1035,37 @@ class ScenarioSessionApiIntegrationTests {
     assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
     assertScenarioSessionGoalStatus(sessionId, "COMPLETED");
     assertSessionHistoryPlaceholder(sessionId);
+    assertThat(hasScenarioAccess(userId, 2102)).isTrue();
+  }
+
+  @Test
+  void dailyScenarioStartedBeforeMidnightGrantsAccessWhenCompletedAfterMidnight() throws Exception {
+    mutableClock.setInstant(Instant.parse("2026-07-28T14:59:59Z"));
+    JsonNode loginBody = login("daily-completion-after-midnight@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1123, 1, "ACTIVE", "자정 완료");
+    seedScenario(2123, 1123, 1, "AI", "ACTIVE", 1);
+    seedScenarioVariant(
+        3123,
+        2123,
+        "자정 완료",
+        "자정 완료",
+        "자정 완료",
+        null,
+        "What food do you like?",
+        "어떤 음식을 좋아해?",
+        null,
+        null,
+        null,
+        "ACTIVE");
+
+    long sessionId = startScenario(accessToken, 2123);
+    mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
+    submitMessage(accessToken, sessionId, "I like pizza.");
+
+    assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
+    assertThat(hasScenarioAccess(userId, 2123)).isTrue();
   }
 
   @Test
@@ -1762,7 +1801,6 @@ class ScenarioSessionApiIntegrationTests {
         null,
         ttsVoiceId("en-US-Ethan:MAI-Voice-2"),
         "ACTIVE");
-
     MvcResult result =
         mockMvc
             .perform(
@@ -1825,7 +1863,6 @@ class ScenarioSessionApiIntegrationTests {
         null,
         insertTtsVoice(990201, "test-session-inactive-voice", "INACTIVE"),
         "ACTIVE");
-
     mockMvc
         .perform(
             post("/api/v1/scenarios/2011/sessions")
@@ -1843,7 +1880,6 @@ class ScenarioSessionApiIntegrationTests {
     seedScenario(2010, 1010, 1, "USER", "ACTIVE", 2);
     seedScenarioVariant(
         3010, 2010, "동시 시작", "동시 시작", "동시 시작", "먼저 말해보세요.", null, null, null, null, null, "ACTIVE");
-
     CountDownLatch ready = new CountDownLatch(2);
     CountDownLatch start = new CountDownLatch(1);
     ExecutorService executorService = Executors.newFixedThreadPool(2);
@@ -1929,7 +1965,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
-  void startScenarioRejectsPreviousScenarioNotCleared() throws Exception {
+  void startScenarioRejectsScenarioAfterTheCurrentScenario() throws Exception {
     JsonNode loginBody = login("locked-scenario@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
     seedCategory(1004, 1, "ACTIVE", "순차 카테고리");
@@ -1939,7 +1975,6 @@ class ScenarioSessionApiIntegrationTests {
     seedScenario(2005, 1004, 2, "AI", "ACTIVE", 2);
     seedScenarioVariant(
         3005, 2005, "두번째", "두번째", "두번째", null, "Second", "두번째", null, null, null, "ACTIVE");
-
     mockMvc
         .perform(
             post("/api/v1/scenarios/2005/sessions")
@@ -1948,7 +1983,95 @@ class ScenarioSessionApiIntegrationTests {
                     "Bearer " + loginBody.get("data").get("accessToken").asText()))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.error.code").value("SCENARIO_LOCKED"))
-        .andExpect(jsonPath("$.error.message").value("PREVIOUS_SCENARIO_NOT_COMPLETED"));
+        .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
+  }
+
+  @Test
+  void startScenarioRejectsScenarioThatIsNotTodayOrCleared() throws Exception {
+    JsonNode loginBody = login("not-today@example.com");
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1013, 1, "ACTIVE", "오늘 아님");
+    seedScenario(2012, 1013, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3012, 2012, "현재", "현재", "현재", "먼저 말해보세요.", null, null, null, null, null, "ACTIVE");
+    seedScenario(2013, 1013, 2, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3013, 2013, "오늘 아님", "오늘 아님", "오늘 아님", "먼저 말해보세요.", null, null, null, null, null, "ACTIVE");
+
+    mockMvc
+        .perform(
+            post("/api/v1/scenarios/2013/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("SCENARIO_LOCKED"))
+        .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
+  }
+
+  @Test
+  void startUnopenedCurrentScenarioRemainsAvailableOnTheNextDay() throws Exception {
+    JsonNode loginBody = login("previous-day-at-midnight@example.com");
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1016, 1, "ACTIVE", "전날 시나리오");
+    seedScenario(2016, 1016, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3016,
+        2016,
+        "전날 시나리오",
+        "전날 시나리오",
+        "전날 시나리오",
+        "먼저 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/scenarios/2016/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void startGrantedScenarioAllowsReplay() throws Exception {
+    JsonNode loginBody = login("granted-scenario@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1015, 1, "ACTIVE", "복습 시나리오");
+    seedScenario(2015, 1015, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3015,
+        2015,
+        "복습 시나리오",
+        "복습 시나리오",
+        "복습 시나리오",
+        "먼저 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    grantScenarioAccess(userId, 2015);
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/2015/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+
+    assertScenarioSession(sessionId, 3015);
   }
 
   @Test
@@ -1973,6 +2096,7 @@ class ScenarioSessionApiIntegrationTests {
             Integer.class,
             startedSession.sessionId());
     assertThat(endedAtCount).isEqualTo(1);
+    assertThat(hasScenarioAccess(startedSession.userId(), 2006)).isFalse();
   }
 
   @Test
@@ -2048,7 +2172,6 @@ class ScenarioSessionApiIntegrationTests {
         null,
         null,
         "ACTIVE");
-
     MvcResult result =
         mockMvc
             .perform(
@@ -2099,6 +2222,34 @@ class ScenarioSessionApiIntegrationTests {
         .get("data")
         .get("sessionId")
         .asLong();
+  }
+
+  private void grantScenarioAccess(long userId, long scenarioId) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_scenario_access (
+            user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at
+        )
+        VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userId,
+        scenarioId);
+  }
+
+  private boolean hasScenarioAccess(long userId, long scenarioId) {
+    Integer accessCount =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM user_scenario_access
+            WHERE user_profile_id = ?
+              AND scenario_id = ?
+              AND target_locale = 'EN'
+            """,
+            Integer.class,
+            userId,
+            scenarioId);
+    return accessCount != null && accessCount == 1;
   }
 
   private boolean awaitMessageFeedbackStatus(long messageId, String expectedStatus)
@@ -2540,6 +2691,40 @@ class ScenarioSessionApiIntegrationTests {
     @Primary
     FakeAiConversationClient fakeAiConversationClient() {
       return new FakeAiConversationClient();
+    }
+
+    @Bean
+    @Primary
+    MutableClock mutableClock() {
+      return new MutableClock(DEFAULT_TEST_INSTANT);
+    }
+  }
+
+  private static class MutableClock extends Clock {
+
+    private volatile Instant instant;
+
+    private MutableClock(Instant instant) {
+      this.instant = instant;
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return SERVICE_ZONE_ID;
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return Clock.fixed(instant, zone);
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
+    }
+
+    private void setInstant(Instant instant) {
+      this.instant = instant;
     }
   }
 

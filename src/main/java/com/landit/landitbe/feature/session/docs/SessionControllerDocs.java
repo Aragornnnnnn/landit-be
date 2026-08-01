@@ -28,7 +28,7 @@ public interface SessionControllerDocs {
    */
   @Operation(
       summary = "사용자 발화 제출",
-      description = "사용자 메시지를 저장하고 다음 AI 메시지 또는 종료 메시지를 생성한다.",
+      description = "사용자 메시지를 저장하고 다음 AI 메시지 또는 종료 메시지를 생성한다. 정상 완료한 시나리오는 이후 복습할 수 있다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

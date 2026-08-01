@@ -48,7 +48,14 @@ public class ScenarioSession extends BaseTimeEntity {
     this.goalCompletionStatus = goalCompletionStatus;
   }
 
-  /** 새 시나리오 세션 보조 정보를 생성한다. */
+  /**
+   * 새 시나리오 세션 보조 정보를 생성한다.
+   *
+   * @param learningSessionId 연결할 학습 세션 ID
+   * @param scenarioLanguageVariantId 시작한 시나리오 언어 variant ID
+   * @param userOpeningInstructionSnapshot 사용자 선톡 시작 안내 스냅샷
+   * @return 생성된 시나리오 세션 보조 정보
+   */
   public static ScenarioSession start(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
@@ -60,7 +67,11 @@ public class ScenarioSession extends BaseTimeEntity {
         GoalCompletionStatus.NOT_STARTED);
   }
 
-  /** AI가 판단한 시나리오 목표 달성 상태를 갱신한다. */
+  /**
+   * AI가 판단한 시나리오 목표 달성 상태를 갱신한다.
+   *
+   * @param goalCompletionStatus 갱신할 목표 달성 상태
+   */
   public void updateGoalCompletionStatus(GoalCompletionStatus goalCompletionStatus) {
     this.goalCompletionStatus = goalCompletionStatus;
   }

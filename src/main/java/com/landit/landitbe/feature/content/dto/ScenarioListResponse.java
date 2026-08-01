@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.content.dto;
 
+import com.landit.landitbe.feature.content.domain.DailyScenarioType;
+import com.landit.landitbe.feature.content.domain.ScenarioAvailabilityStatus;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -80,6 +82,8 @@ public record ScenarioListResponse(
    * @param difficulty 난이도
    * @param firstSpeaker 첫 발화자
    * @param thumbnailUrl 시나리오 썸네일 URL
+   * @param availabilityStatus 사용자별 시나리오 접근 상태
+   * @param dailyScenarioType 오늘 시나리오의 신규·재도전 구분
    * @param completed 사용자 시나리오 완료 여부
    * @param locked 시나리오 잠금 여부
    * @param lockReason 시나리오 잠금 사유
@@ -96,32 +100,33 @@ public record ScenarioListResponse(
       @Schema(description = "난이도") String difficulty,
       @Schema(description = "첫 발화자") String firstSpeaker,
       @Schema(description = "시나리오 썸네일 URL") String thumbnailUrl,
+      @Schema(description = "사용자별 시나리오 접근 상태") ScenarioAvailabilityStatus availabilityStatus,
+      @Schema(description = "오늘 시나리오의 신규·재도전 구분") DailyScenarioType dailyScenarioType,
       @Schema(description = "사용자 시나리오 완료 여부") boolean completed,
       @Schema(description = "시나리오 잠금 여부") boolean locked,
       @Schema(description = "시나리오 잠금 사유") String lockReason,
       @Schema(description = "잠기지 않은 시나리오의 시작 메시지 미리보기") OpeningPreviewResponse openingPreview) {
 
     /**
-     * 조회 Projection과 계산된 진행 상태를 시나리오 응답으로 변환한다.
+     * 조회 Projection과 접근 상태를 시나리오 응답으로 변환한다.
      *
      * @param projection 시나리오 조회 Projection
-     * @param starRating 완료한 시나리오의 별점
-     * @param completed 사용자 시나리오 완료 여부
-     * @param locked 시나리오 잠금 여부
+     * @param availabilityStatus 사용자별 시나리오 접근 상태
+     * @param dailyScenarioType 오늘 시나리오의 신규·재도전 구분
      * @param lockReason 시나리오 잠금 사유
-     * @param openingPreview 시작 메시지 미리보기
      * @return 시나리오 응답
      */
     public static ScenarioResponse from(
         ScenarioListProjection projection,
-        BigDecimal starRating,
-        boolean completed,
-        boolean locked,
+        ScenarioAvailabilityStatus availabilityStatus,
+        DailyScenarioType dailyScenarioType,
         String lockReason,
         OpeningPreviewResponse openingPreview) {
+      boolean completed = availabilityStatus == ScenarioAvailabilityStatus.CLEARED;
+      boolean locked = availabilityStatus == ScenarioAvailabilityStatus.LOCKED;
       return new ScenarioResponse(
           projection.scenarioId(),
-          starRating,
+          completed ? projection.bestStarRating() : null,
           projection.scenarioDisplayOrder(),
           projection.scenarioTitle(),
           projection.briefing(),
@@ -129,6 +134,8 @@ public record ScenarioListResponse(
           projection.difficulty().name(),
           projection.firstSpeaker().name(),
           projection.thumbnailUrl(),
+          availabilityStatus,
+          availabilityStatus == ScenarioAvailabilityStatus.TODAY ? dailyScenarioType : null,
           completed,
           locked,
           lockReason,

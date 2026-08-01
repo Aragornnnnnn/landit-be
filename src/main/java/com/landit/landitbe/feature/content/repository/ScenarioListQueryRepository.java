@@ -14,7 +14,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Long> {
 
-  /** 사용자 기본 언어 조합에 해당하는 목록 데이터를 조회한다. Entity 연관관계가 없는 FK는 명시적으로 join한다. */
+  /**
+   * 사용자 기본 언어 조합에 해당하는 목록 데이터를 조회한다. Entity 연관관계가 없는 FK는 명시적으로 join한다.
+   *
+   * @param userId 사용자 ID
+   * @return 사용자 언어 조합에 맞는 시나리오 목록 데이터
+   */
   @Query(
       """
             SELECT new com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection(
@@ -41,7 +46,6 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
                 tv.model,
                 tv.providerVoiceId,
                 tv.gender,
-                usp.status,
                 usp.bestStarRating
             )
             FROM UserProfile up

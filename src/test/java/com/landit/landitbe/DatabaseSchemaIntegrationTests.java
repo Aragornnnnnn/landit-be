@@ -221,6 +221,23 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("session_history_message", "chk_session_message_feedback_status");
   }
 
+  @DisplayName("사용자 시나리오 복습 권한의 고유 제약을 추가한다.")
+  @Test
+  void userScenarioAccessConstraintsAreAppliedWithoutGlobalSchedule() {
+    assertTableExists("user_scenario_access");
+    assertColumnExists("user_scenario_access", "user_profile_id");
+    assertColumnExists("user_scenario_access", "scenario_id");
+    assertColumnExists("user_scenario_access", "target_locale");
+    assertColumnExists("user_scenario_access", "granted_at");
+    assertTableConstraintExists(
+        "user_scenario_access", "uk_user_scenario_access_user_scenario_locale");
+    assertTableConstraintExists("user_scenario_access", "fk_user_scenario_access_user_profile_id");
+    assertTableConstraintExists("user_scenario_access", "fk_user_scenario_access_scenario_id");
+
+    assertTableDoesNotExist("daily_scenario_schedule");
+    assertColumnDoesNotExist("scenario_session", "daily_scenario_schedule_id");
+  }
+
   @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")
   @Test
   void postgresqlMigrationNormalizesPracticeExamplesPayloadKeys() throws Exception {
@@ -532,6 +549,22 @@ class DatabaseSchemaIntegrationTests {
             columnName);
 
     assertThat(columnCount).as("column %s.%s", tableName, columnName).isZero();
+  }
+
+  private void assertNullableColumn(String tableName, String columnName) {
+    String nullable =
+        jdbcTemplate.queryForObject(
+            """
+            select is_nullable
+            from information_schema.columns
+            where lower(table_name) = ?
+              and lower(column_name) = ?
+            """,
+            String.class,
+            tableName,
+            columnName);
+
+    assertThat(nullable).as("column %s.%s is nullable", tableName, columnName).isEqualTo("YES");
   }
 
   private void assertIndexExists(String indexName) {
