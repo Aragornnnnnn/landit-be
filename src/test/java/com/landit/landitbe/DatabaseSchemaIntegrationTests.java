@@ -451,6 +451,8 @@ class DatabaseSchemaIntegrationTests {
             """
             select provider, model, provider_voice_id, gender, description, accent_locale, status
             from tts_voice
+            where provider = 'OPENROUTER'
+              and model = 'microsoft/mai-voice-2'
             order by provider_voice_id
             """);
 
