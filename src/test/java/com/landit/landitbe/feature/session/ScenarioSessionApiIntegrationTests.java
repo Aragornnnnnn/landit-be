@@ -751,6 +751,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsExactly("I would like an iced americano.");
     assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().sequence())
         .isEqualTo(1);
+    assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().messageSequence())
         .isEqualTo(1);
@@ -768,6 +769,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
         .isEqualTo("I would like an iced americano.");
 
+    fakeAiConversationClient.prepareMessageFeedbackRequest();
     mockMvc
         .perform(
             post("/api/v1/sessions/%d/messages".formatted(sessionId))
@@ -785,6 +787,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(3))
         .andExpect(jsonPath("$.data.submittedMessage.feedbackProcessingStatus").value("PREPARING"));
 
+    assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
     assertThat(
             fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().type().name())
         .isEqualTo("AI_MESSAGE");
@@ -876,6 +879,7 @@ class ScenarioSessionApiIntegrationTests {
                     """))
         .andExpect(status().isOk());
 
+    assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
         .isEqualTo("수정 전 시작 안내입니다.");
   }
@@ -1021,6 +1025,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(1))
         .andExpect(jsonPath("$.data.progress.completed").value(true));
 
+    assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
     assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNull();
     assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest()).isNotNull();
@@ -2918,6 +2923,11 @@ class ScenarioSessionApiIntegrationTests {
 
     private boolean awaitMessageFeedbackRequest() throws InterruptedException {
       return messageFeedbackRequested.await(5, TimeUnit.SECONDS);
+    }
+
+    // 다음 비동기 메시지 피드백 요청을 기다릴 수 있도록 대기 상태를 초기화한다.
+    private void prepareMessageFeedbackRequest() {
+      messageFeedbackRequested = new CountDownLatch(1);
     }
 
     private void releaseInnerThoughtGeneration() {
