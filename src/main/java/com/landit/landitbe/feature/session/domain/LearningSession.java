@@ -105,6 +105,57 @@ public class LearningSession extends BaseTimeEntity {
         startedAt);
   }
 
+  /**
+   * 프리톡 학습 세션을 진행 중 상태로 생성한다.
+   *
+   * @param userProfileId 세션 소유 사용자 ID
+   * @param aiTutorId 대화 상대 AI 튜터 ID
+   * @param targetLocale 학습 대상 locale
+   * @param baseLocale 기준 locale
+   * @param startedAt 세션 시작 시각
+   * @return 진행 중인 프리톡 학습 세션
+   */
+  public static LearningSession startFreeTalk(
+      Long userProfileId,
+      Long aiTutorId,
+      Locale targetLocale,
+      Locale baseLocale,
+      LocalDateTime startedAt) {
+    return new LearningSession(
+        userProfileId,
+        SessionType.FREE_TALK,
+        aiTutorId,
+        targetLocale,
+        baseLocale,
+        InputMode.MIXED,
+        LearningSessionStatus.IN_PROGRESS,
+        startedAt);
+  }
+
+  /**
+   * 사용자의 종료 확정으로 프리톡 세션을 완료한다.
+   *
+   * @param endedAt 세션 종료 시각
+   */
+  public void completeFreeTalkByUser(LocalDateTime endedAt) {
+    this.status = LearningSessionStatus.COMPLETED;
+    this.endedBy = SessionEndActor.USER;
+    this.completionReason = CompletionReason.USER_ENDED;
+    this.endedAt = endedAt;
+  }
+
+  /**
+   * 시간 제한 도달로 프리톡 세션을 완료한다.
+   *
+   * @param endedAt 세션 종료 시각
+   */
+  public void completeFreeTalkByTimeLimit(LocalDateTime endedAt) {
+    this.status = LearningSessionStatus.COMPLETED;
+    this.endedBy = SessionEndActor.TIME_LIMIT;
+    this.completionReason = CompletionReason.TIME_LIMIT_REACHED;
+    this.endedAt = endedAt;
+  }
+
   /** 사용자가 진행 중인 세션을 중도 종료한다. */
   public void interruptByUser(LocalDateTime endedAt) {
     this.status = LearningSessionStatus.INTERRUPTED;

@@ -47,6 +47,16 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   @Column(name = "translated_content", columnDefinition = "text")
   private String translatedContent;
 
+  @Column(name = "client_message_id", length = 36)
+  private String clientMessageId;
+
+  @Column(name = "utterance_duration_ms")
+  private Long utteranceDurationMs;
+
+  @Enumerated(EnumType.STRING)
+  @Column(length = 20)
+  private CharacterEmotion emotion;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "input_type", nullable = false, length = 20)
   private SessionMessageInputType inputType;
@@ -146,6 +156,70 @@ public class SessionHistoryMessage extends BaseTimeEntity {
             null);
     message.innerThoughtProcessingStatus = ProcessingStatus.PREPARING;
     message.feedbackProcessingStatus = ProcessingStatus.PREPARING;
+    return message;
+  }
+
+  /**
+   * 프리톡 사용자의 메시지를 피드백 처리 상태 없이 생성한다.
+   *
+   * @param sessionHistoryId 연결할 세션 히스토리 ID
+   * @param messageSequence 세션 내 메시지 순서
+   * @param turnNumber 대화 턴 번호
+   * @param clientMessageId 클라이언트 멱등성 메시지 ID
+   * @param content 사용자 발화 원문
+   * @param inputType 발화 입력 방식
+   * @param utteranceDurationMs 사용자 발화 시간 밀리초
+   * @return 저장할 프리톡 사용자 메시지
+   * @throws IllegalArgumentException 발화 시간이 음수일 때
+   */
+  public static SessionHistoryMessage freeTalkUser(
+      Long sessionHistoryId,
+      int messageSequence,
+      int turnNumber,
+      String clientMessageId,
+      String content,
+      SessionMessageInputType inputType,
+      long utteranceDurationMs) {
+    if (utteranceDurationMs < 0) {
+      throw new IllegalArgumentException("사용자 발화 시간은 0 이상이어야 합니다.");
+    }
+    SessionHistoryMessage message =
+        new SessionHistoryMessage(
+            sessionHistoryId,
+            messageSequence,
+            turnNumber,
+            ConversationSpeaker.USER,
+            content,
+            null,
+            inputType,
+            null,
+            null);
+    message.clientMessageId = clientMessageId;
+    message.utteranceDurationMs = utteranceDurationMs;
+    return message;
+  }
+
+  /**
+   * 프리톡 AI 메시지를 캐릭터 감정과 함께 생성한다.
+   *
+   * @param sessionHistoryId 연결할 세션 히스토리 ID
+   * @param messageSequence 세션 내 메시지 순서
+   * @param turnNumber 대화 턴 번호
+   * @param content AI 메시지 원문
+   * @param translatedContent AI 메시지 번역문
+   * @param emotion AI 캐릭터 감정
+   * @return 저장할 프리톡 AI 메시지
+   */
+  public static SessionHistoryMessage freeTalkAi(
+      Long sessionHistoryId,
+      int messageSequence,
+      int turnNumber,
+      String content,
+      String translatedContent,
+      CharacterEmotion emotion) {
+    SessionHistoryMessage message =
+        aiGenerated(sessionHistoryId, messageSequence, turnNumber, content, translatedContent);
+    message.emotion = emotion;
     return message;
   }
 

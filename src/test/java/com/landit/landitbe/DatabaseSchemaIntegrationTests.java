@@ -18,6 +18,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StreamUtils;
 
 @ActiveProfiles("test")
@@ -236,6 +237,104 @@ class DatabaseSchemaIntegrationTests {
 
     assertTableDoesNotExist("daily_scenario_schedule");
     assertColumnDoesNotExist("scenario_session", "daily_scenario_schedule_id");
+  }
+
+  @DisplayName("V27 migration은 프리톡 저장 구조와 초기 주제를 추가한다.")
+  @Test
+  void v27AddsFreeTalkStorageStructureAndTopicSeed() {
+    assertTableExists("free_talk_topic");
+    assertTableDoesNotExist("free_talk_turn_result");
+    assertColumnDoesNotExist("ai_tutor", "free_talk_tts_voice_id");
+    assertColumnExists("free_talk_session", "topic_id");
+    assertColumnExists("free_talk_session", "processing_client_message_id");
+    assertColumnExists("session_history_message", "client_message_id");
+    assertColumnExists("session_history_message", "utterance_duration_ms");
+    assertColumnExists("session_history_message", "emotion");
+    assertTableConstraintExists("free_talk_session", "fk_free_talk_session_topic_id");
+    assertTableConstraintExists("session_history_message", "uk_session_history_message_client_id");
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select display_name from free_talk_topic order by display_order", String.class))
+        .containsExactly("오늘 하루 얘기", "주말 계획", "요즘 빠진 것", "스포츠", "고민 상담");
+
+    Integer defaultTutorLabelCount =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from ai_tutor tutor
+            join ai_tutor_language_variant variant on variant.ai_tutor_id = tutor.id
+            where tutor.accent_locale = 'EN_US'
+              and tutor.target_locale = 'EN'
+              and variant.base_locale = 'KR'
+              and variant.display_name = '미국 영어 튜터'
+            """,
+            Integer.class);
+    assertThat(defaultTutorLabelCount).isEqualTo(1);
+  }
+
+  @DisplayName("V27은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
+  @Test
+  @Transactional
+  void v27EnforcesPendingMessageForeignKeyAndClientMessageUniqueness() {
+    Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
+    jdbcTemplate.update(
+        """
+        insert into user_profile (id, nickname, target_locale, base_locale, current_level,
+            ai_tutor_id, push_permission_status, status, created_at, updated_at)
+        values (992001, 'free-talk-schema-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED',
+            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into learning_session (id, user_profile_id, session_type, ai_tutor_id,
+            target_locale, base_locale, input_mode, status, started_at, created_at, updated_at)
+        values (992002, 992001, 'FREE_TALK', ?, 'EN', 'KR', 'MIXED', 'IN_PROGRESS',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into free_talk_session (id, learning_session_id, start_mode, conversation_status,
+            accumulated_speaking_duration_ms, created_at, updated_at)
+        values (992003, 992002, 'USER_FIRST', 'IN_PROGRESS', 0,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history (id, learning_session_id, user_profile_id, session_type,
+            target_locale, base_locale, started_at, ended_at, duration_seconds, user_message_count,
+            created_at)
+        values (992004, 992002, 992001, 'FREE_TALK', 'EN', 'KR', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP, 0, 0, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, input_type, client_message_id, created_at, updated_at)
+        values (992005, 992004, 1, 1, 'USER', 'hello', 'TEXT', 'client-1',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    update free_talk_session
+                    set pending_user_message_id = 992999
+                    where id = 992003
+                    """))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    insert into session_history_message (session_history_id, message_sequence, turn_number,
+                        role, content, input_type, client_message_id, created_at, updated_at)
+                    values (992004, 2, 2, 'USER', 'again', 'TEXT', 'client-1',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @DisplayName("PostgreSQL 전용 V22 migration이 추가 예문 payload 키를 카멜 케이스로 정규화한다.")

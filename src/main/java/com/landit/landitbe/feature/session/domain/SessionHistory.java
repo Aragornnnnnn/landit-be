@@ -102,6 +102,34 @@ public class SessionHistory extends BaseCreatedAtEntity {
         0);
   }
 
+  /**
+   * 프리톡 시작 메시지를 저장할 세션 히스토리 컨테이너를 생성한다.
+   *
+   * @param learningSessionId 연결할 학습 세션 ID
+   * @param userProfileId 세션 소유 사용자 ID
+   * @param targetLocale 학습 대상 locale
+   * @param baseLocale 기준 locale
+   * @param startedAt 세션 시작 시각
+   * @return 프리톡 세션 히스토리
+   */
+  public static SessionHistory startedFreeTalk(
+      Long learningSessionId,
+      Long userProfileId,
+      Locale targetLocale,
+      Locale baseLocale,
+      LocalDateTime startedAt) {
+    return new SessionHistory(
+        learningSessionId,
+        userProfileId,
+        SessionType.FREE_TALK,
+        targetLocale,
+        baseLocale,
+        startedAt,
+        startedAt,
+        0,
+        0);
+  }
+
   /** 세션 완료 시 종료 시각과 사용자 메시지 수를 확정한다. */
   public void complete(LocalDateTime endedAt, int userMessageCount) {
     this.endedAt = endedAt;
