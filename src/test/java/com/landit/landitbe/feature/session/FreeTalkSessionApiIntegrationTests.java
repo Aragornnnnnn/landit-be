@@ -361,7 +361,8 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"))
-        .andExpect(jsonPath(pastSessionsPath + ".responses['400'].description").value("요청 오류"))
+        .andExpect(
+            jsonPath(pastSessionsPath + ".responses['400'].description").value("페이지 번호 또는 크기 오류"))
         .andExpect(jsonPath(pastSessionsPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(
             jsonPath(pastSessionDetailPath + ".responses['403'].description").value("세션 소유자 아님"))
