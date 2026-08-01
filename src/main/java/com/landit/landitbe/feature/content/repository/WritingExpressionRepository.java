@@ -14,8 +14,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface WritingExpressionRepository extends JpaRepository<WritingExpression, Long> {
 
   /**
-   * 특정 시나리오에서 지정한 locale 조합의 활성 Writing 표현을 표시 순서 오름차순으로 조회한다. (displayOrder 시퀀스는 locale 조합별로
-   * 존재하므로, locale 필터 없이는 여러 언어 표현이 섞이고 해금 순서가 깨진다)
+   * 활성 Writing 표현을 시나리오와 로케일 기준 표시 순서로 조회한다.
+   *
+   * <p>표시 순서는 로케일별로 관리하므로 로케일 조건 없이는 학습 순서가 달라질 수 있다.
    *
    * @param scenarioId 표현이 속한 시나리오 ID
    * @param targetLocale 학습 언어 locale

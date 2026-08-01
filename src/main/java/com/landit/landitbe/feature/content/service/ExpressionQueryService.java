@@ -41,8 +41,9 @@ public class ExpressionQueryService {
   private static final int FREE_TALK_EXPRESSION_CANDIDATE_LIMIT = 100;
 
   /**
-   * 추가 예문 payload (practice_examples_payload)에서 반드시 값이 있어야 하는 문자열 키 목록. 하나라도 없거나 비어 있으면 그 예문은 응답에서
-   * 제외한다.
+   * 추가 예문 payload의 필수 문자열 키 목록이다.
+   *
+   * <p>하나라도 없거나 비어 있으면 해당 예문을 응답에서 제외한다.
    */
   private static final List<String> REQUIRED_PRACTICE_SENTENCE_KEYS =
       List.of(
@@ -53,8 +54,9 @@ public class ExpressionQueryService {
           "practiceQuestionTranslation");
 
   /**
-   * 추가 예문 payload에서 반드시 값이 있어야 하는 단어 배열 키 목록(작문 단어 칩 스펙, LAN-229). 키가 없거나, 배열이 아니거나, 비어 있거나, blank
-   * 원소를 담고 있으면 그 예문은 응답에서 제외한다.
+   * 추가 예문 payload에서 반드시 값이 있어야 하는 작문 단어 배열 키 목록이다.
+   *
+   * <p>배열이 없거나 비어 있거나 공백 원소가 있으면 해당 예문을 제외한다.
    */
   private static final List<String> REQUIRED_PRACTICE_SENTENCE_WORD_ARRAY_KEYS =
       List.of("sentenceWords", "sentenceWordChoices");
@@ -85,7 +87,7 @@ public class ExpressionQueryService {
   public List<ExpressionResponse> getExpressionsPerScenario(Long userId, Long scenarioId) {
     scenarioService.validateExists(scenarioId);
 
-    // 사용자 프로필의 학습 locale 기준으로 조회한다. (locale 조합별로 displayOrder 시퀀스가 따로 존재)
+    // 사용자 로케일에 맞는 표현을 로케일별 노출 순서로 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
     List<WritingExpression> expressions =
         writingExpressionRepository
@@ -99,7 +101,7 @@ public class ExpressionQueryService {
     CompletedExpressionIds completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId);
 
-    // 미완료 표현 중 학습 순서가 가장 앞선 하나만 해금되고 그 뒤로는 잠긴다. (리스트는 displayOrder 오름차순)
+    // 미완료 표현 중 학습 순서가 가장 앞선 하나만 잠금을 해제한다.
     Optional<Long> firstUnlockedExpressionId =
         firstIncompleteExpressionId(expressions, completedExpressionIds.values());
 
@@ -213,8 +215,7 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 학습 중인 표현의 추가 예문 목록과 작문 문제(랜덤 1개)를 조회한다. 표현이 없거나 INACTIVE거나 예문이 비어 있으면 RESOURCE_NOT_FOUND 예외를
-   * 던진다.
+   * 학습 중인 표현의 추가 예문 목록과 무작위 작문 문제 한 개를 조회한다.
    *
    * @param userId 표현을 조회할 사용자 ID
    * @param expressionId 연습할 표현 ID
@@ -261,8 +262,9 @@ public class ExpressionQueryService {
   }
 
   /**
-   * JSONB payload(JSON 배열)를 파싱된 예문 목록으로 변환한다. 필수 키가 없거나 값이 빈 불량 예문은 빈 값으로 노출하는 대신 목록에서 제외하고 경고 로그를
-   * 남긴다. imageUrl은 유일한 선택 필드라 없으면 null로 둔다.
+   * JSONB 배열 payload를 파싱된 예문 목록으로 변환한다.
+   *
+   * <p>필수 값이 없는 예문은 제외하고 경고를 남긴다. {@code imageUrl}은 없으면 {@code null}로 둔다.
    */
   private List<ParsedPracticeSentence> parseExtraPracticeSentences(
       JsonNode payload, Long expressionId) {
@@ -293,7 +295,7 @@ public class ExpressionQueryService {
     return false;
   }
 
-  /** 예문 노드의 작문용 단어 배열 키가 없거나, 배열이 아니거나, 비어 있거나, blank 원소를 담고 있는지 확인한다. */
+  /** 예문의 작문용 단어 배열이 없거나 올바르지 않은지 확인한다. */
   private boolean hasInvalidWordArray(JsonNode node) {
     for (String requiredKey : REQUIRED_PRACTICE_SENTENCE_WORD_ARRAY_KEYS) {
       JsonNode arrayNode = node.get(requiredKey);
@@ -309,7 +311,7 @@ public class ExpressionQueryService {
     return false;
   }
 
-  /** 예문 목록에서 랜덤으로 1개를 골라 작문 연습 문제로 변환한다. (인덱스 범위: 0 ~ 목록 길이-1) */
+  /** 예문 목록에서 무작위로 한 개를 골라 작문 연습 문제로 변환한다. */
   private WritingSentenceResponse pickRandomWritingSentence(
       List<ParsedPracticeSentence> parsedSentences) {
     ParsedPracticeSentence picked = parsedSentences.get(random.nextInt(parsedSentences.size()));
@@ -317,7 +319,7 @@ public class ExpressionQueryService {
     return WritingSentenceResponse.from(picked);
   }
 
-  /** 미완료 표현 중 학습 순서가 가장 앞선 표현의 ID를 반환한다. 모두 완료했으면 빈 값을 반환한다. */
+  /** 가장 앞선 미완료 표현의 ID를 반환하며, 모두 완료했으면 빈 값을 반환한다. */
   private Optional<Long> firstIncompleteExpressionId(
       List<WritingExpression> expressions, Set<Long> completedExpressionIds) {
     return expressions.stream()

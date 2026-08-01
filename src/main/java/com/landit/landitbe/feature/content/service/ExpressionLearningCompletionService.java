@@ -1,4 +1,4 @@
-// 원어민 표현 학습 완료 흐름를 처리한다.
+// 원어민 표현 학습 완료 흐름을 처리한다.
 
 package com.landit.landitbe.feature.content.service;
 
@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 원어민 표현 학습 완료 흐름를 처리한다. */
+/** 원어민 표현 학습 완료 흐름을 처리한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,12 +47,7 @@ public class ExpressionLearningCompletionService {
     WritingExpression expression =
         writingExpressionRepository
             .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
-            .orElseThrow(
-                () ->
-                    new ApiException(
-                        ErrorCode
-                            .RESOURCE_NOT_FOUND)); // 해당 표현이 없거나 INACTIVE면 RESOURCE_NOT_FOUND 터트리고
-    // 끝.
+            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     Long scenarioId = expression.getScenarioId();
     if (expression.isOwnedByAnother(userId)) {
       throw new ApiException(ErrorCode.FORBIDDEN);
@@ -65,19 +60,19 @@ public class ExpressionLearningCompletionService {
     CompletedExpressionIds completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId);
 
-    // 1. 만약에 이미 완료한 표현 리스트에 있는 경우라면, lastCompletedAt만 갱신하고 끝내라.
+    // 이미 완료한 표현은 마지막 완료 시각만 갱신한다.
     if (completedExpressionIds.values().contains(expressionId)) {
       learningProgressService.completeExpression(userId, scenarioId, expressionId);
       return;
     }
 
-    // 2. lock 여부 확인 -> 만약 잠겨있다면 에러를 터트린다.
+    // 시나리오 학습 순서에 따라 잠금 여부를 검증한다.
     if (!isUnlockedExpression(userId, scenarioId, expressionId, completedExpressionIds.values())) {
       log.warn(LOCKED_EXPRESSION_LOG, userId, expressionId);
       throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
     }
 
-    // 3. 잠겨있지 않으면 완료 기록을 새로 생성해서 저장한다.
+    // 잠금이 해제된 표현의 완료 이력을 저장한다.
     learningProgressService.completeExpression(userId, scenarioId, expressionId);
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
@@ -93,13 +88,13 @@ public class ExpressionLearningCompletionService {
                     new UserWritingExpressionCompletion(userId, null, expressionId)));
   }
 
-  /** 해당 표현이 지금 학습할 차례가 맞는지(=unlock상태인지) 사용자 locale 기준으로 판정한다. */
+  /** 사용자 로케일과 학습 순서로 표현의 잠금 해제 여부를 판단한다. */
   private boolean isUnlockedExpression(
       Long userId, Long scenarioId, Long expressionId, Set<Long> completedExpressionIds) {
-    // 사용자의 타겟 언어, 기준 언어를 가져온다.
+    // 사용자의 학습 언어와 기준 언어를 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
 
-    // 사용자 locale 기준으로 시나리오에 속한 활성 표현들을 displayOrder 순서대로 가져온다.
+    // 사용자 로케일에 맞는 활성 표현을 노출 순서대로 조회한다.
     List<WritingExpression> expressions =
         writingExpressionRepository
             .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
@@ -108,7 +103,7 @@ public class ExpressionLearningCompletionService {
                 userLocale.baseLocale(),
                 ActiveStatus.ACTIVE);
 
-    // firstIncompleteExpressionId = 가장 첫번째 미완료 표현의 id
+    // 가장 앞선 미완료 표현의 ID를 찾는다.
     Optional<Long> firstIncompleteExpressionId =
         expressions.stream()
             .map(WritingExpression::getId)

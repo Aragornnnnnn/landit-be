@@ -46,13 +46,33 @@ class RemoteAiFreeTalkClientTest {
         "/api/v1/free-talk/opening",
         requests,
         """
-            {"success":true,"data":{"aiMessage":"How was your weekend?","translatedMessage":"주말 어땠어?","emotion":"HAPPY"},"error":null}
+            {
+              "success": true,
+              "data": {
+                "aiMessage": "How was your weekend?",
+                "translatedMessage": "주말 어땠어?",
+                "emotion": "HAPPY"
+              },
+              "error": null
+            }
         """);
     registerJsonResponse(
         "/api/v1/free-talk/turn",
         requests,
         """
-            {"success":true,"data":{"userExitIntentDetected":false,"inferredTitle":"주말 이야기","aiMessage":"That sounds fun.","translatedMessage":"재밌겠다.","emotion":"HAPPY","innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD"},"error":null}
+            {
+              "success": true,
+              "data": {
+                "userExitIntentDetected": false,
+                "inferredTitle": "주말 이야기",
+                "aiMessage": "That sounds fun.",
+                "translatedMessage": "재밌겠다.",
+                "emotion": "HAPPY",
+                "innerThought": "즐거웠나 보다.",
+                "innerThoughtType": "GOOD"
+              },
+              "error": null
+            }
         """);
     registerJsonResponse(
         "/api/v1/free-talk/inner-thought",
@@ -64,7 +84,17 @@ class RemoteAiFreeTalkClientTest {
         "/api/v1/free-talk/closing",
         requests,
         """
-            {"success":true,"data":{"aiMessage":"It was nice talking with you.","translatedMessage":"이야기해서 좋았어.","emotion":"NEUTRAL","innerThought":"대화를 잘 마무리했다.","innerThoughtType":"NORMAL"},"error":null}
+            {
+              "success": true,
+              "data": {
+                "aiMessage": "It was nice talking with you.",
+                "translatedMessage": "이야기해서 좋았어.",
+                "emotion": "NEUTRAL",
+                "innerThought": "대화를 잘 마무리했다.",
+                "innerThoughtType": "NORMAL"
+              },
+              "error": null
+            }
         """);
     RemoteAiFreeTalkClient client = remoteClient();
 
@@ -160,7 +190,15 @@ class RemoteAiFreeTalkClientTest {
         "/api/v1/free-talk/opening",
         new ConcurrentHashMap<>(),
         """
-            {"success":true,"data":{"aiMessage":"How was your weekend?","translatedMessage":"주말 어땠어?","emotion":"EXCITED"},"error":null}
+            {
+              "success": true,
+              "data": {
+                "aiMessage": "How was your weekend?",
+                "translatedMessage": "주말 어땠어?",
+                "emotion": "EXCITED"
+              },
+              "error": null
+            }
         """);
 
     assertThatThrownBy(() -> remoteClient().generateOpening(openingRequest()))
