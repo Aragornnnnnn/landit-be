@@ -80,8 +80,10 @@ public class AppVersionService {
   public AdminAppVersionResponse update(
       Long adminUserProfileId, AppPlatform platform, AdminAppVersionUpdateRequest request) {
     validateVersionRange(request.versionName(), request.minimumSupportedVersionName());
+
     AppVersion appVersion = requireForUpdate(platform);
     String beforeValue = auditValue(appVersion);
+
     appVersion.update(
         request.versionName(),
         request.buildNumber(),
@@ -90,6 +92,7 @@ public class AppVersionService {
         request.softUpdateReason(),
         request.releaseNote(),
         request.releasedAt());
+
     adminAuditService.record(
         adminUserProfileId,
         AdminAction.APP_VERSION_UPDATED,
@@ -97,6 +100,7 @@ public class AppVersionService {
         platform.name(),
         beforeValue,
         auditValue(appVersion));
+
     return AdminAppVersionResponse.from(appVersion);
   }
 

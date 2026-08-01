@@ -207,7 +207,8 @@ class AdminAppVersionApiIntegrationTests {
     jdbcTemplate.update(
         """
         insert into app_version (
-            platform, version_name, minimum_supported_version_name, build_number, active, released_at,
+            platform, version_name, minimum_supported_version_name,
+            build_number, active, released_at,
             created_at
         )
         values (?, ?, ?, ?, true, current_timestamp, current_timestamp)
