@@ -60,57 +60,13 @@ class ExpoPushTokenApiIntegrationTests {
     String accessToken = login(userKey);
     String expoPushToken = "ExponentPushToken[upsert-and-revoke]";
 
-    mockMvc
-        .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":true
-                    }
-                    """
-                        .formatted(expoPushToken)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success").value(true));
+    updateToken(accessToken, AppPlatform.IOS, expoPushToken, true);
     assertTokenStatus(expoPushToken, "ACTIVE");
 
-    mockMvc
-        .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":false
-                    }
-                    """
-                        .formatted(expoPushToken)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success").value(true));
+    updateToken(accessToken, AppPlatform.IOS, expoPushToken, false);
     assertTokenStatus(expoPushToken, "REVOKED");
 
-    mockMvc
-        .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"ANDROID",
-                      "expoPushToken":"%s",
-                      "enabled":true
-                    }
-                    """
-                        .formatted(expoPushToken)))
-        .andExpect(status().isOk());
+    updateToken(accessToken, AppPlatform.ANDROID, expoPushToken, true);
     assertTokenStatus(expoPushToken, "ACTIVE");
     assertTokenPlatform(expoPushToken, "ANDROID");
   }
@@ -248,21 +204,22 @@ class ExpoPushTokenApiIntegrationTests {
 
   /** 테스트 사용자의 Expo Push Token을 활성 상태로 등록한다. */
   private void registerToken(String accessToken, String expoPushToken) throws Exception {
+    updateToken(accessToken, AppPlatform.IOS, expoPushToken, true);
+  }
+
+  private void updateToken(
+      String accessToken, AppPlatform platform, String expoPushToken, boolean enabled)
+      throws Exception {
     mockMvc
         .perform(
             put("/api/v1/me/expo-push-token")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":true
-                    }
-                    """
-                        .formatted(expoPushToken)))
-        .andExpect(status().isOk());
+                    objectMapper.writeValueAsString(
+                        new ExpoPushTokenUpdateRequest(platform, expoPushToken, enabled))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
   }
 
   /** Expo Push Token의 현재 저장 상태를 검증한다. */
@@ -272,7 +229,7 @@ class ExpoPushTokenApiIntegrationTests {
             "select status from user_push_token where expo_push_token = ?",
             String.class,
             expoPushToken);
-    org.assertj.core.api.Assertions.assertThat(actualStatus).isEqualTo(expectedStatus);
+    assertThat(actualStatus).isEqualTo(expectedStatus);
   }
 
   /** Expo Push Token의 현재 저장 플랫폼을 검증한다. */
@@ -282,7 +239,7 @@ class ExpoPushTokenApiIntegrationTests {
             "select platform from user_push_token where expo_push_token = ?",
             String.class,
             expoPushToken);
-    org.assertj.core.api.Assertions.assertThat(actualPlatform).isEqualTo(expectedPlatform);
+    assertThat(actualPlatform).isEqualTo(expectedPlatform);
   }
 
   /** 테스트 사용자의 프로필 ID를 조회한다. */
