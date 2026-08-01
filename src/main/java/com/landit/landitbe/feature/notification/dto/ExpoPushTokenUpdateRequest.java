@@ -39,6 +39,7 @@ public record ExpoPushTokenUpdateRequest(
     return isBracketToken(expoPushToken) || UUID_TOKEN_PATTERN.matcher(expoPushToken).matches();
   }
 
+  // 대괄호로 감싼 Expo Push Token 형식인지 확인한다.
   private boolean isBracketToken(String token) {
     return (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["))
         && token.endsWith("]");

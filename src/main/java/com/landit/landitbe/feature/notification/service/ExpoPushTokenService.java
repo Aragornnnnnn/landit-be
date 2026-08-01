@@ -37,6 +37,7 @@ public class ExpoPushTokenService {
     expoPushTokenPersistenceService.revokeOwnedToken(userProfileId, request.expoPushToken());
   }
 
+  // 토큰 등록 충돌 시 기존 토큰의 소유권을 현재 사용자에게 이전한다.
   private void registerOrClaim(Long userProfileId, ExpoPushTokenUpdateRequest request) {
     try {
       expoPushTokenPersistenceService.registerOrClaim(userProfileId, request);

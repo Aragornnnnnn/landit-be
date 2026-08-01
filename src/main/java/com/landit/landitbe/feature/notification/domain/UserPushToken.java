@@ -39,6 +39,7 @@ public class UserPushToken extends BaseTimeEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected UserPushToken() {}
 
+  // 활성 상태의 Expo Push Token 엔티티를 초기화한다.
   private UserPushToken(Long userProfileId, AppPlatform platform, String expoPushToken) {
     this.userProfileId = userProfileId;
     this.platform = platform;
