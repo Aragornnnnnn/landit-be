@@ -102,7 +102,7 @@ class DatabaseSchemaIntegrationTests {
   @Test
   void appVersionPolicyMigrationUsesPlatformUniqueConstraint() throws Exception {
     String migrationSql =
-        readMigrationSql("db/migration/V32__change_app_version_to_single_platform_policy.sql");
+        readMigrationSql("db/migration/V34__change_app_version_to_single_platform_policy.sql");
 
     assertThat(migrationSql)
         .contains(
@@ -114,9 +114,9 @@ class DatabaseSchemaIntegrationTests {
   @DisplayName("DB별 migration은 앱 버전명의 Major.Minor.Patch 형식을 강제한다.")
   @Test
   void appVersionNameFormatMigrationsUseDatabaseSpecificRegularExpressions() throws Exception {
-    String h2MigrationSql = readMigrationSql("db/h2/V33__enforce_app_version_name_format.sql");
+    String h2MigrationSql = readMigrationSql("db/h2/V35__enforce_app_version_name_format.sql");
     String postgresqlMigrationSql =
-        readMigrationSql("db/postgresql/V33__enforce_app_version_name_format.sql");
+        readMigrationSql("db/postgresql/V35__enforce_app_version_name_format.sql");
 
     assertThat(h2MigrationSql).contains("REGEXP '^[0-9]+\\.[0-9]+\\.[0-9]+$'");
     assertThat(postgresqlMigrationSql).contains("~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'");
@@ -606,13 +606,13 @@ class DatabaseSchemaIntegrationTests {
     assertThat(userAiTutorId(migrationJdbcTemplate, 990202L)).isEqualTo(990102L);
   }
 
-  /** V32 migration은 비활성 이력을 제거하고 기존 최소 지원 기준에 해당하는 버전명을 보존한다. */
+  /** V34 migration은 비활성 이력을 제거하고 기존 최소 지원 기준에 해당하는 버전명을 보존한다. */
   @Test
-  void v32MigrationKeepsSingleActivePolicyAndMapsMinimumSupportedVersionName() {
+  void v34MigrationKeepsSingleActivePolicyAndMapsMinimumSupportedVersionName() {
     String databaseUrl = migrationTestDatabaseUrl();
     JdbcTemplate migrationJdbcTemplate =
         new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
-    migrateToVersion(databaseUrl, "30");
+    migrateToVersion(databaseUrl, "33");
     insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "1.0.0", 10, 8, true);
     insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "0.9.0", 8, 8, false);
 
@@ -633,13 +633,13 @@ class DatabaseSchemaIntegrationTests {
         .isEqualTo("1.0.0");
   }
 
-  /** V32 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다. */
+  /** V34 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다. */
   @Test
-  void v32MigrationFailsWhenMinimumSupportedBuildCannotBeMapped() {
+  void v34MigrationFailsWhenMinimumSupportedBuildCannotBeMapped() {
     String databaseUrl = migrationTestDatabaseUrl();
     JdbcTemplate migrationJdbcTemplate =
         new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
-    migrateToVersion(databaseUrl, "30");
+    migrateToVersion(databaseUrl, "33");
     insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "1.0.0", 10, 8, true);
 
     assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
