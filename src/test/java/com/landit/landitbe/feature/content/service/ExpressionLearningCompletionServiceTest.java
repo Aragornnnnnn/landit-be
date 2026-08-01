@@ -314,7 +314,8 @@ class ExpressionLearningCompletionServiceTest {
   private WritingExpression orderedExpression(Long id) {
     WritingExpression expression = mock(WritingExpression.class);
     // 해금 판정의 findFirst()가 첫 원소에서 멈추면 뒤 mock의 getId는 호출되지 않으므로,
-    lenient().when(expression.getId()).thenReturn(id); // 테스트마다 사용 여부가 달라 lenient로 설정한다.
+    // 테스트마다 사용 여부가 달라 lenient로 설정한다.
+    lenient().when(expression.getId()).thenReturn(id);
     return expression;
   }
 }
