@@ -267,6 +267,21 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
+  void dailyScenarioUsesAsiaSeoulDateWhenDateIsMissingAtMidnightBoundary() throws Exception {
+    mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
+    JsonNode loginResponseBody = login();
+    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedDailyScenarios();
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios/daily")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.date").value("2026-07-29"));
+  }
+
+  @Test
   void scenarioListApiIsRemoved() throws Exception {
     JsonNode loginResponseBody = login();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();

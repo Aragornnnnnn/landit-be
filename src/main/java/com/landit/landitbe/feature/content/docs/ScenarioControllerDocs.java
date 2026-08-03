@@ -20,16 +20,16 @@ import java.time.LocalDate;
 public interface ScenarioControllerDocs {
 
   /**
-   * 인증된 사용자의 오늘 배정 시나리오 또는 과거 최초 완료 이력을 조회한다. 날짜를 생략하면 오늘을 조회한다.
+   * 인증된 사용자의 오늘 배정 시나리오 또는 과거 최초 완료 이력을 조회한다. 날짜를 생략하면 Asia/Seoul 기준 오늘을 조회한다.
    *
    * @param principal 인증된 사용자 정보
-   * @param date 조회 날짜. 생략하면 서버 기준 오늘
+   * @param date 조회 날짜. 생략하면 Asia/Seoul 기준 오늘
    * @return 날짜별 시나리오 조회 응답
    * @throws ApiException 미래 날짜이거나 사용자·시나리오 정보를 찾을 수 없을 때
    */
   @Operation(
       summary = "날짜별 시나리오 조회",
-      description = "오늘 배정된 시나리오 또는 과거 날짜에 최초 완료한 시나리오를 조회한다. date를 생략하면 서버 기준 오늘을 조회한다.",
+      description = "오늘 배정된 시나리오 또는 과거 날짜에 최초 완료한 시나리오를 조회한다. date를 생략하면 Asia/Seoul 기준 오늘을 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -44,7 +44,7 @@ public interface ScenarioControllerDocs {
   })
   ApiResponse<DailyScenarioResponse> getDailyScenario(
       AuthUserPrincipal principal,
-      @Parameter(description = "조회 날짜(yyyy-MM-dd). 생략하면 서버 기준 오늘", example = "2026-07-30")
+      @Parameter(description = "조회 날짜(yyyy-MM-dd). 생략하면 Asia/Seoul 기준 오늘", example = "2026-07-30")
           LocalDate date);
 
   /**
