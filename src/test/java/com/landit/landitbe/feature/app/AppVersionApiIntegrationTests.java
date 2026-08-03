@@ -1,4 +1,4 @@
-// 앱 버전 확인 API의 플랫폼 분리, 업데이트 정책, 오류 응답을 검증한다.
+// 앱 버전명 기준 업데이트 정책과 오류 응답을 검증한다.
 
 package com.landit.landitbe.feature.app;
 
@@ -16,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** 앱 버전 확인 API의 플랫폼 분리, 업데이트 정책, 오류 응답을 검증한다. */
+/** 앱 버전명 기준 업데이트 정책과 오류 응답을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -26,127 +26,125 @@ class AppVersionApiIntegrationTests {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  /** 각 테스트 전에 플랫폼별 정책을 비운다. */
   @BeforeEach
   void setUp() {
     jdbcTemplate.update("DELETE FROM app_version");
   }
 
+  /** IOS와 Android 정책은 서로 독립적으로 최신 및 최소 지원 버전을 판단한다. */
   @Test
   void iosAndAndroidPoliciesAreQueriedIndependentlyWithoutAuthentication() throws Exception {
-    insertPolicy("IOS", "1.4.0", 18, 15);
-    insertPolicy("ANDROID", "2.0.0", 30, 25);
+    insertPolicy("IOS", "1.4.0", "1.2.0", 18);
+    insertPolicy("ANDROID", "2.0.0", "1.5.0", 30);
 
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "16"))
+    check("IOS", "1.3.0", 16)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.updateType").value("SOFT"))
         .andExpect(jsonPath("$.data.latestVersionName").value("1.4.0"))
-        .andExpect(jsonPath("$.data.latestBuildNumber").value(18))
-        .andExpect(jsonPath("$.data.minimumSupportedBuildNumber").value(15))
+        .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.2.0"))
         .andExpect(jsonPath("$.data.reason").value("IOS 업데이트를 권장합니다."))
         .andExpect(jsonPath("$.data.releasedAt").value("2026-06-09T12:00:00"))
         .andExpect(jsonPath("$.error").value(nullValue()));
 
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check")
-                .param("platform", "ANDROID")
-                .param("buildNumber", "30"))
+    check("ANDROID", "2.0.0", 1)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("NONE"))
         .andExpect(jsonPath("$.data.latestVersionName").value("2.0.0"))
         .andExpect(jsonPath("$.data.reason").value(nullValue()));
   }
 
+  /** 최소 지원 버전보다 낮은 앱은 빌드 번호와 무관하게 강제 업데이트를 받는다. */
   @Test
-  void buildBelowMinimumReturnsForce() throws Exception {
-    insertPolicy("IOS", "1.4.0", 18, 15);
+  void versionBelowMinimumReturnsForce() throws Exception {
+    insertPolicy("IOS", "1.3.0", "1.1.0", 100);
 
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "14"))
+    check("IOS", "1.0.0", 999)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("FORCE"))
         .andExpect(jsonPath("$.data.reason").value("IOS 강제 업데이트가 필요합니다."));
   }
 
+  /** 최소 지원 이상이면서 최신 버전보다 낮은 앱은 소프트 업데이트를 받는다. */
   @Test
-  void supportedBuildBelowLatestReturnsSoft() throws Exception {
-    insertPolicy("IOS", "1.4.0", 18, 15);
+  void supportedVersionBelowLatestReturnsSoft() throws Exception {
+    insertPolicy("IOS", "1.3.0", "1.1.0", 100);
 
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "15"))
+    check("IOS", "1.1.0", 1)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("SOFT"))
         .andExpect(jsonPath("$.data.reason").value("IOS 업데이트를 권장합니다."));
+    check("IOS", "1.2.0", 200)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updateType").value("SOFT"));
   }
 
+  /** Minor와 Patch 버전은 문자열이 아닌 숫자 순서로 비교한다. */
   @Test
-  void latestOrHigherBuildReturnsNone() throws Exception {
-    insertPolicy("IOS", "1.4.0", 18, 15);
+  void versionNamesAreComparedNumerically() throws Exception {
+    insertPolicy("IOS", "1.10.0", "1.9.0", 100);
 
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "18"))
+    check("IOS", "1.9.0", 1)
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.updateType").value("NONE"))
-        .andExpect(jsonPath("$.data.reason").value(nullValue()));
-
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "19"))
+        .andExpect(jsonPath("$.data.updateType").value("SOFT"));
+    check("IOS", "1.10.0", 1)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("NONE"));
   }
 
+  /** 최신 버전 이상 앱은 빌드 번호와 관계없이 업데이트가 필요 없다. */
   @Test
-  void missingActivePolicyReturnsConfigurationError() throws Exception {
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "18"))
+  void latestOrHigherVersionReturnsNone() throws Exception {
+    insertPolicy("IOS", "1.3.0", "1.1.0", 100);
+
+    check("IOS", "1.3.0", 1)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updateType").value("NONE"));
+    check("IOS", "1.3.1", 1)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updateType").value("NONE"));
+  }
+
+  /** 플랫폼 정책이 없으면 설정 오류를 반환한다. */
+  @Test
+  void missingPolicyReturnsConfigurationError() throws Exception {
+    check("IOS", "1.0.0", 1)
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.data").value(nullValue()))
-        .andExpect(jsonPath("$.error.code").value("APP_VERSION_POLICY_NOT_CONFIGURED"))
-        .andExpect(jsonPath("$.error.message").value("앱 버전 정책이 올바르게 설정되지 않았습니다."));
+        .andExpect(jsonPath("$.error.code").value("APP_VERSION_POLICY_NOT_CONFIGURED"));
   }
 
+  /** 형식이 맞지 않거나 누락된 앱 버전명은 요청 오류로 거절한다. */
   @Test
-  void invalidPlatformReturnsValidationFailed() throws Exception {
+  void invalidOrMissingVersionNameReturnsValidationFailed() throws Exception {
+    check("IOS", "1.0", 1)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    mockMvc
+        .perform(
+            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "1"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+  }
+
+  /** 빌드 번호는 추적용 요청값이지만 1보다 작거나 누락되면 요청 오류로 거절한다. */
+  @Test
+  void invalidOrMissingBuildNumberReturnsValidationFailed() throws Exception {
+    check("IOS", "1.0.0", 0)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     mockMvc
         .perform(
             get("/api/v1/app-versions/check")
-                .param("platform", "WINDOWS")
-                .param("buildNumber", "18"))
+                .param("platform", "IOS")
+                .param("versionName", "1.0.0"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
-  @Test
-  void invalidOrMissingBuildNumberReturnsValidationFailed() throws Exception {
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "0"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
-
-    mockMvc
-        .perform(get("/api/v1/app-versions/check").param("platform", "IOS"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
-  }
-
-  @Test
-  void missingPlatformReturnsValidationFailed() throws Exception {
-    mockMvc
-        .perform(get("/api/v1/app-versions/check").param("buildNumber", "18"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
-  }
-
+  /** 공개 OpenAPI 문서는 앱 버전명과 빌드 번호 요청값을 모두 노출한다. */
   @Test
   void openApiDocumentsAppVersionCheckContract() throws Exception {
     mockMvc
@@ -155,30 +153,40 @@ class AppVersionApiIntegrationTests {
         .andExpect(
             jsonPath("$.paths['/api/v1/app-versions/check'].get.summary").value("앱 버전 업데이트 확인"))
         .andExpect(
-            jsonPath("$.paths['/api/v1/app-versions/check'].get.parameters.length()").value(2))
+            jsonPath("$.paths['/api/v1/app-versions/check'].get.parameters.length()").value(3))
         .andExpect(jsonPath("$.paths['/api/v1/app-versions/check'].get.responses['200']").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/app-versions/check'].get.responses['400']").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/app-versions/check'].get.responses['500']").exists());
+        .andExpect(jsonPath("$.paths['/api/v1/app-versions/check'].get.responses['400']").exists());
   }
 
+  /** 앱 버전 확인 요청을 만든다. */
+  private org.springframework.test.web.servlet.ResultActions check(
+      String platform, String versionName, long buildNumber) throws Exception {
+    return mockMvc.perform(
+        get("/api/v1/app-versions/check")
+            .param("platform", platform)
+            .param("versionName", versionName)
+            .param("buildNumber", Long.toString(buildNumber)));
+  }
+
+  /** 최신과 최소 지원 버전명이 지정된 플랫폼 정책을 추가한다. */
   private void insertPolicy(
-      String platform, String versionName, long buildNumber, long minimumSupportedBuildNumber) {
+      String platform, String versionName, String minimumSupportedVersionName, long buildNumber) {
     jdbcTemplate.update(
         """
-                        INSERT INTO app_version (
-                            platform, version_name, build_number, minimum_supported_build_number,
-                            force_update_reason, soft_update_reason, release_note, active,
-                            released_at, created_at
-                        )
-                        VALUES (
-                            ?, ?, ?, ?, ?, ?, NULL, TRUE,
-                            TIMESTAMP '2026-06-09 12:00:00', CURRENT_TIMESTAMP
-                        )
+        INSERT INTO app_version (
+            platform, version_name, minimum_supported_version_name, build_number,
+            force_update_reason, soft_update_reason, release_note, active,
+            released_at, created_at
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, NULL, TRUE,
+            TIMESTAMP '2026-06-09 12:00:00', CURRENT_TIMESTAMP
+        )
         """,
         platform,
         versionName,
+        minimumSupportedVersionName,
         buildNumber,
-        minimumSupportedBuildNumber,
         platform + " 강제 업데이트가 필요합니다.",
         platform + " 업데이트를 권장합니다.");
   }
