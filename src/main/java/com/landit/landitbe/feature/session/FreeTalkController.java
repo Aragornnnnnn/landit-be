@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.docs.FreeTalkControllerDocs;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
@@ -12,6 +13,8 @@ import com.landit.landitbe.feature.session.dto.FreeTalkSessionDetailResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionGenerationDispatcher;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionRetryService;
 import com.landit.landitbe.feature.session.service.FreeTalkHistoryQueryService;
 import com.landit.landitbe.feature.session.service.FreeTalkMessageService;
 import com.landit.landitbe.feature.session.service.FreeTalkSessionStartService;
@@ -38,6 +41,8 @@ public class FreeTalkController implements FreeTalkControllerDocs {
   private final FreeTalkSessionStartService freeTalkSessionStartService;
   private final FreeTalkMessageService freeTalkMessageService;
   private final FreeTalkHistoryQueryService freeTalkHistoryQueryService;
+  private final FreeTalkExpressionRetryService freeTalkExpressionRetryService;
+  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
 
   /** {@inheritDoc} */
   @Override
@@ -104,5 +109,16 @@ public class FreeTalkController implements FreeTalkControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
     return ResponseEntity.ok(
         ApiResponse.success(freeTalkHistoryQueryService.getSession(principal.userId(), sessionId)));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/free-talk/sessions/{sessionId}/expressions/retry")
+  public ResponseEntity<ApiResponse<FreeTalkExpressionRetryResponse>> retryExpressions(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
+    FreeTalkExpressionRetryResponse response =
+        freeTalkExpressionRetryService.retry(principal.userId(), sessionId);
+    expressionGenerationDispatcher.dispatch(sessionId);
+    return ApiResponse.success(HttpStatus.ACCEPTED, response);
   }
 }

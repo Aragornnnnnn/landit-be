@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtReque
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
+import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
@@ -27,16 +28,19 @@ public class FreeTalkMessageService {
   private final AiFreeTalkClient aiFreeTalkClient;
   private final SessionMessageService sessionMessageService;
   private final TaskExecutor taskExecutor;
+  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
 
   FreeTalkMessageService(
       FreeTalkSubmittedMessageService submittedMessageService,
       AiFreeTalkClient aiFreeTalkClient,
       SessionMessageService sessionMessageService,
-      @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
+      @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
+      FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher) {
     this.submittedMessageService = submittedMessageService;
     this.aiFreeTalkClient = aiFreeTalkClient;
     this.sessionMessageService = sessionMessageService;
     this.taskExecutor = taskExecutor;
+    this.expressionGenerationDispatcher = expressionGenerationDispatcher;
   }
 
   /**
@@ -77,6 +81,7 @@ public class FreeTalkMessageService {
               .EXIT_CONFIRMATION_REQUIRED) {
         generateInnerThought(innerThoughtRequest(reservation));
       }
+      dispatchIfCompleted(response);
       return response;
     } catch (RuntimeException exception) {
       submittedMessageService.compensate(reservation);
@@ -122,6 +127,7 @@ public class FreeTalkMessageService {
                         reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED)));
       }
       generateInnerThought(innerThoughtRequest(reservation));
+      dispatchIfCompleted(response);
       return response;
     } catch (RuntimeException exception) {
       submittedMessageService.compensateDecision(reservation);
@@ -142,6 +148,13 @@ public class FreeTalkMessageService {
         reservation.firstUserTurn(),
         reservation.topic(),
         reservation.history());
+  }
+
+  // 완료 응답이면 맞춤 표현 생성 작업을 제출한다.
+  private void dispatchIfCompleted(FreeTalkMessageSubmitResponse response) {
+    if (response.turnStatus() == FreeTalkTurnStatus.COMPLETED) {
+      expressionGenerationDispatcher.dispatch(response.sessionId());
+    }
   }
 
   private AiFreeTalkClosingRequest closingRequest(

@@ -272,6 +272,25 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
+  @DisplayName("V29 migration은 프리톡 생성 표현을 공통 학습 콘텐츠로 저장한다.")
+  @Test
+  void v29AddsFreeTalkExpressionLearningStorage() {
+    assertTableExists("free_talk_session_expression");
+    assertTableDoesNotExist("free_talk_expression");
+    assertTableDoesNotExist("user_free_talk_expression_completion");
+    assertColumnExists("free_talk_session", "expression_generation_status");
+    assertColumnExists("free_talk_session", "expression_generation_started_at");
+    assertColumnExists("free_talk_session_expression", "writing_expression_id");
+    assertColumnExists("writing_expression", "owner_user_profile_id");
+    assertNullableColumn("writing_expression", "scenario_id");
+    assertNullableColumn("user_writing_expression_completion", "scenario_id");
+    assertColumnDoesNotExist("free_talk_session_expression", "generated_content_payload");
+    assertColumnDoesNotExist("free_talk_session_expression", "completed_at");
+    assertTableConstraintExists(
+        "free_talk_session", "chk_free_talk_session_expression_generation_status");
+    assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+  }
+
   @DisplayName("V27은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
   @Test
   @Transactional
@@ -434,6 +453,8 @@ class DatabaseSchemaIntegrationTests {
             """
             select provider, model, provider_voice_id, gender, description, accent_locale, status
             from tts_voice
+            where provider = 'OPENROUTER'
+              and model = 'microsoft/mai-voice-2'
             order by provider_voice_id
             """);
 

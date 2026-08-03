@@ -24,7 +24,7 @@ public class UserWritingExpressionCompletion {
   @Column(name = "user_profile_id", nullable = false)
   private Long userProfileId;
 
-  @Column(name = "scenario_id", nullable = false)
+  @Column(name = "scenario_id")
   private Long scenarioId;
 
   @Column(name = "writing_expression_id", nullable = false)

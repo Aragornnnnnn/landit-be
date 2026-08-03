@@ -50,6 +50,13 @@ public class FreeTalkSession extends BaseTimeEntity {
   @Column(name = "accumulated_speaking_duration_ms", nullable = false)
   private long accumulatedSpeakingDurationMs;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "expression_generation_status", length = 20)
+  private ExpressionGenerationStatus expressionGenerationStatus;
+
+  @Column(name = "expression_generation_started_at")
+  private LocalDateTime expressionGenerationStartedAt;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSession() {}
 
@@ -154,6 +161,7 @@ public class FreeTalkSession extends BaseTimeEntity {
     }
     conversationStatus = FreeTalkConversationStatus.COMPLETED;
     pendingUserMessageId = null;
+    expressionGenerationStatus = ExpressionGenerationStatus.PREPARING;
   }
 
   /**
@@ -165,6 +173,46 @@ public class FreeTalkSession extends BaseTimeEntity {
     requireInProgress();
     conversationStatus = FreeTalkConversationStatus.COMPLETED;
     pendingUserMessageId = null;
+    expressionGenerationStatus = ExpressionGenerationStatus.PREPARING;
+  }
+
+  /**
+   * 표현 생성 작업을 실행 중으로 선점한다.
+   *
+   * @throws IllegalStateException 완료된 프리톡의 준비 상태가 아닐 때
+   */
+  public void startExpressionGeneration() {
+    if (conversationStatus != FreeTalkConversationStatus.COMPLETED
+        || expressionGenerationStatus != ExpressionGenerationStatus.PREPARING
+        || expressionGenerationStartedAt != null) {
+      throw new IllegalStateException("표현 생성 작업을 시작할 수 없는 상태입니다.");
+    }
+    expressionGenerationStartedAt = LocalDateTime.now();
+  }
+
+  /** 표현 생성 결과가 준비됐음을 기록하고 실행 시작 시각을 비운다. */
+  public void completeExpressionGeneration() {
+    expressionGenerationStatus = ExpressionGenerationStatus.READY;
+    expressionGenerationStartedAt = null;
+  }
+
+  /** 표현 생성 실패 상태를 기록하고 실행 시작 시각을 비운다. */
+  public void failExpressionGeneration() {
+    expressionGenerationStatus = ExpressionGenerationStatus.FAILED;
+    expressionGenerationStartedAt = null;
+  }
+
+  /**
+   * 실패한 표현 생성 작업을 다시 준비 상태로 전환한다.
+   *
+   * @throws IllegalStateException 완료된 프리톡의 실패 상태가 아닐 때
+   */
+  public void retryExpressionGeneration() {
+    if (conversationStatus != FreeTalkConversationStatus.COMPLETED
+        || expressionGenerationStatus != ExpressionGenerationStatus.FAILED) {
+      throw new IllegalStateException("표현 생성 재시도를 할 수 없는 상태입니다.");
+    }
+    expressionGenerationStatus = ExpressionGenerationStatus.PREPARING;
   }
 
   /**

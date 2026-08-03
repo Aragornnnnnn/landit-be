@@ -1,4 +1,4 @@
-// 프리톡 주제 조회, 세션 시작, 발화 제출과 종료 결정 API의 외부 계약과 저장 경계를 검증한다.
+// 프리톡 API의 외부 계약과 저장 경계를 검증한다.
 
 package com.landit.landitbe.feature.session;
 
@@ -14,6 +14,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContent;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionPracticeExample;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendation;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
@@ -21,8 +28,10 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -56,6 +65,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
     })
 class FreeTalkSessionApiIntegrationTests {
 
+  private static final String EXPRESSION_GENERATION_STATUS_QUERY =
+      "SELECT expression_generation_status "
+          + "FROM free_talk_session "
+          + "WHERE learning_session_id = ?";
+
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -76,12 +90,36 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void cleanUpDatabase() {
+    awaitPendingExpressionGeneration();
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
+    jdbcTemplate.update("DELETE FROM free_talk_session_expression");
     jdbcTemplate.update("DELETE FROM free_talk_session");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE owner_user_profile_id IS NOT NULL");
     jdbcTemplate.update("DELETE FROM free_talk_topic");
+  }
+
+  private void awaitPendingExpressionGeneration() {
+    for (int attempt = 0; attempt < 100; attempt++) {
+      Integer pendingCount =
+          jdbcTemplate.queryForObject(
+              "SELECT COUNT(*) FROM free_talk_session "
+                  + "WHERE expression_generation_status = 'PREPARING'",
+              Integer.class);
+      if (pendingCount == null || pendingCount == 0) {
+        return;
+      }
+      try {
+        Thread.sleep(50L);
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        String message = "프리톡 표현 생성 종료를 기다리는 중 인터럽트되었습니다.";
+        throw new IllegalStateException(message, exception);
+      }
+    }
+    throw new IllegalStateException("프리톡 표현 생성이 제한 시간 안에 종료되지 않았습니다.");
   }
 
   @Test
@@ -303,6 +341,8 @@ class FreeTalkSessionApiIntegrationTests {
     String messagesPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}/messages'].post";
     String exitDecisionPath =
         "$.paths['/api/v1/free-talk/sessions/{sessionId}/exit-decision'].post";
+    String pastSessionsPath = "$.paths['/api/v1/free-talk/sessions'].get";
+    String pastSessionDetailPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}'].get";
     String innerThoughtProcessingStatusPath =
         "$.components.schemas.SessionInnerThoughtResponse.properties.processingStatus";
 
@@ -323,6 +363,14 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(
+            jsonPath(pastSessionsPath + ".responses['400'].description").value("페이지 번호 또는 크기 오류"))
+        .andExpect(jsonPath(pastSessionsPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(
+            jsonPath(pastSessionDetailPath + ".responses['403'].description").value("세션 소유자 아님"))
+        .andExpect(
+            jsonPath(pastSessionDetailPath + ".responses['404'].description")
+                .value("완료된 프리톡 세션 없음"))
         .andExpect(
             jsonPath(innerThoughtProcessingStatusPath + ".description")
                 .value("속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null"));
@@ -532,6 +580,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
+    assertThat(awaitExpressionGenerationStatus(exitSessionId)).isEqualTo("READY");
 
     fakeAiFreeTalkClient.reset();
     long timeLimitSessionId = startUserFirstSession(accessToken);
@@ -545,6 +594,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+    assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
   }
 
   @Test
@@ -769,6 +819,18 @@ class FreeTalkSessionApiIntegrationTests {
     return "/api/v1/free-talk/sessions/%d/exit-decision".formatted(sessionId);
   }
 
+  private String awaitExpressionGenerationStatus(long sessionId) throws InterruptedException {
+    for (int attempt = 0; attempt < 50; attempt++) {
+      String status =
+          jdbcTemplate.queryForObject(EXPRESSION_GENERATION_STATUS_QUERY, String.class, sessionId);
+      if (!"PREPARING".equals(status)) {
+        return status;
+      }
+      Thread.sleep(20L);
+    }
+    return jdbcTemplate.queryForObject(EXPRESSION_GENERATION_STATUS_QUERY, String.class, sessionId);
+  }
+
   private String messageRequest(
       String clientMessageId, String content, long utteranceDurationMs, boolean timeLimitReached) {
     return ("{\"clientMessageId\":\"%s\",\"content\":\"%s\",\"inputType\":\"VOICE\","
@@ -880,6 +942,49 @@ class FreeTalkSessionApiIntegrationTests {
     public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
       return new AiFreeTalkClosingResult(
           "It was great talking with you!", "이야기해서 즐거웠어!", CharacterEmotion.HAPPY);
+    }
+
+    @Override
+    public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+        AiFreeTalkExpressionRecommendationsRequest request) {
+      return new AiFreeTalkExpressionRecommendationsResult(
+          List.of(
+              new AiFreeTalkExpressionRecommendation(
+                  1,
+                  FreeTalkExpressionSourceType.NEW,
+                  null,
+                  "I'm up for that",
+                  "좋아, 그거 하자",
+                  "상대 제안에 동의할 때 사용한다.")));
+    }
+
+    @Override
+    public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
+        AiFreeTalkExpressionLearningContentRequest request) {
+      return new AiFreeTalkExpressionLearningContentResult(
+          List.of(
+              new AiFreeTalkExpressionLearningContent(
+                  "I'm up for that",
+                  "좋아, 그거 하자",
+                  "상대 제안에 동의할 때 사용한다.",
+                  "상대방의 제안이나 계획에 긍정적으로 답할 때 쓴다.",
+                  "Do you want to get coffee after work?",
+                  "퇴근 후 커피 마실래?",
+                  "I'm up for that.",
+                  "좋아, 그러자.",
+                  List.of("I'm", "up", "for", "that."),
+                  List.of("I'm", "up", "for", "that.", "not"),
+                  null,
+                  List.of(
+                      new AiFreeTalkExpressionPracticeExample(
+                          null,
+                          "I'm up for a movie tonight.",
+                          List.of("I'm", "up", "for", "a", "movie", "tonight."),
+                          "I'm up for",
+                          "Want to watch a movie tonight?",
+                          "오늘 밤 영화 보는 거 좋아.",
+                          List.of("I'm", "up", "for", "a", "movie", "tonight.", "not"),
+                          "오늘 밤 영화 볼래?")))));
     }
 
     void reset() {

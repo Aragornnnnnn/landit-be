@@ -36,9 +36,15 @@ class FreeTalkMessageServiceTest {
   private final AiFreeTalkClient aiFreeTalkClient = mock(AiFreeTalkClient.class);
   private final SessionMessageService sessionMessageService = mock(SessionMessageService.class);
   private final TaskExecutor directExecutor = Runnable::run;
+  private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
+      mock(FreeTalkExpressionGenerationDispatcher.class);
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
-          submittedMessageService, aiFreeTalkClient, sessionMessageService, directExecutor);
+          submittedMessageService,
+          aiFreeTalkClient,
+          sessionMessageService,
+          directExecutor,
+          expressionGenerationDispatcher);
 
   @Test
   void marksInnerThoughtFailedWhenPersistingCompletedThoughtFails() {
@@ -94,6 +100,7 @@ class FreeTalkMessageServiceTest {
         new SubmittedMessageResponse(7L, 1, 1, "USER", null, null, ProcessingStatus.PREPARING),
         new NextMessageResponse(
             8L, 2, 2, "AI", "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY),
-        new ProgressResponse(FreeTalkConversationStatus.IN_PROGRESS, 1200L, 60000L, 1200L, 58800L));
+        new ProgressResponse(
+            FreeTalkConversationStatus.IN_PROGRESS, 1200L, 60000L, 1200L, 58800L, null));
   }
 }
