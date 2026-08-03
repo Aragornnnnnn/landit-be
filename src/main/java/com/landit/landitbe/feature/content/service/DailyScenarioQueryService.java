@@ -40,7 +40,7 @@ public class DailyScenarioQueryService {
    * 사용자의 오늘 배정 시나리오 또는 과거 최초 완료 이력을 조회한다.
    *
    * @param userId 사용자 ID
-   * @param date 조회 날짜
+   * @param date 조회 날짜. null이면 Asia/Seoul 기준 오늘
    * @return 날짜별 시나리오 조회 응답
    * @throws ApiException 미래 날짜이거나 사용자·시나리오 정보를 찾을 수 없을 때
    */
@@ -48,13 +48,14 @@ public class DailyScenarioQueryService {
   public DailyScenarioResponse getDailyScenario(long userId, LocalDate date) {
     Instant evaluatedAt = clock.instant();
     LocalDate today = evaluatedAt.atZone(SERVICE_ZONE_ID).toLocalDate();
-    validateNotFuture(date, today);
+    LocalDate queryDate = date != null ? date : today;
+    validateNotFuture(queryDate, today);
 
     UserLocale userLocale = userProfileService.getUserLocale(userId);
     return scenarioAccessService
-        .findAccessGrantedOn(userId, userLocale.targetLocale(), date)
-        .map(history -> completedResponse(userId, date, history))
-        .orElseGet(() -> currentOrEmptyResponse(userId, date, today, userLocale, evaluatedAt));
+        .findAccessGrantedOn(userId, userLocale.targetLocale(), queryDate)
+        .map(history -> completedResponse(userId, queryDate, history))
+        .orElseGet(() -> currentOrEmptyResponse(userId, queryDate, today, userLocale, evaluatedAt));
   }
 
   /** 미래 날짜는 사용자 완료 여부에 따라 배정이 확정되지 않았으므로 조회를 거절한다. */

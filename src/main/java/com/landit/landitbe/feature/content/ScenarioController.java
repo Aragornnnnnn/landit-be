@@ -31,7 +31,8 @@ public class ScenarioController implements ScenarioControllerDocs {
   @GetMapping("/api/v1/scenarios/daily")
   public ApiResponse<DailyScenarioResponse> getDailyScenario(
       @AuthenticationPrincipal AuthUserPrincipal principal,
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate date) {
     return ApiResponse.success(
         dailyScenarioQueryService.getDailyScenario(principal.userId(), date));
   }
