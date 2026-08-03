@@ -9,7 +9,9 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -100,6 +102,54 @@ public class ScenarioAccessService {
       Long userProfileId, Long scenarioId, Locale targetLocale, LocalDate date) {
     return userScenarioAccessRepository.existsUncompletedSessionBefore(
         userProfileId, scenarioId, targetLocale, date.atStartOfDay());
+  }
+
+  /**
+   * 사용자가 날짜 구간 안에서 완료한 시나리오를 날짜별로 조회한다. 같은 날 복습 권한이 복수로 생성된 경우 획득 시각이 가장 이른 시나리오를 사용한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @param startDate 구간 시작 날짜(포함)
+   * @param endDateExclusive 구간 끝 날짜(제외)
+   * @return 날짜 오름차순으로 정렬한 날짜별 완료 시나리오 목록
+   */
+  @Transactional(readOnly = true)
+  public List<DailyCompletion> findCompletionsBetween(
+      Long userProfileId, Locale targetLocale, LocalDate startDate, LocalDate endDateExclusive) {
+    List<UserScenarioAccess> accesses =
+        userScenarioAccessRepository.findAllGrantedBetween(
+            userProfileId, targetLocale, startDate.atStartOfDay(), endDateExclusive.atStartOfDay());
+
+    Map<LocalDate, Long> scenarioIdsByDate = new LinkedHashMap<>();
+    for (UserScenarioAccess access : accesses) {
+      scenarioIdsByDate.putIfAbsent(access.getGrantedAt().toLocalDate(), access.getScenarioId());
+    }
+
+    return scenarioIdsByDate.entrySet().stream()
+        .map(completion -> new DailyCompletion(completion.getKey(), completion.getValue()))
+        .toList();
+  }
+
+  /**
+   * 사용자가 하루 동안 완료한 시나리오를 담는다.
+   *
+   * @param date 완료한 날짜
+   * @param scenarioId 완료한 시나리오 ID
+   */
+  public record DailyCompletion(LocalDate date, Long scenarioId) {}
+
+  /**
+   * 사용자가 대상 언어에서 처음으로 시나리오를 완료한 날짜를 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @return 첫 완료 날짜. 완료 이력이 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<LocalDate> findFirstCompletionDate(Long userProfileId, Locale targetLocale) {
+    return userScenarioAccessRepository
+        .findTopByUserProfileIdAndTargetLocaleOrderByGrantedAtAsc(userProfileId, targetLocale)
+        .map(access -> access.getGrantedAt().toLocalDate());
   }
 
   /**

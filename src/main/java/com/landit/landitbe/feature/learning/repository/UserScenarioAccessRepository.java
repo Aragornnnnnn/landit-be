@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.learning.domain.UserScenarioAccess;
 import com.landit.landitbe.shared.domain.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -82,6 +83,41 @@ public interface UserScenarioAccessRepository extends JpaRepository<UserScenario
       @Param("targetLocale") Locale targetLocale,
       @Param("dayStart") LocalDateTime dayStart,
       @Param("nextDayStart") LocalDateTime nextDayStart);
+
+  /**
+   * 사용자가 구간 안에서 얻은 시나리오 복습 권한을 획득 시각 오름차순으로 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @param rangeStart 구간 시작 시각(포함)
+   * @param rangeEnd 구간 끝 시각(제외)
+   * @return 획득 시각 오름차순으로 정렬한 시나리오 복습 권한 목록
+   */
+  @Query(
+      """
+            SELECT access
+            FROM UserScenarioAccess access
+            WHERE access.userProfileId = :userProfileId
+              AND access.targetLocale = :targetLocale
+              AND access.grantedAt >= :rangeStart
+              AND access.grantedAt < :rangeEnd
+            ORDER BY access.grantedAt ASC
+      """)
+  List<UserScenarioAccess> findAllGrantedBetween(
+      @Param("userProfileId") Long userProfileId,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("rangeStart") LocalDateTime rangeStart,
+      @Param("rangeEnd") LocalDateTime rangeEnd);
+
+  /**
+   * 사용자가 대상 언어에서 가장 먼저 얻은 시나리오 복습 권한을 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @return 획득 시각이 가장 이른 시나리오 복습 권한. 없으면 빈 값
+   */
+  Optional<UserScenarioAccess> findTopByUserProfileIdAndTargetLocaleOrderByGrantedAtAsc(
+      Long userProfileId, Locale targetLocale);
 
   /**
    * 이전 날짜에 시작했지만 완료하지 못한 시나리오 세션이 있는지 확인한다.
