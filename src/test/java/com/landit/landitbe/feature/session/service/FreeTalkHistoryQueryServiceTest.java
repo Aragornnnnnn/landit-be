@@ -9,9 +9,6 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.learning.domain.ExpressionLearningSource;
-import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
-import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
@@ -46,8 +43,6 @@ class FreeTalkHistoryQueryServiceTest {
   @Mock private SessionHistoryMessageRepository sessionHistoryMessageRepository;
   @Mock private FreeTalkSessionExpressionRepository sessionExpressionRepository;
   @Mock private WritingExpressionRepository writingExpressionRepository;
-  @Mock private UserWritingExpressionCompletionRepository expressionCompletionRepository;
-
   @InjectMocks private FreeTalkHistoryQueryService historyQueryService;
 
   /** 기존 표현이 비활성화돼도 과거 프리톡 상세의 스냅샷은 조회한다. */
@@ -75,15 +70,9 @@ class FreeTalkHistoryQueryServiceTest {
         .thenReturn(List.of(sessionExpression));
     when(writingExpressionRepository.findAllById(List.of(300L)))
         .thenReturn(List.of(historicalExpression));
-    LocalDateTime scenarioCompletedAt = LocalDateTime.of(2026, 7, 29, 10, 0);
-    UserWritingExpressionCompletion scenarioCompletion =
-        org.mockito.Mockito.mock(UserWritingExpressionCompletion.class);
-    when(scenarioCompletion.getWritingExpressionId()).thenReturn(300L);
-    when(scenarioCompletion.getLearningSource()).thenReturn(ExpressionLearningSource.SCENARIO);
-    when(scenarioCompletion.getLastCompletedAt()).thenReturn(scenarioCompletedAt);
-    when(expressionCompletionRepository.findAllByUserProfileIdAndWritingExpressionIdIn(
+    when(sessionExpressionRepository.findAllByUserProfileIdAndWritingExpressionIdIn(
             1L, List.of(300L)))
-        .thenReturn(List.of(scenarioCompletion));
+        .thenReturn(List.of());
 
     FreeTalkSessionDetailResponse response = historyQueryService.getSession(1L, 10L);
 
@@ -91,7 +80,50 @@ class FreeTalkHistoryQueryServiceTest {
         .extracting(FreeTalkSessionDetailResponse.Expression::targetExpressionText)
         .containsExactly("make up for");
     assertThat(response.expressions().getFirst().completed()).isFalse();
-    assertThat(response.expressions().getFirst().lastCompletedAt()).isEqualTo(scenarioCompletedAt);
+    assertThat(response.expressions().getFirst().lastRecommendedAt()).isNull();
+  }
+
+  /** 이전 프리톡에서 추천한 표현은 현재 세션에서 미완료로 시작하고 추천 시각을 반환한다. */
+  @Test
+  void returnsPreviousRecommendationTimeWithoutReusingCompletionState() {
+    LearningSession learningSession = completedLearningSessionForDetail();
+    FreeTalkSession freeTalkSession = completedFreeTalkSessionForDetail(100L);
+    SessionHistory history = org.mockito.Mockito.mock(SessionHistory.class);
+    when(history.getId()).thenReturn(1_000L);
+    LocalDateTime previousRecommendedAt = LocalDateTime.of(2026, 7, 27, 10, 0);
+    LocalDateTime currentRecommendedAt = LocalDateTime.of(2026, 7, 28, 10, 0);
+    FreeTalkSessionExpression currentExpression =
+        org.mockito.Mockito.mock(FreeTalkSessionExpression.class);
+    when(currentExpression.getWritingExpressionId()).thenReturn(300L);
+    when(currentExpression.getDisplayOrder()).thenReturn(1);
+    when(currentExpression.getCompletedAt()).thenReturn(null);
+    when(currentExpression.getCreatedAt()).thenReturn(currentRecommendedAt);
+    FreeTalkSessionExpression previousExpression =
+        org.mockito.Mockito.mock(FreeTalkSessionExpression.class);
+    when(previousExpression.getWritingExpressionId()).thenReturn(300L);
+    when(previousExpression.getCreatedAt()).thenReturn(previousRecommendedAt);
+    WritingExpression expression = org.mockito.Mockito.mock(WritingExpression.class);
+    when(expression.getId()).thenReturn(300L);
+    when(expression.getTargetExpressionText()).thenReturn("make up for");
+    when(expression.getBaseExpressionMeaningText()).thenReturn("만회하다");
+    when(learningSessionRepository.findById(10L)).thenReturn(Optional.of(learningSession));
+    when(freeTalkSessionRepository.findByLearningSessionId(10L))
+        .thenReturn(Optional.of(freeTalkSession));
+    when(sessionHistoryRepository.findByLearningSessionId(10L)).thenReturn(Optional.of(history));
+    when(sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(1_000L))
+        .thenReturn(List.of());
+    when(sessionExpressionRepository.findByFreeTalkSessionIdOrderByDisplayOrderAsc(100L))
+        .thenReturn(List.of(currentExpression));
+    when(sessionExpressionRepository.findAllByUserProfileIdAndWritingExpressionIdIn(
+            1L, List.of(300L)))
+        .thenReturn(List.of(previousExpression));
+    when(writingExpressionRepository.findAllById(List.of(300L))).thenReturn(List.of(expression));
+
+    FreeTalkSessionDetailResponse response = historyQueryService.getSession(1L, 10L);
+
+    assertThat(response.expressions().getFirst().completed()).isFalse();
+    assertThat(response.expressions().getFirst().lastRecommendedAt())
+        .isEqualTo(previousRecommendedAt);
   }
 
   /** 목록 조회는 페이지의 세션과 표현을 일괄 조회한다. */

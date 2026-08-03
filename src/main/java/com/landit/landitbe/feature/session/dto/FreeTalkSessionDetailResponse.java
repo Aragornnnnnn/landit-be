@@ -65,7 +65,7 @@ public record FreeTalkSessionDetailResponse(
    * @param targetExpressionText 학습 언어 표현
    * @param baseExpressionMeaningText 기준 언어 표현 뜻
    * @param completed 현재 사용자의 표현 학습 완료 여부
-   * @param lastCompletedAt 프리톡 출처에서 마지막으로 완료한 시각
+   * @param lastRecommendedAt 이전 프리톡에서 같은 표현을 추천받은 마지막 시각
    */
   public record Expression(
       Long expressionId,
@@ -73,5 +73,5 @@ public record FreeTalkSessionDetailResponse(
       String targetExpressionText,
       String baseExpressionMeaningText,
       boolean completed,
-      LocalDateTime lastCompletedAt) {}
+      LocalDateTime lastRecommendedAt) {}
 }
