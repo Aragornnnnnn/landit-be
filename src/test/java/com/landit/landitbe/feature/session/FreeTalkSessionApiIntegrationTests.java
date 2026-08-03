@@ -707,6 +707,55 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void keepsRepeatedExpressionCompletionSeparateForEachFreeTalkSession() throws Exception {
+    JsonNode loginBody = login("free-talk-repeated-expression@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long firstLearningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink firstLink = seedNewExpressionForCompletedSession(firstLearningSessionId);
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET owner_user_profile_id = NULL WHERE id = ?",
+        firstLink.expressionId());
+    jdbcTemplate.update(
+        "UPDATE free_talk_session_expression "
+            + "SET created_at = TIMESTAMP '2026-07-27 10:00:00' "
+            + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+        firstLink.freeTalkSessionId(),
+        firstLink.expressionId());
+
+    long secondLearningSessionId = startUserFirstSession(accessToken);
+    long secondFreeTalkSessionId = completeSession(secondLearningSessionId);
+    freeTalkSessionExpressionRepository.saveAndFlush(
+        FreeTalkSessionExpression.link(secondFreeTalkSessionId, firstLink.expressionId(), 1));
+    jdbcTemplate.update(
+        "UPDATE free_talk_session_expression "
+            + "SET created_at = TIMESTAMP '2026-07-28 10:00:00' "
+            + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+        secondFreeTalkSessionId,
+        firstLink.expressionId());
+    FreeTalkExpressionLink secondLink =
+        new FreeTalkExpressionLink(
+            secondLearningSessionId, secondFreeTalkSessionId, firstLink.expressionId());
+
+    finishExpression(accessToken, secondLink);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", firstLearningSessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.expressions[0].completed").value(false))
+        .andExpect(jsonPath("$.data.expressions[0].lastRecommendedAt").value(nullValue()));
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", secondLearningSessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.expressions[0].completed").value(true))
+        .andExpect(
+            jsonPath("$.data.expressions[0].lastRecommendedAt").value("2026-07-27T10:00:00"));
+  }
+
+  @Test
   void rejectsForeignMissingCompletedAndAwaitingSessions() throws Exception {
     JsonNode ownerLogin = login("free-talk-owner@example.com");
     String ownerToken = ownerLogin.get("data").get("accessToken").asText();
