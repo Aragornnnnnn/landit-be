@@ -222,7 +222,8 @@ public class FreeTalkExpressionGenerationService {
   // 기존 표현 추천을 검증하고 세션 연결 엔티티로 변환한다.
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
-    expressionQueryService.validateActiveExpression(recommendation.existingExpressionId());
+    expressionQueryService.validatePublicFreeTalkExpression(
+        recommendation.existingExpressionId(), context.targetLocale(), context.baseLocale());
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),
         recommendation.existingExpressionId(),
