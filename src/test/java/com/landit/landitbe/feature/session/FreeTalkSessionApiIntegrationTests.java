@@ -659,6 +659,15 @@ class FreeTalkSessionApiIntegrationTests {
 
     finishExpression(accessToken, link);
 
+    Object firstSessionCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM free_talk_session_expression "
+                + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+            Object.class,
+            link.freeTalkSessionId(),
+            link.expressionId());
+    assertThat(firstSessionCompletedAt).isNotNull();
+
     Object firstCompletedAt =
         jdbcTemplate.queryForObject(
             "SELECT completed_at FROM user_writing_expression_completion "
@@ -668,6 +677,14 @@ class FreeTalkSessionApiIntegrationTests {
 
     finishExpression(accessToken, link);
 
+    Object repeatedSessionCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM free_talk_session_expression "
+                + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+            Object.class,
+            link.freeTalkSessionId(),
+            link.expressionId());
+
     Object repeatedCompletedAt =
         jdbcTemplate.queryForObject(
             "SELECT completed_at FROM user_writing_expression_completion "
@@ -675,6 +692,7 @@ class FreeTalkSessionApiIntegrationTests {
             Object.class,
             link.expressionId());
     assertThat(repeatedCompletedAt).isEqualTo(firstCompletedAt);
+    assertThat(repeatedSessionCompletedAt).isEqualTo(firstSessionCompletedAt);
 
     assertThat(
             jdbcTemplate.queryForObject(

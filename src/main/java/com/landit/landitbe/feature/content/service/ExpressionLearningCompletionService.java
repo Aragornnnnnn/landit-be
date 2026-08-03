@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
@@ -76,8 +77,9 @@ public class ExpressionLearningCompletionService {
     }
 
     if (freeTalkSessionId != null) {
-      validateFreeTalkCompletion(userId, freeTalkSessionId, expressionId);
-      completeFreeTalkExpression(userId, scenarioId, expressionId);
+      FreeTalkSessionExpression sessionExpression =
+          validateFreeTalkCompletion(userId, freeTalkSessionId, expressionId);
+      completeFreeTalkExpression(userId, scenarioId, expressionId, sessionExpression);
       return;
     }
 
@@ -108,16 +110,22 @@ public class ExpressionLearningCompletionService {
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
 
-  // 프리톡 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
-  private void completeFreeTalkExpression(Long userId, Long scenarioId, Long expressionId) {
+  // 프리톡 세션 표현과 사용자 전체 완료 이력을 함께 갱신한다.
+  private void completeFreeTalkExpression(
+      Long userId,
+      Long scenarioId,
+      Long expressionId,
+      FreeTalkSessionExpression sessionExpression) {
     writingExpressionRepository
         .findByIdAndStatusForUpdate(expressionId, ActiveStatus.ACTIVE)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+    sessionExpression.complete();
     learningProgressService.completeFreeTalkExpression(userId, scenarioId, expressionId);
   }
 
   // 완료 요청이 사용자의 완료 프리톡에서 추천된 표현인지 검증한다.
-  private void validateFreeTalkCompletion(Long userId, Long freeTalkSessionId, Long expressionId) {
+  private FreeTalkSessionExpression validateFreeTalkCompletion(
+      Long userId, Long freeTalkSessionId, Long expressionId) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionId(freeTalkSessionId)
@@ -131,11 +139,12 @@ public class ExpressionLearningCompletionService {
     }
     if (learningSession.getStatus() != LearningSessionStatus.COMPLETED
         || freeTalkSession.getConversationStatus() != FreeTalkConversationStatus.COMPLETED
-        || freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.READY
-        || !sessionExpressionRepository.existsByFreeTalkSessionIdAndWritingExpressionId(
-            freeTalkSession.getId(), expressionId)) {
+        || freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.READY) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
+    return sessionExpressionRepository
+        .findByFreeTalkSessionIdAndWritingExpressionId(freeTalkSession.getId(), expressionId)
+        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
   /** 사용자 로케일과 학습 순서로 표현의 잠금 해제 여부를 판단한다. */

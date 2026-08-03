@@ -17,5 +17,19 @@ class FreeTalkSessionExpressionTest {
     assertThat(expression.getFreeTalkSessionId()).isEqualTo(10L);
     assertThat(expression.getWritingExpressionId()).isEqualTo(20L);
     assertThat(expression.getDisplayOrder()).isEqualTo(1);
+    assertThat(expression.getCompletedAt()).isNull();
+  }
+
+  /** 같은 프리톡 표현을 다시 완료해도 현재 세션의 최초 완료 시각을 유지한다. */
+  @Test
+  void completesExpressionOncePerSession() {
+    FreeTalkSessionExpression expression = FreeTalkSessionExpression.link(10L, 20L, 1);
+
+    expression.complete();
+    var firstCompletedAt = expression.getCompletedAt();
+    expression.complete();
+
+    assertThat(firstCompletedAt).isNotNull();
+    assertThat(expression.getCompletedAt()).isEqualTo(firstCompletedAt);
   }
 }

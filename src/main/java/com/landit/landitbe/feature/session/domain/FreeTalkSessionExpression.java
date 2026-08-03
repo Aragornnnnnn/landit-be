@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.Getter;
 
 /** 프리톡 세션별 개인화 예문과 표현 노출 순서를 저장한다. */
@@ -29,6 +30,9 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
   @Column(name = "display_order", nullable = false)
   private int displayOrder;
 
+  @Column(name = "completed_at")
+  private LocalDateTime completedAt;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSessionExpression() {}
 
@@ -47,5 +51,12 @@ public class FreeTalkSessionExpression extends BaseTimeEntity {
     expression.writingExpressionId = writingExpressionId;
     expression.displayOrder = displayOrder;
     return expression;
+  }
+
+  /** 현재 프리톡 세션에서 표현 학습을 완료한다. */
+  public void complete() {
+    if (completedAt == null) {
+      completedAt = LocalDateTime.now();
+    }
   }
 }

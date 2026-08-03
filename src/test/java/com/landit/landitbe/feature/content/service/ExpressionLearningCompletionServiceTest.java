@@ -26,6 +26,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
@@ -186,6 +187,8 @@ class ExpressionLearningCompletionServiceTest {
     WritingExpression expression = expressionInScenario();
     FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
     LearningSession learningSession = mock(LearningSession.class);
+    FreeTalkSessionExpression sessionExpression =
+        FreeTalkSessionExpression.link(freeTalkSessionId, LOCKED_EXPRESSION_ID, 1);
     when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
     when(writingExpressionRepository.findByIdAndStatusForUpdate(
@@ -202,12 +205,13 @@ class ExpressionLearningCompletionServiceTest {
         .thenReturn(Optional.of(learningSession));
     when(learningSession.getUserProfileId()).thenReturn(USER_ID);
     when(learningSession.getStatus()).thenReturn(LearningSessionStatus.COMPLETED);
-    when(sessionExpressionRepository.existsByFreeTalkSessionIdAndWritingExpressionId(
+    when(sessionExpressionRepository.findByFreeTalkSessionIdAndWritingExpressionId(
             freeTalkSessionId, LOCKED_EXPRESSION_ID))
-        .thenReturn(true);
+        .thenReturn(Optional.of(sessionExpression));
     expressionLearningCompletionService.completeLearning(
         USER_ID, LOCKED_EXPRESSION_ID, learningSessionId);
 
+    assertThat(sessionExpression.getCompletedAt()).isNotNull();
     verify(learningProgressService)
         .completeFreeTalkExpression(USER_ID, expression.getScenarioId(), LOCKED_EXPRESSION_ID);
     verify(writingExpressionRepository)
