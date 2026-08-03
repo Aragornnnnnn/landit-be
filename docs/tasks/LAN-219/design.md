@@ -30,9 +30,9 @@
 
 ## API 계약
 
-기존 `GET /api/v1/scenarios` 전체 목록 API는 제거한다. `GET /api/v1/scenarios/daily?date=yyyy-MM-dd`만 제공한다.
+기존 `GET /api/v1/scenarios` 전체 목록 API는 제거한다. `GET /api/v1/scenarios/daily`만 제공한다.
 
-- `date`는 필수이며 `Asia/Seoul` 기준 오늘 또는 과거 날짜만 허용한다. 미래 날짜는 `400 INVALID_REQUEST`다.
+- `date`는 선택값이다. 생략하면 `Asia/Seoul` 기준 오늘을 조회하며, 명시할 때는 오늘 또는 과거 날짜만 허용한다. 미래 날짜는 `400 INVALID_REQUEST`다.
 - 오늘 조회는 먼저 오늘 최초 완료한 시나리오를 조회한다. 완료 이력이 없으면 현재 순서의 미완료 시나리오를 반환한다.
 - 과거 조회는 해당 날짜에 `user_scenario_access.granted_at`이 생성된 최초 완료 시나리오만 반환한다. 이력이 없으면 `playable=false`, `scenario=null`이다.
 - `scenario`가 있으면 `dailyScenarioType`은 항상 `NEW`, `RETRY`, `CLEARED` 중 하나다. 과거와 오늘의 완료 이력은 `CLEARED`다.
