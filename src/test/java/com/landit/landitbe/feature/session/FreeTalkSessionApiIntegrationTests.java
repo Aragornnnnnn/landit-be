@@ -942,8 +942,8 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
-            id, scenario_id, owner_user_profile_id, expression_type, usage_frequency_level,
-            target_locale, base_locale, display_order, target_expression_text,
+            id, scenario_id, owner_user_profile_id, expression_source, expression_type,
+            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_question_text, representative_question_translation,
             representative_sentence_text, representative_sentence_translation,
@@ -951,7 +951,7 @@ class FreeTalkSessionApiIntegrationTests {
             representative_image_url, practice_examples_payload, status, created_at, updated_at
         )
         VALUES (
-            ?, NULL, ?, 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
+            ?, NULL, ?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
             '죽이 잘 맞다', '처음 만난 사람과 잘 통할 때 사용한다.',
             '서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.',
             'How was meeting your new teammate?', '새 팀원을 만나 보니 어땠어?',

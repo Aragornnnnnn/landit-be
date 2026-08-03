@@ -327,6 +327,56 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
   }
 
+  @DisplayName("V36 migration은 Writing 표현의 시나리오와 프리톡 사용 영역을 구분한다.")
+  @Test
+  void v36AddsWritingExpressionSource() {
+    assertColumnExists("writing_expression", "expression_source");
+    assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+
+    Integer mismatchedSourceCount =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from writing_expression
+            where (scenario_id is null and expression_source <> 'FREE_TALK')
+               or (scenario_id is not null and expression_source <> 'SCENARIO')
+            """,
+            Integer.class);
+    assertThat(mismatchedSourceCount).isZero();
+  }
+
+  @DisplayName("V36 migration은 시나리오에 속하지 않은 공용 프리톡 표현을 허용한다.")
+  @Test
+  @Transactional
+  void v36AllowsPublicFreeTalkExpression() {
+    jdbcTemplate.update(
+        """
+        insert into writing_expression (
+            expression_source, expression_type, usage_frequency_level, target_locale, base_locale,
+            display_order, target_expression_text, base_expression_meaning_text, usage_summary,
+            usage_description, representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            practice_examples_payload, status, created_at, updated_at
+        )
+        values ('FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 990204,
+            'free-talk sample', '프리톡 샘플', 'summary', 'description', 'sentence', '문장',
+            ARRAY['sentence'], ARRAY['sentence','choice'], CAST('[]' AS jsonb), 'ACTIVE',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+
+    Integer expressionCount =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from writing_expression
+            where expression_source = 'FREE_TALK'
+              and scenario_id is null
+              and owner_user_profile_id is null
+            """,
+            Integer.class);
+    assertThat(expressionCount).isEqualTo(1);
+  }
+
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
   @Test
   void v32ConvertsUserPushTokenToExpoPushToken() {

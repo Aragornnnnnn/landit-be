@@ -1,4 +1,4 @@
-// 시나리오에 연결된 Writing 보충학습 표현 콘텐츠를 저장한다.
+// Writing 보충학습 표현 콘텐츠를 저장한다.
 
 package com.landit.landitbe.feature.content.domain;
 
@@ -19,7 +19,7 @@ import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** 시나리오에 연결된 Writing 보충학습 표현 콘텐츠를 저장한다. */
+/** Writing 보충학습 표현 콘텐츠를 저장한다. */
 @Entity
 @Getter
 @Table(name = "writing_expression")
@@ -34,6 +34,10 @@ public class WritingExpression extends BaseTimeEntity {
 
   @Column(name = "owner_user_profile_id")
   private Long ownerUserProfileId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "expression_source", nullable = false, length = 20)
+  private WritingExpressionSource expressionSource;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "expression_type", nullable = false, length = 30)
@@ -110,6 +114,7 @@ public class WritingExpression extends BaseTimeEntity {
       FreeTalkGeneratedExpressionContent content) {
     WritingExpression expression = new WritingExpression();
     expression.ownerUserProfileId = ownerUserProfileId;
+    expression.expressionSource = WritingExpressionSource.FREE_TALK;
     expression.expressionType = WritingExpressionType.CONVERSATION_SKILL;
     expression.usageFrequencyLevel = ExpressionUsageFrequencyLevel.BASIC;
     expression.targetLocale = targetLocale;
