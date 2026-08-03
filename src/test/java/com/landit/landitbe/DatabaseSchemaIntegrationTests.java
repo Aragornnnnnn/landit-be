@@ -321,10 +321,16 @@ class DatabaseSchemaIntegrationTests {
     assertNullableColumn("writing_expression", "scenario_id");
     assertNullableColumn("user_writing_expression_completion", "scenario_id");
     assertColumnDoesNotExist("free_talk_session_expression", "generated_content_payload");
-    assertColumnExists("free_talk_session_expression", "completed_at");
     assertTableConstraintExists(
         "free_talk_session", "chk_free_talk_session_expression_generation_status");
     assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+  }
+
+  @DisplayName("V37 migration은 프리톡 세션별 표현 완료 시각을 추가한다.")
+  @Test
+  void v37AddsFreeTalkExpressionCompletionTime() {
+    assertColumnExists("free_talk_session_expression", "completed_at");
+    assertNullableColumn("free_talk_session_expression", "completed_at");
   }
 
   @DisplayName("V36 migration은 Writing 표현의 시나리오와 프리톡 사용 영역을 구분한다.")
