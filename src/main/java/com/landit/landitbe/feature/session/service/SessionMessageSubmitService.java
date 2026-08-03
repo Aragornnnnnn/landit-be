@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiInnerThoughtResult;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionMessageInputType;
@@ -31,6 +32,7 @@ public class SessionMessageSubmitService {
   private final SessionMessageService sessionMessageService;
   private final SessionMessageFeedbackRequester sessionMessageFeedbackRequester;
   private final GeneratedMessageService generatedMessageService;
+  private final UserProfileService userProfileService;
   private final PlatformTransactionManager transactionManager;
   private final TaskExecutor taskExecutor;
 
@@ -41,6 +43,7 @@ public class SessionMessageSubmitService {
       SessionMessageService sessionMessageService,
       SessionMessageFeedbackRequester sessionMessageFeedbackRequester,
       GeneratedMessageService generatedMessageService,
+      UserProfileService userProfileService,
       PlatformTransactionManager transactionManager,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
     this.submittedMessageService = submittedMessageService;
@@ -49,6 +52,7 @@ public class SessionMessageSubmitService {
     this.sessionMessageService = sessionMessageService;
     this.sessionMessageFeedbackRequester = sessionMessageFeedbackRequester;
     this.generatedMessageService = generatedMessageService;
+    this.userProfileService = userProfileService;
     this.transactionManager = transactionManager;
     this.taskExecutor = taskExecutor;
   }
@@ -79,9 +83,14 @@ public class SessionMessageSubmitService {
           feedbackProcessingStatus(submittedContext, generation);
       SessionMessageSubmitResponse response =
           executeInTransaction(
-              () ->
-                  generatedMessageService.record(
-                      submittedContext, generation, feedbackProcessingStatus));
+              () -> {
+                if (generation.completed()) {
+                  // 세션 잠금보다 먼저 사용자 잠금을 획득해 완료 기록 순서를 통일한다.
+                  userProfileService.requireActiveForUpdate(userId);
+                }
+                return generatedMessageService.record(
+                    submittedContext, generation, feedbackProcessingStatus);
+              });
       recordInnerThoughtAfterMessageGeneration(asyncGenerationRequests);
       log.info(
           "session message submitted: userId={}, sessionId={}, messageId={}, "

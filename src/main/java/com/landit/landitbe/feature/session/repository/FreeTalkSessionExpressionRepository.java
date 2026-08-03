@@ -1,0 +1,48 @@
+// 프리톡 세션별 개인화 표현을 저장하고 조회한다.
+
+package com.landit.landitbe.feature.session.repository;
+
+import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+/** 프리톡 세션별 개인화 표현을 저장하고 조회한다. */
+public interface FreeTalkSessionExpressionRepository
+    extends JpaRepository<FreeTalkSessionExpression, Long> {
+
+  /**
+   * 세션에 연결된 표현을 노출 순서대로 조회한다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @return 세션에 연결된 맞춤 표현 목록
+   */
+  List<FreeTalkSessionExpression> findByFreeTalkSessionIdOrderByDisplayOrderAsc(
+      Long freeTalkSessionId);
+
+  /**
+   * 여러 세션에 연결된 표현을 세션과 노출 순서대로 일괄 조회한다.
+   *
+   * @param freeTalkSessionIds 프리톡 세션 ID 목록
+   * @return 세션별 맞춤 표현 목록
+   */
+  List<FreeTalkSessionExpression>
+      findByFreeTalkSessionIdInOrderByFreeTalkSessionIdAscDisplayOrderAsc(
+          List<Long> freeTalkSessionIds);
+
+  /**
+   * 프리톡 세션이 특정 표현을 추천했는지 확인한다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @param writingExpressionId Writing 표현 ID
+   * @return 세션에서 추천한 표현이면 {@code true}
+   */
+  boolean existsByFreeTalkSessionIdAndWritingExpressionId(
+      Long freeTalkSessionId, Long writingExpressionId);
+
+  /**
+   * 세션에 연결된 모든 맞춤 표현을 삭제한다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   */
+  void deleteByFreeTalkSessionId(Long freeTalkSessionId);
+}

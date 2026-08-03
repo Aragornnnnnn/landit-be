@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.content.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
@@ -43,6 +44,7 @@ public interface ExpressionControllerDocs {
   /**
    * 선택한 표현의 학습 상세를 조회한다.
    *
+   * @param principal 인증된 사용자
    * @param expressionId 학습할 표현 ID
    * @return 표현 학습 시작 상세
    */
@@ -50,11 +52,13 @@ public interface ExpressionControllerDocs {
       summary = "원어민 표현 학습 시작",
       description = "선택한 표현의 뜻, 설명과 대표 예문을 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(Long expressionId);
+  ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
+      AuthUserPrincipal principal, Long expressionId);
 
   /**
    * 선택한 표현의 추가 예문과 작문 문제를 조회한다.
    *
+   * @param principal 인증된 사용자
    * @param expressionId 학습 중인 표현 ID
    * @return 추가 예문과 작문 문제
    */
@@ -62,18 +66,21 @@ public interface ExpressionControllerDocs {
       summary = "원어민 표현 학습 추가 예문 조회",
       description = "추가 예문 목록과 무작위 작문 문제를 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(Long expressionId);
+  ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
+      AuthUserPrincipal principal, Long expressionId);
 
   /**
    * 선택한 표현의 학습 완료를 기록한다.
    *
    * @param principal 인증된 사용자
    * @param expressionId 완료할 표현 ID
+   * @param request 프리톡 학습 맥락. 시나리오 학습이면 null
    * @return 빈 객체를 담은 성공 응답
    */
   @Operation(
       summary = "원어민 표현 학습 완료",
-      description = "표현 학습 완료를 기록하고 다음 표현 잠금 정책을 갱신한다.",
+      description = "시나리오는 순차 잠금, 프리톡은 세션 연결 검증 후 완료를 기록한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  ApiResponse<Map<String, Object>> finishLearning(AuthUserPrincipal principal, Long expressionId);
+  ApiResponse<Map<String, Object>> finishLearning(
+      AuthUserPrincipal principal, Long expressionId, ExpressionLearningFinishRequest request);
 }

@@ -11,22 +11,22 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 
 /** 앱 버전 정책 API의 OpenAPI 문서를 정의한다. */
 @Tag(name = "App Version", description = "앱 버전 정책 API")
 public interface AppVersionControllerDocs {
 
   /**
-   * 현재 앱 빌드의 업데이트 필요 수준을 확인한다.
+   * 현재 앱 버전의 업데이트 필요 수준을 확인한다.
    *
    * @param platform 앱 플랫폼
-   * @param buildNumber 현재 앱 빌드 번호
+   * @param versionName 현재 앱 버전명
+   * @param buildNumber 현재 앱 빌드 번호. 업데이트 판단에는 사용하지 않는다.
    * @return 플랫폼별 업데이트 정책 응답
-   * @throws ApiException 활성 앱 버전 정책이 설정되지 않았을 때
+   * @throws ApiException 플랫폼 앱 버전 정책이 설정되지 않았을 때
    */
-  @Operation(
-      summary = "앱 버전 업데이트 확인",
-      description = "플랫폼과 현재 빌드 번호를 활성 버전 정책과 비교해 업데이트 필요 수준을 반환한다.")
+  @Operation(summary = "앱 버전 업데이트 확인")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
@@ -40,6 +40,9 @@ public interface AppVersionControllerDocs {
   })
   ApiResponse<AppVersionCheckResponse> check(
       @Parameter(description = "앱 플랫폼", example = "IOS", required = true) AppPlatform platform,
+      @Parameter(description = "현재 앱 버전명", example = "1.2.0", required = true)
+          @Pattern(regexp = "\\d+\\.\\d+\\.\\d+")
+          String versionName,
       @Parameter(description = "현재 앱 빌드 번호", example = "18", required = true) @Min(1)
           long buildNumber);
 }

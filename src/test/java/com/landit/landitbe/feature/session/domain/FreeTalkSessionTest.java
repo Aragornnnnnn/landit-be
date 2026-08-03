@@ -29,6 +29,8 @@ class FreeTalkSessionTest {
     session.completeByUserExit();
 
     assertThat(session.getConversationStatus()).isEqualTo(FreeTalkConversationStatus.COMPLETED);
+    assertThat(session.getExpressionGenerationStatus())
+        .isEqualTo(ExpressionGenerationStatus.PREPARING);
   }
 
   /** 종료 확인 대기 세션도 사용자의 종료 확정으로 완료된다. */
@@ -40,6 +42,16 @@ class FreeTalkSessionTest {
     session.completeByUserExit();
 
     assertThat(session.getConversationStatus()).isEqualTo(FreeTalkConversationStatus.COMPLETED);
+  }
+
+  /** 같은 세션의 표현 생성 작업을 두 번 선점할 수 없다. */
+  @Test
+  void rejectsDuplicateExpressionGenerationStart() {
+    FreeTalkSession session = newSession();
+    session.completeByTimeLimit();
+    session.startExpressionGeneration();
+
+    assertThatIllegalStateException().isThrownBy(session::startExpressionGeneration);
   }
 
   /** 완료된 세션은 더 이상 대화 상태를 변경할 수 없다. */

@@ -1,8 +1,10 @@
-// 지난 프리톡 상세 대화 기록을 표현한다.
+// 지난 프리톡 상세 대화와 맞춤 표현 상태를 표현한다.
 
 package com.landit.landitbe.feature.session.dto;
 
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.domain.ExpressionLearningStatus;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,6 +18,9 @@ import java.util.List;
  * @param completedAt 세션 완료 시각
  * @param userSpeakingDurationMs 세션의 사용자 발화 시간 합계
  * @param messages 전체 대화 메시지
+ * @param expressionGenerationStatus 맞춤 표현 생성 상태
+ * @param expressionLearningStatus 맞춤 표현 학습 상태
+ * @param expressions 이번 프리톡에 연결된 표현 목록
  */
 public record FreeTalkSessionDetailResponse(
     Long sessionId,
@@ -23,7 +28,10 @@ public record FreeTalkSessionDetailResponse(
     LocalDateTime startedAt,
     LocalDateTime completedAt,
     long userSpeakingDurationMs,
-    List<Message> messages) {
+    List<Message> messages,
+    ExpressionGenerationStatus expressionGenerationStatus,
+    ExpressionLearningStatus expressionLearningStatus,
+    List<Expression> expressions) {
 
   /**
    * 저장된 대화 메시지다.
@@ -48,4 +56,22 @@ public record FreeTalkSessionDetailResponse(
       CharacterEmotion emotion,
       String innerThought,
       InnerThoughtType innerThoughtType) {}
+
+  /**
+   * 세션별 맞춤 표현의 요약이다.
+   *
+   * @param expressionId 공통 원어민 표현 ID
+   * @param displayOrder 세션 내 노출 순서
+   * @param targetExpressionText 학습 언어 표현
+   * @param baseExpressionMeaningText 기준 언어 표현 뜻
+   * @param completed 현재 사용자의 표현 학습 완료 여부
+   * @param lastCompletedAt 프리톡 출처에서 마지막으로 완료한 시각
+   */
+  public record Expression(
+      Long expressionId,
+      int displayOrder,
+      String targetExpressionText,
+      String baseExpressionMeaningText,
+      boolean completed,
+      LocalDateTime lastCompletedAt) {}
 }

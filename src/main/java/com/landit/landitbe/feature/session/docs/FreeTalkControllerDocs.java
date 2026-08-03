@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
@@ -203,4 +204,32 @@ public interface FreeTalkControllerDocs {
   ResponseEntity<ApiResponse<FreeTalkSessionDetailResponse>> getSession(
       AuthUserPrincipal principal,
       @Parameter(description = "조회할 프리톡 학습 세션 ID", example = "123") long sessionId);
+
+  /**
+   * 실패한 맞춤 표현 생성 작업을 다시 시작한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 프리톡 학습 세션 ID
+   * @return 표현 생성 재시도 요청 결과
+   */
+  @Operation(summary = "맞춤 표현 생성 재시도", security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "202",
+        description = "재시도 요청 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "세션 소유자 아님"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "세션 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "재시도할 수 없는 세션 상태")
+  })
+  ResponseEntity<ApiResponse<FreeTalkExpressionRetryResponse>> retryExpressions(
+      AuthUserPrincipal principal, long sessionId);
 }

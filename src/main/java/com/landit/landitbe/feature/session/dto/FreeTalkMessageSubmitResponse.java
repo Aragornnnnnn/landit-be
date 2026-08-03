@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.session.dto;
 
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
@@ -126,11 +127,13 @@ public record FreeTalkMessageSubmitResponse(
    * @param speakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
    * @param usedSpeakingTimeMs KST 당일 사용한 사용자 발화 시간 밀리초
    * @param remainingSpeakingTimeMs KST 당일 남은 사용자 발화 시간 밀리초
+   * @param expressionGenerationStatus 맞춤 표현 생성 상태
    */
   public record ProgressResponse(
       FreeTalkConversationStatus sessionStatus,
       long accumulatedSpeakingDurationMs,
       long speakingTimeLimitMs,
       long usedSpeakingTimeMs,
-      long remainingSpeakingTimeMs) {}
+      long remainingSpeakingTimeMs,
+      ExpressionGenerationStatus expressionGenerationStatus) {}
 }
