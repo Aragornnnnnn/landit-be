@@ -60,19 +60,19 @@ public class FreeTalkExpressionGenerationService {
    */
   public void generate(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-    try {
-      // 중복 실행을 막는 상태 전이는 짧은 트랜잭션에서 먼저 확정한다.
-      GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
-      if (context == null) {
-        return;
-      }
+    // 중복 실행을 막는 상태 전이는 짧은 트랜잭션에서 먼저 확정한다.
+    GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
+    if (context == null) {
+      return;
+    }
 
+    try {
       // 전체 대화와 기존 표현 후보를 바탕으로 이번 프리톡에 적합한 표현을 추천한다.
       List<AiFreeTalkExpressionRecommendation> recommendations =
           aiFreeTalkClient
               .recommendExpressions(
                   new AiFreeTalkExpressionRecommendationsRequest(
-                      context.freeTalkSessionId(),
+                      context.learningSessionId(),
                       context.targetLocale().name(),
                       context.baseLocale().name(),
                       context.history(),
@@ -97,7 +97,7 @@ public class FreeTalkExpressionGenerationService {
               : aiFreeTalkClient
                   .generateExpressionLearningContent(
                       new AiFreeTalkExpressionLearningContentRequest(
-                          context.freeTalkSessionId(),
+                          context.learningSessionId(),
                           context.targetLocale().name(),
                           context.baseLocale().name(),
                           newExpressions))
@@ -222,14 +222,6 @@ public class FreeTalkExpressionGenerationService {
   // 기존 표현 추천을 검증하고 세션 연결 엔티티로 변환한다.
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
-    boolean isRecommendationCandidate =
-        context.existingExpressions().stream()
-            .anyMatch(
-                candidate ->
-                    candidate.expressionId().equals(recommendation.existingExpressionId()));
-    if (!isRecommendationCandidate) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-    }
     expressionQueryService.validateActiveExpression(recommendation.existingExpressionId());
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),

@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.session.dto;
 
+import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.domain.ExpressionLearningStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,11 +25,19 @@ public record FreeTalkSessionListResponse(List<Item> items, int page, int size, 
    * @param startedAt 세션 시작 시각
    * @param completedAt 세션 완료 시각
    * @param userSpeakingDurationMs 세션의 사용자 발화 시간 합계
+   * @param expressionGenerationStatus 맞춤 표현 생성 상태
+   * @param expressionLearningStatus 맞춤 표현 학습 상태
+   * @param expressionCount 연결된 맞춤 표현 수
+   * @param completedExpressionCount 완료한 맞춤 표현 수
    */
   public record Item(
       Long sessionId,
       String title,
       LocalDateTime startedAt,
       LocalDateTime completedAt,
-      long userSpeakingDurationMs) {}
+      long userSpeakingDurationMs,
+      ExpressionGenerationStatus expressionGenerationStatus,
+      ExpressionLearningStatus expressionLearningStatus,
+      int expressionCount,
+      int completedExpressionCount) {}
 }

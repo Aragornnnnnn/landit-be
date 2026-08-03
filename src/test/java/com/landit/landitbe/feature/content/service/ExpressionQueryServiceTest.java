@@ -231,6 +231,41 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
+  void shouldAllowPublicExpressionForUserSpecificQueries() {
+    WritingExpression expression = learningExpression();
+    when(expression.getPracticeExamplesPayload()).thenReturn(makePracticeExamplesPayload(1));
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+
+    ExpressionLearningResponse learningResponse =
+        expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID);
+    ExpressionPracticeResponse practiceResponse =
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
+
+    assertThat(learningResponse.expressionId()).isEqualTo(EXPRESSION_ID);
+    assertThat(practiceResponse.practiceSentence()).hasSize(1);
+  }
+
+  @Test
+  void shouldRejectAnotherUsersPrivateExpressionForUserSpecificQueries() {
+    WritingExpression expression = mock(WritingExpression.class);
+    when(expression.isOwnedByAnother(USER_ID)).thenReturn(true);
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+
+    assertThatThrownBy(
+            () -> expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.FORBIDDEN);
+    assertThatThrownBy(
+            () -> expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.FORBIDDEN);
+  }
+
+  @Test
   void shouldThrowWhenExpressionNotFound() {
     // given: DB에 해당 표현 데이터가 없는 상황 가정
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))

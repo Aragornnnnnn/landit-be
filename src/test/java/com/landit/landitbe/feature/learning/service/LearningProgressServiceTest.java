@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.learning.domain.ExpressionLearningSource;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
 import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
@@ -41,7 +42,8 @@ class LearningProgressServiceTest {
   /** 처음 완료한 표현은 새 완료 기록으로 저장한다. */
   @Test
   void savesFirstExpressionCompletion() {
-    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(USER_ID, SCENARIO_ID))
+    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioIdAndLearningSource(
+            USER_ID, SCENARIO_ID, ExpressionLearningSource.SCENARIO))
         .thenReturn(List.of());
 
     learningProgressService.completeExpression(USER_ID, SCENARIO_ID, EXPRESSION_ID);
@@ -54,13 +56,26 @@ class LearningProgressServiceTest {
   void updatesRepeatedExpressionCompletion() {
     UserWritingExpressionCompletion completion = mock(UserWritingExpressionCompletion.class);
     when(completion.getWritingExpressionId()).thenReturn(EXPRESSION_ID);
-    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(USER_ID, SCENARIO_ID))
+    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioIdAndLearningSource(
+            USER_ID, SCENARIO_ID, ExpressionLearningSource.SCENARIO))
         .thenReturn(List.of(completion));
 
     learningProgressService.completeExpression(USER_ID, SCENARIO_ID, EXPRESSION_ID);
 
     verify(completion).markCompletedAgain();
     verify(expressionCompletionRepository, never()).save(any());
+  }
+
+  /** 프리톡 완료 이력은 시나리오 이력과 별도로 저장한다. */
+  @Test
+  void savesFreeTalkCompletionSeparately() {
+    when(expressionCompletionRepository.findByUserProfileIdAndWritingExpressionIdAndLearningSource(
+            USER_ID, EXPRESSION_ID, ExpressionLearningSource.FREE_TALK))
+        .thenReturn(Optional.empty());
+
+    learningProgressService.completeFreeTalkExpression(USER_ID, SCENARIO_ID, EXPRESSION_ID);
+
+    verify(expressionCompletionRepository).save(any(UserWritingExpressionCompletion.class));
   }
 
   /** 다른 기능에는 학습 완료 엔티티 대신 완료한 표현 ID record를 반환한다. */
@@ -70,7 +85,8 @@ class LearningProgressServiceTest {
     UserWritingExpressionCompletion second = mock(UserWritingExpressionCompletion.class);
     when(first.getWritingExpressionId()).thenReturn(10L);
     when(second.getWritingExpressionId()).thenReturn(20L);
-    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioId(USER_ID, SCENARIO_ID))
+    when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioIdAndLearningSource(
+            USER_ID, SCENARIO_ID, ExpressionLearningSource.SCENARIO))
         .thenReturn(List.of(first, second));
 
     CompletedExpressionIds result =

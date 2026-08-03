@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
+import com.landit.landitbe.feature.content.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
@@ -73,11 +74,13 @@ public interface ExpressionControllerDocs {
    *
    * @param principal 인증된 사용자
    * @param expressionId 완료할 표현 ID
+   * @param request 프리톡 학습 맥락. 시나리오 학습이면 null
    * @return 빈 객체를 담은 성공 응답
    */
   @Operation(
       summary = "원어민 표현 학습 완료",
-      description = "표현 학습 완료를 기록하고 다음 표현 잠금 정책을 갱신한다.",
+      description = "시나리오는 순차 잠금, 프리톡은 세션 연결 검증 후 완료를 기록한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  ApiResponse<Map<String, Object>> finishLearning(AuthUserPrincipal principal, Long expressionId);
+  ApiResponse<Map<String, Object>> finishLearning(
+      AuthUserPrincipal principal, Long expressionId, ExpressionLearningFinishRequest request);
 }

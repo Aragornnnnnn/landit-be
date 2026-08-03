@@ -1,4 +1,4 @@
-// 프리톡 세션별 표현 노출 순서를 저장한다.
+// 프리톡 세션별 개인화 예문과 표현 노출 순서를 저장한다.
 
 package com.landit.landitbe.feature.session.domain;
 
@@ -11,7 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 
-/** 프리톡 세션별 표현 노출 순서를 저장한다. */
+/** 프리톡 세션별 개인화 예문과 표현 노출 순서를 저장한다. */
 @Getter
 @Entity
 @Table(name = "free_talk_session_expression")
