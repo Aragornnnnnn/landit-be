@@ -5,14 +5,16 @@ package com.landit.landitbe.feature.content.dto;
 import com.landit.landitbe.feature.content.domain.ScenarioCalendarType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
+import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 시나리오 캘린더 조회 API의 응답 구조를 정의한다.
  *
  * @param type 캘린더 조회 단위
  * @param date 창의 기준 날짜. 요청에서 생략했으면 오늘이 담긴다
- * @param label 화면 헤더 문구. WEEK은 "2026년 7월 5주차", MONTH은 "2026년 7월"
+ * @param label 화면 헤더 문구. WEEK은 "26년 7월 5주차", MONTH은 "26년 7월"
  * @param today 서버 기준 오늘 날짜
  * @param startedAt 사용자가 처음 시나리오를 완료한 날. 이력이 없으면 null
  * @param days 창의 모든 칸. WEEK 7개, MONTH은 그 달 일수(28~31개), 날짜 오름차순
@@ -21,7 +23,7 @@ import java.util.List;
 public record ScenarioCalendarResponse(
     @Schema(description = "캘린더 조회 단위") ScenarioCalendarType type,
     @Schema(description = "창의 기준 날짜. 요청에서 생략했으면 오늘") LocalDate date,
-    @Schema(description = "화면 헤더 문구", example = "2026년 7월 5주차") String label,
+    @Schema(description = "화면 헤더 문구", example = "26년 7월 5주차") String label,
     @Schema(description = "서버 기준 오늘 날짜") LocalDate today,
     @Schema(description = "사용자가 처음 시나리오를 완료한 날. 이력이 없으면 null") LocalDate startedAt,
     @Schema(description = "창의 모든 칸. WEEK 7개, MONTH은 그 달 일수(28~31개), 날짜 오름차순")
@@ -52,6 +54,7 @@ public record ScenarioCalendarResponse(
    * 내부 타입을 정의한다.
    *
    * @param date 해당 칸의 날짜
+   * @param dayOfWeek 해당 칸의 요일. "일"부터 "토"까지 한 글자
    * @param completed 그 날짜에 시나리오를 완료했는지 여부
    * @param scenarioId 완료한 시나리오 ID. 미완료 오늘 칸은 배정된 시나리오 ID, 그 외에는 null
    * @param thumbnailUrl 완료한 시나리오의 썸네일 URL. 미완료 칸은 null
@@ -59,6 +62,7 @@ public record ScenarioCalendarResponse(
   @Schema(description = "시나리오 캘린더 날짜 칸 응답")
   public record CalendarDayResponse(
       @Schema(description = "해당 칸의 날짜") LocalDate date,
+      @Schema(description = "해당 칸의 요일. \"일\"부터 \"토\"까지 한 글자", example = "목") String dayOfWeek,
       @Schema(description = "그 날짜에 시나리오를 완료했는지 여부") boolean completed,
       @Schema(description = "완료한 시나리오 ID. 미완료 오늘 칸은 배정된 시나리오 ID, 그 외에는 null") Long scenarioId,
       @Schema(description = "완료한 시나리오의 썸네일 URL. 미완료 칸은 null") String thumbnailUrl) {
@@ -73,7 +77,7 @@ public record ScenarioCalendarResponse(
      */
     public static CalendarDayResponse completedDay(
         LocalDate date, Long scenarioId, String thumbnailUrl) {
-      return new CalendarDayResponse(date, true, scenarioId, thumbnailUrl);
+      return new CalendarDayResponse(date, koreanDayOfWeek(date), true, scenarioId, thumbnailUrl);
     }
 
     /**
@@ -84,7 +88,7 @@ public record ScenarioCalendarResponse(
      * @return 미완료 상태의 오늘 칸
      */
     public static CalendarDayResponse uncompletedToday(LocalDate date, Long assignedScenarioId) {
-      return new CalendarDayResponse(date, false, assignedScenarioId, null);
+      return new CalendarDayResponse(date, koreanDayOfWeek(date), false, assignedScenarioId, null);
     }
 
     /**
@@ -94,7 +98,12 @@ public record ScenarioCalendarResponse(
      * @return 빈 날짜 칸
      */
     public static CalendarDayResponse emptyDay(LocalDate date) {
-      return new CalendarDayResponse(date, false, null, null);
+      return new CalendarDayResponse(date, koreanDayOfWeek(date), false, null, null);
+    }
+
+    /** 날짜의 요일을 "일"부터 "토"까지 한 글자로 변환한다. */
+    private static String koreanDayOfWeek(LocalDate date) {
+      return date.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
     }
   }
 }

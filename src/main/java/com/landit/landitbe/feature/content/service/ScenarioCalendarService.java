@@ -91,10 +91,11 @@ public class ScenarioCalendarService {
     return type == ScenarioCalendarType.WEEK ? WEEK_WINDOW_DAYS : baseDate.lengthOfMonth();
   }
 
-  /** 기준 날짜가 속한 달을 기준으로 화면 헤더 문구를 만든다. 1일이 포함된 주(일요일 시작)가 1주차다. */
+  /** 기준 날짜가 속한 달을 기준으로 화면 헤더 문구를 만든다. 연도는 두 자리로 줄이고, 1일이 포함된 주(일요일 시작)가 1주차다. */
   private static String label(ScenarioCalendarType type, LocalDate baseDate) {
+    int shortYear = baseDate.getYear() % 100;
     if (type == ScenarioCalendarType.MONTH) {
-      return "%d년 %d월".formatted(baseDate.getYear(), baseDate.getMonthValue());
+      return "%02d년 %d월".formatted(shortYear, baseDate.getMonthValue());
     }
 
     LocalDate firstWeekStart =
@@ -102,7 +103,7 @@ public class ScenarioCalendarService {
     LocalDate weekStart = baseDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
     long weekOfMonth = ChronoUnit.WEEKS.between(firstWeekStart, weekStart) + 1;
 
-    return "%d년 %d월 %d주차".formatted(baseDate.getYear(), baseDate.getMonthValue(), weekOfMonth);
+    return "%02d년 %d월 %d주차".formatted(shortYear, baseDate.getMonthValue(), weekOfMonth);
   }
 
   /** 창 구간의 날짜별 완료 시나리오 ID를 조회한다. */
