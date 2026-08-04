@@ -251,33 +251,38 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
-  void dailyScenarioRejectsMissingDate() throws Exception {
+  void dailyScenarioUsesTodayWhenDateIsMissing() throws Exception {
     JsonNode loginResponseBody = login();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedDailyScenarios();
 
     mockMvc
         .perform(
             get("/api/v1/scenarios/daily")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.date").value("2026-07-28"))
+        .andExpect(jsonPath("$.data.playable").value(true))
+        .andExpect(jsonPath("$.data.scenario.scenarioId").value(100));
   }
 
   @Test
-  void scenarioListApiIsRemoved() throws Exception {
+  void dailyScenarioUsesAsiaSeoulDateWhenDateIsMissingAtMidnightBoundary() throws Exception {
+    mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
     JsonNode loginResponseBody = login();
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedDailyScenarios();
 
     mockMvc
         .perform(
-            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.success").value(false))
-        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+            get("/api/v1/scenarios/daily")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.date").value("2026-07-29"));
   }
 
   @Test
-  void openApiDocumentsDailyScenarioContractAndRemovedListPath() throws Exception {
+  void openApiDocumentsDailyScenarioContract() throws Exception {
     String dailyScenarioPath = "$.paths['/api/v1/scenarios/daily'].get";
 
     mockMvc
@@ -285,11 +290,10 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath(dailyScenarioPath + ".summary").value("날짜별 시나리오 조회"))
         .andExpect(jsonPath(dailyScenarioPath + ".parameters[0].name").value("date"))
-        .andExpect(jsonPath(dailyScenarioPath + ".parameters[0].required").value(true))
+        .andExpect(jsonPath(dailyScenarioPath + ".parameters[0].required").value(false))
         .andExpect(jsonPath(dailyScenarioPath + ".responses['200']").exists())
         .andExpect(jsonPath(dailyScenarioPath + ".responses['400']").exists())
-        .andExpect(jsonPath(dailyScenarioPath + ".responses['401']").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/scenarios']").doesNotExist());
+        .andExpect(jsonPath(dailyScenarioPath + ".responses['401']").exists());
   }
 
   private JsonNode login() throws Exception {
