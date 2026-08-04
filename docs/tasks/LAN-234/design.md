@@ -11,10 +11,10 @@
 
 | API | 응답 |
 | --- | --- |
-| `GET /api/v1/me/streak` | `currentStreakDays`, `activeToday` |
-| `GET /api/v1/me/streak/calendar?year={year}&month={month}` | `currentStreakDays`, `activeToday`, `streakStartedDate`, `longestStreakDays`, `totalActiveDays`, 요청 월의 `activeDates` |
+| `GET /api/v1/me/streak` | `currentStreakDays`, `activeToday`, KST 기준 `today` |
+| `GET /api/v1/me/streak/calendar?year={year}&month={month}` | KST 기준 `today`, `currentStreakDays`, `activeToday`, `firstActiveDate`, `longestStreakDays`, `totalActiveDays`, 요청 월의 `activeDates` |
 
-`month`는 1~12만 허용한다. 스트릭 기록이 없으면 숫자는 0, `activeToday`는 false, 시작일은 null, 날짜 목록은 빈 배열이다.
+`month`는 1~12만 허용한다. `today`는 `activeToday` 계산에 사용한 KST 날짜다. `firstActiveDate`는 현재 연속 구간의 시작일이 아니라 기능 출시 후 최초 활성일이다. 스트릭 기록이 없으면 숫자는 0, `activeToday`는 false, 최초 활성일은 null, 날짜 목록은 빈 배열이다.
 
 ## 집계 정책
 

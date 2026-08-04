@@ -20,14 +20,14 @@ import jakarta.validation.constraints.Min;
 public interface StreakControllerDocs {
 
   /**
-   * 인증된 사용자의 현재 스트릭과 오늘 완료 여부를 조회한다.
+   * 인증된 사용자의 현재 스트릭과 KST 기준 오늘 완료 여부를 조회한다.
    *
    * @param principal 인증된 사용자 정보
    * @return 현재 스트릭 API 응답
    */
   @Operation(
       summary = "현재 스트릭 조회",
-      description = "현재 연속 학습 일수와 오늘 정상 완료 여부를 조회한다.",
+      description = "현재 연속 학습 일수, KST 기준 오늘 날짜와 정상 완료 여부를 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -50,7 +50,7 @@ public interface StreakControllerDocs {
    */
   @Operation(
       summary = "월별 스트릭 달력 조회",
-      description = "현재 스트릭 통계와 요청한 연·월의 완료 날짜를 조회한다.",
+      description = "KST 기준 오늘 날짜, 현재 스트릭 통계와 요청한 연·월의 완료 날짜를 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
