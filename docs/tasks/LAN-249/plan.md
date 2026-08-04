@@ -2,9 +2,9 @@
 
 > **구현 작업자:** `superpowers:test-driven-development`를 적용해 아래 체크박스를 순서대로 수행한다.
 
-**목표:** `GET /api/v1/scenarios/daily` 요청에서 `date`를 생략하면 `Asia/Seoul` 기준 당일 시나리오를 조회한다.
+**목표:** `GET /api/v1/scenarios/daily` 요청에서 `date`를 생략하면 `Asia/Seoul` 기준 당일 시나리오를 조회하고, 삭제된 `GET /api/v1/scenarios` 목록 조회 계약을 복구한다.
 
-**구현 방향:** 컨트롤러는 `date`를 선택 파라미터로 전달하고, 이미 `Clock`과 서비스 시간대를 소유한 `DailyScenarioQueryService`가 요청 시각을 한 번 평가해 기본 조회일을 결정한다. 명시적으로 전달된 날짜의 기존 조회 및 미래 날짜 검증 동작은 유지한다.
+**구현 방향:** 컨트롤러는 `date`를 선택 파라미터로 전달하고, 이미 `Clock`과 서비스 시간대를 소유한 `DailyScenarioQueryService`가 요청 시각을 한 번 평가해 기본 조회일을 결정한다. 삭제 직전의 목록 응답, 조회 서비스, 전용 Repository와 Projection, 통합 테스트를 복원하고 현재 `/daily`, `/calendar` API와 같은 컨트롤러에서 공존시킨다.
 
 **기술 스택:** Java 21, Spring Boot 4, Spring MVC, JUnit 5, MockMvc, springdoc-openapi.
 
@@ -14,6 +14,8 @@
 - `Clock`에서 한 번 얻은 `Instant`로 당일 날짜와 시나리오 진행 상태를 함께 평가한다.
 - `date`가 전달된 요청의 기존 응답 계약은 변경하지 않는다.
 - DB 스키마와 Repository는 변경하지 않는다.
+- 목록 API는 삭제 직전의 경로, 인증, 응답 필드, 정렬, 잠금 및 진행 상태 계약을 유지한다.
+- `/api/v1/scenarios/daily`와 `/api/v1/scenarios/calendar`의 현재 계약은 변경하지 않는다.
 
 ---
 
@@ -134,8 +136,97 @@
 - 변경 범위: Controller, Service, API 문서, 통합 테스트만 수정하며 DB와 Repository는 제외한다.
 - 검증 순서: 실패 테스트 확인 후 최소 구현, 대상 통합 테스트, 전체 `check` 순으로 검증한다.
 
+### Task 2: 기존 시나리오 목록 조회 API 복구
+
+**변경 파일:**
+
+- 복원: `src/test/java/com/landit/landitbe/feature/content/ScenarioListApiIntegrationTests.java`
+- 복원: `src/main/java/com/landit/landitbe/feature/content/dto/ScenarioListResponse.java`
+- 복원: `src/main/java/com/landit/landitbe/feature/content/repository/ScenarioListQueryRepository.java`
+- 복원: `src/main/java/com/landit/landitbe/feature/content/repository/projection/ScenarioListProjection.java`
+- 복원: `src/main/java/com/landit/landitbe/feature/content/service/ScenarioQueryService.java`
+- 수정: `src/main/java/com/landit/landitbe/feature/content/ScenarioController.java`
+- 수정: `src/main/java/com/landit/landitbe/feature/content/docs/ScenarioControllerDocs.java`
+- 수정: `src/main/java/com/landit/landitbe/config/security/AuthSecurityConfig.java`
+
+**인터페이스:**
+
+- 입력: Bearer access token이 포함된 `GET /api/v1/scenarios` 요청.
+- 출력: `ApiResponse<ScenarioListResponse>`에 카테고리별 시나리오와 접근 상태, 신규·재도전 구분, 별점, 시작 메시지 미리보기를 반환한다.
+- 유지 계약: 카테고리와 시나리오 표시 순서, 비활성 콘텐츠 잠금, 완료·오늘·잠금 상태, TTS 음성 응답을 삭제 직전과 동일하게 유지한다.
+
+- [x] **Step 1: 삭제 직전 목록 API 통합 테스트를 복원한다.**
+
+  `0bd0f8a7^`의 `ScenarioListApiIntegrationTests`를 먼저 복원한다. 인증, 정렬, 진행 상태, 잠금, 미리보기, OpenAPI 계약을 기존 기대값 그대로 사용한다.
+
+- [x] **Step 2: 목록 통합 테스트를 실행해 API 부재로 실패하는지 확인한다.**
+
+  실행:
+
+  ```bash
+  ./gradlew test --tests com.landit.landitbe.feature.content.ScenarioListApiIntegrationTests --no-daemon --console=plain
+  ```
+
+  예상 결과: `GET /api/v1/scenarios` 매핑 또는 목록 응답 계약이 없어 테스트가 실패한다.
+
+- [x] **Step 3: 삭제 직전 목록 조회 구성요소를 복원한다.**
+
+  `0bd0f8a7^`에서 `ScenarioListResponse`, `ScenarioListQueryRepository`, `ScenarioListProjection`, `ScenarioQueryService`를 복원한다. 현재 남아 있는 `ScenarioProgressionService`, `ScenarioAccessService`, `UserProfileService` 공개 계약을 그대로 사용한다.
+
+- [x] **Step 4: 현재 시나리오 컨트롤러와 문서에 목록 엔드포인트를 병합한다.**
+
+  `ScenarioController`에 `ScenarioQueryService` 의존성과 다음 메서드를 추가한다.
+
+  ```java
+  @Override
+  @GetMapping("/api/v1/scenarios")
+  public ApiResponse<ScenarioListResponse> listScenarios(
+      @AuthenticationPrincipal AuthUserPrincipal principal) {
+    return ApiResponse.success(scenarioQueryService.getScenarioList(principal.userId()));
+  }
+  ```
+
+  `ScenarioControllerDocs`에는 삭제 직전의 `listScenarios` Javadoc과 OpenAPI 계약을 추가하되 기존 일일·캘린더 메서드는 유지한다.
+
+- [x] **Step 5: 목록 조회 경로에 인증을 다시 적용한다.**
+
+  `AuthSecurityConfig`에 `GET /api/v1/scenarios`를 `authenticated()` 경로로 추가하고, 현재 `/daily`, `/calendar` 인증 규칙을 유지한다.
+
+- [x] **Step 6: 목록 통합 테스트를 실행한다.**
+
+  실행:
+
+  ```bash
+  ./gradlew test --tests com.landit.landitbe.feature.content.ScenarioListApiIntegrationTests --no-daemon --console=plain
+  ```
+
+  예상 결과: 삭제 직전 목록 API 계약 테스트가 모두 통과한다.
+
+- [x] **Step 7: 전체 품질 검사를 실행한다.**
+
+  실행:
+
+  ```bash
+  ./gradlew check --rerun-tasks --no-daemon --console=plain
+  ```
+
+  예상 결과: Spotless, Checkstyle, 목록·일일·캘린더를 포함한 전체 테스트가 모두 통과한다.
+
+- [x] **Step 8: 목록 API 복구를 하나의 논리적 변경으로 커밋한다.**
+
+  ```bash
+  git add src/main/java/com/landit/landitbe/config/security/AuthSecurityConfig.java \
+    src/main/java/com/landit/landitbe/feature/content \
+    src/test/java/com/landit/landitbe/feature/content/ScenarioListApiIntegrationTests.java \
+    docs/tasks/LAN-249/plan.md
+  git commit -m "fix: 시나리오 목록 조회 API 복구"
+  ```
+
 ## 구현 결과
 
 - `date`를 생략하면 `Asia/Seoul` 기준 당일 날짜로 일일 시나리오를 조회한다.
 - 명시적 날짜 조회, 미래 날짜 거부, 인증, OpenAPI 계약을 기존 정책에 맞게 유지·갱신했다.
+- 삭제 직전의 `GET /api/v1/scenarios` 목록 응답, 조회 서비스, 전용 조회, 인증, OpenAPI 계약과 통합 테스트를 복원했다.
+- 일일 조회 통합 테스트에서 목록 API 제거를 검증하던 상충 계약을 제거하고 목록 API 통합 테스트로 책임을 분리했다.
+- 목록 API 복원 전 통합 테스트 13개 중 12개가 엔드포인트 부재로 실패하는 RED를 확인했고, 복원 후 13개가 모두 통과했다.
 - `./gradlew check --rerun-tasks --no-daemon`을 통과했다.

@@ -282,20 +282,7 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
-  void scenarioListApiIsRemoved() throws Exception {
-    JsonNode loginResponseBody = login();
-    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
-
-    mockMvc
-        .perform(
-            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.success").value(false))
-        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
-  }
-
-  @Test
-  void openApiDocumentsDailyScenarioContractAndRemovedListPath() throws Exception {
+  void openApiDocumentsDailyScenarioContract() throws Exception {
     String dailyScenarioPath = "$.paths['/api/v1/scenarios/daily'].get";
 
     mockMvc
@@ -306,8 +293,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath(dailyScenarioPath + ".parameters[0].required").value(false))
         .andExpect(jsonPath(dailyScenarioPath + ".responses['200']").exists())
         .andExpect(jsonPath(dailyScenarioPath + ".responses['400']").exists())
-        .andExpect(jsonPath(dailyScenarioPath + ".responses['401']").exists())
-        .andExpect(jsonPath("$.paths['/api/v1/scenarios']").doesNotExist());
+        .andExpect(jsonPath(dailyScenarioPath + ".responses['401']").exists());
   }
 
   private JsonNode login() throws Exception {
