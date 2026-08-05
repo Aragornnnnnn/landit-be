@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.character.docs;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.character.dto.CurrentStreakResponse;
 import com.landit.landitbe.feature.character.dto.StreakCalendarResponse;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,14 +44,17 @@ public interface StreakControllerDocs {
    * 인증된 사용자의 월별 스트릭 달력 정보를 조회한다.
    *
    * @param principal 인증된 사용자 정보
-   * @param year 조회 연도
-   * @param month 조회 월
+   * @param year 조회 연도. month와 함께 생략하면 KST 현재 월
+   * @param month 조회 월. year와 함께 생략하면 KST 현재 월
    * @return 월별 스트릭 달력 API 응답
    * @throws ConstraintViolationException year 또는 month가 허용 범위를 벗어난 경우
+   * @throws ApiException year와 month 중 하나만 전달된 경우
    */
   @Operation(
       summary = "월별 스트릭 달력 조회",
-      description = "KST 기준 오늘 날짜, 현재 스트릭 통계와 요청한 연·월의 완료 날짜를 조회한다.",
+      description =
+          "KST 기준 오늘 날짜, 현재 스트릭 통계와 조회 월의 완료 날짜를 조회한다. "
+              + "year와 month를 모두 생략하면 KST 현재 월을 조회하고, 지정할 때는 둘 다 전달해야 한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -65,6 +69,10 @@ public interface StreakControllerDocs {
   })
   ApiResponse<StreakCalendarResponse> getCalendar(
       AuthUserPrincipal principal,
-      @Parameter(description = "조회 연도", example = "2026", required = true) @Min(1) int year,
-      @Parameter(description = "조회 월", example = "7", required = true) @Min(1) @Max(12) int month);
+      @Parameter(description = "조회 연도. month와 함께 생략 가능", example = "2026", required = false) @Min(1)
+          Integer year,
+      @Parameter(description = "조회 월. year와 함께 생략 가능", example = "7", required = false)
+          @Min(1)
+          @Max(12)
+          Integer month);
 }

@@ -149,6 +149,37 @@ class StreakApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
+  /** 연·월을 생략하면 서버의 KST 오늘이 속한 월을 조회한다. */
+  @Test
+  void calendarDefaultsToCurrentKstMonth() throws Exception {
+    LoginResult login = login();
+    LocalDate today = LocalDate.now(KOREA_ZONE_ID);
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/streak/calendar")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.year").value(today.getYear()))
+        .andExpect(jsonPath("$.data.month").value(today.getMonthValue()))
+        .andExpect(jsonPath("$.data.today").value(today.toString()));
+  }
+
+  /** 연도와 월 중 하나만 전달한 달력 요청은 공통 검증 오류를 반환한다. */
+  @Test
+  void calendarRejectsPartialMonthParameters() throws Exception {
+    LoginResult login = login();
+
+    for (String query : new String[] {"year=2026", "month=8"}) {
+      mockMvc
+          .perform(
+              get("/api/v1/me/streak/calendar?" + query)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken()))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+  }
+
   /** OpenAPI 문서가 두 스트릭 조회 경로를 노출한다. */
   @Test
   void openApiDocumentsStreakPaths() throws Exception {

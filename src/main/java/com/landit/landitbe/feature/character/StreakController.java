@@ -7,6 +7,8 @@ import com.landit.landitbe.feature.character.docs.StreakControllerDocs;
 import com.landit.landitbe.feature.character.dto.CurrentStreakResponse;
 import com.landit.landitbe.feature.character.dto.StreakCalendarResponse;
 import com.landit.landitbe.feature.character.service.StreakService;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
@@ -38,10 +40,20 @@ public class StreakController implements StreakControllerDocs {
   @GetMapping("/api/v1/me/streak/calendar")
   public ApiResponse<StreakCalendarResponse> getCalendar(
       @AuthenticationPrincipal AuthUserPrincipal principal,
-      @RequestParam int year,
-      @RequestParam int month) {
+      @RequestParam(required = false) Integer year,
+      @RequestParam(required = false) Integer month) {
     return ApiResponse.success(
         StreakCalendarResponse.from(
-            year, month, streakService.getCalendar(principal.userId(), YearMonth.of(year, month))));
+            streakService.getCalendar(principal.userId(), requestedMonth(year, month))));
+  }
+
+  private static YearMonth requestedMonth(Integer year, Integer month) {
+    if (year == null && month == null) {
+      return null;
+    }
+    if (year == null || month == null) {
+      throw new ApiException(ErrorCode.VALIDATION_FAILED);
+    }
+    return YearMonth.of(year, month);
   }
 }

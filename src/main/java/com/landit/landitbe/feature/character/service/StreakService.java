@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -24,6 +25,7 @@ public class StreakService {
 
   private final UserDailyActivityRepository userDailyActivityRepository;
   private final UserLearningActivitySummaryRepository summaryRepository;
+  private final Clock clock;
 
   /**
    * 정상 완료한 대화를 해당 날짜의 스트릭 활동으로 기록한다.
@@ -71,7 +73,11 @@ public class StreakService {
    */
   @Transactional(readOnly = true)
   public CurrentStreak getCurrentStreak(long userId) {
-    LocalDate today = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate today = clock.instant().atZone(KOREA_ZONE_ID).toLocalDate();
+    return currentStreak(userId, today);
+  }
+
+  private CurrentStreak currentStreak(long userId, LocalDate today) {
     return summaryRepository
         .findById(userId)
         .map(summary -> CurrentStreak.from(summary, today))
@@ -82,14 +88,16 @@ public class StreakService {
    * 사용자의 전체 스트릭과 지정한 월의 완료 날짜를 조회한다.
    *
    * @param userId 사용자 ID
-   * @param yearMonth 조회할 연·월
+   * @param requestedMonth 조회할 연·월. null이면 KST 오늘이 속한 월
    * @return 월별 스트릭 정보
    */
   @Transactional(readOnly = true)
-  public StreakCalendar getCalendar(long userId, YearMonth yearMonth) {
+  public StreakCalendar getCalendar(long userId, YearMonth requestedMonth) {
+    LocalDate today = clock.instant().atZone(KOREA_ZONE_ID).toLocalDate();
+    YearMonth yearMonth = requestedMonth != null ? requestedMonth : YearMonth.from(today);
     LocalDate monthStart = yearMonth.atDay(1);
     LocalDate nextMonthStart = yearMonth.plusMonths(1).atDay(1);
-    CurrentStreak currentStreak = getCurrentStreak(userId);
+    CurrentStreak currentStreak = currentStreak(userId, today);
     UserLearningActivitySummary summary = summaryRepository.findById(userId).orElse(null);
     List<LocalDate> activeDates =
         userDailyActivityRepository
@@ -107,6 +115,7 @@ public class StreakService {
         Math.toIntExact(userDailyActivityRepository.countByUserProfileIdAndActiveDayTrue(userId));
 
     return new StreakCalendar(
+        yearMonth,
         currentStreak.currentStreakDays(),
         currentStreak.activeToday(),
         currentStreak.today(),
@@ -139,6 +148,7 @@ public class StreakService {
   /**
    * 월별 스트릭 조회 결과다.
    *
+   * @param yearMonth 조회한 연·월
    * @param currentStreakDays 현재 유효 스트릭 일수
    * @param activeToday 오늘 정상 완료 여부
    * @param today 스트릭 계산에 사용한 KST 기준 오늘 날짜
@@ -148,6 +158,7 @@ public class StreakService {
    * @param activeDates 요청한 월의 완료 날짜
    */
   public record StreakCalendar(
+      YearMonth yearMonth,
       int currentStreakDays,
       boolean activeToday,
       LocalDate today,
