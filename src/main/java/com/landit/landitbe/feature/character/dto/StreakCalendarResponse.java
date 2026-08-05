@@ -11,9 +11,10 @@ import java.util.List;
  *
  * @param year 조회한 연도
  * @param month 조회한 월
+ * @param today 스트릭 계산에 사용한 KST 기준 오늘 날짜
  * @param currentStreakDays 현재 유효 스트릭 일수
  * @param activeToday 오늘 정상 완료 여부
- * @param streakStartedDate 기능 출시 후 첫 완료일
+ * @param firstActiveDate 기능 출시 후 첫 완료일
  * @param longestStreakDays 최장 스트릭 일수
  * @param totalActiveDays 전체 활성 학습일 수
  * @param activeDates 요청한 월의 완료 날짜
@@ -21,9 +22,10 @@ import java.util.List;
 public record StreakCalendarResponse(
     int year,
     int month,
+    LocalDate today,
     int currentStreakDays,
     boolean activeToday,
-    LocalDate streakStartedDate,
+    LocalDate firstActiveDate,
     int longestStreakDays,
     int totalActiveDays,
     List<LocalDate> activeDates) {
@@ -41,9 +43,10 @@ public record StreakCalendarResponse(
     return new StreakCalendarResponse(
         year,
         month,
+        calendar.today(),
         calendar.currentStreakDays(),
         calendar.activeToday(),
-        calendar.streakStartedDate(),
+        calendar.firstActiveDate(),
         calendar.longestStreakDays(),
         calendar.totalActiveDays(),
         calendar.activeDates());

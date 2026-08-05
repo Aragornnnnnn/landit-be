@@ -145,6 +145,7 @@ class StreakServiceTest {
 
     assertThat(currentStreak.currentStreakDays()).isZero();
     assertThat(currentStreak.activeToday()).isFalse();
+    assertThat(currentStreak.today()).isEqualTo(today);
     assertThat(summary.getCurrentStreakDays()).isEqualTo(1);
     verify(summaryRepository, never()).save(any());
   }
@@ -170,7 +171,7 @@ class StreakServiceTest {
     StreakService.StreakCalendar calendar =
         streakService.getCalendar(USER_ID, YearMonth.of(2026, 7));
 
-    assertThat(calendar.streakStartedDate()).isEqualTo(firstDate);
+    assertThat(calendar.firstActiveDate()).isEqualTo(firstDate);
     assertThat(calendar.totalActiveDays()).isEqualTo(2);
     assertThat(calendar.activeDates())
         .containsExactly(LocalDate.of(2026, 7, 12), LocalDate.of(2026, 7, 18));

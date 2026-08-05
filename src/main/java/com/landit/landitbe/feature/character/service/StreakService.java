@@ -75,7 +75,7 @@ public class StreakService {
     return summaryRepository
         .findById(userId)
         .map(summary -> CurrentStreak.from(summary, today))
-        .orElseGet(() -> new CurrentStreak(0, false));
+        .orElseGet(() -> new CurrentStreak(0, false, today));
   }
 
   /**
@@ -97,7 +97,7 @@ public class StreakService {
             .stream()
             .map(UserDailyActivity::getActivityDate)
             .toList();
-    LocalDate streakStartedDate =
+    LocalDate firstActiveDate =
         userDailyActivityRepository
             .findFirstByUserProfileIdAndActiveDayTrueOrderByActivityDateAsc(userId)
             .map(UserDailyActivity::getActivityDate)
@@ -109,7 +109,8 @@ public class StreakService {
     return new StreakCalendar(
         currentStreak.currentStreakDays(),
         currentStreak.activeToday(),
-        streakStartedDate,
+        currentStreak.today(),
+        firstActiveDate,
         longestStreakDays,
         totalActiveDays,
         activeDates);
@@ -120,16 +121,18 @@ public class StreakService {
    *
    * @param currentStreakDays 현재 유효 스트릭 일수
    * @param activeToday 오늘 정상 완료 여부
+   * @param today 스트릭 계산에 사용한 KST 기준 오늘 날짜
    */
-  public record CurrentStreak(int currentStreakDays, boolean activeToday) {
+  public record CurrentStreak(int currentStreakDays, boolean activeToday, LocalDate today) {
 
     // 저장된 마지막 활동일을 기준으로 현재 유효 스트릭을 계산한다.
     private static CurrentStreak from(UserLearningActivitySummary summary, LocalDate today) {
       LocalDate lastActivityDate = summary.getLastActivityDate();
       if (lastActivityDate == null || lastActivityDate.isBefore(today.minusDays(1))) {
-        return new CurrentStreak(0, false);
+        return new CurrentStreak(0, false, today);
       }
-      return new CurrentStreak(summary.getCurrentStreakDays(), lastActivityDate.equals(today));
+      return new CurrentStreak(
+          summary.getCurrentStreakDays(), lastActivityDate.equals(today), today);
     }
   }
 
@@ -138,7 +141,8 @@ public class StreakService {
    *
    * @param currentStreakDays 현재 유효 스트릭 일수
    * @param activeToday 오늘 정상 완료 여부
-   * @param streakStartedDate 기능 출시 후 첫 완료일
+   * @param today 스트릭 계산에 사용한 KST 기준 오늘 날짜
+   * @param firstActiveDate 기능 출시 후 첫 완료일
    * @param longestStreakDays 최장 스트릭 일수
    * @param totalActiveDays 전체 활성 학습일 수
    * @param activeDates 요청한 월의 완료 날짜
@@ -146,7 +150,8 @@ public class StreakService {
   public record StreakCalendar(
       int currentStreakDays,
       boolean activeToday,
-      LocalDate streakStartedDate,
+      LocalDate today,
+      LocalDate firstActiveDate,
       int longestStreakDays,
       int totalActiveDays,
       List<LocalDate> activeDates) {}

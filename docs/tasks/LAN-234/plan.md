@@ -84,6 +84,24 @@ mockMvc.perform(get("/api/v1/me/streak/calendar?year=2026&month=7").header(AUTHO
 - [x] Run the affected session and streak tests, then run `./gradlew check`.
 - [x] Review the diff, update this plan with actual verification, and commit the integration slice.
 
+### Task 4: FE 스트릭 API 계약 후속 보완
+
+**Files:**
+- Modify: `feature/character/service/StreakService.java`, `feature/character/dto/CurrentStreakResponse.java`, `StreakCalendarResponse.java`, `feature/character/docs/StreakControllerDocs.java`
+- Test: `src/test/java/com/landit/landitbe/feature/character/StreakApiIntegrationTests.java`, `service/StreakServiceTest.java`
+
+**Interfaces:**
+- `GET /api/v1/me/streak`와 월별 달력 응답에 `activeToday` 계산 기준인 KST `today`를 제공한다.
+- 최초 활성일 필드를 `streakStartedDate`에서 `firstActiveDate`로 변경한다.
+
+- [x] 응답 계약 테스트를 먼저 변경하고 `today`와 `firstActiveDate` 경로 부재로 실패하는 것을 확인한다.
+- [x] `StreakService`에서 계산한 동일한 `today`를 두 응답에 전달하고 최초 활성일 명칭을 변경한다.
+- [x] 스트릭 API·서비스 대상 테스트를 실행한다.
+- [x] `./gradlew check --rerun-tasks --no-daemon`을 실행하고 최종 결과를 기록한다.
+
 ## Verification
 
 - `./gradlew check` 통과.
+- 후속 계약 RED: `./gradlew test --tests com.landit.landitbe.feature.character.StreakApiIntegrationTests --no-daemon`에서 신규 JSON 경로 3건 실패를 확인했다.
+- 후속 계약 GREEN: `./gradlew test --tests com.landit.landitbe.feature.character.StreakApiIntegrationTests --tests com.landit.landitbe.feature.character.service.StreakServiceTest --no-daemon` 통과.
+- 후속 전체 검증: Spotless 제시 형식을 반영한 뒤 `./gradlew check --rerun-tasks --no-daemon` 9개 작업 통과.

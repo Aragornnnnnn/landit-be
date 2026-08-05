@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.character.service.StreakService;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,8 @@ import org.springframework.test.web.servlet.MvcResult;
       "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
     })
 class StreakApiIntegrationTests {
+
+  private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
   @Autowired private MockMvc mockMvc;
 
@@ -74,6 +77,7 @@ class StreakApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.currentStreakDays").value(0))
         .andExpect(jsonPath("$.data.activeToday").value(false))
+        .andExpect(jsonPath("$.data.today").value(LocalDate.now(KOREA_ZONE_ID).toString()))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
@@ -94,16 +98,17 @@ class StreakApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.year").value(2026))
         .andExpect(jsonPath("$.data.month").value(7))
-        .andExpect(jsonPath("$.data.streakStartedDate").value("2026-07-12"))
+        .andExpect(jsonPath("$.data.today").value(LocalDate.now(KOREA_ZONE_ID).toString()))
+        .andExpect(jsonPath("$.data.firstActiveDate").value("2026-07-12"))
         .andExpect(jsonPath("$.data.longestStreakDays").value(1))
         .andExpect(jsonPath("$.data.totalActiveDays").value(2))
         .andExpect(jsonPath("$.data.activeDates[0]").value("2026-07-12"))
         .andExpect(jsonPath("$.data.activeDates[1]").value("2026-07-18"));
   }
 
-  /** 비활성 일별 활동은 스트릭 시작일로 사용하지 않는다. */
+  /** 비활성 일별 활동은 최초 활성일로 사용하지 않는다. */
   @Test
-  void calendarIgnoresInactiveDayForStreakStartedDate() throws Exception {
+  void calendarIgnoresInactiveDayForFirstActiveDate() throws Exception {
     LoginResult login = login();
     jdbcTemplate.update(
         """
@@ -128,7 +133,7 @@ class StreakApiIntegrationTests {
             get("/api/v1/me/streak/calendar?year=2026&month=7")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.streakStartedDate").value("2026-07-12"));
+        .andExpect(jsonPath("$.data.firstActiveDate").value("2026-07-12"));
   }
 
   /** 월 범위를 벗어난 요청은 공통 검증 오류를 반환한다. */
