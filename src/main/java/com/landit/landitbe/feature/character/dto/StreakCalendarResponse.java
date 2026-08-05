@@ -33,16 +33,13 @@ public record StreakCalendarResponse(
   /**
    * Service 조회 결과를 API 응답으로 변환한다.
    *
-   * @param year 조회한 연도
-   * @param month 조회한 월
    * @param calendar 월별 스트릭 조회 결과
    * @return 월별 스트릭 달력 API 응답
    */
-  public static StreakCalendarResponse from(
-      int year, int month, StreakService.StreakCalendar calendar) {
+  public static StreakCalendarResponse from(StreakService.StreakCalendar calendar) {
     return new StreakCalendarResponse(
-        year,
-        month,
+        calendar.yearMonth().getYear(),
+        calendar.yearMonth().getMonthValue(),
         calendar.today(),
         calendar.currentStreakDays(),
         calendar.activeToday(),

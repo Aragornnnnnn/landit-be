@@ -12,9 +12,13 @@
 | API | 응답 |
 | --- | --- |
 | `GET /api/v1/me/streak` | `currentStreakDays`, `activeToday`, KST 기준 `today` |
-| `GET /api/v1/me/streak/calendar?year={year}&month={month}` | KST 기준 `today`, `currentStreakDays`, `activeToday`, `firstActiveDate`, `longestStreakDays`, `totalActiveDays`, 요청 월의 `activeDates` |
+| `GET /api/v1/me/streak/calendar[?year={year}&month={month}]` | KST 기준 `today`, `currentStreakDays`, `activeToday`, `firstActiveDate`, `longestStreakDays`, `totalActiveDays`, 조회 월의 `activeDates` |
 
 `month`는 1~12만 허용한다. `today`는 `activeToday` 계산에 사용한 KST 날짜다. `firstActiveDate`는 현재 연속 구간의 시작일이 아니라 기능 출시 후 최초 활성일이다. 스트릭 기록이 없으면 숫자는 0, `activeToday`는 false, 최초 활성일은 null, 날짜 목록은 빈 배열이다.
+
+### 달력 기본 월 후속 계약
+
+`year`와 `month`를 모두 생략하면 주입된 `Clock` 기준 KST 현재 월을, 모두 전달하면 지정 월을 조회한다. 하나만 전달하면 `400 VALIDATION_FAILED`를 반환한다. 기존 미래 월 조회는 유지한다.
 
 ## 집계 정책
 
@@ -36,5 +40,6 @@
 
 - 첫 완료, 연속 완료, 같은 날 재완료, 스트릭 재시작, 최장 기록 갱신을 검증한다.
 - 현재 스트릭과 월별 달력 API의 기본값, 월 범위, 잘못된 월을 검증한다.
+- 월 파라미터 전체 생략, 명시 월과 일부 생략 오류를 검증한다.
 - 대화 완료 응답 직후 달력 조회에 오늘 활동이 보이는 통합 테스트를 추가한다.
 - 최소 검증 명령은 `./gradlew check`다.

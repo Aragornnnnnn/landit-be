@@ -13,6 +13,8 @@ import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -36,6 +38,8 @@ class StreakServiceTest {
   @Mock private UserDailyActivityRepository userDailyActivityRepository;
 
   @Mock private UserLearningActivitySummaryRepository summaryRepository;
+
+  @Mock private Clock clock;
 
   @InjectMocks private StreakService streakService;
 
@@ -137,8 +141,9 @@ class StreakServiceTest {
   @Test
   void returnsZeroForExpiredStreakWithoutUpdatingSummary() {
     UserLearningActivitySummary summary = UserLearningActivitySummary.initialize(USER_ID);
-    LocalDate today = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate today = LocalDate.of(2026, 8, 5);
     summary.recordActiveDay(today.minusDays(3));
+    when(clock.instant()).thenReturn(Instant.parse("2026-08-05T00:00:00Z"));
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
 
     StreakService.CurrentStreak currentStreak = streakService.getCurrentStreak(USER_ID);
@@ -155,10 +160,11 @@ class StreakServiceTest {
   void returnsOnlyRequestedMonthActiveDates() {
     LocalDate firstDate = LocalDate.of(2026, 7, 12);
     UserLearningActivitySummary summary = UserLearningActivitySummary.initialize(USER_ID);
-    summary.recordActiveDay(LocalDate.now(KOREA_ZONE_ID));
+    summary.recordActiveDay(LocalDate.of(2026, 8, 5));
     UserDailyActivity firstActivity = UserDailyActivity.startActiveDay(USER_ID, firstDate);
     UserDailyActivity secondActivity =
         UserDailyActivity.startActiveDay(USER_ID, LocalDate.of(2026, 7, 18));
+    when(clock.instant()).thenReturn(Instant.parse("2026-08-05T00:00:00Z"));
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
     when(userDailyActivityRepository.findFirstByUserProfileIdAndActiveDayTrueOrderByActivityDateAsc(
             USER_ID))
