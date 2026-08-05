@@ -11,14 +11,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.character.service.StreakService;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,6 +45,8 @@ import org.springframework.test.web.servlet.MvcResult;
 class StreakApiIntegrationTests {
 
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
+  private static final Instant TEST_INSTANT = Instant.parse("2026-07-31T15:00:00Z");
+  private static final LocalDate TEST_TODAY = TEST_INSTANT.atZone(KOREA_ZONE_ID).toLocalDate();
 
   @Autowired private MockMvc mockMvc;
 
@@ -77,7 +85,7 @@ class StreakApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.currentStreakDays").value(0))
         .andExpect(jsonPath("$.data.activeToday").value(false))
-        .andExpect(jsonPath("$.data.today").value(LocalDate.now(KOREA_ZONE_ID).toString()))
+        .andExpect(jsonPath("$.data.today").value(TEST_TODAY.toString()))
         .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
@@ -98,7 +106,7 @@ class StreakApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.year").value(2026))
         .andExpect(jsonPath("$.data.month").value(7))
-        .andExpect(jsonPath("$.data.today").value(LocalDate.now(KOREA_ZONE_ID).toString()))
+        .andExpect(jsonPath("$.data.today").value(TEST_TODAY.toString()))
         .andExpect(jsonPath("$.data.firstActiveDate").value("2026-07-12"))
         .andExpect(jsonPath("$.data.longestStreakDays").value(1))
         .andExpect(jsonPath("$.data.totalActiveDays").value(2))
@@ -153,16 +161,15 @@ class StreakApiIntegrationTests {
   @Test
   void calendarDefaultsToCurrentKstMonth() throws Exception {
     LoginResult login = login();
-    LocalDate today = LocalDate.now(KOREA_ZONE_ID);
 
     mockMvc
         .perform(
             get("/api/v1/me/streak/calendar")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + login.accessToken()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.year").value(today.getYear()))
-        .andExpect(jsonPath("$.data.month").value(today.getMonthValue()))
-        .andExpect(jsonPath("$.data.today").value(today.toString()));
+        .andExpect(jsonPath("$.data.year").value(TEST_TODAY.getYear()))
+        .andExpect(jsonPath("$.data.month").value(TEST_TODAY.getMonthValue()))
+        .andExpect(jsonPath("$.data.today").value(TEST_TODAY.toString()));
   }
 
   /** 연도와 월 중 하나만 전달한 달력 요청은 공통 검증 오류를 반환한다. */
@@ -216,4 +223,14 @@ class StreakApiIntegrationTests {
   }
 
   private record LoginResult(long userId, String accessToken) {}
+
+  @TestConfiguration
+  static class FixedClockConfiguration {
+
+    @Bean
+    @Primary
+    Clock testClock() {
+      return Clock.fixed(TEST_INSTANT, ZoneOffset.UTC);
+    }
+  }
 }
