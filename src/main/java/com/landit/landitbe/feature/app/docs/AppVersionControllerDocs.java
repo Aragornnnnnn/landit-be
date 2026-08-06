@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 
 /** 앱 버전 정책 API의 OpenAPI 문서를 정의한다. */
@@ -22,7 +21,6 @@ public interface AppVersionControllerDocs {
    *
    * @param platform 앱 플랫폼
    * @param versionName 현재 앱 버전명
-   * @param buildNumber 현재 앱 빌드 번호. 업데이트 판단에는 사용하지 않는다.
    * @return 플랫폼별 업데이트 정책 응답
    * @throws ApiException 플랫폼 앱 버전 정책이 설정되지 않았을 때
    */
@@ -42,7 +40,5 @@ public interface AppVersionControllerDocs {
       @Parameter(description = "앱 플랫폼", example = "IOS", required = true) AppPlatform platform,
       @Parameter(description = "현재 앱 버전명", example = "1.2.0", required = true)
           @Pattern(regexp = "\\d+\\.\\d+\\.\\d+")
-          String versionName,
-      @Parameter(description = "현재 앱 빌드 번호", example = "18", required = true) @Min(1)
-          long buildNumber);
+          String versionName);
 }

@@ -38,7 +38,7 @@ class AppVersionApiIntegrationTests {
     insertPolicy("IOS", "1.4.0", "1.2.0", 18);
     insertPolicy("ANDROID", "2.0.0", "1.5.0", 30);
 
-    check("IOS", "1.3.0", 16)
+    check("IOS", "1.3.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.updateType").value("SOFT"))
@@ -48,7 +48,7 @@ class AppVersionApiIntegrationTests {
         .andExpect(jsonPath("$.data.releasedAt").value("2026-06-09T12:00:00"))
         .andExpect(jsonPath("$.error").value(nullValue()));
 
-    check("ANDROID", "2.0.0", 1)
+    check("ANDROID", "2.0.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("NONE"))
         .andExpect(jsonPath("$.data.latestVersionName").value("2.0.0"))
@@ -60,7 +60,7 @@ class AppVersionApiIntegrationTests {
   void versionBelowMinimumReturnsForce() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
 
-    check("IOS", "1.0.0", 999)
+    check("IOS", "1.0.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("FORCE"))
         .andExpect(jsonPath("$.data.reason").value("IOS 강제 업데이트가 필요합니다."));
@@ -71,11 +71,11 @@ class AppVersionApiIntegrationTests {
   void supportedVersionBelowLatestReturnsSoft() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
 
-    check("IOS", "1.1.0", 1)
+    check("IOS", "1.1.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("SOFT"))
         .andExpect(jsonPath("$.data.reason").value("IOS 업데이트를 권장합니다."));
-    check("IOS", "1.2.0", 200)
+    check("IOS", "1.2.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("SOFT"));
   }
@@ -85,10 +85,10 @@ class AppVersionApiIntegrationTests {
   void versionNamesAreComparedNumerically() throws Exception {
     insertPolicy("IOS", "1.10.0", "1.9.0", 100);
 
-    check("IOS", "1.9.0", 1)
+    check("IOS", "1.9.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("SOFT"));
-    check("IOS", "1.10.0", 1)
+    check("IOS", "1.10.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("NONE"));
   }
@@ -98,10 +98,10 @@ class AppVersionApiIntegrationTests {
   void latestOrHigherVersionReturnsNone() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
 
-    check("IOS", "1.3.0", 1)
+    check("IOS", "1.3.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("NONE"));
-    check("IOS", "1.3.1", 1)
+    check("IOS", "1.3.1")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("NONE"));
   }
@@ -109,42 +109,45 @@ class AppVersionApiIntegrationTests {
   /** 플랫폼 정책이 없으면 설정 오류를 반환한다. */
   @Test
   void missingPolicyReturnsConfigurationError() throws Exception {
-    check("IOS", "1.0.0", 1)
+    check("IOS", "1.0.0")
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.data").value(nullValue()))
         .andExpect(jsonPath("$.error.code").value("APP_VERSION_POLICY_NOT_CONFIGURED"));
   }
 
-  /** 형식이 맞지 않거나 누락된 앱 버전명은 요청 오류로 거절한다. */
+  /** 형식이 맞지 않는 앱 버전명은 요청 오류로 거절한다. */
   @Test
-  void invalidOrMissingVersionNameReturnsValidationFailed() throws Exception {
-    check("IOS", "1.0", 1)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
-    mockMvc
-        .perform(
-            get("/api/v1/app-versions/check").param("platform", "IOS").param("buildNumber", "1"))
+  void invalidVersionNameReturnsValidationFailed() throws Exception {
+    check("IOS", "1.0")
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
-  /** 빌드 번호는 추적용 요청값이지만 1보다 작거나 누락되면 요청 오류로 거절한다. */
+  /** 빌드 번호 없이도 앱 버전 업데이트 확인을 수행한다. */
   @Test
-  void invalidOrMissingBuildNumberReturnsValidationFailed() throws Exception {
-    check("IOS", "1.0.0", 0)
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+  void buildNumberIsNotRequiredForVersionCheck() throws Exception {
+    insertPolicy("IOS", "1.3.0", "1.1.0", 100);
+
     mockMvc
         .perform(
             get("/api/v1/app-versions/check")
                 .param("platform", "IOS")
                 .param("versionName", "1.0.0"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updateType").value("FORCE"));
+  }
+
+  /** 빌드 번호가 없는 요청에서 버전명이 누락되면 요청 오류로 거절한다. */
+  @Test
+  void missingVersionNameWithoutBuildNumberReturnsValidationFailed() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/app-versions/check").param("platform", "IOS"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
-  /** 공개 OpenAPI 문서는 앱 버전명과 빌드 번호 요청값을 모두 노출한다. */
+  /** 공개 OpenAPI 문서는 플랫폼과 앱 버전명 요청값만 노출한다. */
   @Test
   void openApiDocumentsAppVersionCheckContract() throws Exception {
     mockMvc
@@ -153,19 +156,18 @@ class AppVersionApiIntegrationTests {
         .andExpect(
             jsonPath("$.paths['/api/v1/app-versions/check'].get.summary").value("앱 버전 업데이트 확인"))
         .andExpect(
-            jsonPath("$.paths['/api/v1/app-versions/check'].get.parameters.length()").value(3))
+            jsonPath("$.paths['/api/v1/app-versions/check'].get.parameters.length()").value(2))
         .andExpect(jsonPath("$.paths['/api/v1/app-versions/check'].get.responses['200']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/app-versions/check'].get.responses['400']").exists());
   }
 
   /** 앱 버전 확인 요청을 만든다. */
   private org.springframework.test.web.servlet.ResultActions check(
-      String platform, String versionName, long buildNumber) throws Exception {
+      String platform, String versionName) throws Exception {
     return mockMvc.perform(
         get("/api/v1/app-versions/check")
             .param("platform", platform)
-            .param("versionName", versionName)
-            .param("buildNumber", Long.toString(buildNumber)));
+            .param("versionName", versionName));
   }
 
   /** 최신과 최소 지원 버전명이 지정된 플랫폼 정책을 추가한다. */
