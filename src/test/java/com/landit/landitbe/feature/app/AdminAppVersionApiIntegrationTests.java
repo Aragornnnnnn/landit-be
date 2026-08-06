@@ -100,8 +100,7 @@ class AdminAppVersionApiIntegrationTests {
         .perform(
             get("/api/v1/app-versions/check")
                 .param("platform", "ANDROID")
-                .param("versionName", "1.0.0")
-                .param("buildNumber", "10"))
+                .param("versionName", "1.0.0"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.updateType").value("FORCE"));
 

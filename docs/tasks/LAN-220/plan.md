@@ -9,8 +9,8 @@
 - 기존 `app_version` 테이블을 유지하며 `active`는 현재 정책 레코드에 `true`로 유지한다.
 - 버전 정책 등록과 활성 정책 전환 API는 제공하지 않는다.
 - 관리자는 플랫폼별 정책 목록을 조회하고, 플랫폼을 기준으로 정책을 수정한다.
-- `GET /api/v1/app-versions/check`는 `platform`, `versionName`, `buildNumber`을 받는다.
-- 업데이트 판단에는 `versionName`만 사용한다. `buildNumber`는 요청 계약에 유지하지만 이번 범위에서 관측 정보로 기록하지 않는다.
+- `GET /api/v1/app-versions/check`는 `platform`, `versionName`을 받는다.
+- 업데이트 판단에는 `versionName`만 사용하며, 공개 확인 요청에서 빌드 번호를 받지 않는다.
 - 버전명은 `Major.Minor.Patch` 숫자 형식으로 검증하고, 숫자 세 항목을 순서대로 비교한다.
 - 현재 버전이 최소 지원 버전 미만이면 `FORCE`, 최신 버전 미만이면 `SOFT`, 그 외에는 `NONE`을 반환한다.
 - `minimum_supported_build_number`를 `minimum_supported_version_name`으로 교체한다.
@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | `GET` | `/api/v1/admin/app-versions` | iOS·Android 단일 정책 목록 조회 |
 | `PATCH` | `/api/v1/admin/app-versions/{platform}` | 플랫폼 정책의 버전명, 최소 지원 버전명, 빌드 번호, 안내 문구, 릴리스 노트, 출시 시각 수정 |
-| `GET` | `/api/v1/app-versions/check?platform={platform}&versionName={versionName}&buildNumber={buildNumber}` | 현재 앱 버전 기준 업데이트 필요 수준 조회 |
+| `GET` | `/api/v1/app-versions/check?platform={platform}&versionName={versionName}` | 현재 앱 버전 기준 업데이트 필요 수준 조회 |
 
 ## 구현 순서와 검증
 
