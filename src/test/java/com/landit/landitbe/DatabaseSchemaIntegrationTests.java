@@ -644,6 +644,29 @@ class DatabaseSchemaIntegrationTests {
     assertThat(migrationSql).contains("UPDATE user_profile", "WHERE ai_tutor_id IS NULL");
   }
 
+  @DisplayName("V38 migration이 Deepgram Aura 2 TTS 음성을 추가한다.")
+  @Test
+  void v38MigrationSeedsDeepgramAura2Voice() {
+    Map<String, Object> voice =
+        jdbcTemplate.queryForMap(
+            """
+            select provider, model, provider_voice_id, gender, description, accent_locale, status
+            from tts_voice
+            where provider = 'OPENROUTER'
+              and model = 'deepgram/aura-2'
+              and provider_voice_id = 'aura-2-orpheus-en'
+            """);
+
+    assertThat(voice)
+        .containsEntry("PROVIDER", "OPENROUTER")
+        .containsEntry("MODEL", "deepgram/aura-2")
+        .containsEntry("PROVIDER_VOICE_ID", "aura-2-orpheus-en")
+        .containsEntry("GENDER", "MALE")
+        .containsEntry("DESCRIPTION", "굵은 남성 음성")
+        .containsEntry("ACCENT_LOCALE", "EN_US")
+        .containsEntry("STATUS", "ACTIVE");
+  }
+
   @DisplayName("V14 migration은 AI 튜터가 없는 기존 사용자만 기본 튜터로 backfill한다.")
   @Test
   void v14MigrationBackfillsOnlyUsersWithoutAiTutor() {
