@@ -75,7 +75,7 @@ public record ScenarioListResponse(
    *
    * @param scenarioId 시나리오 ID
    * @param starRating 완료한 시나리오의 별점
-   * @param displayOrder 카테고리 내 시나리오 노출 순서
+   * @param displayOrder 전체 시나리오 노출 순서 (40일 커리큘럼의 Day 번호)
    * @param scenarioTitle 시나리오 제목
    * @param briefing 시나리오 설명
    * @param conversationGoal 대화 목표
@@ -93,7 +93,7 @@ public record ScenarioListResponse(
   public record ScenarioResponse(
       @Schema(description = "시나리오 ID") Long scenarioId,
       @Schema(description = "완료한 시나리오의 별점") BigDecimal starRating,
-      @Schema(description = "카테고리 내 시나리오 노출 순서") int displayOrder,
+      @Schema(description = "전체 시나리오 노출 순서 (40일 커리큘럼의 Day 번호)") int displayOrder,
       @Schema(description = "시나리오 제목") String scenarioTitle,
       @Schema(description = "시나리오 설명") String briefing,
       @Schema(description = "대화 목표") String conversationGoal,

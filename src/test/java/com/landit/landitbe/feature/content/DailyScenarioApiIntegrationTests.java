@@ -103,7 +103,8 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
-  void dailyScenarioReturnsLowestIdCurrentScenarioAndExpressionProgress() throws Exception {
+  void dailyScenarioReturnsLowestDisplayOrderCurrentScenarioAndExpressionProgress()
+      throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     seedDailyScenarios();
@@ -126,6 +127,28 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completedAt").value(nullValue()))
         .andExpect(jsonPath("$.data.scenario.expressionCount").value(2))
         .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1));
+  }
+
+  @Test
+  void dailyScenarioPrefersDisplayOrderOverIdWhenOrdersDiverge() throws Exception {
+    JsonNode loginResponseBody = login();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    insertCategory(10, 1);
+    // ID 오름차순과 노출 순서가 어긋나도 노출 순서가 우선한다.
+    insertScenario(100, 10, 2, "USER", "EASY");
+    insertScenarioVariant(100, "첫 번째 시나리오", "첫 번째 시나리오 설명", "첫 번째 목표", "먼저 말해보세요.");
+    insertScenario(101, 10, 1, "AI", "NORMAL");
+    insertScenarioVariant(101, "두 번째 시나리오", "두 번째 시나리오 설명", "두 번째 목표", null);
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios/daily")
+                .queryParam("date", "2026-07-28")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.playable").value(true))
+        .andExpect(jsonPath("$.data.scenario.scenarioId").value(101))
+        .andExpect(jsonPath("$.data.scenario.dailyScenarioType").value("NEW"));
   }
 
   @Test
@@ -319,9 +342,9 @@ class DailyScenarioApiIntegrationTests {
 
   private void seedDailyScenarios() {
     insertCategory(10, 1);
-    insertScenario(100, 10, 2, "USER", "EASY");
+    insertScenario(100, 10, 1, "USER", "EASY");
     insertScenarioVariant(100, "첫 번째 시나리오", "첫 번째 시나리오 설명", "첫 번째 목표", "먼저 말해보세요.");
-    insertScenario(101, 10, 1, "AI", "NORMAL");
+    insertScenario(101, 10, 2, "AI", "NORMAL");
     insertScenarioVariant(101, "두 번째 시나리오", "두 번째 시나리오 설명", "두 번째 목표", null);
   }
 
