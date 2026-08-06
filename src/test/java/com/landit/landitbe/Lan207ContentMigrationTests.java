@@ -23,6 +23,10 @@ class Lan207ContentMigrationTests {
     assertThat(count(jdbcTemplate, "scenario_question")).isEqualTo(120);
     assertThat(count(jdbcTemplate, "scenario_question_language_variant")).isEqualTo(120);
     assertThat(count(jdbcTemplate, "writing_expression")).isEqualTo(163);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM scenario WHERE id = display_order", Integer.class))
+        .isEqualTo(40);
 
     assertThat(
             jdbcTemplate.queryForObject(

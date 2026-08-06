@@ -5458,3 +5458,9 @@ SET question_text = 'Hey, I''m Marco. Is this seat taken? Do you mind if I sit h
     question_translation = '안녕. 나 Marco이라고 해. 여기 자리 있어? 나 여기 앉아도 돼?',
     updated_at = CURRENT_TIMESTAMP
 WHERE id = 22;
+
+-- 화면에서 카테고리와 무관하게 정렬할 수 있도록 기존 시나리오 순서를 전역 번호로 맞춘다.
+UPDATE scenario
+SET display_order = id,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id BETWEEN 1 AND 20;
