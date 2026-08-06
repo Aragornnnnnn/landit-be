@@ -89,9 +89,10 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                             created_at,
                             updated_at
                         )
-                        values (?, ?, 'friend', 'EASY', 'AI', 2, 1, 'ACTIVE',
+                        values (?, ?, 'friend', 'EASY', 'AI', 2, ?, 'ACTIVE',
                             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
+        scenarioId,
         scenarioId,
         scenarioId);
   }
