@@ -127,7 +127,7 @@ class ScenarioListApiIntegrationTests {
     insertScenarioVariant(
         220, "비활성 선행 시나리오", "비활성 선행 시나리오", "비활성 콘텐츠를 건너뛴다.", "먼저 말해보세요.", null, "ACTIVE");
     insertCategory(121, 2, "ACTIVE", "활성 카테고리");
-    insertScenario(221, 121, 1, "USER", "EASY", "ACTIVE", null);
+    insertScenario(221, 121, 2, "USER", "EASY", "ACTIVE", null);
     insertScenarioVariant(221, "현재 시나리오", "현재 시나리오", "현재 시나리오를 시작한다.", "먼저 말해보세요.", null, "ACTIVE");
 
     mockMvc
@@ -178,7 +178,7 @@ class ScenarioListApiIntegrationTests {
     insertScenarioVariant(
         222, "번역 누락 시나리오", "번역 누락 시나리오", "번역 누락 콘텐츠를 건너뛴다.", "먼저 말해보세요.", null, "ACTIVE");
     insertCategory(123, 2, "ACTIVE", "노출 가능한 카테고리");
-    insertScenario(223, 123, 1, "USER", "EASY", "ACTIVE", null);
+    insertScenario(223, 123, 2, "USER", "EASY", "ACTIVE", null);
     insertScenarioVariant(223, "현재 시나리오", "현재 시나리오", "현재 시나리오를 시작한다.", "먼저 말해보세요.", null, "ACTIVE");
 
     mockMvc
@@ -422,7 +422,7 @@ class ScenarioListApiIntegrationTests {
     insertScenarioVariant(
         210, "비활성 음성 시나리오", "비활성 음성을 사용합니다.", "비활성 음성 응답을 확인한다.", null, inactiveVoiceId, "ACTIVE");
     insertCategory(111, 2, "ACTIVE", "미설정 음성");
-    insertScenario(211, 111, 1, "USER", "EASY", "ACTIVE", null);
+    insertScenario(211, 111, 2, "USER", "EASY", "ACTIVE", null);
     insertScenarioVariant(
         211, "미설정 음성 시나리오", "음성을 설정하지 않았습니다.", "미설정 음성 응답을 확인한다.", "먼저 말해보세요.", null, "ACTIVE");
     insertScenarioAccess(userId, 210);
@@ -487,10 +487,10 @@ class ScenarioListApiIntegrationTests {
     insertScenarioQuestion(
         9202, 202, 1, "What is your favorite food?", "가장 좋아하는 음식이 뭐예요?", "질문 1번의 속마음", "GOOD");
 
-    insertScenario(203, 100, 1, "AI", "HARD", "INACTIVE", null);
+    insertScenario(203, 100, 3, "AI", "HARD", "INACTIVE", null);
     insertScenarioVariant(203, "잠긴 시나리오", "비활성 시나리오입니다.", "잠긴 시나리오를 확인한다.", null, null, "ACTIVE");
 
-    insertScenario(204, 102, 1, "AI", "EASY", "ACTIVE", null);
+    insertScenario(204, 102, 4, "AI", "EASY", "ACTIVE", null);
     insertScenarioVariant(
         204, "카테고리가 잠긴 시나리오", "카테고리가 비활성입니다.", "카테고리 잠금을 확인한다.", null, null, "ACTIVE");
 

@@ -9,26 +9,31 @@
 - 백엔드 코드: 일일 진행 순서를 시나리오 ID순 → display_order순으로 변경
   (`ScenarioSequenceQueryRepository.findScenarioIdsInDisplayOrder`)
 
-Day ↔ 시나리오 ↔ 첫 질문 매핑은 [sql/scenario_q1_mapping.md](sql/scenario_q1_mapping.md) 참고.
+Day ↔ 시나리오 ↔ 첫 질문 ↔ tts 매핑은 [sql/scenario_q1_mapping.md](sql/scenario_q1_mapping.md) 참고.
 
-## 반영 순서 (순서 위반 시 제약 충돌로 실패)
+## 반영 방식 (LAN-271에서 Flyway 마이그레이션으로 전환)
 
-| 순서 | 작업 | 의존성 |
+콘텐츠 반영은 수동 SQL이 아니라 **Flyway 마이그레이션**으로 적용한다 (LAN-271).
+CI의 flyway-migration workflow가 `db/migration` + `db/postgresql`을 버전 순서대로 실행하므로
+별도의 수동 실행·순서 관리가 필요 없다. `db/postgresql`은 운영 전용이라 H2 테스트 DB에는
+콘텐츠가 들어가지 않는다.
+
+| 버전 | 파일 | 내용 |
 | --- | --- | --- |
-| 1 | [sql/update_scenario_questions.sql](sql/update_scenario_questions.sql) — 기존 질문 60건 UPDATE | 없음 |
-| 2 | [sql/update_scenarios.sql](sql/update_scenarios.sql) — ai_role + 글로벌 Day 번호 부여 | **3보다 먼저.** 기존 20개가 카테고리별 옛 번호(1~8)를 가진 상태에서 신규가 들어오면 `uk_scenario_category_order` (category_id, display_order) 충돌 (예: 신규 21번 Day 6 vs 기존 id 6의 do 6) |
-| 3 | [sql/insert_new_scenarios.sql](sql/insert_new_scenarios.sql) — '쇼핑' 카테고리 + scenario 21~40 + 질문/해석 | **4(코드 배포) 없이도 가능하나 2 이후 필수.** 5의 D)섹션이 scenario 21~40을 FK 참조하므로 5보다 먼저 |
-| 4 | **LAN-263 코드 배포** — V38 Flyway(Teddy 보이스, LAN-261)가 함께 자동 적용 | 구코드는 id순 진행이라 1~3 데이터 변경의 유저 영향 없음(무중단). 배포 후 Teddy id 확인: `SELECT id FROM tts_voice WHERE model = 'deepgram/aura-2'` → 3이 아니면 5번 파일의 `tts_voice_id = 3`을 실제 id로 치환 |
-| 5 | [sql/update_scenario_language_variant.sql](sql/update_scenario_language_variant.sql) — 이름 치환(A·B) + tts 재배정(C) + 신규 variant 20건 INSERT(D) | **3·4 이후 필수.** D)가 scenario 21~40 참조, C)·D)가 Teddy tts_voice FK 참조. C)는 TTS 담당자 작업과 중복 여부 확인 후 실행 |
-| 6 | 시퀀스 재조정 | id 명시 INSERT를 썼으므로 `scenario`, `scenario_question`, `scenario_question_language_variant`, `scenario_language_variant`, `category`, `category_language_variant` 시퀀스를 MAX(id)로 setval |
+| V39 | `db/postgresql/V39__rewrite_scenario_questions.sql` | 기존 질문 60건 재작성 |
+| V40 | `db/postgresql/V40__apply_scenario_global_display_order.sql` | ai_role 정리 + 글로벌 Day 번호 부여 |
+| V41 | `db/postgresql/V41__insert_new_scenarios.sql` | '쇼핑' 카테고리 + 신규 20개 + 질문/해석 + setval |
+| V42 | `db/postgresql/V42__update_scenario_language_variants.sql` | 캐릭터명 치환 + tts 재배정 + 신규 variant 20건 + setval (Teddy id≠3이면 즉시 실패하는 가드 포함) |
+| V43 | `db/migration/V43__enforce_global_scenario_display_order.sql` | `uk_scenario_category_order` 삭제 + `UNIQUE(display_order)` 전역 강제 |
 
-코드 배포를 맨 앞으로 당겨도 동작은 하지만, 배포~2번 완료 사이에 진행 순서가
-카테고리 교차 순서(display_order, id)로 일시 왜곡되므로 위 순서를 권장한다.
+- 버전 순서가 의존성을 강제한다: V40(빈자리 생성) → V41(신규 INSERT, 유니크 충돌 방지),
+  V38(Teddy) → V42(tts FK), V39~V42(데이터 완성) → V43(전역 unique)
+- 머지 순서: **LAN-263(코드) → LAN-271(마이그레이션)**. 구코드는 id순 진행이라
+  데이터가 먼저 반영돼도 유저 영향이 없고, 새 코드는 데이터 반영 전에도 (do, id)
+  tie-breaker로 결정적으로 동작한다.
 
 ## 남은 작업 (TODO)
 
 - [ ] 신규 20개 썸네일 제작 (현재 `thumbnail_url` NULL) 후 UPDATE
 - [ ] 기존 시나리오 1·6·8 썸네일에 구 캐릭터 외형이 박혀 있으면 교체
 - [ ] 신규 20개 Q1 inner_thought 작성 (현재 NULL) 후 variant UPDATE
-- [ ] 데이터 반영 후 `scenario.display_order` 전역 UNIQUE 제약 마이그레이션 (선택 —
-      데이터가 카테고리별 중복 번호인 상태에서 먼저 나가면 마이그레이션 실패하므로 반드시 반영 후)
