@@ -1,3 +1,14 @@
+-- 시나리오 언어 콘텐츠의 캐릭터명을 통일하고 신규 20건의 언어 콘텐츠를 추가한다.
+-- V38이 등록한 Teddy 보이스(deepgram/aura-2)의 id가 3이 아니면 즉시 실패시킨다.
+DO $$
+BEGIN
+  IF (SELECT id FROM tts_voice
+      WHERE model = 'deepgram/aura-2'
+        AND provider_voice_id = 'aura-2-orpheus-en') IS DISTINCT FROM 3 THEN
+    RAISE EXCEPTION 'Teddy tts_voice id must be 3 before applying scenario language variants';
+  END IF;
+END $$;
+
 -- =============================================================================
 -- scenario_language_variant UPDATE + INSERT SQL
 -- 생성일: 2026-08-06
@@ -15,7 +26,6 @@
 -- 주의: id 명시 INSERT — 시퀀스 사용 시 재조정 필요.
 -- =============================================================================
 
-BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- A) 캐릭터명 치환 (Marco / Chloe) — 제목·브리핑·대화목표
@@ -250,10 +260,14 @@ INSERT INTO scenario_language_variant (id, scenario_id, target_locale, base_loca
  '체류 기간과 데이터 사용량을 설명하고, 요금제와 등록·결제 방식을 정하기',
  'ACTIVE', now(), now(), 3);
 
-COMMIT;
 
 -- =============================================================================
 -- [확인 쿼리]
 -- SELECT scenario_id, title, tts_voice_id FROM scenario_language_variant
 -- WHERE target_locale = 'EN' ORDER BY scenario_id;
 -- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- id 명시 INSERT 이후 auto-increment 시퀀스를 재조정한다.
+-- ---------------------------------------------------------------------------
+SELECT setval(pg_get_serial_sequence('scenario_language_variant', 'id'), (SELECT MAX(id) FROM scenario_language_variant));

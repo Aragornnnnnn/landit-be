@@ -1,3 +1,4 @@
+-- 신규 시나리오 20개(쇼핑 카테고리 포함)와 고정 질문 60건을 추가한다.
 -- =============================================================================
 -- 신규 시나리오 20개 INSERT SQL (scenario id 21~40)
 -- 생성일: 2026-08-06
@@ -19,7 +20,6 @@
 --     (파일 하단 제목 목록 참고)
 -- =============================================================================
 
-BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- 0) category '쇼핑' (id 4) — 신규 시나리오 34~40이 참조하므로 최우선 실행
@@ -204,7 +204,6 @@ INSERT INTO scenario_question_language_variant (id, scenario_question_id, target
 (119, 119, 'EN', 'KR', 'So the prepaid plan is $30 for ten gigs, and unlimited is $45 a month. Which one fits you better?', '선불 요금제는 30달러에 10기가고, 무제한은 한 달에 45달러예요. 어느 쪽이 맞을 것 같으세요?', 'ACTIVE', now(), now(), NULL, NULL),
 (120, 120, 'EN', 'KR', 'I''ll need your passport to register the SIM. And should I set up auto-pay, or will you top it up yourself each month?', '유심 등록에 여권이 필요해요. 그리고 자동 결제로 해드릴까요, 아니면 매달 직접 충전하시겠어요?', 'ACTIVE', now(), now(), NULL, NULL);
 
-COMMIT;
 
 -- =============================================================================
 -- [참고 1] 신규 시나리오 제목 (제목 테이블에 별도 INSERT 필요)
@@ -230,3 +229,12 @@ COMMIT;
 -- [참고 4] USER 먼저 시나리오(21, 24, 26, 29, 39, 40)는 '사용자 시작 안내'
 --          텍스트가 별도 테이블에 있다면 그쪽에도 INSERT 필요
 -- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- id 명시 INSERT 이후 auto-increment 시퀀스를 재조정한다.
+-- ---------------------------------------------------------------------------
+SELECT setval(pg_get_serial_sequence('category', 'id'), (SELECT MAX(id) FROM category));
+SELECT setval(pg_get_serial_sequence('category_language_variant', 'id'), (SELECT MAX(id) FROM category_language_variant));
+SELECT setval(pg_get_serial_sequence('scenario', 'id'), (SELECT MAX(id) FROM scenario));
+SELECT setval(pg_get_serial_sequence('scenario_question', 'id'), (SELECT MAX(id) FROM scenario_question));
+SELECT setval(pg_get_serial_sequence('scenario_question_language_variant', 'id'), (SELECT MAX(id) FROM scenario_question_language_variant));

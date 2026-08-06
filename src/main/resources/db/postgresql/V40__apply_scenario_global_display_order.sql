@@ -1,3 +1,4 @@
+-- 기존 20개 시나리오의 ai_role을 정리하고 display_order를 전체(글로벌) Day 번호로 전환한다.
 -- =============================================================================
 -- scenario 테이블 UPDATE SQL
 -- 생성일: 2026-08-06
@@ -15,10 +16,8 @@
 --   - tts_voice_id: 다른 테이블에 있음. 1=Chloe, 2=Marco 기준으로
 --     시나리오 1·8은 Marco(2), 6은 Chloe(1) 확인 필요.
 --
--- 트랜잭션으로 감쌌습니다. 확인 후 COMMIT 하세요.
 -- =============================================================================
 
-BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- 1) ai_role — 캐릭터명 제거
@@ -76,7 +75,6 @@ UPDATE scenario SET display_order = 37, updated_at = now() WHERE id = 10; -- Day
 UPDATE scenario SET display_order = 38, updated_at = now() WHERE id = 4;  -- Day 38 기숙사 요금 (HARD)
 UPDATE scenario SET display_order = 39, updated_at = now() WHERE id = 7;  -- Day 39 깊은 대화
 
-COMMIT;
 
 -- ---------------------------------------------------------------------------
 -- [참고] 신규 시나리오 20개 INSERT 시 부여할 display_order (40일 플랜):
