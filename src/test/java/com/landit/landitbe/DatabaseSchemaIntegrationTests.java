@@ -667,6 +667,26 @@ class DatabaseSchemaIntegrationTests {
         .containsEntry("STATUS", "ACTIVE");
   }
 
+  @DisplayName("V43 migration이 시나리오 노출 순서를 전체 기준 unique로 강제한다.")
+  @Test
+  void v43MigrationEnforcesGlobalScenarioDisplayOrder() {
+    assertTableConstraintExists("scenario", "uk_scenario_display_order");
+
+    Integer legacyConstraintCount =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.table_constraints
+            where lower(table_name) = 'scenario'
+              and lower(constraint_name) = 'uk_scenario_category_order'
+            """,
+            Integer.class);
+
+    assertThat(legacyConstraintCount)
+        .as("legacy constraint scenario.uk_scenario_category_order")
+        .isZero();
+  }
+
   @DisplayName("V14 migration은 AI 튜터가 없는 기존 사용자만 기본 튜터로 backfill한다.")
   @Test
   void v14MigrationBackfillsOnlyUsersWithoutAiTutor() {
