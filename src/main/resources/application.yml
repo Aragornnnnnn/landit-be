@@ -17,6 +17,8 @@ management:
       exposure:
         include: health,info
   metrics:
+    tags:
+      service.version: ${APP_VERSION:local}
     distribution:
       percentiles-histogram:
         http.server.requests: true
@@ -49,3 +51,8 @@ landit:
 sentry:
   dsn: ${SENTRY_DSN:}
   environment: ${SENTRY_ENVIRONMENT:local}
+
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true

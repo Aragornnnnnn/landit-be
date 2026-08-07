@@ -15,7 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** OpenAPI 문서 응답의 브라우저 렌더링 인코딩을 검증한다. */
-@ActiveProfiles("test")
+@ActiveProfiles({"develop", "test"})
 @SpringBootTest
 @AutoConfigureMockMvc
 class OpenApiDocsEncodingTests {

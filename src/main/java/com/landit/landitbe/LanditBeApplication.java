@@ -24,7 +24,11 @@ public class LanditBeApplication {
 
   private static final String APPLICATION_TIME_ZONE = "Asia/Seoul";
 
-  /** 동작을 수행한다. */
+  /**
+   * Landit 백엔드 애플리케이션을 시작한다.
+   *
+   * @param args 애플리케이션 실행 인자
+   */
   public static void main(String[] args) {
     SpringApplication.run(LanditBeApplication.class, args);
   }

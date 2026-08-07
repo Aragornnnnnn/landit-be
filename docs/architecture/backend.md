@@ -65,52 +65,78 @@ Landit 백엔드는 하나의 코드베이스에서 시작합니다.
 
 ```text
 com.landit.landitbe
-  <feature>
-    api
-    application
-    domain
-    infrastructure
-  common
+├── feature
+│   └── <feature>
+│       ├── <Feature>Controller.java
+│       ├── docs
+│       ├── dto
+│       ├── domain
+│       ├── repository
+│       ├── service
+│       ├── client
+│       └── exception
+├── config
+└── shared
 ```
 
 예시 기능 경계는 인증, 학습 세션, 시나리오, 피드백, 복습, 알림처럼 사용자가 이해할 수 있는 업무 단위입니다.
 `user`, `session`, `message` 같은 테이블명만 보고 모듈을 만들지 않습니다.
 
-## 레이어 역할
+## 패키지 역할
 
-| 레이어 | 역할 |
+| 패키지 | 역할 |
 | --- | --- |
-| `api` | HTTP 요청과 응답 처리 |
-| `application` | 유스케이스 실행, 트랜잭션 관리, 외부 의존성 호출 조율 |
+| 기능 패키지 루트 | Controller를 두어 HTTP 진입점을 노출 |
+| `docs` | Swagger 문서 인터페이스 |
+| `dto` | HTTP 요청과 응답 record |
 | `domain` | 핵심 비즈니스 규칙 |
-| `infrastructure` | DB, 큐, 파일 저장소, 외부 API 연동 |
+| `repository` | JPA Repository와 조회 Projection |
+| `service` | 요청 흐름, 트랜잭션과 기능 동작 |
+| `client` | AI, OAuth, 큐, 파일 저장소 같은 외부 연동 |
+| `exception` | 기능별 예외와 오류 코드 |
+| `config` | Spring Bean과 Configuration Properties |
+| `shared` | 여러 기능이 실제로 공유하는 기능 독립 코드 |
 
 의존성 방향은 아래 기준을 따릅니다.
 
 ```text
-api -> application -> domain
-infrastructure -> application/domain
+Controller
+  -> 요청 흐름 Service
+    -> Repository 소유 Service
+      -> Repository
+      -> Entity
+    -> 외부 Client
+
+다른 feature
+  -> 공개 Service
+  -> 공개 record
+
+feature -> shared
+config -> feature/shared
 ```
 
 핵심 규칙은 단순합니다.
 
-- `domain`은 DB, 큐, 외부 API를 몰라야 합니다.
-- `application`은 비즈니스 흐름을 조율합니다.
-- `infrastructure`는 실제 기술 구현을 담당합니다.
-- API 응답 DTO와 DB Entity를 직접 섞지 않습니다.
+- Controller는 Service만 의존합니다.
+- 모든 Repository는 하나의 기능 Service가 소유합니다.
+- Service는 다른 기능의 Repository와 Entity를 직접 사용하지 않습니다.
+- 다른 기능과는 공개 Service와 record로 통신합니다.
+- `shared`는 어떤 `feature`에도 의존하지 않습니다.
+- 순수 Entity·Projection 변환은 응답 record의 `from()`이 담당합니다.
+- 요청 record에서 Entity를 만들 때는 `toEntity()`를 사용합니다.
 
-## UseCase와 Service 기준
+## Service 기준
 
-`UseCase`는 하나의 사용자 행동이나 중요한 업무 흐름을 표현할 때 사용합니다.
-상태 변경이 있거나, 여러 단계를 조율하거나, 트랜잭션 경계가 중요한 기능은 UseCase로 둡니다.
+모든 공개 비즈니스 로직 클래스는 `Service`로 끝냅니다.
+`UseCase`, `UseCaseService`, `Finder` 접미사는 사용하지 않습니다.
 
-| 구분 | 사용 기준 | 예시 |
+| Service 종류 | 사용 기준 | 예시 |
 | --- | --- | --- |
-| UseCase | 상태 변경, 여러 단계 조율, 트랜잭션 경계가 중요한 기능 | `StartSessionUseCase`, `SendMessageUseCase`, `CompleteSessionUseCase`, `GenerateFeedbackUseCase` |
-| Service | 단순 조회, 관리성 기능, 여러 UseCase에서 공유하는 보조 로직 | `ScenarioQueryService`, `UserProfileService`, `AppVersionService` |
+| 요청 흐름 Service | 사용자 행동과 여러 기능의 협력 순서를 조율 | `ScenarioSessionStartService`, `SessionMessageSubmitService` |
+| Repository 소유 Service | 하나의 기능에서 Repository 조회와 상태 변경을 제공 | `UserProfileService`, `LearningSessionService` |
 
-단순 목록 조회까지 전부 UseCase로 만들지 않습니다.
-파일 수만 늘어나고 얻는 이점이 작기 때문입니다.
+단순 기능은 하나의 Service가 요청 처리와 Repository 소유를 함께 담당할 수 있습니다.
+Repository가 단순 위임만 제공하더라도 다른 클래스가 Repository를 우회하지 않도록 Service 경계를 유지합니다.
 
 ## Port와 Adapter 기준
 
@@ -129,10 +155,16 @@ Landit은 AI Provider, SQS, S3, Push Provider, OAuth Provider 같은 외부 의�
 DB는 애플리케이션의 기본 저장소이고, 초기 단계에서 DB 구현체를 자주 바꿀 가능성이 낮기 때문입니다.
 나중에 특정 저장 로직이 복잡해지거나 테스트가 어려워지면 그때 Port로 분리합니다.
 
+## 배포와 버전 기록
+
+- 프로덕션 배포 workflow는 `MAJOR.MINOR.PATCH` 버전을 입력받아 Flyway migration을 실행한 뒤 이미지를 ECR에 push하고 ECS service를 갱신합니다.
+- ECS service가 안정화된 뒤 workflow는 배포 커밋에 `be-v{버전}` annotated tag와 GitHub Release를 생성합니다.
+- 배포가 실패한 커밋에는 태그와 GitHub Release를 생성하지 않습니다.
+
 ## 하지 않는 것
 
 - 모든 Repository를 기계적으로 인터페이스로 감싸지 않습니다.
-- 단순 조회 기능까지 억지로 UseCase로 만들지 않습니다.
+- `UseCase`, `Finder`, `Recorder`, `Loader`처럼 공개 비즈니스 진입점을 여러 접미사로 나누지 않습니다.
 - 아직 필요하지 않은 Gradle 멀티 모듈 구조를 먼저 만들지 않습니다.
 - AI 호출이나 파일 처리처럼 오래 걸리는 작업을 사용자 API 응답 경로에 직접 묶지 않습니다.
 - 현재 ERD가 바뀔 수 있으므로 테이블 구조를 기준으로 아키텍처를 고정하지 않습니다.

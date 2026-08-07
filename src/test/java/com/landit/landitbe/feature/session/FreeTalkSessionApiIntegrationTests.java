@@ -1,0 +1,1364 @@
+// 프리톡 API의 외부 계약과 저장 경계를 검증한다.
+
+package com.landit.landitbe.feature.session;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContent;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionPracticeExample;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendation;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.domain.CharacterEmotion;
+import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
+import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
+import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+@ActiveProfiles("test")
+@AutoConfigureMockMvc
+@SpringBootTest
+@TestPropertySource(
+    properties = {
+      "landit.auth.oidc.fake-enabled=true",
+      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
+    })
+class FreeTalkSessionApiIntegrationTests {
+
+  private static final String EXPRESSION_GENERATION_STATUS_QUERY =
+      "SELECT expression_generation_status "
+          + "FROM free_talk_session "
+          + "WHERE learning_session_id = ?";
+
+  @Autowired private MockMvc mockMvc;
+
+  @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private FreeTalkSessionExpressionRepository freeTalkSessionExpressionRepository;
+
+  @Autowired private FakeAiFreeTalkClient fakeAiFreeTalkClient;
+
+  private final ObjectMapper objectMapper = new ObjectMapper();
+
+  @BeforeEach
+  void setUp() {
+    fakeAiFreeTalkClient.reset();
+    cleanUpDatabase();
+  }
+
+  @AfterEach
+  void tearDown() {
+    cleanUpDatabase();
+  }
+
+  private void cleanUpDatabase() {
+    awaitPendingExpressionGeneration();
+    jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
+    jdbcTemplate.update("DELETE FROM free_talk_session_expression");
+    jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
+    jdbcTemplate.update("DELETE FROM free_talk_session");
+    jdbcTemplate.update("DELETE FROM session_history_message");
+    jdbcTemplate.update("DELETE FROM session_history");
+    jdbcTemplate.update("DELETE FROM learning_session");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE owner_user_profile_id IS NOT NULL");
+    jdbcTemplate.update("DELETE FROM free_talk_topic");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994104");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994103");
+    jdbcTemplate.update("DELETE FROM scenario WHERE id = 994102");
+    jdbcTemplate.update("DELETE FROM category WHERE id = 994101");
+  }
+
+  private void awaitPendingExpressionGeneration() {
+    for (int attempt = 0; attempt < 100; attempt++) {
+      Integer pendingCount =
+          jdbcTemplate.queryForObject(
+              "SELECT COUNT(*) FROM free_talk_session "
+                  + "WHERE expression_generation_status = 'PREPARING'",
+              Integer.class);
+      if (pendingCount == null || pendingCount == 0) {
+        return;
+      }
+      try {
+        Thread.sleep(50L);
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        String message = "프리톡 표현 생성 종료를 기다리는 중 인터럽트되었습니다.";
+        throw new IllegalStateException(message, exception);
+      }
+    }
+    throw new IllegalStateException("프리톡 표현 생성이 제한 시간 안에 종료되지 않았습니다.");
+  }
+
+  @Test
+  void listTopicsReturnsOnlyActiveTopicsInDisplayOrder() throws Exception {
+    seedTopic(1002, "두 번째", "두 번째 설명", 2, "ACTIVE");
+    seedTopic(1001, "첫 번째", "첫 번째 설명", 1, "ACTIVE");
+    seedTopic(1003, "숨김", "숨김 설명", 3, "INACTIVE");
+    String accessToken =
+        login("free-talk-topics@example.com").get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/topics")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.dailySpeakingTimeLimitMs").value(60000))
+        .andExpect(jsonPath("$.data.remainingSpeakingTimeMs").value(60000))
+        .andExpect(jsonPath("$.data.topics.length()").value(2))
+        .andExpect(jsonPath("$.data.topics[0].topicId").value(1001))
+        .andExpect(jsonPath("$.data.topics[0].displayName").value("첫 번째"))
+        .andExpect(jsonPath("$.data.topics[0].displayOrder").value(1))
+        .andExpect(jsonPath("$.data.topics[1].topicId").value(1002));
+  }
+
+  @Test
+  void rejectsUnauthenticatedTopicAndSessionRequestsWithStandardError() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/free-talk/topics"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"USER_FIRST\"}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+  }
+
+  @Test
+  void startAiFirstSessionPersistsOpeningWithoutTutorCharacterContext() throws Exception {
+    seedTopic(1101, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
+    JsonNode loginBody = login("free-talk-ai-first@example.com");
+    long userId = loginBody.get("data").get("user").get("userId").asLong();
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1101}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
+            .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
+            .andExpect(jsonPath("$.data.title").value("주말 계획"))
+            .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
+            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(
+                jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
+            .andExpect(
+                jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
+            .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
+            .andExpect(jsonPath("$.data.currentMessage.emotion").value("HAPPY"))
+            .andReturn();
+
+    long sessionId =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().sessionId()).isEqualTo(sessionId);
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().topic().topicId()).isEqualTo(1101);
+    assertThat(fakeAiFreeTalkClient.openingTransactionActive()).isFalse();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT session_type FROM learning_session WHERE id = ?", String.class, sessionId))
+        .isEqualTo("FREE_TALK");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT user_profile_id FROM learning_session WHERE id = ?", Long.class, sessionId))
+        .isEqualTo(userId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT content
+                FROM session_history_message shm
+                JOIN session_history sh ON sh.id = shm.session_history_id
+                WHERE sh.learning_session_id = ?
+                """,
+                String.class,
+                sessionId))
+        .isEqualTo("What are your weekend plans?");
+  }
+
+  @Test
+  void startUserFirstSessionDoesNotCallAiAndCreatesEmptyHistory() throws Exception {
+    JsonNode loginBody = login("free-talk-user-first@example.com");
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"USER_FIRST\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.startMode").value("USER_FIRST"))
+            .andExpect(jsonPath("$.data.title").value(nullValue()))
+            .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
+            .andReturn();
+
+    long sessionId =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest()).isNull();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM session_history_message shm
+                JOIN session_history sh ON sh.id = shm.session_history_id
+                WHERE sh.learning_session_id = ?
+                """,
+                Integer.class,
+                sessionId))
+        .isZero();
+  }
+
+  @Test
+  void rejectsInvalidStartModeAndTopicCombinations() throws Exception {
+    seedTopic(1201, "오늘", "오늘의 일을 묻는다.", 1, "ACTIVE");
+    String accessToken =
+        login("free-talk-invalid-request@example.com").get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"AI_FIRST\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"USER_FIRST\",\"topicId\":1201}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
+  void rejectsInactiveAndMissingAiFirstTopics() throws Exception {
+    seedTopic(1251, "비활성", "노출하지 않는 주제다.", 1, "INACTIVE");
+    String accessToken =
+        login("free-talk-missing-topic@example.com").get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1251}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1252}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
+  @Test
+  void removesEveryCreatedRecordWhenAiOpeningFails() throws Exception {
+    seedTopic(1301, "영화", "최근 본 영화를 묻는다.", 1, "ACTIVE");
+    fakeAiFreeTalkClient.failOpening();
+    String accessToken =
+        login("free-talk-opening-failure@example.com").get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1301}"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
+
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM learning_session", Integer.class))
+        .isZero();
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM free_talk_session", Integer.class))
+        .isZero();
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM session_history", Integer.class))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isZero();
+  }
+
+  @Test
+  void openApiDocumentsFreeTalkContracts() throws Exception {
+    String topicsPath = "$.paths['/api/v1/free-talk/topics'].get";
+    String sessionsPath = "$.paths['/api/v1/free-talk/sessions'].post";
+    String messagesPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}/messages'].post";
+    String exitDecisionPath =
+        "$.paths['/api/v1/free-talk/sessions/{sessionId}/exit-decision'].post";
+    String pastSessionsPath = "$.paths['/api/v1/free-talk/sessions'].get";
+    String pastSessionDetailPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}'].get";
+    String innerThoughtProcessingStatusPath =
+        "$.components.schemas.SessionInnerThoughtResponse.properties.processingStatus";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(topicsPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(topicsPath + ".responses['200'].description").value("조회 성공"))
+        .andExpect(jsonPath(topicsPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(sessionsPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(sessionsPath + ".responses['201'].description").value("시작 성공"))
+        .andExpect(jsonPath(sessionsPath + ".responses['400'].description").value("요청 오류"))
+        .andExpect(jsonPath(sessionsPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(sessionsPath + ".responses['404'].description").value("주제 없음"))
+        .andExpect(jsonPath(sessionsPath + ".responses['502'].description").value("AI 응답 오류"))
+        .andExpect(jsonPath(sessionsPath + ".responses['503'].description").value("AI 생성 실패"))
+        .andExpect(jsonPath(messagesPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(
+            jsonPath(pastSessionsPath + ".responses['400'].description").value("페이지 번호 또는 크기 오류"))
+        .andExpect(jsonPath(pastSessionsPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(
+            jsonPath(pastSessionDetailPath + ".responses['403'].description").value("세션 소유자 아님"))
+        .andExpect(
+            jsonPath(pastSessionDetailPath + ".responses['404'].description")
+                .value("완료된 프리톡 세션 없음"))
+        .andExpect(
+            jsonPath(innerThoughtProcessingStatusPath + ".description")
+                .value("속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null"));
+  }
+
+  @Test
+  void replaysCompletedTurnForDuplicateClientMessageId() throws Exception {
+    String accessToken =
+        login("free-talk-message@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    String clientMessageId = UUID.randomUUID().toString();
+    String request = messageRequest(clientMessageId, "I went hiking with friends.", 4200, false);
+
+    MvcResult firstResult =
+        mockMvc
+            .perform(
+                post(messagePath(sessionId))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("Hiking with friends"))
+            .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+            .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
+            .andExpect(
+                jsonPath("$.data.submittedMessage.innerThoughtProcessingStatus").value("PREPARING"))
+            .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
+            .andExpect(jsonPath("$.data.nextMessage.role").value("AI"))
+            .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(4200))
+            .andExpect(jsonPath("$.data.progress.usedSpeakingTimeMs").value(4200))
+            .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(55800))
+            .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"))
+            .andReturn();
+
+    MvcResult replayedResult =
+        mockMvc
+            .perform(
+                post(messagePath(sessionId))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+            .andReturn();
+
+    assertThat(
+            objectMapper
+                .readTree(firstResult.getResponse().getContentAsByteArray())
+                .at("/data/submittedMessage/messageId"))
+        .isEqualTo(
+            objectMapper
+                .readTree(replayedResult.getResponse().getContentAsByteArray())
+                .at("/data/submittedMessage/messageId"));
+    assertThat(
+            objectMapper
+                .readTree(firstResult.getResponse().getContentAsByteArray())
+                .at("/data/nextMessage/messageId"))
+        .isEqualTo(
+            objectMapper
+                .readTree(replayedResult.getResponse().getContentAsByteArray())
+                .at("/data/nextMessage/messageId"));
+
+    assertThat(fakeAiFreeTalkClient.turnTransactionActive()).isFalse();
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void exitDetectionStoresOnlyTheUserMessageAndReplaysRepeatedDecision() throws Exception {
+    String accessToken =
+        login("free-talk-exit@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    String exitRequest =
+        messageRequest(UUID.randomUUID().toString(), "I should go now.", 1200, false);
+    MvcResult detected =
+        mockMvc
+            .perform(
+                post(messagePath(sessionId))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(exitRequest))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
+            .andExpect(jsonPath("$.data.nextMessage").value(nullValue()))
+            .andExpect(
+                jsonPath("$.data.submittedMessage.innerThoughtProcessingStatus").value(nullValue()))
+            .andExpect(jsonPath("$.data.progress.sessionStatus").value("AWAITING_EXIT_DECISION"))
+            .andReturn();
+    long submittedMessageId =
+        objectMapper
+            .readTree(detected.getResponse().getContentAsByteArray())
+            .at("/data/submittedMessage/messageId")
+            .asLong();
+    String decisionRequest =
+        "{\"submittedMessageId\":%d,\"decision\":\"CONTINUE\"}".formatted(submittedMessageId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(decisionRequest))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"));
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(decisionRequest))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"));
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(exitRequest))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.nextMessage.role").value("AI"));
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+  }
+
+  @Test
+  void resumesExpiredMessageReservationForTheSameClientMessageId() throws Exception {
+    String accessToken =
+        login("free-talk-stale-reservation@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    long historyId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM session_history WHERE learning_session_id = ?", Long.class, sessionId);
+    String clientMessageId = UUID.randomUUID().toString();
+    jdbcTemplate.update(
+        """
+        INSERT INTO session_history_message (
+            session_history_id, message_sequence, turn_number, role, content, client_message_id,
+            utterance_duration_ms, input_type, created_at, updated_at
+        )
+        VALUES (?, 1, 1, 'USER', 'I went hiking with friends.', ?, 1200, 'VOICE',
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        historyId,
+        clientMessageId);
+    jdbcTemplate.update(
+        """
+        UPDATE free_talk_session
+        SET processing_client_message_id = ?,
+            updated_at = DATEADD('SECOND', -91, CURRENT_TIMESTAMP)
+        WHERE learning_session_id = ?
+        """,
+        clientMessageId,
+        sessionId);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(clientMessageId, "I went hiking with friends.", 1200, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(1))
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(1200));
+
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void endDecisionAndTimeLimitCompleteTheSession() throws Exception {
+    String accessToken =
+        login("free-talk-complete@example.com").get("data").get("accessToken").asText();
+    long exitSessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, exitSessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(exitSessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
+    assertThat(awaitExpressionGenerationStatus(exitSessionId)).isEqualTo("READY");
+
+    fakeAiFreeTalkClient.reset();
+    long timeLimitSessionId = startUserFirstSession(accessToken);
+    mockMvc
+        .perform(
+            post(messagePath(timeLimitSessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 180000, true)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+    assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
+  }
+
+  @Test
+  void rejectsAnotherUsersPrivateFreeTalkExpression() throws Exception {
+    JsonNode loginBody = login("free-talk-new-expression@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
+    String otherToken =
+        login("free-talk-expression-other@example.com").at("/data/accessToken").asText();
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+  }
+
+  @Test
+  void returnsPrivateFreeTalkExpressionLearningContent() throws Exception {
+    JsonNode loginBody = login("free-talk-learning-content@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetExpressionText").value("hit it off"))
+        .andExpect(jsonPath("$.data.representativeSentenceWords.length()").value(6))
+        .andExpect(jsonPath("$.data.representativeImageUrl").value(nullValue()));
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
+        .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+  }
+
+  @Test
+  void completesPrivateFreeTalkExpressionIdempotently() throws Exception {
+    JsonNode loginBody = login("free-talk-learning-finish@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
+
+    finishExpression(accessToken, link);
+
+    Object firstSessionCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM free_talk_session_expression "
+                + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+            Object.class,
+            link.freeTalkSessionId(),
+            link.expressionId());
+    assertThat(firstSessionCompletedAt).isNotNull();
+
+    Object firstCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM user_writing_expression_completion "
+                + "WHERE writing_expression_id = ?",
+            Object.class,
+            link.expressionId());
+
+    finishExpression(accessToken, link);
+
+    Object repeatedSessionCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM free_talk_session_expression "
+                + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+            Object.class,
+            link.freeTalkSessionId(),
+            link.expressionId());
+
+    Object repeatedCompletedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT completed_at FROM user_writing_expression_completion "
+                + "WHERE writing_expression_id = ?",
+            Object.class,
+            link.expressionId());
+    assertThat(repeatedCompletedAt).isEqualTo(firstCompletedAt);
+    assertThat(repeatedSessionCompletedAt).isEqualTo(firstSessionCompletedAt);
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM user_writing_expression_completion
+                WHERE writing_expression_id = ?
+                """,
+                Integer.class,
+                link.expressionId()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void keepsRepeatedExpressionCompletionSeparateForEachFreeTalkSession() throws Exception {
+    JsonNode loginBody = login("free-talk-repeated-expression@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long firstLearningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink firstLink = seedNewExpressionForCompletedSession(firstLearningSessionId);
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET owner_user_profile_id = NULL WHERE id = ?",
+        firstLink.expressionId());
+    jdbcTemplate.update(
+        "UPDATE free_talk_session_expression "
+            + "SET created_at = TIMESTAMP '2026-07-27 10:00:00' "
+            + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+        firstLink.freeTalkSessionId(),
+        firstLink.expressionId());
+
+    long secondLearningSessionId = startUserFirstSession(accessToken);
+    long secondFreeTalkSessionId = completeSession(secondLearningSessionId);
+    freeTalkSessionExpressionRepository.saveAndFlush(
+        FreeTalkSessionExpression.link(secondFreeTalkSessionId, firstLink.expressionId(), 1));
+    jdbcTemplate.update(
+        "UPDATE free_talk_session_expression "
+            + "SET created_at = TIMESTAMP '2026-07-28 10:00:00' "
+            + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+        secondFreeTalkSessionId,
+        firstLink.expressionId());
+    FreeTalkExpressionLink secondLink =
+        new FreeTalkExpressionLink(
+            secondLearningSessionId, secondFreeTalkSessionId, firstLink.expressionId());
+
+    finishExpression(accessToken, secondLink);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", firstLearningSessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.expressions[0].completed").value(false))
+        .andExpect(jsonPath("$.data.expressions[0].lastRecommendedAt").value(nullValue()));
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", secondLearningSessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.expressions[0].completed").value(true))
+        .andExpect(
+            jsonPath("$.data.expressions[0].lastRecommendedAt").value("2026-07-27T10:00:00"));
+  }
+
+  @Test
+  void rejectsForeignMissingCompletedAndAwaitingSessions() throws Exception {
+    JsonNode ownerLogin = login("free-talk-owner@example.com");
+    String ownerToken = ownerLogin.get("data").get("accessToken").asText();
+    String otherToken =
+        login("free-talk-other@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(ownerToken);
+    String request = messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post(messagePath(999999L))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+        .andExpect(status().isNotFound());
+
+    fakeAiFreeTalkClient.detectExitIntent();
+    submitForExit(ownerToken, sessionId);
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(messageRequest(UUID.randomUUID().toString(), "Again.", 0, false)))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void preservesUserMessageAndDailyUsageWhenAiTurnFails() throws Exception {
+    String accessToken =
+        login("free-talk-compensation@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    String clientMessageId = UUID.randomUUID().toString();
+    String request = messageRequest(clientMessageId, "This should fail.", 700, false);
+    fakeAiFreeTalkClient.failTurn();
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accumulated_speaking_duration_ms FROM free_talk_session "
+                    + "WHERE learning_session_id = ?",
+                Long.class,
+                sessionId))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT processing_client_message_id FROM free_talk_session "
+                    + "WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isNull();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isEqualTo(700L);
+
+    fakeAiFreeTalkClient.reset();
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isEqualTo(700L);
+  }
+
+  @Test
+  void rejectsAnotherMessageWhileTheFirstMessageIsCallingAi() throws Exception {
+    String accessToken =
+        login("free-talk-concurrency@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.blockTurn();
+    final CompletableFuture<Integer> firstStatus =
+        CompletableFuture.supplyAsync(
+            () ->
+                performMessageStatus(
+                    accessToken,
+                    sessionId,
+                    messageRequest(UUID.randomUUID().toString(), "First.", 0, false)));
+    assertThat(fakeAiFreeTalkClient.awaitTurnStarted()).isTrue();
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(messageRequest(UUID.randomUUID().toString(), "Second.", 0, false)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+
+    fakeAiFreeTalkClient.releaseTurn();
+    assertThat(firstStatus.get(5, TimeUnit.SECONDS)).isEqualTo(200);
+  }
+
+  @Test
+  void completesAfterLastUtteranceCrossesDailySpeakingLimit() throws Exception {
+    String accessToken =
+        login("free-talk-server-time-limit@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "Almost done.", 59000, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 3000, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(62000));
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
+  }
+
+  @Test
+  void ignoresClientTimeLimitSignalWhileDailySpeakingTimeRemains() throws Exception {
+    String accessToken =
+        login("free-talk-client-time-limit@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(messageRequest(UUID.randomUUID().toString(), "Keep talking.", 1000, true)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
+        .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(59000));
+  }
+
+  private long startUserFirstSession(String accessToken) throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"USER_FIRST\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper
+        .readTree(result.getResponse().getContentAsByteArray())
+        .at("/data/sessionId")
+        .asLong();
+  }
+
+  private long submitForExit(String accessToken, long sessionId) throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(messagePath(sessionId))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        messageRequest(
+                            UUID.randomUUID().toString(), "I have to leave.", 1200, false)))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper
+        .readTree(result.getResponse().getContentAsByteArray())
+        .at("/data/submittedMessage/messageId")
+        .asLong();
+  }
+
+  private int performMessageStatus(String accessToken, long sessionId, String request) {
+    try {
+      return mockMvc
+          .perform(
+              post(messagePath(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(request))
+          .andReturn()
+          .getResponse()
+          .getStatus();
+    } catch (Exception exception) {
+      throw new IllegalStateException(exception);
+    }
+  }
+
+  private String messagePath(long sessionId) {
+    return "/api/v1/free-talk/sessions/%d/messages".formatted(sessionId);
+  }
+
+  private String exitDecisionPath(long sessionId) {
+    return "/api/v1/free-talk/sessions/%d/exit-decision".formatted(sessionId);
+  }
+
+  private String awaitExpressionGenerationStatus(long sessionId) throws InterruptedException {
+    for (int attempt = 0; attempt < 50; attempt++) {
+      String status =
+          jdbcTemplate.queryForObject(EXPRESSION_GENERATION_STATUS_QUERY, String.class, sessionId);
+      if (!"PREPARING".equals(status)) {
+        return status;
+      }
+      Thread.sleep(20L);
+    }
+    return jdbcTemplate.queryForObject(EXPRESSION_GENERATION_STATUS_QUERY, String.class, sessionId);
+  }
+
+  private String messageRequest(
+      String clientMessageId, String content, long utteranceDurationMs, boolean timeLimitReached) {
+    return ("{\"clientMessageId\":\"%s\",\"content\":\"%s\",\"inputType\":\"VOICE\","
+            + "\"utteranceDurationMs\":%d,\"timeLimitReached\":%s}")
+        .formatted(clientMessageId, content, utteranceDurationMs, timeLimitReached);
+  }
+
+  private FreeTalkExpressionLink seedNewExpressionForCompletedSession(long learningSessionId)
+      throws Exception {
+    long freeTalkSessionId = completeSession(learningSessionId);
+    long ownerUserProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT user_profile_id FROM learning_session WHERE id = ?",
+            Long.class,
+            learningSessionId);
+    long expressionId = 994104L;
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, owner_user_profile_id, expression_source, expression_type,
+            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            base_expression_meaning_text, usage_summary, usage_description,
+            representative_question_text, representative_question_translation,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            representative_image_url, practice_examples_payload, status, created_at, updated_at
+        )
+        VALUES (
+            ?, NULL, ?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
+            '죽이 잘 맞다', '처음 만난 사람과 잘 통할 때 사용한다.',
+            '서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.',
+            'How was meeting your new teammate?', '새 팀원을 만나 보니 어땠어?',
+            'We really hit it off.', '우리는 정말 죽이 잘 맞았어.',
+            ARRAY['We', 'really', 'hit', 'it', 'off', '.'],
+            ARRAY['hit', 'We', 'miss', 'off', 'it', 'really', '.'],
+            NULL, ? FORMAT JSON, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        expressionId,
+        ownerUserProfileId,
+        practiceExamples(null).toString());
+    freeTalkSessionExpressionRepository.saveAndFlush(
+        FreeTalkSessionExpression.link(freeTalkSessionId, expressionId, 1));
+    return new FreeTalkExpressionLink(learningSessionId, freeTalkSessionId, expressionId);
+  }
+
+  private void finishExpression(String accessToken, FreeTalkExpressionLink link) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isEmpty());
+  }
+
+  private record FreeTalkExpressionLink(
+      long learningSessionId, long freeTalkSessionId, long expressionId) {}
+
+  private long completeSession(long learningSessionId) {
+    jdbcTemplate.update(
+        """
+        UPDATE learning_session
+        SET status = 'COMPLETED', ended_at = CURRENT_TIMESTAMP,
+            ended_by = 'USER', completion_reason = 'USER_ENDED'
+        WHERE id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        UPDATE free_talk_session
+        SET conversation_status = 'COMPLETED', expression_generation_status = 'READY'
+        WHERE learning_session_id = ?
+        """,
+        learningSessionId);
+    long freeTalkSessionId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
+            Long.class,
+            learningSessionId);
+    return freeTalkSessionId;
+  }
+
+  private JsonNode practiceExamples(String imageUrl) throws Exception {
+    String imageProperty = imageUrl == null ? "" : ",\"imageUrl\":\"" + imageUrl + "\"";
+    String example =
+        """
+        {
+          "sentenceText": "They hit it off right away.",
+          "sentenceWords": ["They", "hit", "it", "off", "right", "away", "."],
+          "highlightingPart": "hit it off",
+          "practiceQuestion": "How did the introduction go?",
+          "sentenceTranslation": "그들은 바로 죽이 잘 맞았어.",
+          "sentenceWordChoices": ["hit", "They", "miss", "it", "off", "right", "away", "."],
+          "practiceQuestionTranslation": "소개는 어땠어?"%s
+        }
+        """
+            .formatted(imageProperty);
+    return objectMapper.readTree("[" + String.join(",", Collections.nCopies(4, example)) + "]");
+  }
+
+  private JsonNode practiceExamplesWithInvalidEntry() throws Exception {
+    return objectMapper.readTree(
+        """
+        [
+          {
+            "sentenceText": "Valid sentence.",
+            "sentenceWords": ["Valid", "sentence", "."],
+            "highlightingPart": "Valid",
+            "practiceQuestion": "Is this valid?",
+            "sentenceTranslation": "정상 문장.",
+            "sentenceWordChoices": ["sentence", "Valid", "."],
+            "practiceQuestionTranslation": "이 문장은 정상이야?"
+          },
+          {
+            "sentenceText": "Missing words.",
+            "highlightingPart": "Missing",
+            "practiceQuestion": "Are words missing?",
+            "sentenceTranslation": "단어 배열이 빠진 문장.",
+            "sentenceWordChoices": ["Missing", "words", "."],
+            "practiceQuestionTranslation": "단어 배열이 빠졌어?"
+          }
+        ]
+        """);
+  }
+
+  private long seedWritingExpression() throws Exception {
+    jdbcTemplate.update(
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (994101, 994101, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario (
+            id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+            display_order, status, created_at, updated_at
+        )
+        VALUES (
+            994102, 994101, 'friend', 'NORMAL', 'AI', 1,
+            994102, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """);
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            display_order, target_expression_text, base_expression_meaning_text, usage_summary,
+            usage_description, representative_question_text, representative_question_translation,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            representative_image_url, practice_examples_payload, status, created_at, updated_at
+        )
+        VALUES (
+            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1,
+            'make up for', '만회하다', '부족했던 부분을 보완한다.',
+            '부족하거나 잘못된 일을 다른 행동으로 보완할 때 쓴다.',
+            'How will you fix it?', '어떻게 만회할 거야?',
+            'I will make up for it.', '내가 만회할게.',
+            ARRAY['I', 'will', 'make', 'up', 'for', 'it', '.'],
+            ARRAY['make', 'I', 'it', 'up', 'for', 'will', '.'],
+            'https://cdn/representative.png',
+            ? FORMAT JSON, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        practiceExamples("https://cdn/practice.png").toString());
+    return 994103L;
+  }
+
+  private JsonNode login(String email) throws Exception {
+    String nonce = UUID.randomUUID().toString();
+    MvcResult result =
+        mockMvc
+            .perform(
+                post("/api/v1/auth/social-login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"provider":"GOOGLE","idToken":"%s|%s|Free Talk User|%s","nonce":"%s"}
+                        """
+                            .formatted(UUID.randomUUID(), email, nonce, nonce)))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+  }
+
+  private void seedTopic(
+      long id, String displayName, String promptDescription, int displayOrder, String status) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO free_talk_topic (
+            id, display_name, prompt_description, display_order, status, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        id,
+        displayName,
+        promptDescription,
+        displayOrder,
+        status);
+  }
+
+  @TestConfiguration
+  static class FakeAiFreeTalkClientConfiguration {
+
+    @Bean
+    @Primary
+    FakeAiFreeTalkClient fakeAiFreeTalkClient() {
+      return new FakeAiFreeTalkClient();
+    }
+  }
+
+  static class FakeAiFreeTalkClient implements AiFreeTalkClient {
+
+    private AiFreeTalkOpeningRequest lastOpeningRequest;
+    private boolean openingTransactionActive;
+    private boolean failOpening;
+    private volatile boolean turnTransactionActive;
+    private volatile boolean failTurn;
+    private volatile boolean exitIntentDetected;
+    private final AtomicInteger turnCallCount = new AtomicInteger();
+    private volatile CountDownLatch turnStarted = new CountDownLatch(1);
+    private volatile CountDownLatch turnRelease = new CountDownLatch(0);
+
+    @Override
+    public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
+      lastOpeningRequest = request;
+      openingTransactionActive = TransactionSynchronizationManager.isActualTransactionActive();
+      if (failOpening) {
+        throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      }
+      return new AiFreeTalkOpeningResult(
+          "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY);
+    }
+
+    @Override
+    public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
+      turnTransactionActive = TransactionSynchronizationManager.isActualTransactionActive();
+      turnCallCount.incrementAndGet();
+      turnStarted.countDown();
+      try {
+        if (!turnRelease.await(5, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("AI 턴 대기가 시간 초과되었습니다.");
+        }
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(exception);
+      }
+      if (failTurn) {
+        throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      }
+      if (exitIntentDetected && request.responseMode().name().equals("NORMAL")) {
+        return new AiFreeTalkTurnResult(true, null, null, null, null);
+      }
+      return new AiFreeTalkTurnResult(
+          false,
+          request.isFirstUserTurn() ? "Hiking with friends" : null,
+          "That sounds fun! Where are you going next?",
+          "재밌겠다! 다음에는 어디로 갈 거야?",
+          CharacterEmotion.HAPPY);
+    }
+
+    @Override
+    public AiFreeTalkInnerThoughtResult generateInnerThought(
+        AiFreeTalkInnerThoughtRequest request) {
+      return new AiFreeTalkInnerThoughtResult(
+          "즐거운 시간을 보냈나 봐.", com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
+    }
+
+    @Override
+    public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
+      return new AiFreeTalkClosingResult(
+          "It was great talking with you!", "이야기해서 즐거웠어!", CharacterEmotion.HAPPY);
+    }
+
+    @Override
+    public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+        AiFreeTalkExpressionRecommendationsRequest request) {
+      return new AiFreeTalkExpressionRecommendationsResult(
+          List.of(
+              new AiFreeTalkExpressionRecommendation(
+                  1,
+                  FreeTalkExpressionSourceType.NEW,
+                  null,
+                  "I'm up for that",
+                  "좋아, 그거 하자",
+                  "상대 제안에 동의할 때 사용한다.")));
+    }
+
+    @Override
+    public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
+        AiFreeTalkExpressionLearningContentRequest request) {
+      return new AiFreeTalkExpressionLearningContentResult(
+          List.of(
+              new AiFreeTalkExpressionLearningContent(
+                  "I'm up for that",
+                  "좋아, 그거 하자",
+                  "상대 제안에 동의할 때 사용한다.",
+                  "상대방의 제안이나 계획에 긍정적으로 답할 때 쓴다.",
+                  "Do you want to get coffee after work?",
+                  "퇴근 후 커피 마실래?",
+                  "I'm up for that.",
+                  "좋아, 그러자.",
+                  List.of("I'm", "up", "for", "that."),
+                  List.of("I'm", "up", "for", "that.", "not"),
+                  null,
+                  List.of(
+                      new AiFreeTalkExpressionPracticeExample(
+                          null,
+                          "I'm up for a movie tonight.",
+                          List.of("I'm", "up", "for", "a", "movie", "tonight."),
+                          "I'm up for",
+                          "Want to watch a movie tonight?",
+                          "오늘 밤 영화 보는 거 좋아.",
+                          List.of("I'm", "up", "for", "a", "movie", "tonight.", "not"),
+                          "오늘 밤 영화 볼래?")))));
+    }
+
+    void reset() {
+      lastOpeningRequest = null;
+      openingTransactionActive = false;
+      failOpening = false;
+      turnTransactionActive = false;
+      failTurn = false;
+      exitIntentDetected = false;
+      turnCallCount.set(0);
+      turnStarted = new CountDownLatch(1);
+      turnRelease = new CountDownLatch(0);
+    }
+
+    void failOpening() {
+      failOpening = true;
+    }
+
+    void failTurn() {
+      failTurn = true;
+    }
+
+    void detectExitIntent() {
+      exitIntentDetected = true;
+    }
+
+    void blockTurn() {
+      turnRelease = new CountDownLatch(1);
+    }
+
+    boolean awaitTurnStarted() throws InterruptedException {
+      return turnStarted.await(5, TimeUnit.SECONDS);
+    }
+
+    void releaseTurn() {
+      turnRelease.countDown();
+    }
+
+    AiFreeTalkOpeningRequest lastOpeningRequest() {
+      return lastOpeningRequest;
+    }
+
+    boolean openingTransactionActive() {
+      return openingTransactionActive;
+    }
+
+    boolean turnTransactionActive() {
+      return turnTransactionActive;
+    }
+
+    int turnCallCount() {
+      return turnCallCount.get();
+    }
+  }
+}

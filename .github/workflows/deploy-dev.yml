@@ -67,6 +67,7 @@ jobs:
         run: |
           image_uri="$ECR_REGISTRY/$ECR_REPOSITORY"
           docker build \
+            --build-arg "APP_VERSION=${GITHUB_SHA}" \
             -t "$image_uri:${GITHUB_SHA}" \
             -t "$image_uri:latest" \
             .

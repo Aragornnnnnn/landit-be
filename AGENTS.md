@@ -15,9 +15,11 @@ Landit BE 서버에서 Codex와 다른 코딩 에이전트가 지켜야 할 저�
 
 - 백엔드는 모듈러 모놀리스로 시작합니다.
 - 기능 모듈은 테이블 기준이 아니라 사용자 기능과 비즈니스 흐름 기준으로 나눕니다.
-- 각 기능 모듈은 `api`, `application`, `domain`, `infrastructure` 구조를 따릅니다.
-- 상태 변경, 여러 단계 조율, 트랜잭션 경계가 중요한 흐름은 UseCase로 둡니다.
-- 단순 조회와 관리성 기능은 Service로 충분합니다.
+- 최상위 패키지는 사용자 기능을 모은 `feature`, 애플리케이션 설정을 모은 `config`, 기능 독립적인 공통 코드를 모은 `shared`로 나눕니다.
+- 각 기능은 Controller를 기능 패키지 바로 아래에 노출하고 `docs`, `dto`, `domain`, `repository`, `service`, `client`, `exception`처럼 실제 역할이 드러나는 패키지를 사용합니다.
+- 모든 공개 비즈니스 로직 클래스는 `Service`로 끝내며 `UseCase`, `UseCaseService`, `Finder` 접미사를 사용하지 않습니다.
+- 모든 Repository는 하나의 기능 Service가 소유하고, Controller와 다른 기능의 Service는 Repository를 직접 참조하지 않습니다.
+- 다른 기능과는 공개 Service와 record로만 통신합니다.
 - AI Provider, SQS, S3, Push, OAuth 같은 외부 의존성만 Port/Adapter로 분리합니다.
 - 단순 Repository를 처음부터 전부 Port로 감싸지 않습니다.
 - API 서버는 사용자 요청을 빠르게 처리하고, 오래 걸리는 작업은 SQS를 통해 Worker가 처리합니다.
@@ -41,6 +43,27 @@ Landit BE 서버에서 Codex와 다른 코딩 에이전트가 지켜야 할 저�
 - 기존 `checklist.md`와 `context-notes.md`는 과거 기록으로만 유지하고 새 작업에는 만들지 않습니다.
 - PR을 생성할 때는 변경 성격에 맞는 기존 label을 하나 이상 적용하고, 작업자를 assignee로 지정합니다.
 
+## Branch Rules
+
+- 일반 기능 개발은 `feat/{이슈 번호}` 형식을 사용합니다.
+- 일반 기능 개발용 `feat/*`는 `develop`에서 생성하고 `develop`으로 병합합니다.
+- 릴리즈 QA에서 발견한 버그 수정은 `fix/{이슈 번호}`를 사용합니다.
+- `fix/*`는 대상 `release/v{MAJOR}.{MINOR}.{PATCH}`에서 생성하고 해당 release 브랜치로 병합합니다.
+- `release/v{MAJOR}.{MINOR}.{PATCH}`는 `develop`에서 생성하고 검증 후 `main`으로 병합합니다.
+- 릴리즈 브랜치를 생성하기 전, 배포 예정 `MAJOR.MINOR.PATCH` 버전이 명시되지 않았다면 사용자에게 먼저 확인합니다.
+- 운영 배포 후 긴급 수정만 `hotfix/{이슈 번호}`를 사용합니다.
+- `hotfix/{이슈 번호}`는 `main`에서 생성하고 배포 후 `develop`과 진행 중인 `release/*`에 반영합니다.
+- 배포가 끝난 `release/*` 브랜치는 재사용하지 않습니다.
+
+## Release Automation
+
+- 프로덕션 배포는 `main`에서 수동 workflow에 `MAJOR.MINOR.PATCH` 버전을 입력해 실행합니다.
+- 정식 릴리즈의 프로덕션 배포 workflow에는 해당 `release/v{버전}` 브랜치와 같은 버전을 입력합니다.
+- hotfix는 마지막 성공 배포 `be-v{버전}` 태그를 기준으로 다음 PATCH 버전을 에이전트가 제안하고, 사용자가 프로덕션 배포 workflow에 그 버전을 입력합니다.
+- 배포가 성공하면 workflow가 `be-v{버전}` annotated tag와 GitHub Release를 생성합니다.
+- workflow 실행은 태그와 GitHub Release 생성까지 포함한 승인입니다.
+- 이미 존재하는 태그, 태그 삭제나 이동, 롤백, MAJOR 또는 MINOR 버전 결정은 사람에게 확인합니다.
+
 ## Backend Code Convention
 
 - Java 코드는 Google Java Style Guide를 기준으로 합니다.
@@ -48,7 +71,10 @@ Landit BE 서버에서 Codex와 다른 코딩 에이전트가 지켜야 할 저�
 - Spotless는 Java 포맷을, Checkstyle은 명명·Javadoc 형식·코드 구조 등 정적으로 판별 가능한 Google Java Style 규칙을 자동 검사합니다. 첫 줄 한국어 역할 주석의 존재와 Javadoc의 의미는 이 문서와 코드 리뷰로 확인합니다.
 - 와일드카드 import를 사용하지 않습니다.
 - 새 소스 파일의 첫 줄은 파일 역할을 설명하는 한국어 한 줄 주석으로 시작합니다.
-- 메서드 설명은 Javadoc `/** ... */`를 사용합니다.
+- 공개 타입과 `public`, `protected` 메서드는 Javadoc으로 역할과 호출 계약을 설명합니다.
+- Javadoc에는 모든 파라미터의 `@param`, 반환값의 `@return`, 호출자가 알아야 할 예외의 `@throws`를 작성합니다.
+- record 구성 요소는 record 선언부의 `@param`으로 설명합니다.
+- `private` 메서드는 비즈니스 의도나 제약 조건을 코드만으로 파악하기 어려울 때만 Javadoc을 작성합니다.
 - 메서드 내부의 짧은 보조 설명은 `//`를 사용합니다.
 - 이름은 길어져도 역할이 분명하게 작성합니다.
 - 하나의 메서드는 하나의 책임만 갖도록 작성합니다.
