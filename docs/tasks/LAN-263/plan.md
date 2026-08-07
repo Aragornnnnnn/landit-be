@@ -34,6 +34,6 @@ CI의 flyway-migration workflow가 `db/migration` + `db/postgresql`을 버전 �
 
 ## 남은 작업 (TODO)
 
-- [ ] 신규 20개 썸네일 제작 (현재 `thumbnail_url` NULL) 후 UPDATE
+- [x] 신규 20개 썸네일 제작 후 UPDATE — LAN-269(V44)에서 반영
+- [x] 신규 20개 Q1 inner_thought 작성 후 variant UPDATE — LAN-273(V45)에서 반영
 - [ ] 기존 시나리오 1·6·8 썸네일에 구 캐릭터 외형이 박혀 있으면 교체
-- [ ] 신규 20개 Q1 inner_thought 작성 (현재 NULL) 후 variant UPDATE
