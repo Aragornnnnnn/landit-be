@@ -106,3 +106,8 @@ jobs:
           DEPLOYMENT_CREATED_AT: ${{ steps.deploy.outputs.deployment_created_at }}
         run: |
           bash .github/scripts/verify-ecs-deployment.sh
+
+      - name: Deploy the same image to develop EC2
+        env:
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: bash .github/scripts/deploy-ec2-service.sh api "$GITHUB_SHA"
