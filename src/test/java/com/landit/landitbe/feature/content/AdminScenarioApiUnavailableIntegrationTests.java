@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +40,7 @@ class AdminScenarioApiUnavailableIntegrationTests {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  @DisplayName("develop 외 환경에서는 관리자 시나리오 목록 API를 등록하지 않는다.")
   @Test
   void doesNotRegisterAdminScenarioApiOutsideDevelopProfile() throws Exception {
     String accessToken = loginAdmin();

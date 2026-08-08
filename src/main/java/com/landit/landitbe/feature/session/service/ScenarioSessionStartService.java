@@ -94,16 +94,8 @@ public class ScenarioSessionStartService {
     return response;
   }
 
-  /**
-   * 관리자의 develop 환경 테스트용 시나리오 세션을 일반 사용자 진행 제한 없이 시작한다.
-   *
-   * @param userId 관리자 사용자 ID
-   * @param scenarioId 시나리오 ID
-   * @return 생성된 세션과 첫 메시지 정보
-   * @throws ApiException 사용자가 비활성이거나 콘텐츠가 비활성 상태이거나 시작 데이터가 유효하지 않을 때
-   */
-  @Transactional
-  public SessionStartResponse startAdminScenarioSession(long userId, long scenarioId) {
+  /** 개발 환경 전용 관리자 Service에서 진행 제한 없이 세션을 시작할 때 사용한다. */
+  SessionStartResponse startScenarioSessionWithoutProgression(long userId, long scenarioId) {
     return startScenarioSession(userId, scenarioId, false);
   }
 

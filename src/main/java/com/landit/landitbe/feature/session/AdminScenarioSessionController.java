@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.docs.AdminScenarioSessionControllerDocs;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse;
-import com.landit.landitbe.feature.session.service.ScenarioSessionStartService;
+import com.landit.landitbe.feature.session.service.AdminScenarioSessionStartService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AdminScenarioSessionController implements AdminScenarioSessionControllerDocs {
 
-  private final ScenarioSessionStartService scenarioSessionStartService;
+  private final AdminScenarioSessionStartService adminScenarioSessionStartService;
 
   /** {@inheritDoc} */
   @Override
@@ -31,6 +31,6 @@ public class AdminScenarioSessionController implements AdminScenarioSessionContr
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long scenarioId) {
     return ApiResponse.success(
         HttpStatus.CREATED,
-        scenarioSessionStartService.startAdminScenarioSession(principal.userId(), scenarioId));
+        adminScenarioSessionStartService.startScenarioSession(principal.userId(), scenarioId));
   }
 }

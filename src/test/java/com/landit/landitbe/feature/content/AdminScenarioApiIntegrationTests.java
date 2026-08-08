@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,6 +53,7 @@ class AdminScenarioApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM category");
   }
 
+  @DisplayName("관리자는 활성 시나리오만 진행 상태 필드 없이 조회한다.")
   @Test
   void listsOnlyActiveScenariosWithoutUserProgressionFields() throws Exception {
     String accessToken = loginAdmin("admin-scenario-list", "관리자");
@@ -72,11 +74,13 @@ class AdminScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").doesNotExist());
   }
 
+  @DisplayName("인증되지 않은 관리자 시나리오 목록 요청은 거부한다.")
   @Test
   void rejectsUnauthenticatedRequest() throws Exception {
     mockMvc.perform(get("/api/v1/admin/scenarios")).andExpect(status().isUnauthorized());
   }
 
+  @DisplayName("일반 사용자의 관리자 시나리오 목록 요청은 거부한다.")
   @Test
   void rejectsNonAdminRequest() throws Exception {
     String accessToken = login("admin-scenario-user-" + UUID.randomUUID(), "일반 사용자");
@@ -88,6 +92,7 @@ class AdminScenarioApiIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
+  @DisplayName("관리자 시나리오 목록 API를 OpenAPI 문서에 노출한다.")
   @Test
   void documentsAdminScenarioList() throws Exception {
     mockMvc

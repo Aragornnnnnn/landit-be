@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,6 +64,7 @@ class AdminScenarioSessionApiIntegrationTests {
     clearScenarioSessions();
   }
 
+  @DisplayName("관리자는 이전 시나리오를 완료하지 않아도 다음 시나리오를 시작한다.")
   @Test
   void startsScenarioBeforeCompletingPreviousScenario() throws Exception {
     String accessToken = loginAdmin("admin-scenario-out-of-order", "관리자");
@@ -77,14 +79,24 @@ class AdminScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"));
   }
 
+  @DisplayName("관리자는 오늘 다른 시나리오를 완료했어도 추가 시나리오를 시작한다.")
   @Test
   void startsAdditionalScenarioAfterCompletingAnotherToday() throws Exception {
     String userKey = "admin-scenario-start-" + UUID.randomUUID();
     final String accessToken = login(userKey, "관리자");
-    jdbcTemplate.update(
-        "UPDATE user_profile SET role = 'ADMIN' WHERE id = ?", userProfileId(userKey));
+    long userProfileId = userProfileId(userKey);
+    jdbcTemplate.update("UPDATE user_profile SET role = 'ADMIN' WHERE id = ?", userProfileId);
     seedScenarioContent();
-    grantScenarioAccess(userProfileId(userKey), 701);
+    grantScenarioAccess(userProfileId, 701);
+    completeScenarioToday(userProfileId, 701);
+
+    mockMvc
+        .perform(
+            post("/api/v1/scenarios/{scenarioId}/sessions", 702)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("SCENARIO_LOCKED"))
+        .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
 
     mockMvc
         .perform(
@@ -95,6 +107,7 @@ class AdminScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"));
   }
 
+  @DisplayName("관리자도 비활성 시나리오는 시작할 수 없다.")
   @Test
   void rejectsInactiveScenario() throws Exception {
     String accessToken = loginAdmin("admin-scenario-inactive", "관리자");
@@ -107,6 +120,7 @@ class AdminScenarioSessionApiIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
+  @DisplayName("일반 사용자의 관리자 시나리오 세션 시작 요청은 거부한다.")
   @Test
   void rejectsNonAdminRequest() throws Exception {
     String userKey = "admin-scenario-session-user-" + UUID.randomUUID();
@@ -119,6 +133,7 @@ class AdminScenarioSessionApiIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
+  @DisplayName("관리자 시나리오 세션 시작 API를 OpenAPI 문서에 노출한다.")
   @Test
   void documentsAdminScenarioSessionStart() throws Exception {
     mockMvc
@@ -180,6 +195,21 @@ class AdminScenarioSessionApiIntegrationTests {
         INSERT INTO user_scenario_access (
             user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at)
         VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userProfileId,
+        scenarioId);
+  }
+
+  private void completeScenarioToday(long userProfileId, long scenarioId) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_scenario_progress (
+            user_profile_id, scenario_id, target_locale, status, best_star_rating,
+            best_native_score, completed_count, first_cleared_at, last_played_at,
+            created_at, updated_at)
+        VALUES (
+            ?, ?, 'EN', 'CLEARED', 3.0, 100, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         userProfileId,
         scenarioId);
