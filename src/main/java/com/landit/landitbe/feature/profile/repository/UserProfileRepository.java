@@ -7,6 +7,8 @@ import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +16,14 @@ import org.springframework.data.repository.query.Param;
 
 /** 사용자 프로필 엔티티를 PK와 상태 기준으로 조회한다. */
 public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
+
+  /**
+   * 가입일 최신순으로 사용자 프로필을 페이지 조회한다.
+   *
+   * @param pageable 페이지 요청
+   * @return 가입일 최신순 사용자 프로필 목록
+   */
+  Slice<UserProfile> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
 
   /** 특정 상태의 사용자 프로필을 PK로 조회한다. */
   Optional<UserProfile> findByIdAndStatus(Long id, UserProfileStatus status);
