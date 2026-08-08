@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,6 +47,7 @@ class AdminNpsApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM nps_response");
   }
 
+  @DisplayName("NPS 응답과 작성자 정보를 최신 제출순으로 조회한다.")
   @Test
   void listsNpsResponsesWithAuthorsInLatestOrder() throws Exception {
     final String accessToken = loginAdmin();
@@ -71,6 +73,7 @@ class AdminNpsApiIntegrationTests {
         .andExpect(jsonPath("$.data.hasNext").value(false));
   }
 
+  @DisplayName("NPS 응답 목록에 페이지네이션을 적용한다.")
   @Test
   void appliesPagination() throws Exception {
     String accessToken = loginAdmin();
@@ -91,6 +94,7 @@ class AdminNpsApiIntegrationTests {
         .andExpect(jsonPath("$.data.hasNext").value(true));
   }
 
+  @DisplayName("잘못된 NPS 목록 페이지 파라미터를 거부한다.")
   @Test
   void rejectsInvalidPageParameters() throws Exception {
     String accessToken = loginAdmin();
@@ -110,6 +114,7 @@ class AdminNpsApiIntegrationTests {
         .andExpect(status().isBadRequest());
   }
 
+  @DisplayName("인증되지 않았거나 관리자가 아닌 NPS 목록 요청을 거부한다.")
   @Test
   void rejectsUnauthenticatedAndNonAdminRequests() throws Exception {
     mockMvc.perform(get("/api/v1/admin/nps-responses")).andExpect(status().isUnauthorized());
@@ -122,6 +127,7 @@ class AdminNpsApiIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
+  @DisplayName("관리자 NPS 목록 API를 OpenAPI 문서에 노출한다.")
   @Test
   void documentsAdminNpsList() throws Exception {
     mockMvc
