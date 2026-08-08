@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,6 +67,7 @@ class AdminUserApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM category WHERE id = ?", TEST_CATEGORY_ID);
   }
 
+  @DisplayName("사용자 목록을 최신 가입순으로 페이지 조회한다.")
   @Test
   void listsUsersInLatestSignupOrderWithPagination() throws Exception {
     final String accessToken = loginAdmin();
@@ -101,6 +103,7 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.data.size").value(2));
   }
 
+  @DisplayName("사용자 상세에서 프로필과 학습 요약을 조회한다.")
   @Test
   void returnsProfileAndLearningSummaryForUserDetail() throws Exception {
     final String accessToken = loginAdmin();
@@ -143,6 +146,7 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.data.learningSummary.lastLearningDate").value("2026-08-08"));
   }
 
+  @DisplayName("학습 기록이 없는 사용자는 기본 학습 요약을 반환한다.")
   @Test
   void returnsDefaultLearningSummaryWhenUserHasNoLearningHistory() throws Exception {
     String accessToken = loginAdmin();
@@ -161,6 +165,7 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.data.learningSummary.lastLearningDate").value(nullValue()));
   }
 
+  @DisplayName("존재하지 않는 사용자 상세 조회는 찾을 수 없음으로 응답한다.")
   @Test
   void returnsNotFoundForMissingUser() throws Exception {
     String accessToken = loginAdmin();
@@ -173,6 +178,7 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("USER_PROFILE_NOT_FOUND"));
   }
 
+  @DisplayName("사용자 조회의 인증·권한·페이지 파라미터 오류를 거부한다.")
   @Test
   void rejectsUnauthenticatedNonAdminAndInvalidPageRequests() throws Exception {
     mockMvc.perform(get("/api/v1/admin/users")).andExpect(status().isUnauthorized());
@@ -191,6 +197,7 @@ class AdminUserApiIntegrationTests {
         .andExpect(status().isBadRequest());
   }
 
+  @DisplayName("관리자 사용자 목록과 상세 API를 OpenAPI 문서에 노출한다.")
   @Test
   void documentsAdminUserApis() throws Exception {
     mockMvc
