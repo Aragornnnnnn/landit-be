@@ -72,7 +72,7 @@ class AdminNpsApiIntegrationTests {
   }
 
   @Test
-  void appliesPaginationAndRejectsInvalidPageParameters() throws Exception {
+  void appliesPagination() throws Exception {
     String accessToken = loginAdmin();
     for (int index = 0; index < 3; index++) {
       String userKey = "nps-page-" + index + "-" + UUID.randomUUID();
@@ -89,6 +89,11 @@ class AdminNpsApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items.length()").value(2))
         .andExpect(jsonPath("$.data.hasNext").value(true));
+  }
+
+  @Test
+  void rejectsInvalidPageParameters() throws Exception {
+    String accessToken = loginAdmin();
 
     mockMvc
         .perform(
@@ -162,7 +167,10 @@ class AdminNpsApiIntegrationTests {
 
   private void insertNps(String userKey, int score, String opinion, String submittedAt) {
     jdbcTemplate.update(
-        "INSERT INTO nps_response (user_profile_id, score, opinion_text, created_at) VALUES (?, ?, ?, ?)",
+        """
+        INSERT INTO nps_response (user_profile_id, score, opinion_text, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
         userProfileId(userKey),
         score,
         opinion,

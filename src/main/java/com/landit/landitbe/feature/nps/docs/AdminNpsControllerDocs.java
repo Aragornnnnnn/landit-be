@@ -23,7 +23,7 @@ public interface AdminNpsControllerDocs {
    */
   @Operation(
       summary = "관리자 NPS 목록 조회",
-      description = "NPS 응답을 제출 시각 최신순으로 페이지 조회하고 작성자 정보를 함께 반환한다.",
+      description = "NPS 응답을 제출 시각 최신순으로 페이지 조회하고 " + "작성자 정보를 함께 반환한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

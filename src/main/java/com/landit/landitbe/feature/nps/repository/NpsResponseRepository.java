@@ -1,4 +1,4 @@
-// NPS 응답 엔티티를 저장하는 Repository다.
+// NPS 응답을 저장하고 관리자 목록을 조회한다.
 
 package com.landit.landitbe.feature.nps.repository;
 
@@ -9,7 +9,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-/** NPS 응답 엔티티를 저장하는 Repository다. */
+/** NPS 응답을 저장하고 관리자 목록을 조회한다. */
 public interface NpsResponseRepository extends JpaRepository<NpsResponse, Long> {
 
   /**

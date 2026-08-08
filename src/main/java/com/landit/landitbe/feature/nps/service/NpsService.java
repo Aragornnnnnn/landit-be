@@ -1,4 +1,4 @@
-// 사용자의 NPS 응답을 정규화해 저장하는 Service다.
+// NPS 응답을 저장하고 관리자 목록 조회를 제공한다.
 
 package com.landit.landitbe.feature.nps.service;
 
@@ -13,7 +13,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사용자의 NPS 응답을 정규화해 저장하는 Service다. */
+/** NPS 응답을 저장하고 관리자 목록 조회를 제공한다. */
 @Service
 @Slf4j
 public class NpsService {
