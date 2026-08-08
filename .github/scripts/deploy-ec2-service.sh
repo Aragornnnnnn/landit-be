@@ -49,6 +49,13 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     --instance-id "$EC2_INSTANCE_ID" \
     --query Status \
     --output text 2>&1)"; then
+    if [[ "$status" == *"(InvocationDoesNotExist)"* ]]; then
+      if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+        sleep "$POLL_INTERVAL_SECONDS"
+      fi
+      continue
+    fi
+
     echo "Unable to retrieve SSM command status" >&2
     exit 1
   fi

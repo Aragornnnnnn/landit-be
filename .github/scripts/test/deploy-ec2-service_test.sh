@@ -38,6 +38,12 @@ case "$1 $2" in
     IFS=',' read -r -a statuses <<< "$MOCK_STATUSES"
     status_index=$((invocation_count - 1))
     status="${statuses[$status_index]:-${statuses[${#statuses[@]} - 1]}}"
+
+    if [[ "$status" == error:* ]]; then
+      error_code="${status#error:}"
+      echo "An error occurred ($error_code): ${MOCK_INVOCATION_ERROR_DETAIL:-command is not available}" >&2
+      exit 255
+    fi
     printf '%s\n' "$status"
     ;;
   *)
@@ -51,11 +57,13 @@ chmod +x "$TMP_DIR/aws"
 SHA="0123456789abcdef0123456789abcdef01234567"
 
 run_helper() {
+  local max_attempts="${MAX_ATTEMPTS:-3}"
+
   PATH="$TMP_DIR:$PATH" \
     AWS_CALL_LOG="$TMP_DIR/aws-calls" \
     AWS_INVOCATION_COUNT="$TMP_DIR/invocation-count" \
     POLL_INTERVAL_SECONDS=0 \
-    MAX_ATTEMPTS=3 \
+    MAX_ATTEMPTS="$max_attempts" \
     bash "$SCRIPT" "$@"
 }
 
@@ -105,6 +113,41 @@ fi
 if ! grep -Fq "SSM command command-123 status: Success" <<< "$success_output"; then
   echo "successful command status was not reported"
   echo "$success_output"
+  exit 1
+fi
+
+rm -f "$TMP_DIR/aws-calls" "$TMP_DIR/invocation-count"
+eventual_success_output="$(EC2_INSTANCE_ID=i-123 MAX_ATTEMPTS=4 MOCK_STATUSES=error:InvocationDoesNotExist,Pending,InProgress,Success run_helper api "$SHA")"
+if ! grep -Fq "SSM command command-123 status: Success" <<< "$eventual_success_output"; then
+  echo "InvocationDoesNotExist should be retried until the command succeeds"
+  echo "$eventual_success_output"
+  exit 1
+fi
+if [ "$(grep -Fxc "$expected_status_command" "$TMP_DIR/aws-calls")" -ne 4 ]; then
+  echo "InvocationDoesNotExist should consume one bounded polling attempt"
+  cat "$TMP_DIR/aws-calls"
+  exit 1
+fi
+
+rm -f "$TMP_DIR/aws-calls" "$TMP_DIR/invocation-count"
+set +e
+eventual_timeout_output="$(EC2_INSTANCE_ID=i-123 MAX_ATTEMPTS=2 MOCK_STATUSES=error:InvocationDoesNotExist MOCK_INVOCATION_ERROR_DETAIL=super-secret run_helper api "$SHA" 2>&1)"
+eventual_timeout_status=$?
+set -e
+if [ "$eventual_timeout_status" -eq 0 ] || ! grep -Fq "SSM command command-123 did not complete within 2 attempts" <<< "$eventual_timeout_output" || grep -Fq "super-secret" <<< "$eventual_timeout_output"; then
+  echo "InvocationDoesNotExist retries should be bounded without leaking AWS output"
+  echo "$eventual_timeout_output"
+  exit 1
+fi
+
+rm -f "$TMP_DIR/aws-calls" "$TMP_DIR/invocation-count"
+set +e
+access_denied_output="$(EC2_INSTANCE_ID=i-123 MOCK_STATUSES=error:AccessDeniedException MOCK_INVOCATION_ERROR_DETAIL=super-secret run_helper api "$SHA" 2>&1)"
+access_denied_status=$?
+set -e
+if [ "$access_denied_status" -eq 0 ] || ! grep -Fq "Unable to retrieve SSM command status" <<< "$access_denied_output" || grep -Fq "super-secret" <<< "$access_denied_output" || [ "$(grep -Fxc "$expected_status_command" "$TMP_DIR/aws-calls")" -ne 1 ]; then
+  echo "non-retryable command invocation errors should fail once without leaking AWS output"
+  echo "$access_denied_output"
   exit 1
 fi
 
