@@ -22,7 +22,7 @@ public interface AdminScenarioControllerDocs {
    */
   @Operation(
       summary = "관리자 테스트용 시나리오 목록 조회",
-      description = "develop 환경에서 활성 상태인 시나리오 콘텐츠만 관리자 테스트 목록으로 조회한다.",
+      description = "develop 환경에서 활성 상태인 시나리오 콘텐츠만 " + "관리자 테스트 목록으로 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

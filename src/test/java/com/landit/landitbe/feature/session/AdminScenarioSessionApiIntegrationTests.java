@@ -176,26 +176,42 @@ class AdminScenarioSessionApiIntegrationTests {
 
   private void grantScenarioAccess(long userProfileId, long scenarioId) {
     jdbcTemplate.update(
-        "INSERT INTO user_scenario_access (user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at) VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO user_scenario_access (
+            user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at)
+        VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         userProfileId,
         scenarioId);
   }
 
   private void insertCategory(long categoryId, int displayOrder, String status, String name) {
     jdbcTemplate.update(
-        "INSERT INTO category (id, display_order, status, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         categoryId,
         displayOrder,
         status);
     jdbcTemplate.update(
-        "INSERT INTO category_language_variant (category_id, base_locale, name, created_at, updated_at) VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO category_language_variant (
+            category_id, base_locale, name, created_at, updated_at)
+        VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         categoryId,
         name);
   }
 
   private void insertScenario(long scenarioId, long categoryId, int displayOrder, String status) {
     jdbcTemplate.update(
-        "INSERT INTO scenario (id, category_id, ai_role, difficulty, first_speaker, total_question_count, display_order, status, created_at, updated_at) VALUES (?, ?, 'tutor', 'EASY', 'USER', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO scenario (
+            id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+            display_order, status, created_at, updated_at)
+        VALUES (?, ?, 'tutor', 'EASY', 'USER', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         scenarioId,
         categoryId,
         displayOrder,
@@ -204,7 +220,14 @@ class AdminScenarioSessionApiIntegrationTests {
 
   private void insertScenarioVariant(long variantId, long scenarioId, String title) {
     jdbcTemplate.update(
-        "INSERT INTO scenario_language_variant (id, scenario_id, target_locale, base_locale, title, briefing, user_opening_instruction, conversation_goal, status, created_at, updated_at) VALUES (?, ?, 'EN', 'KR', ?, '테스트 설명', '먼저 말해보세요.', '대화 목표', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO scenario_language_variant (
+            id, scenario_id, target_locale, base_locale, title, briefing,
+            user_opening_instruction, conversation_goal, status, created_at, updated_at)
+        VALUES (
+            ?, ?, 'EN', 'KR', ?, '테스트 설명', '먼저 말해보세요.', '대화 목표',
+            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         variantId,
         scenarioId,
         title);

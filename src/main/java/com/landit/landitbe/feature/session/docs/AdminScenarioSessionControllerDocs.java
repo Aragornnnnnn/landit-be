@@ -24,7 +24,7 @@ public interface AdminScenarioSessionControllerDocs {
    */
   @Operation(
       summary = "관리자 테스트용 시나리오 세션 시작",
-      description = "develop 환경에서 진행 순서와 하루 제한 없이 활성 시나리오 테스트 세션을 시작한다.",
+      description = "develop 환경에서 진행 순서와 하루 제한 없이 " + "활성 시나리오 테스트 세션을 시작한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

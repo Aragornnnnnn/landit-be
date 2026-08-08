@@ -68,7 +68,8 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
               ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id
              AND openingQuestionVariant.targetLocale = up.targetLocale
              AND openingQuestionVariant.baseLocale = up.baseLocale
-             AND openingQuestionVariant.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
+             AND openingQuestionVariant.status =
+                 com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN TtsVoice tv
               ON tv.id = slv.ttsVoiceId
              AND tv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE

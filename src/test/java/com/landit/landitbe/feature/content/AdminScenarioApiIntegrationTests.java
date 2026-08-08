@@ -148,12 +148,19 @@ class AdminScenarioApiIntegrationTests {
 
   private void insertCategory(long categoryId, int displayOrder, String status, String name) {
     jdbcTemplate.update(
-        "INSERT INTO category (id, display_order, status, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         categoryId,
         displayOrder,
         status);
     jdbcTemplate.update(
-        "INSERT INTO category_language_variant (category_id, base_locale, name, created_at, updated_at) VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO category_language_variant (
+            category_id, base_locale, name, created_at, updated_at)
+        VALUES (?, 'KR', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         categoryId,
         name);
   }

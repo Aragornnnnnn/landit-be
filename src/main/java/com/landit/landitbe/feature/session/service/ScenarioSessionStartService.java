@@ -95,7 +95,7 @@ public class ScenarioSessionStartService {
   }
 
   /**
-   * 관리자의 develop 환경 테스트용 시나리오 세션을 진행 조건 없이 시작한다.
+   * 관리자의 develop 환경 테스트용 시나리오 세션을 일반 사용자 진행 제한 없이 시작한다.
    *
    * @param userId 관리자 사용자 ID
    * @param scenarioId 시나리오 ID

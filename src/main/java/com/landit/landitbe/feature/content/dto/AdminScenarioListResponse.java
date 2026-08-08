@@ -24,7 +24,8 @@ public record AdminScenarioListResponse(List<CategoryResponse> categories) {
    * @return 카테고리별 관리자 시나리오 목록 응답
    */
   public static AdminScenarioListResponse from(List<ScenarioListProjection> rows) {
-    // 조회 정렬을 유지하면서 같은 카테고리의 시나리오를 하나의 응답 그룹으로 묶는다.
+    // 조회 정렬을 유지하면서 같은 카테고리의 시나리오를
+    // 하나의 응답 그룹으로 묶는다.
     Map<Long, CategoryResponseBuilder> builders = new LinkedHashMap<>();
     for (ScenarioListProjection row : rows) {
       CategoryResponseBuilder builder =

@@ -1,4 +1,4 @@
-// develop 외 환경에서 관리자 시나리오 목록 API가 등록되지 않는지 검증한다.
+// develop 외 환경의 관리자 시나리오 목록 API 미등록을 검증한다.
 
 package com.landit.landitbe.feature.content;
 
@@ -22,7 +22,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** Develop 외 환경에서 관리자 시나리오 목록 API가 등록되지 않는지 검증한다. */
+/** Develop 외 환경의 관리자 시나리오 목록 API 미등록을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
