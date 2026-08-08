@@ -11,3 +11,4 @@
 - GREEN: `bash .github/scripts/test/deploy-ec2-service_test.sh`와 `bash -n .github/scripts/deploy-ec2-service.sh .github/scripts/test/deploy-ec2-service_test.sh`가 통과했다.
 - 전체: `bash .github/scripts/test/deploy-ec2-service_test.sh && ./gradlew check --rerun-tasks --no-daemon`가 통과했다.
 - GitHub Environment variable 생성과 AWS 리소스 변경은 이 작업 범위에서 실행하지 않았다.
+- Task 7 재검증에서 shell test와 `./gradlew check --rerun-tasks --no-daemon`가 다시 통과했다. IaC·AI와 교차 검토해 ECS 검증 다음에 같은 SHA만 EC2로 전달되고, 실제 `EC2_INSTANCE_ID` 등록·EC2 배포·DNS·health 관찰은 미실행임을 확인했다.
