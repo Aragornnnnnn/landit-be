@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.admin;
 
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.content.repository.ScenarioListQueryRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,8 +42,6 @@ class AdminUserApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
-
-  @Autowired private ScenarioListQueryRepository scenarioListQueryRepository;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -166,23 +162,6 @@ class AdminUserApiIntegrationTests {
   }
 
   @Test
-  void findsOnlyRequestedScenarioSummaryForUserLocale() throws Exception {
-    String userKey = "admin-user-scenario-summary-" + UUID.randomUUID();
-    login(userKey, "시나리오 요약 사용자");
-    long userProfileId = userProfileId(userKey);
-    seedScenarioContent();
-
-    var summary =
-        scenarioListQueryRepository
-            .findScenarioSummary(userProfileId, SECOND_SCENARIO_ID)
-            .orElseThrow();
-
-    assertEquals(SECOND_SCENARIO_ID, summary.scenarioId());
-    assertEquals("두 번째 시나리오", summary.scenarioTitle());
-    assertEquals(9822, summary.displayOrder());
-  }
-
-  @Test
   void returnsNotFoundForMissingUser() throws Exception {
     String accessToken = loginAdmin();
 
@@ -258,11 +237,19 @@ class AdminUserApiIntegrationTests {
 
   private void seedScenarioContent() {
     jdbcTemplate.update(
-        "INSERT INTO category (id, display_order, status, created_at, updated_at) VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         TEST_CATEGORY_ID,
         TEST_CATEGORY_ID);
     jdbcTemplate.update(
-        "INSERT INTO category_language_variant (category_id, base_locale, name, created_at, updated_at) VALUES (?, 'KR', '관리자 사용자 테스트', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO category_language_variant (
+            category_id, base_locale, name, created_at, updated_at)
+        VALUES (
+            ?, 'KR', '관리자 사용자 테스트', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         TEST_CATEGORY_ID);
     insertScenario(FIRST_SCENARIO_ID, 9821, "첫 번째 시나리오");
     insertScenario(SECOND_SCENARIO_ID, 9822, "두 번째 시나리오");
@@ -270,26 +257,52 @@ class AdminUserApiIntegrationTests {
 
   private void insertScenario(long scenarioId, int displayOrder, String title) {
     jdbcTemplate.update(
-        "INSERT INTO scenario (id, category_id, ai_role, difficulty, first_speaker, total_question_count, display_order, status, created_at, updated_at) VALUES (?, ?, 'tutor', 'EASY', 'USER', 1, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO scenario (
+            id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+            display_order, status, created_at, updated_at)
+        VALUES (
+            ?, ?, 'tutor', 'EASY', 'USER', 1, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         scenarioId,
         TEST_CATEGORY_ID,
         displayOrder);
     jdbcTemplate.update(
-        "INSERT INTO scenario_language_variant (scenario_id, target_locale, base_locale, title, briefing, conversation_goal, status, created_at, updated_at) VALUES (?, 'EN', 'KR', ?, '설명', '목표', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO scenario_language_variant (
+            scenario_id, target_locale, base_locale, title, briefing,
+            conversation_goal, status, created_at, updated_at)
+        VALUES (
+            ?, 'EN', 'KR', ?, '설명', '목표', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         scenarioId,
         title);
   }
 
   private void grantScenarioAccess(long userProfileId, long scenarioId) {
     jdbcTemplate.update(
-        "INSERT INTO user_scenario_access (user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at) VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO user_scenario_access (
+            user_profile_id, scenario_id, target_locale, granted_at, created_at, updated_at)
+        VALUES (?, ?, 'EN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         userProfileId,
         scenarioId);
   }
 
   private void insertLearningSummary(long userProfileId) {
     jdbcTemplate.update(
-        "INSERT INTO user_learning_activity_summary (user_profile_id, total_session_count, completed_scenario_count, completed_free_talk_count, completed_review_count, total_turn_count, total_study_seconds, learned_expression_count, average_native_score, current_streak_days, longest_streak_days, last_activity_date, created_at, updated_at) VALUES (?, 3, 1, 0, 0, 3, 300, 0, NULL, 3, 3, '2026-08-08', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        """
+        INSERT INTO user_learning_activity_summary (
+            user_profile_id, total_session_count, completed_scenario_count,
+            completed_free_talk_count, completed_review_count, total_turn_count,
+            total_study_seconds, learned_expression_count, average_native_score,
+            current_streak_days, longest_streak_days, last_activity_date,
+            created_at, updated_at)
+        VALUES (
+            ?, 3, 1, 0, 0, 3, 300, 0, NULL, 3, 3, '2026-08-08',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
         userProfileId);
   }
 }

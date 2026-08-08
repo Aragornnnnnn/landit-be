@@ -185,7 +185,7 @@ public class UserProfileService {
   }
 
   /**
-   * 관리자 사용자 상세 조회에 사용할 프로필을 상태와 관계없이 조회한다.
+   * 관리자 사용자 상세 조회에 사용할 프로필을 계정 상태와 관계없이 조회한다.
    *
    * @param userProfileId 사용자 프로필 ID
    * @return 관리자 사용자 프로필

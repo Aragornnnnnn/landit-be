@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.content.service.ScenarioQueryService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
+import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,7 @@ public class AdminUserQueryService {
    *
    * @param userProfileId 사용자 프로필 ID
    * @return 관리자 사용자 상세 응답
-   * @throws com.landit.landitbe.feature.profile.exception.UserProfileException 사용자가 없을 때
+   * @throws UserProfileException 사용자가 없을 때
    */
   @Transactional(readOnly = true)
   public AdminUserDetailResponse getUser(long userProfileId) {
@@ -56,7 +57,8 @@ public class AdminUserQueryService {
     StreakService.LearningActivitySummary activitySummary =
         streakService.getLearningActivitySummary(userProfileId);
 
-    // 비활성 사용자는 더 이상 학습 대상이 아니므로 현재 제공 시나리오를 계산하지 않는다.
+    // 비활성 사용자는 더 이상 학습 대상이 아니므로
+    // 현재 제공 시나리오를 계산하지 않는다.
     AdminUserDetailResponse.CurrentScenario currentScenario =
         profile.status() == UserProfileStatus.ACTIVE ? findCurrentScenario(profile) : null;
 
@@ -64,7 +66,12 @@ public class AdminUserQueryService {
         profile, completedScenarioCount, currentScenario, activitySummary);
   }
 
-  /** 활성 사용자에게만 기존 순차 진행 정책으로 현재 시나리오를 계산한다. */
+  /**
+   * 활성 사용자에게만 기존 순차 진행 정책으로 현재 시나리오를 계산한다.
+   *
+   * @param profile 관리자 사용자 프로필
+   * @return 현재 제공 대상 시나리오. 제공할 시나리오가 없으면 null
+   */
   private AdminUserDetailResponse.CurrentScenario findCurrentScenario(AdminUserProfile profile) {
     ScenarioProgressionService.CurrentScenario currentScenario =
         scenarioProgressionService
