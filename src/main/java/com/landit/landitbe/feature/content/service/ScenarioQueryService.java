@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,17 +50,21 @@ public class ScenarioQueryService {
    */
   @Transactional(readOnly = true)
   public ScenarioListResponse getScenarioList(long userId) {
+    // 접근 권한과 오늘 시나리오를 동일한 기준 시각으로 계산한다.
     Instant evaluatedAt = clock.instant();
     UserLocale userLocale = userProfileService.getUserLocale(userId);
+
     Set<Long> accessibleScenarioIds =
         Set.copyOf(
             scenarioAccessService.findAccessibleScenarioIds(userId, userLocale.targetLocale()));
     List<ScenarioListProjection> scenarioRows =
         scenarioListQueryRepository.findScenarioList(userId);
+
     ScenarioProgressionService.CurrentScenario currentScenario =
         scenarioProgressionService
             .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
             .orElse(null);
+
     return ScenarioListResponse.from(
         categoryGroups(scenarioRows).stream()
             .map(
@@ -67,6 +72,29 @@ public class ScenarioQueryService {
                     categoryGroup.asCategoryResponse(accessibleScenarioIds, currentScenario))
             .toList());
   }
+
+  /**
+   * 사용자의 언어 설정에 맞는 시나리오 기본 정보를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @return 사용자 언어 설정에 맞는 시나리오 기본 정보
+   */
+  @Transactional(readOnly = true)
+  public Optional<ScenarioSummary> findScenarioSummary(long userId, long scenarioId) {
+    return scenarioListQueryRepository
+        .findScenarioSummary(userId, scenarioId)
+        .map(row -> new ScenarioSummary(row.scenarioId(), row.scenarioTitle(), row.displayOrder()));
+  }
+
+  /**
+   * 사용자 상세에 제공할 시나리오 기본 정보다.
+   *
+   * @param scenarioId 시나리오 ID
+   * @param scenarioTitle 시나리오 제목
+   * @param displayOrder 시나리오 노출 순서
+   */
+  public record ScenarioSummary(Long scenarioId, String scenarioTitle, int displayOrder) {}
 
   /** 평탄한 조회 결과를 응답 구조에 맞게 카테고리 단위로 묶는다. */
   private List<CategoryGroup> categoryGroups(List<ScenarioListProjection> scenarioRows) {
@@ -77,6 +105,7 @@ public class ScenarioQueryService {
               scenarioRow.categoryId(), ignored -> new CategoryGroup(scenarioRow));
       categoryGroup.addScenarioRow(scenarioRow);
     }
+
     return categoryGroupsById.values().stream().toList();
   }
 
@@ -87,6 +116,7 @@ public class ScenarioQueryService {
       ScenarioProgressionService.CurrentScenario currentScenario) {
     ScenarioAvailabilityStatus availabilityStatus =
         availabilityStatus(scenarioRow, accessibleScenarioIds, currentScenario);
+
     return ScenarioResponse.from(
         scenarioRow,
         availabilityStatus,
@@ -105,12 +135,15 @@ public class ScenarioQueryService {
         || inactive(scenarioRow.variantStatus())) {
       return ScenarioAvailabilityStatus.LOCKED;
     }
+
     if (accessibleScenarioIds.contains(scenarioRow.scenarioId())) {
       return ScenarioAvailabilityStatus.CLEARED;
     }
+
     if (currentScenario != null && scenarioRow.scenarioId().equals(currentScenario.scenarioId())) {
       return ScenarioAvailabilityStatus.TODAY;
     }
+
     return ScenarioAvailabilityStatus.LOCKED;
   }
 
@@ -121,6 +154,7 @@ public class ScenarioQueryService {
     if (currentScenario == null || !scenarioRow.scenarioId().equals(currentScenario.scenarioId())) {
       return null;
     }
+
     return currentScenario.type();
   }
 
@@ -130,12 +164,15 @@ public class ScenarioQueryService {
     if (availabilityStatus != ScenarioAvailabilityStatus.LOCKED) {
       return null;
     }
+
     if (inactive(scenarioRow.categoryStatus())) {
       return CATEGORY_LOCK_REASON;
     }
+
     if (inactive(scenarioRow.scenarioStatus()) || inactive(scenarioRow.variantStatus())) {
       return SCENARIO_LOCK_REASON;
     }
+
     return DAILY_SCENARIO_NOT_AVAILABLE;
   }
 
@@ -149,6 +186,7 @@ public class ScenarioQueryService {
     if (scenarioRow.firstSpeaker() == ConversationSpeaker.AI) {
       return OpeningPreviewResponse.fromAi(scenarioRow);
     }
+
     return OpeningPreviewResponse.fromUser(scenarioRow);
   }
 

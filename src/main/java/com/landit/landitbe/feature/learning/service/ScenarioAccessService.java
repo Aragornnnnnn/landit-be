@@ -26,6 +26,19 @@ public class ScenarioAccessService {
   private final UserProfileService userProfileService;
 
   /**
+   * 사용자가 대상 언어에서 완료한 시나리오 수를 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param targetLocale 학습 대상 언어
+   * @return 완료한 시나리오 수
+   */
+  @Transactional(readOnly = true)
+  public long countCompletedScenarios(Long userProfileId, Locale targetLocale) {
+    return userScenarioAccessRepository.countByUserProfileIdAndTargetLocale(
+        userProfileId, targetLocale);
+  }
+
+  /**
    * 사용자가 대상 언어의 특정 시나리오 복습 권한을 보유하는지 확인한다.
    *
    * @param userProfileId 사용자 프로필 ID
