@@ -8,6 +8,10 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: deploy-develop-api
+  cancel-in-progress: false
+
 jobs:
   migrate:
     name: Migrate develop DB schema
