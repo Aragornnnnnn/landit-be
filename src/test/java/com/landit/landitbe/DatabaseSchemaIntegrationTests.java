@@ -715,7 +715,7 @@ class DatabaseSchemaIntegrationTests {
     insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "1.0.0", 10, 8, true);
     insertLegacyAppVersionPolicy(migrationJdbcTemplate, "IOS", "0.9.0", 8, 8, false);
 
-    migrateToLatestVersion(databaseUrl);
+    migrateToVersion(databaseUrl, "35");
 
     assertThat(
             migrationJdbcTemplate.queryForObject(
@@ -743,6 +743,45 @@ class DatabaseSchemaIntegrationTests {
 
     assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
         .isInstanceOf(FlywayException.class);
+  }
+
+  /** V48 migration은 두 플랫폼에 1.1.0 강제 업데이트 정책을 적용한다. */
+  @Test
+  void v48MigrationRequiresVersion110ForBothPlatforms() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "43");
+    insertCurrentAppVersionPolicy(migrationJdbcTemplate, "IOS", 101);
+    insertCurrentAppVersionPolicy(migrationJdbcTemplate, "ANDROID", 202);
+
+    migrateToLatestVersion(databaseUrl);
+
+    Integer forceUpdatePolicyCount =
+        migrationJdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM app_version
+            WHERE version_name = '1.1.0'
+              AND minimum_supported_version_name = '1.1.0'
+              AND force_update_reason = '매일 학습을 챙겨주는 알림 기능이 생겼어요!'
+              AND soft_update_reason IS NULL
+              AND release_note = '서비스 신규 기능 및 정책 변경'
+              AND active = TRUE
+              AND released_at > TIMESTAMP '2026-07-16 08:18:09.147652'
+              AND created_at = TIMESTAMP '2026-07-16 08:18:09.147652'
+            """,
+            Integer.class);
+
+    assertThat(forceUpdatePolicyCount).isEqualTo(2);
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "SELECT build_number FROM app_version WHERE platform = 'IOS'", Long.class))
+        .isEqualTo(101L);
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "SELECT build_number FROM app_version WHERE platform = 'ANDROID'", Long.class))
+        .isEqualTo(202L);
   }
 
   private String migrationTestDatabaseUrl() {
@@ -801,6 +840,26 @@ class DatabaseSchemaIntegrationTests {
         buildNumber,
         minimumSupportedBuildNumber,
         active);
+  }
+
+  private void insertCurrentAppVersionPolicy(
+      JdbcTemplate migrationJdbcTemplate, String platform, long buildNumber) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO app_version (
+            platform, version_name, build_number, minimum_supported_version_name,
+            force_update_reason, soft_update_reason, release_note, active,
+            released_at, created_at
+        )
+        VALUES (
+            ?, '1.0.0', ?, '1.0.0',
+            NULL, NULL, 'Landit 최초 출시 버전입니다.', TRUE,
+            TIMESTAMP '2026-07-16 08:18:09.147652',
+            TIMESTAMP '2026-07-16 08:18:09.147652'
+        )
+        """,
+        platform,
+        buildNumber);
   }
 
   private void insertUserProfile(
