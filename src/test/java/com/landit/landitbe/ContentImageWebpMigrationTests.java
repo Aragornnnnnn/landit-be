@@ -19,7 +19,7 @@ import org.springframework.util.StreamUtils;
 class ContentImageWebpMigrationTests {
 
   private static final String MIGRATION_PATH =
-      "db/postgresql/V48__remap_content_images_to_webp.sql";
+      "db/postgresql/V49__remap_content_images_to_webp.sql";
   private static final Pattern URL_MAPPING_PATTERN =
       Pattern.compile("\\('([^']+\\.png)', '([^']+\\.webp)'\\)");
 
