@@ -56,15 +56,29 @@ public class ScenarioSessionStartService {
    */
   @Transactional
   public SessionStartResponse startScenarioSession(long userId, long scenarioId) {
+    return startScenarioSession(userId, scenarioId, true);
+  }
+
+  /** 일반 사용자와 관리자 테스트의 공통 세션 시작 흐름을 처리한다. */
+  private SessionStartResponse startScenarioSession(
+      long userId, long scenarioId, boolean enforceProgression) {
     Instant startedInstant = clock.instant();
     UserProfile userProfile = findActiveUser(userId);
     ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId);
+
     assertContentActive(startRow);
-    assertCurrentScenarioOrReplay(userProfile, startRow.scenarioId(), startedInstant);
+
+    // 일반 사용자에게만 복습 권한, 진행 순서, 하루 제한을 검증한다.
+    if (enforceProgression) {
+      assertCurrentScenarioOrReplay(userProfile, startRow.scenarioId(), startedInstant);
+    }
 
     LocalDateTime now = LocalDateTime.ofInstant(startedInstant, SERVICE_ZONE_ID);
+
+    // 관리자 테스트도 실제 학습과 동일한 진행도와 세션 기록을 남긴다.
     ensureProgress(userProfile, startRow, now);
     LearningSession learningSession = createLearningSession(userId, userProfile, startRow, now);
+
     CurrentMessageResponse currentMessage = null;
     if (startRow.firstSpeaker() == ConversationSpeaker.AI) {
       currentMessage = saveAiOpeningMessage(learningSession.getId(), userProfile, startRow, now);
@@ -78,6 +92,11 @@ public class ScenarioSessionStartService {
         scenarioId,
         learningSession.getId());
     return response;
+  }
+
+  /** 개발 환경 전용 관리자 Service에서 진행 제한 없이 세션을 시작할 때 사용한다. */
+  SessionStartResponse startScenarioSessionWithoutProgression(long userId, long scenarioId) {
+    return startScenarioSession(userId, scenarioId, false);
   }
 
   /** 세션 시작 흐름을 직렬화할 수 있도록 활성 사용자 프로필을 쓰기 잠금으로 조회한다. */
@@ -105,6 +124,7 @@ public class ScenarioSessionStartService {
     if (inactive(startRow.categoryStatus())) {
       throw new ApiException(ErrorCode.CATEGORY_LOCKED);
     }
+
     if (inactive(startRow.scenarioStatus()) || inactive(startRow.variantStatus())) {
       throw new ApiException(ErrorCode.SCENARIO_LOCKED);
     }
@@ -117,6 +137,7 @@ public class ScenarioSessionStartService {
         userProfile.getId(), scenarioId, userProfile.getTargetLocale())) {
       return;
     }
+
     if (!scenarioProgressionService.isCurrentScenario(
         userProfile.getId(), scenarioId, userProfile.getTargetLocale(), startedInstant)) {
       throw new ApiException(ErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE);
@@ -144,6 +165,7 @@ public class ScenarioSessionStartService {
                 userProfile.getTargetLocale(),
                 userProfile.getBaseLocale(),
                 startedAt));
+
     scenarioSessionService.save(
         ScenarioSession.start(
             learningSession.getId(),
@@ -151,6 +173,7 @@ public class ScenarioSessionStartService {
             startRow.firstSpeaker() == ConversationSpeaker.USER
                 ? startRow.userOpeningInstruction()
                 : null));
+
     return learningSession;
   }
 
@@ -161,8 +184,10 @@ public class ScenarioSessionStartService {
       ScenarioSessionStartProjection startRow,
       LocalDateTime startedAt) {
     assertAiOpeningMessageConfigured(startRow);
+
     SessionHistoryMessage message =
         saveAiOpeningHistoryMessage(learningSessionId, userProfile, startRow, startedAt);
+
     return CurrentMessageResponse.from(message);
   }
 
@@ -187,6 +212,7 @@ public class ScenarioSessionStartService {
                 userProfile.getTargetLocale(),
                 userProfile.getBaseLocale(),
                 startedAt));
+
     SessionHistoryMessage message =
         sessionMessageService.save(
             SessionHistoryMessage.aiOpening(
@@ -195,6 +221,7 @@ public class ScenarioSessionStartService {
                 startRow.aiOpeningMessageTranslation(),
                 startRow.aiOpeningInnerThought(),
                 startRow.aiOpeningInnerThoughtType()));
+
     return message;
   }
 
