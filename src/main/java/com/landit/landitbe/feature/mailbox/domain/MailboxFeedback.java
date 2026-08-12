@@ -56,4 +56,14 @@ public class MailboxFeedback extends BaseTimeEntity {
     this.contentText = contentText;
     this.processingStatus = UserFeedbackStatus.PENDING;
   }
+
+  /**
+   * 피드백을 처리 완료 상태로 변경하고 대표 피드백과 연결한다.
+   *
+   * @param representativeFeedbackId 함께 처리할 대표 피드백 ID. 대표 건이면 {@code null}
+   */
+  public void complete(Long representativeFeedbackId) {
+    this.processingStatus = UserFeedbackStatus.COMPLETED;
+    this.resolvedByFeedbackId = representativeFeedbackId;
+  }
 }
