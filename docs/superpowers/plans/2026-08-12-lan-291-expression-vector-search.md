@@ -20,7 +20,7 @@
 ### Task 1: 스키마 정리와 pgvector 컬럼
 
 **Files:**
-- Create: `src/main/resources/db/migration/V51__prepare_writing_expression_embeddings.sql`
+- Create: `src/main/resources/db/postgresql/V51__prepare_writing_expression_embeddings.sql`
 - Create: `src/main/resources/db/h2/V51__prepare_writing_expression_embeddings.sql`
 - Modify: `src/test/java/com/landit/landitbe/DatabaseSchemaIntegrationTests.java`
 
