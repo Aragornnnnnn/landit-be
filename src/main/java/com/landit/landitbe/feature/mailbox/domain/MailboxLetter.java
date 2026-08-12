@@ -87,4 +87,45 @@ public class MailboxLetter extends BaseTimeEntity {
     this.pinned = pinned;
     this.publishedAt = publishedAt;
   }
+
+  /**
+   * 공지·업데이트의 편집 가능한 콘텐츠를 변경한다.
+   *
+   * @param letterType 편지 유형
+   * @param title 편지 제목
+   * @param contentBlocks 구조화된 본문 블록
+   * @param previewText 목록 미리보기
+   */
+  public void updateContent(
+      MailboxLetterType letterType, String title, JsonNode contentBlocks, String previewText) {
+    this.letterType = letterType;
+    this.title = title;
+    this.contentBlocks = contentBlocks;
+    this.bodyText = null;
+    this.previewText = previewText;
+  }
+
+  /**
+   * 편지 게시 상태를 변경한다.
+   *
+   * @param publicationStatus 변경할 게시 상태
+   * @param publishedAt 게시 시각. 게시 상태가 아니면 {@code null}
+   */
+  public void changePublicationStatus(
+      MailboxPublicationStatus publicationStatus, LocalDateTime publishedAt) {
+    this.publicationStatus = publicationStatus;
+    this.publishedAt = publishedAt;
+    if (publicationStatus == MailboxPublicationStatus.UNPUBLISHED) {
+      this.pinned = false;
+    }
+  }
+
+  /**
+   * 게시된 편지의 상단 고정 여부를 변경한다.
+   *
+   * @param pinned 상단 고정 여부
+   */
+  public void changePinned(boolean pinned) {
+    this.pinned = pinned;
+  }
 }
