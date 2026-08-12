@@ -203,6 +203,16 @@ class DatabaseSchemaIntegrationTests {
     assertThat(responseCount).isEqualTo(2);
   }
 
+  @DisplayName("편지함 스키마를 추가하고 기존 NPS 테이블은 유지한다.")
+  @Test
+  void mailboxSchemaCoexistsWithLegacyNps() {
+    assertTableExists("mailbox_letter");
+    assertTableExists("mailbox_feedback");
+    assertTableExists("mailbox_letter_recipient");
+    assertTableExists("mailbox_letter_read");
+    assertTableExists("nps_response");
+  }
+
   @DisplayName("ERD v2 컬럼 차이를 최신 migration으로 반영한다.")
   @Test
   void erdV2ColumnChangesAreAppliedByLatestMigration() {
