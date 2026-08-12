@@ -1,6 +1,4 @@
-# LAN-291 Expression Embedding Foundation Implementation Plan
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+# LAN-291 프리톡 표현 임베딩 구현 계획
 
 **Goal:** 공용 프리톡 표현과 사전 생성 임베딩을 함께 적재하고 사용자 전용 NEW 표현 생성 경로를 제거한다. 벡터 유사도 검색은 후속 이슈에서 구현한다.
 
@@ -66,12 +64,12 @@
 ### Task 4: 전체 검증
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-08-12-lan-291-expression-vector-search.md` 검증 기록.
+- Modify: `docs/tasks/LAN-291/plan.md` 검증 기록.
 
 **Interfaces:**
 - Produces: LAN-291 BE 검증 증거.
 
-- [ ] Spotless, 관련 테스트, 전체 `check`를 실행한다.
-- [ ] PostgreSQL migration SQL과 열린 PR migration 번호를 다시 확인한다.
-- [ ] `git diff --check`, `git status --short`를 확인한다.
-- [ ] 검증 결과를 기록하고 커밋한다.
+- [x] Spotless, 관련 테스트, 전체 `check`를 실행한다.
+- [x] PostgreSQL migration SQL과 열린 PR migration 번호를 다시 확인한다.
+- [x] `git diff --check`, `git status --short`를 확인한다.
+- [x] 검증 결과를 기록하고 커밋한다.
