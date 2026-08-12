@@ -7,6 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /** 사전 생성한 프리톡 표현과 임베딩 migration의 구조를 검증한다. */
@@ -25,15 +27,17 @@ class FreeTalkExpressionEmbeddingMigrationTests {
 
     assertThat(sql.lines().filter(line -> line.matches("\\(\\d+,NULL,.*")).count()).isEqualTo(818L);
     assertThat(sql).contains("(164,NULL,").contains("(981,NULL,");
-    assertThat(count(sql, "::extensions.vector")).isEqualTo(818);
+    Matcher vectors = Pattern.compile("'\\[([^]]+)]'::extensions\\.vector").matcher(sql);
+    int vectorCount = 0;
+    while (vectors.find()) {
+      assertThat(vectors.group(1).split(",")).hasSize(1536);
+      vectorCount++;
+    }
+    assertThat(vectorCount).isEqualTo(818);
     assertThat(sql.substring(0, sql.indexOf("VALUES")))
         .contains("id")
         .contains("embedding")
         .doesNotContain("owner_user_profile_id");
     assertThat(sql).contains("pg_get_serial_sequence('writing_expression', 'id')");
-  }
-
-  private int count(String source, String target) {
-    return (source.length() - source.replace(target, "").length()) / target.length();
   }
 }
