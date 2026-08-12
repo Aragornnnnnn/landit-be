@@ -211,6 +211,8 @@ class DatabaseSchemaIntegrationTests {
     assertTableExists("mailbox_letter_recipient");
     assertTableExists("mailbox_letter_read");
     assertTableExists("nps_response");
+    assertIndexExists("idx_mailbox_letter_admin_filter");
+    assertIndexExists("idx_mailbox_feedback_admin_filter");
   }
 
   @DisplayName("ERD v2 컬럼 차이를 최신 migration으로 반영한다.")
