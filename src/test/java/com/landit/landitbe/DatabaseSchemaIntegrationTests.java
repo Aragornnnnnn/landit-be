@@ -308,7 +308,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
-  @DisplayName("V29 migration은 프리톡 생성 표현을 공통 학습 콘텐츠로 저장한다.")
+  @DisplayName("프리톡 표현 연결 구조는 공용 표현만 참조한다.")
   @Test
   void v29AddsFreeTalkExpressionLearningStorage() {
     assertTableExists("free_talk_session_expression");
@@ -317,13 +317,13 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("free_talk_session", "expression_generation_status");
     assertColumnExists("free_talk_session", "expression_generation_started_at");
     assertColumnExists("free_talk_session_expression", "writing_expression_id");
-    assertColumnExists("writing_expression", "owner_user_profile_id");
+    assertColumnDoesNotExist("writing_expression", "owner_user_profile_id");
     assertNullableColumn("writing_expression", "scenario_id");
     assertNullableColumn("user_writing_expression_completion", "scenario_id");
     assertColumnDoesNotExist("free_talk_session_expression", "generated_content_payload");
     assertTableConstraintExists(
         "free_talk_session", "chk_free_talk_session_expression_generation_status");
-    assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+    assertTableConstraintExists("writing_expression", "chk_writing_expression_scenario_source");
   }
 
   @DisplayName("V37 migration은 프리톡 세션별 표현 완료 시각을 추가한다.")
@@ -333,11 +333,15 @@ class DatabaseSchemaIntegrationTests {
     assertNullableColumn("free_talk_session_expression", "completed_at");
   }
 
-  @DisplayName("V36 migration은 Writing 표현의 시나리오와 프리톡 사용 영역을 구분한다.")
+  @DisplayName("Writing 표현은 시나리오와 프리톡 사용 영역을 소스별로 구분한다.")
   @Test
   void v36AddsWritingExpressionSource() {
     assertColumnExists("writing_expression", "expression_source");
-    assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+    assertColumnExists("writing_expression", "embedding");
+    assertTableConstraintExists("writing_expression", "chk_writing_expression_scenario_source");
+    assertTableConstraintDoesNotExist("writing_expression", "chk_writing_expression_source");
+    assertTableConstraintDoesNotExist(
+        "writing_expression", "fk_writing_expression_owner_user_profile_id");
 
     Integer mismatchedSourceCount =
         jdbcTemplate.queryForObject(
@@ -377,10 +381,25 @@ class DatabaseSchemaIntegrationTests {
             from writing_expression
             where expression_source = 'FREE_TALK'
               and scenario_id is null
-              and owner_user_profile_id is null
             """,
             Integer.class);
     assertThat(expressionCount).isEqualTo(1);
+  }
+
+  @DisplayName("V51 PostgreSQL migration은 pgvector 1536차원 컬럼을 사용한다.")
+  @Test
+  void v51UsesPgvectorAndH2CompatibleEmbeddingMigrations() throws Exception {
+    String postgresqlMigrationSql =
+        readMigrationSql("db/postgresql/V51__prepare_writing_expression_embeddings.sql");
+    String h2MigrationSql =
+        readMigrationSql("db/h2/V51__prepare_writing_expression_embeddings.sql");
+
+    assertThat(postgresqlMigrationSql)
+        .contains(
+            "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions",
+            "embedding extensions.vector(1536)",
+            "chk_writing_expression_scenario_source");
+    assertThat(h2MigrationSql).contains("embedding VARCHAR(32767)");
   }
 
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
@@ -1007,6 +1026,22 @@ class DatabaseSchemaIntegrationTests {
             constraintName);
 
     assertThat(constraintCount).as("constraint %s.%s", tableName, constraintName).isEqualTo(1);
+  }
+
+  private void assertTableConstraintDoesNotExist(String tableName, String constraintName) {
+    Integer constraintCount =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.table_constraints
+            where lower(table_name) = ?
+              and lower(constraint_name) = ?
+            """,
+            Integer.class,
+            tableName,
+            constraintName);
+
+    assertThat(constraintCount).as("constraint %s.%s", tableName, constraintName).isZero();
   }
 
   private String readMigrationSql(String path) throws Exception {
