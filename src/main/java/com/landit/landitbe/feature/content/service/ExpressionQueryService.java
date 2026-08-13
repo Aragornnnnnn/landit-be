@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
@@ -178,25 +177,6 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 프리톡에서 생성한 사용자 전용 표현을 저장한다.
-   *
-   * @param userProfileId 표현을 소유할 사용자 ID
-   * @param targetLocale 학습 언어 locale
-   * @param baseLocale 기준 언어 locale
-   * @param content 저장할 생성 표현 콘텐츠
-   * @return 저장된 사용자 전용 표현
-   */
-  @Transactional
-  public WritingExpression saveFreeTalkGeneratedExpression(
-      Long userProfileId,
-      Locale targetLocale,
-      Locale baseLocale,
-      FreeTalkGeneratedExpressionContent content) {
-    return writingExpressionRepository.save(
-        WritingExpression.freeTalkGenerated(userProfileId, targetLocale, baseLocale, content));
-  }
-
-  /**
    * 프리톡 세션에 연결할 기존 표현이 공용 후보 조건을 만족하는지 검증한다.
    *
    * @param expressionId 프리톡 세션에 연결할 표현 ID
@@ -287,9 +267,6 @@ public class ExpressionQueryService {
                   log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
-    if (expression.isOwnedByAnother(userId)) {
-      throw new ApiException(ErrorCode.FORBIDDEN);
-    }
     return expression;
   }
 

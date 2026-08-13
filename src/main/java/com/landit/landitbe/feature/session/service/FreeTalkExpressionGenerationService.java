@@ -1,22 +1,15 @@
-// 완료 프리톡에서 맞춤 표현을 생성하고 저장한다.
+// 완료 프리톡에 기존 공용 표현을 추천하고 저장한다.
 
 package com.landit.landitbe.feature.session.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
-import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExistingExpression;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContent;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsRequest;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkLearningExpression;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -31,14 +24,12 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 완료 프리톡에서 맞춤 표현을 생성하고 저장한다. */
+/** 완료 프리톡에 기존 공용 표현을 추천하고 저장한다. */
 @RequiredArgsConstructor
 @Service
 public class FreeTalkExpressionGenerationService {
@@ -51,7 +42,6 @@ public class FreeTalkExpressionGenerationService {
   private final ExpressionQueryService expressionQueryService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
-  private final ObjectMapper objectMapper = new ObjectMapper();
 
   /**
    * 완료된 프리톡의 표현 생성 작업을 한 번 실행한다.
@@ -67,6 +57,18 @@ public class FreeTalkExpressionGenerationService {
     }
 
     try {
+      List<AiFreeTalkExistingExpression> existingExpressions =
+          expressionQueryService
+              .getActiveExpressionCandidates(context.targetLocale(), context.baseLocale())
+              .stream()
+              .map(
+                  candidate ->
+                      new AiFreeTalkExistingExpression(
+                          candidate.expressionId(),
+                          candidate.targetExpressionText(),
+                          candidate.baseExpressionMeaningText(),
+                          candidate.usageSummary()))
+              .toList();
       // 전체 대화와 기존 표현 후보를 바탕으로 이번 프리톡에 적합한 표현을 추천한다.
       List<AiFreeTalkExpressionRecommendation> recommendations =
           aiFreeTalkClient
@@ -76,36 +78,11 @@ public class FreeTalkExpressionGenerationService {
                       context.targetLocale().name(),
                       context.baseLocale().name(),
                       context.history(),
-                      context.existingExpressions()))
+                      existingExpressions))
               .recommendations();
 
-      // 새로 추천된 표현에만 기존 표현 학습 API에서 사용할 콘텐츠를 추가 생성한다.
-      List<AiFreeTalkLearningExpression> newExpressions =
-          recommendations.stream()
-              .filter(
-                  recommendation -> recommendation.sourceType() == FreeTalkExpressionSourceType.NEW)
-              .map(
-                  recommendation ->
-                      new AiFreeTalkLearningExpression(
-                          recommendation.targetExpressionText(),
-                          recommendation.baseExpressionMeaningText(),
-                          recommendation.usageSummary()))
-              .toList();
-      List<AiFreeTalkExpressionLearningContent> learningContents =
-          newExpressions.isEmpty()
-              ? List.of()
-              : aiFreeTalkClient
-                  .generateExpressionLearningContent(
-                      new AiFreeTalkExpressionLearningContentRequest(
-                          context.learningSessionId(),
-                          context.targetLocale().name(),
-                          context.baseLocale().name(),
-                          newExpressions))
-                  .expressions();
-
       // 모든 외부 호출이 끝난 뒤 추천 결과를 한 트랜잭션으로 저장한다.
-      transactionTemplate.executeWithoutResult(
-          status -> persistReady(context, recommendations, learningContents));
+      transactionTemplate.executeWithoutResult(status -> persistReady(context, recommendations));
     } catch (RuntimeException exception) {
       // 부분 결과를 남기지 않고 재시도할 수 있도록 실패 상태만 기록한다.
       transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
@@ -145,26 +122,10 @@ public class FreeTalkExpressionGenerationService {
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.startExpressionGeneration();
 
-    // 추천 AI가 재사용 여부를 판단할 수 있도록 활성 표현 후보를 변환한다.
-    List<AiFreeTalkExistingExpression> existingExpressions =
-        expressionQueryService
-            .getActiveExpressionCandidates(
-                learningSession.getTargetLocale(), learningSession.getBaseLocale())
-            .stream()
-            .map(
-                candidate ->
-                    new AiFreeTalkExistingExpression(
-                        candidate.expressionId(),
-                        candidate.targetExpressionText(),
-                        candidate.baseExpressionMeaningText(),
-                        candidate.usageSummary()))
-            .toList();
-
     // 트랜잭션 밖 AI 호출에 필요한 값만 불변 컨텍스트로 반환한다.
     return new GenerationContext(
         learningSessionId,
         freeTalkSession.getId(),
-        learningSession.getUserProfileId(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
         sessionHistoryMessageRepository
@@ -178,15 +139,12 @@ public class FreeTalkExpressionGenerationService {
                         message.getRole().name(),
                         message.getContent(),
                         message.getTranslatedContent()))
-            .toList(),
-        existingExpressions);
+            .toList());
   }
 
   // AI 추천 결과를 세션 표현으로 저장하고 생성 상태를 완료한다.
   private void persistReady(
-      GenerationContext context,
-      List<AiFreeTalkExpressionRecommendation> recommendations,
-      List<AiFreeTalkExpressionLearningContent> learningContents) {
+      GenerationContext context, List<AiFreeTalkExpressionRecommendation> recommendations) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(context.learningSessionId())
@@ -194,17 +152,9 @@ public class FreeTalkExpressionGenerationService {
     if (freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.PREPARING) {
       return;
     }
-    Map<String, AiFreeTalkExpressionLearningContent> contentsByText =
-        learningContents.stream()
-            .collect(
-                Collectors.toMap(
-                    AiFreeTalkExpressionLearningContent::targetExpressionText, content -> content));
     sessionExpressionRepository.deleteByFreeTalkSessionId(context.freeTalkSessionId());
     for (AiFreeTalkExpressionRecommendation recommendation : recommendations) {
-      sessionExpressionRepository.save(
-          recommendation.sourceType() == FreeTalkExpressionSourceType.EXISTING
-              ? existingSessionExpression(context, recommendation)
-              : generatedSessionExpression(context, recommendation, contentsByText));
+      sessionExpressionRepository.save(existingSessionExpression(context, recommendation));
     }
     freeTalkSession.completeExpressionGeneration();
   }
@@ -230,44 +180,10 @@ public class FreeTalkExpressionGenerationService {
         recommendation.displayOrder());
   }
 
-  // 신규 표현의 학습 콘텐츠를 저장하고 세션 연결 엔티티를 생성한다.
-  private FreeTalkSessionExpression generatedSessionExpression(
-      GenerationContext context,
-      AiFreeTalkExpressionRecommendation recommendation,
-      Map<String, AiFreeTalkExpressionLearningContent> contentsByText) {
-    AiFreeTalkExpressionLearningContent content =
-        contentsByText.get(recommendation.targetExpressionText());
-    if (content == null) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-    }
-    WritingExpression generatedExpression =
-        expressionQueryService.saveFreeTalkGeneratedExpression(
-            context.userProfileId(),
-            context.targetLocale(),
-            context.baseLocale(),
-            new FreeTalkGeneratedExpressionContent(
-                content.targetExpressionText(),
-                content.baseExpressionMeaningText(),
-                content.usageSummary(),
-                content.usageDescription(),
-                content.representativeQuestionText(),
-                content.representativeQuestionTranslation(),
-                content.representativeSentenceText(),
-                content.representativeSentenceTranslation(),
-                content.representativeSentenceWords(),
-                content.representativeSentenceWordChoices(),
-                content.representativeImageUrl(),
-                objectMapper.valueToTree(content.practiceExamples())));
-    return FreeTalkSessionExpression.link(
-        context.freeTalkSessionId(), generatedExpression.getId(), recommendation.displayOrder());
-  }
-
   private record GenerationContext(
       long learningSessionId,
       long freeTalkSessionId,
-      long userProfileId,
       Locale targetLocale,
       Locale baseLocale,
-      List<AiConversationHistoryMessage> history,
-      List<AiFreeTalkExistingExpression> existingExpressions) {}
+      List<AiConversationHistoryMessage> history) {}
 }

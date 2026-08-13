@@ -82,7 +82,6 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
         AND expression.targetLocale = :targetLocale
         AND expression.baseLocale = :baseLocale
         AND expression.status = :status
-        AND expression.ownerUserProfileId IS NULL
       ORDER BY expression.id ASC
       """)
   List<WritingExpression> findPublicExpressionCandidates(
@@ -110,7 +109,6 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
         AND expression.targetLocale = :targetLocale
         AND expression.baseLocale = :baseLocale
         AND expression.status = :status
-        AND expression.ownerUserProfileId IS NULL
       """)
   Optional<WritingExpression> findPublicExpressionCandidateById(
       @Param("id") Long id,

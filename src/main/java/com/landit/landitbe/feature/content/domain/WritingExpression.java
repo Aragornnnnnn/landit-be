@@ -32,9 +32,6 @@ public class WritingExpression extends BaseTimeEntity {
   @Column(name = "scenario_id")
   private Long scenarioId;
 
-  @Column(name = "owner_user_profile_id")
-  private Long ownerUserProfileId;
-
   @Enumerated(EnumType.STRING)
   @Column(name = "expression_source", nullable = false, length = 20)
   private WritingExpressionSource expressionSource;
@@ -105,44 +102,4 @@ public class WritingExpression extends BaseTimeEntity {
 
   /** JPA에서 사용하는 기본 생성자다. */
   protected WritingExpression() {}
-
-  /** 프리톡에서 생성한 사용자 전용 학습 표현을 만든다. */
-  public static WritingExpression freeTalkGenerated(
-      Long ownerUserProfileId,
-      Locale targetLocale,
-      Locale baseLocale,
-      FreeTalkGeneratedExpressionContent content) {
-    WritingExpression expression = new WritingExpression();
-    expression.ownerUserProfileId = ownerUserProfileId;
-    expression.expressionSource = WritingExpressionSource.FREE_TALK;
-    expression.expressionType = WritingExpressionType.CONVERSATION_SKILL;
-    expression.usageFrequencyLevel = ExpressionUsageFrequencyLevel.BASIC;
-    expression.targetLocale = targetLocale;
-    expression.baseLocale = baseLocale;
-    expression.displayOrder = 1;
-    expression.targetExpressionText = content.targetExpressionText();
-    expression.baseExpressionMeaningText = content.baseExpressionMeaningText();
-    expression.usageSummary = content.usageSummary();
-    expression.usageDescription = content.usageDescription();
-    expression.representativeQuestionText = content.representativeQuestionText();
-    expression.representativeQuestionTranslation = content.representativeQuestionTranslation();
-    expression.representativeSentenceText = content.representativeSentenceText();
-    expression.representativeSentenceTranslation = content.representativeSentenceTranslation();
-    expression.representativeSentenceWords = content.representativeSentenceWords();
-    expression.representativeSentenceWordChoices = content.representativeSentenceWordChoices();
-    expression.representativeImageUrl = content.representativeImageUrl();
-    expression.practiceExamplesPayload = content.practiceExamplesPayload();
-    expression.status = ActiveStatus.ACTIVE;
-    return expression;
-  }
-
-  /**
-   * 사용자 전용 표현을 다른 사용자가 조회하려는지 확인한다.
-   *
-   * @param userProfileId 표현을 조회하려는 사용자 ID
-   * @return 다른 사용자의 전용 표현이면 true
-   */
-  public boolean isOwnedByAnother(Long userProfileId) {
-    return ownerUserProfileId != null && !ownerUserProfileId.equals(userProfileId);
-  }
 }

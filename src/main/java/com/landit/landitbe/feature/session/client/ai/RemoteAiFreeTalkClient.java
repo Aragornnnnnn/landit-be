@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.session.client.ai;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -33,8 +32,6 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
   private static final String EXPRESSION_RECOMMENDATIONS_PATH =
       "/api/v1/free-talk/expression-recommendations";
-  private static final String EXPRESSION_LEARNING_CONTENT_PATH =
-      "/api/v1/free-talk/expression-learning-content";
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -88,23 +85,6 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       AiFreeTalkExpressionRecommendationsRequest request) {
     return post(
             EXPRESSION_RECOMMENDATIONS_PATH, request, RemoteExpressionRecommendationsResponse.class)
-        .toResult(request);
-  }
-
-  /**
-   * 신규 표현의 학습 콘텐츠를 생성한다.
-   *
-   * @param request 학습 콘텐츠 생성 요청
-   * @return 검증된 학습 콘텐츠 결과
-   * @throws ApiException 원격 AI 호출 또는 응답 검증에 실패했을 때
-   */
-  @Override
-  public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
-      AiFreeTalkExpressionLearningContentRequest request) {
-    return post(
-            EXPRESSION_LEARNING_CONTENT_PATH,
-            request,
-            RemoteExpressionLearningContentResponse.class)
         .toResult(request);
   }
 
@@ -262,42 +242,12 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record RemoteExpressionLearningContentResponse(
-      List<AiFreeTalkExpressionLearningContent> expressions) {
-
-    // 원격 학습 콘텐츠 응답을 검증해 애플리케이션 결과로 변환한다.
-    private AiFreeTalkExpressionLearningContentResult toResult(
-        AiFreeTalkExpressionLearningContentRequest request) {
-      if (expressions == null
-          || expressions.isEmpty()
-          || request.expressions() == null
-          || expressions.size() != request.expressions().size()
-          || hasInvalidLearningContent(expressions, request.expressions())) {
-        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-      }
-      return new AiFreeTalkExpressionLearningContentResult(expressions);
-    }
-  }
-
   // 추천 목록에 순서나 출처가 잘못된 표현이 있는지 확인한다.
   private static boolean hasInvalidRecommendation(
       List<AiFreeTalkExpressionRecommendation> recommendations,
       List<AiFreeTalkExistingExpression> existingExpressions) {
     for (int index = 0; index < recommendations.size(); index++) {
       if (invalidRecommendation(recommendations.get(index), existingExpressions, index + 1)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // 생성된 학습 콘텐츠 목록에 유효하지 않은 항목이 있는지 확인한다.
-  private static boolean hasInvalidLearningContent(
-      List<AiFreeTalkExpressionLearningContent> expressions,
-      List<AiFreeTalkLearningExpression> requestedExpressions) {
-    for (int index = 0; index < expressions.size(); index++) {
-      if (invalidLearningContent(expressions.get(index), requestedExpressions.get(index))) {
         return true;
       }
     }
@@ -311,72 +261,15 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       int expectedDisplayOrder) {
     if (recommendation == null
         || recommendation.displayOrder() != expectedDisplayOrder
-        || recommendation.sourceType() == null
-        || blank(recommendation.targetExpressionText())
-        || blank(recommendation.baseExpressionMeaningText())
-        || blank(recommendation.usageSummary())) {
+        || recommendation.existingExpressionId() == null) {
       return true;
     }
-    if (recommendation.sourceType() == FreeTalkExpressionSourceType.NEW) {
-      return recommendation.existingExpressionId() != null;
-    }
-    return recommendation.existingExpressionId() == null
-        || existingExpressions.stream()
-            .noneMatch(
-                expression ->
-                    expression.expressionId().equals(recommendation.existingExpressionId()));
-  }
-
-  // 생성된 학습 콘텐츠가 요청과 일치하는 유효한 결과인지 검증한다.
-  private static boolean invalidLearningContent(
-      AiFreeTalkExpressionLearningContent content,
-      AiFreeTalkLearningExpression requestedExpression) {
-    if (content == null || requestedExpression == null) {
-      return true;
-    }
-    return missingLearningContent(content) || differsFromRequest(content, requestedExpression);
-  }
-
-  // 생성된 학습 콘텐츠에 필수 값이 빠졌는지 확인한다.
-  private static boolean missingLearningContent(AiFreeTalkExpressionLearningContent content) {
-    return blank(content.targetExpressionText())
-        || blank(content.baseExpressionMeaningText())
-        || blank(content.usageSummary())
-        || blank(content.usageDescription())
-        || invalidOptionalRepresentativeQuestion(content)
-        || blank(content.representativeSentenceText())
-        || blank(content.representativeSentenceTranslation())
-        || content.representativeSentenceWords() == null
-        || content.representativeSentenceWords().isEmpty()
-        || content.representativeSentenceWordChoices() == null
-        || content.representativeSentenceWordChoices().isEmpty()
-        || content.practiceExamples() == null
-        || content.practiceExamples().isEmpty();
-  }
-
-  // 생성된 표현의 핵심 값이 요청한 표현과 다른지 확인한다.
-  private static boolean differsFromRequest(
-      AiFreeTalkExpressionLearningContent content,
-      AiFreeTalkLearningExpression requestedExpression) {
-    return blank(requestedExpression.targetExpressionText())
-        || blank(requestedExpression.baseExpressionMeaningText())
-        || blank(requestedExpression.usageSummary())
-        || !requestedExpression.targetExpressionText().equals(content.targetExpressionText())
-        || !requestedExpression
-            .baseExpressionMeaningText()
-            .equals(content.baseExpressionMeaningText())
-        || !requestedExpression.usageSummary().equals(content.usageSummary());
+    return existingExpressions.stream()
+        .noneMatch(
+            expression -> expression.expressionId().equals(recommendation.existingExpressionId()));
   }
 
   // 선택 질문의 원문과 번역이 함께 제공됐는지 검증한다.
-  private static boolean invalidOptionalRepresentativeQuestion(
-      AiFreeTalkExpressionLearningContent content) {
-    return (content.representativeQuestionText() != null
-            || content.representativeQuestionTranslation() != null)
-        && (blank(content.representativeQuestionText())
-            || blank(content.representativeQuestionTranslation()));
-  }
-
   private static boolean blank(String value) {
     return value == null || value.isBlank();
   }

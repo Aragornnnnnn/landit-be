@@ -52,14 +52,4 @@ public interface AiFreeTalkClient {
    */
   AiFreeTalkExpressionRecommendationsResult recommendExpressions(
       AiFreeTalkExpressionRecommendationsRequest request);
-
-  /**
-   * 새 프리톡 표현의 학습 데이터를 생성한다.
-   *
-   * @param request 학습 데이터가 필요한 신규 표현 목록
-   * @return 생성된 표현별 학습 데이터
-   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
-   */
-  AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
-      AiFreeTalkExpressionLearningContentRequest request);
 }

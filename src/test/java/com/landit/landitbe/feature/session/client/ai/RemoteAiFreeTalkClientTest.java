@@ -122,7 +122,7 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
-  void postsExpressionContractsAndMapsSuccessfulResponses() throws Exception {
+  void postsExistingExpressionContractAndMapsSuccessfulResponse() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(
         "/api/v1/free-talk/expression-recommendations",
@@ -133,27 +133,15 @@ class RemoteAiFreeTalkClientTest {
               "data": {
                 "recommendations": [{
                   "displayOrder": 1,
-                  "sourceType": "EXISTING",
-                  "existingExpressionId": 7,
-                  "targetExpressionText": "I'm up for that",
-                  "baseExpressionMeaningText": "좋아, 그거 하자",
-                  "usageSummary": "제안에 동의할 때 사용"
+                  "existingExpressionId": 7
                 }]
               },
               "error": null
             }
         """);
-    registerJsonResponse(
-        "/api/v1/free-talk/expression-learning-content",
-        requests,
-        successResponse(
-            learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 4)));
-
     RemoteAiFreeTalkClient client = remoteClient();
     AiFreeTalkExpressionRecommendationsResult recommendations =
         client.recommendExpressions(recommendationsRequest());
-    AiFreeTalkExpressionLearningContentResult learningContent =
-        client.generateExpressionLearningContent(learningContentRequest());
 
     assertThat(
             requests
@@ -163,16 +151,7 @@ class RemoteAiFreeTalkClientTest {
                 .get("expressionId")
                 .asLong())
         .isEqualTo(7L);
-    assertThat(
-            requests
-                .get("/api/v1/free-talk/expression-learning-content")
-                .get("expressions")
-                .get(0)
-                .get("targetExpressionText")
-                .asString())
-        .isEqualTo("I'm up for that");
     assertThat(recommendations.recommendations()).hasSize(1);
-    assertThat(learningContent.expressions().getFirst().practiceExamples()).hasSize(4);
   }
 
   @Test
@@ -287,9 +266,7 @@ class RemoteAiFreeTalkClientTest {
     registerRawResponse(
         "/api/v1/free-talk/expression-recommendations",
         200,
-        successResponse(
-            recommendationsData(7L, "I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1)
-                .replace("EXISTING", "UNKNOWN")));
+        successResponse("{\"recommendations\":[{\"displayOrder\":1}]}"));
     assertGenerationError(
         () -> remoteClient().recommendExpressions(recommendationsRequest()),
         ErrorCode.AI_RESPONSE_INVALID);
@@ -309,16 +286,11 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
-  void rejectsRecommendationMissingRequiredText() throws Exception {
+  void rejectsRecommendationMissingExistingExpressionId() throws Exception {
     registerRawResponse(
         "/api/v1/free-talk/expression-recommendations",
         200,
-        successResponse(
-            "{\"recommendations\":[{"
-                + "\"displayOrder\":1,\"sourceType\":\"EXISTING\","
-                + "\"existingExpressionId\":7,\"targetExpressionText\":\" \","
-                + "\"baseExpressionMeaningText\":\"좋아, 그거 하자\","
-                + "\"usageSummary\":\"제안에 동의할 때 사용\"}]}"));
+        successResponse("{\"recommendations\":[{\"displayOrder\":1}]}"));
 
     assertGenerationError(
         () -> remoteClient().recommendExpressions(recommendationsRequest()),
@@ -357,68 +329,6 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
-  void acceptsLearningContentStructureValidatedByAiServer() throws Exception {
-    registerRawResponse(
-        "/api/v1/free-talk/expression-learning-content",
-        200,
-        successResponse(
-            learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 1)));
-
-    AiFreeTalkExpressionLearningContentResult result =
-        remoteClient().generateExpressionLearningContent(learningContentRequest());
-
-    assertThat(result.expressions().getFirst().practiceExamples()).hasSize(1);
-  }
-
-  @Test
-  void rejectsLearningContentWithChangedRequestedMetadata() throws Exception {
-    registerRawResponse(
-        "/api/v1/free-talk/expression-learning-content",
-        200,
-        successResponse(
-            learningContentData("I am up for that", EXPRESSION_MEANING, EXPRESSION_USAGE, 4)));
-
-    assertGenerationError(
-        () -> remoteClient().generateExpressionLearningContent(learningContentRequest()),
-        ErrorCode.AI_RESPONSE_INVALID);
-  }
-
-  @Test
-  void rejectsLearningContentWithMissingRequiredFields() throws Exception {
-    String validContent =
-        learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 1);
-
-    assertInvalidLearningContent(validContent.replace("친근한 제안에 동의할 때 사용합니다.", " "));
-    assertInvalidLearningContent(validContent.replace("Want to go hiking?", " "));
-    assertInvalidLearningContent(validContent.replace("등산 갈래?", " "));
-    assertInvalidLearningContent(validContent.replace("I'm up for that.", " "));
-    assertInvalidLearningContent(validContent.replace("좋아, 그거 하자.", " "));
-    assertInvalidLearningContent(
-        validContent.replace("[\"I'm\", \"up\", \"for\", \"that\"]", "[]"));
-    assertInvalidLearningContent(
-        validContent.replace("[\"that\", \"I'm\", \"up\", \"for\", \"to\"]", "[]"));
-    assertInvalidLearningContent(
-        learningContentData(EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE, 0));
-  }
-
-  @Test
-  void rejectsLearningContentWithDifferentExpressionCount() throws Exception {
-    registerRawResponse(
-        "/api/v1/free-talk/expression-learning-content",
-        200,
-        successResponse(
-            "{\"expressions\":["
-                + learningContentItem("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 4)
-                + ","
-                + learningContentItem("I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 4)
-                + "]}"));
-
-    assertGenerationError(
-        () -> remoteClient().generateExpressionLearningContent(learningContentRequest()),
-        ErrorCode.AI_RESPONSE_INVALID);
-  }
-
-  @Test
   void mapsTimeoutAndInterruptedRequestToGenerationFailure() throws Exception {
     server.createContext(
         "/api/v1/free-talk/opening",
@@ -449,19 +359,6 @@ class RemoteAiFreeTalkClientTest {
         .isInstanceOfSatisfying(
             ApiException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo(expectedErrorCode));
-  }
-
-  private void assertInvalidLearningContent(String contentData) throws Exception {
-    registerRawResponse(
-        "/api/v1/free-talk/expression-learning-content", 200, successResponse(contentData));
-
-    try {
-      assertGenerationError(
-          () -> remoteClient().generateExpressionLearningContent(learningContentRequest()),
-          ErrorCode.AI_RESPONSE_INVALID);
-    } finally {
-      server.removeContext("/api/v1/free-talk/expression-learning-content");
-    }
   }
 
   private void registerJsonResponse(String path, Map<String, JsonNode> requests, String response)
@@ -629,16 +526,6 @@ class RemoteAiFreeTalkClientTest {
         List.of(
             new AiFreeTalkExistingExpression(
                 7L, EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE)));
-  }
-
-  private AiFreeTalkExpressionLearningContentRequest learningContentRequest() {
-    return new AiFreeTalkExpressionLearningContentRequest(
-        300L,
-        "EN",
-        "KR",
-        List.of(
-            new AiFreeTalkLearningExpression(
-                EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE)));
   }
 
   private List<AiConversationHistoryMessage> history() {
