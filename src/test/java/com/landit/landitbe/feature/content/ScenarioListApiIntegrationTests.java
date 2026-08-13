@@ -466,7 +466,7 @@ class ScenarioListApiIntegrationTests {
 
   private void seedScenarioListData(Long clearedUserId) {
     final long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
-    final long ethanVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
+    final long marcoVoiceId = ttsVoiceId("aura-2-hyperion-en");
     insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
     insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
     insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
@@ -478,7 +478,7 @@ class ScenarioListApiIntegrationTests {
         "사용자가 먼저 말을 겁니다.",
         "직원에게 음료를 주문한다.",
         "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
-        ethanVoiceId,
+        marcoVoiceId,
         "ACTIVE");
 
     insertScenario(202, 101, 1, "AI", "EASY", "ACTIVE", "https://cdn.landit.com/ai.png");

@@ -3,8 +3,12 @@
 package com.landit.landitbe;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import com.landit.landitbe.feature.content.domain.TtsVoice;
+import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +31,8 @@ import org.springframework.util.StreamUtils;
 class DatabaseSchemaIntegrationTests {
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private TtsVoiceRepository ttsVoiceRepository;
 
   @Test
   void dbmlCoreTablesExist() {
@@ -573,8 +579,13 @@ class DatabaseSchemaIntegrationTests {
   @DisplayName("V14 migration이 기본 튜터와 시나리오 TTS 음성 두 건을 추가한다.")
   @Test
   void v14MigrationSeedsDefaultTutorAndScenarioTtsVoices() throws Exception {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "14");
+
     List<Map<String, Object>> voices =
-        jdbcTemplate.queryForList(
+        migrationJdbcTemplate.queryForList(
             """
             select provider, model, provider_voice_id, gender, description, accent_locale, status
             from tts_voice
@@ -599,7 +610,7 @@ class DatabaseSchemaIntegrationTests {
 
     assertThatThrownBy(
             () ->
-                jdbcTemplate.update(
+                migrationJdbcTemplate.update(
                     """
                     insert into tts_voice (
                         provider, model, provider_voice_id, gender, accent_locale, status,
@@ -613,7 +624,7 @@ class DatabaseSchemaIntegrationTests {
         .isInstanceOf(DataIntegrityViolationException.class);
 
     Integer defaultTutorCount =
-        jdbcTemplate.queryForObject(
+        migrationJdbcTemplate.queryForObject(
             """
             select count(*)
             from ai_tutor
@@ -625,7 +636,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorCount).isEqualTo(1);
 
     Integer koreanVariantCount =
-        jdbcTemplate.queryForObject(
+        migrationJdbcTemplate.queryForObject(
             """
             select count(*)
             from ai_tutor_language_variant variant
@@ -644,11 +655,31 @@ class DatabaseSchemaIntegrationTests {
     assertThat(migrationSql).contains("UPDATE user_profile", "WHERE ai_tutor_id IS NULL");
   }
 
+  @DisplayName("공용 및 PostgreSQL migration의 버전은 중복되지 않는다.")
+  @Test
+  void commonAndPostgresqlMigrationVersionsAreUnique() {
+    String databaseUrl = migrationTestDatabaseUrl();
+
+    assertThatNoException()
+        .isThrownBy(
+            () ->
+                Flyway.configure()
+                    .dataSource(databaseUrl, "sa", "")
+                    .locations("classpath:db/migration", "classpath:db/postgresql")
+                    .load()
+                    .info());
+  }
+
   @DisplayName("V38 migration이 Deepgram Aura 2 TTS 음성을 추가한다.")
   @Test
   void v38MigrationSeedsDeepgramAura2Voice() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "38");
+
     Map<String, Object> voice =
-        jdbcTemplate.queryForMap(
+        migrationJdbcTemplate.queryForMap(
             """
             select provider, model, provider_voice_id, gender, description, accent_locale, status
             from tts_voice
@@ -665,6 +696,41 @@ class DatabaseSchemaIntegrationTests {
         .containsEntry("DESCRIPTION", "굵은 남성 음성")
         .containsEntry("ACCENT_LOCALE", "EN_US")
         .containsEntry("STATUS", "ACTIVE");
+  }
+
+  @DisplayName("V50 migration이 Marco와 Teddy의 TTS 음성을 변경하고 Chloe는 유지한다.")
+  @Test
+  void v50MigrationUpdatesMarcoAndTeddyVoicesAndKeepsChloe() {
+    List<Map<String, Object>> voices =
+        jdbcTemplate.queryForList(
+            """
+            select id, model, provider_voice_id, description, accent_locale
+            from tts_voice
+            where id in (1, 2, 3)
+            order by id
+            """);
+
+    assertThat(voices)
+        .extracting(
+            row -> row.get("ID"),
+            row -> row.get("MODEL"),
+            row -> row.get("PROVIDER_VOICE_ID"),
+            row -> row.get("DESCRIPTION"),
+            row -> row.get("ACCENT_LOCALE"))
+        .containsExactly(
+            tuple(1L, "microsoft/mai-voice-2", "en-US-Harper:MAI-Voice-2", "미국 영어 여성 음성", "EN_US"),
+            tuple(2L, "deepgram/aura-2", "aura-2-hyperion-en", "호주 영어 남성 음성", "EN_AU"),
+            tuple(3L, "deepgram/aura-2", "aura-2-draco-en", "영국 영어 굵은 남성 음성", "EN_GB"));
+  }
+
+  @DisplayName("V50 migration 이후 Marco와 Teddy의 TTS 음성을 JPA 엔티티로 조회한다.")
+  @Test
+  void v50MigratedVoicesCanBeLoadedAsJpaEntities() {
+    TtsVoice marco = ttsVoiceRepository.findById(2L).orElseThrow();
+    TtsVoice teddy = ttsVoiceRepository.findById(3L).orElseThrow();
+
+    assertThat(marco.getAccentLocale().name()).isEqualTo("EN_AU");
+    assertThat(teddy.getAccentLocale().name()).isEqualTo("EN_GB");
   }
 
   @DisplayName("V43 migration이 시나리오 노출 순서를 전체 기준 unique로 강제한다.")

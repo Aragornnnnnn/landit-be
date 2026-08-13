@@ -1826,7 +1826,7 @@ class ScenarioSessionApiIntegrationTests {
         null,
         null,
         null,
-        ttsVoiceId("en-US-Ethan:MAI-Voice-2"),
+        ttsVoiceId("aura-2-hyperion-en"),
         "ACTIVE");
     MvcResult result =
         mockMvc
@@ -1840,7 +1840,8 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.firstSpeaker").value("USER"))
             .andExpect(
                 jsonPath("$.data.userOpeningInstruction").value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Ethan:MAI-Voice-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.model").value("deepgram/aura-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
             .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
