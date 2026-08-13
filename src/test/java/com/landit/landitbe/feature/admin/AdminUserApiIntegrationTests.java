@@ -10,13 +10,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,6 +45,7 @@ class AdminUserApiIntegrationTests {
   private static final long TEST_CATEGORY_ID = 9820;
   private static final long FIRST_SCENARIO_ID = 9821;
   private static final long SECOND_SCENARIO_ID = 9822;
+  private static final Instant TEST_INSTANT = Instant.parse("2026-08-08T15:00:00Z");
 
   @Autowired private MockMvc mockMvc;
 
@@ -311,5 +318,15 @@ class AdminUserApiIntegrationTests {
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         userProfileId);
+  }
+
+  @TestConfiguration
+  static class FixedClockConfiguration {
+
+    @Bean
+    @Primary
+    Clock testClock() {
+      return Clock.fixed(TEST_INSTANT, ZoneOffset.UTC);
+    }
   }
 }
