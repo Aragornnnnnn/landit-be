@@ -77,6 +77,26 @@ public class StreakService {
     return currentStreak(userId, today);
   }
 
+  /**
+   * 사용자의 현재 스트릭과 마지막 학습일을 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @return 현재 스트릭과 마지막 학습일
+   */
+  @Transactional(readOnly = true)
+  public LearningActivitySummary getLearningActivitySummary(long userId) {
+    LocalDate today = clock.instant().atZone(KOREA_ZONE_ID).toLocalDate();
+    return summaryRepository
+        .findById(userId)
+        .map(
+            summary -> {
+              CurrentStreak currentStreak = CurrentStreak.from(summary, today);
+              return new LearningActivitySummary(
+                  currentStreak.currentStreakDays(), summary.getLastActivityDate());
+            })
+        .orElseGet(() -> new LearningActivitySummary(0, null));
+  }
+
   private CurrentStreak currentStreak(long userId, LocalDate today) {
     return summaryRepository
         .findById(userId)
@@ -144,6 +164,14 @@ public class StreakService {
           summary.getCurrentStreakDays(), lastActivityDate.equals(today), today);
     }
   }
+
+  /**
+   * 관리자 사용자 상세에 제공할 학습 활동 요약이다.
+   *
+   * @param currentStreakDays 현재 스트릭 일수
+   * @param lastActivityDate 마지막 학습일
+   */
+  public record LearningActivitySummary(int currentStreakDays, LocalDate lastActivityDate) {}
 
   /**
    * 월별 스트릭 조회 결과다.
