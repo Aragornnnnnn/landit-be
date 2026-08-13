@@ -27,6 +27,7 @@ import com.landit.landitbe.feature.mailbox.repository.AdminMailboxLetterRecipien
 import com.landit.landitbe.feature.mailbox.repository.AdminMailboxLetterRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -55,6 +56,7 @@ public class AdminMailboxService {
   private final AdminMailboxFeedbackRepository feedbackRepository;
   private final AdminMailboxLetterRecipientRepository recipientRepository;
   private final AdminAuditService adminAuditService;
+  private final EntityManager entityManager;
 
   /**
    * 편지함 어드민 저장소와 감사 Service를 주입받는다.
@@ -63,16 +65,19 @@ public class AdminMailboxService {
    * @param feedbackRepository 어드민 피드백 저장소
    * @param recipientRepository 편지 수신자 저장소
    * @param adminAuditService 관리자 감사 Service
+   * @param entityManager 영속 상태를 DB 저장 값과 동기화할 EntityManager
    */
   public AdminMailboxService(
       AdminMailboxLetterRepository letterRepository,
       AdminMailboxFeedbackRepository feedbackRepository,
       AdminMailboxLetterRecipientRepository recipientRepository,
-      AdminAuditService adminAuditService) {
+      AdminAuditService adminAuditService,
+      EntityManager entityManager) {
     this.letterRepository = letterRepository;
     this.feedbackRepository = feedbackRepository;
     this.recipientRepository = recipientRepository;
     this.adminAuditService = adminAuditService;
+    this.entityManager = entityManager;
   }
 
   /**
@@ -172,6 +177,8 @@ public class AdminMailboxService {
         beforeValue,
         letterSummary(letter) + ",changedFields=" + changedFields(request));
     letterRepository.flush();
+    // DB가 보존한 timestamp 정밀도를 응답에도 동일하게 반영한다.
+    entityManager.refresh(letter);
     return AdminMailboxLetterResponse.from(letter);
   }
 
