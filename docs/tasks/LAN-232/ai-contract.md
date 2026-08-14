@@ -20,7 +20,7 @@ POST /api/v1/free-talk/conversation-embeddings
     {
       "messageId": 1,
       "turnNumber": 1,
-      "role": "ASSISTANT",
+      "role": "AI",
       "content": "Do you like cooking?",
       "translatedContent": "요리하는 거 좋아해?"
     },
@@ -36,12 +36,14 @@ POST /api/v1/free-talk/conversation-embeddings
 ```
 
 - `conversationHistory` 구조는 기존 `expression-recommendations` 요청과 동일하다.
+- `role` 값은 기존 계약과 같은 `AI` / `USER` 두 가지다 (BE의 ConversationSpeaker enum).
 
 ## AI 서버가 할 일
 
 1. **추출**: 대화에서 학습 가치가 있는 **사용자 발화** 핵심 문장을 1~4개 추출한다.
-   - 추출 대상은 USER 발화뿐이다. ASSISTANT 발화는 짧은 응답("Yeah, totally" 등)의
+   - 추출 대상은 USER 발화뿐이다. AI 발화는 짧은 응답("Yeah, totally" 등)의
      의미를 해석하기 위한 맥락으로만 사용한다.
+   - 추출 문장은 대화의 학습 언어(targetLocale) 그대로 작성한다 (맞장구를 재구성할 때도 동일).
    - 짧은 맞장구는 직전 AI 발화의 문맥을 반영해 의미가 드러나는 형태로 정리해도 된다
      (예: "Yeah, totally" → "I totally agree that the exam was hard").
 2. **임베딩**: 추출한 각 문장을 OpenRouter `openai/text-embedding-3-small`로 임베딩한다.
