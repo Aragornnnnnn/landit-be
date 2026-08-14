@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.config.content.ExpressionSearchProperties;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
-import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
+import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -14,14 +14,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /** 대화 임베딩으로 추천 LLM에 전달할 표현 후보를 추린다. */
 @RequiredArgsConstructor
-@Component
-public class ExpressionCandidateSelector {
+@Service
+public class ExpressionCandidateSelectionService {
 
-  private final ExpressionEmbeddingSearchRepository searchRepository;
+  private final ExpressionQueryService expressionQueryService;
   private final ExpressionSearchProperties properties;
 
   /**
@@ -45,7 +45,7 @@ public class ExpressionCandidateSelector {
     Map<Long, Double> bestDistanceByExpressionId = new HashMap<>();
     for (AiConversationExcerpt excerpt : excerpts) {
       for (ExpressionEmbeddingMatch match :
-          searchRepository.searchFreeTalkCandidates(
+          expressionQueryService.searchFreeTalkCandidatesByEmbedding(
               excerpt.embedding(),
               userProfileId,
               targetLocale,

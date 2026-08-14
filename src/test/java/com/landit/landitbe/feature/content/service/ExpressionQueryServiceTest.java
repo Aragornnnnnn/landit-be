@@ -26,6 +26,8 @@ import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -60,6 +62,8 @@ class ExpressionQueryServiceTest {
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
 
+  @Mock private ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
+
   @Mock private LearningProgressService learningProgressService;
 
   @InjectMocks private ExpressionQueryService expressionQueryService;
@@ -93,6 +97,20 @@ class ExpressionQueryServiceTest {
         .containsExactly(
             new ExpressionRecommendationCandidate(102L, "target-102", "base-102", "정중하게 거절할 때 사용"),
             new ExpressionRecommendationCandidate(101L, "target-101", "base-101", "제안에 동의할 때 사용"));
+  }
+
+  @Test
+  void delegatesEmbeddingSearchToOwnedRepository() {
+    List<ExpressionEmbeddingMatch> matches = List.of(new ExpressionEmbeddingMatch(101L, 0.2));
+    when(expressionEmbeddingSearchRepository.searchFreeTalkCandidates(
+            List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 30))
+        .thenReturn(matches);
+
+    List<ExpressionEmbeddingMatch> result =
+        expressionQueryService.searchFreeTalkCandidatesByEmbedding(
+            List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 30);
+
+    assertThat(result).isEqualTo(matches);
   }
 
   @Test

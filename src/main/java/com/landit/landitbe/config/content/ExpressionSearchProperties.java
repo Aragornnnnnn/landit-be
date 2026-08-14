@@ -23,7 +23,11 @@ public record ExpressionSearchProperties(
     if (maxCandidates == null || maxCandidates <= 0) {
       maxCandidates = 30;
     }
-    if (distanceThreshold == null || distanceThreshold <= 0) {
+    // 코사인 거리 유효 범위(0~2)를 벗어나면 기본값으로 정규화한다. 0.0은 유효한 임계값이라 유지한다.
+    if (distanceThreshold == null
+        || distanceThreshold.isNaN()
+        || distanceThreshold < 0
+        || distanceThreshold > 2) {
       distanceThreshold = 0.6;
     }
   }

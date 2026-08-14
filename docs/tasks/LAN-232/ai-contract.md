@@ -77,4 +77,7 @@ POST /api/v1/free-talk/conversation-embeddings
 
 ## 오류
 
-- 생성 실패 시 기존과 동일하게 502 + `AI_RESPONSE_INVALID` 코드 규약을 따른다.
+기존 free-talk 엔드포인트들과 동일한 두 갈래 규약을 따른다.
+
+- **응답 형식 오류** (추출 결과가 계약 위반 등): `502` + 코드 `AI_RESPONSE_INVALID`
+- **생성 실패** (LLM/임베딩 호출 실패 등): `503` + 코드 `AI_GENERATION_FAILED`

@@ -12,6 +12,8 @@ import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -73,6 +75,7 @@ public class ExpressionQueryService {
   private final ScenarioService scenarioService;
   private final UserProfileService userProfileService;
   private final WritingExpressionRepository writingExpressionRepository;
+  private final ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
   private final LearningProgressService learningProgressService;
 
   /**
@@ -153,6 +156,27 @@ public class ExpressionQueryService {
   @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long userId, Long expressionId) {
     return ExpressionLearningResponse.from(requireAccessibleExpression(userId, expressionId));
+  }
+
+  /**
+   * 임베딩 벡터로 공용 프리톡 표현 후보를 코사인 거리 오름차순으로 검색한다. 사용자가 이미 학습 완료한 표현은 제외한다.
+   *
+   * @param embedding 쿼리 임베딩 벡터
+   * @param userProfileId 학습 완료 표현을 제외할 사용자 ID
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @param limit 최대 후보 수
+   * @return 코사인 거리 오름차순의 표현 후보 목록
+   */
+  @Transactional(readOnly = true)
+  public List<ExpressionEmbeddingMatch> searchFreeTalkCandidatesByEmbedding(
+      List<Float> embedding,
+      long userProfileId,
+      Locale targetLocale,
+      Locale baseLocale,
+      int limit) {
+    return expressionEmbeddingSearchRepository.searchFreeTalkCandidates(
+        embedding, userProfileId, targetLocale, baseLocale, limit);
   }
 
   /**

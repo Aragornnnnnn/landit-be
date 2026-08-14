@@ -42,7 +42,7 @@ public class FreeTalkExpressionGenerationService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionQueryService expressionQueryService;
-  private final ExpressionCandidateSelector candidateSelector;
+  private final ExpressionCandidateSelectionService candidateSelectionService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
 
@@ -70,7 +70,7 @@ public class FreeTalkExpressionGenerationService {
                   context.history()));
       // 임베딩 유사도 검색으로 전체 풀 대신 소수 후보만 추린다.
       List<Long> candidateIds =
-          candidateSelector.selectCandidateIds(
+          candidateSelectionService.selectCandidateIds(
               conversationEmbeddings.excerpts(),
               context.userProfileId(),
               context.targetLocale(),
@@ -88,6 +88,10 @@ public class FreeTalkExpressionGenerationService {
                           candidate.baseExpressionMeaningText(),
                           candidate.usageSummary()))
               .toList();
+      if (existingExpressions.isEmpty()) {
+        // 후보 선정과 재검증 사이에 후보가 전부 비활성화되면 재시도할 수 있게 실패로 전환한다.
+        throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      }
       // 전체 대화와 유사도 순 후보를 바탕으로 이번 프리톡에 적합한 표현을 추천한다.
       List<AiFreeTalkExpressionRecommendation> recommendations =
           aiFreeTalkClient
