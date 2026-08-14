@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
+import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
@@ -1244,6 +1247,18 @@ class FreeTalkSessionApiIntegrationTests {
           List.of(
               new AiFreeTalkExpressionRecommendation(
                   1, request.existingExpressions().getFirst().expressionId())));
+    }
+
+    @Override
+    public AiConversationEmbeddingsResult extractConversationEmbeddings(
+        AiConversationEmbeddingsRequest request) {
+      // 첫 성분만 1인 고정 벡터로 유사도 검색 결과를 예측할 수 있게 한다.
+      List<Float> embedding =
+          new java.util.ArrayList<>(
+              Collections.nCopies(AiConversationExcerpt.EMBEDDING_DIMENSION, 0.0f));
+      embedding.set(0, 1.0f);
+      return new AiConversationEmbeddingsResult(
+          List.of(new AiConversationExcerpt("That sounds interesting.", List.copyOf(embedding))));
     }
 
     void reset() {

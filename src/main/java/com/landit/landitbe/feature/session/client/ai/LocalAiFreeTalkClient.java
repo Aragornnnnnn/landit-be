@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.client.ai;
 
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -60,5 +61,21 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         List.of(
             new AiFreeTalkExpressionRecommendation(
                 1, request.existingExpressions().getFirst().expressionId())));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiConversationEmbeddingsResult extractConversationEmbeddings(
+      AiConversationEmbeddingsRequest request) {
+    return new AiConversationEmbeddingsResult(
+        List.of(new AiConversationExcerpt("That sounds interesting.", firstAxisEmbedding())));
+  }
+
+  // 테스트에서 예측할 수 있도록 첫 성분만 1인 고정 임베딩을 만든다.
+  private static List<Float> firstAxisEmbedding() {
+    Float[] embedding = new Float[AiConversationExcerpt.EMBEDDING_DIMENSION];
+    Arrays.fill(embedding, 0.0f);
+    embedding[0] = 1.0f;
+    return List.of(embedding);
   }
 }
