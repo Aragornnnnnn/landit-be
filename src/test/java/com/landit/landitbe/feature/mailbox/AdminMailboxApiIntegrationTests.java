@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.mailbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -75,6 +76,61 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.title").value("새 공지"))
         .andExpect(jsonPath("$.data.contentBlocks[0].type").value("TEXT"))
         .andExpect(jsonPath("$.data.contentBlocks[0].text").value("공지 본문"));
+  }
+
+  @Test
+  void adminCanCreateAndUpdateImageContentBlock() throws Exception {
+    String accessToken = loginAsAdmin("mailbox-admin-image-block");
+    MvcResult created =
+        mockMvc
+            .perform(
+                post("/api/v1/admin/mailbox/letters")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "type":"UPDATE",
+                          "title":"이미지 업데이트",
+                          "contentBlocks":[{
+                            "type":"image",
+                            "url":"https://content.example.com/content/inbox/image.webp",
+                            "altText":"업데이트 화면 예시"
+                          }],
+                          "preview":"업데이트 화면"
+                        }
+                        """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.contentBlocks[0].altText").value("업데이트 화면 예시"))
+            .andReturn();
+    long letterId = responseData(created).get("letterId").asLong();
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"contentBlocks":[{
+                      "type":"image",
+                      "url":"https://content.example.com/content/inbox/image.webp",
+                      "altText":"수정된 대체 텍스트"
+                    }]}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.contentBlocks[0].type").value("image"))
+        .andExpect(jsonPath("$.data.contentBlocks[0].url").value(endsWith("/image.webp")))
+        .andExpect(jsonPath("$.data.contentBlocks[0].altText").value("수정된 대체 텍스트"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/letters")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].letterId").value(letterId))
+        .andExpect(jsonPath("$.data.items[0].contentBlocks[0].type").value("image"))
+        .andExpect(jsonPath("$.data.items[0].contentBlocks[0].altText").value("수정된 대체 텍스트"));
   }
 
   @Test
