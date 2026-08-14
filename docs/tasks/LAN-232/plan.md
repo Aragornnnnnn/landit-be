@@ -38,8 +38,10 @@
 
 ## 배포 체크리스트
 
-1. **AI 서버의 `conversation-embeddings` 엔드포인트 구현·배포가 선행** ([ai-contract.md](ai-contract.md) 전달)
-   — 미구현 상태로 BE만 배포하면 모든 표현 생성이 FAILED가 된다
+1. **AI 서버의 `conversation-embeddings`(LAN-303)와 함께 배포** ([ai-contract.md](ai-contract.md) 전달)
+   — 동시 배포 가능. BE가 먼저 뜨는 겹침 구간에 프리톡을 완료한 유저의 표현 생성만
+   일시 FAILED가 되며, AI 배포 완료 후 재시도로 복구된다. 겹침 영향조차 없애려면
+   AI 먼저 배포 (AI 선배포는 무해 — 새 엔드포인트가 대기할 뿐)
 2. dev/prod 환경변수에 `LANDIT_EXPRESSION_SEARCH_MODE=pgvector` 추가 (SSM/태스크 정의)
 3. dev 배포 후 pgvector 실쿼리 1회 확인 (H2에서는 `<=>` 실행 검증 불가):
    프리톡 1회 완주 → 세션 상세에서 READY + 추천 표현 확인
