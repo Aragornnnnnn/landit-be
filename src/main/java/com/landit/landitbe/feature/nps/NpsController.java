@@ -30,7 +30,11 @@ public class NpsController implements NpsControllerDocs {
     this.npsService = npsService;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   *
+   * <p>DEPRECATED: 프론트엔드의 편지함 전환이 끝나면 NPS API와 함께 제거한다.
+   */
   @Override
   @PostMapping("/api/v1/nps")
   public ResponseEntity<ApiResponse<Void>> submit(
