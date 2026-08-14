@@ -1,4 +1,4 @@
-// pgvector 검색 SQL이 필수 조건과 연산자를 유지하는지 검증한다.
+// PostgreSQL pgvector 검색 SQL이 필수 조건과 연산자를 유지하는지 검증한다.
 
 package com.landit.landitbe.feature.content.repository;
 
@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 /**
- * pgvector 검색 SQL이 필수 조건과 연산자를 유지하는지 검증한다.
+ * PostgreSQL pgvector 검색 SQL이 필수 조건과 연산자를 유지하는지 검증한다.
  *
  * <p>H2 테스트 DB에는 vector 타입이 없어 실행 검증이 불가능하므로, 실행 계약(in-memory 구현과 공유)은 통합 테스트가 검증하고 여기서는 PostgreSQL
  * 전용 SQL의 핵심 구성을 고정한다.
