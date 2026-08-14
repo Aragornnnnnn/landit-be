@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExistingExpression;
@@ -40,6 +42,7 @@ public class FreeTalkExpressionGenerationService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionQueryService expressionQueryService;
+  private final ExpressionCandidateSelector candidateSelector;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
 
@@ -57,9 +60,25 @@ public class FreeTalkExpressionGenerationService {
     }
 
     try {
+      // 대화에서 학습 가치가 있는 사용자 발화를 추출하고 임베딩한다.
+      AiConversationEmbeddingsResult conversationEmbeddings =
+          aiFreeTalkClient.extractConversationEmbeddings(
+              new AiConversationEmbeddingsRequest(
+                  context.learningSessionId(),
+                  context.targetLocale().name(),
+                  context.baseLocale().name(),
+                  context.history()));
+      // 임베딩 유사도 검색으로 전체 풀 대신 소수 후보만 추린다.
+      List<Long> candidateIds =
+          candidateSelector.selectCandidateIds(
+              conversationEmbeddings.excerpts(),
+              context.userProfileId(),
+              context.targetLocale(),
+              context.baseLocale());
       List<AiFreeTalkExistingExpression> existingExpressions =
           expressionQueryService
-              .getActiveExpressionCandidates(context.targetLocale(), context.baseLocale())
+              .getExpressionCandidatesByIds(
+                  candidateIds, context.targetLocale(), context.baseLocale())
               .stream()
               .map(
                   candidate ->
@@ -69,7 +88,7 @@ public class FreeTalkExpressionGenerationService {
                           candidate.baseExpressionMeaningText(),
                           candidate.usageSummary()))
               .toList();
-      // 전체 대화와 기존 표현 후보를 바탕으로 이번 프리톡에 적합한 표현을 추천한다.
+      // 전체 대화와 유사도 순 후보를 바탕으로 이번 프리톡에 적합한 표현을 추천한다.
       List<AiFreeTalkExpressionRecommendation> recommendations =
           aiFreeTalkClient
               .recommendExpressions(
@@ -126,6 +145,7 @@ public class FreeTalkExpressionGenerationService {
     return new GenerationContext(
         learningSessionId,
         freeTalkSession.getId(),
+        learningSession.getUserProfileId(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
         sessionHistoryMessageRepository
@@ -183,6 +203,7 @@ public class FreeTalkExpressionGenerationService {
   private record GenerationContext(
       long learningSessionId,
       long freeTalkSessionId,
+      long userProfileId,
       Locale targetLocale,
       Locale baseLocale,
       List<AiConversationHistoryMessage> history) {}

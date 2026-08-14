@@ -23,9 +23,12 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -153,19 +156,29 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 프리톡 AI가 재사용할 공용 활성 표현 후보 전체를 조회한다.
+   * 프리톡 AI가 재사용할 공용 활성 표현 후보를 ID 목록으로 조회한다. 결과는 입력 ID 순서를 유지한다.
    *
+   * @param expressionIds 유사도 순으로 정렬된 표현 ID 목록
    * @param targetLocale 학습 언어 locale
    * @param baseLocale 기준 언어 locale
-   * @return 공용 활성 표현 후보 목록
+   * @return 입력 순서를 유지한 공용 활성 표현 후보 목록
    */
   @Transactional(readOnly = true)
-  public List<ExpressionRecommendationCandidate> getActiveExpressionCandidates(
-      Locale targetLocale, Locale baseLocale) {
-    return writingExpressionRepository
-        .findPublicExpressionCandidates(
-            WritingExpressionSource.FREE_TALK, targetLocale, baseLocale, ActiveStatus.ACTIVE)
-        .stream()
+  public List<ExpressionRecommendationCandidate> getExpressionCandidatesByIds(
+      List<Long> expressionIds, Locale targetLocale, Locale baseLocale) {
+    Map<Long, WritingExpression> expressionsById =
+        writingExpressionRepository
+            .findPublicExpressionCandidatesByIds(
+                expressionIds,
+                WritingExpressionSource.FREE_TALK,
+                targetLocale,
+                baseLocale,
+                ActiveStatus.ACTIVE)
+            .stream()
+            .collect(Collectors.toMap(WritingExpression::getId, expression -> expression));
+    return expressionIds.stream()
+        .map(expressionsById::get)
+        .filter(Objects::nonNull)
         .map(
             expression ->
                 new ExpressionRecommendationCandidate(

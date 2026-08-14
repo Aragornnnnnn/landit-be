@@ -1,4 +1,4 @@
-// pgvector 연산자로 공용 프리톡 표현 후보를 검색한다.
+// PostgreSQL pgvector 연산자로 공용 프리톡 표현 후보를 검색한다.
 
 package com.landit.landitbe.feature.content.repository;
 
@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * pgvector 연산자로 공용 프리톡 표현 후보를 검색한다.
+ * PostgreSQL pgvector 연산자로 공용 프리톡 표현 후보를 검색한다.
  *
  * <p>코사인 거리 계산은 PostgreSQL이 수행한다. H2 테스트 DB에는 vector 타입이 없으므로 운영 환경에서만 활성화하며, 테스트와 로컬은 in-memory
  * 구현을 사용한다.

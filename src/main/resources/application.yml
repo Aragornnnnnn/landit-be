@@ -49,6 +49,8 @@ landit:
     session-feedback-request-timeout: ${LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT:120s}
   expression-search:
     mode: ${LANDIT_EXPRESSION_SEARCH_MODE:in-memory}
+    max-candidates: ${LANDIT_EXPRESSION_SEARCH_MAX_CANDIDATES:30}
+    distance-threshold: ${LANDIT_EXPRESSION_SEARCH_DISTANCE_THRESHOLD:0.6}
 
 sentry:
   dsn: ${SENTRY_DSN:}
