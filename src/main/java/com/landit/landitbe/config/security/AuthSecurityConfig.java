@@ -86,6 +86,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/nps")
                     .authenticated()
+                    .requestMatchers("/api/v1/mailbox/**")
+                    .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/expo-push-token")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios")

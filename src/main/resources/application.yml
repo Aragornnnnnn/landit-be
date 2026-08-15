@@ -51,6 +51,10 @@ landit:
     mode: ${LANDIT_EXPRESSION_SEARCH_MODE:in-memory}
     max-candidates: ${LANDIT_EXPRESSION_SEARCH_MAX_CANDIDATES:30}
     distance-threshold: ${LANDIT_EXPRESSION_SEARCH_DISTANCE_THRESHOLD:0.6}
+  content-image:
+    bucket-name: ${CONTENT_BUCKET_NAME:}
+    cloudfront-url: ${CONTENT_CLOUDFRONT_URL:}
+    region: ${AWS_REGION:ap-northeast-2}
 
 sentry:
   dsn: ${SENTRY_DSN:}
