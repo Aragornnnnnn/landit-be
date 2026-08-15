@@ -8,7 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import com.landit.landitbe.feature.content.service.TtsVoiceService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
@@ -39,7 +39,7 @@ class FreeTalkSessionServiceTest {
       mock(SessionHistoryMessageRepository.class);
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService =
       mock(FreeTalkDailySpeakingUsageService.class);
-  private final TtsVoiceRepository ttsVoiceRepository = mock(TtsVoiceRepository.class);
+  private final TtsVoiceService ttsVoiceService = mock(TtsVoiceService.class);
   private final FreeTalkSessionService service =
       new FreeTalkSessionService(
           userProfileService,
@@ -49,7 +49,7 @@ class FreeTalkSessionServiceTest {
           sessionHistoryRepository,
           sessionHistoryMessageRepository,
           dailySpeakingUsageService,
-          ttsVoiceRepository);
+          ttsVoiceService);
 
   /** 사용자 잠금을 얻은 뒤 일일 잔여 시간을 다시 확인하고 세션 저장을 중단한다. */
   @Test

@@ -2,9 +2,8 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.domain.TtsVoice;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
-import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import com.landit.landitbe.feature.content.service.TtsVoiceService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
@@ -43,7 +42,7 @@ public class FreeTalkSessionService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
-  private final TtsVoiceRepository ttsVoiceRepository;
+  private final TtsVoiceService ttsVoiceService;
 
   /**
    * 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다.
@@ -61,10 +60,8 @@ public class FreeTalkSessionService {
     dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
     FreeTalkCharacter character = FreeTalkCharacter.fromId(request.characterId());
-    TtsVoice ttsVoice =
-        ttsVoiceRepository
-            .findByProviderVoiceIdAndStatus(character.providerVoiceId(), ActiveStatus.ACTIVE)
-            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+    TtsVoiceResponse ttsVoice =
+        ttsVoiceService.requireActiveByProviderVoiceId(character.providerVoiceId());
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
         learningSessionRepository.save(
@@ -102,11 +99,7 @@ public class FreeTalkSessionService {
         topic == null ? null : topic.getPromptDescription(),
         userProfile.getTargetLocale().name(),
         userProfile.getBaseLocale().name(),
-        TtsVoiceResponse.from(
-            ttsVoice.getProvider(),
-            ttsVoice.getModel(),
-            ttsVoice.getProviderVoiceId(),
-            ttsVoice.getGender()));
+        ttsVoice);
   }
 
   /**

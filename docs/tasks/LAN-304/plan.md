@@ -12,3 +12,4 @@
 
 - 2026-08-15: `./gradlew check` 성공.
 - 2026-08-15: 한도 소진 상태에서도 잘못된 `characterId`가 `INVALID_REQUEST`로 우선 처리되는 회귀 테스트와 `./gradlew check` 성공.
+- 2026-08-15: 리뷰에서 확인한 기능 간 Repository 직접 참조를 `TtsVoiceService` 공개 경계로 분리하고 `./gradlew check` 성공.
