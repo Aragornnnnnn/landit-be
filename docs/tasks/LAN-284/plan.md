@@ -10,5 +10,6 @@
 - RED: `bash .github/scripts/test/deploy-ec2-service_test.sh`가 helper 부재로 실패하는 것을 확인했다.
 - GREEN: `bash .github/scripts/test/deploy-ec2-service_test.sh`와 `bash -n .github/scripts/deploy-ec2-service.sh .github/scripts/test/deploy-ec2-service_test.sh`가 통과했다.
 - 전체: `bash .github/scripts/test/deploy-ec2-service_test.sh && ./gradlew check --rerun-tasks --no-daemon`가 통과했다.
-- GitHub Environment variable 생성과 AWS 리소스 변경은 이 작업 범위에서 실행하지 않았다.
-- Task 7 재검증에서 shell test와 `./gradlew check --rerun-tasks --no-daemon`가 다시 통과했다. IaC·AI와 교차 검토해 ECS 검증 다음에 같은 SHA만 EC2로 전달되고, 실제 `EC2_INSTANCE_ID` 등록·EC2 배포·DNS·health 관찰은 미실행임을 확인했다.
+- IaC 적용으로 개발 EC2와 전용 SSM 문서를 생성했고, BE `develop` Environment에 `EC2_INSTANCE_ID`를 등록했다. 임시 도메인의 HTTPS와 API→AI 내부 health도 확인했다.
+- 최신 `develop` 기준 통합 검증에서 shell test와 `./gradlew check --rerun-tasks --no-daemon`가 통과했다. 배포 workflow는 Flyway migration 성공 뒤 ECS를 검증하고 같은 SHA를 EC2에 전달한다.
+- 이 PR 병합 후 `workflow_dispatch`로 실제 재배포를 검증한다. 기존 ECS·ALB는 해당 검증과 개발 DNS 전환이 끝날 때까지 유지하며, 제거 전 EC2 전용 workflow에서도 Flyway migration 선행 순서를 보존한다.
