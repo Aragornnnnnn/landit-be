@@ -70,8 +70,11 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
              AND openingQuestionVariant.baseLocale = up.baseLocale
              AND openingQuestionVariant.status =
                  com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
+            LEFT JOIN ConversationCharacter character
+              ON character.characterId = s.characterId
+             AND character.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN TtsVoice tv
-              ON tv.id = slv.ttsVoiceId
+              ON tv.id = character.ttsVoiceId
              AND tv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN UserScenarioProgress usp
               ON usp.userProfileId = up.id

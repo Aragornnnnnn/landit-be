@@ -501,12 +501,11 @@ class ScenarioCalendarApiIntegrationTests {
                             briefing,
                             user_opening_instruction,
                             conversation_goal,
-                            tts_voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, '설명', '먼저 말해보세요.', '목표', NULL, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, '설명', '먼저 말해보세요.', '목표', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
         title,

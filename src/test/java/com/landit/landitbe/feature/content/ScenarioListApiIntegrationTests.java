@@ -667,20 +667,36 @@ class ScenarioListApiIntegrationTests {
                             briefing,
                             user_opening_instruction,
                             conversation_goal,
-                            tts_voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
         title,
         briefing,
         userOpeningInstruction,
         conversationGoal,
-        ttsVoiceId,
         variantStatus);
+    assignScenarioCharacter(scenarioId, ttsVoiceId);
+  }
+
+  private void assignScenarioCharacter(long scenarioId, Long ttsVoiceId) {
+    jdbcTemplate.update(
+        """
+        UPDATE scenario
+        SET character_id = (
+            SELECT character_id
+            FROM conversation_character
+            WHERE tts_voice_id = ?
+            ORDER BY character_id
+            LIMIT 1
+        )
+        WHERE id = ?
+        """,
+        ttsVoiceId,
+        scenarioId);
   }
 
   private long ttsVoiceId(String providerVoiceId) {
@@ -709,6 +725,15 @@ class ScenarioListApiIntegrationTests {
         id,
         providerVoiceId,
         status);
+    jdbcTemplate.update(
+        """
+        INSERT INTO conversation_character (
+            character_id, tts_voice_id, status, created_at, updated_at
+        )
+        VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        "test-" + id,
+        id);
     return id;
   }
 

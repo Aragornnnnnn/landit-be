@@ -18,13 +18,4 @@ public interface TtsVoiceRepository extends JpaRepository<TtsVoice, Long> {
    * @return 조건에 맞는 TTS 음성, 없으면 빈 Optional
    */
   Optional<TtsVoice> findByIdAndStatus(Long id, ActiveStatus status);
-
-  /**
-   * 상태가 일치하는 TTS 음성을 Provider 음성 식별자로 조회한다.
-   *
-   * @param providerVoiceId Provider 음성 식별자
-   * @param status 조회할 활성 상태
-   * @return 조건에 맞는 TTS 음성, 없으면 빈 Optional
-   */
-  Optional<TtsVoice> findByProviderVoiceIdAndStatus(String providerVoiceId, ActiveStatus status);
 }

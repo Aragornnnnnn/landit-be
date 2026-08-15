@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
-import com.landit.landitbe.feature.content.service.TtsVoiceService;
+import com.landit.landitbe.feature.content.service.ConversationCharacterService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
@@ -42,7 +42,7 @@ public class FreeTalkSessionService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
-  private final TtsVoiceService ttsVoiceService;
+  private final ConversationCharacterService conversationCharacterService;
 
   /**
    * 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다.
@@ -60,8 +60,7 @@ public class FreeTalkSessionService {
     dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
     FreeTalkCharacter character = FreeTalkCharacter.fromId(request.characterId());
-    TtsVoiceResponse ttsVoice =
-        ttsVoiceService.requireActiveByProviderVoiceId(character.providerVoiceId());
+    TtsVoiceResponse ttsVoice = conversationCharacterService.requireActiveTtsVoice(character.id());
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
         learningSessionRepository.save(

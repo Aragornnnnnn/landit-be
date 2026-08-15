@@ -8,16 +8,14 @@ import java.util.Arrays;
 
 /** 프리톡에서 선택할 수 있는 캐릭터다. */
 public enum FreeTalkCharacter {
-  CHLOE("chloe", "en-US-Harper:MAI-Voice-2"),
-  MARCO("marco", "aura-2-hyperion-en"),
-  TEDDY("teddy", "aura-2-draco-en");
+  CHLOE("chloe"),
+  MARCO("marco"),
+  TEDDY("teddy");
 
   private final String id;
-  private final String providerVoiceId;
 
-  FreeTalkCharacter(String id, String providerVoiceId) {
+  FreeTalkCharacter(String id) {
     this.id = id;
-    this.providerVoiceId = providerVoiceId;
   }
 
   /**
@@ -27,15 +25,6 @@ public enum FreeTalkCharacter {
    */
   public String id() {
     return id;
-  }
-
-  /**
-   * 캐릭터에 대응하는 Provider 음성 식별자를 반환한다.
-   *
-   * @return TTS Provider 음성 식별자
-   */
-  public String providerVoiceId() {
-    return providerVoiceId;
   }
 
   /**

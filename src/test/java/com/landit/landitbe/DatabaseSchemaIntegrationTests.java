@@ -603,8 +603,36 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("ai_tutor", "voice_provider");
     assertColumnDoesNotExist("ai_tutor", "voice_id");
     assertColumnDoesNotExist("scenario", "tts_voice_set_id");
-    assertColumnExists("scenario_language_variant", "tts_voice_id");
-    assertTableConstraintExists("scenario_language_variant", "fk_scenario_lang_tts_voice_id");
+  }
+
+  /** 공용 캐릭터가 시나리오와 프리톡의 TTS 매핑 원본이 된다. */
+  @Test
+  void conversationCharacterOwnsScenarioAndFreeTalkTtsMapping() {
+    assertTableExists("conversation_character");
+    assertColumnExists("conversation_character", "character_id");
+    assertColumnExists("conversation_character", "tts_voice_id");
+    assertColumnExists("conversation_character", "status");
+    assertTableConstraintExists("conversation_character", "fk_conversation_character_tts_voice");
+
+    assertColumnExists("scenario", "character_id");
+    assertTableConstraintExists("scenario", "fk_scenario_character");
+    assertColumnDoesNotExist("scenario_language_variant", "tts_voice_id");
+    assertTableConstraintExists("free_talk_session", "fk_free_talk_session_character");
+
+    List<Map<String, Object>> mappings =
+        jdbcTemplate.queryForList(
+            """
+            select cc.character_id, tv.provider_voice_id
+            from conversation_character cc
+            join tts_voice tv on tv.id = cc.tts_voice_id
+            order by cc.character_id
+            """);
+    assertThat(mappings)
+        .extracting(row -> row.get("CHARACTER_ID"), row -> row.get("PROVIDER_VOICE_ID"))
+        .containsExactly(
+            tuple("chloe", "en-US-Harper:MAI-Voice-2"),
+            tuple("marco", "aura-2-hyperion-en"),
+            tuple("teddy", "aura-2-draco-en"));
   }
 
   @DisplayName("V14 migration이 기본 튜터와 시나리오 TTS 음성 두 건을 추가한다.")
