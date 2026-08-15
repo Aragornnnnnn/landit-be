@@ -38,6 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class MailboxService {
 
   private static final int MAX_PAGE_SIZE = 100;
+  private static final int FIRST_PAGE_CURSOR_PINNED = 2;
+  private static final LocalDateTime FIRST_PAGE_CURSOR_SENT_AT =
+      LocalDateTime.of(9999, 12, 31, 23, 59, 59);
 
   private final MailboxFeedbackRepository mailboxFeedbackRepository;
   private final MailboxLetterRepository mailboxLetterRepository;
@@ -147,9 +150,11 @@ public class MailboxService {
       Long userProfileId, String cursor, int size) {
     validatePageSize(size);
     ReceivedCursor receivedCursor = decodeReceivedCursor(cursor);
-    int cursorPinned = receivedCursor != null && receivedCursor.pinned() ? 1 : 0;
-    LocalDateTime cursorSentAt = receivedCursor == null ? null : receivedCursor.sentAt();
-    long cursorLetterId = receivedCursor == null ? 0L : receivedCursor.letterId();
+    int cursorPinned =
+        receivedCursor == null ? FIRST_PAGE_CURSOR_PINNED : receivedCursor.pinned() ? 1 : 0;
+    LocalDateTime cursorSentAt =
+        receivedCursor == null ? FIRST_PAGE_CURSOR_SENT_AT : receivedCursor.sentAt();
+    long cursorLetterId = receivedCursor == null ? Long.MAX_VALUE : receivedCursor.letterId();
     List<ReceivedLetterSummary> receivedLetters =
         mailboxLetterRepository.findReceivedLetters(
             userProfileId, cursorPinned, cursorSentAt, cursorLetterId, size + 1);
