@@ -2,12 +2,13 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.domain.TtsVoiceGender;
-import com.landit.landitbe.feature.content.domain.TtsVoiceProvider;
+import com.landit.landitbe.feature.content.domain.TtsVoice;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
+import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
+import com.landit.landitbe.feature.session.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.domain.FreeTalkTopic;
@@ -35,13 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkSessionService {
 
-  private static final TtsVoiceResponse FREE_TALK_TTS_VOICE =
-      TtsVoiceResponse.from(
-          TtsVoiceProvider.OPENROUTER,
-          "microsoft/mai-voice-2",
-          "en-US-Harper:MAI-Voice-2",
-          TtsVoiceGender.FEMALE);
-
   private final UserProfileService userProfileService;
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
@@ -49,6 +43,7 @@ public class FreeTalkSessionService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
+  private final TtsVoiceRepository ttsVoiceRepository;
 
   /**
    * 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다.
@@ -65,6 +60,11 @@ public class FreeTalkSessionService {
     UserProfile userProfile = userProfileService.requireActiveForUpdate(userId);
     dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
+    FreeTalkCharacter character = FreeTalkCharacter.fromId(request.characterId());
+    TtsVoice ttsVoice =
+        ttsVoiceRepository
+            .findByProviderVoiceIdAndStatus(character.providerVoiceId(), ActiveStatus.ACTIVE)
+            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
         learningSessionRepository.save(
@@ -79,7 +79,8 @@ public class FreeTalkSessionService {
             FreeTalkSession.start(
                 learningSession.getId(),
                 topic == null ? null : topic.getId(),
-                request.startMode()));
+                request.startMode(),
+                character));
     if (topic != null) {
       freeTalkSession.assignTitle(topic.getDisplayName());
     }
@@ -95,12 +96,17 @@ public class FreeTalkSessionService {
         learningSession.getId(),
         sessionHistory.getId(),
         request.startMode(),
+        character.id(),
         topic == null ? null : topic.getId(),
         topic == null ? null : topic.getDisplayName(),
         topic == null ? null : topic.getPromptDescription(),
         userProfile.getTargetLocale().name(),
         userProfile.getBaseLocale().name(),
-        FREE_TALK_TTS_VOICE);
+        TtsVoiceResponse.from(
+            ttsVoice.getProvider(),
+            ttsVoice.getModel(),
+            ttsVoice.getProviderVoiceId(),
+            ttsVoice.getGender()));
   }
 
   /**
@@ -155,7 +161,7 @@ public class FreeTalkSessionService {
   }
 
   private void validateStartRequest(FreeTalkSessionStartRequest request) {
-    if (request == null || request.startMode() == null) {
+    if (request == null || request.startMode() == null || request.characterId() == null) {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
     boolean aiFirstWithTopic =
@@ -189,6 +195,7 @@ public class FreeTalkSessionService {
    * @param learningSessionId 생성된 학습 세션 ID
    * @param sessionHistoryId 생성된 세션 히스토리 ID
    * @param startMode 첫 발화 주체
+   * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param topicId 선택한 주제 ID
    * @param title 대화 제목
    * @param topicPromptDescription AI에 전달할 주제 설명
@@ -200,6 +207,7 @@ public class FreeTalkSessionService {
       Long learningSessionId,
       Long sessionHistoryId,
       FreeTalkStartMode startMode,
+      String characterId,
       Long topicId,
       String title,
       String topicPromptDescription,

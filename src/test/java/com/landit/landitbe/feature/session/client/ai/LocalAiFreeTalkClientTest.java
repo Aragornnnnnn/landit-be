@@ -32,6 +32,7 @@ class LocalAiFreeTalkClientTest {
   private AiFreeTalkTurnRequest turnRequest() {
     return new AiFreeTalkTurnRequest(
         300L,
+        "chloe",
         3002L,
         1,
         "EN",
@@ -47,6 +48,7 @@ class LocalAiFreeTalkClientTest {
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest() {
     return new AiFreeTalkInnerThoughtRequest(
         300L,
+        "chloe",
         3002L,
         1,
         "EN",

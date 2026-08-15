@@ -101,6 +101,7 @@ class FreeTalkSubmittedMessageServiceTest {
     return new FreeTalkSubmittedMessageService.Reservation(
         300L,
         30L,
+        "chloe",
         3L,
         7L,
         "old-owner",
@@ -118,6 +119,7 @@ class FreeTalkSubmittedMessageServiceTest {
         300L,
         3L,
         30L,
+        "chloe",
         7L,
         FreeTalkExitDecision.END,
         "EN",

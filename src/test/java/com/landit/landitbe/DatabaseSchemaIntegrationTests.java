@@ -476,9 +476,9 @@ class DatabaseSchemaIntegrationTests {
         aiTutorId);
     jdbcTemplate.update(
         """
-        insert into free_talk_session (id, learning_session_id, start_mode, conversation_status,
-            accumulated_speaking_duration_ms, created_at, updated_at)
-        values (992003, 992002, 'USER_FIRST', 'IN_PROGRESS', 0,
+        insert into free_talk_session (id, learning_session_id, start_mode, character_id,
+            conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)
+        values (992003, 992002, 'USER_FIRST', 'chloe', 'IN_PROGRESS', 0,
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """);
     jdbcTemplate.update(

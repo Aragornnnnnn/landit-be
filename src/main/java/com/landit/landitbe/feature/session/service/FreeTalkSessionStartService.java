@@ -54,6 +54,7 @@ public class FreeTalkSessionStartService {
   private AiFreeTalkOpeningRequest openingRequest(StartedFreeTalkSession startedSession) {
     return new AiFreeTalkOpeningRequest(
         startedSession.learningSessionId(),
+        startedSession.characterId(),
         startedSession.targetLocale(),
         startedSession.baseLocale(),
         new AiFreeTalkTopic(
@@ -67,6 +68,7 @@ public class FreeTalkSessionStartService {
     return FreeTalkSessionStartResponse.from(
         startedSession.learningSessionId(),
         startedSession.startMode().name(),
+        startedSession.characterId(),
         startedSession.title(),
         startedSession.ttsVoice(),
         currentMessage);

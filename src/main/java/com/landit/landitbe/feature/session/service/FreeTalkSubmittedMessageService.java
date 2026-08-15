@@ -304,6 +304,7 @@ public class FreeTalkSubmittedMessageService {
     return new Reservation(
         learningSession.getId(),
         freeTalkSession.getId(),
+        freeTalkSession.getCharacterId(),
         history.getId(),
         userMessage.getId(),
         userMessage.getClientMessageId(),
@@ -475,6 +476,7 @@ public class FreeTalkSubmittedMessageService {
         learningSessionId,
         history.getId(),
         session.getId(),
+        session.getCharacterId(),
         submittedMessageId,
         decision,
         learningSession.getTargetLocale().name(),
@@ -773,6 +775,7 @@ public class FreeTalkSubmittedMessageService {
    *
    * @param learningSessionId 학습 세션 ID
    * @param freeTalkSessionId 프리톡 세션 ID
+   * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param historyId 세션 히스토리 ID
    * @param userMessageId 저장된 사용자 메시지 ID
    * @param clientMessageId 중복 요청을 식별하는 클라이언트 메시지 ID
@@ -787,6 +790,7 @@ public class FreeTalkSubmittedMessageService {
   public record Reservation(
       long learningSessionId,
       long freeTalkSessionId,
+      String characterId,
       long historyId,
       long userMessageId,
       String clientMessageId,
@@ -804,6 +808,7 @@ public class FreeTalkSubmittedMessageService {
    * @param learningSessionId 학습 세션 ID
    * @param historyId 세션 히스토리 ID
    * @param freeTalkSessionId 프리톡 세션 ID
+   * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param userMessageId 종료 의사가 감지된 사용자 메시지 ID
    * @param decision 사용자가 선택한 종료 여부
    * @param targetLocale 학습 대상 언어
@@ -815,6 +820,7 @@ public class FreeTalkSubmittedMessageService {
       long learningSessionId,
       long historyId,
       long freeTalkSessionId,
+      String characterId,
       long userMessageId,
       FreeTalkExitDecision decision,
       String targetLocale,
