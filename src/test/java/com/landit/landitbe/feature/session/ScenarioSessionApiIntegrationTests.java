@@ -2392,12 +2392,11 @@ class ScenarioSessionApiIntegrationTests {
             briefing,
             user_opening_instruction,
             conversation_goal,
-            tts_voice_id,
             status,
             created_at,
             updated_at
         )
-        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         variantId,
         scenarioId,
@@ -2405,8 +2404,8 @@ class ScenarioSessionApiIntegrationTests {
         briefing,
         userOpeningInstruction,
         conversationGoal,
-        ttsVoiceId,
         status);
+    assignScenarioCharacter(scenarioId, ttsVoiceId);
     if (openingQuestionText != null && !hasScenarioQuestion(scenarioId, 1)) {
       seedScenarioQuestion(
           100_000L + scenarioId,
@@ -2490,6 +2489,23 @@ class ScenarioSessionApiIntegrationTests {
         "SELECT id FROM tts_voice WHERE provider_voice_id = ?", Long.class, providerVoiceId);
   }
 
+  private void assignScenarioCharacter(long scenarioId, Long ttsVoiceId) {
+    jdbcTemplate.update(
+        """
+        UPDATE scenario
+        SET character_id = (
+            SELECT character_id
+            FROM conversation_character
+            WHERE tts_voice_id = ?
+            ORDER BY character_id
+            LIMIT 1
+        )
+        WHERE id = ?
+        """,
+        ttsVoiceId,
+        scenarioId);
+  }
+
   private long defaultAiTutorId() {
     return jdbcTemplate.queryForObject(
         """
@@ -2523,6 +2539,15 @@ class ScenarioSessionApiIntegrationTests {
         id,
         providerVoiceId,
         status);
+    jdbcTemplate.update(
+        """
+        INSERT INTO conversation_character (
+            character_id, tts_voice_id, status, created_at, updated_at
+        )
+        VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        "test-" + id,
+        id);
     return id;
   }
 

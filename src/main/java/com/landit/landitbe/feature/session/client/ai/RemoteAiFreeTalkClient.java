@@ -177,7 +177,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
     // 원격 첫 발화 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkOpeningResult toResult() {
-      if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
+      if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiFreeTalkOpeningResult(aiMessage, translatedMessage, emotion);
@@ -207,7 +207,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
 
     private boolean hasMissingGeneratedField() {
-      return blank(aiMessage) || blank(translatedMessage) || emotion == null;
+      return blank(aiMessage) || blank(translatedMessage);
     }
 
     private boolean hasGeneratedField() {
@@ -234,7 +234,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
     // 원격 마무리 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkClosingResult toResult() {
-      if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
+      if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiFreeTalkClosingResult(aiMessage, translatedMessage, emotion);

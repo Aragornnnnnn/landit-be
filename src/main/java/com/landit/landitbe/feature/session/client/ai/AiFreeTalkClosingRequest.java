@@ -8,6 +8,7 @@ import java.util.List;
  * 프리톡 마지막 AI 메시지 생성 요청을 담는다.
  *
  * @param sessionId 프리톡 세션 ID
+ * @param characterId 선택한 프리톡 캐릭터 식별자
  * @param submittedMessageId 마지막 사용자 메시지 ID
  * @param submittedTurnNumber 마지막 사용자 메시지 턴 번호
  * @param targetLocale 학습 언어
@@ -18,6 +19,7 @@ import java.util.List;
  */
 public record AiFreeTalkClosingRequest(
     Long sessionId,
+    String characterId,
     Long submittedMessageId,
     int submittedTurnNumber,
     String targetLocale,

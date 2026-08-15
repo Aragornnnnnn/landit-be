@@ -99,8 +99,11 @@ class FreeTalkSubmittedMessageServiceTest {
 
   private FreeTalkSubmittedMessageService.Reservation messageReservation() {
     return new FreeTalkSubmittedMessageService.Reservation(
+        1L,
+        java.time.LocalDate.now(),
         300L,
         30L,
+        "chloe",
         3L,
         7L,
         "old-owner",
@@ -118,6 +121,7 @@ class FreeTalkSubmittedMessageServiceTest {
         300L,
         3L,
         30L,
+        "chloe",
         7L,
         FreeTalkExitDecision.END,
         "EN",

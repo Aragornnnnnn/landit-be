@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.session.service;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -65,12 +66,19 @@ class FreeTalkMessageServiceTest {
     service.submit(1L, 300L, request());
 
     verify(sessionMessageService).failInnerThought(7L);
+    verify(aiFreeTalkClient)
+        .generateTurn(argThat(request -> request.characterId().equals("chloe")));
+    verify(aiFreeTalkClient)
+        .generateInnerThought(argThat(request -> request.characterId().equals("chloe")));
   }
 
   private FreeTalkSubmittedMessageService.Reservation reservation() {
     return new FreeTalkSubmittedMessageService.Reservation(
+        1L,
+        java.time.LocalDate.now(),
         300L,
         30L,
+        "chloe",
         3L,
         7L,
         "9d6928d0-0cbc-4cb1-a9cf-2f91c1f9c0ec",

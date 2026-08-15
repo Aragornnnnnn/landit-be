@@ -32,7 +32,9 @@ class FreeTalkTopicServiceTest {
     when(topicRepository.findAllByStatusOrderByDisplayOrderAsc(ActiveStatus.ACTIVE))
         .thenReturn(List.of(topic));
     when(dailySpeakingUsageService.usage(1L))
-        .thenReturn(new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(42_000L, 18_000L));
+        .thenReturn(
+            new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
+                java.time.LocalDate.now(), 42_000L, 18_000L));
 
     FreeTalkMainResponse response = service.getMain(1L);
 
@@ -49,7 +51,9 @@ class FreeTalkTopicServiceTest {
     when(topicRepository.findAllByStatusOrderByDisplayOrderAsc(ActiveStatus.ACTIVE))
         .thenReturn(List.of());
     when(dailySpeakingUsageService.usage(1L))
-        .thenReturn(new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(60_000L, 0L));
+        .thenReturn(
+            new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
+                java.time.LocalDate.now(), 60_000L, 0L));
 
     FreeTalkMainResponse response = service.getMain(1L);
 

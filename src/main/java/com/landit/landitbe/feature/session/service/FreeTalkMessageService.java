@@ -140,6 +140,7 @@ public class FreeTalkMessageService {
       AiFreeTalkResponseMode responseMode) {
     return new AiFreeTalkTurnRequest(
         reservation.freeTalkSessionId(),
+        reservation.characterId(),
         reservation.userMessageId(),
         reservation.history().getLast().turnNumber(),
         reservation.targetLocale(),
@@ -162,6 +163,7 @@ public class FreeTalkMessageService {
       AiFreeTalkClosingReason closingReason) {
     return new AiFreeTalkClosingRequest(
         reservation.freeTalkSessionId(),
+        reservation.characterId(),
         reservation.userMessageId(),
         reservation.history().getLast().turnNumber(),
         reservation.targetLocale(),
@@ -176,6 +178,7 @@ public class FreeTalkMessageService {
       AiFreeTalkResponseMode responseMode) {
     return new AiFreeTalkTurnRequest(
         reservation.freeTalkSessionId(),
+        reservation.characterId(),
         reservation.userMessageId(),
         reservation.history().getLast().turnNumber(),
         reservation.targetLocale(),
@@ -191,6 +194,7 @@ public class FreeTalkMessageService {
       AiFreeTalkClosingReason closingReason) {
     return new AiFreeTalkClosingRequest(
         reservation.freeTalkSessionId(),
+        reservation.characterId(),
         reservation.userMessageId(),
         reservation.history().getLast().turnNumber(),
         reservation.targetLocale(),
@@ -204,6 +208,7 @@ public class FreeTalkMessageService {
       FreeTalkSubmittedMessageService.Reservation reservation) {
     return new AiFreeTalkInnerThoughtRequest(
         reservation.freeTalkSessionId(),
+        reservation.characterId(),
         reservation.userMessageId(),
         reservation.history().getLast().turnNumber(),
         reservation.targetLocale(),
@@ -216,6 +221,7 @@ public class FreeTalkMessageService {
       FreeTalkSubmittedMessageService.DecisionReservation reservation) {
     return new AiFreeTalkInnerThoughtRequest(
         reservation.freeTalkSessionId(),
+        reservation.characterId(),
         reservation.userMessageId(),
         reservation.history().getLast().turnNumber(),
         reservation.targetLocale(),

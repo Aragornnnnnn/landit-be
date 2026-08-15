@@ -65,6 +65,19 @@ public class FreeTalkDailySpeakingUsage {
     }
   }
 
+  /**
+   * 실패한 AI 요청에서 예약한 사용자 발화 시간을 되돌린다.
+   *
+   * @param utteranceDurationMs 되돌릴 사용자 발화 시간 밀리초
+   * @throws IllegalArgumentException 발화 시간이 음수이거나 현재 사용량보다 클 때
+   */
+  public void release(long utteranceDurationMs) {
+    if (utteranceDurationMs < 0 || utteranceDurationMs > usedSpeakingDurationMs) {
+      throw new IllegalArgumentException("되돌릴 사용자 발화 시간이 올바르지 않습니다.");
+    }
+    usedSpeakingDurationMs -= utteranceDurationMs;
+  }
+
   /** 복합 기본 키를 정의한다. */
   @Embeddable
   @Getter

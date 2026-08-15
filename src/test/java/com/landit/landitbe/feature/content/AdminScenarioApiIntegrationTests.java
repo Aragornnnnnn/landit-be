@@ -69,6 +69,9 @@ class AdminScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios.length()").value(1))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioId").value(601))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioTitle").value("공개 시나리오"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
+                .value("en-US-Harper:MAI-Voice-2"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").doesNotExist())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").doesNotExist())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").doesNotExist());
@@ -181,8 +184,8 @@ class AdminScenarioApiIntegrationTests {
         """
         INSERT INTO scenario (
             id, category_id, ai_role, difficulty, first_speaker, total_question_count,
-            display_order, status, created_at, updated_at)
-        VALUES (?, ?, 'tutor', ?, ?, 3, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            character_id, display_order, status, created_at, updated_at)
+        VALUES (?, ?, 'tutor', ?, ?, 3, 'chloe', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
         categoryId,

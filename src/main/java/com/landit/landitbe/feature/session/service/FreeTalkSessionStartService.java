@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
+import com.landit.landitbe.feature.session.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
@@ -34,6 +35,7 @@ public class FreeTalkSessionStartService {
    */
   public FreeTalkSessionStartResponse startFreeTalkSession(
       long userId, FreeTalkSessionStartRequest request) {
+    FreeTalkCharacter.fromId(request == null ? null : request.characterId());
     dailySpeakingUsageService.requireRemaining(userId);
     StartedFreeTalkSession startedSession = freeTalkSessionService.createStart(userId, request);
     if (startedSession.startMode() == FreeTalkStartMode.USER_FIRST) {
@@ -54,6 +56,7 @@ public class FreeTalkSessionStartService {
   private AiFreeTalkOpeningRequest openingRequest(StartedFreeTalkSession startedSession) {
     return new AiFreeTalkOpeningRequest(
         startedSession.learningSessionId(),
+        startedSession.characterId(),
         startedSession.targetLocale(),
         startedSession.baseLocale(),
         new AiFreeTalkTopic(
@@ -67,6 +70,7 @@ public class FreeTalkSessionStartService {
     return FreeTalkSessionStartResponse.from(
         startedSession.learningSessionId(),
         startedSession.startMode().name(),
+        startedSession.characterId(),
         startedSession.title(),
         startedSession.ttsVoice(),
         currentMessage);
