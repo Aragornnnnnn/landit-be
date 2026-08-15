@@ -189,6 +189,16 @@ class MailboxApiIntegrationTests {
                 .exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/mailbox/unread-count'].get.responses['200']").exists());
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(
+            jsonPath("$.components.schemas.MailboxReceivedDetailResponse.properties.feedbackType")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.MailboxReceivedDetailResponse.properties"
+                        + ".quotedFeedbackContent")
+                .exists());
   }
 
   @Test
@@ -279,11 +289,15 @@ class MailboxApiIntegrationTests {
       mockMvc
           .perform(authorizedGet(user, "/api/v1/mailbox/received/{letterId}", notice.getId()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.letterType").value("NOTICE"));
+          .andExpect(jsonPath("$.data.letterType").value("NOTICE"))
+          .andExpect(jsonPath("$.data.feedbackType").value(nullValue()))
+          .andExpect(jsonPath("$.data.quotedFeedbackContent").value(nullValue()));
       mockMvc
           .perform(authorizedGet(user, "/api/v1/mailbox/received/{letterId}", reply.getId()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.bodyText").value("읽을 답장"));
+          .andExpect(jsonPath("$.data.bodyText").value("읽을 답장"))
+          .andExpect(jsonPath("$.data.feedbackType").value("QUESTION"))
+          .andExpect(jsonPath("$.data.quotedFeedbackContent").value("읽음 문의"));
     }
 
     assertThat(countRows("mailbox_letter_read")).isEqualTo(1);
