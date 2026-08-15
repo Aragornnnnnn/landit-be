@@ -29,11 +29,9 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
    *
    * <p>고정 여부, 발송 시각, 편지 ID의 내림차순으로 정렬한다.
    *
-   * <p>발송 시각이 없는 커서는 첫 페이지를 의미한다.
-   *
    * @param userProfileId 사용자 ID
-   * @param cursorPinned 고정 여부({@code 1}: 고정, {@code 0}: 일반)
-   * @param cursorSentAt 커서의 발송 시각. 첫 페이지는 {@code null}
+   * @param cursorPinned 고정 여부({@code 1}: 고정, {@code 0}: 일반). 첫 페이지는 둘보다 큰 값
+   * @param cursorSentAt 커서의 발송 시각
    * @param cursorLetterId 커서의 편지 ID
    * @param limit 조회 개수
    * @return 받은 편지 요약 목록
@@ -68,8 +66,7 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
                 AND letter.letter_type = 'REPLY'
                 AND recipient.user_profile_id = :userProfileId
           ) received
-          WHERE :cursorSentAt IS NULL
-             OR CASE WHEN received.is_pinned THEN 1 ELSE 0 END < :cursorPinned
+          WHERE CASE WHEN received.is_pinned THEN 1 ELSE 0 END < :cursorPinned
              OR (CASE WHEN received.is_pinned THEN 1 ELSE 0 END = :cursorPinned
                  AND (received.published_at < :cursorSentAt
                    OR (received.published_at = :cursorSentAt

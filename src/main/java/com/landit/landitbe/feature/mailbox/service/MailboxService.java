@@ -38,6 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class MailboxService {
 
   private static final int MAX_PAGE_SIZE = 100;
+  private static final int FIRST_PAGE_CURSOR_PINNED = 2;
+  private static final LocalDateTime FIRST_PAGE_CURSOR_SENT_AT =
+      LocalDateTime.of(9999, 12, 31, 23, 59, 59);
 
   private final MailboxFeedbackRepository mailboxFeedbackRepository;
   private final MailboxLetterRepository mailboxLetterRepository;
@@ -147,9 +150,11 @@ public class MailboxService {
       Long userProfileId, String cursor, int size) {
     validatePageSize(size);
     ReceivedCursor receivedCursor = decodeReceivedCursor(cursor);
-    int cursorPinned = receivedCursor != null && receivedCursor.pinned() ? 1 : 0;
-    LocalDateTime cursorSentAt = receivedCursor == null ? null : receivedCursor.sentAt();
-    long cursorLetterId = receivedCursor == null ? 0L : receivedCursor.letterId();
+    int cursorPinned =
+        receivedCursor == null ? FIRST_PAGE_CURSOR_PINNED : receivedCursor.pinned() ? 1 : 0;
+    LocalDateTime cursorSentAt =
+        receivedCursor == null ? FIRST_PAGE_CURSOR_SENT_AT : receivedCursor.sentAt();
+    long cursorLetterId = receivedCursor == null ? Long.MAX_VALUE : receivedCursor.letterId();
     List<ReceivedLetterSummary> receivedLetters =
         mailboxLetterRepository.findReceivedLetters(
             userProfileId, cursorPinned, cursorSentAt, cursorLetterId, size + 1);
@@ -174,6 +179,7 @@ public class MailboxService {
   public MailboxReceivedDetailResponse getReceivedLetter(Long userProfileId, Long letterId) {
     MailboxLetter letter = findPublishedLetter(letterId);
     LocalDateTime readAt;
+    MailboxFeedback quotedFeedback = null;
     if (letter.getLetterType() == MailboxLetterType.REPLY) {
       // 답장은 사용자별 수신 정보에 최초 읽은 시각을 직접 기록한다.
       mailboxLetterRecipientRepository.markReadIfUnread(letterId, userProfileId);
@@ -182,6 +188,10 @@ public class MailboxService {
               .findByLetterIdAndUserProfileId(letterId, userProfileId)
               .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
       readAt = recipient.getReadAt();
+      quotedFeedback =
+          mailboxFeedbackRepository
+              .findByIdAndUserProfileId(recipient.getRepresentativeFeedbackId(), userProfileId)
+              .orElseThrow(() -> new IllegalStateException("답장과 연결된 대표 피드백을 찾을 수 없습니다."));
     } else {
       // 전역 편지는 사용자마다 읽음 행을 한 번만 생성한다.
       mailboxLetterReadRepository.insertIfAbsent(letterId, userProfileId);
@@ -191,7 +201,7 @@ public class MailboxService {
               .orElseThrow(() -> new IllegalStateException("전역 편지 읽음 정보 저장 후 조회에 실패했습니다."))
               .getReadAt();
     }
-    return toReceivedDetail(letter, readAt);
+    return toReceivedDetail(letter, readAt, quotedFeedback);
   }
 
   /**
@@ -224,13 +234,15 @@ public class MailboxService {
   }
 
   private static MailboxReceivedDetailResponse toReceivedDetail(
-      MailboxLetter letter, LocalDateTime readAt) {
+      MailboxLetter letter, LocalDateTime readAt, MailboxFeedback quotedFeedback) {
     return new MailboxReceivedDetailResponse(
         letter.getId(),
         letter.getLetterType(),
         letter.getTitle(),
         letter.getContentBlocks(),
         letter.getBodyText(),
+        quotedFeedback == null ? null : quotedFeedback.getFeedbackType(),
+        quotedFeedback == null ? null : quotedFeedback.getContentText(),
         letter.isPinned(),
         letter.getPublishedAt(),
         readAt);
