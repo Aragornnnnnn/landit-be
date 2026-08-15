@@ -360,6 +360,36 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void rejectsInvalidCharacterIdBeforeDailySpeakingLimit() throws Exception {
+    JsonNode loginBody = login("free-talk-invalid-character-limit@example.com");
+    long userId = loginBody.get("data").get("user").get("userId").asLong();
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update(
+        """
+        INSERT INTO free_talk_daily_speaking_usage (
+            user_profile_id, usage_date, used_speaking_duration_ms
+        )
+        VALUES (?, CURRENT_DATE, 60000)
+        """,
+        userId);
+
+    for (String content :
+        List.of(
+            "{\"startMode\":\"USER_FIRST\"}",
+            "{\"startMode\":\"USER_FIRST\",\"characterId\":\"\"}",
+            "{\"startMode\":\"USER_FIRST\",\"characterId\":\"unknown\"}")) {
+      mockMvc
+          .perform(
+              post("/api/v1/free-talk/sessions")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(content))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+  }
+
+  @Test
   void rejectsInactiveAndMissingAiFirstTopics() throws Exception {
     seedTopic(1251, "비활성", "노출하지 않는 주제다.", 1, "INACTIVE");
     String accessToken =
