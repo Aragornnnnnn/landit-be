@@ -38,6 +38,31 @@ WHERE provider = 'OPENROUTER'
   AND model = 'deepgram/aura-2'
   AND provider_voice_id = 'aura-2-draco-en';
 
+CREATE TABLE migration_v55_scenario_character_validation (
+    violation_count BIGINT NOT NULL,
+    CONSTRAINT chk_v55_scenario_character_mapping
+        CHECK (violation_count = 0)
+);
+
+INSERT INTO migration_v55_scenario_character_validation (violation_count)
+SELECT COUNT(*)
+FROM (
+    SELECT variant.scenario_id
+    FROM scenario_language_variant variant
+    LEFT JOIN conversation_character character
+      ON character.tts_voice_id = variant.tts_voice_id
+    GROUP BY variant.scenario_id
+    HAVING SUM(
+        CASE
+            WHEN variant.tts_voice_id IS NOT NULL AND character.character_id IS NULL THEN 1
+            ELSE 0
+        END
+    ) > 0
+       OR COUNT(DISTINCT character.character_id) > 1
+) invalid_scenario;
+
+DROP TABLE migration_v55_scenario_character_validation;
+
 ALTER TABLE scenario
     ADD COLUMN character_id VARCHAR(20);
 

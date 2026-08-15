@@ -19,3 +19,5 @@
 - 2026-08-15: 리뷰에서 확인한 기능 간 Repository 직접 참조를 `TtsVoiceService` 공개 경계로 분리하고 `./gradlew check` 성공.
 - 2026-08-15: 캐릭터-TTS 매핑을 `conversation_character`로 통합하고 시나리오 API 관련 통합 테스트 94개 성공.
 - 2026-08-15: 스키마 백필·FK, 공용 조회 서비스, 전체 회귀를 포함한 `./gradlew check --rerun-tasks --no-daemon` 성공.
+- 2026-08-15: 1차 독립 리뷰의 마이그레이션 데이터 유실·API 테스 누락 2건을 반영했다.
+- 2026-08-15: V54→V55 백필·충돌·미매핑 테스와 오늘의 시나리오·관리자 목록 TTS 응답 테스를 추가하고 `./gradlew check --rerun-tasks --no-daemon` 성공.
