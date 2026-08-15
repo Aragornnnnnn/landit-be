@@ -32,6 +32,9 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
   private static final String EXPRESSION_RECOMMENDATIONS_PATH =
       "/api/v1/free-talk/expression-recommendations";
+  private static final String CONVERSATION_EMBEDDINGS_PATH =
+      "/api/v1/free-talk/conversation-embeddings";
+  private static final int MAX_CONVERSATION_EXCERPTS = 4;
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -86,6 +89,20 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     return post(
             EXPRESSION_RECOMMENDATIONS_PATH, request, RemoteExpressionRecommendationsResponse.class)
         .toResult(request);
+  }
+
+  /**
+   * 완료된 프리톡 대화에서 핵심 사용자 발화를 추출하고 임베딩한다.
+   *
+   * @param request 대화 임베딩 요청
+   * @return 검증된 핵심 발화와 임베딩 목록
+   * @throws ApiException 원격 AI 호출 또는 응답 검증에 실패했을 때
+   */
+  @Override
+  public AiConversationEmbeddingsResult extractConversationEmbeddings(
+      AiConversationEmbeddingsRequest request) {
+    return post(CONVERSATION_EMBEDDINGS_PATH, request, RemoteConversationEmbeddingsResponse.class)
+        .toResult();
   }
 
   private <T> T post(String path, Object payload, Class<T> responseType) {
@@ -267,6 +284,30 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     return existingExpressions.stream()
         .noneMatch(
             expression -> expression.expressionId().equals(recommendation.existingExpressionId()));
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteConversationEmbeddingsResponse(List<AiConversationExcerpt> excerpts) {
+
+    // 원격 대화 임베딩 응답을 검증해 애플리케이션 결과로 변환한다.
+    private AiConversationEmbeddingsResult toResult() {
+      if (excerpts == null
+          || excerpts.isEmpty()
+          || excerpts.size() > MAX_CONVERSATION_EXCERPTS
+          || excerpts.stream().anyMatch(RemoteConversationEmbeddingsResponse::invalidExcerpt)) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiConversationEmbeddingsResult(excerpts);
+    }
+
+    // 추출 발화의 필수 값과 임베딩 차원을 검증한다.
+    private static boolean invalidExcerpt(AiConversationExcerpt excerpt) {
+      return excerpt == null
+          || blank(excerpt.excerptText())
+          || excerpt.embedding() == null
+          || excerpt.embedding().size() != AiConversationExcerpt.EMBEDDING_DIMENSION
+          || excerpt.embedding().contains(null);
+    }
   }
 
   // 선택 질문의 원문과 번역이 함께 제공됐는지 검증한다.

@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
+import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
@@ -101,6 +104,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM free_talk_topic");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994104");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994103");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994201");
     jdbcTemplate.update("DELETE FROM scenario WHERE id = 994102");
     jdbcTemplate.update("DELETE FROM category WHERE id = 994101");
   }
@@ -567,6 +571,7 @@ class FreeTalkSessionApiIntegrationTests {
 
   @Test
   void endDecisionAndTimeLimitCompleteTheSession() throws Exception {
+    seedEmbeddedCandidateExpression();
     String accessToken =
         login("free-talk-complete@example.com").get("data").get("accessToken").asText();
     long exitSessionId = startUserFirstSession(accessToken);
@@ -599,6 +604,29 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
     assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
+  }
+
+  @Test
+  void failsExpressionGenerationWhenNoEmbeddedCandidateExists() throws Exception {
+    // 임베딩이 있는 공용 후보를 심지 않으면 유사도 검색이 빈손이 되어 실패로 전환된다.
+    String accessToken =
+        login("free-talk-no-candidate@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
   }
 
   @Test
@@ -850,6 +878,7 @@ class FreeTalkSessionApiIntegrationTests {
 
   @Test
   void completesAfterLastUtteranceCrossesDailySpeakingLimit() throws Exception {
+    seedEmbeddedCandidateExpression();
     String accessToken =
         login("free-talk-server-time-limit@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
@@ -969,6 +998,40 @@ class FreeTalkSessionApiIntegrationTests {
     return ("{\"clientMessageId\":\"%s\",\"content\":\"%s\",\"inputType\":\"VOICE\","
             + "\"utteranceDurationMs\":%d,\"timeLimitReached\":%s}")
         .formatted(clientMessageId, content, utteranceDurationMs, timeLimitReached);
+  }
+
+  // 유사도 검색이 찾을 수 있도록 Fake 임베딩과 같은 방향의 벡터를 가진 공용 후보 표현을 심는다.
+  private void seedEmbeddedCandidateExpression() {
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, expression_source, expression_type,
+            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            base_expression_meaning_text, usage_summary, usage_description,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            practice_examples_payload, embedding, status, created_at, updated_at
+        )
+        VALUES (
+            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1,
+            'piece of cake', '식은 죽 먹기', '쉬운 일을 말할 때 사용한다.',
+            '아주 쉬운 일이었다고 말할 때 사용하는 표현이다.',
+            'It was a piece of cake.', '그건 식은 죽 먹기였어.',
+            ARRAY['It', 'was', 'a', 'piece', 'of', 'cake'],
+            ARRAY['It', 'was', 'a', 'piece', 'of', 'cake'],
+            '[]' FORMAT JSON, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        firstAxisEmbeddingLiteral());
+  }
+
+  // Fake 클라이언트의 쿼리 벡터([1,0,...])와 코사인 거리 0이 되는 1,536차원 벡터 문자열을 만든다.
+  private static String firstAxisEmbeddingLiteral() {
+    StringBuilder literal = new StringBuilder("[1");
+    for (int index = 1; index < 1536; index++) {
+      literal.append(",0");
+    }
+    return literal.append("]").toString();
   }
 
   private FreeTalkExpressionLink seedNewExpressionForCompletedSession(long learningSessionId)
@@ -1244,6 +1307,18 @@ class FreeTalkSessionApiIntegrationTests {
           List.of(
               new AiFreeTalkExpressionRecommendation(
                   1, request.existingExpressions().getFirst().expressionId())));
+    }
+
+    @Override
+    public AiConversationEmbeddingsResult extractConversationEmbeddings(
+        AiConversationEmbeddingsRequest request) {
+      // 첫 성분만 1인 고정 벡터로 유사도 검색 결과를 예측할 수 있게 한다.
+      List<Float> embedding =
+          new java.util.ArrayList<>(
+              Collections.nCopies(AiConversationExcerpt.EMBEDDING_DIMENSION, 0.0f));
+      embedding.set(0, 1.0f);
+      return new AiConversationEmbeddingsResult(
+          List.of(new AiConversationExcerpt("That sounds interesting.", List.copyOf(embedding))));
     }
 
     void reset() {

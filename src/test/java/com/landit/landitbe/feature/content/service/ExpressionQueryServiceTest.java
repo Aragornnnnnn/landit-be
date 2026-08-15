@@ -26,6 +26,8 @@ import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -60,30 +62,55 @@ class ExpressionQueryServiceTest {
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
 
+  @Mock private ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
+
   @Mock private LearningProgressService learningProgressService;
 
   @InjectMocks private ExpressionQueryService expressionQueryService;
 
   @Test
-  void returnsAllPublicFreeTalkCandidatesForReuse() {
-    WritingExpression expression = mock(WritingExpression.class);
-    when(expression.getId()).thenReturn(101L);
-    when(expression.getTargetExpressionText()).thenReturn("target-101");
-    when(expression.getBaseExpressionMeaningText()).thenReturn("base-101");
-    when(expression.getUsageSummary()).thenReturn("제안에 동의할 때 사용");
-    when(writingExpressionRepository.findPublicExpressionCandidates(
+  void returnsCandidatesByIdsPreservingInputOrder() {
+    WritingExpression first = mock(WritingExpression.class);
+    when(first.getId()).thenReturn(101L);
+    when(first.getTargetExpressionText()).thenReturn("target-101");
+    when(first.getBaseExpressionMeaningText()).thenReturn("base-101");
+    when(first.getUsageSummary()).thenReturn("제안에 동의할 때 사용");
+    WritingExpression second = mock(WritingExpression.class);
+    when(second.getId()).thenReturn(102L);
+    when(second.getTargetExpressionText()).thenReturn("target-102");
+    when(second.getBaseExpressionMeaningText()).thenReturn("base-102");
+    when(second.getUsageSummary()).thenReturn("정중하게 거절할 때 사용");
+    // 저장소는 순서를 보장하지 않아도 서비스가 입력 ID 순서를 유지해야 한다.
+    when(writingExpressionRepository.findPublicExpressionCandidatesByIds(
+            eq(List.of(102L, 101L)),
             eq(WritingExpressionSource.FREE_TALK),
             eq(Locale.EN),
             eq(Locale.KR),
             eq(ActiveStatus.ACTIVE)))
-        .thenReturn(List.of(expression));
+        .thenReturn(List.of(first, second));
 
     List<ExpressionRecommendationCandidate> candidates =
-        expressionQueryService.getActiveExpressionCandidates(Locale.EN, Locale.KR);
+        expressionQueryService.getExpressionCandidatesByIds(
+            List.of(102L, 101L), Locale.EN, Locale.KR);
 
     assertThat(candidates)
         .containsExactly(
+            new ExpressionRecommendationCandidate(102L, "target-102", "base-102", "정중하게 거절할 때 사용"),
             new ExpressionRecommendationCandidate(101L, "target-101", "base-101", "제안에 동의할 때 사용"));
+  }
+
+  @Test
+  void delegatesEmbeddingSearchToOwnedRepository() {
+    List<ExpressionEmbeddingMatch> matches = List.of(new ExpressionEmbeddingMatch(101L, 0.2));
+    when(expressionEmbeddingSearchRepository.searchFreeTalkCandidates(
+            List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 30))
+        .thenReturn(matches);
+
+    List<ExpressionEmbeddingMatch> result =
+        expressionQueryService.searchFreeTalkCandidatesByEmbedding(
+            List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 30);
+
+    assertThat(result).isEqualTo(matches);
   }
 
   @Test
