@@ -666,6 +666,20 @@ class DatabaseSchemaIntegrationTests {
         .isInstanceOf(FlywayException.class);
   }
 
+  /** V55 migration은 한 시나리오의 음성 설정 여부가 언어별로 다르면 적용을 중단한다. */
+  @Test
+  void v55MigrationRejectsScenarioWithMixedNullAndCharacterVoice() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "54");
+    insertLegacyScenario(migrationJdbcTemplate, 990304L, 1L);
+    insertLegacyScenarioVariant(migrationJdbcTemplate, 990304L, "JP", null);
+
+    assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
+        .isInstanceOf(FlywayException.class);
+  }
+
   /** V55 migration은 공용 캐릭터로 역매핑할 수 없는 음성이 있으면 적용을 중단한다. */
   @Test
   void v55MigrationRejectsUnmappedScenarioVoice() {
@@ -1001,7 +1015,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   private void insertLegacyScenarioVariant(
-      JdbcTemplate migrationJdbcTemplate, long scenarioId, String baseLocale, long ttsVoiceId) {
+      JdbcTemplate migrationJdbcTemplate, long scenarioId, String baseLocale, Long ttsVoiceId) {
     migrationJdbcTemplate.update(
         """
         INSERT INTO scenario_language_variant (

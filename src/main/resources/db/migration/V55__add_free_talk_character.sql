@@ -59,6 +59,10 @@ FROM (
         END
     ) > 0
        OR COUNT(DISTINCT character.character_id) > 1
+       OR (
+           SUM(CASE WHEN variant.tts_voice_id IS NULL THEN 1 ELSE 0 END) > 0
+           AND SUM(CASE WHEN variant.tts_voice_id IS NOT NULL THEN 1 ELSE 0 END) > 0
+       )
 ) invalid_scenario;
 
 DROP TABLE migration_v55_scenario_character_validation;
