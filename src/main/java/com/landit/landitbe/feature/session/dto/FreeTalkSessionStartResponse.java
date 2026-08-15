@@ -68,7 +68,7 @@ public record FreeTalkSessionStartResponse(
    * @param translatedContent AI 메시지 번역문
    * @param emotion AI 캐릭터 감정
    */
-  @Schema(description = "프리톡 현재 AI 메시지")
+  @Schema(name = "FreeTalkCurrentMessageResponse", description = "프리톡 현재 AI 메시지")
   public record CurrentMessageResponse(
       @Schema(description = "메시지 ID") Long messageId,
       @Schema(description = "대화 턴 번호") int turnNumber,

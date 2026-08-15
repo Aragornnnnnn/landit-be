@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 프리톡 발화 처리 결과와 진행 상태를 반환한다.
@@ -39,6 +40,7 @@ public record FreeTalkMessageSubmitResponse(
    * @param innerThoughtType 속마음 상태 유형
    * @param innerThoughtProcessingStatus 속마음 비동기 처리 상태
    */
+  @Schema(name = "FreeTalkSubmittedMessageResponse", description = "프리톡 사용자 제출 메시지")
   public record SubmittedMessageResponse(
       Long messageId,
       int turnNumber,
@@ -93,6 +95,7 @@ public record FreeTalkMessageSubmitResponse(
    * @param translatedContent AI 발화 번역문
    * @param emotion 캐릭터 감정 상태
    */
+  @Schema(name = "FreeTalkNextMessageResponse", description = "프리톡 AI 후속 메시지")
   public record NextMessageResponse(
       Long messageId,
       int turnNumber,
