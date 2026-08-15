@@ -48,8 +48,9 @@ public class FreeTalkDailySpeakingUsageService {
         .findByIdUserProfileIdAndIdUsageDate(userId, usageDate)
         .map(
             usage ->
-                new DailySpeakingUsage(usage.getUsedSpeakingDurationMs(), remainingForUsage(usage)))
-        .orElse(new DailySpeakingUsage(0L, DAILY_SPEAKING_LIMIT_MS));
+                new DailySpeakingUsage(
+                    usageDate, usage.getUsedSpeakingDurationMs(), remainingForUsage(usage)))
+        .orElse(new DailySpeakingUsage(usageDate, 0L, DAILY_SPEAKING_LIMIT_MS));
   }
 
   /**
@@ -87,7 +88,26 @@ public class FreeTalkDailySpeakingUsageService {
       throw new SessionException(SessionErrorCode.FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED);
     }
     usage.reserve(utteranceDurationMs);
-    return new DailySpeakingUsage(usage.getUsedSpeakingDurationMs(), remainingForUsage(usage));
+    return new DailySpeakingUsage(
+        usageDate, usage.getUsedSpeakingDurationMs(), remainingForUsage(usage));
+  }
+
+  /**
+   * 실패한 AI 요청에서 예약한 일일 발화 시간을 되돌린다.
+   *
+   * @param userId 사용자 ID
+   * @param usageDate 예약이 기록된 KST 날짜
+   * @param utteranceDurationMs 되돌릴 사용자 발화 시간 밀리초
+   * @throws IllegalStateException 예약한 일일 사용량을 찾을 수 없을 때
+   */
+  @Transactional
+  public void release(long userId, LocalDate usageDate, long utteranceDurationMs) {
+    userProfileService.requireActiveForUpdate(userId);
+    FreeTalkDailySpeakingUsage usage =
+        repository
+            .findByUserProfileIdAndUsageDateForUpdate(userId, usageDate)
+            .orElseThrow(() -> new IllegalStateException("예약한 일일 발화 사용량이 없습니다."));
+    usage.release(utteranceDurationMs);
   }
 
   private long remainingForUsage(FreeTalkDailySpeakingUsage usage) {
@@ -101,8 +121,10 @@ public class FreeTalkDailySpeakingUsageService {
   /**
    * 예약 후 일일 누적 발화 시간과 남은 시간을 반환한다.
    *
+   * @param usageDate 사용량을 집계한 KST 날짜
    * @param usedSpeakingDurationMs KST 당일 사용한 사용자 발화 시간 밀리초
    * @param remainingMs KST 당일 남은 사용자 발화 시간 밀리초
    */
-  public record DailySpeakingUsage(long usedSpeakingDurationMs, long remainingMs) {}
+  public record DailySpeakingUsage(
+      LocalDate usageDate, long usedSpeakingDurationMs, long remainingMs) {}
 }

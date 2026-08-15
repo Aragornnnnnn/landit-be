@@ -902,7 +902,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void preservesUserMessageAndDailyUsageWhenAiTurnFails() throws Exception {
+  void refundsDailyUsageWhenAiTurnFails() throws Exception {
     String accessToken =
         login("free-talk-compensation@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
@@ -940,7 +940,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
-        .isEqualTo(700L);
+        .isZero();
 
     fakeAiFreeTalkClient.reset();
     mockMvc

@@ -28,6 +28,7 @@ import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -233,15 +234,18 @@ public class FreeTalkSubmittedMessageService {
     if (existingMessage.getFreeTalkTurnStatus() != null) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+        dailySpeakingUsageService.reserve(userId, existingMessage.getUtteranceDurationMs());
     freeTalkSession.startProcessing(request.clientMessageId());
-    boolean shouldCloseAfterMessage = dailySpeakingUsageService.usage(userId).remainingMs() == 0;
     return reservation(
+        userId,
+        dailyUsage.usageDate(),
         learningSession,
         freeTalkSession,
         history,
         existingMessage,
         messages,
-        shouldCloseAfterMessage);
+        dailyUsage.remainingMs() == 0);
   }
 
   private Reservation reserveNewMessage(
@@ -274,6 +278,8 @@ public class FreeTalkSubmittedMessageService {
     freeTalkSession.startProcessing(request.clientMessageId());
     messages.add(userMessage);
     return reservation(
+        userId,
+        dailyUsage.usageDate(),
         learningSession,
         freeTalkSession,
         history,
@@ -283,6 +289,8 @@ public class FreeTalkSubmittedMessageService {
   }
 
   private Reservation reservation(
+      long userId,
+      LocalDate usageDate,
       LearningSession learningSession,
       FreeTalkSession freeTalkSession,
       SessionHistory history,
@@ -302,6 +310,8 @@ public class FreeTalkSubmittedMessageService {
                             topicValue.getPromptDescription()))
                 .orElse(new AiFreeTalkTopic(null, freeTalkSession.getTitle(), null));
     return new Reservation(
+        userId,
+        usageDate,
         learningSession.getId(),
         freeTalkSession.getId(),
         freeTalkSession.getCharacterId(),
@@ -437,6 +447,8 @@ public class FreeTalkSubmittedMessageService {
             .orElse(null);
     if (session != null
         && reservation.clientMessageId().equals(session.getProcessingClientMessageId())) {
+      dailySpeakingUsageService.release(
+          reservation.userId(), reservation.usageDate(), reservation.utteranceDurationMs());
       session.clearProcessing();
     }
   }
@@ -773,6 +785,8 @@ public class FreeTalkSubmittedMessageService {
   /**
    * AI 호출 전에 저장한 사용자 발화와 대화 문맥이다.
    *
+   * @param userId 요청 사용자 ID
+   * @param usageDate 일일 발화 사용량을 예약한 KST 날짜
    * @param learningSessionId 학습 세션 ID
    * @param freeTalkSessionId 프리톡 세션 ID
    * @param characterId 선택한 프리톡 캐릭터 식별자
@@ -788,6 +802,8 @@ public class FreeTalkSubmittedMessageService {
    * @param history AI에 전달할 대화 기록
    */
   public record Reservation(
+      long userId,
+      LocalDate usageDate,
       long learningSessionId,
       long freeTalkSessionId,
       String characterId,

@@ -99,6 +99,19 @@ class FreeTalkDailySpeakingUsageServiceTest {
     verify(userProfileService).requireActiveForUpdate(1L);
   }
 
+  /** AI 호출에 실패하면 같은 날짜에 예약한 발화 시간을 환불한다. */
+  @Test
+  void releasesReservedUsage() {
+    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    FreeTalkDailySpeakingUsage usage = FreeTalkDailySpeakingUsage.create(1L, usageDate, 3_000L);
+    when(repository.findByUserProfileIdAndUsageDateForUpdate(1L, usageDate))
+        .thenReturn(Optional.of(usage));
+
+    service.release(1L, usageDate, 1_000L);
+
+    assertThat(usage.getUsedSpeakingDurationMs()).isEqualTo(2_000L);
+  }
+
   /** 아직 발화 이력이 없으면 하루 전체 시간을 남은 시간으로 반환한다. */
   @Test
   void returnsEntireDailyLimitWhenUsageDoesNotExist() {

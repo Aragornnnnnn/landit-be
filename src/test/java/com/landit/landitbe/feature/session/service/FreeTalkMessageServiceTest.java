@@ -74,6 +74,8 @@ class FreeTalkMessageServiceTest {
 
   private FreeTalkSubmittedMessageService.Reservation reservation() {
     return new FreeTalkSubmittedMessageService.Reservation(
+        1L,
+        java.time.LocalDate.now(),
         300L,
         30L,
         "chloe",
