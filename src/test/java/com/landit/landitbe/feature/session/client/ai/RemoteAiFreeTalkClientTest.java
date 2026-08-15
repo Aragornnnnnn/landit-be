@@ -155,7 +155,7 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
-  void rejectsResponsesMissingRequiredFieldsOrContainingUnknownEnums() throws Exception {
+  void rejectsResponsesMissingRequiredFields() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/opening",
         new ConcurrentHashMap<>(),
@@ -168,8 +168,10 @@ class RemoteAiFreeTalkClientTest {
             ApiException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+  }
 
-    server.removeContext("/api/v1/free-talk/opening");
+  @Test
+  void acceptsNullEmotionForConversationResponses() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/opening",
         new ConcurrentHashMap<>(),
@@ -179,17 +181,45 @@ class RemoteAiFreeTalkClientTest {
               "data": {
                 "aiMessage": "How was your weekend?",
                 "translatedMessage": "주말 어땠어?",
-                "emotion": "EXCITED"
+                "emotion": null
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/turn",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "userExitIntentDetected": false,
+                "inferredTitle": "주말 이야기",
+                "aiMessage": "That sounds fun.",
+                "translatedMessage": "재밌겠다.",
+                "emotion": null
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/closing",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "aiMessage": "It was nice talking with you.",
+                "translatedMessage": "이야기해서 좋았어.",
+                "emotion": null
               },
               "error": null
             }
         """);
 
-    assertThatThrownBy(() -> remoteClient().generateOpening(openingRequest()))
-        .isInstanceOfSatisfying(
-            ApiException.class,
-            exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    assertThat(remoteClient().generateOpening(openingRequest()).emotion()).isNull();
+    assertThat(remoteClient().generateTurn(turnRequest()).emotion()).isNull();
+    assertThat(remoteClient().generateClosing(closingRequest()).emotion()).isNull();
   }
 
   @Test
@@ -257,8 +287,8 @@ class RemoteAiFreeTalkClientTest {
         successResponse(
             String.join(
                 "",
-                "{\"aiMessage\":\"See you.\",\"translatedMessage\":\"또 봐.\",",
-                "\"emotion\":\"EXCITED\",\"innerThought\":\"잘 마무리했다.\",",
+                "{\"aiMessage\":null,\"translatedMessage\":\"또 봐.\",",
+                "\"emotion\":null,\"innerThought\":\"잘 마무리했다.\",",
                 "\"innerThoughtType\":\"GOOD\"}")));
     assertGenerationError(
         () -> remoteClient().generateClosing(closingRequest()), ErrorCode.AI_RESPONSE_INVALID);
