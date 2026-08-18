@@ -15,6 +15,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -22,6 +24,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 원격 AI 서버의 프리톡 생성 API를 호출한다. */
+@Slf4j
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
 public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
@@ -35,6 +38,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static final String CONVERSATION_EMBEDDINGS_PATH =
       "/api/v1/free-talk/conversation-embeddings";
   private static final int MAX_CONVERSATION_EXCERPTS = 4;
+  private static final String AI_CALL_ELAPSED_LOG = "AI 호출 소요 시간. path={}, elapsedMs={}";
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -106,6 +110,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   }
 
   private <T> T post(String path, Object payload, Class<T> responseType) {
+    long startNanos = System.nanoTime();
     try {
       HttpRequest request =
           HttpRequest.newBuilder(aiUri(path))
@@ -130,6 +135,10 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
     } catch (IOException | IllegalArgumentException exception) {
       throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+    } finally {
+      // 성공과 실패를 가리지 않고 왕복 시간을 남겨 지연 구간을 특정한다.
+      log.info(
+          AI_CALL_ELAPSED_LOG, path, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
     }
   }
 
