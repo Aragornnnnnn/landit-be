@@ -235,7 +235,7 @@ public class MailboxService {
         letter.getPreview(),
         letter.getPinned(),
         letter.getSentAt(),
-        letter.getReadAt() == null);
+        letter.getUnread());
   }
 
   private static MailboxReceivedDetailResponse toReceivedDetail(
