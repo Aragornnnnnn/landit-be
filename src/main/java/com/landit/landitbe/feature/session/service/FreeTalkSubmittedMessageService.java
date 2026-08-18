@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.character.service.StreakService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
@@ -28,8 +30,10 @@ import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,13 +46,17 @@ public class FreeTalkSubmittedMessageService {
 
   private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
   private static final long PROCESSING_TIMEOUT_SECONDS = 90;
+  private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
+  private final UserProfileService userProfileService;
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
+  private final StreakService streakService;
+  private final Clock clock;
 
   /**
    * 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다.
@@ -399,6 +407,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeTimeLimit(
       Reservation reservation, AiFreeTalkClosingResult result) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
     requireProcessingOwner(session, reservation.clientMessageId());
@@ -408,14 +417,17 @@ public class FreeTalkSubmittedMessageService {
     userMessage.prepareInnerThought();
     session.completeByTimeLimit();
     session.clearProcessing();
-    records.learningSession().completeFreeTalkByTimeLimit(LocalDateTime.now());
+    LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
+    records.learningSession().completeFreeTalkByTimeLimit(completedAt);
     records
         .history()
         .complete(
-            LocalDateTime.now(),
+            completedAt,
             Math.toIntExact(
                 sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(
                     records.history().getId(), ConversationSpeaker.USER)));
+    streakService.recordCompletedConversation(
+        records.learningSession().getUserProfileId(), completedAt);
     SessionHistoryMessage aiMessage =
         sessionHistoryMessageRepository.save(
             SessionHistoryMessage.freeTalkAi(

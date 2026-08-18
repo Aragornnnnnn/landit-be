@@ -94,6 +94,8 @@ class FreeTalkSessionApiIntegrationTests {
 
   private void cleanUpDatabase() {
     awaitPendingExpressionGeneration();
+    jdbcTemplate.update("DELETE FROM user_daily_activity");
+    jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
@@ -699,6 +701,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
     assertThat(awaitExpressionGenerationStatus(exitSessionId)).isEqualTo("READY");
+    assertCurrentStreak(accessToken, 0, false);
 
     fakeAiFreeTalkClient.reset();
     long timeLimitSessionId = startUserFirstSession(accessToken);
@@ -713,6 +716,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
     assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
+    assertCurrentStreak(accessToken, 1, true);
   }
 
   @Test
@@ -1185,6 +1189,17 @@ class FreeTalkSessionApiIntegrationTests {
                 .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isEmpty());
+  }
+
+  private void assertCurrentStreak(
+      String accessToken, int expectedCurrentStreakDays, boolean expectedActiveToday)
+      throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/me/streak").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.currentStreakDays").value(expectedCurrentStreakDays))
+        .andExpect(jsonPath("$.data.activeToday").value(expectedActiveToday));
   }
 
   private record FreeTalkExpressionLink(

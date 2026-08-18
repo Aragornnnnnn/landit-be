@@ -2,6 +2,9 @@
 
 package com.landit.landitbe.feature.mailbox.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.mailbox.domain.MailboxFeedback;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetter;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetterRecipient;
@@ -37,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MailboxService {
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final TypeReference<List<Object>> CONTENT_BLOCKS_TYPE = new TypeReference<>() {};
   private static final int MAX_PAGE_SIZE = 100;
   private static final int FIRST_PAGE_CURSOR_PINNED = 2;
   private static final LocalDateTime FIRST_PAGE_CURSOR_SENT_AT =
@@ -230,7 +235,7 @@ public class MailboxService {
         letter.getPreview(),
         letter.getPinned(),
         letter.getSentAt(),
-        letter.getReadAt() == null);
+        letter.getUnread());
   }
 
   private static MailboxReceivedDetailResponse toReceivedDetail(
@@ -239,13 +244,19 @@ public class MailboxService {
         letter.getId(),
         letter.getLetterType(),
         letter.getTitle(),
-        letter.getContentBlocks(),
+        toContentBlocks(letter.getContentBlocks()),
         letter.getBodyText(),
         quotedFeedback == null ? null : quotedFeedback.getFeedbackType(),
         quotedFeedback == null ? null : quotedFeedback.getContentText(),
         letter.isPinned(),
         letter.getPublishedAt(),
         readAt);
+  }
+
+  private static List<Object> toContentBlocks(JsonNode contentBlocks) {
+    return contentBlocks == null
+        ? null
+        : OBJECT_MAPPER.convertValue(contentBlocks, CONTENT_BLOCKS_TYPE);
   }
 
   private static String encodeReceivedCursor(ReceivedLetterSummary letter) {

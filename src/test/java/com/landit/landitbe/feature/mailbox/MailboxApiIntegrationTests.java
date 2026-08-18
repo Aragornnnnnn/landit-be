@@ -228,6 +228,29 @@ class MailboxApiIntegrationTests {
   }
 
   @Test
+  void globalLettersPublishedBeforeSignupAreVisibleButNotUnread() throws Exception {
+    TestUser user = login("signup-boundary");
+    LocalDateTime signedUpAt =
+        jdbcTemplate.queryForObject(
+            "SELECT created_at FROM user_profile WHERE id = ?", LocalDateTime.class, user.id());
+    saveNoticeAt("가입 전 공지", "과거 공지", signedUpAt.minusMinutes(1));
+    saveNoticeAt("가입 후 공지", "새 공지", signedUpAt.plusMinutes(1));
+
+    mockMvc
+        .perform(authorizedGet(user, "/api/v1/mailbox/received"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(2))
+        .andExpect(jsonPath("$.data.items[0].title").value("가입 후 공지"))
+        .andExpect(jsonPath("$.data.items[0].unread").value(true))
+        .andExpect(jsonPath("$.data.items[1].title").value("가입 전 공지"))
+        .andExpect(jsonPath("$.data.items[1].unread").value(false));
+    mockMvc
+        .perform(authorizedGet(user, "/api/v1/mailbox/unread-count"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.unreadCount").value(1));
+  }
+
+  @Test
   void receivedMailboxUsesCursorAndValidatesPageValues() throws Exception {
     saveNotice("고정 공지", "고정", true, 1);
     saveNotice("공지 2", "미리보기 2", false, 2);
@@ -275,8 +298,21 @@ class MailboxApiIntegrationTests {
   }
 
   @Test
+  void receivedNoticeDetailSerializesContentBlocksAsJsonValues() throws Exception {
+    TestUser user = login("content-blocks");
+    MailboxLetter notice = saveNotice("본문 공지", "실제 공지 본문", false, 10);
+
+    mockMvc
+        .perform(authorizedGet(user, "/api/v1/mailbox/received/{letterId}", notice.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.contentBlocks[0].text").value("실제 공지 본문"));
+  }
+
+  @Test
   void receivedDetailMarksLettersReadIdempotentlyAndUpdatesUnreadCount() throws Exception {
     TestUser user = login("read");
+    jdbcTemplate.update(
+        "UPDATE user_profile SET created_at = ? WHERE id = ?", sentAt(0).minusDays(1), user.id());
     MailboxLetter notice = saveNotice("읽을 공지", "공지 미리보기", false, 10);
     saveUpdate("남은 업데이트", "업데이트 미리보기", false, 11);
     MailboxLetter reply = saveTargetedReply(user, submit(user, "읽음 문의"), "읽을 답장", 12);
@@ -391,6 +427,21 @@ class MailboxApiIntegrationTests {
         MailboxLetterType.NOTICE, title, text, pinned, hour, MailboxPublicationStatus.PUBLISHED);
   }
 
+  private MailboxLetter saveNoticeAt(String title, String text, LocalDateTime publishedAt) {
+    var contentBlocks = objectMapper.createArrayNode();
+    contentBlocks.addObject().put("text", text);
+    return mailboxLetterRepository.saveAndFlush(
+        new MailboxLetter(
+            MailboxLetterType.NOTICE,
+            title,
+            contentBlocks,
+            null,
+            text,
+            MailboxPublicationStatus.PUBLISHED,
+            false,
+            publishedAt));
+  }
+
   private MailboxLetter saveDraftNotice(String title, String text, int hour) {
     return saveGlobalLetter(
         MailboxLetterType.NOTICE, title, text, false, hour, MailboxPublicationStatus.DRAFT);
@@ -408,16 +459,11 @@ class MailboxApiIntegrationTests {
       boolean pinned,
       int hour,
       MailboxPublicationStatus status) {
+    var contentBlocks = objectMapper.createArrayNode();
+    contentBlocks.addObject().put("text", text);
     return mailboxLetterRepository.saveAndFlush(
         new MailboxLetter(
-            letterType,
-            title,
-            objectMapper.createArrayNode().addObject().put("text", text),
-            null,
-            text,
-            status,
-            pinned,
-            sentAt(hour)));
+            letterType, title, contentBlocks, null, text, status, pinned, sentAt(hour)));
   }
 
   private MailboxLetter saveReply(String text, String preview, int hour) {

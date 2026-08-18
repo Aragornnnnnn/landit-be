@@ -45,12 +45,14 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
                  received.preview_text AS "preview",
                  received.is_pinned AS "pinned",
                  received.published_at AS "sentAt",
-                 received.read_at AS "readAt"
+                 received.unread AS "unread"
           FROM (
               SELECT letter.id AS letter_id, letter.letter_type, letter.title,
                      letter.preview_text, letter.is_pinned, letter.published_at,
-                     letter_read.read_at
+                     letter.published_at >= profile.created_at
+                       AND letter_read.read_at IS NULL AS unread
               FROM mailbox_letter letter
+              JOIN user_profile profile ON profile.id = :userProfileId
               LEFT JOIN mailbox_letter_read letter_read
                 ON letter_read.letter_id = letter.id
                AND letter_read.user_profile_id = :userProfileId
@@ -59,7 +61,7 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
               UNION ALL
               SELECT letter.id, letter.letter_type, letter.title,
                      letter.preview_text, letter.is_pinned, letter.published_at,
-                     recipient.read_at
+                     recipient.read_at IS NULL
               FROM mailbox_letter letter
               JOIN mailbox_letter_recipient recipient ON recipient.letter_id = letter.id
               WHERE letter.publication_status = 'PUBLISHED'
@@ -94,8 +96,10 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
           SELECT
             (SELECT COUNT(*)
              FROM mailbox_letter letter
+             JOIN user_profile profile ON profile.id = :userProfileId
              WHERE letter.publication_status = 'PUBLISHED'
                AND letter.letter_type IN ('NOTICE', 'UPDATE')
+               AND letter.published_at >= profile.created_at
                AND NOT EXISTS (
                  SELECT 1 FROM mailbox_letter_read letter_read
                  WHERE letter_read.letter_id = letter.id
@@ -158,10 +162,10 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
     LocalDateTime getSentAt();
 
     /**
-     * 읽은 시각을 반환한다.
+     * 안 읽은 편지 여부를 반환한다.
      *
-     * @return 읽은 시각
+     * @return 안 읽은 편지이면 {@code true}
      */
-    LocalDateTime getReadAt();
+    boolean getUnread();
   }
 }

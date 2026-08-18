@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.character.service.StreakService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
@@ -23,6 +25,7 @@ import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepos
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.Test;
 /** 프리톡 처리 예약의 잠금 소유권 검증을 확인한다. */
 class FreeTalkSubmittedMessageServiceTest {
 
+  private final UserProfileService userProfileService = mock(UserProfileService.class);
   private final LearningSessionRepository learningSessionRepository =
       mock(LearningSessionRepository.class);
   private final FreeTalkSessionRepository freeTalkSessionRepository =
@@ -43,14 +47,18 @@ class FreeTalkSubmittedMessageServiceTest {
       mock(SessionHistoryMessageRepository.class);
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService =
       mock(FreeTalkDailySpeakingUsageService.class);
+  private final StreakService streakService = mock(StreakService.class);
   private final FreeTalkSubmittedMessageService service =
       new FreeTalkSubmittedMessageService(
+          userProfileService,
           learningSessionRepository,
           freeTalkSessionRepository,
           freeTalkTopicRepository,
           sessionHistoryRepository,
           sessionHistoryMessageRepository,
-          dailySpeakingUsageService);
+          dailySpeakingUsageService,
+          streakService,
+          Clock.systemUTC());
   private final LearningSession learningSession = mock(LearningSession.class);
   private final FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
   private final SessionHistory history = mock(SessionHistory.class);
