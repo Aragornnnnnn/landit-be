@@ -20,6 +20,9 @@ management:
         enabled: false
 
 landit:
+  # H2에는 vector 타입과 <=> 연산자가 없어 자바 코사인 계산 구현을 사용한다.
+  expression-search:
+    mode: in-memory
   auth:
     oidc:
       fake-enabled: true

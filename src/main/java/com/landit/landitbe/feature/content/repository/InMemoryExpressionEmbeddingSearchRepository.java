@@ -19,8 +19,7 @@ import org.springframework.stereotype.Repository;
 @ConditionalOnProperty(
     prefix = "landit.expression-search",
     name = "mode",
-    havingValue = "in-memory",
-    matchIfMissing = true)
+    havingValue = "in-memory")
 public class InMemoryExpressionEmbeddingSearchRepository
     implements ExpressionEmbeddingSearchRepository {
 

@@ -16,7 +16,11 @@ import org.springframework.stereotype.Repository;
  * 구현을 사용한다.
  */
 @Repository
-@ConditionalOnProperty(prefix = "landit.expression-search", name = "mode", havingValue = "pgvector")
+@ConditionalOnProperty(
+    prefix = "landit.expression-search",
+    name = "mode",
+    havingValue = "pgvector",
+    matchIfMissing = true)
 public class PgVectorExpressionEmbeddingSearchRepository
     implements ExpressionEmbeddingSearchRepository {
 
