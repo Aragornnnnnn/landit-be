@@ -275,6 +275,17 @@ class MailboxApiIntegrationTests {
   }
 
   @Test
+  void receivedNoticeDetailSerializesContentBlocksAsJsonValues() throws Exception {
+    TestUser user = login("content-blocks");
+    MailboxLetter notice = saveNotice("본문 공지", "실제 공지 본문", false, 10);
+
+    mockMvc
+        .perform(authorizedGet(user, "/api/v1/mailbox/received/{letterId}", notice.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.contentBlocks[0].text").value("실제 공지 본문"));
+  }
+
+  @Test
   void receivedDetailMarksLettersReadIdempotentlyAndUpdatesUnreadCount() throws Exception {
     TestUser user = login("read");
     MailboxLetter notice = saveNotice("읽을 공지", "공지 미리보기", false, 10);
@@ -408,16 +419,11 @@ class MailboxApiIntegrationTests {
       boolean pinned,
       int hour,
       MailboxPublicationStatus status) {
+    var contentBlocks = objectMapper.createArrayNode();
+    contentBlocks.addObject().put("text", text);
     return mailboxLetterRepository.saveAndFlush(
         new MailboxLetter(
-            letterType,
-            title,
-            objectMapper.createArrayNode().addObject().put("text", text),
-            null,
-            text,
-            status,
-            pinned,
-            sentAt(hour)));
+            letterType, title, contentBlocks, null, text, status, pinned, sentAt(hour)));
   }
 
   private MailboxLetter saveReply(String text, String preview, int hour) {

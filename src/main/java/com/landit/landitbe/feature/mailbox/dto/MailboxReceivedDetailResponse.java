@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.mailbox.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 받은 편지함 상세 응답이다.
@@ -27,7 +27,7 @@ public record MailboxReceivedDetailResponse(
     @Schema(description = "편지 ID", example = "101") Long letterId,
     @Schema(description = "편지 유형", example = "NOTICE") MailboxLetterType letterType,
     @Schema(description = "편지 제목") String title,
-    @Schema(description = "구조화된 공지·업데이트 본문. 답장은 null") JsonNode contentBlocks,
+    @Schema(description = "구조화된 공지·업데이트 본문. 답장은 null") List<Object> contentBlocks,
     @Schema(description = "답장 본문. 공지·업데이트는 null") String bodyText,
     @Schema(description = "답장과 연결된 원본 피드백 유형. 공지·업데이트는 null") UserFeedbackType feedbackType,
     @Schema(description = "답장과 연결된 원본 피드백 내용. 공지·업데이트는 null") String quotedFeedbackContent,
