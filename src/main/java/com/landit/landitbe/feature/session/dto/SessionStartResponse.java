@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  *
  * @param sessionId 생성된 학습 세션 ID
  * @param scenarioId 시나리오 ID
+ * @param characterId 시나리오 캐릭터 식별자
  * @param sessionType 세션 타입
  * @param firstSpeaker 첫 발화자
  * @param userOpeningInstruction USER first 시 사용자 시작 안내
@@ -26,6 +27,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record SessionStartResponse(
     @Schema(description = "생성된 학습 세션 ID") Long sessionId,
     @Schema(description = "시나리오 ID") Long scenarioId,
+    @Schema(description = "시나리오 캐릭터 식별자", example = "chloe") String characterId,
     @Schema(description = "세션 타입") String sessionType,
     @Schema(description = "첫 발화자") String firstSpeaker,
     @Schema(description = "USER first 시 사용자 시작 안내") String userOpeningInstruction,
@@ -52,6 +54,7 @@ public record SessionStartResponse(
     return new SessionStartResponse(
         learningSession.getId(),
         startProjection.scenarioId(),
+        startProjection.characterId(),
         SessionType.SCENARIO.name(),
         startProjection.firstSpeaker().name(),
         userOpeningInstruction,

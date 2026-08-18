@@ -23,6 +23,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
       """
             SELECT new com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection(
                 s.id,
+                s.characterId,
                 s.categoryId,
                 c.status,
                 s.status,

@@ -149,6 +149,7 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.error").value(nullValue()))
             .andExpect(jsonPath("$.data.sessionId").value(notNullValue()))
             .andExpect(jsonPath("$.data.scenarioId").value(2001))
+            .andExpect(jsonPath("$.data.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"))
             .andExpect(jsonPath("$.data.firstSpeaker").value("AI"))
             .andExpect(jsonPath("$.data.userOpeningInstruction").value(nullValue()))

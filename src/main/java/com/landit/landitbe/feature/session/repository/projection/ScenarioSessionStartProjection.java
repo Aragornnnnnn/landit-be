@@ -12,6 +12,7 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
  * 시나리오 세션 시작 응답과 검증에 필요한 조회 결과를 담는다.
  *
  * @param scenarioId 시나리오 ID
+ * @param characterId 시나리오 캐릭터 식별자
  * @param categoryId 카테고리 ID
  * @param categoryStatus 카테고리 활성 상태
  * @param scenarioStatus 시나리오 활성 상태
@@ -31,6 +32,7 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
  */
 public record ScenarioSessionStartProjection(
     Long scenarioId,
+    String characterId,
     Long categoryId,
     ActiveStatus categoryStatus,
     ActiveStatus scenarioStatus,
