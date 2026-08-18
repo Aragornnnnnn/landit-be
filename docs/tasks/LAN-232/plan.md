@@ -32,7 +32,7 @@
 
 | 프로퍼티 | 환경변수 | 기본값 | 설명 |
 | --- | --- | --- | --- |
-| `mode` | `LANDIT_EXPRESSION_SEARCH_MODE` | in-memory | 운영·dev는 **pgvector** 필수 |
+| `mode` | `LANDIT_EXPRESSION_SEARCH_MODE` | pgvector | H2 테스트만 `in-memory`로 재정의한다 |
 | `max-candidates` | `LANDIT_EXPRESSION_SEARCH_MAX_CANDIDATES` | 30 | 추천 LLM에 전달할 최대 후보 수 |
 | `distance-threshold` | `LANDIT_EXPRESSION_SEARCH_DISTANCE_THRESHOLD` | 0.6 | 후보 인정 최대 코사인 거리. **실측 근거 없는 시작점** — 배포 후 추천 품질을 보고 조정 |
 
@@ -42,11 +42,13 @@
    — 동시 배포 가능. BE가 먼저 뜨는 겹침 구간에 프리톡을 완료한 유저의 표현 생성만
    일시 FAILED가 되며, AI 배포 완료 후 재시도로 복구된다. 겹침 영향조차 없애려면
    AI 먼저 배포 (AI 선배포는 무해 — 새 엔드포인트가 대기할 뿐)
-2. dev/prod 환경변수에 `LANDIT_EXPRESSION_SEARCH_MODE=pgvector` 추가 (SSM/태스크 정의)
+2. ~~dev/prod 환경변수에 `LANDIT_EXPRESSION_SEARCH_MODE=pgvector` 추가 (SSM/태스크 정의)~~
+   — 환경변수 누락으로 dev에서 in-memory 구현이 동작해 후보 검색에 26초가 걸렸다.
+   기본값을 `pgvector`로 뒤집어 설정 없이도 운영 경로가 선택되도록 변경했으므로 별도 조치가 필요 없다.
 3. dev 배포 후 pgvector 실쿼리 1회 확인 (H2에서는 `<=>` 실행 검증 불가):
    프리톡 1회 완주 → 세션 상세에서 READY + 추천 표현 확인
-4. 실패 시 원복: 환경변수만 제거하면 in-memory로 동작하지만 운영 규모에는 부적합 —
-   코드 롤백이 원칙
+4. 실패 시 원복: `LANDIT_EXPRESSION_SEARCH_MODE=in-memory`를 명시하면 되돌릴 수 있지만
+   운영 규모에는 부적합 — 코드 롤백이 원칙
 
 ## 실패 정책
 
