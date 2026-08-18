@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingReason;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
@@ -13,7 +14,11 @@ import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
@@ -61,7 +66,10 @@ public class FreeTalkMessageService {
     }
     FreeTalkSubmittedMessageService.Reservation reservation =
         submittedMessageService.reserve(userId, learningSessionId, request);
+    AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
+    CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
+      innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
       if (reservation.dailyLimitReached()) {
         response =
@@ -79,11 +87,14 @@ public class FreeTalkMessageService {
       if (response.turnStatus()
           != com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus
               .EXIT_CONFIRMATION_REQUIRED) {
-        generateInnerThought(innerThoughtRequest(reservation));
+        recordInnerThought(innerThoughtRequest, innerThoughtFuture);
+      } else {
+        innerThoughtFuture.cancel(true);
       }
       dispatchIfCompleted(response);
       return response;
     } catch (RuntimeException exception) {
+      cancelInnerThought(innerThoughtFuture);
       submittedMessageService.compensate(reservation);
       throw exception;
     }
@@ -109,7 +120,10 @@ public class FreeTalkMessageService {
     FreeTalkSubmittedMessageService.DecisionReservation reservation =
         submittedMessageService.reserveDecision(
             userId, learningSessionId, request.submittedMessageId(), request.decision());
+    AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
+    CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
+      innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
       if (reservation.decision() == FreeTalkExitDecision.END) {
         response =
@@ -126,10 +140,11 @@ public class FreeTalkMessageService {
                     turnRequestForDecision(
                         reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED)));
       }
-      generateInnerThought(innerThoughtRequest(reservation));
+      recordInnerThought(innerThoughtRequest, innerThoughtFuture);
       dispatchIfCompleted(response);
       return response;
     } catch (RuntimeException exception) {
+      cancelInnerThought(innerThoughtFuture);
       submittedMessageService.compensateDecision(reservation);
       throw exception;
     }
@@ -230,35 +245,86 @@ public class FreeTalkMessageService {
         reservation.history());
   }
 
-  private void generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
+  private CompletableFuture<AiFreeTalkInnerThoughtResult> startInnerThought(
+      AiFreeTalkInnerThoughtRequest request) {
     try {
-      CompletableFuture.supplyAsync(
-              () -> aiFreeTalkClient.generateInnerThought(request), taskExecutor)
-          .whenCompleteAsync(
-              (result, exception) -> {
-                if (exception == null) {
-                  try {
-                    sessionMessageService.completeInnerThought(
-                        request.submittedMessageId(),
-                        result.innerThought(),
-                        result.innerThoughtType());
-                  } catch (RuntimeException persistenceException) {
-                    log.warn(
-                        "프리톡 속마음 저장에 실패했습니다. messageId={}",
-                        request.submittedMessageId(),
-                        persistenceException);
-                    sessionMessageService.failInnerThought(request.submittedMessageId());
-                  }
-                  return;
-                }
-                log.warn(
-                    "프리톡 속마음 생성에 실패했습니다. messageId={}", request.submittedMessageId(), exception);
-                sessionMessageService.failInnerThought(request.submittedMessageId());
-              },
-              taskExecutor);
+      return submitCancellableAsync(() -> aiFreeTalkClient.generateInnerThought(request));
     } catch (RuntimeException exception) {
       log.warn("프리톡 속마음 작업을 시작하지 못했습니다. messageId={}", request.submittedMessageId(), exception);
-      sessionMessageService.failInnerThought(request.submittedMessageId());
+      return CompletableFuture.failedFuture(exception);
+    }
+  }
+
+  private void recordInnerThought(
+      AiFreeTalkInnerThoughtRequest request,
+      CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture) {
+    innerThoughtFuture.whenComplete(
+        (result, exception) -> {
+          if (exception == null) {
+            try {
+              sessionMessageService.completeInnerThought(
+                  request.submittedMessageId(), result.innerThought(), result.innerThoughtType());
+            } catch (RuntimeException persistenceException) {
+              log.warn(
+                  "프리톡 속마음 저장에 실패했습니다. messageId={}",
+                  request.submittedMessageId(),
+                  persistenceException);
+              sessionMessageService.failInnerThought(request.submittedMessageId());
+            }
+            return;
+          }
+          log.warn("프리톡 속마음 생성에 실패했습니다. messageId={}", request.submittedMessageId(), exception);
+          sessionMessageService.failInnerThought(request.submittedMessageId());
+        });
+  }
+
+  private void cancelInnerThought(
+      CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture) {
+    if (innerThoughtFuture != null) {
+      innerThoughtFuture.cancel(true);
+    }
+  }
+
+  private <T> CompletableFuture<T> submitCancellableAsync(Callable<T> task) {
+    CancellableCompletableFuture<T> result = new CancellableCompletableFuture<>();
+    FutureTask<T> futureTask =
+        new FutureTask<>(task) {
+          @Override
+          protected void done() {
+            if (isCancelled()) {
+              result.cancel(false);
+              return;
+            }
+            try {
+              result.complete(get());
+            } catch (InterruptedException exception) {
+              Thread.currentThread().interrupt();
+              result.completeExceptionally(exception);
+            } catch (ExecutionException exception) {
+              result.completeExceptionally(exception.getCause());
+            }
+          }
+        };
+    result.bind(futureTask);
+    taskExecutor.execute(futureTask);
+    return result;
+  }
+
+  private static class CancellableCompletableFuture<T> extends CompletableFuture<T> {
+
+    private Future<?> task;
+
+    private void bind(Future<?> task) {
+      this.task = task;
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      boolean cancelled = super.cancel(mayInterruptIfRunning);
+      if (cancelled && task != null) {
+        task.cancel(mayInterruptIfRunning);
+      }
+      return cancelled;
     }
   }
 }
