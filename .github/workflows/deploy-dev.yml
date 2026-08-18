@@ -1,4 +1,4 @@
-# 개발자가 수동 실행해 develop ECS 서비스에 배포합니다.
+# 개발자가 수동 실행해 develop EC2 API 서비스에 배포합니다.
 name: Deploy develop api
 
 on:
@@ -31,9 +31,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
-      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
-      HEALTH_CHECK_URL: ${{ vars.HEALTH_CHECK_URL || secrets.HEALTH_CHECK_URL }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
 
     steps:
       - name: Validate deployment settings
@@ -43,8 +41,7 @@ jobs:
           test -n "$AWS_REGION"
           test -n "$ECR_REGISTRY"
           test -n "$ECR_REPOSITORY"
-          test -n "$ECS_CLUSTER"
-          test -n "$ECS_SERVICE"
+          test -n "$EC2_INSTANCE_ID"
 
           expected_registry="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
           if [ "$ECR_REGISTRY" != "$expected_registry" ]; then
@@ -82,36 +79,5 @@ jobs:
           docker push "$image_uri:${GITHUB_SHA}"
           docker push "$image_uri:latest"
 
-      - name: Force ECS service deployment
-        id: deploy
-        run: |
-          deployment="$(aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$ECS_SERVICE" \
-            --force-new-deployment \
-            --output json)"
-          deployment_id="$(jq -r '.service.deployments[] | select(.status == "PRIMARY") | .id' <<< "$deployment")"
-          deployment_created_at="$(jq -r '.service.deployments[] | select(.status == "PRIMARY") | .createdAt' <<< "$deployment")"
-
-          if [ -z "$deployment_id" ] || [ "$deployment_id" = "null" ] || [ -z "$deployment_created_at" ] || [ "$deployment_created_at" = "null" ]; then
-            echo "New PRIMARY ECS deployment was not returned by update-service"
-            echo "$deployment"
-            exit 1
-          fi
-
-          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
-          echo "deployment_created_at=$deployment_created_at" >> "$GITHUB_OUTPUT"
-          echo "$deployment" | jq '.service | {serviceName, status, desiredCount, runningCount, deployments}'
-
-      - name: Verify ECS service
-        timeout-minutes: 10
-        env:
-          DEPLOYMENT_ID: ${{ steps.deploy.outputs.deployment_id }}
-          DEPLOYMENT_CREATED_AT: ${{ steps.deploy.outputs.deployment_created_at }}
-        run: |
-          bash .github/scripts/verify-ecs-deployment.sh
-
-      - name: Deploy the same image to develop EC2
-        env:
-          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      - name: Deploy image to develop EC2
         run: bash .github/scripts/deploy-ec2-service.sh api "$GITHUB_SHA"

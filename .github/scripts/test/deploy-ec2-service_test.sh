@@ -182,10 +182,20 @@ if ! rg -q '^concurrency:' <<<"$workflow_concurrency" || ! rg -q 'group:[[:space
   exit 1
 fi
 
-ecs_verify_line="$(rg -n -F 'name: Verify ECS service' "$WORKFLOW" | cut -d: -f1)"
-ec2_mirror_line="$(rg -n -F 'name: Deploy the same image to develop EC2' "$WORKFLOW" | cut -d: -f1)"
-if [ -z "$ecs_verify_line" ] || [ -z "$ec2_mirror_line" ] || [ "$ecs_verify_line" -ge "$ec2_mirror_line" ]; then
-  echo 'develop API workflow must mirror to EC2 only after ECS verification.' >&2
+if rg -q 'aws ecs|ECS_CLUSTER|ECS_SERVICE|Verify ECS service|Force ECS service deployment' "$WORKFLOW"; then
+  echo 'develop API workflow must not depend on ECS after cutover.' >&2
+  exit 1
+fi
+
+push_line="$(rg -n -F 'name: Push Docker image' "$WORKFLOW" | cut -d: -f1)"
+ec2_deploy_line="$(rg -n -F 'name: Deploy image to develop EC2' "$WORKFLOW" | cut -d: -f1)"
+if [ -z "$push_line" ] || [ -z "$ec2_deploy_line" ] || [ "$push_line" -ge "$ec2_deploy_line" ]; then
+  echo 'develop API workflow must deploy the pushed SHA to EC2.' >&2
+  exit 1
+fi
+
+if ! rg -q 'name:[[:space:]]*Migrate develop DB schema' "$WORKFLOW" || ! rg -q 'uses:[[:space:]]*\./\.github/workflows/flyway-migration\.yml' "$WORKFLOW" || ! rg -q 'needs:[[:space:]]*migrate' "$WORKFLOW"; then
+  echo 'develop API workflow must keep Flyway migration before EC2 deployment.' >&2
   exit 1
 fi
 
