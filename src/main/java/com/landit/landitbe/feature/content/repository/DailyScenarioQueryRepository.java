@@ -25,6 +25,7 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
       """
             SELECT new com.landit.landitbe.feature.content.repository.projection.DailyScenarioProjection(
                 s.id,
+                s.characterId,
                 slv.title,
                 slv.briefing,
                 slv.conversationGoal,

@@ -127,6 +127,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completedAt").value(nullValue()))
         .andExpect(jsonPath("$.data.scenario.expressionCount").value(2))
         .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1))
+        .andExpect(jsonPath("$.data.scenario.openingPreview.characterId").value("chloe"))
         .andExpect(
             jsonPath("$.data.scenario.openingPreview.ttsVoice.providerVoiceId")
                 .value("en-US-Harper:MAI-Voice-2"));
