@@ -681,7 +681,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void endDecisionAndTimeLimitCompleteTheSession() throws Exception {
+  void endDecisionRecordsStreakWithoutDuplicatingTheSameDayTimeLimit() throws Exception {
     seedEmbeddedCandidateExpression();
     String accessToken =
         login("free-talk-complete@example.com").get("data").get("accessToken").asText();
@@ -701,7 +701,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
     assertThat(awaitExpressionGenerationStatus(exitSessionId)).isEqualTo("READY");
-    assertCurrentStreak(accessToken, 0, false);
+    assertCurrentStreak(accessToken, 1, true);
 
     fakeAiFreeTalkClient.reset();
     long timeLimitSessionId = startUserFirstSession(accessToken);

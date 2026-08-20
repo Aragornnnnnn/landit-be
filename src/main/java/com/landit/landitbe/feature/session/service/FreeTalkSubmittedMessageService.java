@@ -497,6 +497,7 @@ public class FreeTalkSubmittedMessageService {
     session.startProcessing("decision-" + submittedMessageId);
     AiFreeTalkTopic topic = new AiFreeTalkTopic(session.getTopicId(), session.getTitle(), null);
     return new DecisionReservation(
+        userId,
         learningSessionId,
         history.getId(),
         session.getId(),
@@ -563,6 +564,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeEnd(
       DecisionReservation reservation, AiFreeTalkClosingResult result) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
@@ -581,14 +583,17 @@ public class FreeTalkSubmittedMessageService {
                 result.emotion()));
     records.freeTalkSession().completeByUserExit();
     records.freeTalkSession().clearProcessing();
-    records.learningSession().completeFreeTalkByUser(LocalDateTime.now());
+    LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
+    records.learningSession().completeFreeTalkByUser(completedAt);
     records
         .history()
         .complete(
-            LocalDateTime.now(),
+            completedAt,
             Math.toIntExact(
                 sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(
                     records.history().getId(), ConversationSpeaker.USER)));
+    streakService.recordCompletedConversation(
+        records.learningSession().getUserProfileId(), completedAt);
     return response(
         records.learningSessionId(),
         records.freeTalkSession(),
@@ -833,6 +838,7 @@ public class FreeTalkSubmittedMessageService {
   /**
    * 종료 확인 전에 저장한 사용자 메시지와 대화 문맥이다.
    *
+   * @param userId 요청 사용자 ID
    * @param learningSessionId 학습 세션 ID
    * @param historyId 세션 히스토리 ID
    * @param freeTalkSessionId 프리톡 세션 ID
@@ -845,6 +851,7 @@ public class FreeTalkSubmittedMessageService {
    * @param history AI에 전달할 대화 기록
    */
   public record DecisionReservation(
+      long userId,
       long learningSessionId,
       long historyId,
       long freeTalkSessionId,
