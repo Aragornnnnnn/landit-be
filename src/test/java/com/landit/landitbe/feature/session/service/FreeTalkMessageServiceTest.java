@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -11,6 +12,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
@@ -27,6 +32,8 @@ import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse.Nex
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse.ProgressResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse.SubmittedMessageResponse;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -35,6 +42,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.task.TaskExecutor;
 
 /** 프리톡 발화 이후 속마음 저장 실패 처리를 검증한다. */
@@ -78,6 +86,42 @@ class FreeTalkMessageServiceTest {
         .generateTurn(argThat(request -> request.characterId().equals("chloe")));
     verify(aiFreeTalkClient)
         .generateInnerThought(argThat(request -> request.characterId().equals("chloe")));
+  }
+
+  @Test
+  void logsFailedInnerThoughtGenerationAsStructuredError() {
+    Logger logger = (Logger) LoggerFactory.getLogger(FreeTalkMessageService.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+          .thenReturn(reservation());
+      when(aiFreeTalkClient.generateTurn(any()))
+          .thenReturn(
+              new AiFreeTalkTurnResult(
+                  false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY));
+      when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+      when(aiFreeTalkClient.generateInnerThought(any()))
+          .thenThrow(new ApiException(ErrorCode.AI_RESPONSE_INVALID));
+
+      service.submit(1L, 300L, request());
+
+      assertThat(appender.list)
+          .anySatisfy(
+              event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                assertThat(event.getFormattedMessage())
+                    .contains("workflow=free_talk_inner_thought_failed")
+                    .contains("messageId=7")
+                    .contains("errorCode=AI_RESPONSE_INVALID");
+                assertThat(event.getThrowableProxy()).isNotNull();
+              });
+      verify(sessionMessageService).failInnerThought(7L);
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
   }
 
   @Test
