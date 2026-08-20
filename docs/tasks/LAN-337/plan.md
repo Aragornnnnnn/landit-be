@@ -31,7 +31,7 @@
 - `AuthProfile` exposes `UserRole role()` and `UserProfileStatus status()`.
 - `AuthUserResponse` serializes those values as `role` and `status`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add assertions to the social-login integration flow for a new user (`USER`, `ACTIVE`) and an existing user whose profile role is changed to `ADMIN` before the next login.
 
@@ -40,23 +40,23 @@ Add assertions to the social-login integration flow for a new user (`USER`, `ACT
 .andExpect(jsonPath("$.data.user.status").value("ACTIVE"));
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew test --tests com.landit.landitbe.feature.auth.SocialAuthApiIntegrationTests`
 
 Expected: FAIL because `data.user.role` and `data.user.status` are absent.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Extend `AuthProfile.from(UserProfile)` with `getRole()` and `getStatus()`, then pass both enum values through `AuthUserResponse.from(...)` without adding a new controller or endpoint.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `./gradlew test --tests com.landit.landitbe.feature.auth.SocialAuthApiIntegrationTests`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/landit/landitbe/feature/profile/dto/AuthProfile.java src/main/java/com/landit/landitbe/feature/auth/dto/AuthUserResponse.java src/test/java/com/landit/landitbe/feature/auth/SocialAuthApiIntegrationTests.java
@@ -80,7 +80,7 @@ git commit -m "feat: 로그인 응답에 사용자 역할과 상태 추가"
 - OpenAPI references `#/components/schemas/AdminUserListItem`.
 - Always-present response keys use `requiredMode = REQUIRED`; nullable values use `requiredMode = REQUIRED` and `nullable = true`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Extend the OpenAPI integration tests to assert the named list item schema, its `$ref`, and required fields for login/admin response schemas.
 
@@ -90,21 +90,21 @@ jsonPath("$.components.schemas.AdminUserListResponse.properties.items.items.$ref
     .value("#/components/schemas/AdminUserListItem")
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew test --tests com.landit.landitbe.feature.admin.AdminUserApiIntegrationTests --tests com.landit.landitbe.feature.app.AdminAppVersionApiIntegrationTests`
 
 Expected: FAIL because the generated document uses the shared `Item` component and has no required arrays for the target response properties.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Move the nested list record to the new top-level `AdminUserListItem` record, update the mapper, and annotate only the in-scope response components. Preserve nullable keys such as `email`, learning summary optional values, and app-version reason/release/modifier values.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run the same two targeted test classes and confirm the OpenAPI assertions pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/landit/landitbe/feature/admin/dto src/main/java/com/landit/landitbe/feature/app/dto/AdminAppVersionResponse.java src/main/java/com/landit/landitbe/feature/auth/dto/AuthUserResponse.java src/main/java/com/landit/landitbe/feature/auth/dto/AuthTokenResponse.java src/test/java/com/landit/landitbe/feature/admin/AdminUserApiIntegrationTests.java src/test/java/com/landit/landitbe/feature/app/AdminAppVersionApiIntegrationTests.java
@@ -126,7 +126,7 @@ git commit -m "fix: 관리자 OpenAPI 응답 스키마 계약 보완"
 - `UserProfileService.findNickname(Long userProfileId)` returns `Optional<String>`.
 - `AdminAppVersionResponse.from(AppVersion appVersion, String updatedBy)` returns the API DTO.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Extend the admin app-version PATCH test to assert `updatedAt`, `updatedBy`, and persisted `updated_by_user_profile_id`; add a migration fixture assertion for an app version with no audit history.
 
@@ -135,23 +135,23 @@ Extend the admin app-version PATCH test to assert `updatedAt`, `updatedBy`, and 
 .andExpect(jsonPath("$.data.updatedBy").value("관리자"));
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew test --tests com.landit.landitbe.feature.app.AdminAppVersionApiIntegrationTests`
 
 Expected: FAIL because the app-version table and response do not contain the new metadata.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add V57 using a common migration path compatible with H2 and PostgreSQL. Add nullable modifier backfill from the latest `APP_VERSION_UPDATED` audit row per platform, fall back to `created_at` and `NULL`, then enforce `updated_at NOT NULL` and the foreign key. Add entity fields, service mapping, and profile nickname lookup. Update the existing audit record call without removing it.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `./gradlew test --tests com.landit.landitbe.feature.app.AdminAppVersionApiIntegrationTests`
 
 Expected: PASS, including PATCH response, DB modifier ID, and migration fallback assertions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/resources/db/migration/V57__add_app_version_update_metadata.sql src/main/java/com/landit/landitbe/feature/app src/main/java/com/landit/landitbe/feature/profile/service/UserProfileService.java src/test/java/com/landit/landitbe/feature/app/AdminAppVersionApiIntegrationTests.java
@@ -164,25 +164,33 @@ git commit -m "feat: 앱 버전 수정 메타데이터 저장"
 - Modify: `docs/tasks/LAN-337/plan.md`
 - Modify: `docs/tasks/LAN-337/design.md` only if implementation reveals a contract correction.
 
-- [ ] **Step 1: Run focused regression tests**
+- [x] **Step 1: Run focused regression tests**
 
 Run: `./gradlew test --tests com.landit.landitbe.feature.auth.SocialAuthApiIntegrationTests --tests com.landit.landitbe.feature.admin.AdminUserApiIntegrationTests --tests com.landit.landitbe.feature.app.AdminAppVersionApiIntegrationTests`
 
-- [ ] **Step 2: Run repository verification**
+- [x] **Step 2: Run repository verification**
 
 Run: `./gradlew check`
 
 Expected: exit code 0 with Spotless, Checkstyle, and all tests passing.
 
-- [ ] **Step 3: Inspect final diff**
+- [x] **Step 3: Inspect final diff**
 
 Run: `git diff --check` and `git status --short`.
 
 Expected: no whitespace errors and only LAN-337 files changed.
 
-- [ ] **Step 4: Commit verification ledger update**
+- [x] **Step 4: Commit verification ledger update**
 
 ```bash
 git add docs/tasks/LAN-337/plan.md
 git commit -m "docs: LAN-337 검증 결과 기록"
 ```
+
+## Verification record
+
+- Focused regression: `SocialAuthApiIntegrationTests` 18, `AdminUserApiIntegrationTests` 7, `AdminAppVersionApiIntegrationTests` 9, plus related app-version/schema/service tests; all passed.
+- Repository verification: `./gradlew check --no-daemon --rerun-tasks` passed with 520 tests and zero failures, errors, or skipped tests.
+- Final diff checks: `git diff --check 4a1e63d5..HEAD` passed and `git status --short` was clean.
+- Review: Task 1, Task 2, and Task 3 independent reviews approved; Task 3 P2 test gaps were fixed in `1f4fb482` and re-approved.
+- Scope confirmations: no `GET /api/v1/auth/me`, no user-list column decision, and no mailbox title/preview length change.
