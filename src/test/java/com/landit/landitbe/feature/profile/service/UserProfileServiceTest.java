@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -146,6 +147,17 @@ class UserProfileServiceTest {
             userProfileService.updateAuthenticationProfileForUpdate(
                 USER_ID, "updated@example.com", "updated nickname"))
         .isEmpty();
+  }
+
+  /** 다른 기능에는 닉네임 문자열 대신 프로필 공개 계약을 반환한다. */
+  @Test
+  void findsNicknameAsPublicRecord() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfile.getNickname()).thenReturn("nickname");
+    when(userProfileRepository.findById(USER_ID)).thenReturn(Optional.of(userProfile));
+
+    assertThat(userProfileService.findNickname(USER_ID))
+        .contains(new UserProfileNickname("nickname"));
   }
 
   /** 탈퇴 처리는 활성 프로필을 쓰기 잠금으로 조회해 상태를 변경한다. */

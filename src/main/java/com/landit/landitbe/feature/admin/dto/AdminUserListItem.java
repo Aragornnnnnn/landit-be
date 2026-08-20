@@ -8,7 +8,16 @@ import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
-/** 관리자 사용자 목록의 개별 항목 응답을 정의한다. */
+/**
+ * 관리자 사용자 목록의 개별 항목 응답을 정의한다.
+ *
+ * @param userProfileId 사용자 프로필 ID
+ * @param email 사용자 이메일. 없으면 {@code null}
+ * @param nickname 사용자 닉네임
+ * @param role 사용자 역할
+ * @param status 사용자 프로필 상태
+ * @param createdAt 가입 시각
+ */
 public record AdminUserListItem(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long userProfileId,
     @Schema(

@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse.UpdateType;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
+import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -114,7 +115,10 @@ public class AppVersionService {
   /** 앱 버전 정책과 마지막 수정자 닉네임을 관리자 응답으로 변환한다. */
   private AdminAppVersionResponse toAdminResponse(AppVersion appVersion) {
     String updatedBy =
-        userProfileService.findNickname(appVersion.getUpdatedByUserProfileId()).orElse(null);
+        userProfileService
+            .findNickname(appVersion.getUpdatedByUserProfileId())
+            .map(UserProfileNickname::nickname)
+            .orElse(null);
     return AdminAppVersionResponse.from(appVersion, updatedBy);
   }
 
