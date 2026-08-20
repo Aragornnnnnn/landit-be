@@ -161,7 +161,7 @@ public class FreeTalkMessageService {
         reservation.targetLocale(),
         reservation.baseLocale(),
         responseMode,
-        reservation.firstUserTurn(),
+        false,
         reservation.topic(),
         reservation.history());
   }
@@ -184,6 +184,7 @@ public class FreeTalkMessageService {
         reservation.targetLocale(),
         reservation.baseLocale(),
         closingReason,
+        reservation.titleGenerationRequired(),
         reservation.topic(),
         reservation.history());
   }
@@ -215,6 +216,7 @@ public class FreeTalkMessageService {
         reservation.targetLocale(),
         reservation.baseLocale(),
         closingReason,
+        reservation.titleGenerationRequired(),
         reservation.topic(),
         reservation.history());
   }

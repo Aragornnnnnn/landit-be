@@ -30,7 +30,7 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
     return new AiFreeTalkTurnResult(
         false,
-        request.isFirstUserTurn() ? "오늘의 프리톡" : null,
+        null,
         "That sounds interesting. Tell me more.",
         "흥미롭다. 조금 더 이야기해줘.",
         CharacterEmotion.HAPPY);
@@ -47,7 +47,10 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
     return new AiFreeTalkClosingResult(
-        "It was nice talking with you.", "이야기해서 좋았어.", CharacterEmotion.NEUTRAL);
+        request.titleGenerationRequired() ? "오늘의 프리톡" : null,
+        "It was nice talking with you.",
+        "이야기해서 좋았어.",
+        CharacterEmotion.NEUTRAL);
   }
 
   /** {@inheritDoc} */

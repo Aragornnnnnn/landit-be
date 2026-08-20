@@ -91,6 +91,7 @@ class RemoteAiFreeTalkClientTest {
             {
               "success": true,
               "data": {
+                "inferredTitle": "Weekend Hiking",
                 "aiMessage": "It was nice talking with you.",
                 "translatedMessage": "이야기해서 좋았어.",
                 "emotion": "NEUTRAL",
@@ -116,8 +117,11 @@ class RemoteAiFreeTalkClientTest {
     assertThat(requests.get("/api/v1/free-talk/closing").has("partnerDisplayName")).isFalse();
     assertThat(requests.get("/api/v1/free-talk/closing").get("closingReason").asString())
         .isEqualTo("USER_CONFIRMED");
+    assertThat(requests.get("/api/v1/free-talk/closing").get("titleGenerationRequired").asBoolean())
+        .isTrue();
     assertThat(opening.emotion()).isEqualTo(CharacterEmotion.HAPPY);
     assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
+    assertThat(closing.inferredTitle()).isEqualTo("Weekend Hiking");
     assertThat(closing.translatedMessage()).isEqualTo("이야기해서 좋았어.");
   }
 
@@ -220,6 +224,23 @@ class RemoteAiFreeTalkClientTest {
     assertThat(remoteClient().generateOpening(openingRequest()).emotion()).isNull();
     assertThat(remoteClient().generateTurn(turnRequest()).emotion()).isNull();
     assertThat(remoteClient().generateClosing(closingRequest()).emotion()).isNull();
+  }
+
+  @Test
+  void treatsBlankClosingTitleAsMissingWhilePreservingClosingMessage() throws Exception {
+    registerRawResponse(
+        "/api/v1/free-talk/closing",
+        200,
+        successResponse(
+            "{\"inferredTitle\":\"   \","
+                + "\"aiMessage\":\"It was nice talking with you.\","
+                + "\"translatedMessage\":\"이야기해서 좋았어.\",\"emotion\":null}"));
+
+    AiFreeTalkClosingResult result = remoteClient().generateClosing(closingRequest());
+
+    assertThat(result.inferredTitle()).isNull();
+    assertThat(result.aiMessage()).isEqualTo("It was nice talking with you.");
+    assertThat(result.translatedMessage()).isEqualTo("이야기해서 좋았어.");
   }
 
   @Test
@@ -544,6 +565,7 @@ class RemoteAiFreeTalkClientTest {
         "EN",
         "KR",
         AiFreeTalkClosingReason.USER_CONFIRMED,
+        true,
         new AiFreeTalkTopic(null, "주말 이야기", null),
         history());
   }

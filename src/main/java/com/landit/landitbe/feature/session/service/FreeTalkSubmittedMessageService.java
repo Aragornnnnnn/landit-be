@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
@@ -328,11 +329,7 @@ public class FreeTalkSubmittedMessageService {
         userMessage.getClientMessageId(),
         userMessage.getUtteranceDurationMs(),
         shouldCloseAfterMessage,
-        freeTalkSession.getStartMode() == FreeTalkStartMode.USER_FIRST
-            && messages.stream()
-                    .filter(message -> message.getRole() == ConversationSpeaker.USER)
-                    .count()
-                == 1,
+        requiresTitleGeneration(freeTalkSession),
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
         topic,
@@ -355,9 +352,6 @@ public class FreeTalkSubmittedMessageService {
     requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
-    if (result.inferredTitle() != null && session.getTitle() == null) {
-      session.assignTitle(result.inferredTitle());
-    }
     FreeTalkMessageSubmitResponse response;
     if (result.userExitIntentDetected()) {
       userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED);
@@ -413,6 +407,7 @@ public class FreeTalkSubmittedMessageService {
     requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
+    assignClosingTitle(session, result, reservation.titleGenerationRequired());
     userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     userMessage.prepareInnerThought();
     session.completeByTimeLimit();
@@ -504,6 +499,7 @@ public class FreeTalkSubmittedMessageService {
         session.getCharacterId(),
         submittedMessageId,
         decision,
+        requiresTitleGeneration(session),
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
         topic,
@@ -530,9 +526,6 @@ public class FreeTalkSubmittedMessageService {
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.CONTINUE);
     records.userMessage().prepareInnerThought();
-    if (result.inferredTitle() != null && records.freeTalkSession().getTitle() == null) {
-      records.freeTalkSession().assignTitle(result.inferredTitle());
-    }
     SessionHistoryMessage aiMessage =
         sessionHistoryMessageRepository.save(
             SessionHistoryMessage.freeTalkAi(
@@ -570,6 +563,7 @@ public class FreeTalkSubmittedMessageService {
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
     requireProcessingOwner(
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
+    assignClosingTitle(records.freeTalkSession(), result, reservation.titleGenerationRequired());
     records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     records.userMessage().prepareInnerThought();
     final SessionHistoryMessage aiMessage =
@@ -689,6 +683,24 @@ public class FreeTalkSubmittedMessageService {
     if (!processingClientMessageId.equals(session.getProcessingClientMessageId())) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+  }
+
+  private boolean requiresTitleGeneration(FreeTalkSession session) {
+    return session.getStartMode() == FreeTalkStartMode.USER_FIRST && session.getTitle() == null;
+  }
+
+  private void assignClosingTitle(
+      FreeTalkSession session, AiFreeTalkClosingResult result, boolean titleGenerationRequired) {
+    if (!titleGenerationRequired || session.getTitle() != null) {
+      return;
+    }
+    String generatedTitle = result.inferredTitle();
+    if (generatedTitle != null && !generatedTitle.isBlank()) {
+      session.assignTitle(generatedTitle.strip());
+      return;
+    }
+    String characterDisplayName = FreeTalkCharacter.fromId(session.getCharacterId()).displayName();
+    session.assignTitle(characterDisplayName + "와의 대화");
   }
 
   private String decisionProcessingClientMessageId(DecisionReservation reservation) {
@@ -812,7 +824,7 @@ public class FreeTalkSubmittedMessageService {
    * @param clientMessageId 중복 요청을 식별하는 클라이언트 메시지 ID
    * @param utteranceDurationMs 이번 사용자 발화 시간 밀리초
    * @param dailyLimitReached 이번 발화 예약 후 일일 한도에 도달했는지 여부
-   * @param firstUserTurn 사용자 선시작 세션의 첫 사용자 턴인지 여부
+   * @param titleGenerationRequired 사용자 선시작 세션의 제목 생성 필요 여부
    * @param targetLocale 학습 대상 언어
    * @param baseLocale 사용자 기준 언어
    * @param topic 프리톡 주제
@@ -829,7 +841,7 @@ public class FreeTalkSubmittedMessageService {
       String clientMessageId,
       long utteranceDurationMs,
       boolean dailyLimitReached,
-      boolean firstUserTurn,
+      boolean titleGenerationRequired,
       String targetLocale,
       String baseLocale,
       AiFreeTalkTopic topic,
@@ -845,6 +857,7 @@ public class FreeTalkSubmittedMessageService {
    * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param userMessageId 종료 의사가 감지된 사용자 메시지 ID
    * @param decision 사용자가 선택한 종료 여부
+   * @param titleGenerationRequired 사용자 선시작 세션의 제목 생성 필요 여부
    * @param targetLocale 학습 대상 언어
    * @param baseLocale 사용자 기준 언어
    * @param topic 프리톡 주제
@@ -858,6 +871,7 @@ public class FreeTalkSubmittedMessageService {
       String characterId,
       long userMessageId,
       FreeTalkExitDecision decision,
+      boolean titleGenerationRequired,
       String targetLocale,
       String baseLocale,
       AiFreeTalkTopic topic,

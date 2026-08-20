@@ -133,6 +133,7 @@ class FreeTalkSubmittedMessageServiceTest {
         "chloe",
         7L,
         FreeTalkExitDecision.END,
+        true,
         "EN",
         "KO",
         new AiFreeTalkTopic(null, "주말", null),
