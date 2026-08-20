@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -84,6 +86,7 @@ class AdminAppVersionApiIntegrationTests {
   void updatesPlatformPolicyAndRecordsBeforeAndAfterValues() throws Exception {
     insertPolicy("ANDROID", "1.0.0", "1.0.0", 10);
     String adminAccessToken = loginAdmin("admin-app-version-update", "관리자");
+    Long adminUserProfileId = findUserProfileId("admin-app-version-update");
 
     mockMvc
         .perform(
@@ -94,7 +97,15 @@ class AdminAppVersionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.versionName").value("1.2.0"))
         .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.1.0"))
-        .andExpect(jsonPath("$.data.buildNumber").value(11));
+        .andExpect(jsonPath("$.data.buildNumber").value(11))
+        .andExpect(jsonPath("$.data.updatedAt").isNotEmpty())
+        .andExpect(jsonPath("$.data.updatedBy").value("관리자"));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select updated_by_user_profile_id from app_version where platform = 'ANDROID'",
+                Long.class))
+        .isEqualTo(adminUserProfileId);
 
     mockMvc
         .perform(
@@ -116,6 +127,50 @@ class AdminAppVersionApiIntegrationTests {
                     + "order by id desc limit 1",
                 String.class))
         .contains("versionName=1.2.0", "minimumSupportedVersionName=1.1.0");
+  }
+
+  /** 감사 이력이 없는 기존 앱 버전 정책은 생성 시각과 빈 수정자로 이관한다. */
+  @Test
+  void migratesPolicyWithoutAuditHistoryUsingCreatedAtAndNullModifier() {
+    DriverManagerDataSource dataSource =
+        new DriverManagerDataSource(
+            "jdbc:h2:mem:app-version-migration-"
+                + UUID.randomUUID()
+                + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+            "sa",
+            "");
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/migration", "classpath:db/h2")
+        .target("55")
+        .load()
+        .migrate();
+    JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+    migrationJdbcTemplate.update(
+        """
+        insert into app_version (
+            platform, version_name, minimum_supported_version_name,
+            build_number, active, released_at, created_at
+        )
+        values ('IOS', '1.0.0', '1.0.0', 10, true,
+                timestamp '2026-01-02 03:04:05', timestamp '2026-01-02 03:04:05')
+        """);
+
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/migration", "classpath:db/h2")
+        .load()
+        .migrate();
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select updated_at from app_version where platform = 'IOS'", String.class))
+        .startsWith("2026-01-02 03:04:05");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select updated_by_user_profile_id from app_version where platform = 'IOS'",
+                Long.class))
+        .isNull();
   }
 
   /** 최소 지원 버전이 최신 버전보다 높으면 정책 수정을 거절한다. */
@@ -186,7 +241,10 @@ class AdminAppVersionApiIntegrationTests {
         .andExpect(jsonPath(responseSchema + ".properties.releaseNote.type[1]").value("null"))
         .andExpect(jsonPath(responseSchema + ".required[?(@ == 'active')]").exists())
         .andExpect(jsonPath(responseSchema + ".required[?(@ == 'releasedAt')]").exists())
-        .andExpect(jsonPath(responseSchema + ".properties.releasedAt.type[1]").value("null"));
+        .andExpect(jsonPath(responseSchema + ".properties.releasedAt.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'updatedAt')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'updatedBy')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.updatedBy.type[1]").value("null"));
   }
 
   /** 테스트 식별자와 이름으로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
@@ -218,11 +276,15 @@ class AdminAppVersionApiIntegrationTests {
   /** 테스트 사용자를 로그인시키고 관리자 역할을 부여한다. */
   private String loginAdmin(String userKey, String nickname) throws Exception {
     String accessToken = login(userKey, nickname);
-    Long userProfileId =
-        jdbcTemplate.queryForObject(
-            "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
+    Long userProfileId = findUserProfileId(userKey);
     jdbcTemplate.update("update user_profile set role = 'ADMIN' where id = ?", userProfileId);
     return accessToken;
+  }
+
+  /** 테스트 사용자 이메일로 사용자 프로필 ID를 조회한다. */
+  private Long findUserProfileId(String userKey) {
+    return jdbcTemplate.queryForObject(
+        "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
   }
 
   /** 플랫폼별 단일 앱 버전 정책을 추가한다. */
@@ -233,9 +295,9 @@ class AdminAppVersionApiIntegrationTests {
         insert into app_version (
             platform, version_name, minimum_supported_version_name,
             build_number, active, released_at,
-            created_at
+            created_at, updated_at
         )
-        values (?, ?, ?, ?, true, current_timestamp, current_timestamp)
+        values (?, ?, ?, ?, true, current_timestamp, current_timestamp, current_timestamp)
         """,
         platform,
         versionName,

@@ -156,6 +156,20 @@ public class UserProfileService {
   }
 
   /**
+   * 사용자 프로필 ID로 닉네임을 조회한다.
+   *
+   * @param userProfileId 조회할 사용자 프로필 ID
+   * @return 사용자 닉네임. 프로필이 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<String> findNickname(Long userProfileId) {
+    if (userProfileId == null) {
+      return Optional.empty();
+    }
+    return userProfileRepository.findById(userProfileId).map(UserProfile::getNickname);
+  }
+
+  /**
    * 활성 사용자의 학습 locale을 조회한다.
    *
    * @param userId 조회할 사용자 ID

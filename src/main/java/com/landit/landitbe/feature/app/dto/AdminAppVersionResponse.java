@@ -20,6 +20,8 @@ import java.time.LocalDateTime;
  * @param releaseNote 릴리스 노트
  * @param active 활성 정책 여부
  * @param releasedAt 출시 시각
+ * @param updatedAt 마지막 수정 시각
+ * @param updatedBy 마지막 수정자 닉네임
  */
 public record AdminAppVersionResponse(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long appVersionId,
@@ -47,15 +49,22 @@ public record AdminAppVersionResponse(
             requiredMode = Schema.RequiredMode.REQUIRED,
             nullable = true,
             types = {"string", "null"})
-        LocalDateTime releasedAt) {
+        LocalDateTime releasedAt,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime updatedAt,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String updatedBy) {
 
   /**
    * 앱 버전 정책 엔티티를 관리자 응답으로 변환한다.
    *
    * @param appVersion 변환할 앱 버전 정책
+   * @param updatedBy 마지막 수정자 닉네임
    * @return 관리자 앱 버전 정책 응답
    */
-  public static AdminAppVersionResponse from(AppVersion appVersion) {
+  public static AdminAppVersionResponse from(AppVersion appVersion, String updatedBy) {
     return new AdminAppVersionResponse(
         appVersion.getId(),
         appVersion.getPlatform(),
@@ -66,6 +75,8 @@ public record AdminAppVersionResponse(
         appVersion.getSoftUpdateReason(),
         appVersion.getReleaseNote(),
         appVersion.isActive(),
-        appVersion.getReleasedAt());
+        appVersion.getReleasedAt(),
+        appVersion.getUpdatedAt(),
+        updatedBy);
   }
 }
