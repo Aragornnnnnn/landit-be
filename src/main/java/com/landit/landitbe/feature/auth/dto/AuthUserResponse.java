@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.auth.domain.SocialProvider;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 로그인 응답에서 사용자 식별 정보와 신규 가입 여부를 전달한다.
@@ -19,13 +20,17 @@ import com.landit.landitbe.feature.profile.dto.AuthProfile;
  * @param status 사용자 프로필 상태
  */
 public record AuthUserResponse(
-    Long userId,
-    String nickname,
-    String email,
-    String provider,
-    boolean newUser,
-    UserRole role,
-    UserProfileStatus status) {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long userId,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String nickname,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String email,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String provider,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean newUser,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UserRole role,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UserProfileStatus status) {
 
   /**
    * 사용자 프로필과 소셜 로그인 결과를 인증 사용자 응답으로 변환한다.

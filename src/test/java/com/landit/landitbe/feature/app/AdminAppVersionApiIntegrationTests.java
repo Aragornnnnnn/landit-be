@@ -164,6 +164,31 @@ class AdminAppVersionApiIntegrationTests {
                 .doesNotExist());
   }
 
+  /** 관리자 앱 버전 응답의 OpenAPI required 및 nullable 계약을 노출한다. */
+  @Test
+  void documentsAdminAppVersionResponseContract() throws Exception {
+    String responseSchema = "$.components.schemas.AdminAppVersionResponse";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'appVersionId')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'platform')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'versionName')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'buildNumber')]").exists())
+        .andExpect(
+            jsonPath(responseSchema + ".required[?(@ == 'minimumSupportedVersionName')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'forceUpdateReason')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.forceUpdateReason.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'softUpdateReason')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.softUpdateReason.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'releaseNote')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.releaseNote.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'active')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'releasedAt')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.releasedAt.type[1]").value("null"));
+  }
+
   /** 테스트 식별자와 이름으로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey, String nickname) throws Exception {
     String nonce = UUID.randomUUID().toString();
