@@ -8,14 +8,16 @@ import java.util.Arrays;
 
 /** 프리톡에서 선택할 수 있는 캐릭터다. */
 public enum FreeTalkCharacter {
-  CHLOE("chloe"),
-  MARCO("marco"),
-  TEDDY("teddy");
+  CHLOE("chloe", "Chloe"),
+  MARCO("marco", "Marco"),
+  TEDDY("teddy", "Teddy");
 
   private final String id;
+  private final String displayName;
 
-  FreeTalkCharacter(String id) {
+  FreeTalkCharacter(String id, String displayName) {
     this.id = id;
+    this.displayName = displayName;
   }
 
   /**
@@ -25,6 +27,15 @@ public enum FreeTalkCharacter {
    */
   public String id() {
     return id;
+  }
+
+  /**
+   * 제목 fallback에 사용할 캐릭터 표시명을 반환한다.
+   *
+   * @return 영문 캐릭터 표시명
+   */
+  public String displayName() {
+    return displayName;
   }
 
   /**

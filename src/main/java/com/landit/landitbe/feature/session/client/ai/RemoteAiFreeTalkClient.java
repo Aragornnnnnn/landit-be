@@ -239,14 +239,16 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteClosingResponse(
-      String aiMessage, String translatedMessage, CharacterEmotion emotion) {
+      String inferredTitle, String aiMessage, String translatedMessage, CharacterEmotion emotion) {
 
     // 원격 마무리 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkClosingResult toResult() {
-      if (blank(aiMessage) || blank(translatedMessage)) {
+      if (blank(aiMessage)
+          || blank(translatedMessage)
+          || (inferredTitle != null && blank(inferredTitle))) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiFreeTalkClosingResult(aiMessage, translatedMessage, emotion);
+      return new AiFreeTalkClosingResult(inferredTitle, aiMessage, translatedMessage, emotion);
     }
   }
 

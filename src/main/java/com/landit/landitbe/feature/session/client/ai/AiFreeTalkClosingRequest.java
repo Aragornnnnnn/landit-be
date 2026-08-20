@@ -14,6 +14,7 @@ import java.util.List;
  * @param targetLocale 학습 언어
  * @param baseLocale 기준 언어
  * @param closingReason 마무리 메시지 생성 사유
+ * @param titleGenerationRequired 사용자 선시작 세션의 제목 생성 필요 여부
  * @param topic 저장된 프리톡 주제
  * @param conversationHistory 누적 대화 메시지
  */
@@ -25,5 +26,6 @@ public record AiFreeTalkClosingRequest(
     String targetLocale,
     String baseLocale,
     AiFreeTalkClosingReason closingReason,
+    boolean titleGenerationRequired,
     AiFreeTalkTopic topic,
     List<AiConversationHistoryMessage> conversationHistory) {}
