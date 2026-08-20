@@ -214,6 +214,107 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/admin/users/{userProfileId}'].get.summary").exists());
   }
 
+  @DisplayName("관리자 사용자와 로그인 응답의 OpenAPI required 및 nullable 계약을 노출한다.")
+  @Test
+  void documentsAdminUserAndLoginResponseContracts() throws Exception {
+    String schemas = "$.components.schemas.";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(schemas + "AdminUserListItem").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserListResponse.properties.items.items.$ref")
+                .value("#/components/schemas/AdminUserListItem"))
+        .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'items')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'page')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'size')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'hasNext')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserListItem.required[?(@ == 'userProfileId')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'email')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'nickname')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'role')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'status')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'createdAt')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserListItem.properties.email.type[1]").value("null"))
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'userProfileId')]")
+                .exists())
+        .andExpect(jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'email')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'nickname')]").exists())
+        .andExpect(jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'role')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'status')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'targetLocale')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'baseLocale')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'learningLevel')]")
+                .exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'currentLevel')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'aiTutorId')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'pushPermissionStatus')]")
+                .exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'createdAt')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'updatedAt')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'learningSummary')]")
+                .exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.properties.email.type[1]").value("null"))
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.properties.learningLevel.type[1]")
+                .value("null"))
+        .andExpect(
+            jsonPath(schemas + "AdminUserDetailResponse.properties.aiTutorId.type[1]")
+                .value("null"))
+        .andExpect(
+            jsonPath(schemas + "LearningSummary.required[?(@ == 'completedScenarioCount')]")
+                .exists())
+        .andExpect(
+            jsonPath(schemas + "LearningSummary.required[?(@ == 'currentScenario')]").exists())
+        .andExpect(
+            jsonPath(schemas + "LearningSummary.required[?(@ == 'currentStreakDays')]").exists())
+        .andExpect(
+            jsonPath(schemas + "LearningSummary.properties.currentScenario.type[1]").value("null"))
+        .andExpect(
+            jsonPath(schemas + "LearningSummary.required[?(@ == 'lastLearningDate')]").exists())
+        .andExpect(
+            jsonPath(schemas + "LearningSummary.properties.lastLearningDate.type[1]").value("null"))
+        .andExpect(jsonPath(schemas + "CurrentScenario.required[?(@ == 'scenarioId')]").exists())
+        .andExpect(jsonPath(schemas + "CurrentScenario.required[?(@ == 'scenarioTitle')]").exists())
+        .andExpect(jsonPath(schemas + "CurrentScenario.required[?(@ == 'displayOrder')]").exists())
+        .andExpect(
+            jsonPath(schemas + "CurrentScenario.required[?(@ == 'dailyScenarioType')]").exists())
+        .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'tokenType')]").exists())
+        .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'accessToken')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'accessTokenExpiresIn')]")
+                .exists())
+        .andExpect(
+            jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'refreshToken')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'refreshTokenExpiresIn')]")
+                .exists())
+        .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'user')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'userId')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'nickname')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'email')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'provider')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'newUser')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'role')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'status')]").exists())
+        .andExpect(jsonPath(schemas + "AuthUserResponse.properties.email.type[1]").value("null"));
+  }
+
   private String loginAdmin() throws Exception {
     String userKey = "admin-user-admin-" + UUID.randomUUID();
     String accessToken = login(userKey, "관리자");

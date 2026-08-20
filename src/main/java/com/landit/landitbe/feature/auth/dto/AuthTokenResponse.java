@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.auth.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * 로그인 성공 시 발급된 access token과 refresh token을 전달한다.
  *
@@ -13,12 +15,12 @@ package com.landit.landitbe.feature.auth.dto;
  * @param user 로그인 사용자 정보
  */
 public record AuthTokenResponse(
-    String tokenType,
-    String accessToken,
-    long accessTokenExpiresIn,
-    String refreshToken,
-    long refreshTokenExpiresIn,
-    AuthUserResponse user) {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String tokenType,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String accessToken,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long accessTokenExpiresIn,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String refreshToken,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long refreshTokenExpiresIn,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) AuthUserResponse user) {
 
   /**
    * 발급된 토큰과 사용자 정보를 로그인 응답으로 변환한다.

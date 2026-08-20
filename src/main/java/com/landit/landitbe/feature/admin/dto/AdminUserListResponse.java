@@ -2,11 +2,8 @@
 
 package com.landit.landitbe.feature.admin.dto;
 
-import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
-import com.landit.landitbe.feature.profile.domain.UserRole;
-import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
-import java.time.LocalDateTime;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 /**
@@ -17,7 +14,11 @@ import java.util.List;
  * @param size 페이지 크기
  * @param hasNext 다음 페이지 존재 여부
  */
-public record AdminUserListResponse(List<Item> items, int page, int size, boolean hasNext) {
+public record AdminUserListResponse(
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<AdminUserListItem> items,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int page,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int size,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean hasNext) {
 
   /**
    * 프로필 목록 페이지를 관리자 API 응답으로 변환한다.
@@ -26,38 +27,8 @@ public record AdminUserListResponse(List<Item> items, int page, int size, boolea
    * @return 관리자 사용자 목록 응답
    */
   public static AdminUserListResponse from(AdminUserProfilePage profiles) {
-    List<Item> items = profiles.items().stream().map(Item::from).toList();
+    List<AdminUserListItem> items = profiles.items().stream().map(AdminUserListItem::from).toList();
 
     return new AdminUserListResponse(items, profiles.page(), profiles.size(), profiles.hasNext());
-  }
-
-  /**
-   * 관리자 사용자 목록의 항목이다.
-   *
-   * @param userProfileId 사용자 프로필 ID
-   * @param email 이메일
-   * @param nickname 닉네임
-   * @param role 사용자 역할
-   * @param status 계정 상태
-   * @param createdAt 가입 시각
-   */
-  public record Item(
-      Long userProfileId,
-      String email,
-      String nickname,
-      UserRole role,
-      UserProfileStatus status,
-      LocalDateTime createdAt) {
-
-    /** 관리자 프로필 계약을 목록 항목으로 변환한다. */
-    private static Item from(AdminUserProfile profile) {
-      return new Item(
-          profile.userProfileId(),
-          profile.email(),
-          profile.nickname(),
-          profile.role(),
-          profile.status(),
-          profile.createdAt());
-    }
   }
 }

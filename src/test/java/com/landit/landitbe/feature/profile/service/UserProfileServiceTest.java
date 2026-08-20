@@ -10,8 +10,10 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -82,11 +84,15 @@ class UserProfileServiceTest {
     when(userProfile.getId()).thenReturn(USER_ID);
     when(userProfile.getNickname()).thenReturn("nickname");
     when(userProfile.getEmail()).thenReturn("user@example.com");
+    when(userProfile.getRole()).thenReturn(UserRole.USER);
+    when(userProfile.getStatus()).thenReturn(UserProfileStatus.ACTIVE);
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
         .thenReturn(Optional.of(userProfile));
 
     assertThat(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
-        .contains(new AuthProfile(USER_ID, "nickname", "user@example.com"));
+        .contains(
+            new AuthProfile(
+                USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE));
   }
 
   /** 인증 기능에는 Profile 엔티티 대신 쓰기 잠금으로 갱신된 인증용 record를 반환한다. */
@@ -96,6 +102,8 @@ class UserProfileServiceTest {
     when(userProfile.getId()).thenReturn(USER_ID);
     when(userProfile.getNickname()).thenReturn("updated nickname");
     when(userProfile.getEmail()).thenReturn("updated@example.com");
+    when(userProfile.getRole()).thenReturn(UserRole.ADMIN);
+    when(userProfile.getStatus()).thenReturn(UserProfileStatus.BANNED);
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
         .thenReturn(Optional.of(userProfile));
 
@@ -107,7 +115,27 @@ class UserProfileServiceTest {
 
     verify(userProfile).updateProfile("updated@example.com", "updated nickname");
     assertThat(profile)
-        .isEqualTo(new AuthProfile(USER_ID, "updated nickname", "updated@example.com"));
+        .isEqualTo(
+            new AuthProfile(
+                USER_ID,
+                "updated nickname",
+                "updated@example.com",
+                UserRole.ADMIN,
+                UserProfileStatus.BANNED));
+  }
+
+  /** 인증 프로필 변환은 프로필의 null 역할과 상태를 임의의 기본값으로 바꾸지 않는다. */
+  @Test
+  void keepsAuthenticationProfileValuesWithoutFallback() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfile.getId()).thenReturn(USER_ID);
+    when(userProfile.getNickname()).thenReturn("nickname");
+    when(userProfile.getEmail()).thenReturn("user@example.com");
+    when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
+        .thenReturn(Optional.of(userProfile));
+
+    assertThat(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
+        .contains(new AuthProfile(USER_ID, "nickname", "user@example.com", null, null));
   }
 
   /** 비활성 사용자는 인증 기능용 갱신 계약에서 빈 결과로 반환한다. */
@@ -119,6 +147,17 @@ class UserProfileServiceTest {
             userProfileService.updateAuthenticationProfileForUpdate(
                 USER_ID, "updated@example.com", "updated nickname"))
         .isEmpty();
+  }
+
+  /** 다른 기능에는 닉네임 문자열 대신 프로필 공개 계약을 반환한다. */
+  @Test
+  void findsNicknameAsPublicRecord() {
+    UserProfile userProfile = mock(UserProfile.class);
+    when(userProfile.getNickname()).thenReturn("nickname");
+    when(userProfileRepository.findById(USER_ID)).thenReturn(Optional.of(userProfile));
+
+    assertThat(userProfileService.findNickname(USER_ID))
+        .contains(new UserProfileNickname("nickname"));
   }
 
   /** 탈퇴 처리는 활성 프로필을 쓰기 잠금으로 조회해 상태를 변경한다. */

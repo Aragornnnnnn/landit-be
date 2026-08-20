@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -153,6 +154,22 @@ public class UserProfileService {
     return userId != null
         && userProfileRepository.existsByIdAndStatusAndRole(
             userId, UserProfileStatus.ACTIVE, UserRole.ADMIN);
+  }
+
+  /**
+   * 사용자 프로필 ID로 닉네임을 조회한다.
+   *
+   * @param userProfileId 조회할 사용자 프로필 ID
+   * @return 사용자 닉네임 계약. 프로필이 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<UserProfileNickname> findNickname(Long userProfileId) {
+    if (userProfileId == null) {
+      return Optional.empty();
+    }
+    return userProfileRepository
+        .findById(userProfileId)
+        .map(userProfile -> new UserProfileNickname(userProfile.getNickname()));
   }
 
   /**

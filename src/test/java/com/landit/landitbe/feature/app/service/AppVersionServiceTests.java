@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.admin.service.AdminAuditService;
 import com.landit.landitbe.feature.app.domain.AppVersion;
 import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -26,6 +27,8 @@ class AppVersionServiceTests {
 
   @Mock private AdminAuditService adminAuditService;
 
+  @Mock private UserProfileService userProfileService;
+
   @Mock private AppVersion appVersion;
 
   /** 정책 수정은 감사 기록의 이전 값을 만들기 전에 비관적 잠금을 획득한다. */
@@ -34,7 +37,7 @@ class AppVersionServiceTests {
     when(appVersionRepository.findByPlatformForUpdate(AppPlatform.IOS))
         .thenReturn(Optional.of(appVersion));
     AppVersionService appVersionService =
-        new AppVersionService(appVersionRepository, adminAuditService);
+        new AppVersionService(appVersionRepository, adminAuditService, userProfileService);
 
     appVersionService.update(1L, AppPlatform.IOS, updateRequest());
 

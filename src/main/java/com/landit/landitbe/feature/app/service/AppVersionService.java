@@ -11,6 +11,8 @@ import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse.UpdateType;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
+import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -24,17 +26,22 @@ public class AppVersionService {
 
   private final AppVersionRepository appVersionRepository;
   private final AdminAuditService adminAuditService;
+  private final UserProfileService userProfileService;
 
   /**
-   * 앱 버전 Repository와 관리자 감사 Service를 주입받는다.
+   * 앱 버전 Repository와 관리자 감사·프로필 Service를 주입받는다.
    *
    * @param appVersionRepository 앱 버전 정책 Repository
    * @param adminAuditService 관리자 감사 기록 Service
+   * @param userProfileService 사용자 프로필 Service
    */
   public AppVersionService(
-      AppVersionRepository appVersionRepository, AdminAuditService adminAuditService) {
+      AppVersionRepository appVersionRepository,
+      AdminAuditService adminAuditService,
+      UserProfileService userProfileService) {
     this.appVersionRepository = appVersionRepository;
     this.adminAuditService = adminAuditService;
+    this.userProfileService = userProfileService;
   }
 
   /**
@@ -63,7 +70,7 @@ public class AppVersionService {
   @Transactional(readOnly = true)
   public List<AdminAppVersionResponse> list() {
     return appVersionRepository.findAllByOrderByPlatformAsc().stream()
-        .map(AdminAppVersionResponse::from)
+        .map(this::toAdminResponse)
         .toList();
   }
 
@@ -91,7 +98,8 @@ public class AppVersionService {
         request.forceUpdateReason(),
         request.softUpdateReason(),
         request.releaseNote(),
-        request.releasedAt());
+        request.releasedAt(),
+        adminUserProfileId);
 
     adminAuditService.record(
         adminUserProfileId,
@@ -101,7 +109,17 @@ public class AppVersionService {
         beforeValue,
         auditValue(appVersion));
 
-    return AdminAppVersionResponse.from(appVersion);
+    return toAdminResponse(appVersion);
+  }
+
+  /** 앱 버전 정책과 마지막 수정자 닉네임을 관리자 응답으로 변환한다. */
+  private AdminAppVersionResponse toAdminResponse(AppVersion appVersion) {
+    String updatedBy =
+        userProfileService
+            .findNickname(appVersion.getUpdatedByUserProfileId())
+            .map(UserProfileNickname::nickname)
+            .orElse(null);
+    return AdminAppVersionResponse.from(appVersion, updatedBy);
   }
 
   /** 플랫폼의 단일 앱 버전 정책을 비관적 잠금으로 조회한다. */

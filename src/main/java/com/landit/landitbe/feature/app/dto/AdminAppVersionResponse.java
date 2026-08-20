@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.app.dto;
 
 import com.landit.landitbe.feature.app.domain.AppVersion;
 import com.landit.landitbe.shared.domain.AppPlatform;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
 /**
@@ -19,26 +20,51 @@ import java.time.LocalDateTime;
  * @param releaseNote 릴리스 노트
  * @param active 활성 정책 여부
  * @param releasedAt 출시 시각
+ * @param updatedAt 마지막 수정 시각
+ * @param updatedBy 마지막 수정자 닉네임
  */
 public record AdminAppVersionResponse(
-    Long appVersionId,
-    AppPlatform platform,
-    String versionName,
-    long buildNumber,
-    String minimumSupportedVersionName,
-    String forceUpdateReason,
-    String softUpdateReason,
-    String releaseNote,
-    boolean active,
-    LocalDateTime releasedAt) {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long appVersionId,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) AppPlatform platform,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String versionName,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long buildNumber,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String minimumSupportedVersionName,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String forceUpdateReason,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String softUpdateReason,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String releaseNote,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean active,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        LocalDateTime releasedAt,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime updatedAt,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String updatedBy) {
 
   /**
    * 앱 버전 정책 엔티티를 관리자 응답으로 변환한다.
    *
    * @param appVersion 변환할 앱 버전 정책
+   * @param updatedBy 마지막 수정자 닉네임
    * @return 관리자 앱 버전 정책 응답
    */
-  public static AdminAppVersionResponse from(AppVersion appVersion) {
+  public static AdminAppVersionResponse from(AppVersion appVersion, String updatedBy) {
     return new AdminAppVersionResponse(
         appVersion.getId(),
         appVersion.getPlatform(),
@@ -49,6 +75,8 @@ public record AdminAppVersionResponse(
         appVersion.getSoftUpdateReason(),
         appVersion.getReleaseNote(),
         appVersion.isActive(),
-        appVersion.getReleasedAt());
+        appVersion.getReleasedAt(),
+        appVersion.getUpdatedAt(),
+        updatedBy);
   }
 }

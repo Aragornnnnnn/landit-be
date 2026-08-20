@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -84,17 +89,39 @@ class AdminAppVersionApiIntegrationTests {
   void updatesPlatformPolicyAndRecordsBeforeAndAfterValues() throws Exception {
     insertPolicy("ANDROID", "1.0.0", "1.0.0", 10);
     String adminAccessToken = loginAdmin("admin-app-version-update", "관리자");
+    Long adminUserProfileId = findUserProfileId("admin-app-version-update");
 
-    mockMvc
-        .perform(
-            patch("/api/v1/admin/app-versions/{platform}", "ANDROID")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody("1.2.0", "1.1.0", 11)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.versionName").value("1.2.0"))
-        .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.1.0"))
-        .andExpect(jsonPath("$.data.buildNumber").value(11));
+    MvcResult patchResult =
+        mockMvc
+            .perform(
+                patch("/api/v1/admin/app-versions/{platform}", "ANDROID")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody("1.2.0", "1.1.0", 11)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.versionName").value("1.2.0"))
+            .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.1.0"))
+            .andExpect(jsonPath("$.data.buildNumber").value(11))
+            .andExpect(jsonPath("$.data.updatedAt").isNotEmpty())
+            .andExpect(jsonPath("$.data.updatedBy").value("관리자"))
+            .andReturn();
+
+    LocalDateTime responseUpdatedAt =
+        LocalDateTime.parse(
+            objectMapper
+                .readTree(patchResult.getResponse().getContentAsByteArray())
+                .at("/data/updatedAt")
+                .asText());
+    LocalDateTime persistedUpdatedAt =
+        jdbcTemplate.queryForObject(
+            "select updated_at from app_version where platform = 'ANDROID'", LocalDateTime.class);
+    assertThat(responseUpdatedAt).isCloseTo(persistedUpdatedAt, within(1, ChronoUnit.MICROS));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select updated_by_user_profile_id from app_version where platform = 'ANDROID'",
+                Long.class))
+        .isEqualTo(adminUserProfileId);
 
     mockMvc
         .perform(
@@ -116,6 +143,66 @@ class AdminAppVersionApiIntegrationTests {
                     + "order by id desc limit 1",
                 String.class))
         .contains("versionName=1.2.0", "minimumSupportedVersionName=1.1.0");
+  }
+
+  /** 감사 이력이 없는 기존 앱 버전 정책은 생성 시각과 빈 수정자로 이관한다. */
+  @Test
+  void migratesPolicyWithoutAuditHistoryUsingCreatedAtAndNullModifier() {
+    DriverManagerDataSource dataSource = newMigrationDataSource();
+    JdbcTemplate migrationJdbcTemplate = migrateThroughV55(dataSource);
+    migrationJdbcTemplate.update(
+        """
+        insert into app_version (
+            platform, version_name, minimum_supported_version_name,
+            build_number, active, released_at, created_at
+        )
+        values ('IOS', '1.0.0', '1.0.0', 10, true,
+                timestamp '2026-01-02 03:04:05', timestamp '2026-01-02 03:04:05')
+        """);
+
+    migrateToLatest(dataSource);
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select updated_at from app_version where platform = 'IOS'", String.class))
+        .startsWith("2026-01-02 03:04:05");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select updated_by_user_profile_id from app_version where platform = 'IOS'",
+                Long.class))
+        .isNull();
+  }
+
+  /** 최신 앱 버전 감사 기록의 수정 시각과 관리자를 기존 정책에 이관한다. */
+  @Test
+  void migratesLatestAuditHistoryForPlatform() {
+    DriverManagerDataSource dataSource = newMigrationDataSource();
+    JdbcTemplate migrationJdbcTemplate = migrateThroughV55(dataSource);
+    insertMigrationUserProfile(migrationJdbcTemplate, 101L, "이전 관리자");
+    insertMigrationUserProfile(migrationJdbcTemplate, 102L, "최신 관리자");
+    migrationJdbcTemplate.update(
+        """
+        insert into app_version (
+            platform, version_name, minimum_supported_version_name,
+            build_number, active, released_at, created_at
+        )
+        values ('ANDROID', '1.0.0', '1.0.0', 10, true,
+                timestamp '2026-01-02 03:04:05', timestamp '2026-01-02 03:04:05')
+        """);
+    insertAppVersionAuditLog(migrationJdbcTemplate, 101L, "ANDROID", "2026-01-03 03:04:05");
+    insertAppVersionAuditLog(migrationJdbcTemplate, 102L, "ANDROID", "2026-01-04 03:04:05");
+
+    migrateToLatest(dataSource);
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select updated_at from app_version where platform = 'ANDROID'", String.class))
+        .startsWith("2026-01-04 03:04:05");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select updated_by_user_profile_id from app_version where platform = 'ANDROID'",
+                Long.class))
+        .isEqualTo(102L);
   }
 
   /** 최소 지원 버전이 최신 버전보다 높으면 정책 수정을 거절한다. */
@@ -164,6 +251,34 @@ class AdminAppVersionApiIntegrationTests {
                 .doesNotExist());
   }
 
+  /** 관리자 앱 버전 응답의 OpenAPI required 및 nullable 계약을 노출한다. */
+  @Test
+  void documentsAdminAppVersionResponseContract() throws Exception {
+    String responseSchema = "$.components.schemas.AdminAppVersionResponse";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'appVersionId')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'platform')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'versionName')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'buildNumber')]").exists())
+        .andExpect(
+            jsonPath(responseSchema + ".required[?(@ == 'minimumSupportedVersionName')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'forceUpdateReason')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.forceUpdateReason.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'softUpdateReason')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.softUpdateReason.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'releaseNote')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.releaseNote.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'active')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'releasedAt')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.releasedAt.type[1]").value("null"))
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'updatedAt')]").exists())
+        .andExpect(jsonPath(responseSchema + ".required[?(@ == 'updatedBy')]").exists())
+        .andExpect(jsonPath(responseSchema + ".properties.updatedBy.type[1]").value("null"));
+  }
+
   /** 테스트 식별자와 이름으로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey, String nickname) throws Exception {
     String nonce = UUID.randomUUID().toString();
@@ -193,11 +308,82 @@ class AdminAppVersionApiIntegrationTests {
   /** 테스트 사용자를 로그인시키고 관리자 역할을 부여한다. */
   private String loginAdmin(String userKey, String nickname) throws Exception {
     String accessToken = login(userKey, nickname);
-    Long userProfileId =
-        jdbcTemplate.queryForObject(
-            "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
+    Long userProfileId = findUserProfileId(userKey);
     jdbcTemplate.update("update user_profile set role = 'ADMIN' where id = ?", userProfileId);
     return accessToken;
+  }
+
+  /** 테스트 사용자 이메일로 사용자 프로필 ID를 조회한다. */
+  private Long findUserProfileId(String userKey) {
+    return jdbcTemplate.queryForObject(
+        "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
+  }
+
+  /** V55 스키마로 migration 검증용 독립 H2 데이터베이스를 만든다. */
+  private DriverManagerDataSource newMigrationDataSource() {
+    return new DriverManagerDataSource(
+        "jdbc:h2:mem:app-version-migration-"
+            + UUID.randomUUID()
+            + ";MODE=PostgreSQL;NON_KEYWORDS=ROLE;DB_CLOSE_DELAY=-1",
+        "sa",
+        "");
+  }
+
+  /** V57 적용 전 상태까지 migration을 실행한다. */
+  private JdbcTemplate migrateThroughV55(DriverManagerDataSource dataSource) {
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/migration", "classpath:db/h2")
+        .target("55")
+        .load()
+        .migrate();
+    JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+    migrationJdbcTemplate.execute("alter table user_profile drop constraint chk_user_profile_role");
+    return migrationJdbcTemplate;
+  }
+
+  /** 최신 migration을 실행한다. */
+  private void migrateToLatest(DriverManagerDataSource dataSource) {
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/migration", "classpath:db/h2")
+        .load()
+        .migrate();
+  }
+
+  /** 이관 검증용 관리자 사용자 프로필을 추가한다. */
+  private void insertMigrationUserProfile(
+      JdbcTemplate migrationJdbcTemplate, long userProfileId, String nickname) {
+    migrationJdbcTemplate.update(
+        """
+        insert into user_profile (
+            id, nickname, target_locale, base_locale, current_level,
+            push_permission_status, status, role, created_at, updated_at
+        )
+        values (?, ?, 'EN', 'KR', 1, 'NOT_DETERMINED', 'ACTIVE', 'ADMIN',
+                current_timestamp, current_timestamp)
+        """,
+        userProfileId,
+        nickname);
+  }
+
+  /** 이관 검증용 앱 버전 수정 감사 기록을 추가한다. */
+  private void insertAppVersionAuditLog(
+      JdbcTemplate migrationJdbcTemplate,
+      long adminUserProfileId,
+      String platform,
+      String createdAt) {
+    migrationJdbcTemplate.update(
+        """
+        insert into admin_audit_log (
+            admin_user_profile_id, action, target_type, target_id,
+            before_value, after_value, created_at
+        )
+        values (?, 'APP_VERSION_UPDATED', 'APP_VERSION', ?, NULL, NULL, cast(? as timestamp))
+        """,
+        adminUserProfileId,
+        platform,
+        createdAt);
   }
 
   /** 플랫폼별 단일 앱 버전 정책을 추가한다. */
@@ -208,9 +394,9 @@ class AdminAppVersionApiIntegrationTests {
         insert into app_version (
             platform, version_name, minimum_supported_version_name,
             build_number, active, released_at,
-            created_at
+            created_at, updated_at
         )
-        values (?, ?, ?, ?, true, current_timestamp, current_timestamp)
+        values (?, ?, ?, ?, true, current_timestamp, current_timestamp, current_timestamp)
         """,
         platform,
         versionName,
