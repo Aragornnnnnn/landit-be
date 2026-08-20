@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.auth.dto;
 
 import com.landit.landitbe.feature.auth.domain.SocialProvider;
+import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 
 /**
@@ -13,9 +15,17 @@ import com.landit.landitbe.feature.profile.dto.AuthProfile;
  * @param email 사용자 이메일
  * @param provider 소셜 로그인 제공자
  * @param newUser 신규 가입 사용자 여부
+ * @param role 사용자 역할
+ * @param status 사용자 프로필 상태
  */
 public record AuthUserResponse(
-    Long userId, String nickname, String email, String provider, boolean newUser) {
+    Long userId,
+    String nickname,
+    String email,
+    String provider,
+    boolean newUser,
+    UserRole role,
+    UserProfileStatus status) {
 
   /**
    * 사용자 프로필과 소셜 로그인 결과를 인증 사용자 응답으로 변환한다.
@@ -32,6 +42,8 @@ public record AuthUserResponse(
         authProfile.nickname(),
         authProfile.email(),
         provider.name(),
-        newUser);
+        newUser,
+        authProfile.role(),
+        authProfile.status());
   }
 }
