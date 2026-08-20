@@ -14,6 +14,7 @@ import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
+import com.landit.landitbe.shared.exception.ApiException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -275,9 +276,21 @@ public class FreeTalkMessageService {
             }
             return;
           }
-          log.warn("프리톡 속마음 생성에 실패했습니다. messageId={}", request.submittedMessageId(), exception);
+          log.error(
+              "프리톡 속마음 생성에 실패했습니다. "
+                  + "workflow=free_talk_inner_thought_failed messageId={} errorCode={}",
+              request.submittedMessageId(),
+              errorCode(exception),
+              exception);
           sessionMessageService.failInnerThought(request.submittedMessageId());
         });
+  }
+
+  private String errorCode(Throwable exception) {
+    if (exception instanceof ApiException apiException) {
+      return apiException.getErrorCode().name();
+    }
+    return exception.getClass().getSimpleName();
   }
 
   private void cancelInnerThought(
