@@ -1541,7 +1541,7 @@ class ScenarioSessionApiIntegrationTests {
   @Test
   void submitMessageRollsBackUserMessageWhenAiGenerationFails() throws Exception {
     fakeAiConversationClient.blockInnerThoughtGeneration();
-    fakeAiConversationClient.failNextMessageGeneration();
+    fakeAiConversationClient.failNextMessageGenerationAfterInnerThoughtStarts();
     JsonNode loginBody = login("message-ai-fail@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -2804,7 +2804,7 @@ class ScenarioSessionApiIntegrationTests {
 
     private GoalCompletionStatus nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
 
-    private boolean failNextMessageGeneration;
+    private boolean failNextMessageGenerationAfterInnerThoughtStarts;
 
     private boolean failInnerThoughtGeneration;
 
@@ -2835,7 +2835,8 @@ class ScenarioSessionApiIntegrationTests {
       lastNextMessageRequest = request;
       nextMessageTransactionActive.add(
           TransactionSynchronizationManager.isActualTransactionActive());
-      if (failNextMessageGeneration) {
+      if (failNextMessageGenerationAfterInnerThoughtStarts) {
+        awaitInnerThoughtGenerationStartBeforeFailure();
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       return new AiNextMessageResult(
@@ -2940,7 +2941,7 @@ class ScenarioSessionApiIntegrationTests {
       messageFeedbackTransactionActive.clear();
       sessionFeedbackTransactionActive.clear();
       nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
-      failNextMessageGeneration = false;
+      failNextMessageGenerationAfterInnerThoughtStarts = false;
       failInnerThoughtGeneration = false;
       innerThoughtResponseMessageId = null;
       failMessageFeedbackRequest = false;
@@ -2985,8 +2986,19 @@ class ScenarioSessionApiIntegrationTests {
       nextGoalCompletionStatus = GoalCompletionStatus.COMPLETED;
     }
 
-    private void failNextMessageGeneration() {
-      failNextMessageGeneration = true;
+    private void failNextMessageGenerationAfterInnerThoughtStarts() {
+      failNextMessageGenerationAfterInnerThoughtStarts = true;
+    }
+
+    private void awaitInnerThoughtGenerationStartBeforeFailure() {
+      try {
+        if (!innerThoughtGenerationStarted.await(5, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("속마음 생성이 시작되지 않았습니다.");
+        }
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("속마음 생성 시작 대기가 중단되었습니다.", exception);
+      }
     }
 
     private void failInnerThoughtGeneration() {
