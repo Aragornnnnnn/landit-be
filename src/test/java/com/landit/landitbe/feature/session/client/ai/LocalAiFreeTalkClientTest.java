@@ -19,7 +19,7 @@ class LocalAiFreeTalkClientTest {
         client.recommendExpressions(recommendationsRequest()).recommendations().getFirst();
 
     assertThat(turn.userExitIntentDetected()).isFalse();
-    assertThat(turn.inferredTitle()).isEqualTo("오늘의 프리톡");
+    assertThat(turn.inferredTitle()).isNull();
     assertThat(turn.aiMessage()).isNotBlank();
     assertThat(turn.translatedMessage()).isNotBlank();
     assertThat(turn.emotion()).isNotNull();

@@ -511,7 +511,7 @@ class FreeTalkSessionApiIntegrationTests {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(request))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.title").value("Hiking with friends"))
+            .andExpect(jsonPath("$.data.title").value(nullValue()))
             .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
             .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
             .andExpect(
@@ -629,6 +629,84 @@ class FreeTalkSessionApiIntegrationTests {
                         .formatted(submittedMessageId)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+  }
+
+  @Test
+  void assignsCharacterFallbackTitleWhenUserFirstSessionEndsWithoutGeneratedTitle()
+      throws Exception {
+    String accessToken =
+        login("free-talk-title-fallback@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.omitClosingTitle();
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("Chloe와의 대화"))
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
+  @Test
+  void assignsGeneratedEnglishTitleWhenUserFirstSessionEnds() throws Exception {
+    String accessToken =
+        login("free-talk-generated-title@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
+  @Test
+  void preservesRecommendedTopicTitleWhenAiFirstSessionEnds() throws Exception {
+    seedTopic(1151, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
+    String accessToken =
+        login("free-talk-topic-title@example.com").get("data").get("accessToken").asText();
+    MvcResult startResult =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"startMode\":\"AI_FIRST\",\"topicId\":1151,"
+                            + "\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(startResult.getResponse().getContentAsByteArray())
+            .at("/data/sessionId")
+            .asLong();
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 60000, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("주말 계획"))
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
   }
 
   @Test
@@ -1369,6 +1447,7 @@ class FreeTalkSessionApiIntegrationTests {
     private final AtomicInteger turnCallCount = new AtomicInteger();
     private volatile CountDownLatch turnStarted = new CountDownLatch(1);
     private volatile CountDownLatch turnRelease = new CountDownLatch(0);
+    private volatile boolean omitClosingTitle;
 
     @Override
     public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
@@ -1418,7 +1497,10 @@ class FreeTalkSessionApiIntegrationTests {
     @Override
     public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
       return new AiFreeTalkClosingResult(
-          "It was great talking with you!", "이야기해서 즐거웠어!", CharacterEmotion.HAPPY);
+          request.titleGenerationRequired() && !omitClosingTitle ? "Weekend Hiking" : null,
+          "It was great talking with you!",
+          "이야기해서 즐거웠어!",
+          CharacterEmotion.HAPPY);
     }
 
     @Override
@@ -1455,6 +1537,11 @@ class FreeTalkSessionApiIntegrationTests {
       turnCallCount.set(0);
       turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(0);
+      omitClosingTitle = false;
+    }
+
+    void omitClosingTitle() {
+      omitClosingTitle = true;
     }
 
     void failOpening() {
