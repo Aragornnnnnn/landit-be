@@ -14,7 +14,7 @@ import org.springframework.util.StreamUtils;
 class Lan302ContentMigrationTests {
 
   private static final String MIGRATION_PATH =
-      "db/migration/V56__update_lan302_practice_example_image_urls.sql";
+      "db/postgresql/V56__update_lan302_practice_example_image_urls.sql";
 
   @DisplayName("V56은 payload를 먼저 재구성한 뒤 writing expression을 갱신한다.")
   @Test
