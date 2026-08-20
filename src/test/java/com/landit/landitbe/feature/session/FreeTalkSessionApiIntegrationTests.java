@@ -1093,7 +1093,14 @@ class FreeTalkSessionApiIntegrationTests {
                     messageRequest(UUID.randomUUID().toString(), "One last thing.", 3000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(62000));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT title FROM free_talk_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("Weekend Hiking");
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
   }
 

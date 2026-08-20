@@ -227,6 +227,23 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void treatsBlankClosingTitleAsMissingWhilePreservingClosingMessage() throws Exception {
+    registerRawResponse(
+        "/api/v1/free-talk/closing",
+        200,
+        successResponse(
+            "{\"inferredTitle\":\"   \","
+                + "\"aiMessage\":\"It was nice talking with you.\","
+                + "\"translatedMessage\":\"이야기해서 좋았어.\",\"emotion\":null}"));
+
+    AiFreeTalkClosingResult result = remoteClient().generateClosing(closingRequest());
+
+    assertThat(result.inferredTitle()).isNull();
+    assertThat(result.aiMessage()).isEqualTo("It was nice talking with you.");
+    assertThat(result.translatedMessage()).isEqualTo("이야기해서 좋았어.");
+  }
+
+  @Test
   void preservesResponseInvalidForUpstream502AndMaps503ToGenerationFailure() throws Exception {
     server.createContext(
         "/api/v1/free-talk/opening",
