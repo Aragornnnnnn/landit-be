@@ -14,6 +14,7 @@ import java.util.List;
  *
  * @param sessionId 프리톡 학습 세션 ID
  * @param title 프리톡 제목
+ * @param characterId 선택한 프리톡 캐릭터 식별자
  * @param startedAt 세션 시작 시각
  * @param completedAt 세션 완료 시각
  * @param userSpeakingDurationMs 세션의 사용자 발화 시간 합계
@@ -25,6 +26,7 @@ import java.util.List;
 public record FreeTalkSessionDetailResponse(
     Long sessionId,
     String title,
+    String characterId,
     LocalDateTime startedAt,
     LocalDateTime completedAt,
     long userSpeakingDurationMs,

@@ -46,9 +46,6 @@ public class ScenarioLanguageVariant extends BaseTimeEntity {
   @Column(name = "conversation_goal", nullable = false, length = 255)
   private String conversationGoal;
 
-  @Column(name = "tts_voice_id")
-  private Long ttsVoiceId;
-
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private ActiveStatus status;

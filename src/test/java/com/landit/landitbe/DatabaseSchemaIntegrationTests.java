@@ -3,8 +3,12 @@
 package com.landit.landitbe;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import com.landit.landitbe.feature.content.domain.TtsVoice;
+import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +31,8 @@ import org.springframework.util.StreamUtils;
 class DatabaseSchemaIntegrationTests {
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private TtsVoiceRepository ttsVoiceRepository;
 
   @Test
   void dbmlCoreTablesExist() {
@@ -197,6 +203,18 @@ class DatabaseSchemaIntegrationTests {
     assertThat(responseCount).isEqualTo(2);
   }
 
+  @DisplayName("편지함 스키마를 추가하고 기존 NPS 테이블은 유지한다.")
+  @Test
+  void mailboxSchemaCoexistsWithLegacyNps() {
+    assertTableExists("mailbox_letter");
+    assertTableExists("mailbox_feedback");
+    assertTableExists("mailbox_letter_recipient");
+    assertTableExists("mailbox_letter_read");
+    assertTableExists("nps_response");
+    assertIndexExists("idx_mailbox_letter_admin_filter");
+    assertIndexExists("idx_mailbox_feedback_admin_filter");
+  }
+
   @DisplayName("ERD v2 컬럼 차이를 최신 migration으로 반영한다.")
   @Test
   void erdV2ColumnChangesAreAppliedByLatestMigration() {
@@ -308,7 +326,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
-  @DisplayName("V29 migration은 프리톡 생성 표현을 공통 학습 콘텐츠로 저장한다.")
+  @DisplayName("프리톡 표현 연결 구조는 공용 표현만 참조한다.")
   @Test
   void v29AddsFreeTalkExpressionLearningStorage() {
     assertTableExists("free_talk_session_expression");
@@ -317,13 +335,13 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("free_talk_session", "expression_generation_status");
     assertColumnExists("free_talk_session", "expression_generation_started_at");
     assertColumnExists("free_talk_session_expression", "writing_expression_id");
-    assertColumnExists("writing_expression", "owner_user_profile_id");
+    assertColumnDoesNotExist("writing_expression", "owner_user_profile_id");
     assertNullableColumn("writing_expression", "scenario_id");
     assertNullableColumn("user_writing_expression_completion", "scenario_id");
     assertColumnDoesNotExist("free_talk_session_expression", "generated_content_payload");
     assertTableConstraintExists(
         "free_talk_session", "chk_free_talk_session_expression_generation_status");
-    assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+    assertTableConstraintExists("writing_expression", "chk_writing_expression_scenario_source");
   }
 
   @DisplayName("V37 migration은 프리톡 세션별 표현 완료 시각을 추가한다.")
@@ -333,11 +351,15 @@ class DatabaseSchemaIntegrationTests {
     assertNullableColumn("free_talk_session_expression", "completed_at");
   }
 
-  @DisplayName("V36 migration은 Writing 표현의 시나리오와 프리톡 사용 영역을 구분한다.")
+  @DisplayName("Writing 표현은 시나리오와 프리톡 사용 영역을 소스별로 구분한다.")
   @Test
   void v36AddsWritingExpressionSource() {
     assertColumnExists("writing_expression", "expression_source");
-    assertTableConstraintExists("writing_expression", "chk_writing_expression_source");
+    assertColumnExists("writing_expression", "embedding");
+    assertTableConstraintExists("writing_expression", "chk_writing_expression_scenario_source");
+    assertTableConstraintDoesNotExist("writing_expression", "chk_writing_expression_source");
+    assertTableConstraintDoesNotExist(
+        "writing_expression", "fk_writing_expression_owner_user_profile_id");
 
     Integer mismatchedSourceCount =
         jdbcTemplate.queryForObject(
@@ -377,10 +399,25 @@ class DatabaseSchemaIntegrationTests {
             from writing_expression
             where expression_source = 'FREE_TALK'
               and scenario_id is null
-              and owner_user_profile_id is null
             """,
             Integer.class);
     assertThat(expressionCount).isEqualTo(1);
+  }
+
+  @DisplayName("V51 PostgreSQL migration은 pgvector 1536차원 컬럼을 사용한다.")
+  @Test
+  void v51UsesPgvectorAndH2CompatibleEmbeddingMigrations() throws Exception {
+    String postgresqlMigrationSql =
+        readMigrationSql("db/postgresql/V51__prepare_writing_expression_embeddings.sql");
+    String h2MigrationSql =
+        readMigrationSql("db/h2/V51__prepare_writing_expression_embeddings.sql");
+
+    assertThat(postgresqlMigrationSql)
+        .contains(
+            "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions",
+            "embedding extensions.vector(1536)",
+            "chk_writing_expression_scenario_source");
+    assertThat(h2MigrationSql).contains("embedding VARCHAR(32767)");
   }
 
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
@@ -439,9 +476,9 @@ class DatabaseSchemaIntegrationTests {
         aiTutorId);
     jdbcTemplate.update(
         """
-        insert into free_talk_session (id, learning_session_id, start_mode, conversation_status,
-            accumulated_speaking_duration_ms, created_at, updated_at)
-        values (992003, 992002, 'USER_FIRST', 'IN_PROGRESS', 0,
+        insert into free_talk_session (id, learning_session_id, start_mode, character_id,
+            conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)
+        values (992003, 992002, 'USER_FIRST', 'chloe', 'IN_PROGRESS', 0,
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """);
     jdbcTemplate.update(
@@ -566,15 +603,107 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("ai_tutor", "voice_provider");
     assertColumnDoesNotExist("ai_tutor", "voice_id");
     assertColumnDoesNotExist("scenario", "tts_voice_set_id");
-    assertColumnExists("scenario_language_variant", "tts_voice_id");
-    assertTableConstraintExists("scenario_language_variant", "fk_scenario_lang_tts_voice_id");
+  }
+
+  /** 공용 캐릭터가 시나리오와 프리톡의 TTS 매핑 원본이 된다. */
+  @Test
+  void conversationCharacterOwnsScenarioAndFreeTalkTtsMapping() {
+    assertTableExists("conversation_character");
+    assertColumnExists("conversation_character", "character_id");
+    assertColumnExists("conversation_character", "tts_voice_id");
+    assertColumnExists("conversation_character", "status");
+    assertTableConstraintExists("conversation_character", "fk_conversation_character_tts_voice");
+
+    assertColumnExists("scenario", "character_id");
+    assertTableConstraintExists("scenario", "fk_scenario_character");
+    assertColumnDoesNotExist("scenario_language_variant", "tts_voice_id");
+    assertTableConstraintExists("free_talk_session", "fk_free_talk_session_character");
+
+    List<Map<String, Object>> mappings =
+        jdbcTemplate.queryForList(
+            """
+            select cc.character_id, tv.provider_voice_id
+            from conversation_character cc
+            join tts_voice tv on tv.id = cc.tts_voice_id
+            order by cc.character_id
+            """);
+    assertThat(mappings)
+        .extracting(row -> row.get("CHARACTER_ID"), row -> row.get("PROVIDER_VOICE_ID"))
+        .containsExactly(
+            tuple("chloe", "en-US-Harper:MAI-Voice-2"),
+            tuple("marco", "aura-2-hyperion-en"),
+            tuple("teddy", "aura-2-draco-en"));
+  }
+
+  /** V55 migration은 기존 시나리오 음성을 동일한 공용 캐릭터로 이전한다. */
+  @Test
+  void v55MigrationBackfillsScenarioCharacterFromExistingVoice() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "54");
+    insertLegacyScenario(migrationJdbcTemplate, 990301L, 2L);
+
+    migrateToLatestVersion(databaseUrl);
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select character_id from scenario where id = 990301", String.class))
+        .isEqualTo("marco");
+  }
+
+  /** V55 migration은 하나의 시나리오가 여러 캐릭터 음성을 사용하면 적용을 중단한다. */
+  @Test
+  void v55MigrationRejectsScenarioWithMultipleCharacterVoices() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "54");
+    insertLegacyScenario(migrationJdbcTemplate, 990302L, 1L);
+    insertLegacyScenarioVariant(migrationJdbcTemplate, 990302L, "JP", 2L);
+
+    assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
+        .isInstanceOf(FlywayException.class);
+  }
+
+  /** V55 migration은 한 시나리오의 음성 설정 여부가 언어별로 다르면 적용을 중단한다. */
+  @Test
+  void v55MigrationRejectsScenarioWithMixedNullAndCharacterVoice() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "54");
+    insertLegacyScenario(migrationJdbcTemplate, 990304L, 1L);
+    insertLegacyScenarioVariant(migrationJdbcTemplate, 990304L, "JP", null);
+
+    assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
+        .isInstanceOf(FlywayException.class);
+  }
+
+  /** V55 migration은 공용 캐릭터로 역매핑할 수 없는 음성이 있으면 적용을 중단한다. */
+  @Test
+  void v55MigrationRejectsUnmappedScenarioVoice() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "54");
+    insertTestTtsVoice(migrationJdbcTemplate, 990303L);
+    insertLegacyScenario(migrationJdbcTemplate, 990303L, 990303L);
+
+    assertThatThrownBy(() -> migrateToLatestVersion(databaseUrl))
+        .isInstanceOf(FlywayException.class);
   }
 
   @DisplayName("V14 migration이 기본 튜터와 시나리오 TTS 음성 두 건을 추가한다.")
   @Test
   void v14MigrationSeedsDefaultTutorAndScenarioTtsVoices() throws Exception {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "14");
+
     List<Map<String, Object>> voices =
-        jdbcTemplate.queryForList(
+        migrationJdbcTemplate.queryForList(
             """
             select provider, model, provider_voice_id, gender, description, accent_locale, status
             from tts_voice
@@ -599,7 +728,7 @@ class DatabaseSchemaIntegrationTests {
 
     assertThatThrownBy(
             () ->
-                jdbcTemplate.update(
+                migrationJdbcTemplate.update(
                     """
                     insert into tts_voice (
                         provider, model, provider_voice_id, gender, accent_locale, status,
@@ -613,7 +742,7 @@ class DatabaseSchemaIntegrationTests {
         .isInstanceOf(DataIntegrityViolationException.class);
 
     Integer defaultTutorCount =
-        jdbcTemplate.queryForObject(
+        migrationJdbcTemplate.queryForObject(
             """
             select count(*)
             from ai_tutor
@@ -625,7 +754,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorCount).isEqualTo(1);
 
     Integer koreanVariantCount =
-        jdbcTemplate.queryForObject(
+        migrationJdbcTemplate.queryForObject(
             """
             select count(*)
             from ai_tutor_language_variant variant
@@ -644,11 +773,31 @@ class DatabaseSchemaIntegrationTests {
     assertThat(migrationSql).contains("UPDATE user_profile", "WHERE ai_tutor_id IS NULL");
   }
 
+  @DisplayName("공용 및 PostgreSQL migration의 버전은 중복되지 않는다.")
+  @Test
+  void commonAndPostgresqlMigrationVersionsAreUnique() {
+    String databaseUrl = migrationTestDatabaseUrl();
+
+    assertThatNoException()
+        .isThrownBy(
+            () ->
+                Flyway.configure()
+                    .dataSource(databaseUrl, "sa", "")
+                    .locations("classpath:db/migration", "classpath:db/postgresql")
+                    .load()
+                    .info());
+  }
+
   @DisplayName("V38 migration이 Deepgram Aura 2 TTS 음성을 추가한다.")
   @Test
   void v38MigrationSeedsDeepgramAura2Voice() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "38");
+
     Map<String, Object> voice =
-        jdbcTemplate.queryForMap(
+        migrationJdbcTemplate.queryForMap(
             """
             select provider, model, provider_voice_id, gender, description, accent_locale, status
             from tts_voice
@@ -665,6 +814,41 @@ class DatabaseSchemaIntegrationTests {
         .containsEntry("DESCRIPTION", "굵은 남성 음성")
         .containsEntry("ACCENT_LOCALE", "EN_US")
         .containsEntry("STATUS", "ACTIVE");
+  }
+
+  @DisplayName("V50 migration이 Marco와 Teddy의 TTS 음성을 변경하고 Chloe는 유지한다.")
+  @Test
+  void v50MigrationUpdatesMarcoAndTeddyVoicesAndKeepsChloe() {
+    List<Map<String, Object>> voices =
+        jdbcTemplate.queryForList(
+            """
+            select id, model, provider_voice_id, description, accent_locale
+            from tts_voice
+            where id in (1, 2, 3)
+            order by id
+            """);
+
+    assertThat(voices)
+        .extracting(
+            row -> row.get("ID"),
+            row -> row.get("MODEL"),
+            row -> row.get("PROVIDER_VOICE_ID"),
+            row -> row.get("DESCRIPTION"),
+            row -> row.get("ACCENT_LOCALE"))
+        .containsExactly(
+            tuple(1L, "microsoft/mai-voice-2", "en-US-Harper:MAI-Voice-2", "미국 영어 여성 음성", "EN_US"),
+            tuple(2L, "deepgram/aura-2", "aura-2-hyperion-en", "호주 영어 남성 음성", "EN_AU"),
+            tuple(3L, "deepgram/aura-2", "aura-2-draco-en", "영국 영어 굵은 남성 음성", "EN_GB"));
+  }
+
+  @DisplayName("V50 migration 이후 Marco와 Teddy의 TTS 음성을 JPA 엔티티로 조회한다.")
+  @Test
+  void v50MigratedVoicesCanBeLoadedAsJpaEntities() {
+    TtsVoice marco = ttsVoiceRepository.findById(2L).orElseThrow();
+    TtsVoice teddy = ttsVoiceRepository.findById(3L).orElseThrow();
+
+    assertThat(marco.getAccentLocale().name()).isEqualTo("EN_AU");
+    assertThat(teddy.getAccentLocale().name()).isEqualTo("EN_GB");
   }
 
   @DisplayName("V43 migration이 시나리오 노출 순서를 전체 기준 unique로 강제한다.")
@@ -805,6 +989,59 @@ class DatabaseSchemaIntegrationTests {
         .locations("classpath:db/migration", "classpath:db/h2")
         .load()
         .migrate();
+  }
+
+  private void insertLegacyScenario(
+      JdbcTemplate migrationJdbcTemplate, long scenarioId, long ttsVoiceId) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        scenarioId,
+        scenarioId);
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO scenario (
+            id, category_id, ai_role, difficulty, first_speaker, total_question_count,
+            display_order, status, created_at, updated_at
+        )
+        VALUES (?, ?, 'tutor', 'EASY', 'USER', 1, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        scenarioId,
+        scenarioId,
+        scenarioId);
+    insertLegacyScenarioVariant(migrationJdbcTemplate, scenarioId, "KR", ttsVoiceId);
+  }
+
+  private void insertLegacyScenarioVariant(
+      JdbcTemplate migrationJdbcTemplate, long scenarioId, String baseLocale, Long ttsVoiceId) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO scenario_language_variant (
+            scenario_id, target_locale, base_locale, title, briefing,
+            user_opening_instruction, conversation_goal, tts_voice_id,
+            status, created_at, updated_at
+        )
+        VALUES (?, 'EN', ?, '테스트 시나리오', '테스트 설명', '먼저 말해보세요.',
+                '테스트 목표', ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        scenarioId,
+        baseLocale,
+        ttsVoiceId);
+  }
+
+  private void insertTestTtsVoice(JdbcTemplate migrationJdbcTemplate, long ttsVoiceId) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO tts_voice (
+            id, provider, model, provider_voice_id, gender, description,
+            accent_locale, status, created_at, updated_at
+        )
+        VALUES (?, 'OPENROUTER', 'test-model', 'unmapped-voice', 'MALE', '테스트 음성',
+                'EN_US', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        ttsVoiceId);
   }
 
   private void insertAiTutor(JdbcTemplate migrationJdbcTemplate, long tutorId, String status) {
@@ -1007,6 +1244,22 @@ class DatabaseSchemaIntegrationTests {
             constraintName);
 
     assertThat(constraintCount).as("constraint %s.%s", tableName, constraintName).isEqualTo(1);
+  }
+
+  private void assertTableConstraintDoesNotExist(String tableName, String constraintName) {
+    Integer constraintCount =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.table_constraints
+            where lower(table_name) = ?
+              and lower(constraint_name) = ?
+            """,
+            Integer.class,
+            tableName,
+            constraintName);
+
+    assertThat(constraintCount).as("constraint %s.%s", tableName, constraintName).isZero();
   }
 
   private String readMigrationSql(String path) throws Exception {

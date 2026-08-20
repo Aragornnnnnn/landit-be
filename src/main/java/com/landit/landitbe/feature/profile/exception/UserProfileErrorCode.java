@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 
 /** 사용자 프로필 기능에서 예상 가능한 오류 코드와 HTTP 상태를 정의한다. */
 public enum UserProfileErrorCode {
-  INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
+  INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+  USER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
 
   private final HttpStatus status;
   private final String message;

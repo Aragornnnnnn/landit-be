@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.session.client.ai;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -16,6 +15,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -23,6 +24,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 원격 AI 서버의 프리톡 생성 API를 호출한다. */
+@Slf4j
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
 public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
@@ -33,8 +35,10 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
   private static final String EXPRESSION_RECOMMENDATIONS_PATH =
       "/api/v1/free-talk/expression-recommendations";
-  private static final String EXPRESSION_LEARNING_CONTENT_PATH =
-      "/api/v1/free-talk/expression-learning-content";
+  private static final String CONVERSATION_EMBEDDINGS_PATH =
+      "/api/v1/free-talk/conversation-embeddings";
+  private static final int MAX_CONVERSATION_EXCERPTS = 4;
+  private static final String AI_CALL_ELAPSED_LOG = "AI 호출 소요 시간. path={}, elapsedMs={}";
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -92,23 +96,21 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   }
 
   /**
-   * 신규 표현의 학습 콘텐츠를 생성한다.
+   * 완료된 프리톡 대화에서 핵심 사용자 발화를 추출하고 임베딩한다.
    *
-   * @param request 학습 콘텐츠 생성 요청
-   * @return 검증된 학습 콘텐츠 결과
+   * @param request 대화 임베딩 요청
+   * @return 검증된 핵심 발화와 임베딩 목록
    * @throws ApiException 원격 AI 호출 또는 응답 검증에 실패했을 때
    */
   @Override
-  public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
-      AiFreeTalkExpressionLearningContentRequest request) {
-    return post(
-            EXPRESSION_LEARNING_CONTENT_PATH,
-            request,
-            RemoteExpressionLearningContentResponse.class)
-        .toResult(request);
+  public AiConversationEmbeddingsResult extractConversationEmbeddings(
+      AiConversationEmbeddingsRequest request) {
+    return post(CONVERSATION_EMBEDDINGS_PATH, request, RemoteConversationEmbeddingsResponse.class)
+        .toResult();
   }
 
   private <T> T post(String path, Object payload, Class<T> responseType) {
+    long startNanos = System.nanoTime();
     try {
       HttpRequest request =
           HttpRequest.newBuilder(aiUri(path))
@@ -133,6 +135,10 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
     } catch (IOException | IllegalArgumentException exception) {
       throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+    } finally {
+      // 성공과 실패를 가리지 않고 왕복 시간을 남겨 지연 구간을 특정한다.
+      log.info(
+          AI_CALL_ELAPSED_LOG, path, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
     }
   }
 
@@ -180,7 +186,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
     // 원격 첫 발화 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkOpeningResult toResult() {
-      if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
+      if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiFreeTalkOpeningResult(aiMessage, translatedMessage, emotion);
@@ -210,7 +216,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
 
     private boolean hasMissingGeneratedField() {
-      return blank(aiMessage) || blank(translatedMessage) || emotion == null;
+      return blank(aiMessage) || blank(translatedMessage);
     }
 
     private boolean hasGeneratedField() {
@@ -233,14 +239,15 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteClosingResponse(
-      String aiMessage, String translatedMessage, CharacterEmotion emotion) {
+      String inferredTitle, String aiMessage, String translatedMessage, CharacterEmotion emotion) {
 
     // 원격 마무리 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkClosingResult toResult() {
-      if (blank(aiMessage) || blank(translatedMessage) || emotion == null) {
+      if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiFreeTalkClosingResult(aiMessage, translatedMessage, emotion);
+      String normalizedTitle = blank(inferredTitle) ? null : inferredTitle;
+      return new AiFreeTalkClosingResult(normalizedTitle, aiMessage, translatedMessage, emotion);
     }
   }
 
@@ -262,42 +269,12 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record RemoteExpressionLearningContentResponse(
-      List<AiFreeTalkExpressionLearningContent> expressions) {
-
-    // 원격 학습 콘텐츠 응답을 검증해 애플리케이션 결과로 변환한다.
-    private AiFreeTalkExpressionLearningContentResult toResult(
-        AiFreeTalkExpressionLearningContentRequest request) {
-      if (expressions == null
-          || expressions.isEmpty()
-          || request.expressions() == null
-          || expressions.size() != request.expressions().size()
-          || hasInvalidLearningContent(expressions, request.expressions())) {
-        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-      }
-      return new AiFreeTalkExpressionLearningContentResult(expressions);
-    }
-  }
-
   // 추천 목록에 순서나 출처가 잘못된 표현이 있는지 확인한다.
   private static boolean hasInvalidRecommendation(
       List<AiFreeTalkExpressionRecommendation> recommendations,
       List<AiFreeTalkExistingExpression> existingExpressions) {
     for (int index = 0; index < recommendations.size(); index++) {
       if (invalidRecommendation(recommendations.get(index), existingExpressions, index + 1)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // 생성된 학습 콘텐츠 목록에 유효하지 않은 항목이 있는지 확인한다.
-  private static boolean hasInvalidLearningContent(
-      List<AiFreeTalkExpressionLearningContent> expressions,
-      List<AiFreeTalkLearningExpression> requestedExpressions) {
-    for (int index = 0; index < expressions.size(); index++) {
-      if (invalidLearningContent(expressions.get(index), requestedExpressions.get(index))) {
         return true;
       }
     }
@@ -311,72 +288,39 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       int expectedDisplayOrder) {
     if (recommendation == null
         || recommendation.displayOrder() != expectedDisplayOrder
-        || recommendation.sourceType() == null
-        || blank(recommendation.targetExpressionText())
-        || blank(recommendation.baseExpressionMeaningText())
-        || blank(recommendation.usageSummary())) {
+        || recommendation.existingExpressionId() == null) {
       return true;
     }
-    if (recommendation.sourceType() == FreeTalkExpressionSourceType.NEW) {
-      return recommendation.existingExpressionId() != null;
+    return existingExpressions.stream()
+        .noneMatch(
+            expression -> expression.expressionId().equals(recommendation.existingExpressionId()));
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteConversationEmbeddingsResponse(List<AiConversationExcerpt> excerpts) {
+
+    // 원격 대화 임베딩 응답을 검증해 애플리케이션 결과로 변환한다.
+    private AiConversationEmbeddingsResult toResult() {
+      if (excerpts == null
+          || excerpts.isEmpty()
+          || excerpts.size() > MAX_CONVERSATION_EXCERPTS
+          || excerpts.stream().anyMatch(RemoteConversationEmbeddingsResponse::invalidExcerpt)) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiConversationEmbeddingsResult(excerpts);
     }
-    return recommendation.existingExpressionId() == null
-        || existingExpressions.stream()
-            .noneMatch(
-                expression ->
-                    expression.expressionId().equals(recommendation.existingExpressionId()));
-  }
 
-  // 생성된 학습 콘텐츠가 요청과 일치하는 유효한 결과인지 검증한다.
-  private static boolean invalidLearningContent(
-      AiFreeTalkExpressionLearningContent content,
-      AiFreeTalkLearningExpression requestedExpression) {
-    if (content == null || requestedExpression == null) {
-      return true;
+    // 추출 발화의 필수 값과 임베딩 차원을 검증한다.
+    private static boolean invalidExcerpt(AiConversationExcerpt excerpt) {
+      return excerpt == null
+          || blank(excerpt.excerptText())
+          || excerpt.embedding() == null
+          || excerpt.embedding().size() != AiConversationExcerpt.EMBEDDING_DIMENSION
+          || excerpt.embedding().contains(null);
     }
-    return missingLearningContent(content) || differsFromRequest(content, requestedExpression);
-  }
-
-  // 생성된 학습 콘텐츠에 필수 값이 빠졌는지 확인한다.
-  private static boolean missingLearningContent(AiFreeTalkExpressionLearningContent content) {
-    return blank(content.targetExpressionText())
-        || blank(content.baseExpressionMeaningText())
-        || blank(content.usageSummary())
-        || blank(content.usageDescription())
-        || invalidOptionalRepresentativeQuestion(content)
-        || blank(content.representativeSentenceText())
-        || blank(content.representativeSentenceTranslation())
-        || content.representativeSentenceWords() == null
-        || content.representativeSentenceWords().isEmpty()
-        || content.representativeSentenceWordChoices() == null
-        || content.representativeSentenceWordChoices().isEmpty()
-        || content.practiceExamples() == null
-        || content.practiceExamples().isEmpty();
-  }
-
-  // 생성된 표현의 핵심 값이 요청한 표현과 다른지 확인한다.
-  private static boolean differsFromRequest(
-      AiFreeTalkExpressionLearningContent content,
-      AiFreeTalkLearningExpression requestedExpression) {
-    return blank(requestedExpression.targetExpressionText())
-        || blank(requestedExpression.baseExpressionMeaningText())
-        || blank(requestedExpression.usageSummary())
-        || !requestedExpression.targetExpressionText().equals(content.targetExpressionText())
-        || !requestedExpression
-            .baseExpressionMeaningText()
-            .equals(content.baseExpressionMeaningText())
-        || !requestedExpression.usageSummary().equals(content.usageSummary());
   }
 
   // 선택 질문의 원문과 번역이 함께 제공됐는지 검증한다.
-  private static boolean invalidOptionalRepresentativeQuestion(
-      AiFreeTalkExpressionLearningContent content) {
-    return (content.representativeQuestionText() != null
-            || content.representativeQuestionTranslation() != null)
-        && (blank(content.representativeQuestionText())
-            || blank(content.representativeQuestionTranslation()));
-  }
-
   private static boolean blank(String value) {
     return value == null || value.isBlank();
   }

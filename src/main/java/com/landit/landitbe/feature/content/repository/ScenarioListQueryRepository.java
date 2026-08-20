@@ -4,7 +4,9 @@ package com.landit.landitbe.feature.content.repository;
 
 import com.landit.landitbe.feature.content.domain.Scenario;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
+import com.landit.landitbe.feature.content.repository.projection.ScenarioSummaryProjection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -68,8 +70,11 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
              AND openingQuestionVariant.targetLocale = up.targetLocale
              AND openingQuestionVariant.baseLocale = up.baseLocale
              AND openingQuestionVariant.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
+            LEFT JOIN ConversationCharacter character
+              ON character.characterId = s.characterId
+             AND character.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN TtsVoice tv
-              ON tv.id = slv.ttsVoiceId
+              ON tv.id = character.ttsVoiceId
              AND tv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN UserScenarioProgress usp
               ON usp.userProfileId = up.id
@@ -79,4 +84,30 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
             ORDER BY c.displayOrder ASC, s.displayOrder ASC
       """)
   List<ScenarioListProjection> findScenarioList(@Param("userId") long userId);
+
+  /**
+   * 사용자 언어 설정에 맞는 특정 시나리오의 기본 정보를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @return 사용자 언어 설정에 맞는 시나리오 기본 정보
+   */
+  @Query(
+      """
+            SELECT new com.landit.landitbe.feature.content.repository.projection.ScenarioSummaryProjection(
+                s.id,
+                slv.title,
+                s.displayOrder
+            )
+            FROM UserProfile up
+            JOIN ScenarioLanguageVariant slv
+              ON slv.targetLocale = up.targetLocale
+             AND slv.baseLocale = up.baseLocale
+            JOIN Scenario s
+              ON s.id = slv.scenarioId
+            WHERE up.id = :userId
+              AND s.id = :scenarioId
+      """)
+  Optional<ScenarioSummaryProjection> findScenarioSummary(
+      @Param("userId") long userId, @Param("scenarioId") long scenarioId);
 }

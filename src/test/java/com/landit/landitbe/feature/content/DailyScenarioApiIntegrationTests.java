@@ -126,7 +126,11 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completed").value(false))
         .andExpect(jsonPath("$.data.scenario.completedAt").value(nullValue()))
         .andExpect(jsonPath("$.data.scenario.expressionCount").value(2))
-        .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1));
+        .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1))
+        .andExpect(jsonPath("$.data.scenario.openingPreview.characterId").value("chloe"))
+        .andExpect(
+            jsonPath("$.data.scenario.openingPreview.ttsVoice.providerVoiceId")
+                .value("en-US-Harper:MAI-Voice-2"));
   }
 
   @Test
@@ -370,9 +374,9 @@ class DailyScenarioApiIntegrationTests {
         """
         INSERT INTO scenario (
             id, category_id, ai_role, difficulty, first_speaker, total_question_count,
-            display_order, status, created_at, updated_at
+            character_id, display_order, status, created_at, updated_at
         )
-        VALUES (?, ?, 'tutor', ?, ?, 3, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 'tutor', ?, ?, 3, 'chloe', ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
         categoryId,

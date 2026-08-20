@@ -135,6 +135,7 @@ public class FreeTalkHistoryQueryService {
     return new FreeTalkSessionDetailResponse(
         learningSessionId,
         session.getTitle(),
+        session.getCharacterId(),
         completedSession.learningSession().getStartedAt(),
         completedSession.learningSession().getEndedAt(),
         session.getAccumulatedSpeakingDurationMs(),
@@ -162,6 +163,7 @@ public class FreeTalkHistoryQueryService {
     return new FreeTalkSessionListResponse.Item(
         learningSession.getId(),
         session.getTitle(),
+        session.getCharacterId(),
         learningSession.getStartedAt(),
         learningSession.getEndedAt(),
         session.getAccumulatedSpeakingDurationMs(),

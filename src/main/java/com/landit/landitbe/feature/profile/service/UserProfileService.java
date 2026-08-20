@@ -5,6 +5,8 @@ package com.landit.landitbe.feature.profile.service;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
+import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
+import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
@@ -12,6 +14,8 @@ import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -163,5 +167,35 @@ public class UserProfileService {
     UserProfile userProfile = requireActive(userId);
 
     return new UserLocale(userProfile.getTargetLocale(), userProfile.getBaseLocale());
+  }
+
+  /**
+   * 관리자 사용자 목록을 가입일 최신순으로 조회한다.
+   *
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @return 관리자 사용자 프로필 목록 페이지
+   */
+  @Transactional(readOnly = true)
+  public AdminUserProfilePage getAdminUserProfiles(int page, int size) {
+    Slice<UserProfile> profiles =
+        userProfileRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(page, size));
+
+    return AdminUserProfilePage.from(profiles, page, size);
+  }
+
+  /**
+   * 관리자 사용자 상세 조회에 사용할 프로필을 계정 상태와 관계없이 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @return 관리자 사용자 프로필
+   * @throws UserProfileException 사용자가 없을 때
+   */
+  @Transactional(readOnly = true)
+  public AdminUserProfile getAdminUserProfile(long userProfileId) {
+    return userProfileRepository
+        .findById(userProfileId)
+        .map(AdminUserProfile::from)
+        .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.USER_PROFILE_NOT_FOUND));
   }
 }

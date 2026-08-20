@@ -11,13 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
+import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
+import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContent;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentRequest;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionLearningContentResult;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionPracticeExample;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkExpressionRecommendationsResult;
@@ -28,7 +27,6 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
-import com.landit.landitbe.feature.session.domain.FreeTalkExpressionSourceType;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -96,6 +94,8 @@ class FreeTalkSessionApiIntegrationTests {
 
   private void cleanUpDatabase() {
     awaitPendingExpressionGeneration();
+    jdbcTemplate.update("DELETE FROM user_daily_activity");
+    jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
@@ -103,10 +103,10 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM session_history");
     jdbcTemplate.update("DELETE FROM learning_session");
-    jdbcTemplate.update("DELETE FROM writing_expression WHERE owner_user_profile_id IS NOT NULL");
     jdbcTemplate.update("DELETE FROM free_talk_topic");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994104");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994103");
+    jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994201");
     jdbcTemplate.update("DELETE FROM scenario WHERE id = 994102");
     jdbcTemplate.update("DELETE FROM category WHERE id = 994101");
   }
@@ -185,10 +185,12 @@ class FreeTalkSessionApiIntegrationTests {
                 post("/api/v1/free-talk/sessions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1101}"))
+                    .content(
+                        "{\"startMode\":\"AI_FIRST\",\"topicId\":1101,\"characterId\":\"chloe\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
             .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
+            .andExpect(jsonPath("$.data.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
             .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
             .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
@@ -207,6 +209,7 @@ class FreeTalkSessionApiIntegrationTests {
             .get("sessionId")
             .asLong();
     assertThat(fakeAiFreeTalkClient.lastOpeningRequest().sessionId()).isEqualTo(sessionId);
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().characterId()).isEqualTo("chloe");
     assertThat(fakeAiFreeTalkClient.lastOpeningRequest().topic().topicId()).isEqualTo(1101);
     assertThat(fakeAiFreeTalkClient.openingTransactionActive()).isFalse();
     assertThat(
@@ -228,6 +231,12 @@ class FreeTalkSessionApiIntegrationTests {
                 String.class,
                 sessionId))
         .isEqualTo("What are your weekend plans?");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT character_id FROM free_talk_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("chloe");
   }
 
   @Test
@@ -241,9 +250,12 @@ class FreeTalkSessionApiIntegrationTests {
                 post("/api/v1/free-talk/sessions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"startMode\":\"USER_FIRST\"}"))
+                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"marco\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.startMode").value("USER_FIRST"))
+            .andExpect(jsonPath("$.data.characterId").value("marco"))
+            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
             .andExpect(jsonPath("$.data.title").value(nullValue()))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andReturn();
@@ -269,6 +281,42 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void completedSessionListAndDetailIncludeStoredCharacterId() throws Exception {
+    JsonNode loginBody = login("free-talk-character-history@example.com");
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+    MvcResult startResult =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"teddy\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-draco-en"))
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(startResult.getResponse().getContentAsByteArray())
+            .get("data")
+            .get("sessionId")
+            .asLong();
+    completeSession(sessionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].characterId").value("teddy"));
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.characterId").value("teddy"));
+  }
+
+  @Test
   void rejectsInvalidStartModeAndTopicCombinations() throws Exception {
     seedTopic(1201, "오늘", "오늘의 일을 묻는다.", 1, "ACTIVE");
     String accessToken =
@@ -279,7 +327,7 @@ class FreeTalkSessionApiIntegrationTests {
             post("/api/v1/free-talk/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\"}"))
+                .content("{\"startMode\":\"AI_FIRST\",\"characterId\":\"chloe\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     mockMvc
@@ -287,9 +335,60 @@ class FreeTalkSessionApiIntegrationTests {
             post("/api/v1/free-talk/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"USER_FIRST\",\"topicId\":1201}"))
+                .content(
+                    "{\"startMode\":\"USER_FIRST\",\"topicId\":1201,\"characterId\":\"chloe\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
+  void rejectsMissingAndUnsupportedCharacterId() throws Exception {
+    String accessToken =
+        login("free-talk-invalid-character@example.com").get("data").get("accessToken").asText();
+
+    for (String content :
+        List.of(
+            "{\"startMode\":\"USER_FIRST\"}",
+            "{\"startMode\":\"USER_FIRST\",\"characterId\":\"unknown\"}")) {
+      mockMvc
+          .perform(
+              post("/api/v1/free-talk/sessions")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(content))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+  }
+
+  @Test
+  void rejectsInvalidCharacterIdBeforeDailySpeakingLimit() throws Exception {
+    JsonNode loginBody = login("free-talk-invalid-character-limit@example.com");
+    long userId = loginBody.get("data").get("user").get("userId").asLong();
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update(
+        """
+        INSERT INTO free_talk_daily_speaking_usage (
+            user_profile_id, usage_date, used_speaking_duration_ms
+        )
+        VALUES (?, CURRENT_DATE, 60000)
+        """,
+        userId);
+
+    for (String content :
+        List.of(
+            "{\"startMode\":\"USER_FIRST\"}",
+            "{\"startMode\":\"USER_FIRST\",\"characterId\":\"\"}",
+            "{\"startMode\":\"USER_FIRST\",\"characterId\":\"unknown\"}")) {
+      mockMvc
+          .perform(
+              post("/api/v1/free-talk/sessions")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(content))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
   }
 
   @Test
@@ -303,7 +402,7 @@ class FreeTalkSessionApiIntegrationTests {
             post("/api/v1/free-talk/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1251}"))
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1251,\"characterId\":\"chloe\"}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
     mockMvc
@@ -311,7 +410,7 @@ class FreeTalkSessionApiIntegrationTests {
             post("/api/v1/free-talk/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1252}"))
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1252,\"characterId\":\"chloe\"}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
@@ -328,7 +427,7 @@ class FreeTalkSessionApiIntegrationTests {
             post("/api/v1/free-talk/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1301}"))
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1301,\"characterId\":\"chloe\"}"))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
 
@@ -369,6 +468,16 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionsPath + ".responses['404'].description").value("주제 없음"))
         .andExpect(jsonPath(sessionsPath + ".responses['502'].description").value("AI 응답 오류"))
         .andExpect(jsonPath(sessionsPath + ".responses['503'].description").value("AI 생성 실패"))
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.FreeTalkSessionStartRequest.required"
+                        + "[?(@ == 'characterId')]")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.FreeTalkSessionStartRequest.properties"
+                        + ".characterId.enum.length()")
+                .value(3))
         .andExpect(jsonPath(messagesPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
@@ -402,7 +511,7 @@ class FreeTalkSessionApiIntegrationTests {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(request))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.title").value("Hiking with friends"))
+            .andExpect(jsonPath("$.data.title").value(nullValue()))
             .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
             .andExpect(jsonPath("$.data.submittedMessage.role").value("USER"))
             .andExpect(
@@ -523,6 +632,84 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void assignsCharacterFallbackTitleWhenUserFirstSessionEndsWithoutGeneratedTitle()
+      throws Exception {
+    String accessToken =
+        login("free-talk-title-fallback@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.omitClosingTitle();
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("Chloe와의 대화"))
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
+  @Test
+  void assignsGeneratedEnglishTitleWhenUserFirstSessionEnds() throws Exception {
+    String accessToken =
+        login("free-talk-generated-title@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
+  @Test
+  void preservesRecommendedTopicTitleWhenAiFirstSessionEnds() throws Exception {
+    seedTopic(1151, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
+    String accessToken =
+        login("free-talk-topic-title@example.com").get("data").get("accessToken").asText();
+    MvcResult startResult =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"startMode\":\"AI_FIRST\",\"topicId\":1151,"
+                            + "\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(startResult.getResponse().getContentAsByteArray())
+            .at("/data/sessionId")
+            .asLong();
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 60000, false)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.title").value("주말 계획"))
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
+  @Test
   void resumesExpiredMessageReservationForTheSameClientMessageId() throws Exception {
     String accessToken =
         login("free-talk-stale-reservation@example.com").get("data").get("accessToken").asText();
@@ -572,7 +759,8 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void endDecisionAndTimeLimitCompleteTheSession() throws Exception {
+  void endDecisionRecordsStreakWithoutDuplicatingTheSameDayTimeLimit() throws Exception {
+    seedEmbeddedCandidateExpression();
     String accessToken =
         login("free-talk-complete@example.com").get("data").get("accessToken").asText();
     long exitSessionId = startUserFirstSession(accessToken);
@@ -591,6 +779,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
     assertThat(awaitExpressionGenerationStatus(exitSessionId)).isEqualTo("READY");
+    assertCurrentStreak(accessToken, 1, true);
 
     fakeAiFreeTalkClient.reset();
     long timeLimitSessionId = startUserFirstSession(accessToken);
@@ -605,27 +794,34 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
     assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
+    assertCurrentStreak(accessToken, 1, true);
   }
 
   @Test
-  void rejectsAnotherUsersPrivateFreeTalkExpression() throws Exception {
-    JsonNode loginBody = login("free-talk-new-expression@example.com");
-    String accessToken = loginBody.at("/data/accessToken").asText();
-    long learningSessionId = startUserFirstSession(accessToken);
-    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
-    String otherToken =
-        login("free-talk-expression-other@example.com").at("/data/accessToken").asText();
+  void failsExpressionGenerationWhenNoEmbeddedCandidateExists() throws Exception {
+    // 임베딩이 있는 공용 후보를 심지 않으면 유사도 검색이 빈손이 되어 실패로 전환된다.
+    String accessToken =
+        login("free-talk-no-candidate@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
 
     mockMvc
         .perform(
-            get("/api/v1/expressions/{expressionId}/learning-start", link.expressionId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
   }
 
   @Test
-  void returnsPrivateFreeTalkExpressionLearningContent() throws Exception {
+  void returnsPublicFreeTalkExpressionLearningContent() throws Exception {
     JsonNode loginBody = login("free-talk-learning-content@example.com");
     String accessToken = loginBody.at("/data/accessToken").asText();
     long learningSessionId = startUserFirstSession(accessToken);
@@ -713,9 +909,6 @@ class FreeTalkSessionApiIntegrationTests {
     long firstLearningSessionId = startUserFirstSession(accessToken);
     FreeTalkExpressionLink firstLink = seedNewExpressionForCompletedSession(firstLearningSessionId);
     jdbcTemplate.update(
-        "UPDATE writing_expression SET owner_user_profile_id = NULL WHERE id = ?",
-        firstLink.expressionId());
-    jdbcTemplate.update(
         "UPDATE free_talk_session_expression "
             + "SET created_at = TIMESTAMP '2026-07-27 10:00:00' "
             + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
@@ -791,7 +984,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
-  void preservesUserMessageAndDailyUsageWhenAiTurnFails() throws Exception {
+  void refundsDailyUsageWhenAiTurnFails() throws Exception {
     String accessToken =
         login("free-talk-compensation@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
@@ -829,7 +1022,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
-        .isEqualTo(700L);
+        .isZero();
 
     fakeAiFreeTalkClient.reset();
     mockMvc
@@ -876,6 +1069,7 @@ class FreeTalkSessionApiIntegrationTests {
 
   @Test
   void completesAfterLastUtteranceCrossesDailySpeakingLimit() throws Exception {
+    seedEmbeddedCandidateExpression();
     String accessToken =
         login("free-talk-server-time-limit@example.com").get("data").get("accessToken").asText();
     long sessionId = startUserFirstSession(accessToken);
@@ -899,7 +1093,14 @@ class FreeTalkSessionApiIntegrationTests {
                     messageRequest(UUID.randomUUID().toString(), "One last thing.", 3000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(62000));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT title FROM free_talk_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("Weekend Hiking");
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
   }
 
@@ -927,7 +1128,7 @@ class FreeTalkSessionApiIntegrationTests {
                 post("/api/v1/free-talk/sessions")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"startMode\":\"USER_FIRST\"}"))
+                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
             .andExpect(status().isCreated())
             .andReturn();
     return objectMapper
@@ -997,19 +1198,48 @@ class FreeTalkSessionApiIntegrationTests {
         .formatted(clientMessageId, content, utteranceDurationMs, timeLimitReached);
   }
 
+  // 유사도 검색이 찾을 수 있도록 Fake 임베딩과 같은 방향의 벡터를 가진 공용 후보 표현을 심는다.
+  private void seedEmbeddedCandidateExpression() {
+    jdbcTemplate.update(
+        """
+        INSERT INTO writing_expression (
+            id, scenario_id, expression_source, expression_type,
+            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            base_expression_meaning_text, usage_summary, usage_description,
+            representative_sentence_text, representative_sentence_translation,
+            representative_sentence_words, representative_sentence_word_choices,
+            practice_examples_payload, embedding, status, created_at, updated_at
+        )
+        VALUES (
+            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1,
+            'piece of cake', '식은 죽 먹기', '쉬운 일을 말할 때 사용한다.',
+            '아주 쉬운 일이었다고 말할 때 사용하는 표현이다.',
+            'It was a piece of cake.', '그건 식은 죽 먹기였어.',
+            ARRAY['It', 'was', 'a', 'piece', 'of', 'cake'],
+            ARRAY['It', 'was', 'a', 'piece', 'of', 'cake'],
+            '[]' FORMAT JSON, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        """,
+        firstAxisEmbeddingLiteral());
+  }
+
+  // Fake 클라이언트의 쿼리 벡터([1,0,...])와 코사인 거리 0이 되는 1,536차원 벡터 문자열을 만든다.
+  private static String firstAxisEmbeddingLiteral() {
+    StringBuilder literal = new StringBuilder("[1");
+    for (int index = 1; index < 1536; index++) {
+      literal.append(",0");
+    }
+    return literal.append("]").toString();
+  }
+
   private FreeTalkExpressionLink seedNewExpressionForCompletedSession(long learningSessionId)
       throws Exception {
     long freeTalkSessionId = completeSession(learningSessionId);
-    long ownerUserProfileId =
-        jdbcTemplate.queryForObject(
-            "SELECT user_profile_id FROM learning_session WHERE id = ?",
-            Long.class,
-            learningSessionId);
     long expressionId = 994104L;
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
-            id, scenario_id, owner_user_profile_id, expression_source, expression_type,
+            id, scenario_id, expression_source, expression_type,
             usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_question_text, representative_question_translation,
@@ -1018,7 +1248,7 @@ class FreeTalkSessionApiIntegrationTests {
             representative_image_url, practice_examples_payload, status, created_at, updated_at
         )
         VALUES (
-            ?, NULL, ?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
+            ?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
             '죽이 잘 맞다', '처음 만난 사람과 잘 통할 때 사용한다.',
             '서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.',
             'How was meeting your new teammate?', '새 팀원을 만나 보니 어땠어?',
@@ -1029,7 +1259,6 @@ class FreeTalkSessionApiIntegrationTests {
         )
         """,
         expressionId,
-        ownerUserProfileId,
         practiceExamples(null).toString());
     freeTalkSessionExpressionRepository.saveAndFlush(
         FreeTalkSessionExpression.link(freeTalkSessionId, expressionId, 1));
@@ -1045,6 +1274,17 @@ class FreeTalkSessionApiIntegrationTests {
                 .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isEmpty());
+  }
+
+  private void assertCurrentStreak(
+      String accessToken, int expectedCurrentStreakDays, boolean expectedActiveToday)
+      throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/me/streak").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.currentStreakDays").value(expectedCurrentStreakDays))
+        .andExpect(jsonPath("$.data.activeToday").value(expectedActiveToday));
   }
 
   private record FreeTalkExpressionLink(
@@ -1214,6 +1454,7 @@ class FreeTalkSessionApiIntegrationTests {
     private final AtomicInteger turnCallCount = new AtomicInteger();
     private volatile CountDownLatch turnStarted = new CountDownLatch(1);
     private volatile CountDownLatch turnRelease = new CountDownLatch(0);
+    private volatile boolean omitClosingTitle;
 
     @Override
     public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
@@ -1263,50 +1504,34 @@ class FreeTalkSessionApiIntegrationTests {
     @Override
     public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
       return new AiFreeTalkClosingResult(
-          "It was great talking with you!", "이야기해서 즐거웠어!", CharacterEmotion.HAPPY);
+          request.titleGenerationRequired() && !omitClosingTitle ? "Weekend Hiking" : null,
+          "It was great talking with you!",
+          "이야기해서 즐거웠어!",
+          CharacterEmotion.HAPPY);
     }
 
     @Override
     public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
         AiFreeTalkExpressionRecommendationsRequest request) {
+      if (request.existingExpressions().isEmpty()) {
+        return new AiFreeTalkExpressionRecommendationsResult(List.of());
+      }
       return new AiFreeTalkExpressionRecommendationsResult(
           List.of(
               new AiFreeTalkExpressionRecommendation(
-                  1,
-                  FreeTalkExpressionSourceType.NEW,
-                  null,
-                  "I'm up for that",
-                  "좋아, 그거 하자",
-                  "상대 제안에 동의할 때 사용한다.")));
+                  1, request.existingExpressions().getFirst().expressionId())));
     }
 
     @Override
-    public AiFreeTalkExpressionLearningContentResult generateExpressionLearningContent(
-        AiFreeTalkExpressionLearningContentRequest request) {
-      return new AiFreeTalkExpressionLearningContentResult(
-          List.of(
-              new AiFreeTalkExpressionLearningContent(
-                  "I'm up for that",
-                  "좋아, 그거 하자",
-                  "상대 제안에 동의할 때 사용한다.",
-                  "상대방의 제안이나 계획에 긍정적으로 답할 때 쓴다.",
-                  "Do you want to get coffee after work?",
-                  "퇴근 후 커피 마실래?",
-                  "I'm up for that.",
-                  "좋아, 그러자.",
-                  List.of("I'm", "up", "for", "that."),
-                  List.of("I'm", "up", "for", "that.", "not"),
-                  null,
-                  List.of(
-                      new AiFreeTalkExpressionPracticeExample(
-                          null,
-                          "I'm up for a movie tonight.",
-                          List.of("I'm", "up", "for", "a", "movie", "tonight."),
-                          "I'm up for",
-                          "Want to watch a movie tonight?",
-                          "오늘 밤 영화 보는 거 좋아.",
-                          List.of("I'm", "up", "for", "a", "movie", "tonight.", "not"),
-                          "오늘 밤 영화 볼래?")))));
+    public AiConversationEmbeddingsResult extractConversationEmbeddings(
+        AiConversationEmbeddingsRequest request) {
+      // 첫 성분만 1인 고정 벡터로 유사도 검색 결과를 예측할 수 있게 한다.
+      List<Float> embedding =
+          new java.util.ArrayList<>(
+              Collections.nCopies(AiConversationExcerpt.EMBEDDING_DIMENSION, 0.0f));
+      embedding.set(0, 1.0f);
+      return new AiConversationEmbeddingsResult(
+          List.of(new AiConversationExcerpt("That sounds interesting.", List.copyOf(embedding))));
     }
 
     void reset() {
@@ -1319,6 +1544,11 @@ class FreeTalkSessionApiIntegrationTests {
       turnCallCount.set(0);
       turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(0);
+      omitClosingTitle = false;
+    }
+
+    void omitClosingTitle() {
+      omitClosingTitle = true;
     }
 
     void failOpening() {

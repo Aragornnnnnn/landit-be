@@ -66,26 +66,27 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
       Locale targetLocale, Locale baseLocale, ActiveStatus status);
 
   /**
-   * 프리톡 추천에 사용할 공용 표현 후보 전체를 조회한다.
+   * 프리톡 추천에 사용할 공용 표현 후보를 ID 목록으로 조회한다.
    *
+   * @param expressionIds 조회할 Writing 표현 ID 목록
    * @param expressionSource 표현 사용 영역
    * @param targetLocale 학습 언어 locale
    * @param baseLocale 기준 언어 locale
    * @param status 조회할 콘텐츠 상태
-   * @return ID 오름차순의 공용 Writing 표현 후보 목록
+   * @return 조건에 맞는 공용 Writing 표현 목록 (순서 보장 없음)
    */
   @Query(
       """
       SELECT expression
       FROM WritingExpression expression
-      WHERE expression.expressionSource = :expressionSource
+      WHERE expression.id IN :expressionIds
+        AND expression.expressionSource = :expressionSource
         AND expression.targetLocale = :targetLocale
         AND expression.baseLocale = :baseLocale
         AND expression.status = :status
-        AND expression.ownerUserProfileId IS NULL
-      ORDER BY expression.id ASC
       """)
-  List<WritingExpression> findPublicExpressionCandidates(
+  List<WritingExpression> findPublicExpressionCandidatesByIds(
+      @Param("expressionIds") List<Long> expressionIds,
       @Param("expressionSource") WritingExpressionSource expressionSource,
       @Param("targetLocale") Locale targetLocale,
       @Param("baseLocale") Locale baseLocale,
@@ -110,7 +111,6 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
         AND expression.targetLocale = :targetLocale
         AND expression.baseLocale = :baseLocale
         AND expression.status = :status
-        AND expression.ownerUserProfileId IS NULL
       """)
   Optional<WritingExpression> findPublicExpressionCandidateById(
       @Param("id") Long id,

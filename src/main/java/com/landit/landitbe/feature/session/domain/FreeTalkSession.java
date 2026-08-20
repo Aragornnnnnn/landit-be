@@ -34,6 +34,9 @@ public class FreeTalkSession extends BaseTimeEntity {
   @Column(name = "start_mode", nullable = false, length = 20)
   private FreeTalkStartMode startMode;
 
+  @Column(name = "character_id", nullable = false, length = 20)
+  private String characterId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "conversation_status", nullable = false, length = 30)
   private FreeTalkConversationStatus conversationStatus;
@@ -60,10 +63,15 @@ public class FreeTalkSession extends BaseTimeEntity {
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSession() {}
 
-  private FreeTalkSession(Long learningSessionId, Long topicId, FreeTalkStartMode startMode) {
+  private FreeTalkSession(
+      Long learningSessionId,
+      Long topicId,
+      FreeTalkStartMode startMode,
+      FreeTalkCharacter character) {
     this.learningSessionId = learningSessionId;
     this.topicId = topicId;
     this.startMode = startMode;
+    this.characterId = character.id();
     this.conversationStatus = FreeTalkConversationStatus.IN_PROGRESS;
   }
 
@@ -73,11 +81,28 @@ public class FreeTalkSession extends BaseTimeEntity {
    * @param learningSessionId 연결할 학습 세션 ID
    * @param topicId 선택한 추천 주제 ID
    * @param startMode 첫 발화 주체
+   * @param character 선택한 대화 상대 캐릭터
    * @return 진행 중 상태의 프리톡 세션
    */
   public static FreeTalkSession start(
+      Long learningSessionId,
+      Long topicId,
+      FreeTalkStartMode startMode,
+      FreeTalkCharacter character) {
+    return new FreeTalkSession(learningSessionId, topicId, startMode, character);
+  }
+
+  /**
+   * 기존 호출부가 기본 캐릭터로 프리톡 세션을 생성한다.
+   *
+   * @param learningSessionId 연결할 학습 세션 ID
+   * @param topicId 선택한 추천 주제 ID
+   * @param startMode 첫 발화 주체
+   * @return Chloe와 진행 중인 프리톡 세션
+   */
+  public static FreeTalkSession start(
       Long learningSessionId, Long topicId, FreeTalkStartMode startMode) {
-    return new FreeTalkSession(learningSessionId, topicId, startMode);
+    return start(learningSessionId, topicId, startMode, FreeTalkCharacter.CHLOE);
   }
 
   /**

@@ -23,6 +23,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
       """
             SELECT new com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection(
                 s.id,
+                s.characterId,
                 s.categoryId,
                 c.status,
                 s.status,
@@ -58,8 +59,11 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
              AND openingQuestionVariant.targetLocale = up.targetLocale
              AND openingQuestionVariant.baseLocale = up.baseLocale
              AND openingQuestionVariant.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
+            LEFT JOIN ConversationCharacter character
+              ON character.characterId = s.characterId
+             AND character.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN TtsVoice tv
-              ON tv.id = slv.ttsVoiceId
+              ON tv.id = character.ttsVoiceId
              AND tv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             WHERE up.id = :userId
       """)

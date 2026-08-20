@@ -2,11 +2,14 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.character.service.StreakService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
@@ -28,7 +31,10 @@ import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,13 +47,17 @@ public class FreeTalkSubmittedMessageService {
 
   private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
   private static final long PROCESSING_TIMEOUT_SECONDS = 90;
+  private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
+  private final UserProfileService userProfileService;
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
+  private final StreakService streakService;
+  private final Clock clock;
 
   /**
    * 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다.
@@ -233,15 +243,18 @@ public class FreeTalkSubmittedMessageService {
     if (existingMessage.getFreeTalkTurnStatus() != null) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+        dailySpeakingUsageService.reserve(userId, existingMessage.getUtteranceDurationMs());
     freeTalkSession.startProcessing(request.clientMessageId());
-    boolean shouldCloseAfterMessage = dailySpeakingUsageService.usage(userId).remainingMs() == 0;
     return reservation(
+        userId,
+        dailyUsage.usageDate(),
         learningSession,
         freeTalkSession,
         history,
         existingMessage,
         messages,
-        shouldCloseAfterMessage);
+        dailyUsage.remainingMs() == 0);
   }
 
   private Reservation reserveNewMessage(
@@ -274,6 +287,8 @@ public class FreeTalkSubmittedMessageService {
     freeTalkSession.startProcessing(request.clientMessageId());
     messages.add(userMessage);
     return reservation(
+        userId,
+        dailyUsage.usageDate(),
         learningSession,
         freeTalkSession,
         history,
@@ -283,6 +298,8 @@ public class FreeTalkSubmittedMessageService {
   }
 
   private Reservation reservation(
+      long userId,
+      LocalDate usageDate,
       LearningSession learningSession,
       FreeTalkSession freeTalkSession,
       SessionHistory history,
@@ -302,18 +319,17 @@ public class FreeTalkSubmittedMessageService {
                             topicValue.getPromptDescription()))
                 .orElse(new AiFreeTalkTopic(null, freeTalkSession.getTitle(), null));
     return new Reservation(
+        userId,
+        usageDate,
         learningSession.getId(),
         freeTalkSession.getId(),
+        freeTalkSession.getCharacterId(),
         history.getId(),
         userMessage.getId(),
         userMessage.getClientMessageId(),
         userMessage.getUtteranceDurationMs(),
         shouldCloseAfterMessage,
-        freeTalkSession.getStartMode() == FreeTalkStartMode.USER_FIRST
-            && messages.stream()
-                    .filter(message -> message.getRole() == ConversationSpeaker.USER)
-                    .count()
-                == 1,
+        requiresTitleGeneration(freeTalkSession),
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
         topic,
@@ -336,9 +352,6 @@ public class FreeTalkSubmittedMessageService {
     requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
-    if (result.inferredTitle() != null && session.getTitle() == null) {
-      session.assignTitle(result.inferredTitle());
-    }
     FreeTalkMessageSubmitResponse response;
     if (result.userExitIntentDetected()) {
       userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED);
@@ -388,23 +401,28 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeTimeLimit(
       Reservation reservation, AiFreeTalkClosingResult result) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
     requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessage userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
+    assignClosingTitle(session, result, reservation.titleGenerationRequired());
     userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     userMessage.prepareInnerThought();
     session.completeByTimeLimit();
     session.clearProcessing();
-    records.learningSession().completeFreeTalkByTimeLimit(LocalDateTime.now());
+    LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
+    records.learningSession().completeFreeTalkByTimeLimit(completedAt);
     records
         .history()
         .complete(
-            LocalDateTime.now(),
+            completedAt,
             Math.toIntExact(
                 sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(
                     records.history().getId(), ConversationSpeaker.USER)));
+    streakService.recordCompletedConversation(
+        records.learningSession().getUserProfileId(), completedAt);
     SessionHistoryMessage aiMessage =
         sessionHistoryMessageRepository.save(
             SessionHistoryMessage.freeTalkAi(
@@ -436,6 +454,8 @@ public class FreeTalkSubmittedMessageService {
             .orElse(null);
     if (session != null
         && reservation.clientMessageId().equals(session.getProcessingClientMessageId())) {
+      dailySpeakingUsageService.release(
+          reservation.userId(), reservation.usageDate(), reservation.utteranceDurationMs());
       session.clearProcessing();
     }
   }
@@ -472,11 +492,14 @@ public class FreeTalkSubmittedMessageService {
     session.startProcessing("decision-" + submittedMessageId);
     AiFreeTalkTopic topic = new AiFreeTalkTopic(session.getTopicId(), session.getTitle(), null);
     return new DecisionReservation(
+        userId,
         learningSessionId,
         history.getId(),
         session.getId(),
+        session.getCharacterId(),
         submittedMessageId,
         decision,
+        requiresTitleGeneration(session),
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
         topic,
@@ -503,9 +526,6 @@ public class FreeTalkSubmittedMessageService {
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.CONTINUE);
     records.userMessage().prepareInnerThought();
-    if (result.inferredTitle() != null && records.freeTalkSession().getTitle() == null) {
-      records.freeTalkSession().assignTitle(result.inferredTitle());
-    }
     SessionHistoryMessage aiMessage =
         sessionHistoryMessageRepository.save(
             SessionHistoryMessage.freeTalkAi(
@@ -537,11 +557,13 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeEnd(
       DecisionReservation reservation, AiFreeTalkClosingResult result) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
     requireProcessingOwner(
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
+    assignClosingTitle(records.freeTalkSession(), result, reservation.titleGenerationRequired());
     records.userMessage().recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     records.userMessage().prepareInnerThought();
     final SessionHistoryMessage aiMessage =
@@ -555,14 +577,17 @@ public class FreeTalkSubmittedMessageService {
                 result.emotion()));
     records.freeTalkSession().completeByUserExit();
     records.freeTalkSession().clearProcessing();
-    records.learningSession().completeFreeTalkByUser(LocalDateTime.now());
+    LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
+    records.learningSession().completeFreeTalkByUser(completedAt);
     records
         .history()
         .complete(
-            LocalDateTime.now(),
+            completedAt,
             Math.toIntExact(
                 sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(
                     records.history().getId(), ConversationSpeaker.USER)));
+    streakService.recordCompletedConversation(
+        records.learningSession().getUserProfileId(), completedAt);
     return response(
         records.learningSessionId(),
         records.freeTalkSession(),
@@ -658,6 +683,24 @@ public class FreeTalkSubmittedMessageService {
     if (!processingClientMessageId.equals(session.getProcessingClientMessageId())) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+  }
+
+  private boolean requiresTitleGeneration(FreeTalkSession session) {
+    return session.getStartMode() == FreeTalkStartMode.USER_FIRST && session.getTitle() == null;
+  }
+
+  private void assignClosingTitle(
+      FreeTalkSession session, AiFreeTalkClosingResult result, boolean titleGenerationRequired) {
+    if (!titleGenerationRequired || session.getTitle() != null) {
+      return;
+    }
+    String generatedTitle = result.inferredTitle();
+    if (generatedTitle != null && !generatedTitle.isBlank()) {
+      session.assignTitle(generatedTitle.strip());
+      return;
+    }
+    String characterDisplayName = FreeTalkCharacter.fromId(session.getCharacterId()).displayName();
+    session.assignTitle(characterDisplayName + "와의 대화");
   }
 
   private String decisionProcessingClientMessageId(DecisionReservation reservation) {
@@ -771,28 +814,34 @@ public class FreeTalkSubmittedMessageService {
   /**
    * AI 호출 전에 저장한 사용자 발화와 대화 문맥이다.
    *
+   * @param userId 요청 사용자 ID
+   * @param usageDate 일일 발화 사용량을 예약한 KST 날짜
    * @param learningSessionId 학습 세션 ID
    * @param freeTalkSessionId 프리톡 세션 ID
+   * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param historyId 세션 히스토리 ID
    * @param userMessageId 저장된 사용자 메시지 ID
    * @param clientMessageId 중복 요청을 식별하는 클라이언트 메시지 ID
    * @param utteranceDurationMs 이번 사용자 발화 시간 밀리초
    * @param dailyLimitReached 이번 발화 예약 후 일일 한도에 도달했는지 여부
-   * @param firstUserTurn 사용자 선시작 세션의 첫 사용자 턴인지 여부
+   * @param titleGenerationRequired 사용자 선시작 세션의 제목 생성 필요 여부
    * @param targetLocale 학습 대상 언어
    * @param baseLocale 사용자 기준 언어
    * @param topic 프리톡 주제
    * @param history AI에 전달할 대화 기록
    */
   public record Reservation(
+      long userId,
+      LocalDate usageDate,
       long learningSessionId,
       long freeTalkSessionId,
+      String characterId,
       long historyId,
       long userMessageId,
       String clientMessageId,
       long utteranceDurationMs,
       boolean dailyLimitReached,
-      boolean firstUserTurn,
+      boolean titleGenerationRequired,
       String targetLocale,
       String baseLocale,
       AiFreeTalkTopic topic,
@@ -801,22 +850,28 @@ public class FreeTalkSubmittedMessageService {
   /**
    * 종료 확인 전에 저장한 사용자 메시지와 대화 문맥이다.
    *
+   * @param userId 요청 사용자 ID
    * @param learningSessionId 학습 세션 ID
    * @param historyId 세션 히스토리 ID
    * @param freeTalkSessionId 프리톡 세션 ID
+   * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param userMessageId 종료 의사가 감지된 사용자 메시지 ID
    * @param decision 사용자가 선택한 종료 여부
+   * @param titleGenerationRequired 사용자 선시작 세션의 제목 생성 필요 여부
    * @param targetLocale 학습 대상 언어
    * @param baseLocale 사용자 기준 언어
    * @param topic 프리톡 주제
    * @param history AI에 전달할 대화 기록
    */
   public record DecisionReservation(
+      long userId,
       long learningSessionId,
       long historyId,
       long freeTalkSessionId,
+      String characterId,
       long userMessageId,
       FreeTalkExitDecision decision,
+      boolean titleGenerationRequired,
       String targetLocale,
       String baseLocale,
       AiFreeTalkTopic topic,

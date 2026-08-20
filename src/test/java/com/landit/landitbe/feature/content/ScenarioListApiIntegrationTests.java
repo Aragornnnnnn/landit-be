@@ -466,7 +466,7 @@ class ScenarioListApiIntegrationTests {
 
   private void seedScenarioListData(Long clearedUserId) {
     final long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
-    final long ethanVoiceId = ttsVoiceId("en-US-Ethan:MAI-Voice-2");
+    final long marcoVoiceId = ttsVoiceId("aura-2-hyperion-en");
     insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
     insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
     insertCategory(102, 3, "INACTIVE", "잠긴 카테고리");
@@ -478,7 +478,7 @@ class ScenarioListApiIntegrationTests {
         "사용자가 먼저 말을 겁니다.",
         "직원에게 음료를 주문한다.",
         "점원에게 먼저 주문하고 싶은 음료를 말해보세요.",
-        ethanVoiceId,
+        marcoVoiceId,
         "ACTIVE");
 
     insertScenario(202, 101, 1, "AI", "EASY", "ACTIVE", "https://cdn.landit.com/ai.png");
@@ -667,20 +667,36 @@ class ScenarioListApiIntegrationTests {
                             briefing,
                             user_opening_instruction,
                             conversation_goal,
-                            tts_voice_id,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
         title,
         briefing,
         userOpeningInstruction,
         conversationGoal,
-        ttsVoiceId,
         variantStatus);
+    assignScenarioCharacter(scenarioId, ttsVoiceId);
+  }
+
+  private void assignScenarioCharacter(long scenarioId, Long ttsVoiceId) {
+    jdbcTemplate.update(
+        """
+        UPDATE scenario
+        SET character_id = (
+            SELECT character_id
+            FROM conversation_character
+            WHERE tts_voice_id = ?
+            ORDER BY character_id
+            LIMIT 1
+        )
+        WHERE id = ?
+        """,
+        ttsVoiceId,
+        scenarioId);
   }
 
   private long ttsVoiceId(String providerVoiceId) {
@@ -709,6 +725,15 @@ class ScenarioListApiIntegrationTests {
         id,
         providerVoiceId,
         status);
+    jdbcTemplate.update(
+        """
+        INSERT INTO conversation_character (
+            character_id, tts_voice_id, status, created_at, updated_at
+        )
+        VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        "test-" + id,
+        id);
     return id;
   }
 

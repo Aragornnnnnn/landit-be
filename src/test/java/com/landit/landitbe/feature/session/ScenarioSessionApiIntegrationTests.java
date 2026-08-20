@@ -149,6 +149,7 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.error").value(nullValue()))
             .andExpect(jsonPath("$.data.sessionId").value(notNullValue()))
             .andExpect(jsonPath("$.data.scenarioId").value(2001))
+            .andExpect(jsonPath("$.data.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"))
             .andExpect(jsonPath("$.data.firstSpeaker").value("AI"))
             .andExpect(jsonPath("$.data.userOpeningInstruction").value(nullValue()))
@@ -1540,7 +1541,7 @@ class ScenarioSessionApiIntegrationTests {
   @Test
   void submitMessageRollsBackUserMessageWhenAiGenerationFails() throws Exception {
     fakeAiConversationClient.blockInnerThoughtGeneration();
-    fakeAiConversationClient.failNextMessageGeneration();
+    fakeAiConversationClient.failNextMessageGenerationAfterInnerThoughtStarts();
     JsonNode loginBody = login("message-ai-fail@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -1826,7 +1827,7 @@ class ScenarioSessionApiIntegrationTests {
         null,
         null,
         null,
-        ttsVoiceId("en-US-Ethan:MAI-Voice-2"),
+        ttsVoiceId("aura-2-hyperion-en"),
         "ACTIVE");
     MvcResult result =
         mockMvc
@@ -1840,7 +1841,8 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.firstSpeaker").value("USER"))
             .andExpect(
                 jsonPath("$.data.userOpeningInstruction").value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Ethan:MAI-Voice-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.model").value("deepgram/aura-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
             .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
@@ -2391,12 +2393,11 @@ class ScenarioSessionApiIntegrationTests {
             briefing,
             user_opening_instruction,
             conversation_goal,
-            tts_voice_id,
             status,
             created_at,
             updated_at
         )
-        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 'EN', 'KR', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         variantId,
         scenarioId,
@@ -2404,8 +2405,8 @@ class ScenarioSessionApiIntegrationTests {
         briefing,
         userOpeningInstruction,
         conversationGoal,
-        ttsVoiceId,
         status);
+    assignScenarioCharacter(scenarioId, ttsVoiceId);
     if (openingQuestionText != null && !hasScenarioQuestion(scenarioId, 1)) {
       seedScenarioQuestion(
           100_000L + scenarioId,
@@ -2489,6 +2490,23 @@ class ScenarioSessionApiIntegrationTests {
         "SELECT id FROM tts_voice WHERE provider_voice_id = ?", Long.class, providerVoiceId);
   }
 
+  private void assignScenarioCharacter(long scenarioId, Long ttsVoiceId) {
+    jdbcTemplate.update(
+        """
+        UPDATE scenario
+        SET character_id = (
+            SELECT character_id
+            FROM conversation_character
+            WHERE tts_voice_id = ?
+            ORDER BY character_id
+            LIMIT 1
+        )
+        WHERE id = ?
+        """,
+        ttsVoiceId,
+        scenarioId);
+  }
+
   private long defaultAiTutorId() {
     return jdbcTemplate.queryForObject(
         """
@@ -2522,6 +2540,15 @@ class ScenarioSessionApiIntegrationTests {
         id,
         providerVoiceId,
         status);
+    jdbcTemplate.update(
+        """
+        INSERT INTO conversation_character (
+            character_id, tts_voice_id, status, created_at, updated_at
+        )
+        VALUES (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        "test-" + id,
+        id);
     return id;
   }
 
@@ -2777,7 +2804,7 @@ class ScenarioSessionApiIntegrationTests {
 
     private GoalCompletionStatus nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
 
-    private boolean failNextMessageGeneration;
+    private boolean failNextMessageGenerationAfterInnerThoughtStarts;
 
     private boolean failInnerThoughtGeneration;
 
@@ -2808,7 +2835,8 @@ class ScenarioSessionApiIntegrationTests {
       lastNextMessageRequest = request;
       nextMessageTransactionActive.add(
           TransactionSynchronizationManager.isActualTransactionActive());
-      if (failNextMessageGeneration) {
+      if (failNextMessageGenerationAfterInnerThoughtStarts) {
+        awaitInnerThoughtGenerationStartBeforeFailure();
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       return new AiNextMessageResult(
@@ -2913,7 +2941,7 @@ class ScenarioSessionApiIntegrationTests {
       messageFeedbackTransactionActive.clear();
       sessionFeedbackTransactionActive.clear();
       nextGoalCompletionStatus = GoalCompletionStatus.PARTIAL;
-      failNextMessageGeneration = false;
+      failNextMessageGenerationAfterInnerThoughtStarts = false;
       failInnerThoughtGeneration = false;
       innerThoughtResponseMessageId = null;
       failMessageFeedbackRequest = false;
@@ -2958,8 +2986,19 @@ class ScenarioSessionApiIntegrationTests {
       nextGoalCompletionStatus = GoalCompletionStatus.COMPLETED;
     }
 
-    private void failNextMessageGeneration() {
-      failNextMessageGeneration = true;
+    private void failNextMessageGenerationAfterInnerThoughtStarts() {
+      failNextMessageGenerationAfterInnerThoughtStarts = true;
+    }
+
+    private void awaitInnerThoughtGenerationStartBeforeFailure() {
+      try {
+        if (!innerThoughtGenerationStarted.await(5, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("속마음 생성이 시작되지 않았습니다.");
+        }
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("속마음 생성 시작 대기가 중단되었습니다.", exception);
+      }
     }
 
     private void failInnerThoughtGeneration() {

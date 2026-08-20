@@ -25,6 +25,7 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
       """
             SELECT new com.landit.landitbe.feature.content.repository.projection.DailyScenarioProjection(
                 s.id,
+                s.characterId,
                 slv.title,
                 slv.briefing,
                 slv.conversationGoal,
@@ -58,8 +59,11 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
              AND openingQuestionVariant.targetLocale = up.targetLocale
              AND openingQuestionVariant.baseLocale = up.baseLocale
              AND openingQuestionVariant.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
+            LEFT JOIN ConversationCharacter character
+              ON character.characterId = s.characterId
+             AND character.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN TtsVoice tv
-              ON tv.id = slv.ttsVoiceId
+              ON tv.id = character.ttsVoiceId
              AND tv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN UserScenarioProgress usp
               ON usp.userProfileId = up.id

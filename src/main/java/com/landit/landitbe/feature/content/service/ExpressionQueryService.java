@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.landit.landitbe.feature.content.domain.FreeTalkGeneratedExpressionContent;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
@@ -13,6 +12,8 @@ import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -24,9 +25,12 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -71,6 +75,7 @@ public class ExpressionQueryService {
   private final ScenarioService scenarioService;
   private final UserProfileService userProfileService;
   private final WritingExpressionRepository writingExpressionRepository;
+  private final ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
   private final LearningProgressService learningProgressService;
 
   /**
@@ -154,19 +159,50 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 프리톡 AI가 재사용할 공용 활성 표현 후보 전체를 조회한다.
+   * 임베딩 벡터로 공용 프리톡 표현 후보를 코사인 거리 오름차순으로 검색한다. 사용자가 이미 학습 완료한 표현은 제외한다.
    *
+   * @param embedding 쿼리 임베딩 벡터
+   * @param userProfileId 학습 완료 표현을 제외할 사용자 ID
    * @param targetLocale 학습 언어 locale
    * @param baseLocale 기준 언어 locale
-   * @return 공용 활성 표현 후보 목록
+   * @param limit 최대 후보 수
+   * @return 코사인 거리 오름차순의 표현 후보 목록
    */
   @Transactional(readOnly = true)
-  public List<ExpressionRecommendationCandidate> getActiveExpressionCandidates(
-      Locale targetLocale, Locale baseLocale) {
-    return writingExpressionRepository
-        .findPublicExpressionCandidates(
-            WritingExpressionSource.FREE_TALK, targetLocale, baseLocale, ActiveStatus.ACTIVE)
-        .stream()
+  public List<ExpressionEmbeddingMatch> searchFreeTalkCandidatesByEmbedding(
+      List<Float> embedding,
+      long userProfileId,
+      Locale targetLocale,
+      Locale baseLocale,
+      int limit) {
+    return expressionEmbeddingSearchRepository.searchFreeTalkCandidates(
+        embedding, userProfileId, targetLocale, baseLocale, limit);
+  }
+
+  /**
+   * 프리톡 AI가 재사용할 공용 활성 표현 후보를 ID 목록으로 조회한다. 결과는 입력 ID 순서를 유지한다.
+   *
+   * @param expressionIds 유사도 순으로 정렬된 표현 ID 목록
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @return 입력 순서를 유지한 공용 활성 표현 후보 목록
+   */
+  @Transactional(readOnly = true)
+  public List<ExpressionRecommendationCandidate> getExpressionCandidatesByIds(
+      List<Long> expressionIds, Locale targetLocale, Locale baseLocale) {
+    Map<Long, WritingExpression> expressionsById =
+        writingExpressionRepository
+            .findPublicExpressionCandidatesByIds(
+                expressionIds,
+                WritingExpressionSource.FREE_TALK,
+                targetLocale,
+                baseLocale,
+                ActiveStatus.ACTIVE)
+            .stream()
+            .collect(Collectors.toMap(WritingExpression::getId, expression -> expression));
+    return expressionIds.stream()
+        .map(expressionsById::get)
+        .filter(Objects::nonNull)
         .map(
             expression ->
                 new ExpressionRecommendationCandidate(
@@ -175,25 +211,6 @@ public class ExpressionQueryService {
                     expression.getBaseExpressionMeaningText(),
                     expression.getUsageSummary()))
         .toList();
-  }
-
-  /**
-   * 프리톡에서 생성한 사용자 전용 표현을 저장한다.
-   *
-   * @param userProfileId 표현을 소유할 사용자 ID
-   * @param targetLocale 학습 언어 locale
-   * @param baseLocale 기준 언어 locale
-   * @param content 저장할 생성 표현 콘텐츠
-   * @return 저장된 사용자 전용 표현
-   */
-  @Transactional
-  public WritingExpression saveFreeTalkGeneratedExpression(
-      Long userProfileId,
-      Locale targetLocale,
-      Locale baseLocale,
-      FreeTalkGeneratedExpressionContent content) {
-    return writingExpressionRepository.save(
-        WritingExpression.freeTalkGenerated(userProfileId, targetLocale, baseLocale, content));
   }
 
   /**
@@ -287,9 +304,6 @@ public class ExpressionQueryService {
                   log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
-    if (expression.isOwnedByAnother(userId)) {
-      throw new ApiException(ErrorCode.FORBIDDEN);
-    }
     return expression;
   }
 

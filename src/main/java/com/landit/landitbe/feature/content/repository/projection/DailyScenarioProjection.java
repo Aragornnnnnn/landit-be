@@ -13,6 +13,7 @@ import java.math.BigDecimal;
  * 날짜별 시나리오 조회에 필요한 단건 콘텐츠 정보를 담는다.
  *
  * @param scenarioId 시나리오 ID
+ * @param characterId 시나리오 캐릭터 식별자
  * @param scenarioTitle 시나리오 제목
  * @param briefing 시나리오 설명
  * @param conversationGoal 대화 목표
@@ -32,6 +33,7 @@ import java.math.BigDecimal;
  */
 public record DailyScenarioProjection(
     Long scenarioId,
+    String characterId,
     String scenarioTitle,
     String briefing,
     String conversationGoal,

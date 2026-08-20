@@ -29,6 +29,9 @@ public class Scenario extends BaseTimeEntity {
   @Column(name = "ai_role", nullable = false, length = 80)
   private String aiRole;
 
+  @Column(name = "character_id", length = 20)
+  private String characterId;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private ScenarioDifficulty difficulty;
