@@ -126,6 +126,7 @@ class FreeTalkSubmittedMessageServiceTest {
 
   private FreeTalkSubmittedMessageService.DecisionReservation decisionReservation() {
     return new FreeTalkSubmittedMessageService.DecisionReservation(
+        1L,
         300L,
         3L,
         30L,
