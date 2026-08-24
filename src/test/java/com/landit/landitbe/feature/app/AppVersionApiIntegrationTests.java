@@ -178,11 +178,11 @@ class AppVersionApiIntegrationTests {
         INSERT INTO app_version (
             platform, version_name, minimum_supported_version_name, build_number,
             force_update_reason, soft_update_reason, release_note, active,
-            released_at, created_at
+            released_at, created_at, updated_at
         )
         VALUES (
             ?, ?, ?, ?, ?, ?, NULL, TRUE,
-            TIMESTAMP '2026-06-09 12:00:00', CURRENT_TIMESTAMP
+            TIMESTAMP '2026-06-09 12:00:00', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         """,
         platform,

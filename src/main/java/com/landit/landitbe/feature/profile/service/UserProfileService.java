@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -156,6 +157,22 @@ public class UserProfileService {
   }
 
   /**
+   * 사용자 프로필 ID로 닉네임을 조회한다.
+   *
+   * @param userProfileId 조회할 사용자 프로필 ID
+   * @return 사용자 닉네임 계약. 프로필이 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<UserProfileNickname> findNickname(Long userProfileId) {
+    if (userProfileId == null) {
+      return Optional.empty();
+    }
+    return userProfileRepository
+        .findById(userProfileId)
+        .map(userProfile -> new UserProfileNickname(userProfile.getNickname()));
+  }
+
+  /**
    * 활성 사용자의 학습 locale을 조회한다.
    *
    * @param userId 조회할 사용자 ID
@@ -167,6 +184,18 @@ public class UserProfileService {
     UserProfile userProfile = requireActive(userId);
 
     return new UserLocale(userProfile.getTargetLocale(), userProfile.getBaseLocale());
+  }
+
+  /**
+   * 활성 사용자의 학습 수준을 갱신한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param learningLevel 온보딩에서 선택한 1부터 5까지의 학습 수준
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional
+  public void updateLearningLevel(Long userId, int learningLevel) {
+    requireActive(userId).updateLearningLevel(learningLevel);
   }
 
   /**

@@ -21,6 +21,8 @@ import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.service.AiTutorService;
+import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
+import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -65,7 +67,9 @@ class AuthServiceTest {
   /** 프로필을 먼저 잠근 뒤 기존 Refresh Token을 조건부 폐기하고 새 토큰을 발급한다. */
   @Test
   void refreshLocksProfileBeforeRevokingToken() {
-    AuthProfile authProfile = new AuthProfile(USER_ID, "nickname", "user@example.com");
+    AuthProfile authProfile =
+        new AuthProfile(
+            USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE);
     when(tokenService.hashToken(CURRENT_TOKEN)).thenReturn(CURRENT_TOKEN_HASH);
     when(refreshTokenRepository.findUserProfileIdByTokenHash(CURRENT_TOKEN_HASH))
         .thenReturn(Optional.of(USER_ID));
@@ -94,7 +98,9 @@ class AuthServiceTest {
   /** 이미 소비된 Refresh Token이면 새 자격증명을 발급하지 않는다. */
   @Test
   void refreshRejectsConcurrentlyConsumedToken() {
-    AuthProfile authProfile = new AuthProfile(USER_ID, "nickname", "user@example.com");
+    AuthProfile authProfile =
+        new AuthProfile(
+            USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE);
     when(tokenService.hashToken(CURRENT_TOKEN)).thenReturn(CURRENT_TOKEN_HASH);
     when(refreshTokenRepository.findUserProfileIdByTokenHash(CURRENT_TOKEN_HASH))
         .thenReturn(Optional.of(USER_ID));
@@ -115,7 +121,9 @@ class AuthServiceTest {
   /** 로그아웃도 프로필을 먼저 잠근 뒤 Refresh Token을 조건부 폐기한다. */
   @Test
   void logoutLocksProfileBeforeRevokingToken() {
-    AuthProfile authProfile = new AuthProfile(USER_ID, "nickname", "user@example.com");
+    AuthProfile authProfile =
+        new AuthProfile(
+            USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE);
     when(tokenService.hashToken(CURRENT_TOKEN)).thenReturn(CURRENT_TOKEN_HASH);
     when(refreshTokenRepository.findUserProfileIdByTokenHash(CURRENT_TOKEN_HASH))
         .thenReturn(Optional.of(USER_ID));

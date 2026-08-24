@@ -45,9 +45,8 @@ public class UserProfile extends BaseTimeEntity {
   @Column(name = "base_locale", nullable = false, length = 35)
   private Locale baseLocale;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "learning_level", length = 20)
-  private LearningLevel learningLevel;
+  @Column(name = "learning_level")
+  private Integer learningLevel;
 
   @Column(name = "current_level", nullable = false)
   private int currentLevel;
@@ -100,6 +99,11 @@ public class UserProfile extends BaseTimeEntity {
     if (nickname != null) {
       this.nickname = nickname;
     }
+  }
+
+  /** 온보딩에서 선택한 학습 수준으로 갱신한다. */
+  public void updateLearningLevel(int learningLevel) {
+    this.learningLevel = learningLevel;
   }
 
   /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
