@@ -93,11 +93,14 @@ class SocialAuthApiIntegrationTests {
             .andExpect(jsonPath("$.data.user.email").value("ryan@example.com"))
             .andExpect(jsonPath("$.data.user.provider").value("GOOGLE"))
             .andExpect(jsonPath("$.data.user.newUser").value(true))
+            .andExpect(jsonPath("$.data.user.role").value("USER"))
+            .andExpect(jsonPath("$.data.user.status").value("ACTIVE"))
             .andReturn();
 
     JsonNode firstBody = objectMapper.readTree(firstLogin.getResponse().getContentAsByteArray());
     String userId = firstBody.get("data").get("user").get("userId").asText();
     assertDefaultAiTutorAssigned(Long.parseLong(userId));
+    jdbcTemplate.update("UPDATE user_profile SET role = 'ADMIN' WHERE id = ?", userId);
 
     mockMvc
         .perform(
@@ -113,7 +116,9 @@ class SocialAuthApiIntegrationTests {
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.userId").value(userId))
-        .andExpect(jsonPath("$.data.user.newUser").value(false));
+        .andExpect(jsonPath("$.data.user.newUser").value(false))
+        .andExpect(jsonPath("$.data.user.role").value("ADMIN"))
+        .andExpect(jsonPath("$.data.user.status").value("ACTIVE"));
   }
 
   @Test

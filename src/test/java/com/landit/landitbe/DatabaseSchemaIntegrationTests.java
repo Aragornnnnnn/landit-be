@@ -1126,12 +1126,12 @@ class DatabaseSchemaIntegrationTests {
         INSERT INTO app_version (
             platform, version_name, minimum_supported_version_name, build_number,
             force_update_reason, soft_update_reason, release_note, active,
-            released_at, created_at
+            released_at, created_at, updated_at
         )
         VALUES (
             ?, ?, ?, ?,
             '강제 업데이트', '업데이트 권장', NULL, FALSE,
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         """,
         platform,

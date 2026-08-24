@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.shared.domain.Locale;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -33,20 +34,32 @@ import java.time.LocalDateTime;
  * @param learningSummary 학습 요약
  */
 public record AdminUserDetailResponse(
-    Long userProfileId,
-    String email,
-    String nickname,
-    UserRole role,
-    UserProfileStatus status,
-    Locale targetLocale,
-    Locale baseLocale,
-    LearningLevel learningLevel,
-    int currentLevel,
-    Long aiTutorId,
-    PushPermissionStatus pushPermissionStatus,
-    LocalDateTime createdAt,
-    LocalDateTime updatedAt,
-    LearningSummary learningSummary) {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long userProfileId,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        String email,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String nickname,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UserRole role,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UserProfileStatus status,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Locale targetLocale,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Locale baseLocale,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"string", "null"})
+        LearningLevel learningLevel,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int currentLevel,
+    @Schema(
+            requiredMode = Schema.RequiredMode.REQUIRED,
+            nullable = true,
+            types = {"integer", "null"})
+        Long aiTutorId,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PushPermissionStatus pushPermissionStatus,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime updatedAt,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LearningSummary learningSummary) {
 
   /**
    * 프로필과 학습 조회 결과를 관리자 상세 응답으로 조립한다.
@@ -95,10 +108,18 @@ public record AdminUserDetailResponse(
    * @param lastLearningDate 최근 학습일
    */
   public record LearningSummary(
-      long completedScenarioCount,
-      CurrentScenario currentScenario,
-      int currentStreakDays,
-      LocalDate lastLearningDate) {}
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long completedScenarioCount,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              nullable = true,
+              types = {"object", "null"})
+          CurrentScenario currentScenario,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int currentStreakDays,
+      @Schema(
+              requiredMode = Schema.RequiredMode.REQUIRED,
+              nullable = true,
+              types = {"string", "null"})
+          LocalDate lastLearningDate) {}
 
   /**
    * 현재 제공 대상 시나리오 정보다.
@@ -109,10 +130,10 @@ public record AdminUserDetailResponse(
    * @param dailyScenarioType 데일리 시나리오 유형
    */
   public record CurrentScenario(
-      Long scenarioId,
-      String scenarioTitle,
-      int displayOrder,
-      DailyScenarioType dailyScenarioType) {
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Long scenarioId,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String scenarioTitle,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int displayOrder,
+      @Schema(requiredMode = Schema.RequiredMode.REQUIRED) DailyScenarioType dailyScenarioType) {
 
     /**
      * 시나리오 Service 공개 계약을 상세 응답으로 변환한다.

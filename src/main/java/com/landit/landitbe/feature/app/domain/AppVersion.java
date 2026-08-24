@@ -51,6 +51,12 @@ public class AppVersion extends BaseCreatedAtEntity {
   @Column(name = "released_at")
   private LocalDateTime releasedAt;
 
+  @Column(name = "updated_at", nullable = false)
+  private LocalDateTime updatedAt;
+
+  @Column(name = "updated_by_user_profile_id")
+  private Long updatedByUserProfileId;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected AppVersion() {}
 
@@ -64,6 +70,7 @@ public class AppVersion extends BaseCreatedAtEntity {
    * @param softUpdateReason 권장 업데이트 안내 사유
    * @param releaseNote 릴리스 노트
    * @param releasedAt 출시 시각
+   * @param updatedByUserProfileId 수정한 사용자 프로필 ID
    */
   public void update(
       String versionName,
@@ -72,7 +79,8 @@ public class AppVersion extends BaseCreatedAtEntity {
       String forceUpdateReason,
       String softUpdateReason,
       String releaseNote,
-      LocalDateTime releasedAt) {
+      LocalDateTime releasedAt,
+      Long updatedByUserProfileId) {
     this.versionName = versionName;
     this.buildNumber = buildNumber;
     this.minimumSupportedVersionName = minimumSupportedVersionName;
@@ -80,6 +88,8 @@ public class AppVersion extends BaseCreatedAtEntity {
     this.softUpdateReason = softUpdateReason;
     this.releaseNote = releaseNote;
     this.releasedAt = releasedAt;
+    this.updatedAt = LocalDateTime.now();
+    this.updatedByUserProfileId = updatedByUserProfileId;
   }
 
   /**
@@ -170,5 +180,23 @@ public class AppVersion extends BaseCreatedAtEntity {
    */
   public LocalDateTime getReleasedAt() {
     return releasedAt;
+  }
+
+  /**
+   * 마지막 수정 시각을 반환한다.
+   *
+   * @return 마지막 수정 시각
+   */
+  public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+  }
+
+  /**
+   * 마지막 수정자 사용자 프로필 ID를 반환한다.
+   *
+   * @return 마지막 수정자 사용자 프로필 ID. 없으면 {@code null}
+   */
+  public Long getUpdatedByUserProfileId() {
+    return updatedByUserProfileId;
   }
 }
