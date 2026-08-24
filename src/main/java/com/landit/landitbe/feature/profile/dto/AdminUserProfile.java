@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.profile.dto;
 
-import com.landit.landitbe.feature.profile.domain.LearningLevel;
 import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
@@ -35,7 +34,7 @@ public record AdminUserProfile(
     UserProfileStatus status,
     Locale targetLocale,
     Locale baseLocale,
-    LearningLevel learningLevel,
+    Integer learningLevel,
     int currentLevel,
     Long aiTutorId,
     PushPermissionStatus pushPermissionStatus,

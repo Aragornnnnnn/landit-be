@@ -652,6 +652,69 @@ class DatabaseSchemaIntegrationTests {
         .isEqualTo("marco");
   }
 
+  /** V58 migration은 기존 학습 수준을 1~5 정수 척도로 변환하고 범위를 제한한다. */
+  @Test
+  void v58MigrationConvertsAndConstrainsUserLearningLevel() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "32");
+    insertLegacyLearningLevel(migrationJdbcTemplate, 990401L, "BEGINNER");
+    insertLegacyLearningLevel(migrationJdbcTemplate, 990402L, "INTERMEDIATE");
+    insertLegacyLearningLevel(migrationJdbcTemplate, 990403L, "ADVANCED");
+
+    migrateToLatestVersion(databaseUrl);
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                """
+                select data_type
+                from information_schema.columns
+                where lower(table_name) = 'user_profile'
+                  and lower(column_name) = 'learning_level'
+                """,
+                String.class))
+        .isEqualToIgnoringCase("INTEGER");
+    assertThat(
+            migrationJdbcTemplate.queryForList(
+                "select learning_level from user_profile order by id", Integer.class))
+        .containsExactly(1, 3, 5);
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.table_constraints
+                where lower(table_name) = 'user_profile'
+                  and lower(constraint_name) = 'chk_user_profile_learning_level'
+                """,
+                Integer.class))
+        .isEqualTo(1);
+  }
+
+  /** 사용자 학습 수준 CHECK 제약은 1과 5를 허용하고 범위를 벗어난 값을 거절한다. */
+  @Test
+  void userLearningLevelConstraintAllowsOneToFiveOnly() {
+    long userProfileId = 990404L;
+    insertUserProfile(jdbcTemplate, userProfileId, null);
+
+    assertThatNoException()
+        .isThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "update user_profile set learning_level = 1 where id = ?", userProfileId));
+    assertThatNoException()
+        .isThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "update user_profile set learning_level = 5 where id = ?", userProfileId));
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "update user_profile set learning_level = 6 where id = ?", userProfileId))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining("chk_user_profile_learning_level");
+  }
+
   /** V55 migration은 하나의 시나리오가 여러 캐릭터 음성을 사용하면 적용을 중단한다. */
   @Test
   void v55MigrationRejectsScenarioWithMultipleCharacterVoices() {
@@ -1112,6 +1175,22 @@ class DatabaseSchemaIntegrationTests {
         """,
         userProfileId,
         aiTutorId);
+  }
+
+  /** 기존 문자열 학습 수준을 가진 마이그레이션 검증용 사용자 프로필을 저장한다. */
+  private void insertLegacyLearningLevel(
+      JdbcTemplate migrationJdbcTemplate, long userProfileId, String learningLevel) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO user_profile (
+            id, nickname, target_locale, base_locale, learning_level, current_level,
+            push_permission_status, status, created_at, updated_at
+        )
+        VALUES (?, 'learning-level-migration-user', 'EN', 'KR', ?, 1,
+                'NOT_DETERMINED', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userProfileId,
+        learningLevel);
   }
 
   private Long userAiTutorId(JdbcTemplate migrationJdbcTemplate, long userProfileId) {

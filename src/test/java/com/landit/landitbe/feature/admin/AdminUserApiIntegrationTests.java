@@ -117,6 +117,7 @@ class AdminUserApiIntegrationTests {
     String userKey = "admin-user-detail-" + UUID.randomUUID();
     login(userKey, "상세 사용자");
     long userProfileId = userProfileId(userKey);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 4 WHERE id = ?", userProfileId);
     seedScenarioContent();
     grantScenarioAccess(userProfileId, FIRST_SCENARIO_ID);
     jdbcTemplate.update(
@@ -139,6 +140,7 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.data.status").value("ACTIVE"))
         .andExpect(jsonPath("$.data.targetLocale").value("EN"))
         .andExpect(jsonPath("$.data.baseLocale").value("KR"))
+        .andExpect(jsonPath("$.data.learningLevel").value(4))
         .andExpect(jsonPath("$.data.currentLevel").value(1))
         .andExpect(jsonPath("$.data.pushPermissionStatus").value("NOT_DETERMINED"))
         .andExpect(jsonPath("$.data.learningSummary.completedScenarioCount").value(1))

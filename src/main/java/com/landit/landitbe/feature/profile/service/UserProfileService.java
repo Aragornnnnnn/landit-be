@@ -187,6 +187,18 @@ public class UserProfileService {
   }
 
   /**
+   * 활성 사용자의 학습 수준을 갱신한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param learningLevel 온보딩에서 선택한 1부터 5까지의 학습 수준
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional
+  public void updateLearningLevel(Long userId, int learningLevel) {
+    requireActive(userId).updateLearningLevel(learningLevel);
+  }
+
+  /**
    * 관리자 사용자 목록을 가입일 최신순으로 조회한다.
    *
    * @param page 페이지 번호
