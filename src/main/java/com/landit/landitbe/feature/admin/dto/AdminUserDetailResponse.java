@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.admin.dto;
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.service.ScenarioQueryService;
-import com.landit.landitbe.feature.profile.domain.LearningLevel;
 import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
@@ -48,8 +47,8 @@ public record AdminUserDetailResponse(
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
             nullable = true,
-            types = {"string", "null"})
-        LearningLevel learningLevel,
+            types = {"integer", "null"})
+        Integer learningLevel,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int currentLevel,
     @Schema(
             requiredMode = Schema.RequiredMode.REQUIRED,
