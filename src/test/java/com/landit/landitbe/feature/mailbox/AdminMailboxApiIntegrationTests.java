@@ -349,6 +349,37 @@ class AdminMailboxApiIntegrationTests {
   }
 
   @Test
+  void adminCanListFeedbacksWithoutKeyword() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-empty-feedback-search");
+    Long userId = loginAndFindUserId("mailbox-empty-feedback-search-user");
+    insertFeedback(userId, "검색어 없는 문의", "QUESTION", "PENDING", 10);
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(1))
+        .andExpect(jsonPath("$.data.items[0].content").value("검색어 없는 문의"));
+  }
+
+  @Test
+  void adminCanListFeedbacksWithBlankKeyword() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-blank-feedback-search");
+    Long userId = loginAndFindUserId("mailbox-blank-feedback-search-user");
+    insertFeedback(userId, "빈 검색어 문의", "QUESTION", "PENDING", 10);
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                .param("keyword", ""))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(1))
+        .andExpect(jsonPath("$.data.items[0].content").value("빈 검색어 문의"));
+  }
+
+  @Test
   void adminFeedbackSearchTreatsLikeWildcardsAsText() throws Exception {
     final String adminToken = loginAsAdmin("mailbox-admin-literal-search");
     Long userId = loginAndFindUserId("mailbox-literal-search-user");

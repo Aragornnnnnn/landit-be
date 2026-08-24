@@ -45,7 +45,7 @@ public interface AdminMailboxFeedbackRepository extends JpaRepository<MailboxFee
       from MailboxFeedback feedback, UserProfile profile
       where profile.id = feedback.userProfileId
         and (:keyword is null
-          or lower(feedback.contentText) like lower(concat('%', :keyword, '%')) escape '!')
+          or lower(feedback.contentText) like lower(concat('%', cast(:keyword as string), '%')) escape '!')
         and (:type is null or feedback.feedbackType = :type)
         and (:status is null or feedback.processingStatus = :status)
         and (:createdFrom is null or feedback.createdAt >= :createdFrom)
