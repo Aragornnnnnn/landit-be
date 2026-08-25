@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
+import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterListResponse;
@@ -91,6 +92,15 @@ public interface AdminMailboxControllerDocs {
       int page,
       int size,
       FeedbackSort sort);
+
+  /**
+   * 피드백 상세와 최신 답장을 조회한다.
+   *
+   * @param feedbackId 피드백 ID
+   * @return 피드백 상세
+   */
+  @Operation(summary = "피드백 상세 조회", security = @SecurityRequirement(name = "bearerAuth"))
+  ApiResponse<AdminMailboxFeedbackDetailResponse> getFeedback(Long feedbackId);
 
   /**
    * 여러 사용자에게 같은 답장을 보낸다.

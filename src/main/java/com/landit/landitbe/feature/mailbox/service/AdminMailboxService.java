@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
+import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterCreateRequest;
@@ -220,6 +221,47 @@ public class AdminMailboxService {
         size,
         feedbacks.getTotalElements(),
         feedbacks.getTotalPages());
+  }
+
+  /**
+   * 피드백 상세와 대표 피드백에 연결된 최신 답장을 조회한다.
+   *
+   * @param feedbackId 피드백 ID
+   * @return 피드백 상세 응답
+   * @throws ApiException 피드백이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public AdminMailboxFeedbackDetailResponse getFeedback(Long feedbackId) {
+    AdminMailboxFeedbackSummary feedback =
+        feedbackRepository
+            .findSummaryByFeedbackId(feedbackId)
+            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+    Long representativeFeedbackId =
+        feedback.getResolvedByFeedbackId() == null
+            ? feedbackId
+            : feedback.getResolvedByFeedbackId();
+    Set<Long> replyFeedbackIds = new LinkedHashSet<>();
+    replyFeedbackIds.add(representativeFeedbackId);
+    replyFeedbackIds.add(feedbackId);
+    MailboxLetter reply =
+        letterRepository
+            .findRepliesByFeedbackIds(
+                feedback.getUserProfileId(), replyFeedbackIds, PageRequest.of(0, 1))
+            .stream()
+            .findFirst()
+            .orElse(null);
+    return new AdminMailboxFeedbackDetailResponse(
+        feedback.getFeedbackId(),
+        feedback.getUserProfileId(),
+        feedback.getEmail(),
+        feedback.getNickname(),
+        feedback.getType(),
+        feedback.getContent(),
+        feedback.getStatus(),
+        feedback.getResolvedByFeedbackId(),
+        feedback.getCreatedAt(),
+        feedback.getUpdatedAt(),
+        toFeedbackReply(reply));
   }
 
   private Page<AdminMailboxFeedbackSummary> findFeedbacks(
@@ -483,6 +525,14 @@ public class AdminMailboxService {
         feedback.getResolvedByFeedbackId(),
         feedback.getCreatedAt(),
         feedback.getUpdatedAt());
+  }
+
+  private AdminMailboxFeedbackDetailResponse.Reply toFeedbackReply(MailboxLetter letter) {
+    if (letter == null) {
+      return null;
+    }
+    return new AdminMailboxFeedbackDetailResponse.Reply(
+        letter.getId(), letter.getTitle(), letter.getBodyText(), letter.getPublishedAt());
   }
 
   private String letterSummary(MailboxLetter letter) {
