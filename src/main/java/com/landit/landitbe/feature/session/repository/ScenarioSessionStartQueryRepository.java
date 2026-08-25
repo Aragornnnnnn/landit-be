@@ -34,6 +34,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
                 slv.userOpeningInstruction,
                 openingQuestionVariant.questionText,
                 openingQuestionVariant.questionTranslation,
+                openingQuestionVariant.audioUrl,
                 openingQuestionVariant.innerThought,
                 openingQuestionVariant.innerThoughtType,
                 tv.provider,

@@ -188,7 +188,7 @@ public class ScenarioSessionStartService {
     SessionHistoryMessage message =
         saveAiOpeningHistoryMessage(learningSessionId, userProfile, startRow, startedAt);
 
-    return CurrentMessageResponse.from(message);
+    return CurrentMessageResponse.from(message, startRow.openingQuestionAudioUrl());
   }
 
   /** AI first 시작 데이터가 비어 있으면 콘텐츠 설정 오류로 본다. */
