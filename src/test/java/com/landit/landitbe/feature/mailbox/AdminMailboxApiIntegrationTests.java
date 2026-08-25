@@ -364,6 +364,36 @@ class AdminMailboxApiIntegrationTests {
   }
 
   @Test
+  void adminFeedbackSearchOmitsMissingCreatedToCondition() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-feedback-created-from-only");
+    Long userId = loginAndFindUserId("mailbox-feedback-created-from-only-user");
+    insertFeedback(userId, "시작일만 있는 문의", "QUESTION", "PENDING", 10);
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                .param("createdFrom", "2026-01-02"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+  }
+
+  @Test
+  void adminFeedbackSearchOmitsMissingCreatedFromCondition() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-feedback-created-to-only");
+    Long userId = loginAndFindUserId("mailbox-feedback-created-to-only-user");
+    insertFeedback(userId, "종료일만 있는 문의", "QUESTION", "PENDING", 10);
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                .param("createdTo", "2025-12-31"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+  }
+
+  @Test
   void adminCanListFeedbacksWithBlankKeyword() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-blank-feedback-search");
     Long userId = loginAndFindUserId("mailbox-blank-feedback-search-user");
