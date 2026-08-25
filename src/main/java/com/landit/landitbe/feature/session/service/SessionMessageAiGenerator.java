@@ -57,6 +57,8 @@ class SessionMessageAiGenerator {
     return new Generation(
         combine(nextMessageResult.acknowledgement(), nextQuestion.questionText()),
         combine(nextMessageResult.translatedAcknowledgement(), nextQuestion.questionTranslation()),
+        nextMessageResult.acknowledgement(),
+        nextQuestion.questionAudioUrl(),
         null,
         null,
         nextMessageResult.goalCompletionStatus(),
@@ -94,6 +96,8 @@ class SessionMessageAiGenerator {
     return new Generation(
         closingMessageResult.aiMessage(),
         closingMessageResult.translatedMessage(),
+        closingMessageResult.aiMessage(),
+        null,
         closingMessageResult.innerThought(),
         closingMessageResult.innerThoughtType(),
         goalCompletionStatus,
@@ -147,6 +151,8 @@ class SessionMessageAiGenerator {
   record Generation(
       String aiMessage,
       String translatedMessage,
+      String ttsText,
+      String questionAudioUrl,
       String innerThought,
       InnerThoughtType innerThoughtType,
       GoalCompletionStatus goalCompletionStatus,
