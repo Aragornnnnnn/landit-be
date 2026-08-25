@@ -16,6 +16,7 @@ import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyRequest;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -98,6 +99,7 @@ public interface AdminMailboxControllerDocs {
    *
    * @param feedbackId 피드백 ID
    * @return 피드백 상세
+   * @throws ApiException 피드백을 찾을 수 없을 때
    */
   @Operation(summary = "피드백 상세 조회", security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<AdminMailboxFeedbackDetailResponse> getFeedback(Long feedbackId);
