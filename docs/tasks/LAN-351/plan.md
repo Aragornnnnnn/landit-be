@@ -14,7 +14,8 @@
 ## Global Constraints
 
 - 기존 `content`, `translatedContent`, `tts_voice` PK/FK를 유지한다.
-- 최종 CloudFront URL 매핑을 받기 전에는 임시 URL로 Flyway 마이그레이션을 작성하지 않는다.
+- 질문 음원 URL은 LAN-351 manifest의 `scenarioQuestionId`와 `s3Key`로 매핑한다.
+- `scenarioId`와 `displayOrder`로 S3 key를 조합하지 않는다.
 - FE, 합성 음원 저장, `GET /api/v1/scenarios`는 변경하지 않는다.
 
 ---
@@ -36,16 +37,16 @@ class NextMessageResponse(BaseModel):
     goalCompletionStatus: GoalCompletionStatus
 ```
 
-- [ ] AI API 테스트를 `acknowledgement`, `translatedAcknowledgement` 계약으로 먼저 변경한다.
-- [ ] `python -m unittest tests.test_conversation_api.NextMessageApiTests`를 실행해 기존 구현의 실패를 확인한다.
-- [ ] 프롬프트·복구 로직·Pydantic 응답을 맞장구 전용으로 최소 변경한다. 고정 질문은 문맥으로만 유지한다.
-- [ ] 대상 테스트와 `python -m unittest discover -s tests`를 통과시킨다.
-- [ ] `feat/LAN-351`에 AI 계약 변경을 커밋한다.
+- [x] AI API 테스트를 `acknowledgement`, `translatedAcknowledgement` 계약으로 먼저 변경한다.
+- [x] `python -m unittest tests.test_conversation_api.NextMessageApiTests`를 실행해 기존 구현의 실패를 확인한다.
+- [x] 프롬프트·복구 로직·Pydantic 응답을 맞장구 전용으로 최소 변경한다. 고정 질문은 문맥으로만 유지한다.
+- [x] 대상 테스트와 `python -m unittest discover -s tests`를 통과시킨다.
+- [x] `feat/LAN-351`에 AI 계약 변경을 커밋한다.
 
 ### Task 2: 질문 음원과 캐릭터 음성 마이그레이션
 
 **Files:**
-- Create: `src/main/resources/db/migration/V58__add_scenario_question_audio_url.sql`
+- Create: `src/main/resources/db/migration/V59__add_scenario_question_audio_url.sql`
 - Modify: `src/main/java/com/landit/landitbe/feature/content/domain/ScenarioQuestionLanguageVariant.java`
 - Modify: 질문·날짜별 시나리오·세션 시작 Projection과 Query Repository.
 - Test: `src/test/java/com/landit/landitbe/DatabaseSchemaIntegrationTests.java`
@@ -54,11 +55,11 @@ class NextMessageResponse(BaseModel):
 **Interfaces:**
 - Produces: `NextQuestionContext.questionAudioUrl`, 시작·날짜별 조회 Projection의 `questionAudioUrl`.
 
-- [ ] DB 테스트에 `audio_url NOT NULL`, 전체 URL 백필, Chloe/Marco/Teddy 매핑 기대값을 추가한다.
-- [ ] `./gradlew test --tests 'com.landit.landitbe.DatabaseSchemaIntegrationTests' --tests 'com.landit.landitbe.feature.content.ScenarioQuestionQueryRepositoryIntegrationTests' --tests 'com.landit.landitbe.feature.content.DailyScenarioApiIntegrationTests' --tests 'com.landit.landitbe.feature.session.ScenarioSessionApiIntegrationTests'`를 실행해 실패를 확인한다.
-- [ ] 검증된 URL 매핑으로 V58을 작성하고 엔티티·Projection·조회 쿼리에 `audioUrl`을 전달한다.
-- [ ] 관련 DB·조회 테스트를 통과시킨다.
-- [ ] 스키마·콘텐츠 조회 변경을 커밋한다.
+- [x] DB 테스트에 `audio_url NOT NULL`, 전체 URL 백필, Chloe/Marco/Teddy 매핑 기대값을 추가한다.
+- [x] 대상 DB 테스트를 실행해 URL 백필과 `NOT NULL` 미적용 실패를 확인한다.
+- [x] 검증된 URL 매핑으로 V59를 작성하고 엔티티·Projection·조회 쿼리에 `audioUrl`을 전달한다.
+- [x] 관련 DB·조회 테스트를 통과시킨다.
+- [x] 스키마·콘텐츠 조회 변경을 커밋한다.
 
 ### Task 3: BE 메시지 조합과 API 계약
 
@@ -86,8 +87,16 @@ record NextMessageResponse(
     String questionAudioUrl) {}
 ```
 
-- [ ] 원격 AI 파싱, 전체 메시지 결합, AI-first·USER-first·종료 턴 응답 테스트를 먼저 변경한다.
-- [ ] `./gradlew test --tests 'com.landit.landitbe.feature.session.client.ai.RemoteAiConversationClientTest' --tests 'com.landit.landitbe.feature.session.ScenarioSessionApiIntegrationTests' --tests 'com.landit.landitbe.feature.content.DailyScenarioApiIntegrationTests'`를 실행해 실패를 확인한다.
-- [ ] BE가 맞장구와 고정 질문을 결합해 저장하고 세 API 응답에 새 필드를 추가한다.
-- [ ] 대상 테스트를 통과시킨 뒤 `./gradlew check`를 실행한다.
-- [ ] API 계약 변경과 검증 결과를 커밋한다.
+- [x] 원격 AI 파싱, 전체 메시지 결합, AI-first·USER-first·종료 턴 응답 테스트를 먼저 변경한다.
+- [x] 대상 테스트를 실행해 기존 AI 응답 계약의 실패를 확인한다.
+- [x] BE가 맞장구와 고정 질문을 결합해 저장하고 세 API 응답에 새 필드를 추가한다.
+- [x] 대상 테스트를 통과시킨 뒤 `./gradlew check`를 실행한다.
+- [x] API 계약 변경과 검증 결과를 커밋한다.
+
+## 진행 메모
+
+- 2026-08-25: 실제 최신 DB별 migration이 V58이므로 LAN-351은 V59를 사용한다.
+- 2026-08-25: 게시된 manifest의 assets 120건이 `scenarioQuestionId` 1~120과 중복 없이 일치함을 확인했다.
+- 2026-08-25: 고정 질문 음원은 manifest의 `s3Key`에 CloudFront 도메인을 붙여 백필한다.
+- 2026-08-25: 맞장구와 고정 질문 MP3는 바이트를 단순 연결하지 않고 디코딩 후 결합·재인코딩해야 한다.
+- 2026-08-25: manifest의 MP3 120개 CloudFront 조회와 `./gradlew check`가 성공했다.
