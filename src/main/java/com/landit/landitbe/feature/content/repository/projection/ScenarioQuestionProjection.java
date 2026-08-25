@@ -9,6 +9,11 @@ package com.landit.landitbe.feature.content.repository.projection;
  * @param sequence 항목 순서
  * @param questionText 질문 본문
  * @param questionTranslation 질문 번역
+ * @param questionAudioUrl 질문 음원 URL
  */
 public record ScenarioQuestionProjection(
-    Long questionId, int sequence, String questionText, String questionTranslation) {}
+    Long questionId,
+    int sequence,
+    String questionText,
+    String questionTranslation,
+    String questionAudioUrl) {}
