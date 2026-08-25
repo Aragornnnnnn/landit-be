@@ -19,7 +19,12 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class LocalAiConversationClient implements AiConversationClient {
 
-  /** 다음 고정 질문 앞에 재생할 고정 맞장구를 반환한다. */
+  /**
+   * 다음 고정 질문 앞에 재생할 고정 맞장구를 반환한다.
+   *
+   * @param request 다음 메시지 생성 요청
+   * @return 로컬 환경에서 사용할 고정 맞장구와 목표 달성 상태
+   */
   @Override
   public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
     return new AiNextMessageResult("Got it.", "알겠어.", GoalCompletionStatus.PARTIAL);
