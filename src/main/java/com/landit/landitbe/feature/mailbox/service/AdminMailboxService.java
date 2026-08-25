@@ -210,20 +210,35 @@ public class AdminMailboxService {
     validateFeedbackSearchPeriod(createdFrom, createdTo);
     LocalDateTime from = createdFrom == null ? null : createdFrom.atStartOfDay();
     LocalDateTime to = createdTo == null ? null : createdTo.plusDays(1).atStartOfDay();
+    String normalizedKeyword = normalizeSearchKeyword(keyword);
+    PageRequest pageRequest = feedbackPageRequest(page, size, sort);
     Page<AdminMailboxFeedbackSummary> feedbacks =
-        feedbackRepository.search(
-            normalizeSearchKeyword(keyword),
-            type,
-            status,
-            from,
-            to,
-            feedbackPageRequest(page, size, sort));
+        findFeedbacks(normalizedKeyword, type, status, from, to, pageRequest);
     return new AdminMailboxFeedbackListResponse(
         feedbacks.getContent().stream().map(this::toFeedbackResponse).toList(),
         page,
         size,
         feedbacks.getTotalElements(),
         feedbacks.getTotalPages());
+  }
+
+  private Page<AdminMailboxFeedbackSummary> findFeedbacks(
+      String keyword,
+      UserFeedbackType type,
+      UserFeedbackStatus status,
+      LocalDateTime from,
+      LocalDateTime to,
+      PageRequest pageRequest) {
+    if (from == null && to == null) {
+      return feedbackRepository.searchWithoutCreatedRange(keyword, type, status, pageRequest);
+    }
+    if (from == null) {
+      return feedbackRepository.searchWithoutCreatedFrom(keyword, type, status, to, pageRequest);
+    }
+    if (to == null) {
+      return feedbackRepository.searchWithoutCreatedTo(keyword, type, status, from, pageRequest);
+    }
+    return feedbackRepository.search(keyword, type, status, from, to, pageRequest);
   }
 
   /**

@@ -60,6 +60,114 @@ public interface AdminMailboxFeedbackRepository extends JpaRepository<MailboxFee
       Pageable pageable);
 
   /**
+   * 날짜 조건 없이 사용자 정보와 함께 어드민 피드백을 검색한다.
+   *
+   * @param keyword 본문 검색어
+   * @param type 피드백 유형
+   * @param status 처리 상태
+   * @param pageable 페이지와 정렬 조건
+   * @return 조건에 맞는 피드백 페이지
+   */
+  @Query(
+      """
+      select feedback.id as feedbackId,
+             feedback.userProfileId as userProfileId,
+             profile.email as email,
+             profile.nickname as nickname,
+             feedback.feedbackType as type,
+             feedback.contentText as content,
+             feedback.processingStatus as status,
+             feedback.resolvedByFeedbackId as resolvedByFeedbackId,
+             feedback.createdAt as createdAt,
+             feedback.updatedAt as updatedAt
+      from MailboxFeedback feedback, UserProfile profile
+      where profile.id = feedback.userProfileId
+        and (:keyword is null
+          or lower(feedback.contentText) like lower(concat('%', cast(:keyword as string), '%')) escape '!')
+        and (:type is null or feedback.feedbackType = :type)
+        and (:status is null or feedback.processingStatus = :status)
+      """)
+  Page<AdminMailboxFeedbackSummary> searchWithoutCreatedRange(
+      @Param("keyword") String keyword,
+      @Param("type") UserFeedbackType type,
+      @Param("status") UserFeedbackStatus status,
+      Pageable pageable);
+
+  /**
+   * 시작일 조건 없이 종료일 조건만으로 어드민 피드백을 검색한다.
+   *
+   * @param keyword 본문 검색어
+   * @param type 피드백 유형
+   * @param status 처리 상태
+   * @param createdTo 검색 종료 시각
+   * @param pageable 페이지와 정렬 조건
+   * @return 조건에 맞는 피드백 페이지
+   */
+  @Query(
+      """
+      select feedback.id as feedbackId,
+             feedback.userProfileId as userProfileId,
+             profile.email as email,
+             profile.nickname as nickname,
+             feedback.feedbackType as type,
+             feedback.contentText as content,
+             feedback.processingStatus as status,
+             feedback.resolvedByFeedbackId as resolvedByFeedbackId,
+             feedback.createdAt as createdAt,
+             feedback.updatedAt as updatedAt
+      from MailboxFeedback feedback, UserProfile profile
+      where profile.id = feedback.userProfileId
+        and (:keyword is null
+          or lower(feedback.contentText) like lower(concat('%', cast(:keyword as string), '%')) escape '!')
+        and (:type is null or feedback.feedbackType = :type)
+        and (:status is null or feedback.processingStatus = :status)
+        and feedback.createdAt < :createdTo
+      """)
+  Page<AdminMailboxFeedbackSummary> searchWithoutCreatedFrom(
+      @Param("keyword") String keyword,
+      @Param("type") UserFeedbackType type,
+      @Param("status") UserFeedbackStatus status,
+      @Param("createdTo") LocalDateTime createdTo,
+      Pageable pageable);
+
+  /**
+   * 종료일 조건 없이 시작일 조건만으로 어드민 피드백을 검색한다.
+   *
+   * @param keyword 본문 검색어
+   * @param type 피드백 유형
+   * @param status 처리 상태
+   * @param createdFrom 검색 시작 시각
+   * @param pageable 페이지와 정렬 조건
+   * @return 조건에 맞는 피드백 페이지
+   */
+  @Query(
+      """
+      select feedback.id as feedbackId,
+             feedback.userProfileId as userProfileId,
+             profile.email as email,
+             profile.nickname as nickname,
+             feedback.feedbackType as type,
+             feedback.contentText as content,
+             feedback.processingStatus as status,
+             feedback.resolvedByFeedbackId as resolvedByFeedbackId,
+             feedback.createdAt as createdAt,
+             feedback.updatedAt as updatedAt
+      from MailboxFeedback feedback, UserProfile profile
+      where profile.id = feedback.userProfileId
+        and (:keyword is null
+          or lower(feedback.contentText) like lower(concat('%', cast(:keyword as string), '%')) escape '!')
+        and (:type is null or feedback.feedbackType = :type)
+        and (:status is null or feedback.processingStatus = :status)
+        and feedback.createdAt >= :createdFrom
+      """)
+  Page<AdminMailboxFeedbackSummary> searchWithoutCreatedTo(
+      @Param("keyword") String keyword,
+      @Param("type") UserFeedbackType type,
+      @Param("status") UserFeedbackStatus status,
+      @Param("createdFrom") LocalDateTime createdFrom,
+      Pageable pageable);
+
+  /**
    * 일괄 답장 대상 피드백을 ID 순서로 잠금 조회한다.
    *
    * @param ids 잠글 피드백 ID
