@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.memory.repository;
 
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,6 +32,15 @@ public class ConversationMemoryRepository {
           :confidence, 'ACTIVE', :validFrom, :validTo, :observedAt, :recordedAt, NULL,
           NULL, NULL, NULL, :extractorVersion, :embeddingModel,
           CAST(:embedding AS extensions.vector))
+      """;
+
+  private static final String SUPERSEDE_ACTIVE_SQL =
+      """
+      UPDATE conversation_memory
+      SET status = 'SUPERSEDED', valid_to = :validTo, superseded_at = :supersededAt,
+          superseded_by_id = :newMemoryId
+      WHERE id = :oldMemoryId
+        AND status = 'ACTIVE'
       """;
 
   private static final String INSERT_SOURCE_SQL =
@@ -71,6 +81,31 @@ public class ConversationMemoryRepository {
                         .addValue("sourceMessageId", sourceMessageId))
             .toArray(MapSqlParameterSource[]::new));
     return memoryId.longValue();
+  }
+
+  /**
+   * 기존 활성 기억을 새 기억으로 조건부 대체하고 유효 기간을 닫는다.
+   *
+   * @param oldMemoryId 대체할 기존 기억 ID
+   * @param newMemoryId 기존 기억이 가리킬 새 기억 ID
+   * @param validTo 기존 기억의 유효 종료 시각
+   * @param supersededAt 대체 상태가 기록된 시각
+   * @return 기존 기억이 활성 상태여서 갱신됐으면 true
+   */
+  public boolean supersedeActive(
+      long oldMemoryId, long newMemoryId, LocalDateTime validTo, LocalDateTime supersededAt) {
+    if (oldMemoryId <= 0 || newMemoryId <= 0 || validTo == null || supersededAt == null) {
+      throw new IllegalArgumentException("대체할 장기기억 상태 값이 유효하지 않습니다.");
+    }
+    int updated =
+        jdbcTemplate.update(
+            SUPERSEDE_ACTIVE_SQL,
+            new MapSqlParameterSource()
+                .addValue("oldMemoryId", oldMemoryId)
+                .addValue("newMemoryId", newMemoryId)
+                .addValue("validTo", validTo)
+                .addValue("supersededAt", supersededAt));
+    return updated == 1;
   }
 
   private static MapSqlParameterSource memoryParameters(NewConversationMemory memory) {
