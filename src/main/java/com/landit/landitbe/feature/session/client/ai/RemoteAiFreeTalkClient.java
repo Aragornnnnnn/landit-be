@@ -37,6 +37,8 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       "/api/v1/free-talk/expression-recommendations";
   private static final String CONVERSATION_EMBEDDINGS_PATH =
       "/api/v1/free-talk/conversation-embeddings";
+  private static final String MEMORY_CANDIDATES_PATH = "/api/v1/free-talk/memory-candidates";
+  private static final String MEMORY_RESOLUTION_PATH = "/api/v1/free-talk/memory-resolution";
   private static final int MAX_CONVERSATION_EXCERPTS = 4;
   private static final String AI_CALL_ELAPSED_LOG = "AI 호출 소요 시간. path={}, elapsedMs={}";
 
@@ -107,6 +109,18 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       AiConversationEmbeddingsRequest request) {
     return post(CONVERSATION_EMBEDDINGS_PATH, request, RemoteConversationEmbeddingsResponse.class)
         .toResult();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+    return post(MEMORY_CANDIDATES_PATH, request, AiMemoryCandidatesResult.class);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+    return post(MEMORY_RESOLUTION_PATH, request, AiMemoryResolutionResult.class);
   }
 
   private <T> T post(String path, Object payload, Class<T> responseType) {

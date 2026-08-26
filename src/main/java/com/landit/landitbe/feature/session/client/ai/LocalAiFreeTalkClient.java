@@ -74,6 +74,24 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         List.of(new AiConversationExcerpt("That sounds interesting.", firstAxisEmbedding())));
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+    return new AiMemoryCandidatesResult("memory-candidate-v1", List.of());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+    return new AiMemoryResolutionResult(
+        request.candidates().stream()
+            .map(
+                candidate ->
+                    new AiMemoryResolutionResult.Resolution(
+                        candidate.candidateIndex(), AiMemoryOperation.ADD, List.of()))
+            .toList());
+  }
+
   // 테스트에서 예측할 수 있도록 첫 성분만 1인 고정 임베딩을 만든다.
   private static List<Float> firstAxisEmbedding() {
     Float[] embedding = new Float[AiConversationExcerpt.EMBEDDING_DIMENSION];

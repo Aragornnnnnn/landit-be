@@ -26,6 +26,11 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
@@ -1532,6 +1537,22 @@ class FreeTalkSessionApiIntegrationTests {
       embedding.set(0, 1.0f);
       return new AiConversationEmbeddingsResult(
           List.of(new AiConversationExcerpt("That sounds interesting.", List.copyOf(embedding))));
+    }
+
+    @Override
+    public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+      return new AiMemoryCandidatesResult("memory-candidate-v1", List.of());
+    }
+
+    @Override
+    public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+      return new AiMemoryResolutionResult(
+          request.candidates().stream()
+              .map(
+                  candidate ->
+                      new AiMemoryResolutionResult.Resolution(
+                          candidate.candidateIndex(), AiMemoryOperation.ADD, List.of()))
+              .toList());
     }
 
     void reset() {
