@@ -84,7 +84,6 @@ public class FreeTalkMessageService {
     try {
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
-      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult = null;
       if (reservation.dailyLimitReached()) {
         response =
             submittedMessageService.finalizeTimeLimit(
@@ -92,16 +91,7 @@ public class FreeTalkMessageService {
                 aiFreeTalkClient.generateClosing(
                     closingRequest(reservation, AiFreeTalkClosingReason.TIME_LIMIT_REACHED)));
       } else {
-        memoryResult = retrieveFirstUserMemory(reservation);
-        AiFreeTalkTurnResult turnResult =
-            generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult);
-        response = submittedMessageService.finalizeTurn(reservation, turnResult);
-        if (memoryResult != null) {
-          memoryRetrievalService.recordUsage(
-              memoryResult,
-              turnResult.usedMemoryIds(),
-              response.nextMessage() == null ? null : response.nextMessage().messageId());
-        }
+        response = processRegularTurn(reservation);
       }
       if (response.turnStatus()
           != com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus
@@ -117,6 +107,31 @@ public class FreeTalkMessageService {
       submittedMessageService.compensate(reservation);
       throw exception;
     }
+  }
+
+  private FreeTalkMessageSubmitResponse processRegularTurn(
+      FreeTalkSubmittedMessageService.Reservation reservation) {
+    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+        retrieveFirstUserMemory(reservation);
+    AiFreeTalkTurnResult turnResult =
+        generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult);
+    FreeTalkMessageSubmitResponse response =
+        submittedMessageService.finalizeTurn(reservation, turnResult);
+    recordMemoryUsage(memoryResult, turnResult, response);
+    return response;
+  }
+
+  private void recordMemoryUsage(
+      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult,
+      AiFreeTalkTurnResult turnResult,
+      FreeTalkMessageSubmitResponse response) {
+    if (memoryResult == null) {
+      return;
+    }
+    memoryRetrievalService.recordUsage(
+        memoryResult,
+        turnResult.usedMemoryIds(),
+        response.nextMessage() == null ? null : response.nextMessage().messageId());
   }
 
   /**
@@ -192,13 +207,7 @@ public class FreeTalkMessageService {
     if (!isFirstUserTurn(reservation)) {
       return null;
     }
-    String query =
-        reservation.history().stream()
-            .filter(message -> "USER".equals(message.role()))
-            .map(message -> message.content())
-            .filter(content -> content != null && !content.isBlank())
-            .findFirst()
-            .orElse("");
+    String query = firstUserMessageQuery(reservation);
     return memoryRetrievalService.retrieve(
         new FreeTalkMemoryRetrievalService.RetrievalRequest(
             reservation.freeTalkSessionId(),
@@ -206,6 +215,15 @@ public class FreeTalkMessageService {
             reservation.characterId(),
             MemoryRetrievalStage.FIRST_USER_TURN,
             query));
+  }
+
+  private String firstUserMessageQuery(FreeTalkSubmittedMessageService.Reservation reservation) {
+    return reservation.history().stream()
+        .filter(message -> "USER".equals(message.role()))
+        .map(message -> message.content())
+        .filter(content -> content != null && !content.isBlank())
+        .findFirst()
+        .orElse("");
   }
 
   private boolean isFirstUserTurn(FreeTalkSubmittedMessageService.Reservation reservation) {

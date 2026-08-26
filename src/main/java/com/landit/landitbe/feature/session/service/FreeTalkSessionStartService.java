@@ -45,6 +45,11 @@ public class FreeTalkSessionStartService {
     if (startedSession.startMode() == FreeTalkStartMode.USER_FIRST) {
       return response(startedSession, null);
     }
+    return startAiFirstSession(userId, startedSession);
+  }
+
+  private FreeTalkSessionStartResponse startAiFirstSession(
+      long userId, StartedFreeTalkSession startedSession) {
     FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
         memoryRetrievalService.retrieve(
             new FreeTalkMemoryRetrievalService.RetrievalRequest(
