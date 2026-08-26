@@ -96,7 +96,7 @@ public class ConversationMemoryWriteService {
     return false;
   }
 
-  /** resolution operation에 따라 신규 기억 저장과 기존 기억 대체를 순서대로 계획한다. */
+  /** 상태 판정 결과에 따라 신규 기억 저장과 기존 기억 대체를 순서대로 계획한다. */
   private void persistPlan(ConversationMemoryResolutionPlan plan) {
     if (plan.operation() == AiMemoryOperation.IGNORE) {
       return;

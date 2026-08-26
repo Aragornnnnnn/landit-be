@@ -119,7 +119,7 @@ final class FreeTalkMemoryResolutionPlanner {
     return resolutions;
   }
 
-  /** resolution 응답은 후보 수와 같아야 누락된 저장 계획을 만들지 않는다. */
+  /** 상태 판정 응답은 후보 수와 같아야 누락된 저장 계획을 만들지 않는다. */
   private static void validateResolutionCount(
       List<FreeTalkMemoryCandidate> candidates, AiMemoryResolutionResult result) {
     if (result == null
