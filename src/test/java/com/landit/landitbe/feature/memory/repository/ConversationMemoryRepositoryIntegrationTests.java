@@ -61,6 +61,50 @@ class ConversationMemoryRepositoryIntegrationTests {
     jdbcTemplate.update("delete from user_profile where id between ? and ?", USER_ID, USER_ID + 2);
   }
 
+  @Test
+  void savesActiveMemoryAndItsSourceWithValidityAndNullableStateUnset() {
+    seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
+
+    long memoryId = repository.save(validEventMemory(), List.of(SOURCE_MESSAGE_ID));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select status from conversation_memory where id = ?", String.class, memoryId))
+        .isEqualTo("ACTIVE");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from conversation_memory_source where memory_id = ?",
+                Integer.class,
+                memoryId))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select valid_to from conversation_memory where id = ?",
+                java.sql.Timestamp.class,
+                memoryId))
+        .isEqualTo(java.sql.Timestamp.valueOf(NOW.plusDays(1)));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select superseded_at is null and superseded_by_id is null "
+                    + "and invalidated_at is null and invalidation_reason is null "
+                    + "from conversation_memory where id = ?",
+                Boolean.class,
+                memoryId))
+        .isTrue();
+  }
+
+  @Test
+  void rollsBackMemoryWhenSourceForeignKeyFails() {
+    seedConversation(
+        USER_ID + 2, LEARNING_SESSION_ID + 2, SESSION_HISTORY_ID + 2, SOURCE_MESSAGE_ID + 2);
+
+    assertThatThrownBy(
+            () -> repository.save(validEventMemory(USER_ID + 2), List.of(SOURCE_MESSAGE_ID + 999)))
+        .isInstanceOf(DataIntegrityViolationException.class);
+
+    assertThat(countMemoriesForUser(USER_ID + 2)).isZero();
+  }
+
   private NewConversationMemory validEventMemory() {
     return validEventMemory(USER_ID);
   }
