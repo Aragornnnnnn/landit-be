@@ -84,8 +84,7 @@ public class FreeTalkMemoryRetrievalService {
     return matches.stream().limit(MAX_RESULTS).toList();
   }
 
-  private static List<AiFreeTalkMemoryContext> toContexts(
-      List<ConversationMemoryMatch> matches) {
+  private static List<AiFreeTalkMemoryContext> toContexts(List<ConversationMemoryMatch> matches) {
     return matches.stream().map(FreeTalkMemoryRetrievalService::toContext).toList();
   }
 
