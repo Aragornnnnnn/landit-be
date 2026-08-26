@@ -273,20 +273,28 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
   }
 
-  // AI가 반환한 장기기억 식별자가 제공된 문맥의 부분집합인지 확인한다.
+  /** AI가 반환한 장기기억 식별자가 제공된 문맥의 유효한 부분집합인지 확인한다. */
   private static List<Long> validUsedMemoryIds(
       List<Long> usedMemoryIds, List<AiFreeTalkMemoryContext> memoryContext) {
     List<Long> normalized = usedMemoryIds == null ? List.of() : usedMemoryIds;
-    if (normalized.stream().anyMatch(id -> id == null || id <= 0)
-        || normalized.size() != normalized.stream().distinct().count()
-        || memoryContext == null
-        || !memoryContext.stream()
-            .map(AiFreeTalkMemoryContext::memoryId)
-            .collect(java.util.stream.Collectors.toSet())
-            .containsAll(normalized)) {
+    if (hasInvalidUsedMemoryIds(normalized) || !isMemorySubset(normalized, memoryContext)) {
       return List.of();
     }
     return List.copyOf(normalized);
+  }
+
+  private static boolean hasInvalidUsedMemoryIds(List<Long> usedMemoryIds) {
+    return usedMemoryIds.stream().anyMatch(id -> id == null || id <= 0)
+        || usedMemoryIds.size() != usedMemoryIds.stream().distinct().count();
+  }
+
+  private static boolean isMemorySubset(
+      List<Long> usedMemoryIds, List<AiFreeTalkMemoryContext> memoryContext) {
+    return memoryContext != null
+        && memoryContext.stream()
+            .map(AiFreeTalkMemoryContext::memoryId)
+            .collect(java.util.stream.Collectors.toSet())
+            .containsAll(usedMemoryIds);
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
