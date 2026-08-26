@@ -463,7 +463,8 @@ class RemoteAiFreeTalkClientTest {
             "KOREAN_LEARNER",
             Duration.ofSeconds(1),
             requestTimeout,
-            Duration.ofSeconds(1)));
+            Duration.ofSeconds(1),
+                    Duration.ofSeconds(20)));
   }
 
   private String successResponse(String data) {

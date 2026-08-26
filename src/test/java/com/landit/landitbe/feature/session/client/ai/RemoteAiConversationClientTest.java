@@ -656,7 +656,8 @@ class RemoteAiConversationClientTest {
                     "KOREAN_LEARNER",
                     Duration.ofSeconds(5),
                     Duration.ofSeconds(60),
-                    Duration.ofSeconds(60)));
+                    Duration.ofSeconds(60),
+                    Duration.ofSeconds(20)));
   }
 
   private RemoteAiConversationClient remoteClient(Duration requestTimeout) {
@@ -673,7 +674,8 @@ class RemoteAiConversationClientTest {
             "KOREAN_LEARNER",
             Duration.ofSeconds(5),
             requestTimeout,
-            sessionFeedbackRequestTimeout));
+            sessionFeedbackRequestTimeout,
+                    Duration.ofSeconds(20)));
   }
 
   private void writeSessionFeedbackSuccessResponse(com.sun.net.httpserver.HttpExchange exchange)

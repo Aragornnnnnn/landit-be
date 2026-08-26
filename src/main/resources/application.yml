@@ -47,6 +47,7 @@ landit:
     connect-timeout: ${LANDIT_AI_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_AI_REQUEST_TIMEOUT:60s}
     session-feedback-request-timeout: ${LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT:120s}
+    pronunciation-request-timeout: ${LANDIT_AI_PRONUNCIATION_REQUEST_TIMEOUT:20s}
   expression-search:
     mode: ${LANDIT_EXPRESSION_SEARCH_MODE:pgvector}
     max-candidates: ${LANDIT_EXPRESSION_SEARCH_MAX_CANDIDATES:30}
