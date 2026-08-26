@@ -49,6 +49,7 @@ public class PgVectorConversationMemorySearchRepository
       ORDER BY cm.embedding <=> CAST(:embedding AS extensions.vector), cm.id
       LIMIT :limit
       """;
+
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   /** {@inheritDoc} */

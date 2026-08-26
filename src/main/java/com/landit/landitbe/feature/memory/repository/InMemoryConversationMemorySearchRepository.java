@@ -40,6 +40,7 @@ public class InMemoryConversationMemorySearchRepository
         AND cm.memory_type = ?
         AND cm.character_id IS NULL
       """;
+
   private final JdbcTemplate jdbcTemplate;
 
   /** {@inheritDoc} */
