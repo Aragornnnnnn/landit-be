@@ -74,6 +74,7 @@ public class ConversationMemoryWriteService {
     return PersistenceResult.STORED;
   }
 
+  /** 사용자 잠금 안에서 비교 목록을 다시 조회해 AI 판정 시점 이후 변경을 차단한다. */
   private boolean snapshotChanged(List<ConversationMemoryResolutionPlan> plans) {
     for (ConversationMemoryResolutionPlan plan : plans) {
       NewConversationMemory memory = plan.memory();
@@ -95,6 +96,7 @@ public class ConversationMemoryWriteService {
     return false;
   }
 
+  /** resolution operation에 따라 신규 기억 저장과 기존 기억 대체를 순서대로 계획한다. */
   private void persistPlan(ConversationMemoryResolutionPlan plan) {
     if (plan.operation() == AiMemoryOperation.IGNORE) {
       return;
