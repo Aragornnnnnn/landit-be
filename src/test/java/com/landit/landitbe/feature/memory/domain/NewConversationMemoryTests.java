@@ -56,9 +56,72 @@ class NewConversationMemoryTests {
   }
 
   @Test
+  void preservesValidToAndRejectsReversedValidity() {
+    LocalDateTime validTo = NOW.plusDays(1);
+    NewConversationMemory memory = memory(fixture -> fixture.validTo = validTo);
+
+    assertThat(memory.validTo()).isEqualTo(validTo);
+    assertInvalid(fixture -> fixture.validTo = NOW.minusSeconds(1));
+  }
+
+  @Test
   void rejectsBlankOrTooLongContent() {
     assertInvalid(fixture -> fixture.content = " ");
     assertInvalid(fixture -> fixture.content = "a".repeat(501));
+  }
+
+  @Test
+  void rejectsInvalidConfidence() {
+    for (double confidence : new double[] {-0.01, 1.01, Double.NaN, Double.POSITIVE_INFINITY}) {
+      assertInvalid(fixture -> fixture.confidence = confidence);
+    }
+  }
+
+  @Test
+  void rejectsMissingTemporalValuesAndMetadata() {
+    assertInvalid(fixture -> fixture.validFrom = null);
+    assertInvalid(fixture -> fixture.observedAt = null);
+    assertInvalid(fixture -> fixture.recordedAt = null);
+    assertInvalid(fixture -> fixture.extractorVersion = " ");
+    assertInvalid(fixture -> fixture.embeddingModel = " ");
+  }
+
+  @Test
+  void rejectsInvalidEmbeddingShapeAndComponents() {
+    assertInvalid(fixture -> fixture.embedding = List.of(0.1f));
+    List<Float> withNull = validEmbedding();
+    withNull.set(0, null);
+    assertInvalid(fixture -> fixture.embedding = withNull);
+    List<Float> withNan = validEmbedding();
+    withNan.set(0, Float.NaN);
+    assertInvalid(fixture -> fixture.embedding = withNan);
+    List<Float> withInfinity = validEmbedding();
+    withInfinity.set(0, Float.POSITIVE_INFINITY);
+    assertInvalid(fixture -> fixture.embedding = withInfinity);
+  }
+
+  @Test
+  void trimsTextAndDefensivelyCopiesEmbedding() {
+    List<Float> embedding = validEmbedding();
+    NewConversationMemory memory =
+        memory(
+            fixture -> {
+              fixture.characterId = " chloe ";
+              fixture.content = " remembered content ";
+              fixture.extractorVersion = " extractor-v1 ";
+              fixture.embeddingModel = " embedding-v1 ";
+              fixture.embedding = embedding;
+            });
+
+    embedding.set(0, 0.9f);
+
+    assertThat(memory.characterId()).isEqualTo("chloe");
+    assertThat(memory.content()).isEqualTo("remembered content");
+    assertThat(memory.extractorVersion()).isEqualTo("extractor-v1");
+    assertThat(memory.embeddingModel()).isEqualTo("embedding-v1");
+    assertThat(memory.embedding().get(0)).isEqualTo(0.1f);
+    assertThatThrownBy(() -> memory.embedding().set(0, 0.9f))
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 
   private void assertInvalid(Consumer<MemoryFixture> customize) {
