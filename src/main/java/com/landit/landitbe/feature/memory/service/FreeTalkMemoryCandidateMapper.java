@@ -54,41 +54,61 @@ final class FreeTalkMemoryCandidateMapper {
     }
     validateCandidateContract(context, candidate);
 
-    OffsetDateTime observedAt =
-        sources.stream()
-            .map(AiConversationHistoryMessage::occurredAt)
-            .max((left, right) -> left.toInstant().compareTo(right.toInstant()))
-            .orElseThrow();
+    OffsetDateTime observedAt = latestObservedAt(sources);
     LocalDateTime observedAtLocal = observedAt.atZoneSameInstant(clock.getZone()).toLocalDateTime();
     LocalDateTime validFrom = toLocalDateTime(candidate.validFrom(), observedAtLocal);
     LocalDateTime validTo = toLocalDateTime(candidate.validTo(), null);
     String characterId =
         candidate.memoryType() == ConversationMemoryType.PROFILE ? null : context.characterId();
     NewConversationMemory memory =
-        new NewConversationMemory(
-            context.userProfileId(),
-            characterId,
-            candidate.memoryType(),
-            candidate.content(),
-            toJavaLocale(context.baseLocale()),
-            candidate.confidence(),
-            validFrom,
-            validTo,
-            observedAtLocal,
-            LocalDateTime.now(clock),
-            extractorVersion,
-            candidate.embeddingModel(),
-            candidate.embedding());
+        toMemory(
+            context, candidate, characterId, validFrom, validTo, observedAtLocal, extractorVersion);
     return new FreeTalkMemoryCandidate(
         candidate.candidateIndex(),
         memory,
-        new AiMemoryResolutionRequest.Candidate(
-            candidate.candidateIndex(),
-            candidate.content(),
-            candidate.memoryType(),
-            candidate.sourceMessageIds(),
-            observedAt,
-            List.of()),
+        toResolutionCandidate(candidate, observedAt),
+        List.of());
+  }
+
+  private static OffsetDateTime latestObservedAt(List<AiConversationHistoryMessage> sources) {
+    return sources.stream()
+        .map(AiConversationHistoryMessage::occurredAt)
+        .max((left, right) -> left.toInstant().compareTo(right.toInstant()))
+        .orElseThrow();
+  }
+
+  private NewConversationMemory toMemory(
+      FreeTalkMemoryGenerationContextService.GenerationContext context,
+      AiMemoryCandidatesResult.Candidate candidate,
+      String characterId,
+      LocalDateTime validFrom,
+      LocalDateTime validTo,
+      LocalDateTime observedAt,
+      String extractorVersion) {
+    return new NewConversationMemory(
+        context.userProfileId(),
+        characterId,
+        candidate.memoryType(),
+        candidate.content(),
+        toJavaLocale(context.baseLocale()),
+        candidate.confidence(),
+        validFrom,
+        validTo,
+        observedAt,
+        LocalDateTime.now(clock),
+        extractorVersion,
+        candidate.embeddingModel(),
+        candidate.embedding());
+  }
+
+  private static AiMemoryResolutionRequest.Candidate toResolutionCandidate(
+      AiMemoryCandidatesResult.Candidate candidate, OffsetDateTime observedAt) {
+    return new AiMemoryResolutionRequest.Candidate(
+        candidate.candidateIndex(),
+        candidate.content(),
+        candidate.memoryType(),
+        candidate.sourceMessageIds(),
+        observedAt,
         List.of());
   }
 

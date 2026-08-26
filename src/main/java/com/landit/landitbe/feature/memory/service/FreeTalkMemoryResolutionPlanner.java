@@ -83,6 +83,15 @@ final class FreeTalkMemoryResolutionPlanner {
       List<FreeTalkMemoryCandidate> candidates, AiMemoryResolutionResult result) {
     validateResolutionCount(candidates, result);
     Map<Integer, FreeTalkMemoryCandidate> candidatesByIndex = candidatesByIndex(candidates);
+    Map<Integer, AiMemoryResolutionResult.Resolution> resolutions =
+        validateResolutions(result, candidatesByIndex);
+    return candidates.stream()
+        .map(candidate -> toPlan(candidate, resolutions.get(candidate.candidateIndex())))
+        .toList();
+  }
+
+  private static Map<Integer, AiMemoryResolutionResult.Resolution> validateResolutions(
+      AiMemoryResolutionResult result, Map<Integer, FreeTalkMemoryCandidate> candidatesByIndex) {
     Map<Integer, AiMemoryResolutionResult.Resolution> resolutions = new HashMap<>();
     Set<Long> supersededAcrossCandidates = new HashSet<>();
     for (AiMemoryResolutionResult.Resolution resolution : result.resolutions()) {
@@ -100,12 +109,10 @@ final class FreeTalkMemoryResolutionPlanner {
         throw new IllegalArgumentException("장기기억 대체 대상이 유효하지 않습니다.");
       }
     }
-    if (resolutions.size() != candidates.size()) {
+    if (resolutions.size() != candidatesByIndex.size()) {
       throw new IllegalArgumentException("모든 장기기억 후보의 상태 판정이 필요합니다.");
     }
-    return candidates.stream()
-        .map(candidate -> toPlan(candidate, resolutions.get(candidate.candidateIndex())))
-        .toList();
+    return resolutions;
   }
 
   private static void validateResolutionCount(
