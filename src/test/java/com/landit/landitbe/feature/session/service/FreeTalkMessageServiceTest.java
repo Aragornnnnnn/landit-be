@@ -17,10 +17,14 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
+import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
@@ -60,6 +64,8 @@ class FreeTalkMessageServiceTest {
       mock(FreeTalkExpressionGenerationDispatcher.class);
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService =
       mock(FreeTalkMemoryGenerationDispatchService.class);
+  private final FreeTalkMemoryRetrievalService memoryRetrievalService =
+      mock(FreeTalkMemoryRetrievalService.class);
   private final TaskExecutor directExecutor = Runnable::run;
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
@@ -68,7 +74,48 @@ class FreeTalkMessageServiceTest {
           sessionMessageService,
           directExecutor,
           expressionGenerationDispatcher,
-          memoryGenerationDispatchService);
+          memoryGenerationDispatchService,
+          memoryRetrievalService);
+
+  @Test
+  void retrievesMemoryOnlyForTheFirstUserTurnAndRecordsUsedResponse() {
+    FreeTalkSubmittedMessageService.Reservation reservation = reservation();
+    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+        new FreeTalkMemoryRetrievalService.RetrievalResult(
+            30L,
+            MemoryRetrievalStage.FIRST_USER_TURN,
+            List.of(new AiFreeTalkMemoryContext(11L, ConversationMemoryType.EVENT, "hiking")),
+            true);
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation);
+    when(memoryRetrievalService.retrieve(any())).thenReturn(memoryResult);
+    when(aiFreeTalkClient.generateTurn(any()))
+        .thenReturn(
+            new AiFreeTalkTurnResult(
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of(11L)));
+    when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+
+    service.submit(1L, 300L, request());
+
+    verify(memoryRetrievalService)
+        .retrieve(
+            argThat(
+                request ->
+                    request.sessionId() == 30L
+                        && request.userProfileId() == 1L
+                        && request.stage() == MemoryRetrievalStage.FIRST_USER_TURN
+                        && request.query().equals("I went hiking.")));
+    verify(aiFreeTalkClient)
+        .generateTurn(
+            argThat(
+                request ->
+                    request.isFirstUserTurn()
+                        && request.memoryContext().stream()
+                            .map(AiFreeTalkMemoryContext::memoryId)
+                            .toList()
+                            .equals(List.of(11L))));
+    verify(memoryRetrievalService).recordUsage(memoryResult, List.of(11L), 8L);
+  }
 
   @Test
   void marksInnerThoughtFailedWhenPersistingCompletedThoughtFails() {
@@ -78,7 +125,7 @@ class FreeTalkMessageServiceTest {
     when(aiFreeTalkClient.generateTurn(any()))
         .thenReturn(
             new AiFreeTalkTurnResult(
-                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY));
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
     when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
     when(aiFreeTalkClient.generateInnerThought(any()))
         .thenReturn(new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD));
@@ -107,7 +154,7 @@ class FreeTalkMessageServiceTest {
       when(aiFreeTalkClient.generateTurn(any()))
           .thenReturn(
               new AiFreeTalkTurnResult(
-                  false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY));
+                  false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
       when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
       when(aiFreeTalkClient.generateInnerThought(any()))
           .thenThrow(new ApiException(ErrorCode.AI_RESPONSE_INVALID));
@@ -141,7 +188,7 @@ class FreeTalkMessageServiceTest {
     when(aiFreeTalkClient.generateTurn(any()))
         .thenReturn(
             new AiFreeTalkTurnResult(
-                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY));
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
     when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
 
     concurrentService.submit(1L, 300L, request());
@@ -163,7 +210,7 @@ class FreeTalkMessageServiceTest {
     when(aiFreeTalkClient.generateTurn(any()))
         .thenReturn(
             new AiFreeTalkTurnResult(
-                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY));
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
     when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
 
     concurrentService.submit(1L, 300L, request());
@@ -227,6 +274,7 @@ class FreeTalkMessageServiceTest {
     service.decideExit(1L, 300L, new FreeTalkExitDecisionRequest(7L, FreeTalkExitDecision.END));
 
     verify(memoryGenerationDispatchService).dispatch(300L);
+     verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
   }
 
   @Test
@@ -255,7 +303,7 @@ class FreeTalkMessageServiceTest {
           .thenAnswer(
               invocation -> {
                 assertTrue(innerThoughtStarted.await(1, TimeUnit.SECONDS));
-                return new AiFreeTalkTurnResult(true, null, null, null, null);
+                return new AiFreeTalkTurnResult(true, null, null, null, null, List.of());
               });
       when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(exitResponse());
 
@@ -274,7 +322,8 @@ class FreeTalkMessageServiceTest {
         sessionMessageService,
         taskExecutor,
         expressionGenerationDispatcher,
-        memoryGenerationDispatchService);
+        memoryGenerationDispatchService,
+        memoryRetrievalService);
   }
 
   private FreeTalkSubmittedMessageService.Reservation reservation() {
@@ -338,7 +387,7 @@ class FreeTalkMessageServiceTest {
 
   private AiFreeTalkTurnResult turnResult() {
     return new AiFreeTalkTurnResult(
-        false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY);
+        false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of());
   }
 
   private AiFreeTalkClosingResult closingResult() {

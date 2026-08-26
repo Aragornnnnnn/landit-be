@@ -3,19 +3,25 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
+import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingReason;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -37,6 +43,7 @@ public class FreeTalkMessageService {
   private final TaskExecutor taskExecutor;
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService;
+  private final FreeTalkMemoryRetrievalService memoryRetrievalService;
 
   FreeTalkMessageService(
       FreeTalkSubmittedMessageService submittedMessageService,
@@ -44,13 +51,15 @@ public class FreeTalkMessageService {
       SessionMessageService sessionMessageService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
-      FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService) {
+      FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
+      FreeTalkMemoryRetrievalService memoryRetrievalService) {
     this.submittedMessageService = submittedMessageService;
     this.aiFreeTalkClient = aiFreeTalkClient;
     this.sessionMessageService = sessionMessageService;
     this.taskExecutor = taskExecutor;
     this.expressionGenerationDispatcher = expressionGenerationDispatcher;
     this.memoryGenerationDispatchService = memoryGenerationDispatchService;
+    this.memoryRetrievalService = memoryRetrievalService;
   }
 
   /**
@@ -76,6 +85,7 @@ public class FreeTalkMessageService {
     try {
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
+      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult = null;
       if (reservation.dailyLimitReached()) {
         response =
             submittedMessageService.finalizeTimeLimit(
@@ -83,11 +93,16 @@ public class FreeTalkMessageService {
                 aiFreeTalkClient.generateClosing(
                     closingRequest(reservation, AiFreeTalkClosingReason.TIME_LIMIT_REACHED)));
       } else {
-        response =
-            submittedMessageService.finalizeTurn(
-                reservation,
-                aiFreeTalkClient.generateTurn(
-                    turnRequest(reservation, AiFreeTalkResponseMode.NORMAL)));
+        memoryResult = retrieveFirstUserMemory(reservation);
+        AiFreeTalkTurnResult turnResult =
+            generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult);
+        response = submittedMessageService.finalizeTurn(reservation, turnResult);
+        if (memoryResult != null) {
+          memoryRetrievalService.recordUsage(
+              memoryResult,
+              turnResult.usedMemoryIds(),
+              response.nextMessage() == null ? null : response.nextMessage().messageId());
+        }
       }
       if (response.turnStatus()
           != com.landit.landitbe.feature.session.domain.FreeTalkTurnStatus
@@ -157,7 +172,8 @@ public class FreeTalkMessageService {
 
   private AiFreeTalkTurnRequest turnRequest(
       FreeTalkSubmittedMessageService.Reservation reservation,
-      AiFreeTalkResponseMode responseMode) {
+      AiFreeTalkResponseMode responseMode,
+      List<AiFreeTalkMemoryContext> memoryContext) {
     return new AiFreeTalkTurnRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -166,9 +182,55 @@ public class FreeTalkMessageService {
         reservation.targetLocale(),
         reservation.baseLocale(),
         responseMode,
-        false,
+        isFirstUserTurn(reservation),
         reservation.topic(),
-        reservation.history());
+        reservation.history(),
+        memoryContext);
+  }
+
+  private FreeTalkMemoryRetrievalService.RetrievalResult retrieveFirstUserMemory(
+      FreeTalkSubmittedMessageService.Reservation reservation) {
+    if (!isFirstUserTurn(reservation)) {
+      return null;
+    }
+    String query =
+        reservation.history().stream()
+            .filter(message -> "USER".equals(message.role()))
+            .map(message -> message.content())
+            .filter(content -> content != null && !content.isBlank())
+            .findFirst()
+            .orElse("");
+    return memoryRetrievalService.retrieve(
+        new FreeTalkMemoryRetrievalService.RetrievalRequest(
+            reservation.freeTalkSessionId(),
+            reservation.userId(),
+            reservation.characterId(),
+            MemoryRetrievalStage.FIRST_USER_TURN,
+            query));
+  }
+
+  private boolean isFirstUserTurn(FreeTalkSubmittedMessageService.Reservation reservation) {
+    return reservation.titleGenerationRequired()
+        && reservation.history().stream().filter(message -> "USER".equals(message.role())).count()
+            == 1;
+  }
+
+  private AiFreeTalkTurnResult generateTurn(
+      FreeTalkSubmittedMessageService.Reservation reservation,
+      AiFreeTalkResponseMode responseMode,
+      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
+    List<AiFreeTalkMemoryContext> memoryContext =
+        memoryResult == null ? List.of() : memoryResult.contexts();
+    try {
+      return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, memoryContext));
+    } catch (RuntimeException exception) {
+      if (memoryContext.isEmpty()
+          || !(exception instanceof ApiException apiException)
+          || apiException.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID) {
+        throw exception;
+      }
+      return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, List.of()));
+    }
   }
 
   // 완료 응답이면 맞춤 표현 생성 작업을 제출한다.
@@ -208,7 +270,8 @@ public class FreeTalkMessageService {
         responseMode,
         false,
         reservation.topic(),
-        reservation.history());
+        reservation.history(),
+        List.of());
   }
 
   private AiFreeTalkClosingRequest closingRequestForDecision(
