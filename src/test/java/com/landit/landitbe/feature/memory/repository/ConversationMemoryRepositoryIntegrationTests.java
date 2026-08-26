@@ -94,6 +94,26 @@ class ConversationMemoryRepositoryIntegrationTests {
   }
 
   @Test
+  void rejectsEmptyDuplicateAndNonPositiveSourceIdsBeforeInsert() {
+    seedConversation(
+        USER_ID + 1, LEARNING_SESSION_ID + 1, SESSION_HISTORY_ID + 1, SOURCE_MESSAGE_ID + 1);
+    long before = countMemoriesForUser(USER_ID + 1);
+
+    assertThatThrownBy(() -> repository.save(validEventMemory(USER_ID + 1), List.of()))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                repository.save(
+                    validEventMemory(USER_ID + 1),
+                    List.of(SOURCE_MESSAGE_ID + 1, SOURCE_MESSAGE_ID + 1)))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> repository.save(validEventMemory(USER_ID + 1), List.of(0L)))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+
+    assertThat(countMemoriesForUser(USER_ID + 1)).isEqualTo(before);
+  }
+
+  @Test
   void rollsBackMemoryWhenSourceForeignKeyFails() {
     seedConversation(
         USER_ID + 2, LEARNING_SESSION_ID + 2, SESSION_HISTORY_ID + 2, SOURCE_MESSAGE_ID + 2);
