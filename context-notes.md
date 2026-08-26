@@ -239,3 +239,10 @@
 - PR #2의 base는 `feat/LAN-59`이고, head `feat/LAN-79`는 rebase 전 LAN-59 히스토리 위에 만들어져 있었다.
 - PR #1에서 `feat/LAN-59`를 현재 `origin/develop` 위로 rebase하면서, PR #2에는 예전 LAN-59 커밋과 오래된 Flyway workflow 커밋이 남아 충돌했다.
 - `feat/LAN-79`는 LAN-79 전용 커밋 4개만 현재 `origin/feat/LAN-59` 위로 다시 얹는다.
+
+## 2026-08-26 LAN-358 대표 예문 이미지 URL 반영
+
+- 최종 WebP는 ID 1~981 모두 1448x1086이며 S3 객체 크기, `image/webp`, immutable 캐시 헤더와 CloudFront 200 응답을 전수 검증했다.
+- 객체 key는 `content/writing-expressions/{expressionId}/representative/{sha256}.webp`로 구성해 같은 콘텐츠는 식별 가능하고 기존 객체를 덮어쓰지 않는다.
+- PostgreSQL 전용 V59 마이그레이션은 대상 ID 누락 시 실패하고, 실제 URL과 다른 행만 갱신한 뒤 적용 결과를 다시 검증한다.
+- H2는 테스트용 공통 스키마만 사용하므로 대량 운영 콘텐츠 URL 마이그레이션을 추가하지 않는다.

@@ -252,6 +252,14 @@
 - [x] 관련 검증 실행.
 - [x] PR 브랜치 push 전 상태 확인.
 
+## 2026-08-26 LAN-358 대표 예문 이미지 URL 반영
+
+- [x] 검수 완료 WebP 981개의 S3 및 CloudFront 조회 검증.
+- [x] ID 1~981의 `representative_image_url` 마이그레이션 생성.
+- [x] 행 수, ID-URL 대응, 적용 안전장치 테스트 추가.
+- [x] 관련 Gradle 테스트와 전체 변경 검증.
+- [ ] 논리 단위 커밋과 PR 생성.
+
 ## 2026-07-07 LAN-79 PR 충돌 정리
 
 - [x] `feat/LAN-79`를 현재 `origin/feat/LAN-59` 기준으로 rebase.
