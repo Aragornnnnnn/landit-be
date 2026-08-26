@@ -7,12 +7,14 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** H2와 PostgreSQL이 같은 검색 입력 계약과 JDBC 시각 변환을 사용하도록 한다. */
 final class ConversationMemorySearchSupport {
 
   private static final int EMBEDDING_DIMENSION = 1536;
 
   private ConversationMemorySearchSupport() {}
 
+  /** 일반 검색은 양수 사용자·제한과 비어 있지 않은 캐릭터 범위를 요구한다. */
   static String validateSearchArguments(
       List<Float> queryEmbedding, long userProfileId, String characterId, int limit) {
     validateEmbedding(queryEmbedding);
@@ -25,11 +27,13 @@ final class ConversationMemorySearchSupport {
     return characterId.trim();
   }
 
+  /** JDBC timestamp를 애플리케이션의 지역 없는 시각으로 변환한다. */
   static LocalDateTime toLocalDateTime(ResultSet resultSet, String columnName) throws SQLException {
     var timestamp = resultSet.getTimestamp(columnName);
     return timestamp == null ? null : timestamp.toLocalDateTime();
   }
 
+  /** 코사인 검색이 가능한 유한한 1,536차원 비영 임베딩인지 확인한다. */
   private static void validateEmbedding(List<Float> queryEmbedding) {
     if (queryEmbedding == null || queryEmbedding.size() != EMBEDDING_DIMENSION) {
       throw new IllegalArgumentException("쿼리 임베딩 차원이 유효하지 않습니다.");

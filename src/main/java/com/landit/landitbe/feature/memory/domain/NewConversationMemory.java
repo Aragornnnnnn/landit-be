@@ -52,6 +52,7 @@ public record NewConversationMemory(
     embedding = copyValidEmbedding(embedding);
   }
 
+  /** 사용자·기억 유형·locale 조합이 저장 식별자 계약에 맞는지 확인한다. */
   private static void validateIdentity(
       long userProfileId, ConversationMemoryType memoryType, Locale contentLocale) {
     if (userProfileId <= 0) {
@@ -62,6 +63,7 @@ public record NewConversationMemory(
     }
   }
 
+  /** PROFILE은 캐릭터 없이, 나머지 유형은 캐릭터 범위로만 저장한다. */
   private static void validateScope(ConversationMemoryType memoryType, String characterId) {
     if (memoryType == ConversationMemoryType.PROFILE && characterId != null) {
       throw new IllegalArgumentException("프로필 기억의 범위가 유효하지 않습니다.");
@@ -72,12 +74,14 @@ public record NewConversationMemory(
     }
   }
 
+  /** 신뢰도는 유한한 0 이상 1 이하 값만 저장한다. */
   private static void validateConfidence(double confidence) {
     if (!Double.isFinite(confidence) || confidence < 0 || confidence > 1) {
       throw new IllegalArgumentException("기억 신뢰도가 유효하지 않습니다.");
     }
   }
 
+  /** 필수 시각과 유효 기간의 선후 관계를 저장 전에 검증한다. */
   private static void validateTemporalValues(
       LocalDateTime validFrom,
       LocalDateTime validTo,
@@ -91,6 +95,7 @@ public record NewConversationMemory(
     }
   }
 
+  /** 저장 임베딩은 1,536차원 유한값의 방어적 복사본이어야 한다. */
   private static List<Float> copyValidEmbedding(List<Float> embedding) {
     if (embedding == null || embedding.size() != 1536) {
       throw new IllegalArgumentException("임베딩 차원이 유효하지 않습니다.");
