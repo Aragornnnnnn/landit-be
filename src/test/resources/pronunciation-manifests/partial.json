@@ -1,0 +1,18 @@
+{
+  "assets": [
+    {
+      "expressionId": 990301,
+      "accentLocale": "EN_US",
+      "expressionAudioUrl": "https://cdn.example.com/expression.mp3",
+      "sentenceAudioUrl": "https://cdn.example.com/valid.mp3",
+      "words": [{"order": 1, "word": "There's"}]
+    },
+    {
+      "expressionId": 999999,
+      "accentLocale": "EN_US",
+      "expressionAudioUrl": "https://cdn.example.com/expr.mp3",
+      "sentenceAudioUrl": "https://cdn.example.com/sentence.mp3",
+      "words": [{"order": 1, "word": "sample"}]
+    }
+  ]
+}

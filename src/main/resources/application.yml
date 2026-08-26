@@ -55,6 +55,8 @@ landit:
     bucket-name: ${CONTENT_BUCKET_NAME:}
     cloudfront-url: ${CONTENT_CLOUDFRONT_URL:}
     region: ${AWS_REGION:ap-northeast-2}
+  pronunciation-asset:
+    manifest-mode: ${LANDIT_PRONUNCIATION_MANIFEST_MODE:s3}
 
 sentry:
   dsn: ${SENTRY_DSN:}
