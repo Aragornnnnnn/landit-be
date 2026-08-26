@@ -48,6 +48,7 @@ public class FreeTalkSessionStartService {
     return startAiFirstSession(userId, startedSession);
   }
 
+  /** AI-first 세션은 검색 문맥을 먼저 만들고 실패하면 시작 작업을 정리한다. */
   private FreeTalkSessionStartResponse startAiFirstSession(
       long userId, StartedFreeTalkSession startedSession) {
     FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
@@ -93,6 +94,7 @@ public class FreeTalkSessionStartService {
         memoryContext);
   }
 
+  /** 시작 시 AI가 참고할 수 있도록 주제와 캐릭터의 짧은 검색 문맥을 만든다. */
   private String memoryQuery(StartedFreeTalkSession startedSession) {
     return String.join(
         " ",

@@ -109,6 +109,7 @@ public class FreeTalkMessageService {
     }
   }
 
+  /** 일반 턴에서 첫 사용자 기억 조회, AI 생성, 저장, 사용 trace를 순서대로 처리한다. */
   private FreeTalkMessageSubmitResponse processRegularTurn(
       FreeTalkSubmittedMessageService.Reservation reservation) {
     FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
@@ -121,6 +122,7 @@ public class FreeTalkMessageService {
     return response;
   }
 
+  /** 생성 응답의 memory ID를 해당 턴에 제공한 검색 결과와 연결해 기록한다. */
   private void recordMemoryUsage(
       FreeTalkMemoryRetrievalService.RetrievalResult memoryResult,
       AiFreeTalkTurnResult turnResult,
@@ -202,6 +204,7 @@ public class FreeTalkMessageService {
         memoryContext);
   }
 
+  /** 장기기억은 제목 생성이 필요한 실제 첫 사용자 턴에서만 조회한다. */
   private FreeTalkMemoryRetrievalService.RetrievalResult retrieveFirstUserMemory(
       FreeTalkSubmittedMessageService.Reservation reservation) {
     if (!isFirstUserTurn(reservation)) {
@@ -217,6 +220,7 @@ public class FreeTalkMessageService {
             query));
   }
 
+  /** 첫 사용자 발화의 비어 있지 않은 본문만 검색 임베딩 입력으로 사용한다. */
   private String firstUserMessageQuery(FreeTalkSubmittedMessageService.Reservation reservation) {
     return reservation.history().stream()
         .filter(message -> "USER".equals(message.role()))
