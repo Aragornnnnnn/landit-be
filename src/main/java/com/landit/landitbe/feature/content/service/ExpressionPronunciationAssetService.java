@@ -32,7 +32,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 발음 평가 자산의 2단계 임포트와 커버리지 계산을 처리한다.
@@ -54,6 +56,7 @@ public class ExpressionPronunciationAssetService {
   private final WritingExpressionRepository writingExpressionRepository;
   private final AdminAuditService adminAuditService;
   private final PronunciationManifestReader manifestReader;
+  private final PlatformTransactionManager transactionManager;
 
   // 매니페스트에 배치 메타데이터 같은 추가 필드가 있어도 무시하고 파싱한다.
   private final ObjectMapper objectMapper =
@@ -68,10 +71,18 @@ public class ExpressionPronunciationAssetService {
    * @param manifestKey S3 기준 데이터 파일 키
    * @return 삽입·갱신 건수와 실패 목록
    */
-  @Transactional
   public AdminPronunciationAssetImportResult importReference(Long adminUserId, String manifestKey) {
+    // S3 다운로드·파싱은 트랜잭션 밖에서 한다 — 외부 I/O가 느려질 때 DB 커넥션을 점유하지 않게.
+    // upsert만 수동 트랜잭션 경계(TransactionTemplate)로 감싼다. (@Transactional을 내부 메서드에
+    // 붙이면 자기 호출이라 프록시를 타지 않아 적용되지 않는다.)
     PronunciationReferenceManifest manifest = parseReference(manifestReader.read(manifestKey));
+    return new TransactionTemplate(transactionManager)
+        .execute(status -> upsertReference(adminUserId, manifestKey, manifest));
+  }
 
+  // 기준 데이터 upsert의 트랜잭션 본문이다. 전 건이 하나의 트랜잭션으로 묶인다.
+  private AdminPronunciationAssetImportResult upsertReference(
+      Long adminUserId, String manifestKey, PronunciationReferenceManifest manifest) {
     // 판별 재료를 미리 한 번에 조회한다 (건별 조회 방지).
     Set<Long> requestedIds =
         collectIds(manifest.entries(), PronunciationReferenceManifest.Entry::expressionId);
@@ -121,10 +132,16 @@ public class ExpressionPronunciationAssetService {
    * @param manifestKey S3 TTS 매니페스트 키
    * @return 갱신 건수와 실패 목록 (이 단계는 삽입이 없다)
    */
-  @Transactional
   public AdminPronunciationAssetImportResult importTts(Long adminUserId, String manifestKey) {
+    // 기준 데이터 임포트와 같은 이유로 S3 읽기는 트랜잭션 밖, upsert만 트랜잭션 안이다.
     PronunciationTtsManifest manifest = parseTts(manifestReader.read(manifestKey));
+    return new TransactionTemplate(transactionManager)
+        .execute(status -> attachTtsInTransaction(adminUserId, manifestKey, manifest));
+  }
 
+  // TTS URL 부착의 트랜잭션 본문이다.
+  private AdminPronunciationAssetImportResult attachTtsInTransaction(
+      Long adminUserId, String manifestKey, PronunciationTtsManifest manifest) {
     Set<Long> requestedIds =
         collectIds(manifest.assets(), PronunciationTtsManifest.Asset::expressionId);
     Map<AssetKey, ExpressionPronunciationAsset> existingAssets = findExistingAssets(requestedIds);

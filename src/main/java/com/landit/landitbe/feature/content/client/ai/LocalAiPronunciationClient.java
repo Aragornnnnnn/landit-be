@@ -25,7 +25,12 @@ public class LocalAiPronunciationClient implements AiPronunciationClient {
   private static final int WORD_DURATION_MS = 400;
   private static final int WORD_GAP_MS = 500;
 
-  /** 고정 판정을 반환한다. 2번째 단어는 PHONEME_ERROR, 4번째 단어는 STRESS_ERROR, 나머지는 CORRECT다. */
+  /**
+   * 고정 판정을 반환한다. 2번째 단어는 PHONEME_ERROR, 4번째 단어는 STRESS_ERROR, 나머지는 CORRECT다.
+   *
+   * @param request 발음 분석 요청. 단어 목록의 order 기준으로 판정한다
+   * @return 요청 단어와 1:1로 대응하는 고정 판정 목록 (타임스탬프는 단어당 500ms 간격의 결정적 값)
+   */
   @Override
   public AiPronunciationAnalysisResult analyze(AiPronunciationAnalysisRequest request) {
     List<AiPronunciationAnalysisResult.Word> words = new ArrayList<>();
