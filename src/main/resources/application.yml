@@ -51,6 +51,8 @@ landit:
     mode: ${LANDIT_EXPRESSION_SEARCH_MODE:pgvector}
     max-candidates: ${LANDIT_EXPRESSION_SEARCH_MAX_CANDIDATES:30}
     distance-threshold: ${LANDIT_EXPRESSION_SEARCH_DISTANCE_THRESHOLD:0.6}
+  memory-search:
+    mode: ${LANDIT_MEMORY_SEARCH_MODE:pgvector}
   content-image:
     bucket-name: ${CONTENT_BUCKET_NAME:}
     cloudfront-url: ${CONTENT_CLOUDFRONT_URL:}
