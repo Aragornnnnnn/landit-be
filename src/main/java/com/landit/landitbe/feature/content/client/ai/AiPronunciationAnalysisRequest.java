@@ -15,7 +15,8 @@ import java.util.List;
  * @param accentLocale 판정 기준 억양
  * @param words 문장의 단어 목록 (order 오름차순)
  */
-public record AiPronunciationAnalysisRequest( // ai 서버에 보내는 것
+// BE → AI 서버로 "보내는" 방향의 모델이다. 받는 방향은 AiPronunciationAnalysisResult.
+public record AiPronunciationAnalysisRequest(
     String userAudio,
     String userAudioFormat,
     String sentenceText,
@@ -44,7 +45,7 @@ public record AiPronunciationAnalysisRequest( // ai 서버에 보내는 것
    */
   public record AccentContrast(String expected, String other, String errorType) {}
 
-  /** base64 오디오가 로그·예외 메시지에 통째로 찍히지 않게 요약 표현만 반환한다. */
+  /** 로그·예외 메시지에 base64 오디오가 통째로 찍히지 않게 요약 표현만 반환한다. */
   @Override
   public String toString() {
     return "AiPronunciationAnalysisRequest[userAudio=<%d bytes base64>, userAudioFormat=%s,"

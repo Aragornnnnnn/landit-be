@@ -86,7 +86,7 @@ public class RemoteAiPronunciationClient implements AiPronunciationClient {
         }
       }
     } catch (JacksonException ignored) {
-      // 오류 본문을 해석할 수 없으면 발음 분석 실패로 처리한다.
+      // 오류 본문을 해석할 수 없으면 PRONUNCIATION_ANALYSIS_FAILED로 처리한다.
     }
     return new ApiException(ErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
   }
