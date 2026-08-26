@@ -18,11 +18,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class FreeTalkMemoryGenerationService {
 
-  private static final int MAX_CANDIDATES = 5;
-  private static final int MAX_COMPARABLE_MEMORIES = 3;
-  private static final int EMBEDDING_DIMENSION = 1536;
-  private static final String EMBEDDING_MODEL = "openai/text-embedding-3-small";
-
   private final FreeTalkMemoryGenerationContextService contextService;
   private final AiFreeTalkClient aiClient;
   private final ConversationMemoryWriteService writeService;

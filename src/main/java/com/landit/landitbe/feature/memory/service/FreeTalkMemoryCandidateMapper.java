@@ -56,13 +56,7 @@ final class FreeTalkMemoryCandidateMapper {
 
     OffsetDateTime observedAt = latestObservedAt(sources);
     LocalDateTime observedAtLocal = observedAt.atZoneSameInstant(clock.getZone()).toLocalDateTime();
-    LocalDateTime validFrom = toLocalDateTime(candidate.validFrom(), observedAtLocal);
-    LocalDateTime validTo = toLocalDateTime(candidate.validTo(), null);
-    String characterId =
-        candidate.memoryType() == ConversationMemoryType.PROFILE ? null : context.characterId();
-    NewConversationMemory memory =
-        toMemory(
-            context, candidate, characterId, validFrom, validTo, observedAtLocal, extractorVersion);
+    NewConversationMemory memory = toMemory(context, candidate, observedAtLocal, extractorVersion);
     return new FreeTalkMemoryCandidate(
         candidate.candidateIndex(),
         memory,
@@ -80,11 +74,10 @@ final class FreeTalkMemoryCandidateMapper {
   private NewConversationMemory toMemory(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       AiMemoryCandidatesResult.Candidate candidate,
-      String characterId,
-      LocalDateTime validFrom,
-      LocalDateTime validTo,
       LocalDateTime observedAt,
       String extractorVersion) {
+    String characterId =
+        candidate.memoryType() == ConversationMemoryType.PROFILE ? null : context.characterId();
     return new NewConversationMemory(
         context.userProfileId(),
         characterId,
@@ -92,8 +85,8 @@ final class FreeTalkMemoryCandidateMapper {
         candidate.content(),
         toJavaLocale(context.baseLocale()),
         candidate.confidence(),
-        validFrom,
-        validTo,
+        toLocalDateTime(candidate.validFrom(), observedAt),
+        toLocalDateTime(candidate.validTo(), null),
         observedAt,
         LocalDateTime.now(clock),
         extractorVersion,
