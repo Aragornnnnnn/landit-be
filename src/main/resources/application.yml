@@ -53,6 +53,8 @@ landit:
     distance-threshold: ${LANDIT_EXPRESSION_SEARCH_DISTANCE_THRESHOLD:0.6}
   memory-search:
     mode: ${LANDIT_MEMORY_SEARCH_MODE:pgvector}
+  memory:
+    write-enabled: ${LANDIT_MEMORY_WRITE_ENABLED:false}
   content-image:
     bucket-name: ${CONTENT_BUCKET_NAME:}
     cloudfront-url: ${CONTENT_CLOUDFRONT_URL:}
