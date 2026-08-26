@@ -39,6 +39,41 @@ class ConversationMemorySearchRepositoryIntegrationTests {
         "delete from user_profile where id between ? and ?", USER_ID, OTHER_USER_ID);
   }
 
+  @Test
+  void searchesOnlyCurrentScopeAndOrdersByDistanceThenMemoryId() {
+    seedUser(USER_ID);
+    seedUser(OTHER_USER_ID);
+    seedMemory(997101L, USER_ID, null, "PROFILE", "ACTIVE", "[1,0,0]");
+    seedMemory(997102L, USER_ID, "chloe", "EVENT", "ACTIVE", "[0.6,0.8,0]");
+    seedMemory(997103L, USER_ID, "chloe", "EVENT", "ACTIVE", "[0.6,0.8,0]");
+    seedMemory(997104L, USER_ID, "marco", "EVENT", "ACTIVE", "[1,0,0]");
+    seedMemory(997106L, USER_ID, "chloe", "EVENT", "SUPERSEDED", "[1,0,0]");
+    seedMemory(997107L, USER_ID, "chloe", "EVENT", "INVALIDATED", "[1,0,0]");
+    seedMemory(997108L, OTHER_USER_ID, "chloe", "EVENT", "ACTIVE", "[1,0,0]");
+
+    List<ConversationMemoryMatch> matches =
+        searchRepository.searchActive(USER_ID, " chloe ", QUERY_EMBEDDING, 3);
+
+    assertThat(matches)
+        .extracting(ConversationMemoryMatch::memoryId)
+        .containsExactly(997101L, 997102L, 997103L);
+    assertThat(matches.get(0).distance()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(1e-9));
+    assertThat(matches.get(1).distance()).isCloseTo(0.4, org.assertj.core.data.Offset.offset(1e-9));
+  }
+
+  @Test
+  void rejectsStoredDimensionAndZeroVector() {
+    seedUser(USER_ID);
+    seedMemory(997110L, USER_ID, "chloe", "EVENT", "ACTIVE", "[1,0]");
+    assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, "chloe", QUERY_EMBEDDING, 1))
+        .hasRootCauseInstanceOf(IllegalStateException.class);
+
+    jdbcTemplate.update("delete from conversation_memory where id = ?", 997110L);
+    seedMemory(997111L, USER_ID, "chloe", "EVENT", "ACTIVE", "[0,0,0]");
+    assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, "chloe", QUERY_EMBEDDING, 1))
+        .hasRootCauseInstanceOf(IllegalStateException.class);
+  }
+
   private void seedUser(long userId) {
     jdbcTemplate.update(
         """
