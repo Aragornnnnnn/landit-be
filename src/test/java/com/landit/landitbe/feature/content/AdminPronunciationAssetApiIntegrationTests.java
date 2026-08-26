@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +75,14 @@ class AdminPronunciationAssetApiIntegrationTests {
             CAST('[]' AS jsonb), 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         EXPRESSION_ID);
+  }
+
+  // 시드한 표현을 남기지 않는다. 다른 테스트(예: 스키마 테스트의 FREE_TALK 표현 카운트)가
+  // 전역 상태를 세기 때문에, 마지막 테스트 후에도 세상을 원래대로 돌려놓아야 한다.
+  // 자산 행은 FK CASCADE로 함께 삭제된다.
+  @AfterEach
+  void tearDown() {
+    jdbcTemplate.update("delete from writing_expression where id = ?", EXPRESSION_ID);
   }
 
   @Test

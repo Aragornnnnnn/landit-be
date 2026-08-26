@@ -70,6 +70,11 @@ public class ExpressionPronunciationService {
     AccentLocale accentLocale = accentLocaleResolver.require(userId);
     ExpressionPronunciationAsset asset = requireCompleteAsset(expressionId, accentLocale);
     Map<Integer, AssetWord> assetWords = parseAssetWords(asset.getWords());
+    if (assetWords.isEmpty()) {
+      // 자산 행은 있는데 단어 데이터가 비어 있으면 데이터 불량이다.
+      // 조용히 0단어로 채점(0÷0)하지 않고 명시적으로 거른다.
+      throw new ApiException(ErrorCode.PRONUNCIATION_DATA_NOT_FOUND);
+    }
 
     // 3단계: AI 서버에 판정을 요청한다. 유저 오디오는 base64로 실어 보낸다.
     // 단어 목록은 퀴즈 배열이 아니라 자산 words 기준이다 — 발음 정렬은 "late-night"을 2단어로 나누는 등

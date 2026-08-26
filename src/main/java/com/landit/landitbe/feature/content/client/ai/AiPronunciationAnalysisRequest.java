@@ -48,14 +48,14 @@ public record AiPronunciationAnalysisRequest(
   /** 로그·예외 메시지에 base64 오디오가 통째로 찍히지 않게 요약 표현만 반환한다. */
   @Override
   public String toString() {
-    return "AiPronunciationAnalysisRequest[userAudio=<%d bytes base64>, userAudioFormat=%s,"
-        + " sentenceText=%s, referenceAudioUrl=%s, accentLocale=%s, words=%s]"
-            .formatted(
-                userAudio == null ? 0 : userAudio.length(),
-                userAudioFormat,
-                sentenceText,
-                referenceAudioUrl,
-                accentLocale,
-                words);
+    return ("AiPronunciationAnalysisRequest[userAudio=<%d bytes base64>, userAudioFormat=%s,"
+            + " sentenceText=%s, referenceAudioUrl=%s, accentLocale=%s, words=%s]")
+        .formatted(
+            userAudio == null ? 0 : userAudio.length(),
+            userAudioFormat,
+            sentenceText,
+            referenceAudioUrl,
+            accentLocale,
+            words);
   }
 }

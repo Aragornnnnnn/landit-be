@@ -151,7 +151,7 @@ class RemoteAiPronunciationClientTest {
   @Test
   void requestToStringDoesNotContainAudioBase64() {
     // base64 오디오가 로그에 통째로 찍히는 사고를 toString 레벨에서 막는다.
-    assertThat(analysisRequest().toString()).doesNotContain("YXVkaW8=").contains("6 bytes");
+    assertThat(analysisRequest().toString()).doesNotContain("YXVkaW8=").contains("8 bytes base64");
   }
 
   private RemoteAiPronunciationClient remoteClient() {

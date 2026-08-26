@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
+import com.landit.landitbe.shared.domain.AccentLocale;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +50,10 @@ class ExpressionPronunciationApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  @Autowired
+  private com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository
+      assetRepository;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeEach
@@ -69,6 +76,16 @@ class ExpressionPronunciationApiIntegrationTests {
     insertAsset(EXPRESSION_ID, 8);
     insertAsset(SHORT_EXPRESSION_ID, 1);
     // NO_ASSET_EXPRESSION_ID는 의도적으로 자산을 넣지 않는다.
+  }
+
+  // 시드한 표현 3건을 남기지 않는다 (전역 카운트를 세는 다른 테스트 보호). 자산은 CASCADE로 함께 삭제된다.
+  @AfterEach
+  void tearDown() {
+    jdbcTemplate.update(
+        "delete from writing_expression where id in (?, ?, ?)",
+        EXPRESSION_ID,
+        SHORT_EXPRESSION_ID,
+        NO_ASSET_EXPRESSION_ID);
   }
 
   @Test
@@ -204,8 +221,9 @@ class ExpressionPronunciationApiIntegrationTests {
   }
 
   // 표현의 EN_US 발음 자산을 시드한다 (TTS까지 완성된 상태).
-  // words는 자산 계약 스키마(order·word·syllables·stressIndex·pronunciationDisplay·audioUrl)를 따르고,
-  // 이 목록이 AI 요청의 단어 목록이 되므로 문장 단어 수와 개수를 맞춘다.
+  // JDBC CAST(? AS jsonb) 시드는 H2에서 Hibernate JSON 타입 읽기와 호환되지 않아
+  // (words가 빈 값으로 읽힘) 실제 저장 경로와 같은 엔티티 저장을 사용한다.
+  // words 목록이 AI 요청의 단어 목록이 되므로 문장 단어 수와 개수를 맞춘다.
   private void insertAsset(long expressionId, int wordCount) {
     StringBuilder wordsJson = new StringBuilder("[");
     for (int order = 1; order <= wordCount; order++) {
@@ -240,18 +258,18 @@ class ExpressionPronunciationApiIntegrationTests {
       }
     }
     wordsJson.append("]");
-    jdbcTemplate.update(
-        """
-        insert into expression_pronunciation_asset (
-            writing_expression_id, accent_locale, expression_audio_url, sentence_audio_url,
-            words, created_at, updated_at
-        )
-        values (?, 'EN_US', 'https://cdn.example.com/expression.mp3',
-            'https://cdn.example.com/sentence.mp3', CAST(? AS jsonb),
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """,
-        expressionId,
-        wordsJson.toString());
+    try {
+      ExpressionPronunciationAsset asset =
+          new ExpressionPronunciationAsset(
+              expressionId, AccentLocale.EN_US, objectMapper.readTree(wordsJson.toString()));
+      asset.attachTts(
+          "https://cdn.example.com/expression.mp3",
+          "https://cdn.example.com/sentence.mp3",
+          objectMapper.readTree(wordsJson.toString()));
+      assetRepository.save(asset);
+    } catch (Exception exception) {
+      throw new IllegalStateException("발음 자산 시드 JSON 생성에 실패했습니다.", exception);
+    }
   }
 
   // 로그인 후 유저의 튜터를 EN_US 억양의 튜터로 고정한다 (시드 자산이 EN_US라서).
