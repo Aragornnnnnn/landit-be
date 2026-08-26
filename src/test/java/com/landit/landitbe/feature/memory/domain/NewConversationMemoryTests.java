@@ -61,7 +61,9 @@ class NewConversationMemoryTests {
     NewConversationMemory memory = memory(fixture -> fixture.validTo = validTo);
 
     assertThat(memory.validTo()).isEqualTo(validTo);
-    assertInvalid(fixture -> fixture.validTo = NOW.minusSeconds(1));
+    assertThatThrownBy(() -> memory(fixture -> fixture.validTo = NOW.minusSeconds(1)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("기억 유효 종료 시각이 시작 시각보다 빠릅니다.");
   }
 
   @Test

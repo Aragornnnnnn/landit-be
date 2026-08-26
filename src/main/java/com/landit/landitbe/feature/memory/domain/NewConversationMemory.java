@@ -40,17 +40,29 @@ public record NewConversationMemory(
 
   /** 입력 문자열과 1,536차원 임베딩을 정규화하고 저장 가능한 값인지 검증한다. */
   public NewConversationMemory {
+    validateIdentity(userProfileId, memoryType, contentLocale);
+
+    characterId = characterId == null ? null : characterId.trim();
+    content = trimRequired(content, 500, "기억 본문");
+    extractorVersion = trimRequired(extractorVersion, Integer.MAX_VALUE, "추출기 버전");
+    embeddingModel = trimRequired(embeddingModel, Integer.MAX_VALUE, "임베딩 모델");
+    validateScope(memoryType, characterId);
+    validateConfidence(confidence);
+    validateTemporalValues(validFrom, validTo, observedAt, recordedAt);
+    embedding = copyValidEmbedding(embedding);
+  }
+
+  private static void validateIdentity(
+      long userProfileId, ConversationMemoryType memoryType, Locale contentLocale) {
     if (userProfileId <= 0) {
       throw new IllegalArgumentException("사용자 프로필 ID가 유효하지 않습니다.");
     }
     if (memoryType == null || contentLocale == null) {
       throw new IllegalArgumentException("장기기억 유형과 지역은 필수입니다.");
     }
+  }
 
-    characterId = characterId == null ? null : characterId.trim();
-    content = trimRequired(content, 500, "기억 본문");
-    extractorVersion = trimRequired(extractorVersion, Integer.MAX_VALUE, "추출기 버전");
-    embeddingModel = trimRequired(embeddingModel, Integer.MAX_VALUE, "임베딩 모델");
+  private static void validateScope(ConversationMemoryType memoryType, String characterId) {
     if (memoryType == ConversationMemoryType.PROFILE && characterId != null) {
       throw new IllegalArgumentException("프로필 기억의 범위가 유효하지 않습니다.");
     }
@@ -58,13 +70,28 @@ public record NewConversationMemory(
         && (characterId == null || characterId.isBlank())) {
       throw new IllegalArgumentException("이벤트·에피소드 기억에는 캐릭터가 필요합니다.");
     }
+  }
+
+  private static void validateConfidence(double confidence) {
     if (!Double.isFinite(confidence) || confidence < 0 || confidence > 1) {
       throw new IllegalArgumentException("기억 신뢰도가 유효하지 않습니다.");
     }
-    if ((validFrom == null || observedAt == null || recordedAt == null)
-        || (validTo != null && validTo.isBefore(validFrom))) {
+  }
+
+  private static void validateTemporalValues(
+      LocalDateTime validFrom,
+      LocalDateTime validTo,
+      LocalDateTime observedAt,
+      LocalDateTime recordedAt) {
+    if (validFrom == null || observedAt == null || recordedAt == null) {
       throw new IllegalArgumentException("기억 시각은 필수입니다.");
     }
+    if (validTo != null && validTo.isBefore(validFrom)) {
+      throw new IllegalArgumentException("기억 유효 종료 시각이 시작 시각보다 빠릅니다.");
+    }
+  }
+
+  private static List<Float> copyValidEmbedding(List<Float> embedding) {
     if (embedding == null || embedding.size() != 1536) {
       throw new IllegalArgumentException("임베딩 차원이 유효하지 않습니다.");
     }
@@ -73,7 +100,7 @@ public record NewConversationMemory(
         throw new IllegalArgumentException("임베딩 값이 유효하지 않습니다.");
       }
     }
-    embedding = List.copyOf(embedding);
+    return List.copyOf(embedding);
   }
 
   private static String trimRequired(String value, int maxLength, String fieldName) {
