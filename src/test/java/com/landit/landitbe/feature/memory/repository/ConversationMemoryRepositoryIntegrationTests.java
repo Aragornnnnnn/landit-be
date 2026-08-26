@@ -27,6 +27,7 @@ class ConversationMemoryRepositoryIntegrationTests {
 
   private static final long USER_ID = 995001L;
   private static final long LEARNING_SESSION_ID = 995002L;
+  private static final long FREE_TALK_SESSION_ID = 995005L;
   private static final long SESSION_HISTORY_ID = 995003L;
   private static final long SOURCE_MESSAGE_ID = 995004L;
   private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 25, 12, 0);
@@ -37,6 +38,10 @@ class ConversationMemoryRepositoryIntegrationTests {
 
   @AfterEach
   void clearFixtures() {
+    jdbcTemplate.update(
+        "delete from free_talk_memory_retrieval where free_talk_session_id = ?",
+        FREE_TALK_SESSION_ID);
+    jdbcTemplate.update("delete from free_talk_session where id = ?", FREE_TALK_SESSION_ID);
     jdbcTemplate.update(
         "delete from conversation_memory_source where memory_id in "
             + "(select id from conversation_memory where user_profile_id between ? and ?)",
@@ -132,6 +137,41 @@ class ConversationMemoryRepositoryIntegrationTests {
   }
 
   @Test
+  void deletesMemorySourceAndFreeTalkRetrievalTraceOnUserWithdrawal() {
+    seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
+    long memoryId = repository.save(validEventMemory(), List.of(SOURCE_MESSAGE_ID));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from conversation_memory_source where memory_id = ?",
+                Long.class,
+                memoryId))
+        .isEqualTo(1L);
+    jdbcTemplate.update(
+        """
+        insert into free_talk_memory_retrieval (
+            free_talk_session_id, retrieval_stage, candidate_rank, policy_version, used, created_at)
+        values (?, 'OPENING', 0, 'memory-retrieval-v1', false, CURRENT_TIMESTAMP)
+        """,
+        FREE_TALK_SESSION_ID);
+
+    repository.deleteAllByUserProfileId(USER_ID);
+
+    assertThat(countMemoriesForUser(USER_ID)).isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from conversation_memory_source where memory_id = ?",
+                Long.class,
+                memoryId))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from free_talk_memory_retrieval where free_talk_session_id = ?",
+                Long.class,
+                FREE_TALK_SESSION_ID))
+        .isZero();
+  }
+
+  @Test
   void supersedesOnlyActiveMemoryAndClosesItsValidityAtNewMemoryStart() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
     long oldMemoryId = repository.save(validEventMemory(), List.of(SOURCE_MESSAGE_ID));
@@ -216,6 +256,15 @@ class ConversationMemoryRepositoryIntegrationTests {
         learningSessionId,
         userProfileId,
         aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into free_talk_session (
+            id, learning_session_id, start_mode, character_id, conversation_status,
+            accumulated_speaking_duration_ms, created_at, updated_at)
+        values (?, ?, 'USER_FIRST', 'chloe', 'COMPLETED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        FREE_TALK_SESSION_ID,
+        learningSessionId);
     jdbcTemplate.update(
         """
         insert into session_history (

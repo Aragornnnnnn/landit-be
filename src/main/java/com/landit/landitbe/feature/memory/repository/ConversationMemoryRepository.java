@@ -52,6 +52,38 @@ public class ConversationMemoryRepository {
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   /**
+   * 탈퇴 사용자의 기억·원본 계보·검색 trace를 검색 불가능하게 제거한다.
+   *
+   * @param userProfileId 삭제할 사용자의 프로필 ID
+   * @return 삭제한 장기기억 행 수
+   */
+  public int deleteAllByUserProfileId(long userProfileId) {
+    MapSqlParameterSource parameters =
+        new MapSqlParameterSource().addValue("userProfileId", userProfileId);
+    jdbcTemplate.update(
+        """
+        DELETE FROM free_talk_memory_retrieval
+        WHERE free_talk_session_id IN (
+            SELECT fts.id
+            FROM free_talk_session fts
+            JOIN learning_session ls ON ls.id = fts.learning_session_id
+            WHERE ls.user_profile_id = :userProfileId)
+        """,
+        parameters);
+    jdbcTemplate.update(
+        """
+        DELETE FROM conversation_memory_source
+        WHERE memory_id IN (
+            SELECT id FROM conversation_memory WHERE user_profile_id = :userProfileId)
+        """,
+        parameters);
+    int deletedMemoryCount =
+        jdbcTemplate.update(
+            "DELETE FROM conversation_memory WHERE user_profile_id = :userProfileId", parameters);
+    return deletedMemoryCount;
+  }
+
+  /**
    * 장기기억과 원본 메시지 source를 하나의 트랜잭션으로 저장한다.
    *
    * @param memory 저장할 장기기억 입력

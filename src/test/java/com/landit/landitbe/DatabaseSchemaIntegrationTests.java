@@ -441,6 +441,19 @@ class DatabaseSchemaIntegrationTests {
         "conversation_memory_source", "fk_conversation_memory_source_message");
   }
 
+  @DisplayName("V67 프리톡 기억 검색 trace는 세션·기억 계보와 후보 순위를 연결한다.")
+  @Test
+  void freeTalkMemoryRetrievalTraceSchemaPreservesLineage() {
+    assertTableExists("free_talk_memory_retrieval");
+    assertColumnExists("free_talk_memory_retrieval", "candidate_rank");
+    assertColumnExists("free_talk_memory_retrieval", "response_message_id");
+    assertTableConstraintExists(
+        "free_talk_memory_retrieval", "fk_free_talk_memory_retrieval_session");
+    assertTableConstraintExists(
+        "free_talk_memory_retrieval", "fk_free_talk_memory_retrieval_memory");
+    assertIndexExists("uk_free_talk_memory_retrieval_session_stage_rank");
+  }
+
   @DisplayName("V65 장기기억 제약은 잘못된 범위·상태·시간·신뢰도를 거부한다.")
   @Test
   @Transactional
