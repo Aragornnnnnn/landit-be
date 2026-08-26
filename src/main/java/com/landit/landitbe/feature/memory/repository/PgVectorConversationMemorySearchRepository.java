@@ -36,6 +36,20 @@ public class PgVectorConversationMemorySearchRepository
       LIMIT :limit
       """;
 
+  static final String COMPARABLE_SEARCH_SQL =
+      """
+      SELECT cm.id, cm.memory_type, cm.content,
+             cm.valid_from, cm.valid_to, cm.observed_at,
+             cm.embedding <=> CAST(:embedding AS extensions.vector) AS distance
+      FROM conversation_memory cm
+      WHERE cm.user_profile_id = :userProfileId
+        AND cm.status = 'ACTIVE'
+        AND cm.memory_type = :memoryType
+        AND cm.character_id IS NULL
+      ORDER BY cm.embedding <=> CAST(:embedding AS extensions.vector), cm.id
+      LIMIT :limit
+      """;
+
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   /** {@inheritDoc} */
@@ -55,6 +69,37 @@ public class PgVectorConversationMemorySearchRepository
         SEARCH_SQL, parameters, PgVectorConversationMemorySearchRepository::mapMatch);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public List<ConversationMemoryMatch> searchActiveComparable(
+      List<Float> queryEmbedding,
+      long userProfileId,
+      String characterId,
+      ConversationMemoryType memoryType,
+      int limit) {
+    String normalizedCharacterId =
+        ConversationMemorySearchSupport.validateComparableSearchArguments(
+            queryEmbedding, userProfileId, characterId, memoryType, limit);
+    MapSqlParameterSource parameters =
+        new MapSqlParameterSource()
+            .addValue("embedding", toVectorLiteral(queryEmbedding))
+            .addValue("userProfileId", userProfileId)
+            .addValue("memoryType", memoryType.name())
+            .addValue("limit", limit);
+    String sql = COMPARABLE_SEARCH_SQL;
+    if (normalizedCharacterId != null) {
+      sql =
+          COMPARABLE_SEARCH_SQL.replace(
+              "cm.character_id IS NULL", "cm.character_id = :characterId");
+      parameters.addValue("characterId", normalizedCharacterId);
+    }
+    return jdbcTemplate.query(
+        sql, parameters, PgVectorConversationMemorySearchRepository::mapMatch);
+  }
+
+  private static String toVectorLiteral(List<Float> embedding) {
+    return embedding.toString().replace(" ", "");
+  }
   private static ConversationMemoryMatch mapMatch(ResultSet resultSet, int rowNumber)
       throws SQLException {
     return new ConversationMemoryMatch(

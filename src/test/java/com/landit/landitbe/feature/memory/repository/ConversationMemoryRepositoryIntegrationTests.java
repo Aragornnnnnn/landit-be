@@ -43,6 +43,12 @@ class ConversationMemoryRepositoryIntegrationTests {
         USER_ID,
         USER_ID + 2);
     jdbcTemplate.update(
+        "update conversation_memory set status = 'ACTIVE', valid_to = null, "
+            + "superseded_at = null, superseded_by_id = null "
+            + "where user_profile_id between ? and ?",
+        USER_ID,
+        USER_ID + 2);
+    jdbcTemplate.update(
         "delete from conversation_memory where user_profile_id between ? and ?",
         USER_ID,
         USER_ID + 2);
@@ -125,11 +131,44 @@ class ConversationMemoryRepositoryIntegrationTests {
     assertThat(countMemoriesForUser(USER_ID + 2)).isZero();
   }
 
+  @Test
+  void supersedesOnlyActiveMemoryAndClosesItsValidityAtNewMemoryStart() {
+    seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
+    long oldMemoryId = repository.save(validEventMemory(), List.of(SOURCE_MESSAGE_ID));
+    long newMemoryId =
+        repository.save(validEventMemory(USER_ID, NOW.plusDays(1)), List.of(SOURCE_MESSAGE_ID));
+
+    assertThat(
+            repository.supersedeActive(
+                oldMemoryId, newMemoryId, NOW.plusDays(1), NOW.plusDays(1).plusMinutes(1)))
+        .isTrue();
+    assertThat(
+            jdbcTemplate.queryForMap(
+                "select status, valid_to, superseded_by_id from conversation_memory where id = ?",
+                oldMemoryId))
+        .containsEntry("STATUS", "SUPERSEDED")
+        .containsEntry("SUPERSEDED_BY_ID", newMemoryId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select valid_to from conversation_memory where id = ?",
+                LocalDateTime.class,
+                oldMemoryId))
+        .isEqualTo(NOW.plusDays(1));
+    assertThat(
+            repository.supersedeActive(
+                oldMemoryId, newMemoryId, NOW.plusDays(1), NOW.plusDays(1).plusMinutes(2)))
+        .isFalse();
+  }
+
   private NewConversationMemory validEventMemory() {
     return validEventMemory(USER_ID);
   }
 
   private NewConversationMemory validEventMemory(long userProfileId) {
+    return validEventMemory(userProfileId, NOW);
+  }
+
+  private NewConversationMemory validEventMemory(long userProfileId, LocalDateTime validFrom) {
     return new NewConversationMemory(
         userProfileId,
         "chloe",
@@ -137,8 +176,8 @@ class ConversationMemoryRepositoryIntegrationTests {
         "remembered content",
         Locale.ENGLISH,
         0.8,
-        NOW,
-        NOW.plusDays(1),
+        validFrom,
+        validFrom.plusDays(1),
         NOW,
         NOW,
         "extractor-v1",

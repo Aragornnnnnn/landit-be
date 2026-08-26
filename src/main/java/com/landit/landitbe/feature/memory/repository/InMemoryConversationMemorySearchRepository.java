@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.memory.repository;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,17 @@ public class InMemoryConversationMemorySearchRepository
         AND (cm.character_id IS NULL OR cm.character_id = ?)
       """;
 
+  private static final String COMPARABLE_CANDIDATE_SQL =
+      """
+      SELECT cm.id, cm.memory_type, cm.content,
+             cm.valid_from, cm.valid_to, cm.observed_at, cm.embedding
+      FROM conversation_memory cm
+      WHERE cm.user_profile_id = ?
+        AND cm.status = 'ACTIVE'
+        AND cm.memory_type = ?
+        AND cm.character_id IS NULL
+      """;
+
   private final JdbcTemplate jdbcTemplate;
 
   /** {@inheritDoc} */
@@ -44,6 +56,34 @@ public class InMemoryConversationMemorySearchRepository
             InMemoryConversationMemorySearchRepository::mapMatch,
             userProfileId,
             normalizedCharacterId)
+        .stream()
+        .map(candidate -> withDistance(candidate, queryEmbedding))
+        .sorted(
+            Comparator.comparingDouble(ConversationMemoryMatch::distance)
+                .thenComparingLong(ConversationMemoryMatch::memoryId))
+        .limit(limit)
+        .toList();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<ConversationMemoryMatch> searchActiveComparable(
+      List<Float> queryEmbedding,
+      long userProfileId,
+      String characterId,
+      ConversationMemoryType memoryType,
+      int limit) {
+    String normalizedCharacterId =
+        ConversationMemorySearchSupport.validateComparableSearchArguments(
+            queryEmbedding, userProfileId, characterId, memoryType, limit);
+    String sql = COMPARABLE_CANDIDATE_SQL;
+    List<Object> parameters = new ArrayList<>(List.of(userProfileId, memoryType.name()));
+    if (normalizedCharacterId != null) {
+      sql = COMPARABLE_CANDIDATE_SQL.replace("cm.character_id IS NULL", "cm.character_id = ?");
+      parameters.add(normalizedCharacterId);
+    }
+    return jdbcTemplate
+        .query(sql, InMemoryConversationMemorySearchRepository::mapMatch, parameters.toArray())
         .stream()
         .map(candidate -> withDistance(candidate, queryEmbedding))
         .sorted(

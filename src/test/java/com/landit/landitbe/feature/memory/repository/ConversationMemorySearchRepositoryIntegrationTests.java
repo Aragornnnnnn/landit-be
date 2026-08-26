@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.memory.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -59,6 +60,23 @@ class ConversationMemorySearchRepositoryIntegrationTests {
         .containsExactly(997101L, 997102L, 997103L);
     assertThat(matches.get(0).distance()).isCloseTo(0.0, org.assertj.core.data.Offset.offset(1e-9));
     assertThat(matches.get(1).distance()).isCloseTo(0.4, org.assertj.core.data.Offset.offset(1e-9));
+  }
+
+  @Test
+  void searchesComparableMemoriesByExactTypeAndScope() {
+    seedUser(USER_ID);
+    seedMemory(997120L, USER_ID, null, "PROFILE", "ACTIVE", "[1,0,0]");
+    seedMemory(997122L, USER_ID, "chloe", "EVENT", "ACTIVE", "[0.9,0.1,0]");
+    seedMemory(997123L, USER_ID, "chloe", "EVENT", "ACTIVE", "[0.8,0.2,0]");
+    seedMemory(997124L, USER_ID, "chloe", "EPISODE", "ACTIVE", "[1,0,0]");
+
+    List<ConversationMemoryMatch> matches =
+        searchRepository.searchActiveComparable(
+            QUERY_EMBEDDING, USER_ID, "chloe", ConversationMemoryType.EVENT, 3);
+
+    assertThat(matches)
+        .extracting(ConversationMemoryMatch::memoryId)
+        .containsExactly(997122L, 997123L);
   }
 
   @Test
