@@ -20,7 +20,6 @@ import com.landit.landitbe.feature.session.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -221,16 +220,7 @@ public class FreeTalkMessageService {
       FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
     List<AiFreeTalkMemoryContext> memoryContext =
         memoryResult == null ? List.of() : memoryResult.contexts();
-    try {
-      return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, memoryContext));
-    } catch (RuntimeException exception) {
-      if (memoryContext.isEmpty()
-          || !(exception instanceof ApiException apiException)
-          || apiException.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID) {
-        throw exception;
-      }
-      return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, List.of()));
-    }
+    return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, memoryContext));
   }
 
   // 완료 응답이면 맞춤 표현 생성 작업을 제출한다.

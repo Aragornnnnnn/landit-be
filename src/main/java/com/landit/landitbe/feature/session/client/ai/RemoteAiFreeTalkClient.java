@@ -284,7 +284,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
             .map(AiFreeTalkMemoryContext::memoryId)
             .collect(java.util.stream.Collectors.toSet())
             .containsAll(normalized)) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      return List.of();
     }
     return List.copyOf(normalized);
   }

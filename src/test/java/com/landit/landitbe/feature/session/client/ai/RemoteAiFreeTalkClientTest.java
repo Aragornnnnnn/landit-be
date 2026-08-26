@@ -270,6 +270,31 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void normalizesUsedMemoryIdOutsideContextWithoutRejectingConversation() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        new ConcurrentHashMap<>(),
+        successResponse(
+            "{\"aiMessage\":\"How is the interview going?\","
+                + "\"translatedMessage\":\"면접은 잘 되어가?\","
+                + "\"usedMemoryIds\":[88]}"));
+
+    AiFreeTalkOpeningResult result =
+        remoteClient()
+            .generateOpening(
+                new AiFreeTalkOpeningRequest(
+                    300L,
+                    "chloe",
+                    "EN",
+                    "KR",
+                    new AiFreeTalkTopic(2L, "주말 계획", "Ask about weekend plans."),
+                    List.of(
+                        new AiFreeTalkMemoryContext(77L, ConversationMemoryType.EVENT, "면접 계획"))));
+
+    assertThat(result.usedMemoryIds()).isEmpty();
+  }
+
+  @Test
   void rejectsResponsesMissingRequiredFields() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/opening",

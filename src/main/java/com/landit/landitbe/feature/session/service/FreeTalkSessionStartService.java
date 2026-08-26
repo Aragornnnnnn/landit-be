@@ -15,8 +15,6 @@ import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
 import com.landit.landitbe.feature.session.service.FreeTalkSessionService.StartedFreeTalkSession;
-import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -71,17 +69,8 @@ public class FreeTalkSessionStartService {
   private AiFreeTalkOpeningResult generateOpening(
       StartedFreeTalkSession startedSession,
       FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
-    try {
-      return aiFreeTalkClient.generateOpening(
-          openingRequest(startedSession, memoryResult.contexts()));
-    } catch (RuntimeException exception) {
-      if (memoryResult.contexts().isEmpty()
-          || !(exception instanceof ApiException apiException)
-          || apiException.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID) {
-        throw exception;
-      }
-      return aiFreeTalkClient.generateOpening(openingRequest(startedSession, java.util.List.of()));
-    }
+    return aiFreeTalkClient.generateOpening(
+        openingRequest(startedSession, memoryResult.contexts()));
   }
 
   private AiFreeTalkOpeningRequest openingRequest(

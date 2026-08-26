@@ -3,12 +3,14 @@
 package com.landit.landitbe.feature.session.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -115,6 +117,25 @@ class FreeTalkMessageServiceTest {
                             .toList()
                             .equals(List.of(11L))));
     verify(memoryRetrievalService).recordUsage(memoryResult, List.of(11L), 8L);
+  }
+
+  @Test
+  void doesNotRetryTurnWhenAiRejectsMemoryUsageMetadata() {
+    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+        new FreeTalkMemoryRetrievalService.RetrievalResult(
+            30L,
+            MemoryRetrievalStage.FIRST_USER_TURN,
+            List.of(new AiFreeTalkMemoryContext(11L, ConversationMemoryType.EVENT, "hiking")),
+            true);
+    ApiException exception = new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation());
+    when(memoryRetrievalService.retrieve(any())).thenReturn(memoryResult);
+    when(aiFreeTalkClient.generateTurn(any())).thenThrow(exception);
+
+    assertThatThrownBy(() -> service.submit(1L, 300L, request())).isSameAs(exception);
+
+    verify(aiFreeTalkClient, times(1)).generateTurn(any());
   }
 
   @Test

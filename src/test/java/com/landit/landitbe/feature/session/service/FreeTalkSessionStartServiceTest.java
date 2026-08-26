@@ -4,9 +4,11 @@ package com.landit.landitbe.feature.session.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,6 +24,8 @@ import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -91,6 +95,41 @@ class FreeTalkSessionStartServiceTest {
                         .toList()
                         .equals(List.of(55L))));
     verify(memoryRetrievalService).recordUsage(memoryResult, List.of(55L), 400L);
+  }
+
+  @Test
+  void doesNotRetryOpeningWhenAiRejectsMemoryUsageMetadata() {
+    FreeTalkSessionService.StartedFreeTalkSession startedSession =
+        new FreeTalkSessionService.StartedFreeTalkSession(
+            100L,
+            200L,
+            300L,
+            FreeTalkStartMode.AI_FIRST,
+            "chloe",
+            10L,
+            "Weekend plans",
+            "Discuss weekend plans.",
+            "EN",
+            "KO",
+            null);
+    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+        new FreeTalkMemoryRetrievalService.RetrievalResult(
+            300L,
+            MemoryRetrievalStage.OPENING,
+            List.of(new AiFreeTalkMemoryContext(55L, ConversationMemoryType.EVENT, "hiking")),
+            true);
+    ApiException exception = new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+    when(freeTalkSessionService.createStart(anyLong(), any())).thenReturn(startedSession);
+    when(memoryRetrievalService.retrieve(any())).thenReturn(memoryResult);
+    when(aiFreeTalkClient.generateOpening(any())).thenThrow(exception);
+
+    assertThatThrownBy(
+            () ->
+                service.startFreeTalkSession(
+                    1L, new FreeTalkSessionStartRequest(FreeTalkStartMode.AI_FIRST, 10L)))
+        .isSameAs(exception);
+
+    verify(aiFreeTalkClient, times(1)).generateOpening(any());
   }
 
   /** 오늘의 발화 한도를 모두 사용했으면 세션을 생성하지 않는다. */
