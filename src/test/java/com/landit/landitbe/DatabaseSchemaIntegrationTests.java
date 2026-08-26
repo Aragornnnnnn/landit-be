@@ -142,6 +142,21 @@ class DatabaseSchemaIntegrationTests {
   }
 
   @Test
+  void expressionPronunciationAssetStoresOneRowPerExpressionAndAccent() {
+    assertTableExists("expression_pronunciation_asset");
+    assertColumnExists("expression_pronunciation_asset", "writing_expression_id");
+    assertColumnExists("expression_pronunciation_asset", "accent_locale");
+    assertColumnExists("expression_pronunciation_asset", "expression_audio_url");
+    assertColumnExists("expression_pronunciation_asset", "sentence_audio_url");
+    assertColumnExists("expression_pronunciation_asset", "words");
+    assertTableConstraintExists(
+        "expression_pronunciation_asset", "uk_expression_pronunciation_asset_expression_accent");
+    assertTableConstraintExists(
+        "expression_pronunciation_asset",
+        "fk_expression_pronunciation_asset_writing_expression_id");
+  }
+
+  @Test
   void sessionHistoryMessageFeedbackDoesNotKeepLearningExpressionBackReference() {
     Integer columnCount =
         jdbcTemplate.queryForObject(
