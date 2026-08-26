@@ -17,6 +17,7 @@ import java.util.List;
  * @param isFirstUserTurn 사용자 선시작의 첫 발화 여부
  * @param topic 선택했거나 추론된 주제
  * @param conversationHistory 누적 대화 메시지
+ * @param memoryContext 세션 첫 사용자 발화에 사용할 범위 검증된 장기기억 문맥
  */
 public record AiFreeTalkTurnRequest(
     Long sessionId,
@@ -28,4 +29,11 @@ public record AiFreeTalkTurnRequest(
     AiFreeTalkResponseMode responseMode,
     boolean isFirstUserTurn,
     AiFreeTalkTopic topic,
-    List<AiConversationHistoryMessage> conversationHistory) {}
+    List<AiConversationHistoryMessage> conversationHistory,
+    List<AiFreeTalkMemoryContext> memoryContext) {
+
+  /** 요청 문맥을 방어적으로 복사한다. */
+  public AiFreeTalkTurnRequest {
+    memoryContext = memoryContext == null ? List.of() : List.copyOf(memoryContext);
+  }
+}
