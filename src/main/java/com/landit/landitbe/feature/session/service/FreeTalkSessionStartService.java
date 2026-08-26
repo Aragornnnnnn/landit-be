@@ -2,7 +2,10 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
+import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
@@ -12,6 +15,8 @@ import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
 import com.landit.landitbe.feature.session.service.FreeTalkSessionService.StartedFreeTalkSession;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +28,7 @@ public class FreeTalkSessionStartService {
   private final FreeTalkSessionService freeTalkSessionService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
+  private final FreeTalkMemoryRetrievalService memoryRetrievalService;
 
   /**
    * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.
@@ -41,11 +47,20 @@ public class FreeTalkSessionStartService {
     if (startedSession.startMode() == FreeTalkStartMode.USER_FIRST) {
       return response(startedSession, null);
     }
+    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+        memoryRetrievalService.retrieve(
+            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+                startedSession.freeTalkSessionId(),
+                userId,
+                startedSession.characterId(),
+                MemoryRetrievalStage.OPENING,
+                memoryQuery(startedSession)));
     try {
-      AiFreeTalkOpeningResult openingResult =
-          aiFreeTalkClient.generateOpening(openingRequest(startedSession));
+      AiFreeTalkOpeningResult openingResult = generateOpening(startedSession, memoryResult);
       CurrentMessageResponse currentMessage =
           freeTalkSessionService.saveOpening(startedSession, openingResult);
+      memoryRetrievalService.recordUsage(
+          memoryResult, openingResult.usedMemoryIds(), currentMessage.messageId());
       return response(startedSession, currentMessage);
     } catch (RuntimeException exception) {
       freeTalkSessionService.deleteStart(startedSession.learningSessionId());
@@ -53,7 +68,25 @@ public class FreeTalkSessionStartService {
     }
   }
 
-  private AiFreeTalkOpeningRequest openingRequest(StartedFreeTalkSession startedSession) {
+  private AiFreeTalkOpeningResult generateOpening(
+      StartedFreeTalkSession startedSession,
+      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
+    try {
+      return aiFreeTalkClient.generateOpening(
+          openingRequest(startedSession, memoryResult.contexts()));
+    } catch (RuntimeException exception) {
+      if (memoryResult.contexts().isEmpty()
+          || !(exception instanceof ApiException apiException)
+          || apiException.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID) {
+        throw exception;
+      }
+      return aiFreeTalkClient.generateOpening(openingRequest(startedSession, java.util.List.of()));
+    }
+  }
+
+  private AiFreeTalkOpeningRequest openingRequest(
+      StartedFreeTalkSession startedSession,
+      java.util.List<AiFreeTalkMemoryContext> memoryContext) {
     return new AiFreeTalkOpeningRequest(
         startedSession.learningSessionId(),
         startedSession.characterId(),
@@ -62,7 +95,20 @@ public class FreeTalkSessionStartService {
         new AiFreeTalkTopic(
             startedSession.topicId(),
             startedSession.title(),
-            startedSession.topicPromptDescription()));
+            startedSession.topicPromptDescription()),
+        memoryContext);
+  }
+
+  private String memoryQuery(StartedFreeTalkSession startedSession) {
+    return String.join(
+        " ",
+        java.util.List.of(
+                startedSession.title(),
+                startedSession.topicPromptDescription(),
+                startedSession.characterId())
+            .stream()
+            .filter(value -> value != null && !value.isBlank())
+            .toList());
   }
 
   private FreeTalkSessionStartResponse response(
