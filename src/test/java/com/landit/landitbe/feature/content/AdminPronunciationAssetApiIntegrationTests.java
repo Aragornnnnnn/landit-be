@@ -1,4 +1,4 @@
-// 관리자 발음 평가 자산 S3 임포트 API의 통합 동작을 검증한다.
+// 관리자 발음 평가 자산 2단계 임포트 API의 통합 동작을 검증한다.
 
 package com.landit.landitbe.feature.content;
 
@@ -24,11 +24,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * 관리자 발음 평가 자산 S3 임포트 API의 통합 동작을 검증한다.
+ * 관리자 발음 평가 자산 2단계 임포트 API의 통합 동작을 검증한다.
  *
- * <p>테스트 프로필은 매니페스트를 클래스패스({@code src/test/resources/pronunciation-manifests/})에서 읽는 로컬 리더를 사용한다.
+ * <p>1단계(기준 데이터) → 2단계(TTS) 순서와 각 단계의 실패 처리, 커버리지의 단계별 결석 표시를 확인한다. 테스트 프로필은 매니페스트를
+ * 클래스패스({@code src/test/resources/pronunciation-manifests/})에서 읽는 로컬 리더를 사용한다.
  */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -40,10 +42,10 @@ import org.springframework.test.web.servlet.MvcResult;
     })
 class AdminPronunciationAssetApiIntegrationTests {
 
-  private static final String IMPORT_URL =
-      "/api/v1/admin/expressions/pronunciation-assets/import-from-s3";
-  private static final String COVERAGE_URL =
-      "/api/v1/admin/expressions/pronunciation-assets/coverage";
+  private static final String BASE_URL = "/api/v1/admin/expressions/pronunciation-assets";
+  private static final String IMPORT_REFERENCE_URL = BASE_URL + "/import-reference-from-s3";
+  private static final String IMPORT_TTS_URL = BASE_URL + "/import-tts-from-s3";
+  private static final String COVERAGE_URL = BASE_URL + "/coverage";
   private static final long EXPRESSION_ID = 990301L;
 
   @Autowired private MockMvc mockMvc;
@@ -75,147 +77,207 @@ class AdminPronunciationAssetApiIntegrationTests {
   }
 
   @Test
-  void importInsertsNewAssetAndUpdatesExistingAsset() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-upsert");
+  void referenceImportInsertsThenUpdatesWords() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-upsert");
 
-    // 같은 (표현, 억양)을 두 번 임포트하면 첫 번째는 삽입, 두 번째는 갱신이어야 한다.
+    // 1차 임포트는 삽입, 같은 (표현, 억양)의 2차 임포트는 갱신이어야 한다.
     mockMvc
-        .perform(importFromS3("first.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.inserted").value(1))
         .andExpect(jsonPath("$.data.updated").value(0))
         .andExpect(jsonPath("$.data.failures").isEmpty());
 
     mockMvc
-        .perform(importFromS3("second.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us_v2.json", accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.inserted").value(0))
         .andExpect(jsonPath("$.data.updated").value(1));
 
-    Integer assetCount =
+    // words가 v2 내용으로 교체됐고, 음성 URL은 아직 비어 있어야 한다 (TTS 임포트 전).
+    String words =
         jdbcTemplate.queryForObject(
-            "select count(*) from expression_pronunciation_asset where writing_expression_id = ?",
-            Integer.class,
+            "select cast(words as varchar) from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
+            String.class,
             EXPRESSION_ID);
     String sentenceAudioUrl =
         jdbcTemplate.queryForObject(
-            """
-            select sentence_audio_url from expression_pronunciation_asset
-            where writing_expression_id = ? and accent_locale = 'EN_US'
-            """,
+            "select sentence_audio_url from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
             String.class,
             EXPRESSION_ID);
-    assertThat(assetCount).isEqualTo(1);
-    assertThat(sentenceAudioUrl).isEqualTo("https://cdn.example.com/second.mp3");
+    assertThat(words).contains("thairz-v2");
+    assertThat(sentenceAudioUrl).isNull();
   }
 
   @Test
-  void importStoresSeparateRowsPerAccentLocale() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-accent");
+  void referenceImportRejectsStaleSentenceText() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-stale");
 
-    mockMvc.perform(importFromS3("first.json", accessToken)).andExpect(status().isOk());
+    // 기준 데이터를 만든 문장이 DB의 대표 예문과 다르면 낡은 데이터로 보고 실패 처리해야 한다.
     mockMvc
-        .perform(importFromS3("gb.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_stale.json", accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.inserted").value(1));
-
-    Integer assetCount =
-        jdbcTemplate.queryForObject(
-            "select count(*) from expression_pronunciation_asset where writing_expression_id = ?",
-            Integer.class,
-            EXPRESSION_ID);
-    assertThat(assetCount).isEqualTo(2);
+        .andExpect(jsonPath("$.data.inserted").value(0))
+        .andExpect(
+            jsonPath("$.data.failures[0].reason")
+                .value("기준 데이터의 문장이 DB의 대표 예문과 다릅니다. 최신 문장으로 재생성이 필요합니다."));
   }
 
   @Test
-  void importReportsUnknownExpressionAsFailureAndImportsValidOnes() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-partial");
+  void referenceImportReportsUnknownExpressionAsFailure() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-unknown");
 
     mockMvc
-        .perform(importFromS3("partial.json", accessToken))
+        .perform(
+            importFrom(IMPORT_REFERENCE_URL, "reference_unknown_expression.json", accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.inserted").value(1))
         .andExpect(jsonPath("$.data.failures[0].expressionId").value(999999))
         .andExpect(jsonPath("$.data.failures[0].reason").value("존재하지 않는 표현입니다."));
   }
 
   @Test
-  void importRejectsEmptyWordsArrayAsFailure() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-empty-words");
+  void ttsImportFailsWithoutReferenceData() throws Exception {
+    String accessToken = loginAsAdmin("pron-tts-no-ref");
+
+    // 기준 데이터(1단계) 없이 TTS(2단계)부터 임포트하면 실패 목록에 담겨야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(
+            jsonPath("$.data.failures[0].reason").value("기준 데이터가 없습니다. 기준 데이터 임포트를 먼저 실행하세요."));
+  }
+
+  @Test
+  void ttsImportAttachesUrlsAndJoinsWordAudio() throws Exception {
+    String accessToken = loginAsAdmin("pron-tts-join");
 
     mockMvc
-        .perform(importFromS3("empty-words.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us.json", accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.inserted").value(0))
-        .andExpect(jsonPath("$.data.failures[0].reason").value("words는 비어 있지 않은 배열이어야 합니다."));
+        .andExpect(jsonPath("$.data.updated").value(1))
+        .andExpect(jsonPath("$.data.failures").isEmpty());
+
+    // 문장 URL 컬럼이 채워지고, words의 각 항목에 audioUrl이 order로 조인돼야 한다.
+    String sentenceAudioUrl =
+        jdbcTemplate.queryForObject(
+            "select sentence_audio_url from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
+            String.class,
+            EXPRESSION_ID);
+    String words =
+        jdbcTemplate.queryForObject(
+            "select cast(words as varchar) from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
+            String.class,
+            EXPRESSION_ID);
+    assertThat(sentenceAudioUrl).isEqualTo("https://cdn.example.com/sentence.mp3");
+    assertThat(words)
+        .contains("https://cdn.example.com/words/2.mp3")
+        .contains("accentContrast"); // 기준 데이터의 기존 필드가 조인 후에도 보존돼야 한다.
+  }
+
+  @Test
+  void ttsImportFailsWhenWordOrderIsMissing() throws Exception {
+    String accessToken = loginAsAdmin("pron-tts-missing-word");
+
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_missing_word.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(
+            jsonPath("$.data.failures[0].reason").value("TTS 매니페스트의 단어 order가 기준 데이터와 맞지 않습니다."));
+  }
+
+  @Test
+  void coverageSeparatesReferenceAndAudioMissing() throws Exception {
+    String accessToken = loginAsAdmin("pron-coverage");
+
+    // 기준 데이터만 임포트한 상태: EN_US는 기준 데이터 출석 + 음성 결석, EN_GB는 기준 데이터부터 결석.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+
+    JsonNode afterReference = coverageData(accessToken);
+    assertThat(missingOf(afterReference, "EN_US", "referenceMissing")).doesNotContain(EXPRESSION_ID);
+    assertThat(missingOf(afterReference, "EN_US", "audioMissing")).contains(EXPRESSION_ID);
+    assertThat(missingOf(afterReference, "EN_GB", "referenceMissing")).contains(EXPRESSION_ID);
+
+    // TTS까지 임포트하면 EN_US의 음성 결석도 사라진다.
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us.json", accessToken))
+        .andExpect(status().isOk());
+
+    JsonNode afterTts = coverageData(accessToken);
+    assertThat(missingOf(afterTts, "EN_US", "audioMissing")).doesNotContain(EXPRESSION_ID);
   }
 
   @Test
   void importReturnsNotFoundForMissingManifest() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-missing-manifest");
+    String accessToken = loginAsAdmin("pron-missing-manifest");
 
     mockMvc
-        .perform(importFromS3("no-such-manifest.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "no-such-manifest.json", accessToken))
         .andExpect(status().isNotFound());
   }
 
   @Test
   void importReturnsBadRequestForMalformedManifest() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-malformed");
+    String accessToken = loginAsAdmin("pron-malformed");
 
     mockMvc
-        .perform(importFromS3("malformed.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "malformed.json", accessToken))
         .andExpect(status().isBadRequest());
   }
 
   @Test
-  void coverageReportsMissingExpressionPerLocale() throws Exception {
-    String accessToken = loginAsAdmin("pron-asset-coverage");
-
-    // EN_US 자산만 임포트한 상태에서 커버리지를 조회하면,
-    // 시드 표현이 EN_US에서는 빠진 목록에 없고 EN_GB에서는 빠진 목록에 있어야 한다.
-    mockMvc.perform(importFromS3("first.json", accessToken)).andExpect(status().isOk());
-
-    MvcResult result =
-        mockMvc
-            .perform(get(COVERAGE_URL).header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-            .andExpect(status().isOk())
-            .andReturn();
-
-    JsonNode data = objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("data");
-    assertThat(data.get("totalActiveExpressions").asInt()).isGreaterThanOrEqualTo(1);
-    assertThat(missingIdsOf(data, "EN_US")).doesNotContain(EXPRESSION_ID);
-    assertThat(missingIdsOf(data, "EN_GB")).contains(EXPRESSION_ID);
-  }
-
-  @Test
   void importIsForbiddenForNonAdminUser() throws Exception {
-    String accessToken = login("pron-asset-normal-user").accessToken();
+    String accessToken = login("pron-normal-user").accessToken();
 
-    mockMvc.perform(importFromS3("first.json", accessToken)).andExpect(status().isForbidden());
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isForbidden());
   }
 
   @Test
   void importRequiresAuthentication() throws Exception {
     mockMvc
-        .perform(post(IMPORT_URL).param("manifestKey", "first.json"))
+        .perform(post(IMPORT_REFERENCE_URL).param("manifestKey", "reference_us.json"))
         .andExpect(status().isUnauthorized());
   }
 
   // 매니페스트 키로 임포트 요청을 만든다.
-  private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder importFromS3(
-      String manifestKey, String accessToken) {
-    return post(IMPORT_URL)
+  private MockHttpServletRequestBuilder importFrom(
+      String url, String manifestKey, String accessToken) {
+    return post(url)
         .param("manifestKey", manifestKey)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
   }
 
-  // 커버리지 응답에서 특정 억양의 빠진 표현 ID 목록을 꺼낸다.
-  private List<Long> missingIdsOf(JsonNode data, String accentLocale) {
+  // 커버리지 응답의 data 노드를 조회한다.
+  private JsonNode coverageData(String accessToken) throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(get(COVERAGE_URL).header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("data");
+  }
+
+  // 커버리지 응답에서 특정 억양의 결석 목록(referenceMissing 또는 audioMissing)을 꺼낸다.
+  private List<Long> missingOf(JsonNode data, String accentLocale, String fieldName) {
     for (JsonNode locale : data.get("locales")) {
       if (accentLocale.equals(locale.get("accentLocale").asText())) {
         List<Long> ids = new ArrayList<>();
-        locale.get("missing").forEach(id -> ids.add(id.asLong()));
+        locale.get(fieldName).forEach(id -> ids.add(id.asLong()));
         return ids;
       }
     }

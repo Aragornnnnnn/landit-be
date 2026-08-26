@@ -24,11 +24,20 @@ public class AdminPronunciationAssetController implements AdminPronunciationAsse
 
   /** {@inheritDoc} */
   @Override
-  @PostMapping("/api/v1/admin/expressions/pronunciation-assets/import-from-s3")
-  public ApiResponse<AdminPronunciationAssetImportResult> importFromS3(
+  @PostMapping("/api/v1/admin/expressions/pronunciation-assets/import-reference-from-s3")
+  public ApiResponse<AdminPronunciationAssetImportResult> importReference(
       @AuthenticationPrincipal AuthUserPrincipal principal, @RequestParam String manifestKey) {
     return ApiResponse.success(
-        expressionPronunciationAssetService.importFromManifest(principal.userId(), manifestKey));
+        expressionPronunciationAssetService.importReference(principal.userId(), manifestKey));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/admin/expressions/pronunciation-assets/import-tts-from-s3")
+  public ApiResponse<AdminPronunciationAssetImportResult> importTts(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @RequestParam String manifestKey) {
+    return ApiResponse.success(
+        expressionPronunciationAssetService.importTts(principal.userId(), manifestKey));
   }
 
   /** {@inheritDoc} */

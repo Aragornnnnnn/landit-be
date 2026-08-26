@@ -44,14 +44,15 @@ public class ExpressionPronunciationAsset extends BaseTimeEntity {
 
   // 타겟 표현만 읽어주는 원어민 TTS mp3의 CDN URL.
   // 예: https://cdn.landit.com/content/expression-pronunciation-audio/101/EN_US/{fingerprint}.mp3
-  // ("There is nothing like"만 읽은 음성)
-  @Column(name = "expression_audio_url", nullable = false, length = 500)
+  // ("There is nothing like"만 읽은 음성). TTS 임포트 전에는 null (TTS 미완성 상태).
+  @Column(name = "expression_audio_url", length = 500)
   private String expressionAudioUrl;
 
   // 대표 예문 전체를 읽어주는 원어민 TTS mp3의 CDN URL.
   // 예: "There's nothing like hiking to clear my head." 전체를 읽은 음성.
   // 앱의 "원어민 발음 듣기" 재생용이자, AI 서버가 유저 음성과 대조하는 판정 기준 음성.
-  @Column(name = "sentence_audio_url", nullable = false, length = 500)
+  // TTS 임포트 전에는 null이며, 이 상태의 자산으로는 발음 평가를 열지 않는다.
+  @Column(name = "sentence_audio_url", length = 500)
   private String sentenceAudioUrl;
 
   // 단어별 발음 기준 데이터 배열. order 오름차순으로 대표 예문의 단어와 1:1 대응한다.
@@ -68,37 +69,50 @@ public class ExpressionPronunciationAsset extends BaseTimeEntity {
   protected ExpressionPronunciationAsset() {}
 
   /**
-   * 발음 평가 자산을 생성한다.
+   * 기준 데이터만으로 발음 평가 자산을 생성한다. 음성 URL은 TTS 임포트에서 채워진다.
    *
    * @param writingExpressionId Writing 표현 ID
    * @param accentLocale 억양 locale
-   * @param expressionAudioUrl 표현 TTS URL
-   * @param sentenceAudioUrl 대표 예문 TTS URL
    * @param words 단어별 발음 기준 데이터
    */
   public ExpressionPronunciationAsset(
-      Long writingExpressionId,
-      AccentLocale accentLocale,
-      String expressionAudioUrl,
-      String sentenceAudioUrl,
-      JsonNode words) {
+      Long writingExpressionId, AccentLocale accentLocale, JsonNode words) {
     this.writingExpressionId = writingExpressionId;
     this.accentLocale = accentLocale;
-    this.expressionAudioUrl = expressionAudioUrl;
-    this.sentenceAudioUrl = sentenceAudioUrl;
     this.words = words;
   }
 
   /**
-   * 자산 내용을 새 값으로 교체한다. 음성 재생성이나 기준 데이터 갱신 시 사용한다.
+   * 기준 데이터를 새 값으로 교체한다. 기준 데이터 재임포트 시 사용한다.
+   *
+   * <p>단어별 audioUrl은 words 안에 저장되므로, 교체 후에는 TTS 임포트를 다시 실행해 audioUrl을 재조인해야 한다.
+   *
+   * @param words 단어별 발음 기준 데이터
+   */
+  public void replaceWords(JsonNode words) {
+    this.words = words;
+  }
+
+  /**
+   * TTS 임포트 결과를 붙인다 — 문장·표현 음성 URL을 채우고, audioUrl이 조인된 words로 교체한다.
    *
    * @param expressionAudioUrl 표현 TTS URL
    * @param sentenceAudioUrl 대표 예문 TTS URL
-   * @param words 단어별 발음 기준 데이터
+   * @param wordsWithAudio 단어별 audioUrl이 채워진 발음 기준 데이터
    */
-  public void replaceContents(String expressionAudioUrl, String sentenceAudioUrl, JsonNode words) {
+  public void attachTts(
+      String expressionAudioUrl, String sentenceAudioUrl, JsonNode wordsWithAudio) {
     this.expressionAudioUrl = expressionAudioUrl;
     this.sentenceAudioUrl = sentenceAudioUrl;
-    this.words = words;
+    this.words = wordsWithAudio;
+  }
+
+  /**
+   * TTS까지 완성된 자산인지 반환한다. 발음 평가는 완성된 자산에서만 연다.
+   *
+   * @return 대표 예문 TTS URL이 있으면 true
+   */
+  public boolean hasTts() {
+    return sentenceAudioUrl != null && !sentenceAudioUrl.isBlank();
   }
 }

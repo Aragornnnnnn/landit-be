@@ -1,16 +1,21 @@
-// 발음 평가 자산의 S3 매니페스트 임포트와 커버리지 계산을 처리한다.
+// 발음 평가 자산의 2단계 임포트(기준 데이터 → TTS)와 커버리지 계산을 처리한다.
 
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.landit.landitbe.feature.admin.domain.AdminAction;
 import com.landit.landitbe.feature.admin.service.AdminAuditService;
 import com.landit.landitbe.feature.content.client.PronunciationManifestReader;
 import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
+import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.AdminPronunciationAssetCoverageResponse;
 import com.landit.landitbe.feature.content.dto.AdminPronunciationAssetImportResult;
-import com.landit.landitbe.feature.content.dto.PronunciationAssetManifest;
+import com.landit.landitbe.feature.content.dto.PronunciationReferenceManifest;
+import com.landit.landitbe.feature.content.dto.PronunciationTtsManifest;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
@@ -22,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +35,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 발음 평가 자산의 S3 매니페스트 임포트와 커버리지 계산을 처리한다.
+ * 발음 평가 자산의 2단계 임포트와 커버리지 계산을 처리한다.
  *
- * <p>TTS 사전 생성 배치(landit-iac)가 S3에 올린 매니페스트를 내려받아 (표현, 억양) 단위로 upsert한다. 실패한 건은 조용히 건너뛰지 않고 사유와 함께
- * 결과에 담아 반환한다.
+ * <p>1단계(기준 데이터): AI 파이프라인이 만든 locale별 기준 데이터 JSON을 읽어 자산 행을 만든다 — 음성 URL은 아직 비어 있다. 2단계(TTS):
+ * TTS 매니페스트의 URL을 기존 행에 붙이고, 단어별 audioUrl을 order로 조인해 words에 넣는다. 실패한 건은 조용히 건너뛰지 않고 사유와 함께 결과에 담아
+ * 반환한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,7 +48,7 @@ public class ExpressionPronunciationAssetService {
   private static final String AUDIT_TARGET_TYPE = "EXPRESSION_PRONUNCIATION_ASSET";
 
   // 매니페스트 항목 수의 안전 상한. 전체 데이터(981 표현 × 3 억양)보다 넉넉하게 잡되 폭주는 막는다.
-  private static final int MAX_MANIFEST_ASSETS = 10_000;
+  private static final int MAX_MANIFEST_ENTRIES = 10_000;
 
   private final ExpressionPronunciationAssetRepository assetRepository;
   private final WritingExpressionRepository writingExpressionRepository;
@@ -53,57 +60,113 @@ public class ExpressionPronunciationAssetService {
       new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
   /**
-   * S3의 매니페스트를 내려받아 발음 평가 자산을 (표현, 억양) 단위로 upsert한다.
+   * 1단계 — 기준 데이터 JSON(locale별)을 읽어 자산의 words를 upsert한다.
+   *
+   * <p>기준 데이터의 sentenceText가 DB의 대표 예문과 다르면 그 건은 실패 처리한다 — 문장이 바뀐 뒤 만든 낡은 기준 데이터가 들어오는 사고를 막는다.
    *
    * @param adminUserId 작업을 수행한 관리자 사용자 ID
-   * @param manifestKey S3 매니페스트 키
+   * @param manifestKey S3 기준 데이터 파일 키
    * @return 삽입·갱신 건수와 실패 목록
-   * @throws ApiException 매니페스트가 없거나(404) 형식이 잘못됐을 때(400)
    */
   @Transactional
-  public AdminPronunciationAssetImportResult importFromManifest(
-      Long adminUserId, String manifestKey) {
-    // 0단계: S3(또는 로컬 스텁)에서 매니페스트 JSON을 읽어 파싱·기본 검증한다.
-    PronunciationAssetManifest manifest = parseManifest(manifestReader.read(manifestKey));
+  public AdminPronunciationAssetImportResult importReference(Long adminUserId, String manifestKey) {
+    PronunciationReferenceManifest manifest =
+        parseReference(manifestReader.read(manifestKey));
 
-    // 1단계: 판별에 필요한 데이터를 미리 한 번에 조회해 둔다.
-    //   - 어떤 표현 ID가 실제로 존재하는지 (없는 표현이면 실패 처리해야 하므로)
-    //   - 어떤 (표현, 억양) 자산이 이미 있는지 (있으면 갱신, 없으면 삽입이므로)
-    //   건별로 조회하면 항목 수만큼 쿼리가 나가서, 여기서 각 1번씩만 조회한다.
-    Set<Long> requestedExpressionIds = collectExpressionIds(manifest);
-    Set<Long> existingExpressionIds = findExistingExpressionIds(requestedExpressionIds);
-    Map<AssetKey, ExpressionPronunciationAsset> existingAssets =
-        findExistingAssets(requestedExpressionIds);
+    // 판별 재료를 미리 한 번에 조회한다 (건별 조회 방지).
+    Set<Long> requestedIds = collectIds(manifest.entries(), PronunciationReferenceManifest.Entry::expressionId);
+    Map<Long, WritingExpression> expressions = findExpressions(requestedIds);
+    Map<AssetKey, ExpressionPronunciationAsset> existingAssets = findExistingAssets(requestedIds);
 
-    // 2단계: 항목을 하나씩 검증하고 upsert한다. 결과는 삽입/갱신/실패 셋 중 하나다.
     int inserted = 0;
     int updated = 0;
     List<AdminPronunciationAssetImportResult.Failure> failures = new ArrayList<>();
-    Set<AssetKey> processedKeys = new HashSet<>(); // 매니페스트 안에서 같은 (표현, 억양)이 중복되는 것을 잡는다.
+    Set<AssetKey> processedKeys = new HashSet<>();
 
-    for (PronunciationAssetManifest.Asset asset : manifest.assets()) {
-      ImportOutcome outcome =
-          importOne(asset, existingExpressionIds, existingAssets, processedKeys, failures);
-      switch (outcome) {
-        case INSERTED -> inserted++;
-        case UPDATED -> updated++;
-        case FAILED -> {}
+    for (PronunciationReferenceManifest.Entry entry : manifest.entries()) {
+      AssetKey key = new AssetKey(entry.expressionId(), entry.accentLocale());
+      String failureReason = validateReference(entry, expressions, processedKeys, key);
+      if (failureReason != null) {
+        failures.add(
+            new AdminPronunciationAssetImportResult.Failure(
+                entry.expressionId(), entry.accentLocale(), failureReason));
+        continue;
+      }
+      processedKeys.add(key);
+
+      ExpressionPronunciationAsset existing = existingAssets.get(key);
+      if (existing != null) {
+        // 기준 데이터를 교체하면 words 안의 audioUrl도 사라지므로, 이후 TTS 임포트를 다시 실행해야 한다.
+        existing.replaceWords(entry.words());
+        updated++;
+      } else {
+        assetRepository.save(
+            new ExpressionPronunciationAsset(
+                entry.expressionId(), entry.accentLocale(), entry.words()));
+        inserted++;
       }
     }
 
-    // 3단계: 관리자 쓰기 작업이므로 감사 로그를 요청당 1건 남기고 결과를 반환한다.
-    //   어떤 매니페스트를 임포트했는지 추적할 수 있게 대상 식별자로 매니페스트 키를 기록한다.
     recordAudit(adminUserId, manifestKey, inserted, updated, failures.size());
     return new AdminPronunciationAssetImportResult(inserted, updated, failures);
   }
 
   /**
+   * 2단계 — TTS 매니페스트의 음성 URL을 기존 자산에 붙인다.
+   *
+   * <p>문장·표현 URL 컬럼을 채우고, 단어별 audioUrl은 기준 데이터 words에 order로 조인해 넣는다. 기준 데이터가 아직 없는 (표현, 억양)은 실패
+   * 처리한다 — 1단계를 먼저 실행해야 한다.
+   *
+   * @param adminUserId 작업을 수행한 관리자 사용자 ID
+   * @param manifestKey S3 TTS 매니페스트 키
+   * @return 갱신 건수와 실패 목록 (이 단계는 삽입이 없다)
+   */
+  @Transactional
+  public AdminPronunciationAssetImportResult importTts(Long adminUserId, String manifestKey) {
+    PronunciationTtsManifest manifest = parseTts(manifestReader.read(manifestKey));
+
+    Set<Long> requestedIds = collectIds(manifest.assets(), PronunciationTtsManifest.Asset::expressionId);
+    Map<AssetKey, ExpressionPronunciationAsset> existingAssets = findExistingAssets(requestedIds);
+
+    int updated = 0;
+    List<AdminPronunciationAssetImportResult.Failure> failures = new ArrayList<>();
+
+    for (PronunciationTtsManifest.Asset ttsAsset : manifest.assets()) {
+      AssetKey key = new AssetKey(ttsAsset.expressionId(), ttsAsset.accentLocale());
+      ExpressionPronunciationAsset asset = existingAssets.get(key);
+      String failureReason = validateTts(ttsAsset, asset);
+      if (failureReason != null) {
+        failures.add(
+            new AdminPronunciationAssetImportResult.Failure(
+                ttsAsset.expressionId(), ttsAsset.accentLocale(), failureReason));
+        continue;
+      }
+
+      JsonNode joinedWords = joinWordAudio(asset.getWords(), ttsAsset.words());
+      if (joinedWords == null) {
+        failures.add(
+            new AdminPronunciationAssetImportResult.Failure(
+                ttsAsset.expressionId(),
+                ttsAsset.accentLocale(),
+                "TTS 매니페스트의 단어 order가 기준 데이터와 맞지 않습니다."));
+        continue;
+      }
+      asset.attachTts(ttsAsset.expressionAudioUrl(), ttsAsset.sentenceAudioUrl(), joinedWords);
+      updated++;
+    }
+
+    recordAudit(adminUserId, manifestKey, 0, updated, failures.size());
+    return new AdminPronunciationAssetImportResult(0, updated, failures);
+  }
+
+  /**
    * 발음 자산이 빠진 표현이 없는지 억양별로 출석 체크한다.
    *
-   * <p>"활성 표현 전체 명단"과 "자산이 실제로 들어 있는 표현"을 대조해서, 억양마다 자산이 없는 표현 ID 목록(결석자 명단)을 만든다. 유저에게 노출되는 표현이
-   * 선별적이라 QA로는 981개를 전부 확인할 수 없으므로, 임포트 누락은 이 전수 대조로 잡는다. 임포트 후 모든 억양의 missing이 비어 있으면 완료 확정이다.
+   * <p>"활성 표현 전체 명단"과 자산 상태를 대조해서, 억양마다 두 가지 결석자 명단을 만든다: 기준 데이터가 아예 없는 표현, 기준 데이터는 있는데 음성(TTS)이
+   * 아직 없는 표현. 유저에게 노출되는 표현이 선별적이라 QA로는 전량 확인할 수 없으므로, 임포트 누락은 이 전수 대조로 잡는다. 두 missing이 모두 비어 있으면
+   * 완료 확정이다.
    *
-   * @return 전체 표현 수와, 억양별 (자산 보유 수 + 자산이 없는 표현 ID 목록)
+   * @return 전체 표현 수와, 억양별 (기준 데이터/음성 보유 수 + 빠진 표현 ID 목록)
    */
   @Transactional(readOnly = true)
   public AdminPronunciationAssetCoverageResponse coverage() {
@@ -111,122 +174,163 @@ public class ExpressionPronunciationAssetService {
     List<Long> activeExpressionIds =
         writingExpressionRepository.findIdsByStatus(ActiveStatus.ACTIVE);
 
-    // 2단계: "출석한 애들" = 자산 테이블에 행이 있는 (표현, 억양)을 억양별 Set으로 묶는다.
-    //   words JSONB까지 다 읽으면 무거우니 (표현 ID, 억양) 두 컬럼만 가볍게 조회한다.
-    Map<AccentLocale, Set<Long>> coveredByLocale = new HashMap<>();
-    for (ExpressionPronunciationAssetRepository.AssetLocaleView view :
-        assetRepository.findAllBy()) {
-      coveredByLocale
+    // 2단계: 자산 상태를 억양별로 묶는다 — 기준 데이터 보유 여부와 TTS 완성 여부를 나눠서.
+    Map<AccentLocale, Set<Long>> referenceByLocale = new HashMap<>();
+    Map<AccentLocale, Set<Long>> audioByLocale = new HashMap<>();
+    for (ExpressionPronunciationAssetRepository.AssetLocaleView view : assetRepository.findAllBy()) {
+      referenceByLocale
           .computeIfAbsent(view.getAccentLocale(), locale -> new HashSet<>())
           .add(view.getWritingExpressionId());
+      if (view.getSentenceAudioUrl() != null && !view.getSentenceAudioUrl().isBlank()) {
+        audioByLocale
+            .computeIfAbsent(view.getAccentLocale(), locale -> new HashSet<>())
+            .add(view.getWritingExpressionId());
+      }
     }
 
-    // 3단계: 억양마다 명단과 대조해 "결석자"(활성 표현인데 자산이 없는 ID)를 골라낸다.
+    // 3단계: 억양마다 명단과 대조해 "결석자"를 골라낸다.
     List<AdminPronunciationAssetCoverageResponse.LocaleCoverage> locales = new ArrayList<>();
     for (AccentLocale locale : AccentLocale.values()) {
-      Set<Long> covered = coveredByLocale.getOrDefault(locale, Set.of());
-      List<Long> missing =
-          activeExpressionIds.stream().filter(id -> !covered.contains(id)).sorted().toList();
+      Set<Long> hasReference = referenceByLocale.getOrDefault(locale, Set.of());
+      Set<Long> hasAudio = audioByLocale.getOrDefault(locale, Set.of());
+      List<Long> referenceMissing =
+          activeExpressionIds.stream().filter(id -> !hasReference.contains(id)).sorted().toList();
+      // 음성 결석은 "기준 데이터는 있는데 음성이 없는" 표현만 — 기준 데이터부터 없는 건 위 목록이 담당한다.
+      List<Long> audioMissing =
+          activeExpressionIds.stream()
+              .filter(id -> hasReference.contains(id) && !hasAudio.contains(id))
+              .sorted()
+              .toList();
       locales.add(
           new AdminPronunciationAssetCoverageResponse.LocaleCoverage(
-              locale, activeExpressionIds.size() - missing.size(), missing));
+              locale,
+              activeExpressionIds.size() - referenceMissing.size(),
+              referenceMissing,
+              (int) activeExpressionIds.stream().filter(hasAudio::contains).count(),
+              audioMissing));
     }
     return new AdminPronunciationAssetCoverageResponse(activeExpressionIds.size(), locales);
   }
 
-  // 매니페스트 JSON을 파싱하고 목록의 기본 형태를 검증한다.
-  private PronunciationAssetManifest parseManifest(String manifestJson) {
-    PronunciationAssetManifest manifest;
+  // 기준 데이터 JSON을 파싱하고 목록의 기본 형태를 검증한다. 파일 최상위는 항목 배열이다.
+  private PronunciationReferenceManifest parseReference(String manifestJson) {
+    List<PronunciationReferenceManifest.Entry> entries;
     try {
-      manifest = objectMapper.readValue(manifestJson, PronunciationAssetManifest.class);
+      entries =
+          objectMapper.readValue(
+              manifestJson,
+              objectMapper
+                  .getTypeFactory()
+                  .constructCollectionType(List.class, PronunciationReferenceManifest.Entry.class));
     } catch (Exception exception) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST, "매니페스트 JSON 형식이 올바르지 않습니다.");
+      throw new ApiException(ErrorCode.INVALID_REQUEST, "기준 데이터 JSON 형식이 올바르지 않습니다.");
     }
-    if (manifest.assets() == null || manifest.assets().isEmpty()) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST, "매니페스트에 assets 목록이 없습니다.");
+    validateEntryCount(entries == null ? 0 : entries.size());
+    return new PronunciationReferenceManifest(entries);
+  }
+
+  // TTS 매니페스트 JSON을 파싱하고 목록의 기본 형태를 검증한다.
+  private PronunciationTtsManifest parseTts(String manifestJson) {
+    PronunciationTtsManifest manifest;
+    try {
+      manifest = objectMapper.readValue(manifestJson, PronunciationTtsManifest.class);
+    } catch (Exception exception) {
+      throw new ApiException(ErrorCode.INVALID_REQUEST, "TTS 매니페스트 JSON 형식이 올바르지 않습니다.");
     }
-    if (manifest.assets().size() > MAX_MANIFEST_ASSETS) {
-      throw new ApiException(
-          ErrorCode.INVALID_REQUEST, "매니페스트 항목이 상한(%d)을 초과했습니다.".formatted(MAX_MANIFEST_ASSETS));
-    }
+    validateEntryCount(manifest.assets() == null ? 0 : manifest.assets().size());
     return manifest;
   }
 
-  // 자산 1건을 검증하고 upsert한다. 검증에 걸리면 실패 목록에 사유를 담고 FAILED를 반환한다.
-  private ImportOutcome importOne(
-      PronunciationAssetManifest.Asset asset,
-      Set<Long> existingExpressionIds,
-      Map<AssetKey, ExpressionPronunciationAsset> existingAssets,
-      Set<AssetKey> processedKeys,
-      List<AdminPronunciationAssetImportResult.Failure> failures) {
-    AssetKey key = new AssetKey(asset.expressionId(), asset.accentLocale());
-
-    String failureReason = validate(asset, existingExpressionIds, processedKeys, key);
-    if (failureReason != null) {
-      failures.add(
-          new AdminPronunciationAssetImportResult.Failure(
-              asset.expressionId(), asset.accentLocale(), failureReason));
-      return ImportOutcome.FAILED;
+  // 매니페스트 항목 수가 비어 있지 않고 상한 이하인지 확인한다.
+  private void validateEntryCount(int count) {
+    if (count == 0) {
+      throw new ApiException(ErrorCode.INVALID_REQUEST, "매니페스트에 항목이 없습니다.");
     }
-    processedKeys.add(key);
-
-    // 이미 있는 (표현, 억양)이면 내용만 교체하고, 없으면 새 행을 만든다.
-    ExpressionPronunciationAsset existing = existingAssets.get(key);
-    if (existing != null) {
-      existing.replaceContents(asset.expressionAudioUrl(), asset.sentenceAudioUrl(), asset.words());
-      return ImportOutcome.UPDATED;
+    if (count > MAX_MANIFEST_ENTRIES) {
+      throw new ApiException(
+          ErrorCode.INVALID_REQUEST, "매니페스트 항목이 상한(%d)을 초과했습니다.".formatted(MAX_MANIFEST_ENTRIES));
     }
-    assetRepository.save(
-        new ExpressionPronunciationAsset(
-            asset.expressionId(),
-            asset.accentLocale(),
-            asset.expressionAudioUrl(),
-            asset.sentenceAudioUrl(),
-            asset.words()));
-    return ImportOutcome.INSERTED;
   }
 
-  // 매니페스트 항목의 실패 사유를 판별한다. 정상이면 null을 반환한다.
-  private String validate(
-      PronunciationAssetManifest.Asset asset,
-      Set<Long> existingExpressionIds,
+  // 기준 데이터 항목의 실패 사유를 판별한다. 정상이면 null.
+  private String validateReference(
+      PronunciationReferenceManifest.Entry entry,
+      Map<Long, WritingExpression> expressions,
       Set<AssetKey> processedKeys,
       AssetKey key) {
-    // HTTP 요청 본문이 아니라 S3 파일이라 bean validation이 없으므로 필수 값을 코드로 검사한다.
-    if (asset.expressionId() == null
-        || asset.accentLocale() == null
-        || asset.expressionAudioUrl() == null
-        || asset.expressionAudioUrl().isBlank()
-        || asset.sentenceAudioUrl() == null
-        || asset.sentenceAudioUrl().isBlank()
-        || asset.words() == null) {
+    if (entry.expressionId() == null || entry.accentLocale() == null || entry.words() == null) {
       return "필수 값이 누락됐습니다.";
     }
-    if (!existingExpressionIds.contains(asset.expressionId())) {
+    WritingExpression expression = expressions.get(entry.expressionId());
+    if (expression == null) {
       return "존재하지 않는 표현입니다.";
     }
     if (processedKeys.contains(key)) {
       return "매니페스트 안에 같은 (표현, 억양) 항목이 중복됩니다.";
     }
-    if (!asset.words().isArray() || asset.words().isEmpty()) {
+    if (!entry.words().isArray() || entry.words().isEmpty()) {
       return "words는 비어 있지 않은 배열이어야 합니다.";
+    }
+    // 낡은 기준 데이터 방지: 만들 때 쓴 문장과 지금 DB 문장이 다르면 거른다 (V60처럼 문장이 바뀐 경우).
+    if (entry.sentenceText() != null
+        && !Objects.equals(entry.sentenceText(), expression.getRepresentativeSentenceText())) {
+      return "기준 데이터의 문장이 DB의 대표 예문과 다릅니다. 최신 문장으로 재생성이 필요합니다.";
     }
     return null;
   }
 
-  // 매니페스트에 담긴 표현 ID를 중복 없이 모은다. 필수 값 검증 전이므로 null은 제외한다.
-  private Set<Long> collectExpressionIds(PronunciationAssetManifest manifest) {
-    return manifest.assets().stream()
-        .map(PronunciationAssetManifest.Asset::expressionId)
-        .filter(id -> id != null)
-        .collect(Collectors.toSet());
+  // TTS 항목의 실패 사유를 판별한다. 정상이면 null.
+  private String validateTts(
+      PronunciationTtsManifest.Asset ttsAsset, ExpressionPronunciationAsset existingAsset) {
+    if (ttsAsset.expressionId() == null
+        || ttsAsset.accentLocale() == null
+        || ttsAsset.sentenceAudioUrl() == null
+        || ttsAsset.sentenceAudioUrl().isBlank()
+        || ttsAsset.expressionAudioUrl() == null
+        || ttsAsset.expressionAudioUrl().isBlank()
+        || ttsAsset.words() == null
+        || ttsAsset.words().isEmpty()) {
+      return "필수 값이 누락됐습니다.";
+    }
+    if (existingAsset == null) {
+      return "기준 데이터가 없습니다. 기준 데이터 임포트를 먼저 실행하세요.";
+    }
+    return null;
   }
 
-  // 요청된 표현 ID 중 실제로 존재하는 것만 골라낸다.
-  private Set<Long> findExistingExpressionIds(Set<Long> expressionIds) {
+  // 기준 데이터 words에 단어별 audioUrl을 order로 조인한 새 배열을 만든다. order가 안 맞으면 null.
+  private JsonNode joinWordAudio(
+      JsonNode referenceWords, List<PronunciationTtsManifest.Asset.WordAudio> wordAudios) {
+    Map<Integer, String> audioByOrder =
+        wordAudios.stream()
+            .collect(
+                Collectors.toMap(
+                    PronunciationTtsManifest.Asset.WordAudio::order,
+                    PronunciationTtsManifest.Asset.WordAudio::audioUrl,
+                    (first, second) -> first));
+    ArrayNode joined = objectMapper.createArrayNode();
+    for (JsonNode word : referenceWords) {
+      int order = word.path("order").asInt();
+      String audioUrl = audioByOrder.get(order);
+      if (audioUrl == null || audioUrl.isBlank()) {
+        return null; // 기준 데이터의 단어인데 음성이 없으면 불완전한 매니페스트다.
+      }
+      ObjectNode withAudio = word.deepCopy();
+      withAudio.put("audioUrl", audioUrl);
+      joined.add(withAudio);
+    }
+    return joined;
+  }
+
+  // 목록에서 표현 ID를 중복 없이 모은다. 필수 값 검증 전이므로 null은 제외한다.
+  private <T> Set<Long> collectIds(List<T> items, java.util.function.Function<T, Long> idExtractor) {
+    return items.stream().map(idExtractor).filter(Objects::nonNull).collect(Collectors.toSet());
+  }
+
+  // 요청된 표현들을 ID로 찾을 수 있게 Map으로 만든다.
+  private Map<Long, WritingExpression> findExpressions(Set<Long> expressionIds) {
     return writingExpressionRepository.findAllById(expressionIds).stream()
-        .map(expression -> expression.getId())
-        .collect(Collectors.toSet());
+        .collect(Collectors.toMap(WritingExpression::getId, expression -> expression));
   }
 
   // 요청된 표현들의 기존 자산을 (표현, 억양) 키로 찾을 수 있게 Map으로 만든다.
@@ -249,13 +353,6 @@ public class ExpressionPronunciationAssetService {
         manifestKey,
         null,
         "inserted=%d, updated=%d, failed=%d".formatted(inserted, updated, failed));
-  }
-
-  // 자산 1건의 처리 결과다. 삽입됨 / 갱신됨 / 실패함.
-  private enum ImportOutcome {
-    INSERTED,
-    UPDATED,
-    FAILED
   }
 
   // upsert 판별에 사용하는 (표현 ID, 억양) 복합 키다.

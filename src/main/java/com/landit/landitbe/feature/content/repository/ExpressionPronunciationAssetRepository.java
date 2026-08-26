@@ -33,13 +33,13 @@ public interface ExpressionPronunciationAssetRepository
       Collection<Long> writingExpressionIds);
 
   /**
-   * 전체 자산의 (표현 ID, 억양)만 가볍게 조회한다. words JSONB를 읽지 않으므로 커버리지 계산에 적합하다.
+   * 전체 자산의 (표현 ID, 억양, 문장 음성 URL)만 가볍게 조회한다. words JSONB를 읽지 않으므로 커버리지 계산에 적합하다.
    *
-   * @return 전체 자산의 표현 ID·억양 목록
+   * @return 전체 자산의 표현 ID·억양·문장 음성 URL 목록
    */
   List<AssetLocaleView> findAllBy();
 
-  /** 자산의 표현 ID와 억양만 담는 조회 전용 뷰다. */
+  /** 자산의 커버리지 판별에 필요한 컬럼만 담는 조회 전용 뷰다. */
   interface AssetLocaleView {
 
     /** Writing 표현 ID를 반환한다. */
@@ -47,5 +47,8 @@ public interface ExpressionPronunciationAssetRepository
 
     /** 억양 locale을 반환한다. */
     AccentLocale getAccentLocale();
+
+    /** 대표 예문 TTS URL을 반환한다. TTS 임포트 전이면 null이다. */
+    String getSentenceAudioUrl();
   }
 }
