@@ -130,6 +130,71 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @Test
+  void returnsStaleAndWritesNothingWhenOrderedSnapshotIdsChanged() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "new comparable memory", "ACTIVE");
+
+    ConversationMemoryWriteService.PersistenceResult result =
+        writeService.persistIfSnapshotCurrent(
+            LEARNING_SESSION_ID,
+            USER_ID,
+            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+
+    assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STALE);
+    assertThat(countMemories()).isEqualTo(1);
+    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
+  }
+
+  @Test
+  void rollsBackNewMemoryAndEarlierSupersedesWhenOneTargetIsInvalid() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "first old memory", "ACTIVE");
+
+    assertThatThrownBy(
+            () ->
+                writeService.persistIfSnapshotCurrent(
+                    LEARNING_SESSION_ID,
+                    USER_ID,
+                    List.of(
+                        plan(
+                            AiMemoryOperation.SUPERSEDE,
+                            List.of(FIRST_OLD_MEMORY_ID),
+                            List.of(FIRST_OLD_MEMORY_ID)),
+                        plan(
+                            AiMemoryOperation.SUPERSEDE,
+                            List.of(FIRST_OLD_MEMORY_ID),
+                            List.of(FIRST_OLD_MEMORY_ID)))))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(countMemories()).isEqualTo(1);
+    assertThat(statusOf(FIRST_OLD_MEMORY_ID)).isEqualTo("ACTIVE");
+    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
+  }
+
+  @Test
+  void rejectsSupersedeTargetOutsideSnapshotAndUserScopeBeforeWriting() {
+    seedCompletedPreparingSession();
+    seedUser(OTHER_USER_ID);
+    seedMemory(OTHER_USER_MEMORY_ID, OTHER_USER_ID, "other user's memory", "ACTIVE");
+
+    assertThatThrownBy(
+            () ->
+                writeService.persistIfSnapshotCurrent(
+                    LEARNING_SESSION_ID,
+                    USER_ID,
+                    List.of(
+                        plan(
+                            AiMemoryOperation.SUPERSEDE,
+                            List.of(OTHER_USER_MEMORY_ID),
+                            List.of()))))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThat(countMemories()).isZero();
+    assertThat(statusOf(OTHER_USER_MEMORY_ID)).isEqualTo("ACTIVE");
+    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
+  }
+
   private ConversationMemoryResolutionPlan plan(
       AiMemoryOperation operation, List<Long> supersededMemoryIds, List<Long> snapshotMemoryIds) {
     return new ConversationMemoryResolutionPlan(
