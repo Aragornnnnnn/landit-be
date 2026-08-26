@@ -78,6 +78,10 @@ class RemoteAiPronunciationClientTest {
     assertThat(sentRequest.path("userAudioFormat").asString()).isEqualTo("m4a");
     assertThat(sentRequest.path("accentLocale").asString()).isEqualTo("EN_US");
     assertThat(sentRequest.path("words")).hasSize(3);
+    // 억양 대조 힌트가 있는 단어는 그대로 실리고, 없는 단어는 null로 나간다 (AI 서버는 생략과 동일 취급).
+    assertThat(sentRequest.path("words").get(1).path("accentContrast").path("expected").asString())
+        .isEqualTo("sounds like 「nuh·thing」");
+    assertThat(sentRequest.path("words").get(0).path("accentContrast").isNull()).isTrue();
 
     // 응답의 단어별 판정이 그대로 매핑돼야 한다.
     assertThat(result.words()).hasSize(3);
@@ -171,8 +175,12 @@ class RemoteAiPronunciationClientTest {
         "https://cdn.example.com/sentence.mp3",
         AccentLocale.EN_US,
         List.of(
-            new AiPronunciationAnalysisRequest.Word(1, "There's"),
-            new AiPronunciationAnalysisRequest.Word(2, "nothing"),
-            new AiPronunciationAnalysisRequest.Word(3, "hiking")));
+            new AiPronunciationAnalysisRequest.Word(1, "There's", null),
+            new AiPronunciationAnalysisRequest.Word(
+                2,
+                "nothing",
+                new AiPronunciationAnalysisRequest.AccentContrast(
+                    "sounds like 「nuh·thing」", "sounds like 「nah·ssing」", "PHONEME")),
+            new AiPronunciationAnalysisRequest.Word(3, "hiking", null)));
   }
 }

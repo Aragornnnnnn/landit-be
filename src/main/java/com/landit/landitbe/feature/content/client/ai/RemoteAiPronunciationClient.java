@@ -80,6 +80,10 @@ public class RemoteAiPronunciationClient implements AiPronunciationClient {
         if (ErrorCode.AI_RESPONSE_INVALID.name().equals(upstreamErrorCode)) {
           return new ApiException(ErrorCode.AI_RESPONSE_INVALID);
         }
+        // AI 서버의 오디오 검증(길이 30초 등)에 걸린 경우는 사용자 입력 문제로 그대로 전달한다.
+        if (ErrorCode.INVALID_AUDIO.name().equals(upstreamErrorCode)) {
+          return new ApiException(ErrorCode.INVALID_AUDIO);
+        }
       }
     } catch (JacksonException ignored) {
       // 오류 본문을 해석할 수 없으면 발음 분석 실패로 처리한다.
