@@ -53,7 +53,8 @@ class FreeTalkSubmittedMessageServiceTest {
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService =
       mock(FreeTalkDailySpeakingUsageService.class);
   private final StreakService streakService = mock(StreakService.class);
-  private final FreeTalkSubmittedMessageService service = service(new MemoryProperties(false));
+  private final FreeTalkSubmittedMessageService service =
+      service(new MemoryProperties(false, false));
 
   private FreeTalkSubmittedMessageService service(MemoryProperties memoryProperties) {
     return new FreeTalkSubmittedMessageService(
@@ -79,7 +80,8 @@ class FreeTalkSubmittedMessageServiceTest {
     stubSuccessfulFinalization("old-owner");
     FreeTalkSession session = realFinalizationSession("old-owner");
 
-    service(new MemoryProperties(false)).finalizeTimeLimit(messageReservation(), closingResult());
+    service(new MemoryProperties(false, false))
+        .finalizeTimeLimit(messageReservation(), closingResult());
 
     assertThat(session.getMemoryGenerationStatus()).isNull();
   }
@@ -89,7 +91,8 @@ class FreeTalkSubmittedMessageServiceTest {
     stubSuccessfulFinalization("old-owner");
     FreeTalkSession session = realFinalizationSession("old-owner");
 
-    service(new MemoryProperties(true)).finalizeTimeLimit(messageReservation(), closingResult());
+    service(new MemoryProperties(true, false))
+        .finalizeTimeLimit(messageReservation(), closingResult());
 
     assertThat(session.getMemoryGenerationStatus())
         .isEqualTo(com.landit.landitbe.feature.session.domain.MemoryGenerationStatus.PREPARING);
@@ -100,7 +103,7 @@ class FreeTalkSubmittedMessageServiceTest {
     stubSuccessfulFinalization("decision-7");
     FreeTalkSession session = realFinalizationSession("decision-7");
 
-    service(new MemoryProperties(false)).finalizeEnd(decisionReservation(), closingResult());
+    service(new MemoryProperties(false, false)).finalizeEnd(decisionReservation(), closingResult());
 
     assertThat(session.getMemoryGenerationStatus()).isNull();
   }
@@ -110,7 +113,7 @@ class FreeTalkSubmittedMessageServiceTest {
     stubSuccessfulFinalization("decision-7");
     FreeTalkSession session = realFinalizationSession("decision-7");
 
-    service(new MemoryProperties(true)).finalizeEnd(decisionReservation(), closingResult());
+    service(new MemoryProperties(true, false)).finalizeEnd(decisionReservation(), closingResult());
 
     assertThat(session.getMemoryGenerationStatus())
         .isEqualTo(com.landit.landitbe.feature.session.domain.MemoryGenerationStatus.PREPARING);
