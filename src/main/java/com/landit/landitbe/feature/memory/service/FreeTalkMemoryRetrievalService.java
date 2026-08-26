@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +33,7 @@ public class FreeTalkMemoryRetrievalService {
   private final ConversationMemorySearchRepository searchRepository;
   private final FreeTalkMemoryRetrievalTraceRepository traceRepository;
   private final MemoryProperties memoryProperties;
+  private final MeterRegistry meterRegistry;
 
   /**
    * 활성화된 경우 세션의 지정 단계에서 장기기억을 한 번 검색한다.
@@ -46,6 +48,7 @@ public class FreeTalkMemoryRetrievalService {
     try {
       return retrieveWhenEnabled(request);
     } catch (RuntimeException exception) {
+      meterRegistry.counter("landit.memory.fallback", "stage", request.stage().name()).increment();
       return fallback(request);
     }
   }
