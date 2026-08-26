@@ -435,6 +435,74 @@ class DatabaseSchemaIntegrationTests {
         "conversation_memory_source", "fk_conversation_memory_source_message");
   }
 
+  @DisplayName("V59 장기기억 제약은 잘못된 범위·상태·시간·신뢰도를 거부한다.")
+  @Test
+  @Transactional
+  void conversationMemoryConstraintsRejectInvalidScopeStateAndRange() {
+    insertConversationMemoryFixtures();
+
+    insertConversationMemory(new MemoryFixture(994103L));
+    List<InvalidMemoryCase> invalidCases =
+        List.of(
+            new InvalidMemoryCase(994101L, fixture -> fixture.characterId = "chloe"),
+            new InvalidMemoryCase(
+                994102L,
+                fixture -> {
+                  fixture.memoryType = "EVENT";
+                  fixture.characterId = null;
+                }),
+            new InvalidMemoryCase(994104L, fixture -> fixture.supersededById = 994103L),
+            new InvalidMemoryCase(
+                994105L,
+                fixture -> {
+                  fixture.status = "SUPERSEDED";
+                  fixture.supersededAt = Timestamp.valueOf("2026-08-25 20:10:00");
+                }),
+            new InvalidMemoryCase(
+                994106L,
+                fixture -> {
+                  fixture.status = "SUPERSEDED";
+                  fixture.supersededById = 994103L;
+                }),
+            new InvalidMemoryCase(
+                994107L,
+                fixture -> {
+                  fixture.status = "INVALIDATED";
+                  fixture.invalidatedAt = Timestamp.valueOf("2026-08-25 20:10:00");
+                }),
+            new InvalidMemoryCase(
+                994108L,
+                fixture -> {
+                  fixture.status = "INVALIDATED";
+                  fixture.invalidationReason = "INCORRECT_EXTRACTION";
+                }),
+            new InvalidMemoryCase(
+                994109L, fixture -> fixture.validTo = Timestamp.valueOf("2026-08-25 19:00:00")),
+            new InvalidMemoryCase(
+                994110L, fixture -> fixture.confidence = BigDecimal.valueOf(-0.01)),
+            new InvalidMemoryCase(
+                994111L, fixture -> fixture.confidence = BigDecimal.valueOf(1.01)));
+
+    invalidCases.forEach(this::assertInvalidMemory);
+  }
+
+  @DisplayName("V59 원본 메시지 계보는 삭제 순서와 링크를 제한한다.")
+  @Test
+  @Transactional
+  void conversationMemorySourceConstraintsRejectInvalidLinks() {
+    insertConversationMemoryFixtures();
+    insertConversationMemory(new MemoryFixture(994120L));
+    jdbcTemplate.update(
+        "insert into conversation_memory_source (memory_id, session_history_message_id) "
+            + "values (?, ?)",
+        994120L,
+        994005L);
+
+    assertThatThrownBy(
+            () -> jdbcTemplate.update("delete from session_history_message where id = ?", 994005L))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
   @Test
   void v32ConvertsUserPushTokenToExpoPushToken() {
