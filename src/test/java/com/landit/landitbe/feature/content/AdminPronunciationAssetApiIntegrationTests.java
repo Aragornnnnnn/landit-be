@@ -159,6 +159,47 @@ class AdminPronunciationAssetApiIntegrationTests {
   }
 
   @Test
+  void referenceImportRejectsBlankWord() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-blank-word");
+
+    // 단어 텍스트가 빈 항목은 런타임 단어 대조를 무력화하므로 임포트에서 거른다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_blank_word.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.inserted").value(0))
+        .andExpect(jsonPath("$.data.failures[0].reason").value("words 항목에 word가 없습니다."));
+  }
+
+  @Test
+  void referenceReimportResetsTtsStateSoCoverageCatchesIt() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-reimport-reset");
+
+    // TTS까지 완성한 뒤 기준 데이터를 재임포트하면, 단어 audioUrl이 사라진 반쪽 상태가 된다.
+    // 이때 문장 URL이 남아 있으면 커버리지가 "완성"이라고 거짓말하므로, URL이 초기화되고
+    // audioMissing 결석 목록에 다시 잡혀야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us_v2.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(1));
+
+    String sentenceAudioUrl =
+        jdbcTemplate.queryForObject(
+            "select sentence_audio_url from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
+            String.class,
+            EXPRESSION_ID);
+    assertThat(sentenceAudioUrl).isNull();
+    assertThat(missingOf(coverageData(accessToken), "EN_US", "audioMissing"))
+        .contains(EXPRESSION_ID);
+  }
+
+  @Test
   void referenceImportReportsUnknownExpressionAsFailure() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-unknown");
 

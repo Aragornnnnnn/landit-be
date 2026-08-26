@@ -28,7 +28,6 @@ import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -60,7 +59,9 @@ public class ExpressionPronunciationService {
    * @return 점수·통과 여부·단어별 판정
    * @throws ApiException 오디오가 잘못됐거나(400), 표현·발음 데이터가 없거나(404), AI 분석이 실패했을 때(502)
    */
-  @Transactional(readOnly = true)
+  // 의도적으로 @Transactional을 붙이지 않는다 — 트랜잭션으로 묶으면 AI 호출(최대 20초) 동안
+  // DB 커넥션을 점유해서, 동시 요청 몇 개만으로 커넥션 풀이 고갈된다. 이 메서드의 DB 작업은
+  // 서로 독립적인 단건 조회뿐이라 트랜잭션 묶음이 필요 없다.
   public PronunciationAnalysisResponse analyze(
       Long userId, Long expressionId, MultipartFile audio) {
     // 1단계: 녹음 파일이 형식·크기 제한에 맞는지 먼저 확인한다 (AI 호출 비용을 쓰기 전에 거른다).

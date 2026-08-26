@@ -83,14 +83,18 @@ public class ExpressionPronunciationAsset extends BaseTimeEntity {
   }
 
   /**
-   * 기준 데이터를 새 값으로 교체한다. 기준 데이터 재임포트 시 사용한다.
+   * 기준 데이터를 새 값으로 교체하고 음성 URL을 초기화한다. 기준 데이터 재임포트 시 사용한다.
    *
-   * <p>단어별 audioUrl은 words 안에 저장되므로, 교체 후에는 TTS 임포트를 다시 실행해 audioUrl을 재조인해야 한다.
+   * <p>단어별 audioUrl은 words 안에 저장되므로 교체 순간 사라진다. 이때 문장·표현 URL을 남겨두면 자산이 "완성"으로 보여서 커버리지가 결석을 못 잡고,
+   * 단어 음성만 조용히 죽은 반쪽 상태가 된다. URL까지 초기화해 자산을 명시적으로 "TTS 미완성" 상태로 되돌린다 — 커버리지의 audioMissing에 잡히고, TTS
+   * 임포트를 다시 실행해야 완성된다.
    *
    * @param words 단어별 발음 기준 데이터
    */
   public void replaceWords(JsonNode words) {
     this.words = words;
+    this.expressionAudioUrl = null;
+    this.sentenceAudioUrl = null;
   }
 
   /**
