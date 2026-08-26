@@ -70,7 +70,7 @@ public class FreeTalkMemoryGenerationService {
                   context.baseLocale(),
                   context.timezone(),
                   context.history()));
-      validateExtractionResult(extraction, context);
+      validateExtractionResult(extraction);
       List<ConversationMemoryResolutionPlan> plans = buildPlans(context, extraction);
       if (writeService.persistIfSnapshotCurrent(learningSessionId, context.userProfileId(), plans)
           == ConversationMemoryWriteService.PersistenceResult.STALE) {
@@ -160,6 +160,7 @@ public class FreeTalkMemoryGenerationService {
     Set<Long> supersededAcrossCandidates = new HashSet<>();
     for (AiMemoryResolutionResult.Resolution resolution : result.resolutions()) {
       if (resolution == null
+          || resolution.candidateIndex() == null
           || resolution.operation() == null
           || resolution.supersededMemoryIds() == null
           || candidatesByIndex.get(resolution.candidateIndex()) == null
@@ -228,7 +229,9 @@ public class FreeTalkMemoryGenerationService {
     if (sources.stream().anyMatch(message -> message == null || !"USER".equals(message.role()))) {
       throw new IllegalArgumentException("장기기억 원본은 사용자 메시지만 허용됩니다.");
     }
-    if (candidate.memoryType() == null
+    if (candidate.candidateIndex() == null
+        || candidate.confidence() == null
+        || candidate.memoryType() == null
         || candidate.content() == null
         || candidate.content().isBlank()
         || candidate.content().length() > 500
@@ -303,9 +306,7 @@ public class FreeTalkMemoryGenerationService {
     return byId;
   }
 
-  private static void validateExtractionResult(
-      AiMemoryCandidatesResult result,
-      FreeTalkMemoryGenerationContextService.GenerationContext context) {
+  private static void validateExtractionResult(AiMemoryCandidatesResult result) {
     if (result == null
         || result.extractorVersion() == null
         || result.extractorVersion().isBlank()
@@ -313,10 +314,11 @@ public class FreeTalkMemoryGenerationService {
         || result.candidates().size() > MAX_CANDIDATES) {
       throw new IllegalArgumentException("장기기억 후보 추출 응답이 유효하지 않습니다.");
     }
-    historyById(context.history());
     for (int index = 0; index < result.candidates().size(); index++) {
       AiMemoryCandidatesResult.Candidate candidate = result.candidates().get(index);
-      if (candidate == null || candidate.candidateIndex() != index) {
+      if (candidate == null
+          || candidate.candidateIndex() == null
+          || candidate.candidateIndex() != index) {
         throw new IllegalArgumentException("장기기억 후보 인덱스가 연속적이지 않습니다.");
       }
     }

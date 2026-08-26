@@ -16,12 +16,12 @@ public record AiMemoryCandidatesResult(String extractorVersion, List<Candidate> 
 
   /** 장기기억으로 검토할 후보 한 건을 담는다. */
   public record Candidate(
-      int candidateIndex,
+      Integer candidateIndex,
       ConversationMemoryType memoryType,
       String content,
       String contentLocale,
       List<Long> sourceMessageIds,
-      double confidence,
+      Double confidence,
       OffsetDateTime validFrom,
       OffsetDateTime validTo,
       String embeddingModel,

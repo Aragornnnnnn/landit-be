@@ -34,6 +34,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** 프리톡 장기기억 생성 오케스트레이션의 계약을 검증한다. */
 class FreeTalkMemoryGenerationServiceTest {
@@ -54,6 +58,9 @@ class FreeTalkMemoryGenerationServiceTest {
   private ConversationMemoryWriteService writeService;
   private FreeTalkMemoryGenerationContextService contextService;
   private FreeTalkMemoryGenerationService generationService;
+  private final JsonMapper jsonMapper =
+      JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES).build();
+
   @BeforeEach
   void setUp() {
     aiClient = Mockito.mock(AiFreeTalkClient.class);
@@ -177,6 +184,16 @@ class FreeTalkMemoryGenerationServiceTest {
   }
 
   @Test
+  void failsClosedWhenCandidateIndexIsMissingFromMappedResponse() throws Exception {
+    assertMissingCandidateFieldFails("candidateIndex");
+  }
+
+  @Test
+  void failsClosedWhenConfidenceIsMissingFromMappedResponse() throws Exception {
+    assertMissingCandidateFieldFails("confidence");
+  }
+
+  @Test
   void failsClosedAfterStaleWriteWithoutRetrying() {
     AiMemoryCandidatesResult.Candidate candidate = candidate(0, USER_MESSAGE_ID, "updated fact");
     ConversationMemoryMatch comparable = comparable(909L);
@@ -249,6 +266,27 @@ class FreeTalkMemoryGenerationServiceTest {
     LocalDateTime now = LocalDateTime.of(2026, 8, 24, 10, 0);
     return new ConversationMemoryMatch(
         memoryId, ConversationMemoryType.EVENT, "old fact", now, null, now, 0.1);
+  }
+
+  private void assertMissingCandidateFieldFails(String fieldName) throws Exception {
+    when(aiClient.extractMemoryCandidates(any())).thenReturn(mappedCandidateWithout(fieldName));
+    when(searchRepository.searchActiveComparable(
+            any(), eq(USER_PROFILE_ID), eq("chloe"), eq(ConversationMemoryType.EVENT), eq(3)))
+        .thenReturn(List.of());
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService).fail(LEARNING_SESSION_ID);
+  }
+
+  private AiMemoryCandidatesResult mappedCandidateWithout(String fieldName) throws Exception {
+    AiMemoryCandidatesResult valid =
+        new AiMemoryCandidatesResult(
+            "extractor-v1", List.of(candidate(0, USER_MESSAGE_ID, "user fact")));
+    JsonNode root = jsonMapper.valueToTree(valid);
+    ((ObjectNode) root.get("candidates").get(0)).remove(fieldName);
+    return jsonMapper.treeToValue(root, AiMemoryCandidatesResult.class);
   }
 
   private static List<Float> embedding() {

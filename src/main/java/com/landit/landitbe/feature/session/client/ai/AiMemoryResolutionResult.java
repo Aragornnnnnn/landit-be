@@ -13,5 +13,5 @@ public record AiMemoryResolutionResult(List<Resolution> resolutions) {
 
   /** 후보 한 건에 대한 상태 판정 결과를 담는다. */
   public record Resolution(
-      int candidateIndex, AiMemoryOperation operation, List<Long> supersededMemoryIds) {}
+      Integer candidateIndex, AiMemoryOperation operation, List<Long> supersededMemoryIds) {}
 }
