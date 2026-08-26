@@ -23,7 +23,8 @@ class Lan269ContentMigrationTests {
       "db/postgresql/V44__add_scenario_thumbnails_and_writing_expressions.sql";
   private static final Pattern THUMBNAIL_URL_PATTERN =
       Pattern.compile(
-          "WHEN (\\d+) THEN '(https://d19azau1un4t7r\\.cloudfront\\.net/content/scenarios/(\\d+)/thumbnail/[^']+\\.png)'");
+          "WHEN (\\d+) THEN"
+              + " '(https://d19azau1un4t7r\\.cloudfront\\.net/content/scenarios/(\\d+)/thumbnail/[^']+\\.png)'");
   private static final Pattern PRACTICE_EXAMPLE_URL_PATTERN =
       Pattern.compile(
           "https://d19azau1un4t7r\\.cloudfront\\.net/content/scenarios/(\\d+)/expressions/(\\d+)/practice-examples/[^\\\"]+\\.png");

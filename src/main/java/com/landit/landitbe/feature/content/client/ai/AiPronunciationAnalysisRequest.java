@@ -48,13 +48,13 @@ public record AiPronunciationAnalysisRequest( // ai 서버에 보내는 것
   @Override
   public String toString() {
     return "AiPronunciationAnalysisRequest[userAudio=<%d bytes base64>, userAudioFormat=%s,"
-            + " sentenceText=%s, referenceAudioUrl=%s, accentLocale=%s, words=%s]"
-        .formatted(
-            userAudio == null ? 0 : userAudio.length(),
-            userAudioFormat,
-            sentenceText,
-            referenceAudioUrl,
-            accentLocale,
-            words);
+        + " sentenceText=%s, referenceAudioUrl=%s, accentLocale=%s, words=%s]"
+            .formatted(
+                userAudio == null ? 0 : userAudio.length(),
+                userAudioFormat,
+                sentenceText,
+                referenceAudioUrl,
+                accentLocale,
+                words);
   }
 }

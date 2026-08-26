@@ -23,8 +23,8 @@ public interface AdminPronunciationAssetControllerDocs {
   /**
    * 1단계 — S3의 기준 데이터 JSON(locale별)을 내려받아 자산의 발음 표기 데이터를 upsert한다.
    *
-   * <p>기준 데이터의 문장이 DB의 대표 예문과 다르면 그 건은 실패 목록에 담긴다 (낡은 데이터 방지). 기준 데이터를 재임포트하면 단어별 음성 URL이 초기화되므로
-   * 이후 TTS 임포트를 다시 실행해야 한다.
+   * <p>기준 데이터의 문장이 DB의 대표 예문과 다르면 그 건은 실패 목록에 담긴다 (낡은 데이터 방지). 기준 데이터를 재임포트하면 단어별 음성 URL이 초기화되므로 이후
+   * TTS 임포트를 다시 실행해야 한다.
    *
    * @param principal 인증된 관리자 사용자
    * @param manifestKey S3 기준 데이터 파일 키
@@ -57,8 +57,7 @@ public interface AdminPronunciationAssetControllerDocs {
   @Operation(
       summary = "관리자 발음 TTS 매니페스트 S3 임포트 (2단계)",
       description =
-          "S3의 TTS 매니페스트를 내려받아 문장·표현·단어별 음성 URL을 기존 자산에 붙인다."
-              + " 기준 데이터 임포트(1단계)가 먼저 실행돼 있어야 한다.",
+          "S3의 TTS 매니페스트를 내려받아 문장·표현·단어별 음성 URL을 기존 자산에 붙인다." + " 기준 데이터 임포트(1단계)가 먼저 실행돼 있어야 한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<AdminPronunciationAssetImportResult> importTts(
       AuthUserPrincipal principal,

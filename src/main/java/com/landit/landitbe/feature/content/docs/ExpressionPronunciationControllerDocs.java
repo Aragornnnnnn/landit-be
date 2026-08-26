@@ -31,8 +31,7 @@ public interface ExpressionPronunciationControllerDocs {
   @Operation(
       summary = "문장 발화 음성파일 제출",
       description =
-          "대표 예문을 읽은 녹음을 분석해 점수와 단어별 발음·강세 판정, 코칭 문구를 반환한다."
-              + " 판정 기준은 사용자의 AI 튜터 억양을 따른다.",
+          "대표 예문을 읽은 녹음을 분석해 점수와 단어별 발음·강세 판정, 코칭 문구를 반환한다." + " 판정 기준은 사용자의 AI 튜터 억양을 따른다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<PronunciationAnalysisResponse> analyzeSentence(
       AuthUserPrincipal principal,

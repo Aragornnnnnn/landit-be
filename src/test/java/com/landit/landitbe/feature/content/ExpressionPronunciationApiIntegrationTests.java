@@ -63,7 +63,8 @@ class ExpressionPronunciationApiIntegrationTests {
         "There's nothing like hiking to clear my head.",
         "ARRAY['There''s','nothing','like','hiking','to','clear','my','head']");
     insertExpression(SHORT_EXPRESSION_ID, "Hello.", "ARRAY['Hello']");
-    insertExpression(NO_ASSET_EXPRESSION_ID, "No asset sentence.", "ARRAY['No','asset','sentence']");
+    insertExpression(
+        NO_ASSET_EXPRESSION_ID, "No asset sentence.", "ARRAY['No','asset','sentence']");
 
     insertAsset(EXPRESSION_ID, 8);
     insertAsset(SHORT_EXPRESSION_ID, 1);

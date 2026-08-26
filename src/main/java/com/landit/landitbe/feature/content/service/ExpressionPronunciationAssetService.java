@@ -37,8 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 발음 평가 자산의 2단계 임포트와 커버리지 계산을 처리한다.
  *
- * <p>1단계(기준 데이터): AI 파이프라인이 만든 locale별 기준 데이터 JSON을 읽어 자산 행을 만든다 — 음성 URL은 아직 비어 있다. 2단계(TTS):
- * TTS 매니페스트의 URL을 기존 행에 붙이고, 단어별 audioUrl을 order로 조인해 words에 넣는다. 실패한 건은 조용히 건너뛰지 않고 사유와 함께 결과에 담아
+ * <p>1단계(기준 데이터): AI 파이프라인이 만든 locale별 기준 데이터 JSON을 읽어 자산 행을 만든다 — 음성 URL은 아직 비어 있다. 2단계(TTS): TTS
+ * 매니페스트의 URL을 기존 행에 붙이고, 단어별 audioUrl을 order로 조인해 words에 넣는다. 실패한 건은 조용히 건너뛰지 않고 사유와 함께 결과에 담아
  * 반환한다.
  */
 @Service
@@ -70,11 +70,11 @@ public class ExpressionPronunciationAssetService {
    */
   @Transactional
   public AdminPronunciationAssetImportResult importReference(Long adminUserId, String manifestKey) {
-    PronunciationReferenceManifest manifest =
-        parseReference(manifestReader.read(manifestKey));
+    PronunciationReferenceManifest manifest = parseReference(manifestReader.read(manifestKey));
 
     // 판별 재료를 미리 한 번에 조회한다 (건별 조회 방지).
-    Set<Long> requestedIds = collectIds(manifest.entries(), PronunciationReferenceManifest.Entry::expressionId);
+    Set<Long> requestedIds =
+        collectIds(manifest.entries(), PronunciationReferenceManifest.Entry::expressionId);
     Map<Long, WritingExpression> expressions = findExpressions(requestedIds);
     Map<AssetKey, ExpressionPronunciationAsset> existingAssets = findExistingAssets(requestedIds);
 
@@ -125,7 +125,8 @@ public class ExpressionPronunciationAssetService {
   public AdminPronunciationAssetImportResult importTts(Long adminUserId, String manifestKey) {
     PronunciationTtsManifest manifest = parseTts(manifestReader.read(manifestKey));
 
-    Set<Long> requestedIds = collectIds(manifest.assets(), PronunciationTtsManifest.Asset::expressionId);
+    Set<Long> requestedIds =
+        collectIds(manifest.assets(), PronunciationTtsManifest.Asset::expressionId);
     Map<AssetKey, ExpressionPronunciationAsset> existingAssets = findExistingAssets(requestedIds);
 
     int updated = 0;
@@ -162,9 +163,9 @@ public class ExpressionPronunciationAssetService {
   /**
    * 발음 자산이 빠진 표현이 없는지 억양별로 출석 체크한다.
    *
-   * <p>"활성 표현 전체 명단"과 자산 상태를 대조해서, 억양마다 두 가지 결석자 명단을 만든다: 기준 데이터가 아예 없는 표현, 기준 데이터는 있는데 음성(TTS)이
-   * 아직 없는 표현. 유저에게 노출되는 표현이 선별적이라 QA로는 전량 확인할 수 없으므로, 임포트 누락은 이 전수 대조로 잡는다. 두 missing이 모두 비어 있으면
-   * 완료 확정이다.
+   * <p>"활성 표현 전체 명단"과 자산 상태를 대조해서, 억양마다 두 가지 결석자 명단을 만든다: 기준 데이터가 아예 없는 표현, 기준 데이터는 있는데 음성(TTS)이 아직
+   * 없는 표현. 유저에게 노출되는 표현이 선별적이라 QA로는 전량 확인할 수 없으므로, 임포트 누락은 이 전수 대조로 잡는다. 두 missing이 모두 비어 있으면 완료
+   * 확정이다.
    *
    * @return 전체 표현 수와, 억양별 (기준 데이터/음성 보유 수 + 빠진 표현 ID 목록)
    */
@@ -177,7 +178,8 @@ public class ExpressionPronunciationAssetService {
     // 2단계: 자산 상태를 억양별로 묶는다 — 기준 데이터 보유 여부와 TTS 완성 여부를 나눠서.
     Map<AccentLocale, Set<Long>> referenceByLocale = new HashMap<>();
     Map<AccentLocale, Set<Long>> audioByLocale = new HashMap<>();
-    for (ExpressionPronunciationAssetRepository.AssetLocaleView view : assetRepository.findAllBy()) {
+    for (ExpressionPronunciationAssetRepository.AssetLocaleView view :
+        assetRepository.findAllBy()) {
       referenceByLocale
           .computeIfAbsent(view.getAccentLocale(), locale -> new HashSet<>())
           .add(view.getWritingExpressionId());
@@ -323,7 +325,8 @@ public class ExpressionPronunciationAssetService {
   }
 
   // 목록에서 표현 ID를 중복 없이 모은다. 필수 값 검증 전이므로 null은 제외한다.
-  private <T> Set<Long> collectIds(List<T> items, java.util.function.Function<T, Long> idExtractor) {
+  private <T> Set<Long> collectIds(
+      List<T> items, java.util.function.Function<T, Long> idExtractor) {
     return items.stream().map(idExtractor).filter(Objects::nonNull).collect(Collectors.toSet());
   }
 

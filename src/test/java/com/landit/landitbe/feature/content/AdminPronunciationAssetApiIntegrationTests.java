@@ -29,8 +29,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * 관리자 발음 평가 자산 2단계 임포트 API의 통합 동작을 검증한다.
  *
- * <p>1단계(기준 데이터) → 2단계(TTS) 순서와 각 단계의 실패 처리, 커버리지의 단계별 결석 표시를 확인한다. 테스트 프로필은 매니페스트를
- * 클래스패스({@code src/test/resources/pronunciation-manifests/})에서 읽는 로컬 리더를 사용한다.
+ * <p>1단계(기준 데이터) → 2단계(TTS) 순서와 각 단계의 실패 처리, 커버리지의 단계별 결석 표시를 확인한다. 테스트 프로필은 매니페스트를 클래스패스({@code
+ * src/test/resources/pronunciation-manifests/})에서 읽는 로컬 리더를 사용한다.
  */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
@@ -130,8 +130,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     String accessToken = loginAsAdmin("pron-ref-unknown");
 
     mockMvc
-        .perform(
-            importFrom(IMPORT_REFERENCE_URL, "reference_unknown_expression.json", accessToken))
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_unknown_expression.json", accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.failures[0].expressionId").value(999999))
         .andExpect(jsonPath("$.data.failures[0].reason").value("존재하지 않는 표현입니다."));
@@ -207,7 +206,8 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(status().isOk());
 
     JsonNode afterReference = coverageData(accessToken);
-    assertThat(missingOf(afterReference, "EN_US", "referenceMissing")).doesNotContain(EXPRESSION_ID);
+    assertThat(missingOf(afterReference, "EN_US", "referenceMissing"))
+        .doesNotContain(EXPRESSION_ID);
     assertThat(missingOf(afterReference, "EN_US", "audioMissing")).contains(EXPRESSION_ID);
     assertThat(missingOf(afterReference, "EN_GB", "referenceMissing")).contains(EXPRESSION_ID);
 

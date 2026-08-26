@@ -120,12 +120,11 @@ class ExpressionLearningApiIntegrationTests {
         login("google-learn-audio", "learn-audio@example.com", "Audio User", "audio-nonce");
     assignUsTutor("learn-audio@example.com");
     jdbcTemplate.update(
-        "INSERT INTO expression_pronunciation_asset "
-            + "(writing_expression_id, accent_locale, expression_audio_url, sentence_audio_url, "
-            + "words, created_at, updated_at) "
-            + "VALUES (?, 'EN_US', 'https://cdn.example.com/expression.mp3', "
-            + "'https://cdn.example.com/sentence.mp3', CAST('[{\"order\":1,\"word\":\"w\"}]' AS jsonb), "
-            + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        "INSERT INTO expression_pronunciation_asset (writing_expression_id, accent_locale,"
+            + " expression_audio_url, sentence_audio_url, words, created_at, updated_at) VALUES (?,"
+            + " 'EN_US', 'https://cdn.example.com/expression.mp3',"
+            + " 'https://cdn.example.com/sentence.mp3', CAST('[{\"order\":1,\"word\":\"w\"}]' AS"
+            + " jsonb), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
         expressionId);
 
     mockMvc

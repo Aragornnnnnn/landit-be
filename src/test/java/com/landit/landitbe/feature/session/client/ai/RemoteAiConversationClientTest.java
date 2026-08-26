@@ -675,7 +675,7 @@ class RemoteAiConversationClientTest {
             Duration.ofSeconds(5),
             requestTimeout,
             sessionFeedbackRequestTimeout,
-                    Duration.ofSeconds(20)));
+            Duration.ofSeconds(20)));
   }
 
   private void writeSessionFeedbackSuccessResponse(com.sun.net.httpserver.HttpExchange exchange)

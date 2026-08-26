@@ -45,8 +45,7 @@ public class UserAccentLocaleResolver {
   }
 
   /**
-   * 유저의 목표 억양을 도출한다. 튜터가 없으면 빈 값을 반환한다 — 억양이 부가 정보인 곳(learning-start의 음성 URL)에서 화면 전체를 깨지 않기 위해
-   * 쓴다.
+   * 유저의 목표 억양을 도출한다. 튜터가 없으면 빈 값을 반환한다 — 억양이 부가 정보인 곳(learning-start의 음성 URL)에서 화면 전체를 깨지 않기 위해 쓴다.
    *
    * @param userId 사용자 ID
    * @return 목표 억양. 도출할 수 없으면 빈 Optional

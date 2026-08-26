@@ -144,7 +144,9 @@ public class ExpressionPronunciationService {
             entry ->
                 words.add(
                     new AiPronunciationAnalysisRequest.Word(
-                        entry.getKey(), entry.getValue().word(), entry.getValue().accentContrast())));
+                        entry.getKey(),
+                        entry.getValue().word(),
+                        entry.getValue().accentContrast())));
     return new AiPronunciationAnalysisRequest(
         encodeAudio(audio),
         audioFormat,

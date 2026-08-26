@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
@@ -12,7 +13,6 @@ import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
-import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
@@ -160,8 +160,7 @@ public class ExpressionQueryService {
   @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long userId, Long expressionId) {
     WritingExpression expression = requireAccessibleExpression(userId, expressionId);
-    return ExpressionLearningResponse.from(
-        expression, findSentenceAudioUrl(userId, expressionId));
+    return ExpressionLearningResponse.from(expression, findSentenceAudioUrl(userId, expressionId));
   }
 
   // 사용자의 목표 억양에 맞는 대표 예문 TTS URL을 찾는다.

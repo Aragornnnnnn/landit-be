@@ -13,8 +13,8 @@ import org.springframework.stereotype.Component;
 /**
  * 클래스패스 리소스에서 발음 평가 자산 매니페스트를 읽는 로컬·테스트용 구현이다.
  *
- * <p>{@code classpath:pronunciation-manifests/{manifestKey}} 경로의 파일을 읽는다. AWS 자격증명 없이 임포트
- * 플로우를 실행할 수 있게 한다.
+ * <p>{@code classpath:pronunciation-manifests/{manifestKey}} 경로의 파일을 읽는다. AWS 자격증명 없이 임포트 플로우를 실행할
+ * 수 있게 한다.
  */
 @Component
 @ConditionalOnProperty(
