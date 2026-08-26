@@ -62,6 +62,22 @@ class ConversationMemorySearchRepositoryIntegrationTests {
   }
 
   @Test
+  void rejectsInvalidSearchArgumentsBeforeSql() {
+    assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, "chloe", List.of(0.1f), 1))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    List<Float> nonFinite = validEmbedding();
+    nonFinite.set(0, Float.NaN);
+    assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, "chloe", nonFinite, 1))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> searchRepository.searchActive(0, "chloe", QUERY_EMBEDDING, 1))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, "chloe", QUERY_EMBEDDING, 0))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, " ", QUERY_EMBEDDING, 1))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void rejectsStoredDimensionAndZeroVector() {
     seedUser(USER_ID);
     seedMemory(997110L, USER_ID, "chloe", "EVENT", "ACTIVE", "[1,0]");
