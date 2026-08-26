@@ -43,7 +43,7 @@ public class InMemoryConversationMemorySearchRepository
   public List<ConversationMemoryMatch> searchActive(
       long userProfileId, String characterId, List<Float> queryEmbedding, int limit) {
     String normalizedCharacterId =
-        PgVectorConversationMemorySearchRepository.validateSearchArguments(
+        ConversationMemorySearchSupport.validateSearchArguments(
             queryEmbedding, userProfileId, characterId, limit);
     return jdbcTemplate
         .query(
@@ -66,9 +66,9 @@ public class InMemoryConversationMemorySearchRepository
             resultSet.getLong("id"),
             ConversationMemoryType.valueOf(resultSet.getString("memory_type")),
             resultSet.getString("content"),
-            PgVectorConversationMemorySearchRepository.toLocalDateTime(resultSet, "valid_from"),
-            PgVectorConversationMemorySearchRepository.toLocalDateTime(resultSet, "valid_to"),
-            PgVectorConversationMemorySearchRepository.toLocalDateTime(resultSet, "observed_at"),
+            ConversationMemorySearchSupport.toLocalDateTime(resultSet, "valid_from"),
+            ConversationMemorySearchSupport.toLocalDateTime(resultSet, "valid_to"),
+            ConversationMemorySearchSupport.toLocalDateTime(resultSet, "observed_at"),
             0.0);
     return new StoredCandidate(match, parseVector(resultSet.getString("embedding")));
   }
@@ -87,6 +87,7 @@ public class InMemoryConversationMemorySearchRepository
         distance);
   }
 
+  /** H2 JDBC가 반환한 벡터 문자열을 차원·유한값이 보장된 배열로 변환한다. */
   private static double[] parseVector(String storedVector) {
     if (storedVector == null) {
       throw new IllegalStateException("저장 임베딩이 없습니다.");
@@ -103,6 +104,10 @@ public class InMemoryConversationMemorySearchRepository
     if (components.length != 1536) {
       throw new IllegalStateException("저장 임베딩 차원이 유효하지 않습니다.");
     }
+    return parseComponents(components);
+  }
+
+  private static double[] parseComponents(String[] components) {
     double[] vector = new double[components.length];
     for (int index = 0; index < components.length; index++) {
       try {
