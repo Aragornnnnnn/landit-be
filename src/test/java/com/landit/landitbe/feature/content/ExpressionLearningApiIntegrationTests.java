@@ -111,6 +111,60 @@ class ExpressionLearningApiIntegrationTests {
                 .value("https://cdn.example.com/images/101.png"));
   }
 
+  /** 발음 자산(TTS 완성)이 있으면 사용자 억양에 맞는 대표 예문 음성 URL이 내려가는지 검증한다. */
+  @Test
+  void learningStartReturnsSentenceAudioUrlWhenPronunciationAssetIsReady() throws Exception {
+    // given: 표현 + EN_US 발음 자산(TTS 완성)이 있고, 사용자의 튜터가 EN_US 억양인 상태
+    Long expressionId = seedExpression();
+    String accessToken =
+        login("google-learn-audio", "learn-audio@example.com", "Audio User", "audio-nonce");
+    assignUsTutor("learn-audio@example.com");
+    jdbcTemplate.update(
+        "INSERT INTO expression_pronunciation_asset "
+            + "(writing_expression_id, accent_locale, expression_audio_url, sentence_audio_url, "
+            + "words, created_at, updated_at) "
+            + "VALUES (?, 'EN_US', 'https://cdn.example.com/expression.mp3', "
+            + "'https://cdn.example.com/sentence.mp3', CAST('[{\"order\":1,\"word\":\"w\"}]' AS jsonb), "
+            + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        expressionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data.representativeSentenceAudioUrl")
+                .value("https://cdn.example.com/sentence.mp3"));
+  }
+
+  /** 발음 자산이 아직 없으면 음성 URL이 null이고 나머지 응답은 정상인지 검증한다 (단계적 자산 구축 대응). */
+  @Test
+  void learningStartReturnsNullAudioUrlWhenAssetIsMissing() throws Exception {
+    Long expressionId = seedExpression();
+    String accessToken =
+        login("google-learn-noaudio", "learn-noaudio@example.com", "NoAudio User", "noaudio-nonce");
+    assignUsTutor("learn-noaudio@example.com");
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetExpressionText").value("blow my mind"))
+        .andExpect(jsonPath("$.data.representativeSentenceAudioUrl").isEmpty());
+  }
+
+  /** 사용자의 튜터를 EN_US 억양 튜터로 고정한다 (발음 자산 시드가 EN_US라서). */
+  private void assignUsTutor(String email) {
+    Long usTutorId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM ai_tutor WHERE accent_locale = 'EN_US' ORDER BY id LIMIT 1",
+            Long.class);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET ai_tutor_id = ? WHERE email = ?", usTutorId, email);
+  }
+
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
   @Test
   void learningStartRejectsUnknownExpression() throws Exception {

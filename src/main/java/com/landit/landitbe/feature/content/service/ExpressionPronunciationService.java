@@ -7,15 +7,11 @@ import com.landit.landitbe.feature.content.client.ai.AiPronunciationAnalysisRequ
 import com.landit.landitbe.feature.content.client.ai.AiPronunciationAnalysisResult;
 import com.landit.landitbe.feature.content.client.ai.AiPronunciationClient;
 import com.landit.landitbe.feature.content.client.ai.AiPronunciationWordStatus;
-import com.landit.landitbe.feature.content.domain.AiTutor;
 import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.PronunciationAnalysisResponse;
-import com.landit.landitbe.feature.content.repository.AiTutorRepository;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.profile.domain.UserProfile;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -49,8 +45,7 @@ public class ExpressionPronunciationService {
 
   private final WritingExpressionRepository writingExpressionRepository;
   private final ExpressionPronunciationAssetRepository assetRepository;
-  private final AiTutorRepository aiTutorRepository;
-  private final UserProfileService userProfileService;
+  private final UserAccentLocaleResolver accentLocaleResolver;
   private final AiPronunciationClient aiPronunciationClient;
   private final PronunciationCoachingTemplate coachingTemplate;
 
@@ -72,7 +67,7 @@ public class ExpressionPronunciationService {
     // 2단계: 판정에 필요한 재료를 모은다 — 표현(정답 문장), 유저의 목표 억양, 그 억양의 발음 자산.
     // 자산은 TTS까지 완성된 것만 쓴다 (기준 데이터만 있는 반쪽 자산은 판정 기준 음성이 없다).
     WritingExpression expression = requireActiveExpression(expressionId);
-    AccentLocale accentLocale = resolveUserAccentLocale(userId);
+    AccentLocale accentLocale = accentLocaleResolver.require(userId);
     ExpressionPronunciationAsset asset = requireCompleteAsset(expressionId, accentLocale);
     Map<Integer, AssetWord> assetWords = parseAssetWords(asset.getWords());
 
@@ -119,19 +114,6 @@ public class ExpressionPronunciationService {
     return writingExpressionRepository
         .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-  }
-
-  // 유저 프로필의 AI 튜터에서 목표 억양을 도출한다.
-  private AccentLocale resolveUserAccentLocale(Long userId) {
-    UserProfile userProfile = userProfileService.requireActive(userId);
-    if (userProfile.getAiTutorId() == null) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST, "AI 튜터가 설정되지 않았습니다.");
-    }
-    AiTutor tutor =
-        aiTutorRepository
-            .findById(userProfile.getAiTutorId())
-            .orElseThrow(() -> new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED));
-    return tutor.getAccentLocale();
   }
 
   // 표현·억양의 발음 자산을 조회한다. 자산이 없거나 TTS가 아직 없으면 404 — 반쪽 자산으로는 평가를 열지 않는다.
