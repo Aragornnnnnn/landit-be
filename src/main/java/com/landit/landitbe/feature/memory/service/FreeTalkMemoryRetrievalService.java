@@ -1,0 +1,150 @@
+// 프리톡 세션 시작 장기기억 검색과 사용 trace를 fail-open으로 조율한다.
+
+package com.landit.landitbe.feature.memory.service;
+
+import com.landit.landitbe.config.memory.MemoryProperties;
+import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
+import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/** 프리톡 세션 시작에 한 번만 장기기억을 검색하고 사용 결과를 기록한다. */
+@Slf4j
+@Service
+public class FreeTalkMemoryRetrievalService {
+
+  static final String POLICY_VERSION = "memory-retrieval-v1";
+  private static final int MAX_RESULTS = 3;
+  private static final int EMBEDDING_DIMENSION = 1536;
+  private static final String EMBEDDING_MODEL = "openai/text-embedding-3-small";
+
+  private final AiFreeTalkClient aiClient;
+  private final ConversationMemorySearchRepository searchRepository;
+  private final FreeTalkMemoryRetrievalTraceRepository traceRepository;
+  private final MemoryProperties memoryProperties;
+
+  /** 장기기억 검색 의존성을 주입받아 서비스를 구성한다. */
+  public FreeTalkMemoryRetrievalService(
+      AiFreeTalkClient aiClient,
+      ConversationMemorySearchRepository searchRepository,
+      FreeTalkMemoryRetrievalTraceRepository traceRepository,
+      MemoryProperties memoryProperties) {
+    this.aiClient = aiClient;
+    this.searchRepository = searchRepository;
+    this.traceRepository = traceRepository;
+    this.memoryProperties = memoryProperties;
+  }
+
+  /** 활성화된 경우 세션의 지정 단계에서 장기기억을 한 번 검색한다. */
+  public RetrievalResult retrieve(RetrievalRequest request) {
+    if (!memoryProperties.useEnabled()) {
+      return RetrievalResult.empty(request.sessionId(), request.stage());
+    }
+    try {
+      if (!traceRepository.claim(request.sessionId(), request.stage(), POLICY_VERSION)) {
+        return RetrievalResult.empty(request.sessionId(), request.stage());
+      }
+      AiMemoryQueryEmbeddingResult embeddingResult =
+          aiClient.embedMemoryQuery(new AiMemoryQueryEmbeddingRequest(request.query()));
+      validateEmbeddingResult(embeddingResult);
+      List<ConversationMemoryMatch> matches =
+          searchRepository.searchActive(
+              request.userProfileId(),
+              request.characterId(),
+              embeddingResult.embedding(),
+              MAX_RESULTS);
+      if (matches == null) {
+        throw new IllegalArgumentException("장기기억 검색 후보 개수가 유효하지 않습니다.");
+      }
+      matches = matches.stream().limit(MAX_RESULTS).toList();
+      List<AiFreeTalkMemoryContext> contexts =
+          matches.stream().map(FreeTalkMemoryRetrievalService::toContext).toList();
+      traceRepository.saveCandidates(request.sessionId(), request.stage(), matches, POLICY_VERSION);
+      return new RetrievalResult(request.sessionId(), request.stage(), contexts, true);
+    } catch (RuntimeException exception) {
+      log.warn("프리톡 장기기억 검색을 건너뜁니다. stage={} policyVersion={}", request.stage(), POLICY_VERSION);
+      return RetrievalResult.empty(request.sessionId(), request.stage());
+    }
+  }
+
+  /** AI가 실제 사용한 기억을 제공 문맥의 부분집합으로 검증해 trace에 기록한다. */
+  public void recordUsage(
+      RetrievalResult result, List<Long> usedMemoryIds, Long responseMessageId) {
+    if (!result.claimed()) {
+      return;
+    }
+    Set<Long> contextIds =
+        result.contexts().stream()
+            .map(AiFreeTalkMemoryContext::memoryId)
+            .collect(java.util.stream.Collectors.toSet());
+    List<Long> normalized = usedMemoryIds == null ? List.of() : usedMemoryIds;
+    if (normalized.stream().anyMatch(id -> id == null || id <= 0)
+        || normalized.size() != new HashSet<>(normalized).size()
+        || !contextIds.containsAll(normalized)) {
+      normalized = List.of();
+    }
+    try {
+      traceRepository.recordUsage(
+          result.sessionId(), result.stage(), normalized, responseMessageId);
+    } catch (RuntimeException exception) {
+      log.warn(
+          "프리톡 장기기억 사용 trace를 저장하지 못했습니다. stage={} policyVersion={}",
+          result.stage(),
+          POLICY_VERSION);
+    }
+  }
+
+  private static AiFreeTalkMemoryContext toContext(ConversationMemoryMatch match) {
+    if (match == null
+        || match.memoryId() <= 0
+        || match.memoryType() == null
+        || match.content() == null
+        || match.content().isBlank()) {
+      throw new IllegalArgumentException("장기기억 검색 후보가 유효하지 않습니다.");
+    }
+    return new AiFreeTalkMemoryContext(match.memoryId(), match.memoryType(), match.content());
+  }
+
+  private static void validateEmbeddingResult(AiMemoryQueryEmbeddingResult result) {
+    if (result == null
+        || !EMBEDDING_MODEL.equals(result.embeddingModel())
+        || result.embedding() == null
+        || result.embedding().size() != EMBEDDING_DIMENSION
+        || result.embedding().stream().anyMatch(value -> value == null || !Float.isFinite(value))) {
+      throw new IllegalArgumentException("장기기억 query embedding 계약이 유효하지 않습니다.");
+    }
+  }
+
+  /** 장기기억 검색에 필요한 입력을 표현한다. */
+  public record RetrievalRequest(
+      long sessionId,
+      long userProfileId,
+      String characterId,
+      MemoryRetrievalStage stage,
+      String query) {}
+
+  /** 검색 결과와 이후 사용 trace 연결 정보를 표현한다. */
+  public record RetrievalResult(
+      long sessionId,
+      MemoryRetrievalStage stage,
+      List<AiFreeTalkMemoryContext> contexts,
+      boolean claimed) {
+
+    static RetrievalResult empty(long sessionId, MemoryRetrievalStage stage) {
+      return new RetrievalResult(sessionId, stage, List.of(), false);
+    }
+
+    /** 검색 결과의 사용 문맥을 방어적으로 복사한다. */
+    public RetrievalResult {
+      contexts = contexts == null ? List.of() : List.copyOf(contexts);
+    }
+  }
+}
