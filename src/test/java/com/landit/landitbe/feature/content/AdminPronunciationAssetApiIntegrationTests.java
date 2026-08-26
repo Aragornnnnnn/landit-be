@@ -147,6 +147,18 @@ class AdminPronunciationAssetApiIntegrationTests {
   }
 
   @Test
+  void referenceImportRejectsDuplicatedWordOrder() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-dup-order");
+
+    // words 배열 안에서 order가 중복되면 런타임 조인이 깨지므로 임포트에서 거른다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_bad_word_items.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.inserted").value(0))
+        .andExpect(jsonPath("$.data.failures[0].reason").value("words 항목의 order가 중복됩니다."));
+  }
+
+  @Test
   void referenceImportReportsUnknownExpressionAsFailure() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-unknown");
 

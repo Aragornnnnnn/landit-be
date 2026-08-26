@@ -278,6 +278,12 @@ public class ExpressionPronunciationAssetService {
     if (!entry.words().isArray() || entry.words().isEmpty()) {
       return "words는 비어 있지 않은 배열이어야 합니다.";
     }
+    // 배열 안 항목의 품질도 확인한다 — order 누락/중복이나 빈 word가 저장되면
+    // 런타임 병합(order 조인)이 그때서야 깨진다. 임포트 시점에 거르는 게 낫다.
+    String wordItemFailure = validateWordItems(entry.words());
+    if (wordItemFailure != null) {
+      return wordItemFailure;
+    }
     // 낡은 기준 데이터 방지: 만들 때 쓴 문장과 지금 DB 문장이 다르면 거른다 (V60처럼 문장이 바뀐 경우).
     if (!Objects.equals(entry.sentenceText(), expression.getRepresentativeSentenceText())) {
       return "기준 데이터의 문장이 DB의 대표 예문과 다릅니다. 최신 문장으로 재생성이 필요합니다.";
@@ -326,6 +332,24 @@ public class ExpressionPronunciationAssetService {
       joined.add(withAudio);
     }
     return joined;
+  }
+
+  // words 배열 항목들의 order·word 품질을 검증한다. 정상이면 null.
+  // order 누락/중복이나 빈 word가 저장되면 런타임 병합(order 조인)이 그때서야 깨지므로 임포트 시점에 거른다.
+  private String validateWordItems(JsonNode words) {
+    Set<Integer> orders = new HashSet<>();
+    for (JsonNode word : words) {
+      if (!word.path("order").isInt() || word.path("order").asInt() < 1) {
+        return "words 항목에 order가 없거나 올바르지 않습니다.";
+      }
+      if (!orders.add(word.path("order").asInt())) {
+        return "words 항목의 order가 중복됩니다.";
+      }
+      if (word.path("word").asText("").isBlank()) {
+        return "words 항목에 word가 없습니다.";
+      }
+    }
+    return null;
   }
 
   // 목록에서 표현 ID를 중복 없이 모은다. 필수 값 검증 전이므로 null은 제외한다.
