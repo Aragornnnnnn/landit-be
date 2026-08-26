@@ -139,6 +139,82 @@ class FreeTalkMemoryGenerationServiceTest {
         .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), any());
   }
 
+  @Test
+  void rejectsCandidateWithNonUserSourceBeforeWriting() {
+    AiMemoryCandidatesResult.Candidate candidate = candidate(0, AI_MESSAGE_ID, "invalid source");
+    when(aiClient.extractMemoryCandidates(any()))
+        .thenReturn(new AiMemoryCandidatesResult("extractor-v1", List.of(candidate)));
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService).fail(LEARNING_SESSION_ID);
+  }
+
+  @Test
+  void rejectsCandidateWithInvalidEmbeddingModelBeforeWriting() {
+    AiMemoryCandidatesResult.Candidate candidate =
+        new AiMemoryCandidatesResult.Candidate(
+            0,
+            ConversationMemoryType.EVENT,
+            "invalid model",
+            "KR",
+            List.of(USER_MESSAGE_ID),
+            0.8,
+            CANDIDATE_VALID_FROM,
+            null,
+            "other/model",
+            embedding());
+    when(aiClient.extractMemoryCandidates(any()))
+        .thenReturn(new AiMemoryCandidatesResult("extractor-v1", List.of(candidate)));
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    verify(searchRepository, never())
+        .searchActiveComparable(any(), anyLong(), any(), any(), anyInt());
+    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService).fail(LEARNING_SESSION_ID);
+  }
+
+  @Test
+  void failsClosedAfterStaleWriteWithoutRetrying() {
+    AiMemoryCandidatesResult.Candidate candidate = candidate(0, USER_MESSAGE_ID, "updated fact");
+    ConversationMemoryMatch comparable = comparable(909L);
+    when(aiClient.extractMemoryCandidates(any()))
+        .thenReturn(new AiMemoryCandidatesResult("extractor-v1", List.of(candidate)));
+    when(searchRepository.searchActiveComparable(
+            any(), eq(USER_PROFILE_ID), eq("chloe"), eq(ConversationMemoryType.EVENT), eq(3)))
+        .thenReturn(List.of(comparable));
+    when(aiClient.resolveMemory(any()))
+        .thenReturn(
+            new AiMemoryResolutionResult(
+                List.of(
+                    new AiMemoryResolutionResult.Resolution(
+                        0, AiMemoryOperation.SUPERSEDE, List.of(909L)))));
+    when(writeService.persistIfSnapshotCurrent(anyLong(), anyLong(), any()))
+        .thenReturn(ConversationMemoryWriteService.PersistenceResult.STALE);
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    verify(searchRepository)
+        .searchActiveComparable(
+            any(), eq(USER_PROFILE_ID), eq("chloe"), eq(ConversationMemoryType.EVENT), eq(3));
+    verify(aiClient).resolveMemory(any());
+    verify(writeService)
+        .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), any());
+    verify(contextService).fail(LEARNING_SESSION_ID);
+  }
+
+  @Test
+  void doesNotRunWhenAnotherWorkerAlreadyClaimedTheJob() {
+    when(contextService.claim(LEARNING_SESSION_ID)).thenReturn(null);
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    verify(aiClient, never()).extractMemoryCandidates(any());
+    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+  }
+
   private FreeTalkMemoryGenerationContextService.GenerationContext context() {
     return new FreeTalkMemoryGenerationContextService.GenerationContext(
         LEARNING_SESSION_ID,
