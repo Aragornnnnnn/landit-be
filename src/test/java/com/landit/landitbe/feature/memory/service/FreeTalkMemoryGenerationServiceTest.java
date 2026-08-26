@@ -69,7 +69,11 @@ class FreeTalkMemoryGenerationServiceTest {
     contextService = Mockito.mock(FreeTalkMemoryGenerationContextService.class);
     generationService =
         new FreeTalkMemoryGenerationService(
-            contextService, aiClient, searchRepository, writeService, CLOCK);
+            contextService,
+            aiClient,
+            writeService,
+            new FreeTalkMemoryCandidateMapper(CLOCK),
+            new FreeTalkMemoryResolutionPlanner(aiClient, searchRepository, CLOCK));
     when(contextService.claim(LEARNING_SESSION_ID)).thenReturn(context());
     when(writeService.persistIfSnapshotCurrent(anyLong(), anyLong(), any()))
         .thenReturn(ConversationMemoryWriteService.PersistenceResult.STORED);

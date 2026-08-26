@@ -8,6 +8,8 @@ import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.domain.MemoryGenerationStatus;
+import com.landit.landitbe.feature.session.domain.SessionHistory;
+import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
@@ -51,39 +53,12 @@ public class FreeTalkMemoryGenerationContextService {
             .findById(learningSessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
 
-    if (learningSession.getStatus() != LearningSessionStatus.COMPLETED
-        || freeTalkSession.getConversationStatus() != FreeTalkConversationStatus.COMPLETED
-        || freeTalkSession.getMemoryGenerationStatus() != MemoryGenerationStatus.PREPARING
-        || freeTalkSession.getMemoryGenerationStartedAt() != null) {
+    if (!isEligibleForClaim(learningSession, freeTalkSession)) {
       return null;
     }
 
-    var history =
-        sessionHistoryRepository
-            .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
-    List<AiConversationHistoryMessage> historyMessages =
-        sessionHistoryMessageRepository
-            .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
-            .stream()
-            .map(
-                message -> {
-                  if (message.getId() == null
-                      || message.getRole() == null
-                      || message.getCreatedAt() == null) {
-                    throw new IllegalStateException("프리톡 이력 메시지 문맥이 유효하지 않습니다.");
-                  }
-                  OffsetDateTime occurredAt =
-                      message.getCreatedAt().atZone(clock.getZone()).toOffsetDateTime();
-                  return new AiConversationHistoryMessage(
-                      message.getId(),
-                      message.getTurnNumber(),
-                      message.getRole().name(),
-                      message.getContent(),
-                      message.getTranslatedContent(),
-                      occurredAt);
-                })
-            .toList();
+    SessionHistory history = loadHistory(learningSessionId);
+    List<AiConversationHistoryMessage> historyMessages = loadHistoryMessages(history.getId());
     freeTalkSession.startMemoryGeneration(LocalDateTime.now(clock));
     return new GenerationContext(
         learningSessionId,
@@ -93,6 +68,44 @@ public class FreeTalkMemoryGenerationContextService {
         learningSession.getBaseLocale().name(),
         clock.getZone().getId(),
         historyMessages);
+  }
+
+  /** 완료 후 아직 다른 worker가 선점하지 않은 세션만 장기기억 생성 대상이다. */
+  private static boolean isEligibleForClaim(
+      LearningSession learningSession, FreeTalkSession freeTalkSession) {
+    return learningSession.getStatus() == LearningSessionStatus.COMPLETED
+        && freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED
+        && freeTalkSession.getMemoryGenerationStatus() == MemoryGenerationStatus.PREPARING
+        && freeTalkSession.getMemoryGenerationStartedAt() == null;
+  }
+
+  private SessionHistory loadHistory(long learningSessionId) {
+    return sessionHistoryRepository
+        .findByLearningSessionId(learningSessionId)
+        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+  }
+
+  private List<AiConversationHistoryMessage> loadHistoryMessages(long historyId) {
+    return sessionHistoryMessageRepository
+        .findBySessionHistoryIdOrderByMessageSequenceAsc(historyId)
+        .stream()
+        .map(this::toHistoryMessage)
+        .toList();
+  }
+
+  /** AI 입력에는 원본 메시지의 식별자·순서·시각이 모두 필요하다. */
+  private AiConversationHistoryMessage toHistoryMessage(SessionHistoryMessage message) {
+    if (message.getId() == null || message.getRole() == null || message.getCreatedAt() == null) {
+      throw new IllegalStateException("프리톡 이력 메시지 문맥이 유효하지 않습니다.");
+    }
+    OffsetDateTime occurredAt = message.getCreatedAt().atZone(clock.getZone()).toOffsetDateTime();
+    return new AiConversationHistoryMessage(
+        message.getId(),
+        message.getTurnNumber(),
+        message.getRole().name(),
+        message.getContent(),
+        message.getTranslatedContent(),
+        occurredAt);
   }
 
   /**
