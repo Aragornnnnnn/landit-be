@@ -39,7 +39,7 @@ public class FreeTalkMemoryRetrievalTraceRepository {
     }
   }
 
-  /** 선점 marker를 검색 후보로 채우고 나머지 후보를 저장한다. */
+  /** 선점 marker를 보존하고 검색 후보를 저장한다. */
   public void saveCandidates(
       long sessionId,
       MemoryRetrievalStage stage,
@@ -48,19 +48,7 @@ public class FreeTalkMemoryRetrievalTraceRepository {
     if (matches == null || matches.isEmpty()) {
       return;
     }
-    ConversationMemoryMatch first = matches.getFirst();
-    jdbcTemplate.update(
-        """
-        UPDATE free_talk_memory_retrieval
-        SET memory_id = ?, candidate_rank = 1, distance = ?, policy_version = ?
-        WHERE free_talk_session_id = ? AND retrieval_stage = ? AND candidate_rank = 0
-        """,
-        first.memoryId(),
-        first.distance(),
-        policyVersion,
-        sessionId,
-        stage.name());
-    for (int index = 1; index < matches.size(); index++) {
+    for (int index = 0; index < matches.size(); index++) {
       ConversationMemoryMatch match = matches.get(index);
       jdbcTemplate.update(
           """
