@@ -20,9 +20,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -181,12 +183,22 @@ public class ExpressionPronunciationService {
     }
 
     List<PronunciationAnalysisResponse.Word> responseWords = new ArrayList<>();
+    Set<Integer> judgedOrders = new HashSet<>();
     int errorCount = 0;
     for (AiPronunciationAnalysisResult.Word judged : aiResult.words()) {
+      AssetWord assetWord = assetWords.get(judged.order());
+      // 크기만 같아도 order가 중복([1,1,2])되거나 자산에 없는 order가 섞이면 병합이 엉뚱한
+      // 단어에 붙는다. order 유일성·존재·단어 텍스트 일치·판정 상태 존재까지 전부 확인한다.
+      if (assetWord == null
+          || !judgedOrders.add(judged.order())
+          || judged.status() == null
+          || !Objects.equals(assetWord.word(), judged.word())) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
       if (judged.status() != AiPronunciationWordStatus.CORRECT) {
         errorCount++;
       }
-      responseWords.add(toResponseWord(judged, assetWords.get(judged.order())));
+      responseWords.add(toResponseWord(judged, assetWord));
     }
 
     // 점수는 BE가 계산한다: 정상 단어 비율. 오류가 하나도 없으면 자연히 100이고 통과다.

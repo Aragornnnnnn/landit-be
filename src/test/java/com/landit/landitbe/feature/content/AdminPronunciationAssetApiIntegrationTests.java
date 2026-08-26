@@ -135,6 +135,18 @@ class AdminPronunciationAssetApiIntegrationTests {
   }
 
   @Test
+  void referenceImportRejectsMissingSentenceText() throws Exception {
+    String accessToken = loginAsAdmin("pron-ref-no-sentence");
+
+    // sentenceText를 생략하면 낡은 데이터 검증이 우회되므로, 생략 자체를 실패 처리해야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_missing_sentence.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.inserted").value(0))
+        .andExpect(jsonPath("$.data.failures[0].reason").value("필수 값이 누락됐습니다."));
+  }
+
+  @Test
   void referenceImportReportsUnknownExpressionAsFailure() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-unknown");
 
