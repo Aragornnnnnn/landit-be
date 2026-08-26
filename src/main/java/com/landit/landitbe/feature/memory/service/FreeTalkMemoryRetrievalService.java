@@ -49,30 +49,50 @@ public class FreeTalkMemoryRetrievalService {
       return RetrievalResult.empty(request.sessionId(), request.stage());
     }
     try {
-      if (!traceRepository.claim(request.sessionId(), request.stage(), POLICY_VERSION)) {
-        return RetrievalResult.empty(request.sessionId(), request.stage());
-      }
-      AiMemoryQueryEmbeddingResult embeddingResult =
-          aiClient.embedMemoryQuery(new AiMemoryQueryEmbeddingRequest(request.query()));
-      validateEmbeddingResult(embeddingResult);
-      List<ConversationMemoryMatch> matches =
-          searchRepository.searchActive(
-              request.userProfileId(),
-              request.characterId(),
-              embeddingResult.embedding(),
-              MAX_RESULTS);
-      if (matches == null) {
-        throw new IllegalArgumentException("장기기억 검색 후보 개수가 유효하지 않습니다.");
-      }
-      matches = matches.stream().limit(MAX_RESULTS).toList();
-      List<AiFreeTalkMemoryContext> contexts =
-          matches.stream().map(FreeTalkMemoryRetrievalService::toContext).toList();
-      traceRepository.saveCandidates(request.sessionId(), request.stage(), matches, POLICY_VERSION);
-      return new RetrievalResult(request.sessionId(), request.stage(), contexts, true);
+      return retrieveWhenEnabled(request);
     } catch (RuntimeException exception) {
-      log.warn("프리톡 장기기억 검색을 건너뜁니다. stage={} policyVersion={}", request.stage(), POLICY_VERSION);
+      return fallback(request);
+    }
+  }
+
+  /** 선점한 단계에서 임베딩·검색·후보 trace를 한 흐름으로 처리한다. */
+  private RetrievalResult retrieveWhenEnabled(RetrievalRequest request) {
+    if (!traceRepository.claim(request.sessionId(), request.stage(), POLICY_VERSION)) {
       return RetrievalResult.empty(request.sessionId(), request.stage());
     }
+    AiMemoryQueryEmbeddingResult embeddingResult =
+        aiClient.embedMemoryQuery(new AiMemoryQueryEmbeddingRequest(request.query()));
+    validateEmbeddingResult(embeddingResult);
+    List<ConversationMemoryMatch> matches = searchMatches(request, embeddingResult);
+    List<AiFreeTalkMemoryContext> contexts = toContexts(matches);
+    traceRepository.saveCandidates(request.sessionId(), request.stage(), matches, POLICY_VERSION);
+    return new RetrievalResult(request.sessionId(), request.stage(), contexts, true);
+  }
+
+  /** 검색 저장소 결과를 최대 반환 수로 제한하고 null 응답을 거부한다. */
+  private List<ConversationMemoryMatch> searchMatches(
+      RetrievalRequest request, AiMemoryQueryEmbeddingResult embeddingResult) {
+    List<ConversationMemoryMatch> matches =
+        searchRepository.searchActive(
+            request.userProfileId(),
+            request.characterId(),
+            embeddingResult.embedding(),
+            MAX_RESULTS);
+    if (matches == null) {
+      throw new IllegalArgumentException("장기기억 검색 후보 개수가 유효하지 않습니다.");
+    }
+    return matches.stream().limit(MAX_RESULTS).toList();
+  }
+
+  private static List<AiFreeTalkMemoryContext> toContexts(
+      List<ConversationMemoryMatch> matches) {
+    return matches.stream().map(FreeTalkMemoryRetrievalService::toContext).toList();
+  }
+
+  /** 검색 실패는 대화 요청을 막지 않고 빈 문맥으로 전환한다. */
+  private RetrievalResult fallback(RetrievalRequest request) {
+    log.warn("프리톡 장기기억 검색을 건너뜁니다. stage={} policyVersion={}", request.stage(), POLICY_VERSION);
+    return RetrievalResult.empty(request.sessionId(), request.stage());
   }
 
   /** AI가 실제 사용한 기억을 제공 문맥의 부분집합으로 검증해 trace에 기록한다. */
@@ -81,16 +101,7 @@ public class FreeTalkMemoryRetrievalService {
     if (!result.claimed()) {
       return;
     }
-    Set<Long> contextIds =
-        result.contexts().stream()
-            .map(AiFreeTalkMemoryContext::memoryId)
-            .collect(java.util.stream.Collectors.toSet());
-    List<Long> normalized = usedMemoryIds == null ? List.of() : usedMemoryIds;
-    if (normalized.stream().anyMatch(id -> id == null || id <= 0)
-        || normalized.size() != new HashSet<>(normalized).size()
-        || !contextIds.containsAll(normalized)) {
-      normalized = List.of();
-    }
+    List<Long> normalized = normalizeUsedMemoryIds(result.contexts(), usedMemoryIds);
     try {
       traceRepository.recordUsage(
           result.sessionId(), result.stage(), normalized, responseMessageId);
@@ -100,6 +111,22 @@ public class FreeTalkMemoryRetrievalService {
           result.stage(),
           POLICY_VERSION);
     }
+  }
+
+  /** AI가 사용했다고 답한 ID는 이번 응답에 제공한 기억의 부분집합일 때만 기록한다. */
+  private static List<Long> normalizeUsedMemoryIds(
+      List<AiFreeTalkMemoryContext> contexts, List<Long> usedMemoryIds) {
+    List<Long> normalized = usedMemoryIds == null ? List.of() : usedMemoryIds;
+    Set<Long> contextIds =
+        contexts.stream()
+            .map(AiFreeTalkMemoryContext::memoryId)
+            .collect(java.util.stream.Collectors.toSet());
+    if (normalized.stream().anyMatch(id -> id == null || id <= 0)
+        || normalized.size() != new HashSet<>(normalized).size()
+        || !contextIds.containsAll(normalized)) {
+      return List.of();
+    }
+    return normalized;
   }
 
   private static AiFreeTalkMemoryContext toContext(ConversationMemoryMatch match) {
