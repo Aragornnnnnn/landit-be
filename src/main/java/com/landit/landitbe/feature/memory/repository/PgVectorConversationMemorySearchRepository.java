@@ -49,7 +49,6 @@ public class PgVectorConversationMemorySearchRepository
       ORDER BY cm.embedding <=> CAST(:embedding AS extensions.vector), cm.id
       LIMIT :limit
       """;
-
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
   /** {@inheritDoc} */
@@ -100,7 +99,6 @@ public class PgVectorConversationMemorySearchRepository
   private static String toVectorLiteral(List<Float> embedding) {
     return embedding.toString().replace(" ", "");
   }
-
   private static ConversationMemoryMatch mapMatch(ResultSet resultSet, int rowNumber)
       throws SQLException {
     return new ConversationMemoryMatch(
