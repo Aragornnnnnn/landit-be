@@ -19,6 +19,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 추출 응답의 원본·시간·임베딩 계약을 검증해 저장 후보로 변환한다. */
 @Component
 @RequiredArgsConstructor
 final class FreeTalkMemoryCandidateMapper {
@@ -29,6 +30,7 @@ final class FreeTalkMemoryCandidateMapper {
 
   private final Clock clock;
 
+  /** 후보 인덱스와 원본 이력을 닫힌 계약으로 확인한 뒤 저장 후보를 만든다. */
   List<FreeTalkMemoryCandidate> mapCandidates(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       AiMemoryCandidatesResult extraction) {
@@ -64,6 +66,7 @@ final class FreeTalkMemoryCandidateMapper {
         List.of());
   }
 
+  /** 여러 원본 중 가장 최근 사용자 메시지 시각을 기억 관찰 시각으로 사용한다. */
   private static OffsetDateTime latestObservedAt(List<AiConversationHistoryMessage> sources) {
     return sources.stream()
         .map(AiConversationHistoryMessage::occurredAt)
@@ -71,11 +74,13 @@ final class FreeTalkMemoryCandidateMapper {
         .orElseThrow();
   }
 
+  /** 후보의 시간대와 PROFILE 범위를 저장 모델의 불변 규칙에 맞춰 변환한다. */
   private NewConversationMemory toMemory(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       AiMemoryCandidatesResult.Candidate candidate,
       LocalDateTime observedAt,
       String extractorVersion) {
+    // PROFILE은 전역 기억이므로 캐릭터 범위를 저장하지 않는다.
     String characterId =
         candidate.memoryType() == ConversationMemoryType.PROFILE ? null : context.characterId();
     return new NewConversationMemory(
@@ -105,6 +110,7 @@ final class FreeTalkMemoryCandidateMapper {
         List.of());
   }
 
+  /** 후보가 참조하는 원본은 비어 있지 않고 중복 없는 양수 메시지 ID여야 한다. */
   private static void validateSourceMessageIds(AiMemoryCandidatesResult.Candidate candidate) {
     if (candidate == null
         || candidate.sourceMessageIds() == null
@@ -116,6 +122,7 @@ final class FreeTalkMemoryCandidateMapper {
     }
   }
 
+  /** 저장·검색 계약을 지키도록 locale, confidence, 유효기간, 임베딩을 함께 검증한다. */
   private static void validateCandidateContract(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       AiMemoryCandidatesResult.Candidate candidate) {
@@ -136,6 +143,7 @@ final class FreeTalkMemoryCandidateMapper {
     }
   }
 
+  /** AI가 참조한 원본을 실제 사용자 이력으로 확정하기 위해 ID 유일성을 검증한다. */
   private static Map<Long, AiConversationHistoryMessage> historyById(
       List<AiConversationHistoryMessage> history) {
     if (history == null) {
@@ -154,6 +162,7 @@ final class FreeTalkMemoryCandidateMapper {
     return byId;
   }
 
+  /** 추출 버전과 후보 순서를 고정해 이후 resolution이 모든 후보를 다루게 한다. */
   private static void validateExtractionResult(AiMemoryCandidatesResult result) {
     if (result == null
         || result.extractorVersion() == null

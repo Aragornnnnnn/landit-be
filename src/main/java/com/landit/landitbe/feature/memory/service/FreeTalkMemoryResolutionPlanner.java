@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/** 비교 기억을 조회하고 AI 판정을 완전한 저장 계획으로 검증한다. */
 @Component
 @RequiredArgsConstructor
 final class FreeTalkMemoryResolutionPlanner {
@@ -30,6 +31,7 @@ final class FreeTalkMemoryResolutionPlanner {
   private final ConversationMemorySearchRepository searchRepository;
   private final Clock clock;
 
+  /** 비교 대상을 붙인 뒤 단일 신규 후보는 즉시 추가하고 나머지는 AI 판정을 검증한다. */
   List<ConversationMemoryResolutionPlan> plan(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       List<FreeTalkMemoryCandidate> candidates) {
@@ -50,6 +52,7 @@ final class FreeTalkMemoryResolutionPlanner {
     return plansFromResolutions(candidatesWithComparables, resolution);
   }
 
+  /** 같은 사용자·캐릭터·유형의 활성 기억만 비교 대상으로 제한한다. */
   private FreeTalkMemoryCandidate addComparables(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       FreeTalkMemoryCandidate candidate) {
@@ -90,6 +93,7 @@ final class FreeTalkMemoryResolutionPlanner {
         .toList();
   }
 
+  /** 모든 후보가 정확히 한 번 판정되고 대체 ID가 후보별 비교 범위에 속하는지 확인한다. */
   private static Map<Integer, AiMemoryResolutionResult.Resolution> validateResolutions(
       AiMemoryResolutionResult result, Map<Integer, FreeTalkMemoryCandidate> candidatesByIndex) {
     Map<Integer, AiMemoryResolutionResult.Resolution> resolutions = new HashMap<>();
@@ -115,6 +119,7 @@ final class FreeTalkMemoryResolutionPlanner {
     return resolutions;
   }
 
+  /** resolution 응답은 후보 수와 같아야 누락된 저장 계획을 만들지 않는다. */
   private static void validateResolutionCount(
       List<FreeTalkMemoryCandidate> candidates, AiMemoryResolutionResult result) {
     if (result == null
@@ -159,6 +164,7 @@ final class FreeTalkMemoryResolutionPlanner {
         resolution.supersededMemoryIds());
   }
 
+  /** 대체 ID는 양수·중복 없음·비교 결과의 부분집합이며 후보 간에도 겹치지 않아야 한다. */
   private static boolean invalidSupersededIds(
       AiMemoryOperation operation, List<Long> ids, Set<Long> comparableIds, Set<Long> globalIds) {
     if (ids.stream().anyMatch(id -> id == null || id <= 0)

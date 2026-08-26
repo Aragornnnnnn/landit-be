@@ -79,12 +79,14 @@ public class FreeTalkMemoryGenerationContextService {
         && freeTalkSession.getMemoryGenerationStartedAt() == null;
   }
 
+  /** 생성 대상 세션의 단일 이력 컨테이너를 찾아 원본 기준을 고정한다. */
   private SessionHistory loadHistory(long learningSessionId) {
     return sessionHistoryRepository
         .findByLearningSessionId(learningSessionId)
         .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
   }
 
+  /** 메시지 순서를 보존해 AI가 후보 원본 ID와 관찰 시각을 검증할 수 있게 한다. */
   private List<AiConversationHistoryMessage> loadHistoryMessages(long historyId) {
     return sessionHistoryMessageRepository
         .findBySessionHistoryIdOrderByMessageSequenceAsc(historyId)
