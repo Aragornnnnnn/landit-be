@@ -276,4 +276,4 @@
 - [x] ID 982~1938의 `representative_image_url` V68 마이그레이션 생성.
 - [x] manifest와 SQL의 ID-URL 전수 대조.
 - [x] 관련 Gradle 테스트와 전체 검증.
-- [ ] 논리 단위 커밋과 신규 PR 생성.
+- [x] 논리 단위 커밋과 신규 PR 생성.
