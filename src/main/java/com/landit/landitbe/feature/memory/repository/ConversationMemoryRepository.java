@@ -48,6 +48,7 @@ public class ConversationMemoryRepository {
    * @param sourceMessageIds 기억의 근거가 되는 원본 메시지 ID 목록
    * @return 생성된 장기기억 ID
    * @throws IllegalArgumentException source ID가 비어 있거나 중복·비양수인 경우
+   * @throws IllegalStateException 장기기억 ID를 생성하지 못한 경우
    */
   @Transactional
   public long save(NewConversationMemory memory, List<Long> sourceMessageIds) {

@@ -14,7 +14,16 @@ final class ConversationMemorySearchSupport {
 
   private ConversationMemorySearchSupport() {}
 
-  /** 일반 검색은 양수 사용자·제한과 비어 있지 않은 캐릭터 범위를 요구한다. */
+  /**
+   * 일반 검색 입력이 양수 사용자·제한과 비어 있지 않은 캐릭터 범위를 갖는지 확인한다.
+   *
+   * @param queryEmbedding 검색 쿼리 1,536차원 임베딩
+   * @param userProfileId 검색 대상 사용자 프로필 ID
+   * @param characterId 현재 대화 캐릭터 ID
+   * @param limit 반환할 최대 결과 수
+   * @return 앞뒤 공백을 제거한 캐릭터 ID
+   * @throws IllegalArgumentException 임베딩·사용자·캐릭터·제한 값이 유효하지 않은 경우
+   */
   static String validateSearchArguments(
       List<Float> queryEmbedding, long userProfileId, String characterId, int limit) {
     validateEmbedding(queryEmbedding);
@@ -27,7 +36,14 @@ final class ConversationMemorySearchSupport {
     return characterId.trim();
   }
 
-  /** JDBC timestamp를 애플리케이션의 지역 없는 시각으로 변환한다. */
+  /**
+   * JDBC timestamp를 애플리케이션의 지역 없는 시각으로 변환한다.
+   *
+   * @param resultSet JDBC 조회 결과
+   * @param columnName 변환할 timestamp 컬럼명
+   * @return 컬럼 값 또는 null
+   * @throws SQLException JDBC 결과를 읽지 못한 경우
+   */
   static LocalDateTime toLocalDateTime(ResultSet resultSet, String columnName) throws SQLException {
     var timestamp = resultSet.getTimestamp(columnName);
     return timestamp == null ? null : timestamp.toLocalDateTime();

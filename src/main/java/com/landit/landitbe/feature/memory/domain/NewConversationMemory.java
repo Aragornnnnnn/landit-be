@@ -38,7 +38,24 @@ public record NewConversationMemory(
     String embeddingModel,
     List<Float> embedding) {
 
-  /** 입력 문자열과 1,536차원 임베딩을 정규화하고 저장 가능한 값인지 검증한다. */
+  /**
+   * 입력 문자열과 1,536차원 임베딩을 정규화하고 저장 가능한 값인지 검증한다.
+   *
+   * @param userProfileId 기억을 소유하는 사용자 프로필 ID
+   * @param characterId 기억을 관찰한 캐릭터 ID. PROFILE은 null이다.
+   * @param memoryType 기억의 의미 유형
+   * @param content 기억으로 저장할 원문
+   * @param contentLocale 원문의 언어 지역
+   * @param confidence 기억 추출 결과의 신뢰도
+   * @param validFrom 기억이 유효해진 시각
+   * @param validTo 기억이 유효한 마지막 시각. 현재 유효하면 null이다.
+   * @param observedAt 기억 사실을 관찰한 시각
+   * @param recordedAt 기억을 저장하는 시각
+   * @param extractorVersion 기억 추출기 버전
+   * @param embeddingModel 임베딩 모델 식별자
+   * @param embedding 1,536차원 임베딩
+   * @throws IllegalArgumentException 입력 값이 저장 계약을 위반할 때
+   */
   public NewConversationMemory {
     validateIdentity(userProfileId, memoryType, contentLocale);
 
