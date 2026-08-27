@@ -157,11 +157,17 @@ public class FreeTalkMessageService {
     FreeTalkSubmittedMessageService.DecisionReservation reservation =
         submittedMessageService.reserveDecision(
             userId, learningSessionId, request.submittedMessageId(), request.decision());
+    return processExitDecision(reservation);
+  }
+
+  /** 속마음·결정 확정·보상 순서를 한 예외 경계에서 보존한다. */
+  private FreeTalkMessageSubmitResponse processExitDecision(
+      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
     AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
-      FreeTalkMessageSubmitResponse response = processExitDecision(reservation);
+      FreeTalkMessageSubmitResponse response = finalizeDecision(reservation);
       recordInnerThought(innerThoughtRequest, innerThoughtFuture);
       dispatchIfCompleted(response);
       return response;
@@ -172,8 +178,8 @@ public class FreeTalkMessageService {
     }
   }
 
-  /** 종료 선택에 따라 END 또는 CONTINUE의 AI 처리 경계를 선택한다. */
-  private FreeTalkMessageSubmitResponse processExitDecision(
+  /** 종료 선택에 따라 END 또는 CONTINUE의 상태 확정 경계를 선택한다. */
+  private FreeTalkMessageSubmitResponse finalizeDecision(
       FreeTalkSubmittedMessageService.DecisionReservation reservation) {
     if (reservation.decision() == FreeTalkExitDecision.END) {
       return finalizeEndDecision(reservation);

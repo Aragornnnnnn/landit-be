@@ -18,8 +18,8 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
@@ -295,7 +295,7 @@ class FreeTalkMessageServiceTest {
     service.decideExit(1L, 300L, new FreeTalkExitDecisionRequest(7L, FreeTalkExitDecision.END));
 
     verify(memoryGenerationDispatchService).dispatch(300L);
-     verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
+    verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
   }
 
   @Test
