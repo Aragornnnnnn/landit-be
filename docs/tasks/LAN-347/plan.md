@@ -6,7 +6,7 @@ V1은 프리톡 장기기억을 원본 메시지 계보와 함께 저장하고, 
 
 V1에 포함한다.
 
-- PostgreSQL/H2 V59의 `conversation_memory`, `conversation_memory_source` 스키마.
+- PostgreSQL/H2 V65의 `conversation_memory`, `conversation_memory_source` 스키마.
 - `PROFILE`의 character null, `EVENT`·`EPISODE`의 character 필수 제약.
 - `ACTIVE`·`SUPERSEDED`·`INVALIDATED` 상태와 유효 기간·관찰·기록·상태 전환 메타데이터.
 - confidence, extractor/model 버전, 1,536차원 vector, USER 메시지 provenance.

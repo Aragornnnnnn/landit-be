@@ -1,4 +1,4 @@
--- 프리톡 장기기억과 원본 계보를 저장하는 H2 V59 스키마를 추가한다.
+-- 프리톡 장기기억과 원본 계보를 저장하는 H2 V65 스키마를 추가한다.
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE DOMAIN IF NOT EXISTS extensions.vector AS VARCHAR(32767);
 

@@ -423,7 +423,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(h2MigrationSql).contains("embedding VARCHAR(32767)");
   }
 
-  @DisplayName("V59 장기기억 스키마는 범위·상태·원본 계보 제약을 유지한다.")
+  @DisplayName("V65 장기기억 스키마는 범위·상태·원본 계보 제약을 유지한다.")
   @Test
   void conversationMemorySchemaPreservesScopeStateAndLineage() {
     assertTableExists("conversation_memory");
@@ -435,7 +435,7 @@ class DatabaseSchemaIntegrationTests {
         "conversation_memory_source", "fk_conversation_memory_source_message");
   }
 
-  @DisplayName("V59 장기기억 제약은 잘못된 범위·상태·시간·신뢰도를 거부한다.")
+  @DisplayName("V65 장기기억 제약은 잘못된 범위·상태·시간·신뢰도를 거부한다.")
   @Test
   @Transactional
   void conversationMemoryConstraintsRejectInvalidScopeStateAndRange() {
@@ -486,7 +486,7 @@ class DatabaseSchemaIntegrationTests {
     invalidCases.forEach(this::assertInvalidMemory);
   }
 
-  @DisplayName("V59 원본 메시지 계보는 삭제 순서와 링크를 제한한다.")
+  @DisplayName("V65 원본 메시지 계보는 삭제 순서와 링크를 제한한다.")
   @Test
   @Transactional
   void conversationMemorySourceConstraintsRejectInvalidLinks() {

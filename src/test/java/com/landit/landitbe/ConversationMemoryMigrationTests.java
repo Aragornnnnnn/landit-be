@@ -1,4 +1,4 @@
-// 장기기억 V59 migration의 DB별 구조 차이를 검증한다.
+// 장기기억 V65 migration의 DB별 구조 차이를 검증한다.
 
 package com.landit.landitbe;
 
@@ -12,9 +12,9 @@ import org.springframework.util.StreamUtils;
 class ConversationMemoryMigrationTests {
 
   @Test
-  void v59MigrationsUseDatabaseSpecificVectorAndIndexSyntax() throws Exception {
-    String postgresqlSql = readMigrationSql("db/postgresql/V59__add_conversation_memory.sql");
-    String h2Sql = readMigrationSql("db/h2/V59__add_conversation_memory.sql");
+  void v65MigrationsUseDatabaseSpecificVectorAndIndexSyntax() throws Exception {
+    String postgresqlSql = readMigrationSql("db/postgresql/V65__add_conversation_memory.sql");
+    String h2Sql = readMigrationSql("db/h2/V65__add_conversation_memory.sql");
 
     assertThat(postgresqlSql)
         .contains("embedding extensions.vector(1536) NOT NULL")
