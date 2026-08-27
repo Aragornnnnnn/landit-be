@@ -120,24 +120,28 @@ public class ConversationMemoryWriteService {
   private static void validatePlans(
       long userProfileId, List<ConversationMemoryResolutionPlan> plans) {
     for (ConversationMemoryResolutionPlan plan : plans) {
-      if (plan == null) {
-        throw new IllegalArgumentException("장기기억 판정 계획이 유효하지 않습니다.");
-      }
-      NewConversationMemory memory = plan.memory();
-      if (memory.userProfileId() != userProfileId) {
-        throw new IllegalArgumentException("장기기억 사용자 범위가 일치하지 않습니다.");
-      }
-      if (plan.operation() == AiMemoryOperation.SUPERSEDE && plan.supersededMemoryIds().isEmpty()) {
-        throw new IllegalArgumentException("대체할 장기기억이 필요합니다.");
-      }
-      if (plan.operation() == AiMemoryOperation.SUPERSEDE
-          && !plan.snapshotMemoryIds().containsAll(plan.supersededMemoryIds())) {
-        throw new IllegalArgumentException("대체할 장기기억이 비교 검색 snapshot에 없습니다.");
-      }
-      if (plan.operation() != AiMemoryOperation.SUPERSEDE
-          && !plan.supersededMemoryIds().isEmpty()) {
-        throw new IllegalArgumentException("ADD·IGNORE에는 대체할 장기기억이 없어야 합니다.");
-      }
+      validatePlan(userProfileId, plan);
+    }
+  }
+
+  /** 한 계획이 잠금한 사용자와 operation별 대체 범위를 벗어나지 않는지 확인한다. */
+  private static void validatePlan(long userProfileId, ConversationMemoryResolutionPlan plan) {
+    if (plan == null) {
+      throw new IllegalArgumentException("장기기억 판정 계획이 유효하지 않습니다.");
+    }
+    NewConversationMemory memory = plan.memory();
+    if (memory.userProfileId() != userProfileId) {
+      throw new IllegalArgumentException("장기기억 사용자 범위가 일치하지 않습니다.");
+    }
+    if (plan.operation() == AiMemoryOperation.SUPERSEDE && plan.supersededMemoryIds().isEmpty()) {
+      throw new IllegalArgumentException("대체할 장기기억이 필요합니다.");
+    }
+    if (plan.operation() == AiMemoryOperation.SUPERSEDE
+        && !plan.snapshotMemoryIds().containsAll(plan.supersededMemoryIds())) {
+      throw new IllegalArgumentException("대체할 장기기억이 비교 검색 snapshot에 없습니다.");
+    }
+    if (plan.operation() != AiMemoryOperation.SUPERSEDE && !plan.supersededMemoryIds().isEmpty()) {
+      throw new IllegalArgumentException("ADD·IGNORE에는 대체할 장기기억이 없어야 합니다.");
     }
   }
 

@@ -50,8 +50,7 @@ public class FreeTalkMemoryGenerationService {
   }
 
   private void persistGeneratedMemories(
-      long learningSessionId,
-      FreeTalkMemoryGenerationContextService.GenerationContext context) {
+      long learningSessionId, FreeTalkMemoryGenerationContextService.GenerationContext context) {
     List<ConversationMemoryResolutionPlan> plans = createResolutionPlans(context);
     if (writeService.persistIfSnapshotCurrent(learningSessionId, context.userProfileId(), plans)
         == ConversationMemoryWriteService.PersistenceResult.STALE) {

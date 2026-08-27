@@ -100,23 +100,33 @@ final class FreeTalkMemoryResolutionService {
     Set<Long> supersededAcrossCandidates = new HashSet<>();
     for (AiMemoryResolutionResult.Resolution resolution : result.resolutions()) {
       validateResolution(resolution, candidatesByIndex, resolutions);
-      FreeTalkMemoryCandidate candidate = candidatesByIndex.get(resolution.candidateIndex());
-      Set<Long> comparableIds =
-          candidate.comparableMemories().stream()
-              .map(ConversationMemoryMatch::memoryId)
-              .collect(Collectors.toSet());
-      if (invalidSupersededIds(
-          resolution.operation(),
-          resolution.supersededMemoryIds(),
-          comparableIds,
-          supersededAcrossCandidates)) {
-        throw new IllegalArgumentException("장기기억 대체 대상이 유효하지 않습니다.");
-      }
+      validateSupersededIdsForCandidate(
+          resolution,
+          candidatesByIndex.get(resolution.candidateIndex()),
+          supersededAcrossCandidates);
     }
     if (resolutions.size() != candidatesByIndex.size()) {
       throw new IllegalArgumentException("모든 장기기억 후보의 상태 판정이 필요합니다.");
     }
     return resolutions;
+  }
+
+  /** 후보별 비교 범위와 전역 대체 ID 중복을 같은 순서로 검증한다. */
+  private static void validateSupersededIdsForCandidate(
+      AiMemoryResolutionResult.Resolution resolution,
+      FreeTalkMemoryCandidate candidate,
+      Set<Long> supersededAcrossCandidates) {
+    Set<Long> comparableIds =
+        candidate.comparableMemories().stream()
+            .map(ConversationMemoryMatch::memoryId)
+            .collect(Collectors.toSet());
+    if (invalidSupersededIds(
+        resolution.operation(),
+        resolution.supersededMemoryIds(),
+        comparableIds,
+        supersededAcrossCandidates)) {
+      throw new IllegalArgumentException("장기기억 대체 대상이 유효하지 않습니다.");
+    }
   }
 
   /** 상태 판정 응답은 후보 수와 같아야 누락된 저장 계획을 만들지 않는다. */
