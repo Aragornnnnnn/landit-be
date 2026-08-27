@@ -4,7 +4,7 @@
 
 V1은 완료된 FreeTalk 세션의 USER 메시지에서 AI 후보를 추출하고, 기존 ACTIVE 기억과 비교해 ADD·SUPERSEDE·IGNORE를 판정한 뒤 세션 상태와 기억·계보를 원자 저장한다.
 
-- V60의 `PREPARING`·`READY`·`FAILED` lifecycle과 `LANDIT_MEMORY_WRITE_ENABLED` feature flag를 유지한다.
+- V66의 `PREPARING`·`READY`·`FAILED` lifecycle과 `LANDIT_MEMORY_WRITE_ENABLED` feature flag를 유지한다.
 - 세션 완료 요청은 dispatcher가 in-process async 작업으로 등록하고 LLM 응답을 기다리지 않는다.
 - 후보는 연속 `candidateIndex`, USER provenance, base locale, confidence, validFrom/validTo, 1,536차원 finite embedding과 고정 model을 검증한다.
 - 기존 비교 검색은 같은 사용자·캐릭터·memory type 범위에서 최대 3건을 제공한다.
