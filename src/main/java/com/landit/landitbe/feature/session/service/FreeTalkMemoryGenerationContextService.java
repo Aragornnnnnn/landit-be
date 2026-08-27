@@ -42,6 +42,7 @@ public class FreeTalkMemoryGenerationContextService {
    * @return 선점했으면 불변 문맥, 다른 작업이 선점했거나 실행 대상이 아니면 null
    * @throws ApiException 프리톡 세션 또는 이력 컨테이너를 찾을 수 없을 때
    * @throws IllegalStateException 이력 메시지 또는 장기기억 생성 상태가 유효하지 않을 때
+   * @throws IllegalArgumentException 생성 문맥의 ID, 캐릭터 또는 필수 값이 유효하지 않을 때
    */
   @Transactional
   public GenerationContext claim(long learningSessionId) {
