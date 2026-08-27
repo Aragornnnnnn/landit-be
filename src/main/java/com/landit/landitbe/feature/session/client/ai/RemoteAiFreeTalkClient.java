@@ -211,7 +211,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       CharacterEmotion emotion,
       List<Long> usedMemoryIds) {
 
-    // 원격 첫 발화 응답을 검증해 애플리케이션 결과로 변환한다.
+    /** 원격 첫 발화와 memory 사용 ID를 검증해 애플리케이션 결과로 변환한다. */
     private AiFreeTalkOpeningResult toResult(List<AiFreeTalkMemoryContext> memoryContext) {
       if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -230,7 +230,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       CharacterEmotion emotion,
       List<Long> usedMemoryIds) {
 
-    // 원격 후속 발화 응답을 검증해 애플리케이션 결과로 변환한다.
+    /** 원격 후속 발화의 종료·생성 필드와 memory 사용 ID를 함께 검증한다. */
     private AiFreeTalkTurnResult toResult(List<AiFreeTalkMemoryContext> memoryContext) {
       if (userExitIntentDetected == null
           || (!userExitIntentDetected && hasMissingGeneratedField())) {
@@ -261,7 +261,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteMemoryQueryEmbeddingResponse(String embeddingModel, List<Float> embedding) {
 
-    // 원격 query embedding을 차원·유한값 계약으로 검증한다.
+    /** 원격 query embedding이 차원·유한값 계약을 지키는지 검증한다. */
     private AiMemoryQueryEmbeddingResult toResult() {
       if (blank(embeddingModel)
           || embedding == null

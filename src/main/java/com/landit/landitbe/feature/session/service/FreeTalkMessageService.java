@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingReason;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
@@ -160,22 +161,7 @@ public class FreeTalkMessageService {
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
-      FreeTalkMessageSubmitResponse response;
-      if (reservation.decision() == FreeTalkExitDecision.END) {
-        response =
-            submittedMessageService.finalizeEnd(
-                reservation,
-                aiFreeTalkClient.generateClosing(
-                    closingRequestForDecision(
-                        reservation, AiFreeTalkClosingReason.USER_CONFIRMED)));
-      } else {
-        response =
-            submittedMessageService.finalizeContinue(
-                reservation,
-                aiFreeTalkClient.generateTurn(
-                    turnRequestForDecision(
-                        reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED)));
-      }
+      FreeTalkMessageSubmitResponse response = processExitDecision(reservation);
       recordInnerThought(innerThoughtRequest, innerThoughtFuture);
       dispatchIfCompleted(response);
       return response;
@@ -184,6 +170,33 @@ public class FreeTalkMessageService {
       submittedMessageService.compensateDecision(reservation);
       throw exception;
     }
+  }
+
+  /** 종료 선택에 따라 END 또는 CONTINUE의 AI 처리 경계를 선택한다. */
+  private FreeTalkMessageSubmitResponse processExitDecision(
+      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+    if (reservation.decision() == FreeTalkExitDecision.END) {
+      return finalizeEndDecision(reservation);
+    }
+    return finalizeContinueDecision(reservation);
+  }
+
+  /** END 선택은 closing AI 응답과 완료 확정을 한 경계에서 처리한다. */
+  private FreeTalkMessageSubmitResponse finalizeEndDecision(
+      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+    AiFreeTalkClosingRequest closingRequest =
+        closingRequestForDecision(reservation, AiFreeTalkClosingReason.USER_CONFIRMED);
+    AiFreeTalkClosingResult closingResult = aiFreeTalkClient.generateClosing(closingRequest);
+    return submittedMessageService.finalizeEnd(reservation, closingResult);
+  }
+
+  /** CONTINUE 선택은 후속 turn AI 응답과 진행 확정을 한 경계에서 처리한다. */
+  private FreeTalkMessageSubmitResponse finalizeContinueDecision(
+      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+    AiFreeTalkTurnRequest turnRequest =
+        turnRequestForDecision(reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED);
+    AiFreeTalkTurnResult turnResult = aiFreeTalkClient.generateTurn(turnRequest);
+    return submittedMessageService.finalizeContinue(reservation, turnResult);
   }
 
   private AiFreeTalkTurnRequest turnRequest(
@@ -245,7 +258,7 @@ public class FreeTalkMessageService {
     return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, memoryContext));
   }
 
-  // 완료 응답이면 맞춤 표현 생성 작업을 제출한다.
+  /** 완료 응답만 후속 표현·장기기억 생성을 등록해 중간 응답을 재처리하지 않는다. */
   private void dispatchIfCompleted(FreeTalkMessageSubmitResponse response) {
     if (response.turnStatus() == FreeTalkTurnStatus.COMPLETED) {
       expressionGenerationDispatcher.dispatch(response.sessionId());

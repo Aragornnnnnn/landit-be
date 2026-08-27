@@ -17,7 +17,7 @@ public class FreeTalkMemoryRetrievalTraceRepository {
 
   private final JdbcTemplate jdbcTemplate;
 
-  /** 세션과 검색 단계의 첫 조회를 원자적으로 선점한다. */
+  /** 세션과 검색 단계의 첫 조회를 원자적으로 선점하고 중복 선점은 false로 처리한다. */
   public boolean claim(long sessionId, MemoryRetrievalStage stage, String policyVersion) {
     try {
       return jdbcTemplate.update(
