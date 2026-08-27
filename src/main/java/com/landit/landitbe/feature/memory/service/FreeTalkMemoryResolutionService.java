@@ -18,12 +18,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /** 비교 기억을 조회하고 AI 판정을 완전한 저장 계획으로 검증한다. */
-@Component
+@Service
 @RequiredArgsConstructor
-final class FreeTalkMemoryResolutionPlanner {
+final class FreeTalkMemoryResolutionService {
 
   private static final int MAX_COMPARABLE_MEMORIES = 3;
 

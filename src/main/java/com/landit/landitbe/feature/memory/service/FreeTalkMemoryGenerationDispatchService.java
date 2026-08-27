@@ -10,14 +10,14 @@ import org.springframework.stereotype.Service;
 
 /** 완료 프리톡의 장기기억 생성 작업 등록 경계를 제공한다. */
 @Service
-public class FreeTalkMemoryGenerationDispatcher {
+public class FreeTalkMemoryGenerationDispatchService {
 
   private final FreeTalkMemoryGenerationService generationService;
   private final TaskExecutor taskExecutor;
   private final MemoryProperties memoryProperties;
 
-  /** 장기기억 생성 디스패처를 구성한다. */
-  public FreeTalkMemoryGenerationDispatcher(
+  /** 장기기억 생성 등록에 필요한 실행기와 실패 보상 경계를 주입받는다. */
+  public FreeTalkMemoryGenerationDispatchService(
       FreeTalkMemoryGenerationService generationService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       MemoryProperties memoryProperties) {

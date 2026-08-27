@@ -16,7 +16,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatcher;
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
@@ -58,8 +58,8 @@ class FreeTalkMessageServiceTest {
   private final SessionMessageService sessionMessageService = mock(SessionMessageService.class);
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
       mock(FreeTalkExpressionGenerationDispatcher.class);
-  private final FreeTalkMemoryGenerationDispatcher memoryGenerationDispatcher =
-      mock(FreeTalkMemoryGenerationDispatcher.class);
+  private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService =
+      mock(FreeTalkMemoryGenerationDispatchService.class);
   private final TaskExecutor directExecutor = Runnable::run;
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
@@ -68,7 +68,7 @@ class FreeTalkMessageServiceTest {
           sessionMessageService,
           directExecutor,
           expressionGenerationDispatcher,
-          memoryGenerationDispatcher);
+          memoryGenerationDispatchService);
 
   @Test
   void marksInnerThoughtFailedWhenPersistingCompletedThoughtFails() {
@@ -184,9 +184,9 @@ class FreeTalkMessageServiceTest {
 
     service.submit(1L, 300L, request());
 
-    InOrder invocationOrder = inOrder(submittedMessageService, memoryGenerationDispatcher);
+    InOrder invocationOrder = inOrder(submittedMessageService, memoryGenerationDispatchService);
     invocationOrder.verify(submittedMessageService).finalizeTimeLimit(any(), any());
-    invocationOrder.verify(memoryGenerationDispatcher).dispatch(300L);
+    invocationOrder.verify(memoryGenerationDispatchService).dispatch(300L);
   }
 
   /** 완료되지 않은 응답은 기억 생성 dispatcher로 전달하지 않는다. */
@@ -199,7 +199,7 @@ class FreeTalkMessageServiceTest {
 
     service.submit(1L, 300L, request());
 
-    verify(memoryGenerationDispatcher, org.mockito.Mockito.never()).dispatch(any(Long.class));
+    verify(memoryGenerationDispatchService, org.mockito.Mockito.never()).dispatch(any(Long.class));
   }
 
   /** 이미 저장된 완료 응답을 재생할 때 기억 생성 dispatcher를 중복 호출하지 않는다. */
@@ -210,7 +210,7 @@ class FreeTalkMessageServiceTest {
 
     service.submit(1L, 300L, request());
 
-    verify(memoryGenerationDispatcher, org.mockito.Mockito.never()).dispatch(any(Long.class));
+    verify(memoryGenerationDispatchService, org.mockito.Mockito.never()).dispatch(any(Long.class));
     verify(submittedMessageService, org.mockito.Mockito.never()).finalizeTimeLimit(any(), any());
   }
 
@@ -226,7 +226,7 @@ class FreeTalkMessageServiceTest {
 
     service.decideExit(1L, 300L, new FreeTalkExitDecisionRequest(7L, FreeTalkExitDecision.END));
 
-    verify(memoryGenerationDispatcher).dispatch(300L);
+    verify(memoryGenerationDispatchService).dispatch(300L);
   }
 
   @Test
@@ -274,7 +274,7 @@ class FreeTalkMessageServiceTest {
         sessionMessageService,
         taskExecutor,
         expressionGenerationDispatcher,
-        memoryGenerationDispatcher);
+        memoryGenerationDispatchService);
   }
 
   private FreeTalkSubmittedMessageService.Reservation reservation() {

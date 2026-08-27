@@ -22,7 +22,7 @@ public class FreeTalkMemoryGenerationService {
   private final AiFreeTalkClient aiClient;
   private final ConversationMemoryWriteService writeService;
   private final FreeTalkMemoryCandidateMapper candidateMapper;
-  private final FreeTalkMemoryResolutionPlanner resolutionPlanner;
+  private final FreeTalkMemoryResolutionService resolutionService;
 
   /** 완료된 프리톡의 장기기억 생성을 한 번 실행한다. */
   public void generate(long learningSessionId) {
@@ -48,7 +48,7 @@ public class FreeTalkMemoryGenerationService {
                   context.timezone(),
                   context.history()));
       List<FreeTalkMemoryCandidate> candidates = candidateMapper.mapCandidates(context, extraction);
-      List<ConversationMemoryResolutionPlan> plans = resolutionPlanner.plan(context, candidates);
+      List<ConversationMemoryResolutionPlan> plans = resolutionService.plan(context, candidates);
       if (writeService.persistIfSnapshotCurrent(learningSessionId, context.userProfileId(), plans)
           == ConversationMemoryWriteService.PersistenceResult.STALE) {
         throw new IllegalStateException("장기기억 비교 snapshot이 변경됐습니다.");

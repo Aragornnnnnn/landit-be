@@ -12,18 +12,18 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 
 /** 프리톡 장기기억 생성 작업 제출 조건과 거부 처리를 검증한다. */
-class FreeTalkMemoryGenerationDispatcherTest {
+class FreeTalkMemoryGenerationDispatchServiceTest {
 
   @Test
   void doesNotSubmitWhenMemoryWritingIsDisabled() {
     FreeTalkMemoryGenerationService generationService =
         Mockito.mock(FreeTalkMemoryGenerationService.class);
     TaskExecutor taskExecutor = Mockito.mock(TaskExecutor.class);
-    FreeTalkMemoryGenerationDispatcher dispatcher =
-        new FreeTalkMemoryGenerationDispatcher(
+    FreeTalkMemoryGenerationDispatchService dispatchService =
+        new FreeTalkMemoryGenerationDispatchService(
             generationService, taskExecutor, new MemoryProperties(false));
 
-    dispatcher.dispatch(10L);
+    dispatchService.dispatch(10L);
 
     verify(taskExecutor, never()).execute(Mockito.any());
     verify(generationService, never()).generate(10L);
@@ -37,11 +37,11 @@ class FreeTalkMemoryGenerationDispatcherTest {
         task -> {
           throw new TaskRejectedException("queue full");
         };
-    FreeTalkMemoryGenerationDispatcher dispatcher =
-        new FreeTalkMemoryGenerationDispatcher(
+    FreeTalkMemoryGenerationDispatchService dispatchService =
+        new FreeTalkMemoryGenerationDispatchService(
             generationService, rejectingExecutor, new MemoryProperties(true));
 
-    dispatcher.dispatch(10L);
+    dispatchService.dispatch(10L);
 
     verify(generationService).markFailed(10L);
   }
@@ -51,11 +51,11 @@ class FreeTalkMemoryGenerationDispatcherTest {
     FreeTalkMemoryGenerationService generationService =
         Mockito.mock(FreeTalkMemoryGenerationService.class);
     TaskExecutor taskExecutor = Mockito.mock(TaskExecutor.class);
-    FreeTalkMemoryGenerationDispatcher dispatcher =
-        new FreeTalkMemoryGenerationDispatcher(
+    FreeTalkMemoryGenerationDispatchService dispatchService =
+        new FreeTalkMemoryGenerationDispatchService(
             generationService, taskExecutor, new MemoryProperties(true));
 
-    dispatcher.dispatch(10L);
+    dispatchService.dispatch(10L);
 
     verify(taskExecutor).execute(Mockito.any());
   }
