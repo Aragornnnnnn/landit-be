@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 /** PostgreSQL pgvector로 범위가 제한된 장기기억 exact 검색을 수행한다. */
 @Repository
+@RequiredArgsConstructor
 @ConditionalOnProperty(
     prefix = "landit.memory-search",
     name = "mode",
@@ -35,15 +37,6 @@ public class PgVectorConversationMemorySearchRepository
       """;
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
-
-  /**
-   * Named parameter JDBC 접근자로 PostgreSQL 장기기억 검색 저장소를 구성한다.
-   *
-   * @param jdbcTemplate pgvector 검색에 사용할 JDBC 접근자
-   */
-  public PgVectorConversationMemorySearchRepository(NamedParameterJdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
-  }
 
   /** {@inheritDoc} */
   @Override

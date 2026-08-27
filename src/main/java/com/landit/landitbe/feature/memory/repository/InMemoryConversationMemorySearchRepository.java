@@ -7,12 +7,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /** H2에서 SQL 범위 선필터 후 자바 exact 코사인 검색을 수행한다. */
 @Repository
+@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "landit.memory-search", name = "mode", havingValue = "in-memory")
 public class InMemoryConversationMemorySearchRepository
     implements ConversationMemorySearchRepository {
@@ -28,15 +30,6 @@ public class InMemoryConversationMemorySearchRepository
       """;
 
   private final JdbcTemplate jdbcTemplate;
-
-  /**
-   * H2 후보 조회에 사용할 JDBC 접근자로 in-memory 검색 저장소를 구성한다.
-   *
-   * @param jdbcTemplate 범위가 제한된 장기기억 조회에 사용할 JDBC 접근자
-   */
-  public InMemoryConversationMemorySearchRepository(JdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
-  }
 
   /** {@inheritDoc} */
   @Override

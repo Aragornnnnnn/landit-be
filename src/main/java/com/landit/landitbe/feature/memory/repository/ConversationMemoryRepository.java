@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** 장기기억 원문과 원본 메시지 계보를 저장한다. */
 @Repository
+@RequiredArgsConstructor
 public class ConversationMemoryRepository {
 
   private static final String INSERT_MEMORY_SQL =
@@ -38,15 +40,6 @@ public class ConversationMemoryRepository {
       """;
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
-
-  /**
-   * 명명된 파라미터 JDBC 접근자로 장기기억 저장소를 구성한다.
-   *
-   * @param jdbcTemplate 장기기억과 source INSERT에 사용할 JDBC 접근자
-   */
-  public ConversationMemoryRepository(NamedParameterJdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
-  }
 
   /**
    * 장기기억과 원본 메시지 source를 하나의 트랜잭션으로 저장한다.
