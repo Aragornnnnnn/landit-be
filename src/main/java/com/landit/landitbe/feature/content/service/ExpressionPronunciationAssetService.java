@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,12 @@ public class ExpressionPronunciationAssetService {
 
   // 매니페스트 항목 수의 안전 상한. 전체 데이터(981 표현 × 3 억양)보다 넉넉하게 잡되 폭주는 막는다.
   private static final int MAX_MANIFEST_ENTRIES = 10_000;
+
+  // 발화 불가능한 패턴형 표현("be busy ~ing", "+목적어" 등) 판별 문자. 이런 표현은 TTS 배치가
+  // 표현 음성을 아예 만들지 않아 expressionAudioUrl이 null인 것이 정상이다.
+  // landit-ai scripts/build_tts_source.py의 _TEMPLATED 정규식과 같은 규칙이다 — 한쪽을 바꾸면
+  // 반드시 같이 바꿔야 한다.
+  private static final Pattern TEMPLATED_EXPRESSION_CHARS = Pattern.compile("[~가-힣()+]");
 
   private final ExpressionPronunciationAssetRepository assetRepository;
   private final WritingExpressionRepository writingExpressionRepository;
@@ -145,6 +152,8 @@ public class ExpressionPronunciationAssetService {
     Set<Long> requestedIds =
         collectIds(manifest.assets(), PronunciationTtsManifest.Asset::expressionId);
     Map<AssetKey, ExpressionPronunciationAsset> existingAssets = findExistingAssets(requestedIds);
+    // 표현 텍스트로 패턴형 여부를 판별해야 해서 (validateTts 참고) 표현도 함께 조회한다.
+    Map<Long, WritingExpression> expressions = findExpressions(requestedIds);
 
     int updated = 0;
     List<AdminPronunciationAssetImportResult.Failure> failures = new ArrayList<>();
@@ -152,7 +161,7 @@ public class ExpressionPronunciationAssetService {
     for (PronunciationTtsManifest.Asset ttsAsset : manifest.assets()) {
       AssetKey key = new AssetKey(ttsAsset.expressionId(), ttsAsset.accentLocale());
       ExpressionPronunciationAsset asset = existingAssets.get(key);
-      String failureReason = validateTts(ttsAsset, asset);
+      String failureReason = validateTts(ttsAsset, asset, expressions.get(ttsAsset.expressionId()));
       if (failureReason != null) {
         failures.add(
             new AdminPronunciationAssetImportResult.Failure(
@@ -310,21 +319,41 @@ public class ExpressionPronunciationAssetService {
 
   // TTS 항목의 실패 사유를 판별한다. 정상이면 null.
   private String validateTts(
-      PronunciationTtsManifest.Asset ttsAsset, ExpressionPronunciationAsset existingAsset) {
+      PronunciationTtsManifest.Asset ttsAsset,
+      ExpressionPronunciationAsset existingAsset,
+      WritingExpression expression) {
     if (ttsAsset.expressionId() == null
         || ttsAsset.accentLocale() == null
         || ttsAsset.sentenceAudioUrl() == null
         || ttsAsset.sentenceAudioUrl().isBlank()
-        || ttsAsset.expressionAudioUrl() == null
-        || ttsAsset.expressionAudioUrl().isBlank()
         || ttsAsset.words() == null
         || ttsAsset.words().isEmpty()) {
       return "필수 값이 누락됐습니다.";
     }
+    // 단어 음성 URL이 비면 조인 단계에서 NPE로 임포트 전체가 죽는다. 여기서 실패 목록행으로 거른다.
+    for (PronunciationTtsManifest.Asset.WordAudio wordAudio : ttsAsset.words()) {
+      if (wordAudio.audioUrl() == null || wordAudio.audioUrl().isBlank()) {
+        return "TTS 매니페스트 words 항목에 audioUrl이 없습니다.";
+      }
+    }
     if (existingAsset == null) {
       return "기준 데이터가 없습니다. 기준 데이터 임포트를 먼저 실행하세요.";
     }
+    // 표현 음성(expressionAudioUrl)은 패턴형 표현에만 null이 허용된다. 발화 가능한 일반 표현인데
+    // null이면 생성 누락 사고이므로 실패 목록행으로 잡는다.
+    boolean hasExpressionAudio =
+        ttsAsset.expressionAudioUrl() != null && !ttsAsset.expressionAudioUrl().isBlank();
+    if (!hasExpressionAudio && !isTemplatedExpression(expression)) {
+      return "발화 가능한 표현인데 표현 음성(expressionAudioUrl)이 없습니다.";
+    }
     return null;
+  }
+
+  // 표현이 발화 불가능한 패턴형인지 판별한다. 표현을 못 찾으면(이론상 자산이 있으면 항상 있음)
+  // 보수적으로 일반 표현 취급해 표현 음성 누락을 잡는다.
+  private boolean isTemplatedExpression(WritingExpression expression) {
+    return expression != null
+        && TEMPLATED_EXPRESSION_CHARS.matcher(expression.getTargetExpressionText()).find();
   }
 
   // 기준 데이터 words에 단어별 audioUrl을 order로 조인한 새 배열을 만든다. order가 안 맞으면 null.

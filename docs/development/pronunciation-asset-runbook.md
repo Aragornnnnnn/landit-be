@@ -73,7 +73,9 @@ BE 파서가 기대하는 JSON 모양(확정 계약)으로 변환·검증해서 
    POST /api/v1/admin/expressions/pronunciation-assets/import-reference-from-s3?manifestKey={reference_key}
    ```
    응답의 `failures`가 비어 있는지 확인. "문장이 DB와 다릅니다" 실패가 나오면 → 그 표현의 문장이
-   기준 데이터 생성 이후 바뀐 것. 해당 표현만 2번부터 재생성
+   기준 데이터 생성 이후 바뀐 것. 해당 표현만 2번부터 재생성.
+   **주의**: 이 단계는 재임포트 시 해당 자산의 음성 URL을 초기화한다 — 7번까지 마쳐야 자산이
+   완성되므로 6번과 7번 사이에 작업을 멈추지 말 것
 7. **TTS 임포트** — 1회 호출:
    ```
    POST /api/v1/admin/expressions/pronunciation-assets/import-tts-from-s3?manifestKey={be_manifest_key}
@@ -94,7 +96,9 @@ BE 파서가 기대하는 JSON 모양(확정 계약)으로 변환·검증해서 
 2. 그 표현들만 대상으로 절차 A의 2~5 진행. `build_tts_source.py`의 `--ids 164,177` 옵션으로
    대상 표현만 골라 돌릴 수 있고, 이미 S3에 있는 mp3는 재사용되므로 전량 재실행해도 안전하다
 3. 절차 A의 6~8과 동일하게 임포트 → 커버리지 재확인.
-   임포트는 upsert라 기존 행은 영향받지 않는다
+   **주의**: 기준 데이터 재임포트(6번)는 그 (표현, 억양)의 음성 URL을 초기화한다 — 6번을 실행한
+   표현은 7번(TTS 임포트)까지 마쳐야 다시 완성되며, 그 사이 해당 표현의 발음 평가는 404가 된다.
+   6번과 7번은 반드시 붙여서 실행할 것
 
 ## 절차 C — 문장을 수정했을 때 (V60 같은 데이터 마이그레이션)
 

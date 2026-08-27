@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * 관리자 발음 평가 자산 임포트 API의 OpenAPI 문서를 정의한다.
@@ -42,6 +43,7 @@ public interface AdminPronunciationAssetControllerDocs {
       @Parameter(
               description = "S3 기준 데이터 파일 키",
               example = "content/expression-pronunciation-audio/manifests/reference_EN_US.json")
+          @NotBlank
           String manifestKey);
 
   /**
@@ -64,6 +66,7 @@ public interface AdminPronunciationAssetControllerDocs {
       @Parameter(
               description = "S3 TTS 매니페스트 키",
               example = "content/expression-pronunciation-audio/manifests/tts-2026-08-26.json")
+          @NotBlank
           String manifestKey);
 
   /**

@@ -43,7 +43,12 @@ public class RemoteAiPronunciationClient implements AiPronunciationClient {
   /** {@inheritDoc} */
   @Override
   public AiPronunciationAnalysisResult analyze(AiPronunciationAnalysisRequest request) {
-    URI uri = URI.create(properties.baseUrl() + ANALYZE_PATH);
+    // base-url 설정이 비면 URI 조립 단계에서 500으로 새므로, 다른 Remote 클라이언트들처럼
+    // 여기서 걸러 호출 실패(502)로 응답한다. resolve()는 끝 슬래시 유무도 흡수한다.
+    if (properties.baseUrl() == null || properties.baseUrl().isBlank()) {
+      throw new ApiException(ErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
+    }
+    URI uri = URI.create(properties.baseUrl()).resolve(ANALYZE_PATH);
     try {
       HttpRequest httpRequest =
           HttpRequest.newBuilder(uri)

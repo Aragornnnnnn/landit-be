@@ -48,6 +48,8 @@ class AdminPronunciationAssetApiIntegrationTests {
   private static final String IMPORT_TTS_URL = BASE_URL + "/import-tts-from-s3";
   private static final String COVERAGE_URL = BASE_URL + "/coverage";
   private static final long EXPRESSION_ID = 990301L;
+  // 패턴형 표현(타겟 텍스트에 ~ 포함) 시드용. 표현 음성이 없는 것이 정상인 케이스를 검증한다.
+  private static final long PATTERN_EXPRESSION_ID = 990304L;
 
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -57,6 +59,7 @@ class AdminPronunciationAssetApiIntegrationTests {
   @BeforeEach
   void setUp() {
     jdbcTemplate.update("delete from expression_pronunciation_asset");
+    jdbcTemplate.update("delete from writing_expression where id = ?", PATTERN_EXPRESSION_ID);
     jdbcTemplate.update("delete from writing_expression where id = ?", EXPRESSION_ID);
     jdbcTemplate.update(
         """
@@ -83,6 +86,7 @@ class AdminPronunciationAssetApiIntegrationTests {
   @AfterEach
   void tearDown() {
     jdbcTemplate.update("delete from writing_expression where id = ?", EXPRESSION_ID);
+    jdbcTemplate.update("delete from writing_expression where id = ?", PATTERN_EXPRESSION_ID);
   }
 
   @Test
@@ -326,6 +330,105 @@ class AdminPronunciationAssetApiIntegrationTests {
     mockMvc
         .perform(post(IMPORT_REFERENCE_URL).param("manifestKey", "reference_us.json"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void ttsImportAllowsNullExpressionAudioForTemplatedExpression() throws Exception {
+    String accessToken = loginAsAdmin("pron-pattern-null-ok");
+    seedPatternExpression();
+
+    // 패턴형 표현("be busy ~ing")은 표현 음성을 아예 만들지 않으므로 expressionAudioUrl이
+    // null이어도 정상 임포트돼야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us_pattern.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.failures").isEmpty());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_pattern.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(1))
+        .andExpect(jsonPath("$.data.failures").isEmpty());
+
+    // 표현 음성 칸은 null 그대로, 문장 음성은 채워져 자산이 완성 상태여야 한다.
+    String expressionAudioUrl =
+        jdbcTemplate.queryForObject(
+            "select expression_audio_url from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
+            String.class,
+            PATTERN_EXPRESSION_ID);
+    String sentenceAudioUrl =
+        jdbcTemplate.queryForObject(
+            "select sentence_audio_url from expression_pronunciation_asset"
+                + " where writing_expression_id = ? and accent_locale = 'EN_US'",
+            String.class,
+            PATTERN_EXPRESSION_ID);
+    assertThat(expressionAudioUrl).isNull();
+    assertThat(sentenceAudioUrl).isEqualTo("https://cdn.example.com/pattern/sentence.mp3");
+  }
+
+  @Test
+  void ttsImportRejectsNullExpressionAudioForSpeakableExpression() throws Exception {
+    String accessToken = loginAsAdmin("pron-speakable-null");
+
+    // 발화 가능한 일반 표현("There is nothing like")인데 표현 음성이 없으면 생성 누락 사고다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_null_expression_audio.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(jsonPath("$.data.failures[0].expressionId").value(EXPRESSION_ID))
+        .andExpect(
+            jsonPath("$.data.failures[0].reason")
+                .value("발화 가능한 표현인데 표현 음성(expressionAudioUrl)이 없습니다."));
+  }
+
+  @Test
+  void ttsImportRejectsNullWordAudioUrl() throws Exception {
+    String accessToken = loginAsAdmin("pron-word-audio-null");
+
+    // 단어 음성 URL이 비면 조인에서 터지는 대신 실패 목록행으로 잡혀야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_null_word_audio.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(
+            jsonPath("$.data.failures[0].reason").value("TTS 매니페스트 words 항목에 audioUrl이 없습니다."));
+  }
+
+  @Test
+  void importRejectsBlankManifestKey() throws Exception {
+    String accessToken = loginAsAdmin("pron-blank-key");
+
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "", accessToken))
+        .andExpect(status().isBadRequest());
+    mockMvc.perform(importFrom(IMPORT_TTS_URL, "", accessToken)).andExpect(status().isBadRequest());
+  }
+
+  // 패턴형 표현(타겟 텍스트에 ~ 포함, 표현 음성 없음)을 시드한다.
+  private void seedPatternExpression() {
+    jdbcTemplate.update(
+        """
+        insert into writing_expression (
+            id, expression_source, expression_type, usage_frequency_level, target_locale,
+            base_locale, display_order, target_expression_text, base_expression_meaning_text,
+            usage_summary, usage_description, representative_sentence_text,
+            representative_sentence_translation, representative_sentence_words,
+            representative_sentence_word_choices, practice_examples_payload, status,
+            created_at, updated_at
+        )
+        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 990304,
+            'be busy ~ing', '~하느라 바쁘다', 'summary', 'description',
+            'I''m busy studying now.', '지금 공부하느라 바빠.',
+            ARRAY['I''m','busy','studying','now.'], ARRAY['I''m','busy'],
+            CAST('[]' AS jsonb), 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        PATTERN_EXPRESSION_ID);
   }
 
   // 매니페스트 키로 임포트 요청을 만든다.

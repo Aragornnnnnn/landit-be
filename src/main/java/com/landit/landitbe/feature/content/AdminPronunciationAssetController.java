@@ -8,8 +8,10 @@ import com.landit.landitbe.feature.content.dto.AdminPronunciationAssetCoverageRe
 import com.landit.landitbe.feature.content.dto.AdminPronunciationAssetImportResult;
 import com.landit.landitbe.feature.content.service.ExpressionPronunciationAssetService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** 관리자 발음 평가 자산 임포트 요청을 처리한다. */
 @RequiredArgsConstructor
 @RestController
+@Validated
 public class AdminPronunciationAssetController implements AdminPronunciationAssetControllerDocs {
 
   private final ExpressionPronunciationAssetService expressionPronunciationAssetService;
@@ -26,7 +29,8 @@ public class AdminPronunciationAssetController implements AdminPronunciationAsse
   @Override
   @PostMapping("/api/v1/admin/expressions/pronunciation-assets/import-reference-from-s3")
   public ApiResponse<AdminPronunciationAssetImportResult> importReference(
-      @AuthenticationPrincipal AuthUserPrincipal principal, @RequestParam String manifestKey) {
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @RequestParam @NotBlank String manifestKey) {
     return ApiResponse.success(
         expressionPronunciationAssetService.importReference(principal.userId(), manifestKey));
   }
@@ -35,7 +39,8 @@ public class AdminPronunciationAssetController implements AdminPronunciationAsse
   @Override
   @PostMapping("/api/v1/admin/expressions/pronunciation-assets/import-tts-from-s3")
   public ApiResponse<AdminPronunciationAssetImportResult> importTts(
-      @AuthenticationPrincipal AuthUserPrincipal principal, @RequestParam String manifestKey) {
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @RequestParam @NotBlank String manifestKey) {
     return ApiResponse.success(
         expressionPronunciationAssetService.importTts(principal.userId(), manifestKey));
   }
