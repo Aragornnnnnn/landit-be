@@ -43,6 +43,7 @@ final class FreeTalkMemoryCandidateMapper {
         .toList();
   }
 
+  /** 원본 계보와 후보 계약을 확인한 뒤 저장·resolution 입력을 같은 관찰 시각으로 만든다. */
   private FreeTalkMemoryCandidate mapCandidate(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       AiMemoryCandidatesResult.Candidate candidate,

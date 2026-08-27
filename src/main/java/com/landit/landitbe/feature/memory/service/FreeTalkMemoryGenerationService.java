@@ -63,6 +63,7 @@ public class FreeTalkMemoryGenerationService {
     failSafely(learningSessionId, null);
   }
 
+  /** 실패 상태 전환 자체의 예외가 후속 작업 실패 처리를 막지 않도록 삼킨다. */
   private void failSafely(long learningSessionId, RuntimeException cause) {
     try {
       contextService.fail(learningSessionId);

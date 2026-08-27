@@ -116,6 +116,7 @@ public class ConversationMemoryWriteService {
     }
   }
 
+  /** 저장 계획은 잠금한 사용자와 snapshot 범위 안에서만 실행할 수 있다. */
   private static void validatePlans(
       long userProfileId, List<ConversationMemoryResolutionPlan> plans) {
     for (ConversationMemoryResolutionPlan plan : plans) {

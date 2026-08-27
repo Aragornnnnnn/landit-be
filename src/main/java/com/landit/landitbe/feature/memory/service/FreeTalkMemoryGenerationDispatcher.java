@@ -27,7 +27,7 @@ public class FreeTalkMemoryGenerationDispatcher {
   }
 
   /**
-   * 장기기억 생성 작업 등록이 활성화된 경우에만 후속 작업 경계를 연다.
+   * 장기기억 생성 작업 등록이 활성화된 경우에만 후속 작업 경계를 연다. 작업 등록이 거부되면 준비 상태를 실패로 전환해 미완료 작업을 남기지 않는다.
    *
    * @param sessionId 장기기억을 생성할 프리톡 세션 ID
    */
