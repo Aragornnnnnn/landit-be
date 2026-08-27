@@ -23,7 +23,15 @@ public record AiConversationHistoryMessage(
     String translatedContent,
     @JsonInclude(JsonInclude.Include.NON_NULL) OffsetDateTime occurredAt) {
 
-  /** 기존 AI 계약과 호환되는 시간 정보 없는 히스토리 메시지를 생성한다. */
+  /**
+   * 기존 AI 계약과 호환되는 시간 정보 없는 히스토리 메시지를 생성한다.
+   *
+   * @param messageId 메시지 ID
+   * @param turnNumber 대화 턴 번호
+   * @param role 메시지 발화자 역할
+   * @param content 메시지 본문
+   * @param translatedContent 번역된 메시지 본문
+   */
   public AiConversationHistoryMessage(
       Long messageId, int turnNumber, String role, String content, String translatedContent) {
     this(messageId, turnNumber, role, content, translatedContent, null);

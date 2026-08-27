@@ -41,6 +41,7 @@ public class FreeTalkMemoryGenerationContextService {
    * @param learningSessionId 선점할 학습 세션 ID
    * @return 선점했으면 불변 문맥, 다른 작업이 선점했거나 실행 대상이 아니면 null
    * @throws ApiException 프리톡 세션 또는 이력 컨테이너를 찾을 수 없을 때
+   * @throws IllegalStateException 이력 메시지 또는 장기기억 생성 상태가 유효하지 않을 때
    */
   @Transactional
   public GenerationContext claim(long learningSessionId) {
@@ -130,6 +131,7 @@ public class FreeTalkMemoryGenerationContextService {
    * 실행 중인 장기기억 생성 작업을 조건부 실패 상태로 전환한다.
    *
    * @param learningSessionId 실패 처리할 학습 세션 ID
+   * @throws IllegalStateException 장기기억 생성 상태가 완료된 프리톡과 일치하지 않을 때
    */
   @Transactional
   public void fail(long learningSessionId) {
@@ -139,7 +141,17 @@ public class FreeTalkMemoryGenerationContextService {
         .ifPresent(FreeTalkSession::failMemoryGeneration);
   }
 
-  /** 외부 AI 호출에 필요한 선점 완료 문맥을 불변 값으로 보관한다. */
+  /**
+   * 외부 AI 호출에 필요한 선점 완료 문맥을 불변 값으로 보관한다.
+   *
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @param userProfileId 기억을 소유하는 사용자 프로필 ID
+   * @param characterId 프리톡 캐릭터 ID
+   * @param targetLocale 학습 언어 지역
+   * @param baseLocale 기준 언어 지역
+   * @param timezone 세션 시간대
+   * @param history 시간 순서가 보존된 대화 히스토리
+   */
   public record GenerationContext(
       long learningSessionId,
       long userProfileId,
@@ -149,7 +161,18 @@ public class FreeTalkMemoryGenerationContextService {
       String timezone,
       List<AiConversationHistoryMessage> history) {
 
-    /** 문맥 목록을 방어적으로 복사해 외부 호출 중 변경되지 않도록 한다. */
+    /**
+     * 문맥 목록을 방어적으로 복사해 외부 호출 중 변경되지 않도록 한다.
+     *
+     * @param learningSessionId 프리톡 학습 세션 ID
+     * @param userProfileId 기억을 소유하는 사용자 프로필 ID
+     * @param characterId 프리톡 캐릭터 ID
+     * @param targetLocale 학습 언어 지역
+     * @param baseLocale 기준 언어 지역
+     * @param timezone 세션 시간대
+     * @param history 시간 순서가 보존된 대화 히스토리
+     * @throws IllegalArgumentException ID, 캐릭터 또는 문맥 값이 유효하지 않을 때
+     */
     public GenerationContext {
       if (learningSessionId <= 0 || userProfileId <= 0) {
         throw new IllegalArgumentException("장기기억 생성 문맥 ID가 유효하지 않습니다.");

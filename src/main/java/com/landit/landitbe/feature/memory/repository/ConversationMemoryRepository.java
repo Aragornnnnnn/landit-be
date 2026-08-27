@@ -91,6 +91,7 @@ public class ConversationMemoryRepository {
    * @param validTo 기존 기억의 유효 종료 시각
    * @param supersededAt 대체 상태가 기록된 시각
    * @return 기존 기억이 활성 상태여서 갱신됐으면 true
+   * @throws IllegalArgumentException ID 또는 시각 값이 유효하지 않은 경우
    */
   public boolean supersedeActive(
       long oldMemoryId, long newMemoryId, LocalDateTime validTo, LocalDateTime supersededAt) {

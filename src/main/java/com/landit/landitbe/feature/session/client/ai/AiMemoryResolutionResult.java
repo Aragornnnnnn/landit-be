@@ -11,7 +11,13 @@ import java.util.List;
  */
 public record AiMemoryResolutionResult(List<Resolution> resolutions) {
 
-  /** 후보 한 건에 대한 상태 판정 결과를 담는다. */
+  /**
+   * 후보 한 건에 대한 상태 판정 결과를 담는다.
+   *
+   * @param candidateIndex 상태를 판정한 후보의 순번
+   * @param operation 후보에 적용할 ADD, SUPERSEDE 또는 IGNORE 연산
+   * @param supersededMemoryIds SUPERSEDE 시 대체할 기존 기억 ID 목록
+   */
   public record Resolution(
       Integer candidateIndex, AiMemoryOperation operation, List<Long> supersededMemoryIds) {}
 }
