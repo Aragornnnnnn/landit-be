@@ -13,11 +13,13 @@ import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResul
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /** 프리톡 세션 시작에 한 번만 장기기억을 검색하고 사용 결과를 기록한다. */
 @Slf4j
+@RequiredArgsConstructor
 @Service
 public class FreeTalkMemoryRetrievalService {
 
@@ -30,18 +32,6 @@ public class FreeTalkMemoryRetrievalService {
   private final ConversationMemorySearchRepository searchRepository;
   private final FreeTalkMemoryRetrievalTraceRepository traceRepository;
   private final MemoryProperties memoryProperties;
-
-  /** 장기기억 검색 의존성을 주입받아 서비스를 구성한다. */
-  public FreeTalkMemoryRetrievalService(
-      AiFreeTalkClient aiClient,
-      ConversationMemorySearchRepository searchRepository,
-      FreeTalkMemoryRetrievalTraceRepository traceRepository,
-      MemoryProperties memoryProperties) {
-    this.aiClient = aiClient;
-    this.searchRepository = searchRepository;
-    this.traceRepository = traceRepository;
-    this.memoryProperties = memoryProperties;
-  }
 
   /** 활성화된 경우 세션의 지정 단계에서 장기기억을 한 번 검색한다. */
   public RetrievalResult retrieve(RetrievalRequest request) {

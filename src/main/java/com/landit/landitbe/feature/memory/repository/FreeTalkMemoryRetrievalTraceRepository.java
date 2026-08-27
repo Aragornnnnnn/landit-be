@@ -5,20 +5,17 @@ package com.landit.landitbe.feature.memory.repository;
 import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /** 세션별 장기기억 검색을 한 번으로 제한하고 후보·사용 trace를 저장한다. */
 @Repository
+@RequiredArgsConstructor
 public class FreeTalkMemoryRetrievalTraceRepository {
 
   private final JdbcTemplate jdbcTemplate;
-
-  /** 검색 trace 저장에 사용할 JDBC 접근자로 저장소를 구성한다. */
-  public FreeTalkMemoryRetrievalTraceRepository(JdbcTemplate jdbcTemplate) {
-    this.jdbcTemplate = jdbcTemplate;
-  }
 
   /** 세션과 검색 단계의 첫 조회를 원자적으로 선점한다. */
   public boolean claim(long sessionId, MemoryRetrievalStage stage, String policyVersion) {
