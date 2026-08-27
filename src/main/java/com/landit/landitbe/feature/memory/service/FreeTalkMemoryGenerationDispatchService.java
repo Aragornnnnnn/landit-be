@@ -16,7 +16,13 @@ public class FreeTalkMemoryGenerationDispatchService {
   private final TaskExecutor taskExecutor;
   private final MemoryProperties memoryProperties;
 
-  /** 장기기억 생성 등록에 필요한 실행기와 실패 보상 경계를 주입받는다. */
+  /**
+   * 장기기억 생성 등록에 필요한 실행기와 실패 보상 경계를 주입받는다.
+   *
+   * @param generationService 장기기억 생성과 실패 상태 전환 서비스
+   * @param taskExecutor 장기기억 생성을 비동기로 실행할 작업 실행기
+   * @param memoryProperties 장기기억 쓰기 기능 설정
+   */
   public FreeTalkMemoryGenerationDispatchService(
       FreeTalkMemoryGenerationService generationService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,

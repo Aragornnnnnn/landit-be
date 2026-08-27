@@ -31,7 +31,14 @@ final class FreeTalkMemoryResolutionService {
   private final ConversationMemorySearchRepository searchRepository;
   private final Clock clock;
 
-  /** 비교 대상을 붙인 뒤 단일 신규 후보는 즉시 추가하고 나머지는 AI 판정을 검증한다. */
+  /**
+   * 각 후보에 비교 기억을 연결하고, 신규 후보는 추가 계획으로, 기존 기억과 겹치는 후보는 AI 판정 결과에 따른 저장 계획으로 변환한다.
+   *
+   * @param context 장기기억 생성에 필요한 사용자와 프리톡 세션 정보
+   * @param candidates 저장 후보와 원본 메시지 정보
+   * @return 후보별 추가, 유지 또는 대체 저장 계획
+   * @throws IllegalArgumentException 비교 기억 또는 AI 상태 판정 결과가 계약에 맞지 않을 때
+   */
   List<ConversationMemoryResolutionPlan> plan(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       List<FreeTalkMemoryCandidate> candidates) {

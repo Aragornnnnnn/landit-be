@@ -24,7 +24,11 @@ public class FreeTalkMemoryGenerationService {
   private final FreeTalkMemoryCandidateMapper candidateMapper;
   private final FreeTalkMemoryResolutionService resolutionService;
 
-  /** 완료된 프리톡의 장기기억 생성을 한 번 실행한다. */
+  /**
+   * 완료된 프리톡의 대화 이력에서 장기기억을 생성하고 저장한다. 생성 과정의 실패는 실패 상태로 기록하고 프리톡 흐름으로 전파하지 않는다.
+   *
+   * @param learningSessionId 장기기억을 생성할 완료 프리톡 세션 ID
+   */
   public void generate(long learningSessionId) {
     FreeTalkMemoryGenerationContextService.GenerationContext context =
         claimContextOrFail(learningSessionId);
@@ -77,7 +81,11 @@ public class FreeTalkMemoryGenerationService {
             context.history()));
   }
 
-  /** 작업 제출 실패 등으로 실행되지 못한 작업을 조건부 실패 상태로 전환한다. */
+  /**
+   * 작업 제출 실패 등으로 실행되지 못한 장기기억 생성 작업을 조건부 실패 상태로 전환한다.
+   *
+   * @param learningSessionId 실패 상태로 전환할 프리톡 세션 ID
+   */
   public void markFailed(long learningSessionId) {
     failSafely(learningSessionId, null);
   }

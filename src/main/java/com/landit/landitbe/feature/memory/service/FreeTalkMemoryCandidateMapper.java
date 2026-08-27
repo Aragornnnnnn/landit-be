@@ -30,7 +30,14 @@ final class FreeTalkMemoryCandidateMapper {
 
   private final Clock clock;
 
-  /** 후보 인덱스와 원본 이력을 닫힌 계약으로 확인한 뒤 저장 후보를 만든다. */
+  /**
+   * AI가 추출한 후보와 원본 사용자 메시지를 검증하고 저장 및 상태 판정에 사용할 후보로 변환한다.
+   *
+   * @param context 장기기억 생성에 필요한 사용자와 프리톡 세션 정보
+   * @param extraction AI가 추출한 장기기억 후보 응답
+   * @return 검증된 장기기억 후보 목록
+   * @throws IllegalArgumentException 추출 응답이나 원본 메시지가 장기기억 계약에 맞지 않을 때
+   */
   List<FreeTalkMemoryCandidate> mapCandidates(
       FreeTalkMemoryGenerationContextService.GenerationContext context,
       AiMemoryCandidatesResult extraction) {

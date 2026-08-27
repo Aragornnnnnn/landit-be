@@ -22,7 +22,14 @@ record FreeTalkMemoryCandidate(
     comparableMemories = List.copyOf(comparableMemories);
   }
 
-  /** 비교 기억을 resolution 입력에도 같은 시간대 규칙으로 반영한다. */
+  /**
+   * 검색된 비교 기억을 상태 판정 입력에 동일한 시간대 규칙으로 반영한 새 후보를 만든다.
+   *
+   * @param comparableMemories 후보와 비교할 활성 장기기억 목록
+   * @param zoneId 비교 기억의 로컬 시각을 변환할 시간대
+   * @return 비교 기억이 반영된 새 후보
+   * @throws IllegalArgumentException 비교 기억이 ID, 내용 또는 유효 기간 계약에 맞지 않을 때
+   */
   FreeTalkMemoryCandidate withComparable(
       List<ConversationMemoryMatch> comparableMemories, ZoneId zoneId) {
     validateComparableMemories(comparableMemories);
