@@ -26,36 +26,56 @@ public class FreeTalkMemoryGenerationService {
 
   /** 완료된 프리톡의 장기기억 생성을 한 번 실행한다. */
   public void generate(long learningSessionId) {
-    FreeTalkMemoryGenerationContextService.GenerationContext context;
-    try {
-      context = contextService.claim(learningSessionId);
-    } catch (RuntimeException exception) {
-      failSafely(learningSessionId, exception);
-      return;
-    }
+    FreeTalkMemoryGenerationContextService.GenerationContext context =
+        claimContextOrFail(learningSessionId);
     if (context == null) {
       return;
     }
 
     try {
-      AiMemoryCandidatesResult extraction =
-          aiClient.extractMemoryCandidates(
-              new AiMemoryCandidatesRequest(
-                  context.learningSessionId(),
-                  context.characterId(),
-                  context.targetLocale(),
-                  context.baseLocale(),
-                  context.timezone(),
-                  context.history()));
-      List<FreeTalkMemoryCandidate> candidates = candidateMapper.mapCandidates(context, extraction);
-      List<ConversationMemoryResolutionPlan> plans = resolutionService.plan(context, candidates);
-      if (writeService.persistIfSnapshotCurrent(learningSessionId, context.userProfileId(), plans)
-          == ConversationMemoryWriteService.PersistenceResult.STALE) {
-        throw new IllegalStateException("장기기억 비교 snapshot이 변경됐습니다.");
-      }
+      persistGeneratedMemories(learningSessionId, context);
     } catch (RuntimeException exception) {
       failSafely(learningSessionId, exception);
     }
+  }
+
+  private FreeTalkMemoryGenerationContextService.GenerationContext claimContextOrFail(
+      long learningSessionId) {
+    try {
+      return contextService.claim(learningSessionId);
+    } catch (RuntimeException exception) {
+      failSafely(learningSessionId, exception);
+      return null;
+    }
+  }
+
+  private void persistGeneratedMemories(
+      long learningSessionId,
+      FreeTalkMemoryGenerationContextService.GenerationContext context) {
+    List<ConversationMemoryResolutionPlan> plans = createResolutionPlans(context);
+    if (writeService.persistIfSnapshotCurrent(learningSessionId, context.userProfileId(), plans)
+        == ConversationMemoryWriteService.PersistenceResult.STALE) {
+      throw new IllegalStateException("장기기억 비교 snapshot이 변경됐습니다.");
+    }
+  }
+
+  private List<ConversationMemoryResolutionPlan> createResolutionPlans(
+      FreeTalkMemoryGenerationContextService.GenerationContext context) {
+    AiMemoryCandidatesResult extraction = extractMemoryCandidates(context);
+    List<FreeTalkMemoryCandidate> candidates = candidateMapper.mapCandidates(context, extraction);
+    return resolutionService.plan(context, candidates);
+  }
+
+  private AiMemoryCandidatesResult extractMemoryCandidates(
+      FreeTalkMemoryGenerationContextService.GenerationContext context) {
+    return aiClient.extractMemoryCandidates(
+        new AiMemoryCandidatesRequest(
+            context.learningSessionId(),
+            context.characterId(),
+            context.targetLocale(),
+            context.baseLocale(),
+            context.timezone(),
+            context.history()));
   }
 
   /** 작업 제출 실패 등으로 실행되지 못한 작업을 조건부 실패 상태로 전환한다. */
