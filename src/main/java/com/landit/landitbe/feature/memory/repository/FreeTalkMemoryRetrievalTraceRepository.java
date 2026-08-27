@@ -17,7 +17,14 @@ public class FreeTalkMemoryRetrievalTraceRepository {
 
   private final JdbcTemplate jdbcTemplate;
 
-  /** 세션과 검색 단계의 첫 조회를 원자적으로 선점하고 중복 선점은 false로 처리한다. */
+  /**
+   * 세션과 검색 단계의 첫 조회를 원자적으로 선점하고 중복 선점은 false로 처리한다.
+   *
+   * @param sessionId 장기기억을 조회할 프리톡 세션 ID
+   * @param stage 조회를 수행하는 세션 시작 단계
+   * @param policyVersion 조회 정책 버전
+   * @return 처음 선점했으면 true, 이미 선점했거나 중복 제약에 걸리면 false
+   */
   public boolean claim(long sessionId, MemoryRetrievalStage stage, String policyVersion) {
     try {
       return jdbcTemplate.update(
@@ -36,7 +43,14 @@ public class FreeTalkMemoryRetrievalTraceRepository {
     }
   }
 
-  /** 선점 marker를 보존하고 검색 후보를 저장한다. */
+  /**
+   * 선점 marker를 보존하고 검색 후보를 저장한다.
+   *
+   * @param sessionId 장기기억을 조회한 프리톡 세션 ID
+   * @param stage 조회를 수행한 세션 시작 단계
+   * @param matches 저장할 검색 후보 목록
+   * @param policyVersion 조회 정책 버전
+   */
   public void saveCandidates(
       long sessionId,
       MemoryRetrievalStage stage,
@@ -63,7 +77,14 @@ public class FreeTalkMemoryRetrievalTraceRepository {
     }
   }
 
-  /** AI가 실제 사용했다고 응답한 후보와 연결 응답을 기록한다. */
+  /**
+   * AI가 실제 사용했다고 응답한 후보와 연결 응답을 기록한다.
+   *
+   * @param sessionId 장기기억을 조회한 프리톡 세션 ID
+   * @param stage 조회를 수행한 세션 시작 단계
+   * @param usedMemoryIds AI가 실제 사용한 장기기억 ID 목록
+   * @param responseMessageId 장기기억을 사용한 AI 응답 메시지 ID
+   */
   public void recordUsage(
       long sessionId,
       MemoryRetrievalStage stage,

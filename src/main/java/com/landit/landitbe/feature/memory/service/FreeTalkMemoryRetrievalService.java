@@ -33,7 +33,12 @@ public class FreeTalkMemoryRetrievalService {
   private final FreeTalkMemoryRetrievalTraceRepository traceRepository;
   private final MemoryProperties memoryProperties;
 
-  /** 활성화된 경우 세션의 지정 단계에서 장기기억을 한 번 검색한다. */
+  /**
+   * 활성화된 경우 세션의 지정 단계에서 장기기억을 한 번 검색한다.
+   *
+   * @param request 장기기억 검색에 필요한 세션·사용자·질의 정보
+   * @return 검색 문맥과 trace 선점 여부. 검색 실패 시 빈 문맥을 반환한다.
+   */
   public RetrievalResult retrieve(RetrievalRequest request) {
     if (!memoryProperties.useEnabled()) {
       return RetrievalResult.empty(request.sessionId(), request.stage());
@@ -84,7 +89,13 @@ public class FreeTalkMemoryRetrievalService {
     return RetrievalResult.empty(request.sessionId(), request.stage());
   }
 
-  /** AI가 실제 사용한 기억을 제공 문맥의 부분집합으로 검증해 trace에 기록한다. */
+  /**
+   * AI가 실제 사용한 기억을 제공 문맥의 부분집합으로 검증해 trace에 기록한다.
+   *
+   * @param result 검색 단계의 결과와 제공 문맥
+   * @param usedMemoryIds AI가 실제 사용했다고 응답한 장기기억 ID 목록
+   * @param responseMessageId 장기기억을 사용한 AI 응답 메시지 ID
+   */
   public void recordUsage(
       RetrievalResult result, List<Long> usedMemoryIds, Long responseMessageId) {
     if (!result.claimed()) {
@@ -139,7 +150,15 @@ public class FreeTalkMemoryRetrievalService {
     }
   }
 
-  /** 장기기억 검색에 필요한 입력을 표현한다. */
+  /**
+   * 장기기억 검색에 필요한 입력을 표현한다.
+   *
+   * @param sessionId 검색할 프리톡 세션 ID
+   * @param userProfileId 검색 대상 사용자 프로필 ID
+   * @param characterId 검색할 캐릭터 ID
+   * @param stage 검색을 수행하는 세션 시작 단계
+   * @param query 임베딩으로 변환할 자연어 검색 질의
+   */
   public record RetrievalRequest(
       long sessionId,
       long userProfileId,
@@ -147,7 +166,14 @@ public class FreeTalkMemoryRetrievalService {
       MemoryRetrievalStage stage,
       String query) {}
 
-  /** 검색 결과와 이후 사용 trace 연결 정보를 표현한다. */
+  /**
+   * 검색 결과와 이후 사용 trace 연결 정보를 표현한다.
+   *
+   * @param sessionId 검색한 프리톡 세션 ID
+   * @param stage 검색을 수행한 세션 시작 단계
+   * @param contexts AI에 제공할 장기기억 문맥 목록
+   * @param claimed 이번 단계의 검색 marker를 선점했는지 여부
+   */
   public record RetrievalResult(
       long sessionId,
       MemoryRetrievalStage stage,
@@ -158,7 +184,14 @@ public class FreeTalkMemoryRetrievalService {
       return new RetrievalResult(sessionId, stage, List.of(), false);
     }
 
-    /** 검색 결과의 사용 문맥을 방어적으로 복사한다. */
+    /**
+     * 검색 결과의 사용 문맥을 방어적으로 복사한다.
+     *
+     * @param sessionId 검색한 프리톡 세션 ID
+     * @param stage 검색을 수행한 세션 시작 단계
+     * @param contexts AI에 제공할 장기기억 문맥 목록
+     * @param claimed 이번 단계의 검색 marker를 선점했는지 여부
+     */
     public RetrievalResult {
       contexts = contexts == null ? List.of() : List.copyOf(contexts);
     }
