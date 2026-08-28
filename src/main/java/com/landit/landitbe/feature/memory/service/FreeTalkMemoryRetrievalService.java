@@ -140,7 +140,13 @@ public class FreeTalkMemoryRetrievalService {
         || match.content().isBlank()) {
       throw new IllegalArgumentException("장기기억 검색 후보가 유효하지 않습니다.");
     }
-    return new AiFreeTalkMemoryContext(match.memoryId(), match.memoryType(), match.content());
+    return new AiFreeTalkMemoryContext(
+        match.memoryId(),
+        match.memoryType(),
+        match.content(),
+        match.validFrom(),
+        match.validTo(),
+        match.observedAt());
   }
 
   private static void validateEmbeddingResult(AiMemoryQueryEmbeddingResult result) {

@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,12 @@ class FreeTalkMemoryRetrievalServiceTest {
     assertThat(result.contexts())
         .extracting(AiFreeTalkMemoryContext::memoryId)
         .containsExactly(1L, 2L, 3L);
+    assertThat(result.contexts().getFirst().validFrom())
+        .isEqualTo(LocalDateTime.of(2026, 7, 1, 9, 0));
+    assertThat(result.contexts().getFirst().validTo())
+        .isEqualTo(LocalDateTime.of(2026, 7, 31, 23, 59));
+    assertThat(result.contexts().getFirst().observedAt())
+        .isEqualTo(LocalDateTime.of(2026, 8, 1, 10, 30));
     verify(traceRepository)
         .saveCandidates(
             eq(10L), eq(MemoryRetrievalStage.OPENING), any(), eq("memory-retrieval-v1"));
@@ -117,7 +124,13 @@ class FreeTalkMemoryRetrievalServiceTest {
 
   private ConversationMemoryMatch match(long memoryId, double distance) {
     return new ConversationMemoryMatch(
-        memoryId, ConversationMemoryType.EVENT, "memory " + memoryId, null, null, null, distance);
+        memoryId,
+        ConversationMemoryType.EVENT,
+        "memory " + memoryId,
+        LocalDateTime.of(2026, 7, 1, 9, 0),
+        LocalDateTime.of(2026, 7, 31, 23, 59),
+        LocalDateTime.of(2026, 8, 1, 10, 30),
+        distance);
   }
 
   private List<Float> embedding() {
