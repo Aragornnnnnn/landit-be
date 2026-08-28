@@ -38,7 +38,7 @@ public record PronunciationReferenceManifest(List<Entry> entries) {
    * @param expressionId 어느 표현의 데이터인지 (writing_expression.id)
    * @param accentLocale 어느 억양의 데이터인지 (EN_US / EN_GB / EN_AU)
    * @param sentenceText 이 기준 데이터를 만들 때 사용한 대표 예문. 임포트할 때 DB의 현재 문장과 비교해서, 문장이 바뀐 뒤 만든 낡은 데이터면 걸러내는
-   *     데 쓴다 (V60처럼 문장이 수정되는 경우 대비)
+   *     데 쓴다 (V61처럼 문장이 수정되는 경우 대비)
    * @param words 단어별 발음 기준 데이터 배열. 세부 구조가 자주 바뀔 수 있어 통째로(JsonNode) 받아 저장한다. 항목: order(순번),
    *     word(단어), syllables(음절 분해), stressIndex(강세 위치, 무강세 기능어는 -1), pronunciationDisplay(원어민 발음
    *     표기), accentContrast(억양 대조 힌트, 대조 단어에만 있음)

@@ -310,7 +310,7 @@ public class ExpressionPronunciationAssetService {
     if (wordItemFailure != null) {
       return wordItemFailure;
     }
-    // 낡은 기준 데이터 방지: 만들 때 쓴 문장과 지금 DB 문장이 다르면 거른다 (V60처럼 문장이 바뀐 경우).
+    // 낡은 기준 데이터 방지: 만들 때 쓴 문장과 지금 DB 문장이 다르면 거른다 (V61처럼 문장이 바뀐 경우).
     if (!Objects.equals(entry.sentenceText(), expression.getRepresentativeSentenceText())) {
       return "기준 데이터의 문장이 DB의 대표 예문과 다릅니다. 최신 문장으로 재생성이 필요합니다.";
     }
