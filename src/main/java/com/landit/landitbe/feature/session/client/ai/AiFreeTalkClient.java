@@ -26,6 +26,15 @@ public interface AiFreeTalkClient {
   AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request);
 
   /**
+   * 장기기억 검색 query를 임베딩한다.
+   *
+   * @param request 검색 query
+   * @return 1,536차원 query embedding
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request);
+
+  /**
    * 사용자 발화에 대한 상대 역할의 속마음을 생성한다.
    *
    * @param request 사용자 발화와 누적 대화 정보

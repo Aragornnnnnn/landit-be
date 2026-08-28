@@ -9,6 +9,10 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.landit.landitbe.feature.content.domain.TtsVoice;
 import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;
+import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
@@ -36,6 +40,8 @@ class DatabaseSchemaIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private TtsVoiceRepository ttsVoiceRepository;
+
+  @Autowired private FreeTalkMemoryRetrievalTraceRepository memoryRetrievalTraceRepository;
 
   @Test
   void dbmlCoreTablesExist() {
@@ -524,6 +530,38 @@ class DatabaseSchemaIntegrationTests {
     assertThatThrownBy(
             () -> jdbcTemplate.update("delete from session_history_message where id = ?", 994005L))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @DisplayName("프리톡 기억 검색 선점 marker는 후보 저장 후에도 세션별 1회를 보장한다.")
+  @Test
+  @Transactional
+  void freeTalkMemoryRetrievalClaimRemainsAfterCandidatesAreSaved() {
+    insertConversationMemoryFixtures();
+    insertConversationMemory(new MemoryFixture(994103L));
+
+    assertThat(
+            memoryRetrievalTraceRepository.claim(
+                994003L, MemoryRetrievalStage.OPENING, "memory-retrieval-v1"))
+        .isTrue();
+    memoryRetrievalTraceRepository.saveCandidates(
+        994003L,
+        MemoryRetrievalStage.OPENING,
+        List.of(
+            new ConversationMemoryMatch(
+                994103L, ConversationMemoryType.PROFILE, "memory", null, null, null, 0.1)),
+        "memory-retrieval-v1");
+
+    assertThat(
+            memoryRetrievalTraceRepository.claim(
+                994003L, MemoryRetrievalStage.OPENING, "memory-retrieval-v1"))
+        .isFalse();
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select candidate_rank from free_talk_memory_retrieval "
+                    + "where free_talk_session_id = 994003 and retrieval_stage = 'OPENING' "
+                    + "order by candidate_rank",
+                Integer.class))
+        .containsExactly(0, 1);
   }
 
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")

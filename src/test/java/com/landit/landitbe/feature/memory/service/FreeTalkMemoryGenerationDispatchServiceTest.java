@@ -21,7 +21,7 @@ class FreeTalkMemoryGenerationDispatchServiceTest {
     TaskExecutor taskExecutor = Mockito.mock(TaskExecutor.class);
     FreeTalkMemoryGenerationDispatchService dispatchService =
         new FreeTalkMemoryGenerationDispatchService(
-            generationService, taskExecutor, new MemoryProperties(false));
+            generationService, taskExecutor, new MemoryProperties(false, false));
 
     dispatchService.dispatch(10L);
 
@@ -39,7 +39,7 @@ class FreeTalkMemoryGenerationDispatchServiceTest {
         };
     FreeTalkMemoryGenerationDispatchService dispatchService =
         new FreeTalkMemoryGenerationDispatchService(
-            generationService, rejectingExecutor, new MemoryProperties(true));
+            generationService, rejectingExecutor, new MemoryProperties(true, false));
 
     dispatchService.dispatch(10L);
 
@@ -53,7 +53,7 @@ class FreeTalkMemoryGenerationDispatchServiceTest {
     TaskExecutor taskExecutor = Mockito.mock(TaskExecutor.class);
     FreeTalkMemoryGenerationDispatchService dispatchService =
         new FreeTalkMemoryGenerationDispatchService(
-            generationService, taskExecutor, new MemoryProperties(true));
+            generationService, taskExecutor, new MemoryProperties(true, false));
 
     dispatchService.dispatch(10L);
 

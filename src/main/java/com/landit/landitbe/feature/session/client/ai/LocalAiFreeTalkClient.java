@@ -22,7 +22,10 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
     return new AiFreeTalkOpeningResult(
-        "What would you like to talk about today?", "오늘은 무슨 이야기를 하고 싶어?", CharacterEmotion.HAPPY);
+        "What would you like to talk about today?",
+        "오늘은 무슨 이야기를 하고 싶어?",
+        CharacterEmotion.HAPPY,
+        List.of());
   }
 
   /** {@inheritDoc} */
@@ -33,7 +36,14 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         null,
         "That sounds interesting. Tell me more.",
         "흥미롭다. 조금 더 이야기해줘.",
-        CharacterEmotion.HAPPY);
+        CharacterEmotion.HAPPY,
+        List.of());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
+    return new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", firstAxisEmbedding());
   }
 
   /** {@inheritDoc} */

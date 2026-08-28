@@ -216,6 +216,85 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void postsMemoryQueryEmbeddingContractAndMapsFixedDimensionVector() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/memory-query-embedding",
+        requests,
+        successResponse(
+            "{\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
+                + embeddingJson()
+                + "}"));
+
+    AiMemoryQueryEmbeddingResult result =
+        remoteClient().embedMemoryQuery(new AiMemoryQueryEmbeddingRequest(" weekend plans "));
+
+    assertThat(requests.get("/api/v1/free-talk/memory-query-embedding").get("query").asText())
+        .isEqualTo(" weekend plans ");
+    assertThat(result.embeddingModel()).isEqualTo("openai/text-embedding-3-small");
+    assertThat(result.embedding()).hasSize(1536);
+  }
+
+  @Test
+  void mapsUsedMemoryIdsAndSendsMemoryContextForOpening() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        requests,
+        successResponse(
+            "{\"aiMessage\":\"How is the interview going?\","
+                + "\"translatedMessage\":\"면접은 잘 되어가?\","
+                + "\"usedMemoryIds\":[77]}"));
+
+    AiFreeTalkOpeningResult result =
+        remoteClient()
+            .generateOpening(
+                new AiFreeTalkOpeningRequest(
+                    300L,
+                    "chloe",
+                    "EN",
+                    "KR",
+                    new AiFreeTalkTopic(2L, "주말 계획", "Ask about weekend plans."),
+                    List.of(
+                        new AiFreeTalkMemoryContext(77L, ConversationMemoryType.EVENT, "면접 계획"))));
+
+    assertThat(
+            requests
+                .get("/api/v1/free-talk/opening")
+                .get("memoryContext")
+                .get(0)
+                .get("memoryId")
+                .asLong())
+        .isEqualTo(77L);
+    assertThat(result.usedMemoryIds()).containsExactly(77L);
+  }
+
+  @Test
+  void normalizesUsedMemoryIdOutsideContextWithoutRejectingConversation() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        new ConcurrentHashMap<>(),
+        successResponse(
+            "{\"aiMessage\":\"How is the interview going?\","
+                + "\"translatedMessage\":\"면접은 잘 되어가?\","
+                + "\"usedMemoryIds\":[88]}"));
+
+    AiFreeTalkOpeningResult result =
+        remoteClient()
+            .generateOpening(
+                new AiFreeTalkOpeningRequest(
+                    300L,
+                    "chloe",
+                    "EN",
+                    "KR",
+                    new AiFreeTalkTopic(2L, "주말 계획", "Ask about weekend plans."),
+                    List.of(
+                        new AiFreeTalkMemoryContext(77L, ConversationMemoryType.EVENT, "면접 계획"))));
+
+    assertThat(result.usedMemoryIds()).isEmpty();
+  }
+
+  @Test
   void rejectsResponsesMissingRequiredFields() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/opening",
@@ -606,12 +685,23 @@ class RemoteAiFreeTalkClientTest {
         "chloe",
         "EN",
         "KR",
-        new AiFreeTalkTopic(2L, "주말 계획", "Ask about the user's weekend plans."));
+        new AiFreeTalkTopic(2L, "주말 계획", "Ask about the user's weekend plans."),
+        List.of());
   }
 
   private AiFreeTalkTurnRequest turnRequest() {
     return new AiFreeTalkTurnRequest(
-        300L, "chloe", 3002L, 1, "EN", "KR", AiFreeTalkResponseMode.NORMAL, true, null, history());
+        300L,
+        "chloe",
+        3002L,
+        1,
+        "EN",
+        "KR",
+        AiFreeTalkResponseMode.NORMAL,
+        true,
+        null,
+        history(),
+        List.of());
   }
 
   private AiFreeTalkClosingRequest closingRequest() {
