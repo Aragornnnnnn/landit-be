@@ -119,6 +119,7 @@ public record DailyScenarioResponse(
    *
    * @param aiOpeningMessage AI first 시 첫 AI 메시지
    * @param aiOpeningMessageTranslation 첫 AI 메시지 번역
+   * @param questionAudioUrl 첫 고정 질문 음원 URL
    * @param userOpeningInstruction USER first 시 사용자 시작 안내
    * @param innerThought 첫 화면에 보여줄 상대 역할의 속마음
    * @param innerThoughtType 속마음 유형
@@ -129,6 +130,7 @@ public record DailyScenarioResponse(
   public record OpeningPreviewResponse(
       @Schema(description = "AI first 시 첫 AI 메시지") String aiOpeningMessage,
       @Schema(description = "첫 AI 메시지 번역") String aiOpeningMessageTranslation,
+      @Schema(description = "첫 고정 질문 음원 URL") String questionAudioUrl,
       @Schema(description = "USER first 시 사용자 시작 안내") String userOpeningInstruction,
       @Schema(description = "첫 화면에 보여줄 상대 역할의 속마음") String innerThought,
       @Schema(description = "속마음 유형") String innerThoughtType,
@@ -146,6 +148,7 @@ public record DailyScenarioResponse(
         return new OpeningPreviewResponse(
             projection.aiOpeningMessage(),
             projection.aiOpeningMessageTranslation(),
+            projection.openingQuestionAudioUrl(),
             null,
             projection.innerThought(),
             projection.innerThoughtType() == null ? null : projection.innerThoughtType().name(),
@@ -157,6 +160,7 @@ public record DailyScenarioResponse(
                 projection.ttsVoiceGender()));
       }
       return new OpeningPreviewResponse(
+          null,
           null,
           null,
           projection.userOpeningInstruction(),

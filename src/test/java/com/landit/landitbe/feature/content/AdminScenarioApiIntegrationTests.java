@@ -71,7 +71,7 @@ class AdminScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioTitle").value("공개 시나리오"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
-                .value("en-US-Harper:MAI-Voice-2"))
+                .value("aura-2-luna-en"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").doesNotExist())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").doesNotExist())
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].locked").doesNotExist());

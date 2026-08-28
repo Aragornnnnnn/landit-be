@@ -137,7 +137,7 @@ class ScenarioSessionApiIntegrationTests {
         "기존 시작 메시지",
         "음식 이야기는 처음 대화를 열기 좋다.",
         "GOOD",
-        ttsVoiceId("en-US-Harper:MAI-Voice-2"),
+        ttsVoiceId("aura-2-luna-en"),
         "ACTIVE");
     MvcResult result =
         mockMvc
@@ -154,9 +154,8 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.firstSpeaker").value("AI"))
             .andExpect(jsonPath("$.data.userOpeningInstruction").value(nullValue()))
             .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(jsonPath("$.data.ttsVoice.model").value("microsoft/mai-voice-2"))
-            .andExpect(
-                jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.model").value("deepgram/aura-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
             .andExpect(jsonPath("$.data.ttsVoice.gender").value("FEMALE"))
             .andExpect(jsonPath("$.data.currentMessage.messageId").value(notNullValue()))
             .andExpect(jsonPath("$.data.currentMessage.turnNumber").value(1))
@@ -167,6 +166,9 @@ class ScenarioSessionApiIntegrationTests {
                     .value("What food do you like? Why do you like it?"))
             .andExpect(
                 jsonPath("$.data.currentMessage.translatedContent").value("좋아하는 음식이 있어? 왜 좋아해?"))
+            .andExpect(
+                jsonPath("$.data.currentMessage.questionAudioUrl")
+                    .value("https://cdn.example.com/questions/4001.mp3"))
             .andExpect(jsonPath("$.data.currentMessage.innerThought").value("질문 1번의 속마음"))
             .andExpect(jsonPath("$.data.currentMessage.innerThoughtType").value("GOOD"))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
@@ -308,6 +310,10 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(
                 jsonPath("$.data.nextMessage.translatedContent")
                     .value("아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?"))
+            .andExpect(jsonPath("$.data.nextMessage.ttsText").value("Oh, you like spicy pizza."))
+            .andExpect(
+                jsonPath("$.data.nextMessage.questionAudioUrl")
+                    .value("https://cdn.example.com/questions/4102.mp3"))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
             .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
             .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(2))
@@ -465,7 +471,11 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(
                 jsonPath("$.data.nextMessage.content")
-                    .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                    .value("Oh, you like spicy pizza. What would you like?"))
+            .andExpect(jsonPath("$.data.nextMessage.ttsText").value("Oh, you like spicy pizza."))
+            .andExpect(
+                jsonPath("$.data.nextMessage.questionAudioUrl")
+                    .value("https://cdn.example.com/questions/4203.mp3"))
             .andReturn();
     long messageId =
         objectMapper
@@ -796,7 +806,7 @@ class ScenarioSessionApiIntegrationTests {
             fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().type().name())
         .isEqualTo("AI_MESSAGE");
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
-        .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
+        .isEqualTo("Oh, you like spicy pizza. What size would you like?");
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
         .isEqualTo("A medium size, please.");
   }
@@ -1024,6 +1034,10 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(
             jsonPath("$.data.nextMessage.content")
                 .value("Thanks for sharing. That was a good conversation."))
+        .andExpect(
+            jsonPath("$.data.nextMessage.ttsText")
+                .value("Thanks for sharing. That was a good conversation."))
+        .andExpect(jsonPath("$.data.nextMessage.questionAudioUrl").value(nullValue()))
         .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
         .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
         .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(1))
@@ -1294,7 +1308,7 @@ class ScenarioSessionApiIntegrationTests {
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.type").value("AI_MESSAGE"))
         .andExpect(
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.content")
-                .value("Oh, you like spicy pizza. What food did you eat recently?"));
+                .value("Oh, you like spicy pizza. Would you like anything else?"));
 
     assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().expectedMessageIds())
         .containsExactlyElementsOf(userMessageIds(sessionId));
@@ -1389,7 +1403,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
         .andExpect(
             jsonPath("$.data.nextMessage.content")
-                .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                .value("Oh, you like spicy pizza. Do you want me to stop now?"))
         .andExpect(jsonPath("$.data.progress.completed").value(false));
 
     assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
@@ -1413,7 +1427,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsExactly(
             "What do you want me to do?",
             "Could you keep it down at night?",
-            "Oh, you like spicy pizza. What food did you eat recently?");
+            "Oh, you like spicy pizza. Do you want me to stop now?");
   }
 
   @Test
@@ -2470,17 +2484,19 @@ class ScenarioSessionApiIntegrationTests {
             base_locale,
             question_text,
             question_translation,
+            audio_url,
             inner_thought,
             inner_thought_type,
             status,
             created_at,
             updated_at
         )
-        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         questionText,
         questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId),
         innerThought,
         innerThoughtType);
   }
@@ -2840,9 +2856,7 @@ class ScenarioSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       return new AiNextMessageResult(
-          "Oh, you like spicy pizza. What food did you eat recently?",
-          "아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?",
-          nextGoalCompletionStatus);
+          "Oh, you like spicy pizza.", "아, 매콤한 피자를 좋아하는구나.", nextGoalCompletionStatus);
     }
 
     @Override

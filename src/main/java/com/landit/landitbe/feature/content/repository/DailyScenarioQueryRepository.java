@@ -34,6 +34,7 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
                 s.firstSpeaker,
                 openingQuestionVariant.questionText,
                 openingQuestionVariant.questionTranslation,
+                openingQuestionVariant.audioUrl,
                 slv.userOpeningInstruction,
                 openingQuestionVariant.innerThought,
                 openingQuestionVariant.innerThoughtType,

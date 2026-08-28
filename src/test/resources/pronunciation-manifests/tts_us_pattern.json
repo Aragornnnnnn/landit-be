@@ -1,0 +1,16 @@
+{
+  "assets": [
+    {
+      "expressionId": 990304,
+      "accentLocale": "EN_US",
+      "expressionAudioUrl": null,
+      "sentenceAudioUrl": "https://cdn.example.com/pattern/sentence.mp3",
+      "words": [
+        {"order": 1, "audioUrl": "https://cdn.example.com/pattern/words/1.mp3"},
+        {"order": 2, "audioUrl": "https://cdn.example.com/pattern/words/2.mp3"},
+        {"order": 3, "audioUrl": "https://cdn.example.com/pattern/words/3.mp3"},
+        {"order": 4, "audioUrl": "https://cdn.example.com/pattern/words/4.mp3"}
+      ]
+    }
+  ]
+}

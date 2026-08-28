@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
@@ -14,6 +15,7 @@ import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
+import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -75,6 +77,8 @@ public class ExpressionQueryService {
   private final ScenarioService scenarioService;
   private final UserProfileService userProfileService;
   private final WritingExpressionRepository writingExpressionRepository;
+  private final ExpressionPronunciationAssetRepository pronunciationAssetRepository;
+  private final UserAccentLocaleResolver accentLocaleResolver;
   private final ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
   private final LearningProgressService learningProgressService;
 
@@ -155,7 +159,23 @@ public class ExpressionQueryService {
    */
   @Transactional(readOnly = true)
   public ExpressionLearningResponse getExpressionForLearning(Long userId, Long expressionId) {
-    return ExpressionLearningResponse.from(requireAccessibleExpression(userId, expressionId));
+    WritingExpression expression = requireAccessibleExpression(userId, expressionId);
+    return ExpressionLearningResponse.from(expression, findSentenceAudioUrl(userId, expressionId));
+  }
+
+  // 사용자의 목표 억양에 맞는 대표 예문 TTS URL을 찾는다.
+  // 발음 자산이 아직 없거나 TTS 미완성이면 null — 표현 981개의 자산을 단계적으로 채우는 동안
+  // 학습 시작 화면이 깨지지 않게 하기 위한 의도된 동작이다 (앱은 null이면 발음 파트를 숨긴다).
+  private String findSentenceAudioUrl(Long userId, Long expressionId) {
+    return accentLocaleResolver
+        .tryResolve(userId)
+        .flatMap(
+            accentLocale ->
+                pronunciationAssetRepository.findByWritingExpressionIdAndAccentLocale(
+                    expressionId, accentLocale))
+        .filter(ExpressionPronunciationAsset::hasTts)
+        .map(ExpressionPronunciationAsset::getSentenceAudioUrl)
+        .orElse(null);
   }
 
   /**
