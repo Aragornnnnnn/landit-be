@@ -82,10 +82,21 @@ class NewConversationMemoryTests {
   @Test
   void rejectsMissingTemporalValuesAndMetadata() {
     assertInvalid(fixture -> fixture.validFrom = null);
+    assertInvalid(
+        fixture -> {
+          fixture.validTo = NOW.minusSeconds(1);
+        });
     assertInvalid(fixture -> fixture.observedAt = null);
     assertInvalid(fixture -> fixture.recordedAt = null);
     assertInvalid(fixture -> fixture.extractorVersion = " ");
     assertInvalid(fixture -> fixture.embeddingModel = " ");
+  }
+
+  @Test
+  void preservesNullableValidToWhenTemporalRangeIsValid() {
+    NewConversationMemory memory = memory(fixture -> fixture.validTo = NOW.plusDays(1));
+
+    assertThat(memory.validTo()).isEqualTo(NOW.plusDays(1));
   }
 
   @Test

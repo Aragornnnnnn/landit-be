@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingReason;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
@@ -35,18 +36,21 @@ public class FreeTalkMessageService {
   private final SessionMessageService sessionMessageService;
   private final TaskExecutor taskExecutor;
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
+  private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService;
 
   FreeTalkMessageService(
       FreeTalkSubmittedMessageService submittedMessageService,
       AiFreeTalkClient aiFreeTalkClient,
       SessionMessageService sessionMessageService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
-      FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher) {
+      FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
+      FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService) {
     this.submittedMessageService = submittedMessageService;
     this.aiFreeTalkClient = aiFreeTalkClient;
     this.sessionMessageService = sessionMessageService;
     this.taskExecutor = taskExecutor;
     this.expressionGenerationDispatcher = expressionGenerationDispatcher;
+    this.memoryGenerationDispatchService = memoryGenerationDispatchService;
   }
 
   /**
@@ -171,6 +175,7 @@ public class FreeTalkMessageService {
   private void dispatchIfCompleted(FreeTalkMessageSubmitResponse response) {
     if (response.turnStatus() == FreeTalkTurnStatus.COMPLETED) {
       expressionGenerationDispatcher.dispatch(response.sessionId());
+      memoryGenerationDispatchService.dispatch(response.sessionId());
     }
   }
 

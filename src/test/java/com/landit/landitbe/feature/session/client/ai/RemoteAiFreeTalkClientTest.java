@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -13,6 +14,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -156,6 +158,61 @@ class RemoteAiFreeTalkClientTest {
                 .asLong())
         .isEqualTo(7L);
     assertThat(recommendations.recommendations()).hasSize(1);
+  }
+
+  @Test
+  void postsMemoryCandidateContractAndMapsSuccessfulResponse() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/memory-candidates",
+        requests,
+        successResponse(memoryCandidateData("memory-candidate-v1", 0, "EVENT")));
+
+    AiMemoryCandidatesResult result =
+        remoteClient().extractMemoryCandidates(memoryCandidatesRequest());
+
+    JsonNode request = requests.get("/api/v1/free-talk/memory-candidates");
+    assertThat(request.get("sessionId").asLong()).isEqualTo(300L);
+    assertThat(request.get("characterId").asText()).isEqualTo("chloe");
+    assertThat(request.get("timezone").asText()).isEqualTo("Asia/Seoul");
+    assertThat(request.get("conversationHistory").get(0).get("messageId").asLong())
+        .isEqualTo(3001L);
+    assertThat(request.get("conversationHistory").get(0).get("occurredAt").asText())
+        .isEqualTo("2026-08-25T20:00:00+09:00");
+    assertThat(result.extractorVersion()).isEqualTo("memory-candidate-v1");
+    assertThat(result.candidates()).hasSize(1);
+    assertThat(result.candidates().getFirst().embedding()).hasSize(1536);
+    assertThat(result.candidates().getFirst().embeddingModel())
+        .isEqualTo("openai/text-embedding-3-small");
+  }
+
+  @Test
+  void postsMemoryResolutionContractAndMapsSuccessfulResponse() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/memory-resolution",
+        requests,
+        successResponse(
+            "{\"resolutions\":[{\"candidateIndex\":0,\"operation\":\"SUPERSEDE\","
+                + "\"supersededMemoryIds\":[77]}]}"));
+
+    AiMemoryResolutionResult result = remoteClient().resolveMemory(memoryResolutionRequest());
+
+    JsonNode request = requests.get("/api/v1/free-talk/memory-resolution");
+    assertThat(request.get("candidates").get(0).get("candidateIndex").asInt()).isZero();
+    assertThat(request.get("candidates").get(0).get("observedAt").asText())
+        .isEqualTo("2026-08-29T19:20:00+09:00");
+    assertThat(
+            request
+                .get("candidates")
+                .get(0)
+                .get("comparableMemories")
+                .get(0)
+                .get("memoryId")
+                .asLong())
+        .isEqualTo(77L);
+    assertThat(result.resolutions().getFirst().operation()).isEqualTo(AiMemoryOperation.SUPERSEDE);
+    assertThat(result.resolutions().getFirst().supersededMemoryIds()).containsExactly(77L);
   }
 
   @Test
@@ -589,5 +646,74 @@ class RemoteAiFreeTalkClientTest {
   private List<AiConversationHistoryMessage> history() {
     return List.of(
         new AiConversationHistoryMessage(3002L, 1, "USER", "I'm going hiking with friends.", null));
+  }
+
+  private AiMemoryCandidatesRequest memoryCandidatesRequest() {
+    return new AiMemoryCandidatesRequest(
+        300L,
+        "chloe",
+        "EN",
+        "KR",
+        "Asia/Seoul",
+        List.of(
+            new AiConversationHistoryMessage(
+                3001L,
+                1,
+                "AI",
+                "How was your weekend?",
+                "주말은 어땠어?",
+                OffsetDateTime.parse("2026-08-25T20:00:00+09:00")),
+            new AiConversationHistoryMessage(
+                3002L,
+                1,
+                "USER",
+                "I have an interview next Friday.",
+                null,
+                OffsetDateTime.parse("2026-08-25T20:10:00+09:00"))));
+  }
+
+  private AiMemoryResolutionRequest memoryResolutionRequest() {
+    return new AiMemoryResolutionRequest(
+        List.of(
+            new AiMemoryResolutionRequest.Candidate(
+                0,
+                "사용자는 면접에 합격했다.",
+                ConversationMemoryType.EVENT,
+                List.of(3002L),
+                OffsetDateTime.parse("2026-08-29T19:20:00+09:00"),
+                List.of(
+                    new AiMemoryResolutionRequest.ComparableMemory(
+                        77L,
+                        "사용자는 다음 주에 면접이 있다.",
+                        OffsetDateTime.parse("2026-08-25T20:10:00+09:00"),
+                        null,
+                        OffsetDateTime.parse("2026-08-25T20:10:00+09:00"))))));
+  }
+
+  private String memoryCandidateData(
+      String extractorVersion, int candidateIndex, String memoryType) {
+    return "{\"extractorVersion\":\""
+        + extractorVersion
+        + "\",\"candidates\":["
+        + memoryCandidateJson(candidateIndex, memoryType)
+        + "]}";
+  }
+
+  private String memoryCandidateJson(int candidateIndex, String memoryType) {
+    return "{\"candidateIndex\":"
+        + candidateIndex
+        + ",\"memoryType\":\""
+        + memoryType
+        + "\",\"content\":\"사용자는 2026년 8월 28일에 면접이 있다.\","
+        + "\"contentLocale\":\"KR\",\"sourceMessageIds\":[3002],"
+        + "\"confidence\":0.94,"
+        + "\"validFrom\":\"2026-08-25T20:10:00+09:00\",\"validTo\":null,"
+        + "\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
+        + embeddingJson()
+        + "}";
+  }
+
+  private String embeddingJson() {
+    return "[" + String.join(",", java.util.Collections.nCopies(1536, "0.0")) + "]";
   }
 }

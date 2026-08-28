@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.memory.repository;
 
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -32,6 +33,39 @@ final class ConversationMemorySearchSupport {
     }
     if (characterId == null || characterId.isBlank()) {
       throw new IllegalArgumentException("검색 캐릭터는 필수입니다.");
+    }
+    return characterId.trim();
+  }
+
+  /**
+   * 후보와 같은 유형·범위의 비교 검색 입력이 유효한지 확인한다.
+   *
+   * @param queryEmbedding 검색 쿼리 1,536차원 임베딩
+   * @param userProfileId 검색 대상 사용자 프로필 ID
+   * @param characterId 비교할 캐릭터 ID. PROFILE은 null이다.
+   * @param memoryType 비교할 장기기억 의미 유형
+   * @param limit 반환할 최대 결과 수
+   * @return 앞뒤 공백을 제거한 캐릭터 ID 또는 PROFILE의 null 범위
+   * @throws IllegalArgumentException 임베딩·범위·유형·제한 값이 유효하지 않은 경우
+   */
+  static String validateComparableSearchArguments(
+      List<Float> queryEmbedding,
+      long userProfileId,
+      String characterId,
+      ConversationMemoryType memoryType,
+      int limit) {
+    validateEmbedding(queryEmbedding);
+    if (userProfileId <= 0 || limit <= 0 || memoryType == null) {
+      throw new IllegalArgumentException("비교 검색 사용자·유형·제한 값이 유효하지 않습니다.");
+    }
+    if (memoryType == ConversationMemoryType.PROFILE) {
+      if (characterId != null && !characterId.isBlank()) {
+        throw new IllegalArgumentException("프로필 비교 검색의 캐릭터 범위가 유효하지 않습니다.");
+      }
+      return null;
+    }
+    if (characterId == null || characterId.isBlank()) {
+      throw new IllegalArgumentException("이벤트·에피소드 비교 검색 캐릭터가 필요합니다.");
     }
     return characterId.trim();
   }
