@@ -14,6 +14,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -256,7 +257,13 @@ class RemoteAiFreeTalkClientTest {
                     "KR",
                     new AiFreeTalkTopic(2L, "주말 계획", "Ask about weekend plans."),
                     List.of(
-                        new AiFreeTalkMemoryContext(77L, ConversationMemoryType.EVENT, "면접 계획"))));
+                        new AiFreeTalkMemoryContext(
+                            77L,
+                            ConversationMemoryType.EVENT,
+                            "면접 계획",
+                            LocalDateTime.of(2026, 7, 1, 9, 0),
+                            LocalDateTime.of(2026, 7, 31, 23, 59),
+                            LocalDateTime.of(2026, 8, 1, 10, 30)))));
 
     assertThat(
             requests
@@ -266,6 +273,10 @@ class RemoteAiFreeTalkClientTest {
                 .get("memoryId")
                 .asLong())
         .isEqualTo(77L);
+    JsonNode memoryContext = requests.get("/api/v1/free-talk/opening").get("memoryContext").get(0);
+    assertThat(memoryContext.get("validFrom").asText()).isEqualTo("2026-07-01T09:00:00");
+    assertThat(memoryContext.get("validTo").asText()).isEqualTo("2026-07-31T23:59:00");
+    assertThat(memoryContext.get("observedAt").asText()).isEqualTo("2026-08-01T10:30:00");
     assertThat(result.usedMemoryIds()).containsExactly(77L);
   }
 
