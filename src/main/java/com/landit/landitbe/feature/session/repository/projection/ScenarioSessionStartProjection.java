@@ -23,6 +23,7 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
  * @param userOpeningInstruction 사용자 첫 발화 안내
  * @param aiOpeningMessage 첫 AI 메시지
  * @param aiOpeningMessageTranslation 첫 AI 메시지 번역
+ * @param openingQuestionAudioUrl 첫 고정 질문 음원 URL
  * @param aiOpeningInnerThought 첫 AI 메시지의 속마음
  * @param aiOpeningInnerThoughtType 첫 AI 메시지의 속마음 유형
  * @param ttsVoiceProvider TTS 제공자
@@ -43,6 +44,7 @@ public record ScenarioSessionStartProjection(
     String userOpeningInstruction,
     String aiOpeningMessage,
     String aiOpeningMessageTranslation,
+    String openingQuestionAudioUrl,
     String aiOpeningInnerThought,
     InnerThoughtType aiOpeningInnerThoughtType,
     TtsVoiceProvider ttsVoiceProvider,

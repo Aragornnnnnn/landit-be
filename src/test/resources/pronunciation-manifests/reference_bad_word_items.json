@@ -1,0 +1,11 @@
+[
+  {
+    "expressionId": 990301,
+    "accentLocale": "EN_US",
+    "sentenceText": "There's nothing like hiking.",
+    "words": [
+      {"order": 1, "word": "There's", "pronunciationDisplay": "thairz"},
+      {"order": 1, "word": "nothing", "pronunciationDisplay": "nuh·thing"}
+    ]
+  }
+]

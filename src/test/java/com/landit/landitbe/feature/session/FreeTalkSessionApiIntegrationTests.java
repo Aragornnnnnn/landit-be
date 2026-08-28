@@ -202,8 +202,7 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
             .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
             .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(
-                jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
             .andExpect(
                 jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
             .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
