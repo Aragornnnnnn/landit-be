@@ -1,0 +1,11 @@
+[
+  {
+    "expressionId": 990301,
+    "accentLocale": "EN_US",
+    "sentenceText": "An old sentence that was changed.",
+    "words": [
+      {"order": 1, "word": "old", "syllables": ["old"], "stressIndex": 0,
+       "pronunciationDisplay": "ould"}
+    ]
+  }
+]

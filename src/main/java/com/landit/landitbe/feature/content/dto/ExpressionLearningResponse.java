@@ -49,15 +49,24 @@ public record ExpressionLearningResponse(
                     + "\"have\", \"get\", \"your\", \"mind\"]")
         List<String> representativeSentenceWordChoices,
     @Schema(description = "대표 예문 이미지 URL", example = "https://cdn.example.com/images/101.png")
-        String representativeImageUrl) {
+        String representativeImageUrl,
+    @Schema(
+            description =
+                "대표 예문 원어민 TTS URL. 발음 페이지의 '원어민 발음 듣기' 재생용."
+                    + " 사용자의 AI 튜터 억양 기준이며, 발음 자산이 아직 준비되지 않은 표현은 null"
+                    + " (앱은 null이면 발음 듣기·발화 파트를 숨긴다)",
+            example = "https://cdn.landit.com/content/expression-pronunciation-audio/101/abc.mp3")
+        String representativeSentenceAudioUrl) {
 
   /**
-   * 표현 엔티티를 학습 시작 응답으로 변환한다.
+   * 표현 엔티티와 대표 예문 TTS URL을 학습 시작 응답으로 변환한다.
    *
    * @param expression 변환할 표현 엔티티
+   * @param representativeSentenceAudioUrl 대표 예문 원어민 TTS URL. 발음 자산이 없으면 null
    * @return 표현 학습 시작 응답
    */
-  public static ExpressionLearningResponse from(WritingExpression expression) {
+  public static ExpressionLearningResponse from(
+      WritingExpression expression, String representativeSentenceAudioUrl) {
     return new ExpressionLearningResponse(
         expression.getId(),
         expression.getTargetExpressionText(),
@@ -69,6 +78,7 @@ public record ExpressionLearningResponse(
         expression.getRepresentativeSentenceTranslation(),
         expression.getRepresentativeSentenceWords(),
         expression.getRepresentativeSentenceWordChoices(),
-        expression.getRepresentativeImageUrl());
+        expression.getRepresentativeImageUrl(),
+        representativeSentenceAudioUrl);
   }
 }

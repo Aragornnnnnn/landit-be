@@ -151,6 +151,21 @@ class DatabaseSchemaIntegrationTests {
   }
 
   @Test
+  void expressionPronunciationAssetStoresOneRowPerExpressionAndAccent() {
+    assertTableExists("expression_pronunciation_asset");
+    assertColumnExists("expression_pronunciation_asset", "writing_expression_id");
+    assertColumnExists("expression_pronunciation_asset", "accent_locale");
+    assertColumnExists("expression_pronunciation_asset", "expression_audio_url");
+    assertColumnExists("expression_pronunciation_asset", "sentence_audio_url");
+    assertColumnExists("expression_pronunciation_asset", "words");
+    assertTableConstraintExists(
+        "expression_pronunciation_asset", "uk_expression_pronunciation_asset_expression_accent");
+    assertTableConstraintExists(
+        "expression_pronunciation_asset",
+        "fk_expression_pronunciation_asset_writing_expression_id");
+  }
+
+  @Test
   void sessionHistoryMessageFeedbackDoesNotKeepLearningExpressionBackReference() {
     Integer columnCount =
         jdbcTemplate.queryForObject(
@@ -252,8 +267,16 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("scenario_question_language_variant", "base_locale");
     assertColumnExists("scenario_question_language_variant", "question_text");
     assertColumnExists("scenario_question_language_variant", "question_translation");
+    assertColumnExists("scenario_question_language_variant", "audio_url");
+    assertNotNullableColumn("scenario_question_language_variant", "audio_url");
     assertColumnExists("scenario_question_language_variant", "status");
     assertTableConstraintExists("scenario_question_language_variant", "uk_scenario_question_lang");
+
+    Integer missingAudioUrlCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from scenario_question_language_variant where audio_url is null",
+            Integer.class);
+    assertThat(missingAudioUrlCount).isZero();
   }
 
   @DisplayName("V18 migration은 첫 질문 속마음을 질문 Variant로 옮긴다.")
@@ -751,7 +774,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(mappings)
         .extracting(row -> row.get("CHARACTER_ID"), row -> row.get("PROVIDER_VOICE_ID"))
         .containsExactly(
-            tuple("chloe", "en-US-Harper:MAI-Voice-2"),
+            tuple("chloe", "aura-2-luna-en"),
             tuple("marco", "aura-2-hyperion-en"),
             tuple("teddy", "aura-2-draco-en"));
   }
@@ -1000,9 +1023,9 @@ class DatabaseSchemaIntegrationTests {
         .containsEntry("STATUS", "ACTIVE");
   }
 
-  @DisplayName("V50 migration이 Marco와 Teddy의 TTS 음성을 변경하고 Chloe는 유지한다.")
+  @DisplayName("V59 migration 이후 세 캐릭터의 TTS 음성이 Aura 2로 통일된다.")
   @Test
-  void v50MigrationUpdatesMarcoAndTeddyVoicesAndKeepsChloe() {
+  void v59MigrationUnifiesCharacterVoicesWithAura2() {
     List<Map<String, Object>> voices =
         jdbcTemplate.queryForList(
             """
@@ -1020,7 +1043,7 @@ class DatabaseSchemaIntegrationTests {
             row -> row.get("DESCRIPTION"),
             row -> row.get("ACCENT_LOCALE"))
         .containsExactly(
-            tuple(1L, "microsoft/mai-voice-2", "en-US-Harper:MAI-Voice-2", "미국 영어 여성 음성", "EN_US"),
+            tuple(1L, "deepgram/aura-2", "aura-2-luna-en", "미국 영어 여성 음성", "EN_US"),
             tuple(2L, "deepgram/aura-2", "aura-2-hyperion-en", "호주 영어 남성 음성", "EN_AU"),
             tuple(3L, "deepgram/aura-2", "aura-2-draco-en", "영국 영어 굵은 남성 음성", "EN_GB"));
   }
@@ -1522,6 +1545,22 @@ class DatabaseSchemaIntegrationTests {
             columnName);
 
     assertThat(nullable).as("column %s.%s is nullable", tableName, columnName).isEqualTo("YES");
+  }
+
+  private void assertNotNullableColumn(String tableName, String columnName) {
+    String nullable =
+        jdbcTemplate.queryForObject(
+            """
+            select is_nullable
+            from information_schema.columns
+            where lower(table_name) = ?
+              and lower(column_name) = ?
+            """,
+            String.class,
+            tableName,
+            columnName);
+
+    assertThat(nullable).as("column %s.%s is not nullable", tableName, columnName).isEqualTo("NO");
   }
 
   private void assertIndexExists(String indexName) {
