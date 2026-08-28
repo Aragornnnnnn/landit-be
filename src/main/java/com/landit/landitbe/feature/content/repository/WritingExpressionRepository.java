@@ -55,6 +55,15 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
   Optional<WritingExpression> findByIdAndStatusForUpdate(Long id, ActiveStatus status);
 
   /**
+   * 상태가 일치하는 표현의 ID만 조회한다. 발음 자산 커버리지 계산에 사용한다.
+   *
+   * @param status 조회할 활성 상태
+   * @return 조건에 맞는 표현 ID 목록
+   */
+  @Query("select expression.id from WritingExpression expression where expression.status = :status")
+  List<Long> findIdsByStatus(ActiveStatus status);
+
+  /**
    * 학습 언어와 기준 언어에 맞는 활성 Writing 표현을 조회한다.
    *
    * @param targetLocale 학습 언어 locale
