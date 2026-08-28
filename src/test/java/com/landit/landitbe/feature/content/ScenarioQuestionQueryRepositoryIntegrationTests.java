@@ -43,6 +43,8 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
     assertThat(question.get().sequence()).isEqualTo(2);
     assertThat(question.get().questionText()).isEqualTo("Do you cook often?");
     assertThat(question.get().questionTranslation()).isEqualTo("요리를 자주 해?");
+    assertThat(question.get().questionAudioUrl())
+        .isEqualTo("https://cdn.example.com/questions/991302.mp3");
   }
 
   @Test
@@ -133,11 +135,12 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                             base_locale,
                             question_text,
                             question_translation,
+                            audio_url,
                             status,
                             created_at,
                             updated_at
                         )
-                        values (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        values (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         variantId,
         questionId,
@@ -145,6 +148,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         baseLocale,
         questionText,
         questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(variantId),
         status);
   }
 }

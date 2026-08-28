@@ -160,7 +160,7 @@ class RemoteAiConversationClientTest {
   }
 
   @Test
-  void generateNextMessageAcceptsResponseWithoutInnerThought() throws Exception {
+  void generateNextMessageMapsAcknowledgementResponse() throws Exception {
     server.createContext(
         "/api/v1/conversation/next-message",
         exchange -> {
@@ -169,8 +169,8 @@ class RemoteAiConversationClientTest {
                     {
                       "success": true,
                       "data": {
-                        "aiMessage": "What food did you eat recently?",
-                        "translatedMessage": "최근에는 어떤 음식을 먹었어?",
+                        "acknowledgement": "Sounds tasty.",
+                        "translatedAcknowledgement": "맛있겠다.",
                         "goalCompletionStatus": "PARTIAL"
                       },
                       "error": null
@@ -202,8 +202,8 @@ class RemoteAiConversationClientTest {
                     new AiNextQuestion(
                         1L, 2, "What food did you eat recently?", "최근에는 어떤 음식을 먹었어?")));
 
-    assertThat(result.aiMessage()).isEqualTo("What food did you eat recently?");
-    assertThat(result.translatedMessage()).isEqualTo("최근에는 어떤 음식을 먹었어?");
+    assertThat(result.acknowledgement()).isEqualTo("Sounds tasty.");
+    assertThat(result.translatedAcknowledgement()).isEqualTo("맛있겠다.");
     assertThat(result.goalCompletionStatus()).isEqualTo(GoalCompletionStatus.PARTIAL);
   }
 

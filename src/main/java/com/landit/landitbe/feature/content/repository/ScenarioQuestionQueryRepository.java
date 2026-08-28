@@ -22,7 +22,8 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
                 scenarioQuestion.id,
                 scenarioQuestion.displayOrder,
                 questionVariant.questionText,
-                questionVariant.questionTranslation
+                questionVariant.questionTranslation,
+                questionVariant.audioUrl
             )
             FROM ScenarioQuestion scenarioQuestion
             JOIN ScenarioQuestionLanguageVariant questionVariant
