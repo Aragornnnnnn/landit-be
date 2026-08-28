@@ -21,6 +21,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ class FreeTalkMemoryRetrievalServiceTest {
   private AiFreeTalkClient aiClient;
   private ConversationMemorySearchRepository searchRepository;
   private FreeTalkMemoryRetrievalTraceRepository traceRepository;
+  private SimpleMeterRegistry meterRegistry;
   private FreeTalkMemoryRetrievalService service;
 
   @BeforeEach
@@ -40,9 +42,14 @@ class FreeTalkMemoryRetrievalServiceTest {
     aiClient = Mockito.mock(AiFreeTalkClient.class);
     searchRepository = Mockito.mock(ConversationMemorySearchRepository.class);
     traceRepository = Mockito.mock(FreeTalkMemoryRetrievalTraceRepository.class);
+    meterRegistry = new SimpleMeterRegistry();
     service =
         new FreeTalkMemoryRetrievalService(
-            aiClient, searchRepository, traceRepository, new MemoryProperties(false, true));
+            aiClient,
+            searchRepository,
+            traceRepository,
+            new MemoryProperties(false, true),
+            meterRegistry);
   }
 
   @Test
@@ -84,6 +91,13 @@ class FreeTalkMemoryRetrievalServiceTest {
 
     assertThat(result.contexts()).isEmpty();
     verify(searchRepository, never()).searchActive(anyLong(), anyString(), any(), anyInt());
+    assertThat(
+            meterRegistry
+                .get("landit.memory.fallback")
+                .tag("stage", MemoryRetrievalStage.FIRST_USER_TURN.name())
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   @Test

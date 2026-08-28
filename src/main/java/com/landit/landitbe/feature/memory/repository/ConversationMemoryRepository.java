@@ -49,7 +49,53 @@ public class ConversationMemoryRepository {
       VALUES (:memoryId, :sourceMessageId)
       """;
 
+  private static final String DELETE_RETRIEVAL_TRACE_SQL =
+      """
+      DELETE FROM free_talk_memory_retrieval
+      WHERE free_talk_session_id IN (
+          SELECT fts.id
+          FROM free_talk_session fts
+          JOIN learning_session ls ON ls.id = fts.learning_session_id
+          WHERE ls.user_profile_id = :userProfileId)
+      """;
+
+  private static final String DELETE_MEMORY_SOURCE_SQL =
+      """
+      DELETE FROM conversation_memory_source
+      WHERE memory_id IN (
+          SELECT id FROM conversation_memory WHERE user_profile_id = :userProfileId)
+      """;
+
+  private static final String DELETE_MEMORY_SQL =
+      "DELETE FROM conversation_memory WHERE user_profile_id = :userProfileId";
+
   private final NamedParameterJdbcTemplate jdbcTemplate;
+
+  /**
+   * 탈퇴 사용자의 기억·원본 계보·검색 trace를 FK 의존 순서로 제거한다.
+   *
+   * @param userProfileId 삭제할 사용자의 프로필 ID
+   * @return 삭제한 장기기억 행 수
+   */
+  public int deleteAllByUserProfileId(long userProfileId) {
+    MapSqlParameterSource parameters =
+        new MapSqlParameterSource().addValue("userProfileId", userProfileId);
+    deleteRetrievalTraces(parameters);
+    deleteMemorySources(parameters);
+    return deleteMemories(parameters);
+  }
+
+  private void deleteRetrievalTraces(MapSqlParameterSource parameters) {
+    jdbcTemplate.update(DELETE_RETRIEVAL_TRACE_SQL, parameters);
+  }
+
+  private void deleteMemorySources(MapSqlParameterSource parameters) {
+    jdbcTemplate.update(DELETE_MEMORY_SOURCE_SQL, parameters);
+  }
+
+  private int deleteMemories(MapSqlParameterSource parameters) {
+    return jdbcTemplate.update(DELETE_MEMORY_SQL, parameters);
+  }
 
   /**
    * 장기기억과 원본 메시지 source를 하나의 트랜잭션으로 저장한다.
