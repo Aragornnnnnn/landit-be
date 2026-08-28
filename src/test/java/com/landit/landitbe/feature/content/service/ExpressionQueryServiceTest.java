@@ -28,6 +28,7 @@ import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
+import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -65,6 +66,11 @@ class ExpressionQueryServiceTest {
   @Mock private ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
 
   @Mock private LearningProgressService learningProgressService;
+
+  // learning-start의 발음 음성 URL 조회에 쓰는 의존성. 목으로 선언하지 않으면 @InjectMocks가
+  // null로 둔 채 지나가서 관련 테스트가 NPE로 깨진다.
+  @Mock private ExpressionPronunciationAssetRepository pronunciationAssetRepository;
+  @Mock private UserAccentLocaleResolver accentLocaleResolver;
 
   @InjectMocks private ExpressionQueryService expressionQueryService;
 

@@ -15,6 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param connectTimeout AI 서버 연결 제한 시간
  * @param requestTimeout 일반 AI 요청 제한 시간
  * @param sessionFeedbackRequestTimeout 최종 피드백 AI 요청 제한 시간
+ * @param pronunciationRequestTimeout 발음 평가 AI 요청 제한 시간
  */
 @ConfigurationProperties(prefix = "landit.ai")
 public record AiClientProperties(
@@ -23,16 +24,20 @@ public record AiClientProperties(
     String serviceAudience,
     Duration connectTimeout,
     Duration requestTimeout,
-    Duration sessionFeedbackRequestTimeout)
+    Duration sessionFeedbackRequestTimeout,
+    Duration pronunciationRequestTimeout)
     implements AiConversationSettings {
 
-  /** 비어 있는 AI 클라이언트 모드와 서비스 대상을 기본값으로 정규화한다. */
+  /** 비어 있는 AI 클라이언트 모드와 서비스 대상, 발음 평가 제한 시간을 기본값으로 정규화한다. */
   public AiClientProperties {
     if (clientMode == null || clientMode.isBlank()) {
       clientMode = "local";
     }
     if (serviceAudience == null || serviceAudience.isBlank()) {
       serviceAudience = "KOREAN_LEARNER";
+    }
+    if (pronunciationRequestTimeout == null) {
+      pronunciationRequestTimeout = Duration.ofSeconds(20);
     }
   }
 }

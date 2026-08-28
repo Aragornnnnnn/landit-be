@@ -24,11 +24,14 @@ class ScenarioContentServiceTest {
   @Test
   void returnsNextQuestionContext() {
     ScenarioQuestionProjection projection =
-        new ScenarioQuestionProjection(10L, 2, "question", "translation");
+        new ScenarioQuestionProjection(
+            10L, 2, "question", "translation", "https://cdn.example.com/question.mp3");
     when(repository.findActiveQuestion(1L, 2, Locale.EN, Locale.KR))
         .thenReturn(Optional.of(projection));
 
     assertThat(service.findActiveQuestion(1L, 2, Locale.EN, Locale.KR))
-        .contains(new NextQuestionContext(10L, 2, "question", "translation"));
+        .contains(
+            new NextQuestionContext(
+                10L, 2, "question", "translation", "https://cdn.example.com/question.mp3"));
   }
 }
