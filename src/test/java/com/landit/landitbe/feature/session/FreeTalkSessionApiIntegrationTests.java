@@ -26,11 +26,19 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -194,8 +202,7 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
             .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
             .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(
-                jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
+            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
             .andExpect(
                 jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
             .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
@@ -1464,7 +1471,7 @@ class FreeTalkSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       return new AiFreeTalkOpeningResult(
-          "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY);
+          "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY, List.of());
     }
 
     @Override
@@ -1484,14 +1491,22 @@ class FreeTalkSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       if (exitIntentDetected && request.responseMode().name().equals("NORMAL")) {
-        return new AiFreeTalkTurnResult(true, null, null, null, null);
+        return new AiFreeTalkTurnResult(true, null, null, null, null, List.of());
       }
       return new AiFreeTalkTurnResult(
           false,
           request.isFirstUserTurn() ? "Hiking with friends" : null,
           "That sounds fun! Where are you going next?",
           "재밌겠다! 다음에는 어디로 갈 거야?",
-          CharacterEmotion.HAPPY);
+          CharacterEmotion.HAPPY,
+          List.of());
+    }
+
+    @Override
+    public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
+      List<Float> embedding = new ArrayList<>(Collections.nCopies(1536, 0.0f));
+      embedding.set(0, 1.0f);
+      return new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", embedding);
     }
 
     @Override
@@ -1532,6 +1547,22 @@ class FreeTalkSessionApiIntegrationTests {
       embedding.set(0, 1.0f);
       return new AiConversationEmbeddingsResult(
           List.of(new AiConversationExcerpt("That sounds interesting.", List.copyOf(embedding))));
+    }
+
+    @Override
+    public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+      return new AiMemoryCandidatesResult("memory-candidate-v1", List.of());
+    }
+
+    @Override
+    public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+      return new AiMemoryResolutionResult(
+          request.candidates().stream()
+              .map(
+                  candidate ->
+                      new AiMemoryResolutionResult.Resolution(
+                          candidate.candidateIndex(), AiMemoryOperation.ADD, List.of()))
+              .toList());
     }
 
     void reset() {

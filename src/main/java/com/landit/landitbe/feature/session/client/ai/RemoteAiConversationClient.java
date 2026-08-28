@@ -203,13 +203,18 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteNextMessageResponse(
-      String aiMessage, String translatedMessage, GoalCompletionStatus goalCompletionStatus) {
+      String acknowledgement,
+      String translatedAcknowledgement,
+      GoalCompletionStatus goalCompletionStatus) {
 
     private AiNextMessageResult toResponse() {
-      if (blank(aiMessage) || blank(translatedMessage) || goalCompletionStatus == null) {
+      if (blank(acknowledgement)
+          || blank(translatedAcknowledgement)
+          || goalCompletionStatus == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiNextMessageResult(aiMessage, translatedMessage, goalCompletionStatus);
+      return new AiNextMessageResult(
+          acknowledgement, translatedAcknowledgement, goalCompletionStatus);
     }
   }
 

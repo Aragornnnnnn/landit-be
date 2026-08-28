@@ -354,10 +354,10 @@ class ScenarioListApiIntegrationTests {
                 .value("OPENROUTER"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.model")
-                .value("microsoft/mai-voice-2"))
+                .value("deepgram/aura-2"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
-                .value("en-US-Harper:MAI-Voice-2"))
+                .value("aura-2-luna-en"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.gender")
                 .value("FEMALE"))
@@ -465,7 +465,7 @@ class ScenarioListApiIntegrationTests {
   }
 
   private void seedScenarioListData(Long clearedUserId) {
-    final long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
+    final long harperVoiceId = ttsVoiceId("aura-2-luna-en");
     final long marcoVoiceId = ttsVoiceId("aura-2-hyperion-en");
     insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
     insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
@@ -570,17 +570,19 @@ class ScenarioListApiIntegrationTests {
                             base_locale,
                             question_text,
                             question_translation,
+                            audio_url,
                             inner_thought,
                             inner_thought_type,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         questionText,
         questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId),
         innerThought,
         innerThoughtType);
   }

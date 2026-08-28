@@ -1,4 +1,4 @@
--- LAN-358 검수 완료 대표 예문 이미지 981개의 CloudFront URL을 Writing 표현에 반영한다.
+-- V64에서 LAN-358 검수 완료 대표 예문 이미지 981개의 CloudFront URL을 Writing 표현에 반영한다.
 -- 실행 전: manifest의 모든 S3 객체와 CloudFront 응답이 검증되었는지 확인한다.
 SELECT pg_advisory_xact_lock(hashtext('lan358-representative-image-urls'));
 LOCK TABLE writing_expression IN SHARE ROW EXCLUSIVE MODE;

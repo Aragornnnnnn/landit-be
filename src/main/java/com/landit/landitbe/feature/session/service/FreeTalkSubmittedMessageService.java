@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.config.memory.MemoryProperties;
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
@@ -57,6 +58,7 @@ public class FreeTalkSubmittedMessageService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
   private final StreakService streakService;
+  private final MemoryProperties memoryProperties;
   private final Clock clock;
 
   /**
@@ -411,6 +413,7 @@ public class FreeTalkSubmittedMessageService {
     userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     userMessage.prepareInnerThought();
     session.completeByTimeLimit();
+    prepareMemoryGeneration(session);
     session.clearProcessing();
     LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
     records.learningSession().completeFreeTalkByTimeLimit(completedAt);
@@ -576,6 +579,7 @@ public class FreeTalkSubmittedMessageService {
                 result.translatedMessage(),
                 result.emotion()));
     records.freeTalkSession().completeByUserExit();
+    prepareMemoryGeneration(records.freeTalkSession());
     records.freeTalkSession().clearProcessing();
     LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
     records.learningSession().completeFreeTalkByUser(completedAt);
@@ -709,6 +713,12 @@ public class FreeTalkSubmittedMessageService {
 
   private void clearExpiredProcessing(FreeTalkSession session) {
     session.clearProcessingIfExpired(LocalDateTime.now().minusSeconds(PROCESSING_TIMEOUT_SECONDS));
+  }
+
+  private void prepareMemoryGeneration(FreeTalkSession session) {
+    if (memoryProperties.writeEnabled()) {
+      session.prepareMemoryGeneration();
+    }
   }
 
   private int nextUserTurnNumber(List<SessionHistoryMessage> messages) {

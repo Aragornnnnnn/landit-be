@@ -4,17 +4,21 @@ package com.landit.landitbe.feature.session.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.memory.MemoryProperties;
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
@@ -23,6 +27,7 @@ import com.landit.landitbe.feature.session.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.repository.SessionHistoryRepository;
+import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Clock;
@@ -49,20 +54,117 @@ class FreeTalkSubmittedMessageServiceTest {
       mock(FreeTalkDailySpeakingUsageService.class);
   private final StreakService streakService = mock(StreakService.class);
   private final FreeTalkSubmittedMessageService service =
-      new FreeTalkSubmittedMessageService(
-          userProfileService,
-          learningSessionRepository,
-          freeTalkSessionRepository,
-          freeTalkTopicRepository,
-          sessionHistoryRepository,
-          sessionHistoryMessageRepository,
-          dailySpeakingUsageService,
-          streakService,
-          Clock.systemUTC());
+      service(new MemoryProperties(false, false));
+
+  private FreeTalkSubmittedMessageService service(MemoryProperties memoryProperties) {
+    return new FreeTalkSubmittedMessageService(
+        userProfileService,
+        learningSessionRepository,
+        freeTalkSessionRepository,
+        freeTalkTopicRepository,
+        sessionHistoryRepository,
+        sessionHistoryMessageRepository,
+        dailySpeakingUsageService,
+        streakService,
+        memoryProperties,
+        Clock.systemUTC());
+  }
+
   private final LearningSession learningSession = mock(LearningSession.class);
   private final FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
   private final SessionHistory history = mock(SessionHistory.class);
   private final SessionHistoryMessage userMessage = mock(SessionHistoryMessage.class);
+
+  @Test
+  void doesNotPrepareMemoryGenerationWhenWriteIsDisabledForTimeLimitCompletion() {
+    stubSuccessfulFinalization("old-owner");
+    FreeTalkSession session = realFinalizationSession("old-owner");
+
+    service(new MemoryProperties(false, false))
+        .finalizeTimeLimit(messageReservation(), closingResult());
+
+    assertThat(session.getMemoryGenerationStatus()).isNull();
+  }
+
+  @Test
+  void preparesMemoryGenerationWhenWriteIsEnabledForTimeLimitCompletion() {
+    stubSuccessfulFinalization("old-owner");
+    FreeTalkSession session = realFinalizationSession("old-owner");
+
+    service(new MemoryProperties(true, false))
+        .finalizeTimeLimit(messageReservation(), closingResult());
+
+    assertThat(session.getMemoryGenerationStatus())
+        .isEqualTo(com.landit.landitbe.feature.session.domain.MemoryGenerationStatus.PREPARING);
+  }
+
+  @Test
+  void doesNotPrepareMemoryGenerationWhenWriteIsDisabledForUserConfirmedCompletion() {
+    stubSuccessfulFinalization("decision-7");
+    FreeTalkSession session = realFinalizationSession("decision-7");
+
+    service(new MemoryProperties(false, false)).finalizeEnd(decisionReservation(), closingResult());
+
+    assertThat(session.getMemoryGenerationStatus()).isNull();
+  }
+
+  @Test
+  void preparesMemoryGenerationWhenWriteIsEnabledForUserConfirmedCompletion() {
+    stubSuccessfulFinalization("decision-7");
+    FreeTalkSession session = realFinalizationSession("decision-7");
+
+    service(new MemoryProperties(true, false)).finalizeEnd(decisionReservation(), closingResult());
+
+    assertThat(session.getMemoryGenerationStatus())
+        .isEqualTo(com.landit.landitbe.feature.session.domain.MemoryGenerationStatus.PREPARING);
+  }
+
+  private FreeTalkSession realFinalizationSession(String processingClientMessageId) {
+    FreeTalkSession session = FreeTalkSession.start(300L, null, FreeTalkStartMode.AI_FIRST);
+    session.startProcessing(processingClientMessageId);
+    when(freeTalkSessionRepository.findByLearningSessionIdForUpdate(300L))
+        .thenReturn(Optional.of(session));
+    return session;
+  }
+
+  private void stubSuccessfulFinalization(String processingClientMessageId) {
+    when(freeTalkSession.getProcessingClientMessageId()).thenReturn(processingClientMessageId);
+    when(freeTalkSession.getTitle()).thenReturn("주말");
+    when(freeTalkSession.getStartMode()).thenReturn(FreeTalkStartMode.AI_FIRST);
+    when(freeTalkSession.getId()).thenReturn(30L);
+    when(freeTalkSession.getConversationStatus())
+        .thenReturn(
+            com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus.COMPLETED);
+    when(learningSession.getId()).thenReturn(300L);
+    when(learningSession.getUserProfileId()).thenReturn(1L);
+    when(history.getId()).thenReturn(3L);
+    when(userMessage.getId()).thenReturn(7L);
+    when(userMessage.getTurnNumber()).thenReturn(1);
+    when(userMessage.getMessageSequence()).thenReturn(1);
+    when(userMessage.getRole()).thenReturn(ConversationSpeaker.USER);
+    SessionHistoryMessage aiMessage = mock(SessionHistoryMessage.class);
+    when(aiMessage.getId()).thenReturn(8L);
+    when(aiMessage.getTurnNumber()).thenReturn(2);
+    when(aiMessage.getMessageSequence()).thenReturn(2);
+    when(aiMessage.getRole()).thenReturn(ConversationSpeaker.AI);
+    when(aiMessage.getContent()).thenReturn("See you!");
+    when(aiMessage.getTranslatedContent()).thenReturn("또 봐요!");
+    when(aiMessage.getEmotion()).thenReturn(null);
+    when(sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(3L))
+        .thenReturn(List.of(userMessage));
+    when(sessionHistoryMessageRepository.save(any(SessionHistoryMessage.class)))
+        .thenReturn(aiMessage);
+    when(sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(any(Long.class), any()))
+        .thenReturn(1L);
+    when(dailySpeakingUsageService.usage(1L))
+        .thenReturn(
+            new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
+                java.time.LocalDate.now(), 1_200L, 58_800L));
+  }
+
+  private AiFreeTalkClosingResult closingResult() {
+    return new AiFreeTalkClosingResult("주말", "See you!", "또 봐요!", null);
+  }
 
   @BeforeEach
   void setUp() {

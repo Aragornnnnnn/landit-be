@@ -128,9 +128,10 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.expressionCount").value(2))
         .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1))
         .andExpect(jsonPath("$.data.scenario.openingPreview.characterId").value("chloe"))
+        .andExpect(jsonPath("$.data.scenario.openingPreview.questionAudioUrl").value(nullValue()))
         .andExpect(
             jsonPath("$.data.scenario.openingPreview.ttsVoice.providerVoiceId")
-                .value("en-US-Harper:MAI-Voice-2"));
+                .value("aura-2-luna-en"));
   }
 
   @Test
@@ -143,6 +144,7 @@ class DailyScenarioApiIntegrationTests {
     insertScenarioVariant(100, "첫 번째 시나리오", "첫 번째 시나리오 설명", "첫 번째 목표", "먼저 말해보세요.");
     insertScenario(101, 10, 1, "AI", "NORMAL");
     insertScenarioVariant(101, "두 번째 시나리오", "두 번째 시나리오 설명", "두 번째 목표", null);
+    insertScenarioQuestion(1001, 101, "How was your day?", "오늘 하루 어땠어?");
 
     mockMvc
         .perform(
@@ -152,7 +154,10 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.playable").value(true))
         .andExpect(jsonPath("$.data.scenario.scenarioId").value(101))
-        .andExpect(jsonPath("$.data.scenario.dailyScenarioType").value("NEW"));
+        .andExpect(jsonPath("$.data.scenario.dailyScenarioType").value("NEW"))
+        .andExpect(
+            jsonPath("$.data.scenario.openingPreview.questionAudioUrl")
+                .value("https://cdn.example.com/questions/1001.mp3"));
   }
 
   @Test
@@ -404,6 +409,31 @@ class DailyScenarioApiIntegrationTests {
         briefing,
         userOpeningInstruction,
         conversationGoal);
+  }
+
+  private void insertScenarioQuestion(
+      long questionId, long scenarioId, String questionText, String questionTranslation) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_question (
+            id, scenario_id, display_order, status, created_at, updated_at
+        )
+        VALUES (?, ?, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        questionId,
+        scenarioId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_question_language_variant (
+            scenario_question_id, target_locale, base_locale, question_text,
+            question_translation, audio_url, status, created_at, updated_at
+        )
+        VALUES (?, 'EN', 'KR', ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        questionId,
+        questionText,
+        questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId));
   }
 
   private long insertWritingExpression(long scenarioId, int displayOrder) {

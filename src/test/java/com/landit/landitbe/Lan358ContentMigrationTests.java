@@ -20,13 +20,13 @@ import org.springframework.util.StreamUtils;
 class Lan358ContentMigrationTests {
 
   private static final String MIGRATION_PATH =
-      "db/postgresql/V63__update_writing_expression_representative_image_urls.sql";
+      "db/postgresql/V64__update_writing_expression_representative_image_urls.sql";
   private static final Pattern UPDATE_VALUE =
       Pattern.compile(
           "\\((\\d+), 'https://d19azau1un4t7r\\.cloudfront\\.net/content/"
               + "writing-expressions/(\\d+)/representative/([0-9a-f]{64})\\.webp'\\)");
 
-  @DisplayName("V63은 ID 1부터 981까지 대표 이미지 URL을 정확히 한 개씩 매핑한다.")
+  @DisplayName("V64는 ID 1부터 981까지 대표 이미지 URL을 정확히 한 개씩 매핑한다.")
   @Test
   void mapsEveryWritingExpressionToOneRepresentativeImage() throws Exception {
     Matcher matcher = UPDATE_VALUE.matcher(readMigrationSql());
@@ -45,7 +45,7 @@ class Lan358ContentMigrationTests {
     assertThat(imageHashes).hasSize(981);
   }
 
-  @DisplayName("V63은 대상 누락과 적용 실패를 감지하고 기존 URL과 다른 행만 갱신한다.")
+  @DisplayName("V64는 대상 누락과 적용 실패를 감지하고 기존 URL과 다른 행만 갱신한다.")
   @Test
   void guardsMigrationTargetsAndVerification() throws Exception {
     assertThat(readMigrationSql())

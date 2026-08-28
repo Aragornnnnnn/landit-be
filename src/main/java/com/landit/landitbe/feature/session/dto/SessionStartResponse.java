@@ -76,6 +76,7 @@ public record SessionStartResponse(
    * @param role 발화 주체
    * @param content 메시지 본문
    * @param translatedContent 기준 locale 번역
+   * @param questionAudioUrl 첫 고정 질문 음원 URL
    * @param innerThought 첫 화면에 보여줄 상대 역할의 속마음
    * @param innerThoughtType 속마음 유형
    */
@@ -87,6 +88,7 @@ public record SessionStartResponse(
       @Schema(description = "발화 주체") String role,
       @Schema(description = "메시지 본문") String content,
       @Schema(description = "기준 locale 번역") String translatedContent,
+      @Schema(description = "첫 고정 질문 음원 URL") String questionAudioUrl,
       @Schema(description = "첫 화면에 보여줄 상대 역할의 속마음") String innerThought,
       @Schema(description = "속마음 유형") String innerThoughtType) {
 
@@ -94,9 +96,11 @@ public record SessionStartResponse(
      * 저장된 AI 시작 메시지를 현재 메시지 응답으로 변환한다.
      *
      * @param message 저장된 AI 시작 메시지
+     * @param questionAudioUrl 첫 고정 질문 음원 URL
      * @return 현재 메시지 응답
      */
-    public static CurrentMessageResponse from(SessionHistoryMessage message) {
+    public static CurrentMessageResponse from(
+        SessionHistoryMessage message, String questionAudioUrl) {
       return new CurrentMessageResponse(
           message.getId(),
           message.getTurnNumber(),
@@ -104,6 +108,7 @@ public record SessionStartResponse(
           message.getRole().name(),
           message.getContent(),
           message.getTranslatedContent(),
+          questionAudioUrl,
           message.getInnerThought(),
           message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name());
     }
