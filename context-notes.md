@@ -244,5 +244,5 @@
 
 - 최종 WebP는 ID 1~981 모두 1448x1086이며 S3 객체 크기, `image/webp`, immutable 캐시 헤더와 CloudFront 200 응답을 전수 검증했다.
 - 객체 key는 `content/writing-expressions/{expressionId}/representative/{sha256}.webp`로 구성해 같은 콘텐츠는 식별 가능하고 기존 객체를 덮어쓰지 않는다.
-- 열린 PR #124의 V59와 PR #125의 V59~V62를 고려해 PostgreSQL 전용 V63을 사용한다. 대상 ID 누락 시 실패하고, 실제 URL과 다른 행만 갱신한 뒤 적용 결과를 다시 검증한다.
+- 병합된 PR #124의 V59와 PR #125의 V60~V63을 고려해 PostgreSQL 전용 V64를 사용한다. 대상 ID 누락 시 실패하고, 실제 URL과 다른 행만 갱신한 뒤 적용 결과를 다시 검증한다.
 - H2는 테스트용 공통 스키마만 사용하므로 대량 운영 콘텐츠 URL 마이그레이션을 추가하지 않는다.

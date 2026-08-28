@@ -9,9 +9,12 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.landit.landitbe.feature.content.domain.TtsVoice;
 import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.DisplayName;
@@ -441,6 +444,86 @@ class DatabaseSchemaIntegrationTests {
             "embedding extensions.vector(1536)",
             "chk_writing_expression_scenario_source");
     assertThat(h2MigrationSql).contains("embedding VARCHAR(32767)");
+  }
+
+  @DisplayName("V65 장기기억 스키마는 범위·상태·원본 계보 제약을 유지한다.")
+  @Test
+  void conversationMemorySchemaPreservesScopeStateAndLineage() {
+    assertTableExists("conversation_memory");
+    assertTableExists("conversation_memory_source");
+    assertColumnExists("conversation_memory", "embedding");
+    assertTableConstraintExists("conversation_memory", "chk_conversation_memory_scope");
+    assertTableConstraintExists("conversation_memory", "chk_conversation_memory_state");
+    assertTableConstraintExists(
+        "conversation_memory_source", "fk_conversation_memory_source_message");
+  }
+
+  @DisplayName("V65 장기기억 제약은 잘못된 범위·상태·시간·신뢰도를 거부한다.")
+  @Test
+  @Transactional
+  void conversationMemoryConstraintsRejectInvalidScopeStateAndRange() {
+    insertConversationMemoryFixtures();
+
+    insertConversationMemory(new MemoryFixture(994103L));
+    List<InvalidMemoryCase> invalidCases =
+        List.of(
+            new InvalidMemoryCase(994101L, fixture -> fixture.characterId = "chloe"),
+            new InvalidMemoryCase(
+                994102L,
+                fixture -> {
+                  fixture.memoryType = "EVENT";
+                  fixture.characterId = null;
+                }),
+            new InvalidMemoryCase(994104L, fixture -> fixture.supersededById = 994103L),
+            new InvalidMemoryCase(
+                994105L,
+                fixture -> {
+                  fixture.status = "SUPERSEDED";
+                  fixture.supersededAt = Timestamp.valueOf("2026-08-25 20:10:00");
+                }),
+            new InvalidMemoryCase(
+                994106L,
+                fixture -> {
+                  fixture.status = "SUPERSEDED";
+                  fixture.supersededById = 994103L;
+                }),
+            new InvalidMemoryCase(
+                994107L,
+                fixture -> {
+                  fixture.status = "INVALIDATED";
+                  fixture.invalidatedAt = Timestamp.valueOf("2026-08-25 20:10:00");
+                }),
+            new InvalidMemoryCase(
+                994108L,
+                fixture -> {
+                  fixture.status = "INVALIDATED";
+                  fixture.invalidationReason = "INCORRECT_EXTRACTION";
+                }),
+            new InvalidMemoryCase(
+                994109L, fixture -> fixture.validTo = Timestamp.valueOf("2026-08-25 19:00:00")),
+            new InvalidMemoryCase(
+                994110L, fixture -> fixture.confidence = BigDecimal.valueOf(-0.01)),
+            new InvalidMemoryCase(
+                994111L, fixture -> fixture.confidence = BigDecimal.valueOf(1.01)));
+
+    invalidCases.forEach(this::assertInvalidMemory);
+  }
+
+  @DisplayName("V65 원본 메시지 계보는 삭제 순서와 링크를 제한한다.")
+  @Test
+  @Transactional
+  void conversationMemorySourceConstraintsRejectInvalidLinks() {
+    insertConversationMemoryFixtures();
+    insertConversationMemory(new MemoryFixture(994120L));
+    jdbcTemplate.update(
+        "insert into conversation_memory_source (memory_id, session_history_message_id) "
+            + "values (?, ?)",
+        994120L,
+        994005L);
+
+    assertThatThrownBy(
+            () -> jdbcTemplate.update("delete from session_history_message where id = ?", 994005L))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
@@ -1254,6 +1337,114 @@ class DatabaseSchemaIntegrationTests {
             tableName);
 
     assertThat(tableCount).as("table %s", tableName).isEqualTo(1);
+  }
+
+  private void insertConversationMemoryFixtures() {
+    Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
+    jdbcTemplate.update(
+        """
+        insert into user_profile (id, nickname, target_locale, base_locale, current_level,
+            ai_tutor_id, push_permission_status, status, created_at, updated_at)
+        values (994001, 'conversation-memory-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED',
+            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into learning_session (id, user_profile_id, session_type, ai_tutor_id,
+            target_locale, base_locale, input_mode, status, ended_by, completion_reason,
+            started_at, ended_at, created_at, updated_at)
+        values (994002, 994001, 'FREE_TALK', ?, 'EN', 'KR', 'MIXED', 'COMPLETED',
+            'USER', 'USER_EXIT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into free_talk_session (id, learning_session_id, start_mode, character_id,
+            conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)
+        values (994003, 994002, 'USER_FIRST', 'chloe', 'COMPLETED', 0,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history (id, learning_session_id, user_profile_id, session_type,
+            target_locale, base_locale, started_at, ended_at, duration_seconds, user_message_count,
+            created_at)
+        values (994004, 994002, 994001, 'FREE_TALK', 'EN', 'KR', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP, 0, 2, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, input_type, created_at, updated_at)
+        values (994005, 994004, 1, 1, 'USER', 'hello', 'TEXT', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, input_type, created_at, updated_at)
+        values (994006, 994004, 2, 1, 'AI', 'Hi there', 'TEXT', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """);
+  }
+
+  private void assertInvalidMemory(InvalidMemoryCase invalidCase) {
+    assertThatThrownBy(() -> insertConversationMemory(invalidCase.fixture()))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  private void insertConversationMemory(MemoryFixture fixture) {
+    jdbcTemplate.update(
+        """
+        insert into conversation_memory (
+            id, user_profile_id, character_id, memory_type, content, content_locale,
+            confidence, status, valid_from, valid_to, observed_at, recorded_at, superseded_at,
+            superseded_by_id, invalidated_at, invalidation_reason, extractor_version,
+            embedding_model, embedding)
+        values (?, 994001, ?, ?, '사용자는 장기기억 스키마를 검증한다.', 'KR', ?, ?, ?, ?,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, 'memory-test-v1',
+            'openai/text-embedding-3-small', '[0.1]')
+        """,
+        fixture.id,
+        fixture.characterId,
+        fixture.memoryType,
+        fixture.confidence,
+        fixture.status,
+        fixture.validFrom,
+        fixture.validTo,
+        fixture.supersededAt,
+        fixture.supersededById,
+        fixture.invalidatedAt,
+        fixture.invalidationReason);
+  }
+
+  private record InvalidMemoryCase(long id, Consumer<MemoryFixture> customize) {
+
+    private MemoryFixture fixture() {
+      MemoryFixture fixture = new MemoryFixture(id);
+      customize.accept(fixture);
+      return fixture;
+    }
+  }
+
+  private static final class MemoryFixture {
+    private final long id;
+    private String characterId;
+    private String memoryType = "PROFILE";
+    private BigDecimal confidence = BigDecimal.valueOf(0.8);
+    private String status = "ACTIVE";
+    private Timestamp validFrom = Timestamp.valueOf("2026-08-25 20:00:00");
+    private Timestamp validTo;
+    private Timestamp supersededAt;
+    private Long supersededById;
+    private Timestamp invalidatedAt;
+    private String invalidationReason;
+
+    private MemoryFixture(long id) {
+      this.id = id;
+    }
   }
 
   private void assertTableDoesNotExist(String tableName) {

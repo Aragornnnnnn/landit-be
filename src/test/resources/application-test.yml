@@ -23,6 +23,8 @@ landit:
   # H2에는 vector 타입과 <=> 연산자가 없어 자바 코사인 계산 구현을 사용한다.
   expression-search:
     mode: in-memory
+  memory-search:
+    mode: in-memory
   # 테스트는 AWS 자격증명 없이 돌도록 매니페스트를 클래스패스 리소스에서 읽는다.
   pronunciation-asset:
     manifest-mode: local
