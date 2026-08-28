@@ -55,6 +55,12 @@ class Lan358AdditionalContentMigrationTests {
             "LAN-358 additional expression embedding is missing", "vector_dims(embedding) <> 1536");
   }
 
+  @DisplayName("V68은 현재 writing_expression 스키마에 없는 컬럼을 참조하지 않는다.")
+  @Test
+  void usesOnlyCurrentWritingExpressionColumns() throws Exception {
+    assertThat(readMigrationSql()).doesNotContain("owner_user_profile_id");
+  }
+
   @DisplayName("V68은 ID 982부터 1938까지 대표 이미지 URL을 정확히 한 개씩 매핑한다.")
   @Test
   void mapsEveryAdditionalWritingExpressionToOneRepresentativeImage() throws Exception {
