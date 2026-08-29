@@ -37,6 +37,22 @@ class PushQueueMessageHandlerTest {
     verify(pushReceiptService).check(10L, 2);
   }
 
+  /** Receipt 확인 횟수 정책은 Handler가 아닌 Receipt Service가 판단한다. */
+  @Test
+  void delegatesPositiveReceiptAttemptToReceiptService() {
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "receipt-message-id",
+            "PUSH_RECEIPT_CHECK",
+            Instant.parse("2026-07-24T11:15:00Z"),
+            new PushQueuePayload(10L, 4));
+
+    pushQueueMessageHandler.handle(message);
+
+    verify(pushReceiptService).check(10L, 4);
+  }
+
   /** 지원하지 않는 version은 실패시켜 SQS 재시도와 DLQ 이동 대상으로 남긴다. */
   @Test
   void rejectsUnsupportedVersion() {
