@@ -219,6 +219,18 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void openApiDocumentsFixedQuestionTextAsNullable() throws Exception {
+    String fixedQuestionTextSchema =
+        "$.components.schemas.NextMessageResponse.properties.fixedQuestionText";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(fixedQuestionTextSchema + ".type[0]").value("string"))
+        .andExpect(jsonPath(fixedQuestionTextSchema + ".type[1]").value("null"));
+  }
+
+  @Test
   void startAiFirstScenarioWithoutFirstFixedQuestionReturnsInternalServerError() throws Exception {
     JsonNode loginBody = login("ai-first-without-question@example.com");
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -311,6 +323,9 @@ class ScenarioSessionApiIntegrationTests {
                 jsonPath("$.data.nextMessage.translatedContent")
                     .value("아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?"))
             .andExpect(jsonPath("$.data.nextMessage.ttsText").value("Oh, you like spicy pizza."))
+            .andExpect(
+                jsonPath("$.data.nextMessage.fixedQuestionText")
+                    .value("What food did you eat recently?"))
             .andExpect(
                 jsonPath("$.data.nextMessage.questionAudioUrl")
                     .value("https://cdn.example.com/questions/4102.mp3"))
@@ -1037,6 +1052,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(
             jsonPath("$.data.nextMessage.ttsText")
                 .value("Thanks for sharing. That was a good conversation."))
+        .andExpect(jsonPath("$.data.nextMessage.fixedQuestionText").value(nullValue()))
         .andExpect(jsonPath("$.data.nextMessage.questionAudioUrl").value(nullValue()))
         .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
         .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
