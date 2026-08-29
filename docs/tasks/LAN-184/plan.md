@@ -1,5 +1,13 @@
 # LAN-184 구현 및 검증 기록
 
+## 2026-08-29 정책 변경 상태
+
+예약 알림 정책은 [design.md](design.md)의 `DAILY_SCENARIO_REMINDER → CONTINUE_EXPRESSION → SMALL_TALK_REMINDER` 우선순위로 변경하기로 결정했다. 아래 구현 기록은 정책 변경 전 브랜치 상태를 설명하며, 새 정책은 아직 코드와 테스트에 반영되지 않았다.
+
+- 현재 `CONTINUE_SCENARIO`, `CONTINUE_EXPRESSION`, `REVIEW_LEARNING` 선정 로직은 교체 대상이다.
+- 새 정책을 구현·검증하기 전에는 dev·prod Scheduler를 활성화하지 않는다.
+- 구현 후 이 문서의 학습 알림 정책, 현재 구현 상태, 검증 결과를 새 근거로 갱신한다.
+
 ## 최종 구현 범위
 
 - 기존 `UserPushToken` 등록 API와 `ACTIVE`·`REVOKED` 상태를 유지한다.
@@ -11,7 +19,7 @@
 - 일시적인 Expo 오류는 발송 이력에 재시도 표식을 남기고 예약 배치 SQS 재전달로 복구한다. 이미 Ticket을 접수한 이력은 Expo에 다시 보내지 않고 Receipt 확인만 다시 예약한다.
 - dev 테스트 API는 로그인 사용자의 `TEST_NOTIFICATION`을 `NotificationDispatchService`로 직접 요청한다.
 
-## 학습 알림 정책
+## 현재 코드의 학습 알림 정책 변경 전 기록
 
 | 유형 | 선택 결과 | 딥링크 |
 | --- | --- | --- |
