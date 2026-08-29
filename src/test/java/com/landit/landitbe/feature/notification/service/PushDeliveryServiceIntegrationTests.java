@@ -7,13 +7,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.domain.PushDevice;
-import com.landit.landitbe.feature.notification.domain.PushTokenStatus;
+import com.landit.landitbe.feature.notification.domain.UserPushToken;
+import com.landit.landitbe.feature.notification.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
-import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
+import com.landit.landitbe.feature.notification.repository.UserPushTokenRepository;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDate;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,23 +28,21 @@ import org.springframework.transaction.annotation.Transactional;
 class PushDeliveryServiceIntegrationTests {
 
   private static final long USER_ID = 996001L;
-  private static final UUID INSTALLATION_ID =
-      UUID.fromString("550e8400-e29b-41d4-a716-446655440020");
   private static final String SENT_EXPO_PUSH_TOKEN = "ExponentPushToken[delivery-service-token]";
   private static final String REFRESHED_EXPO_PUSH_TOKEN =
       "ExponentPushToken[delivery-service-refreshed-token]";
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
-  @Autowired private PushDeviceRepository pushDeviceRepository;
+  @Autowired private UserPushTokenRepository userPushTokenRepository;
 
   @Autowired private PushDeliveryRepository pushDeliveryRepository;
 
   @Autowired private PushDeliveryService pushDeliveryService;
 
-  private PushDevice pushDevice;
+  private UserPushToken userPushToken;
 
-  /** 각 테스트에서 사용할 사용자와 발송 가능한 설치를 저장한다. */
+  /** 각 테스트에서 사용할 사용자와 활성 Expo Push Token을 저장한다. */
   @BeforeEach
   void setUp() {
     jdbcTemplate.update(
@@ -58,13 +55,12 @@ class PushDeliveryServiceIntegrationTests {
             'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         USER_ID);
-    pushDevice =
-        pushDeviceRepository.saveAndFlush(
-            PushDevice.create(
-                USER_ID, INSTALLATION_ID, AppPlatform.IOS, true, SENT_EXPO_PUSH_TOKEN));
+    userPushToken =
+        userPushTokenRepository.saveAndFlush(
+            UserPushToken.register(USER_ID, AppPlatform.IOS, SENT_EXPO_PUSH_TOKEN));
   }
 
-  /** 같은 날짜·사용자·설치 발송을 반복 선점해도 발송 이력은 한 건만 생성한다. */
+  /** 같은 이벤트·사용자·Token 발송을 반복 선점해도 발송 이력은 한 건만 생성한다. */
   @Test
   void preparesSameReviewReminderOnlyOnce() {
     PreparePushDeliveryCommand command = command();
@@ -89,21 +85,21 @@ class PushDeliveryServiceIntegrationTests {
     assertThat(pushDeliveryRepository.count()).isEqualTo(1);
   }
 
-  /** 재시도 전에 설치 Token이 바뀌면 오래된 이력을 새 Token으로 발송하지 않는다. */
+  /** 재시도 전에 Token이 해제되면 오래된 이력을 다시 발송하지 않는다. */
   @Test
-  void skipsRetryWhenCurrentTokenDiffersFromSentToken() {
+  void skipsRetryWhenTokenIsRevoked() {
     PreparePushDeliveryCommand command = command();
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command).orElseThrow();
     pushDeliveryService.markRetryable(prepared.pushDeliveryId());
-    pushDevice.synchronize(USER_ID, AppPlatform.IOS, true, REFRESHED_EXPO_PUSH_TOKEN);
-    pushDeviceRepository.saveAndFlush(pushDevice);
+    userPushToken.revoke();
+    userPushTokenRepository.saveAndFlush(userPushToken);
 
     assertThat(pushDeliveryService.prepare(command)).isEmpty();
   }
 
-  /** DeviceNotRegistered Receipt를 기록하면 실제 Push Device Token을 INVALID로 변경한다. */
+  /** DeviceNotRegistered Receipt를 기록하면 실제 Expo Push Token을 REVOKED로 변경한다. */
   @Test
-  void invalidatesPushDeviceAfterDeviceNotRegisteredReceipt() {
+  void revokesTokenAfterDeviceNotRegisteredReceipt() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
     pushDeliveryService.recordTicketResult(
         prepared.pushDeliveryId(), PushTicketResult.accepted("ticket-1"));
@@ -111,50 +107,25 @@ class PushDeliveryServiceIntegrationTests {
     pushDeliveryService.recordReceiptResult(
         prepared.pushDeliveryId(), PushReceiptResult.failed("DeviceNotRegistered"));
 
-    assertThat(pushDeviceRepository.findById(pushDevice.getId()).orElseThrow().getTokenStatus())
-        .isEqualTo(PushTokenStatus.INVALID);
+    assertThat(userPushTokenRepository.findById(userPushToken.getId()).orElseThrow().getStatus())
+        .isEqualTo(UserPushTokenStatus.REVOKED);
   }
 
-  /** 발송 뒤 같은 설치의 Token이 갱신되면 오래된 Receipt가 새 Token을 무효화하지 않는다. */
+  /** 오래된 Token의 Receipt 실패가 새로 등록된 다른 Token을 비활성화하지 않는다. */
   @Test
-  void keepsRefreshedTokenActiveAfterOldTokenReceiptFailure() {
+  void keepsNewTokenActiveAfterOldTokenReceiptFailure() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
     pushDeliveryService.recordTicketResult(
         prepared.pushDeliveryId(), PushTicketResult.accepted("ticket-1"));
-    pushDevice.synchronize(USER_ID, AppPlatform.IOS, true, REFRESHED_EXPO_PUSH_TOKEN);
-    pushDeviceRepository.saveAndFlush(pushDevice);
+    UserPushToken refreshedToken =
+        userPushTokenRepository.saveAndFlush(
+            UserPushToken.register(USER_ID, AppPlatform.IOS, REFRESHED_EXPO_PUSH_TOKEN));
 
     pushDeliveryService.recordReceiptResult(
         prepared.pushDeliveryId(), PushReceiptResult.failed("DeviceNotRegistered"));
 
-    PushDevice refreshedDevice = pushDeviceRepository.findById(pushDevice.getId()).orElseThrow();
-    assertThat(refreshedDevice.getExpoPushToken()).isEqualTo(REFRESHED_EXPO_PUSH_TOKEN);
-    assertThat(refreshedDevice.getTokenStatus()).isEqualTo(PushTokenStatus.ACTIVE);
-  }
-
-  /** 발송 Token이 다른 설치로 이전되면 오래된 Receipt가 그 Token의 현재 소유자를 무효화한다. */
-  @Test
-  void invalidatesCurrentOwnerAfterSentTokenTransfer() {
-    PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
-    pushDeliveryService.recordTicketResult(
-        prepared.pushDeliveryId(), PushTicketResult.accepted("ticket-1"));
-    pushDevice.detachToken();
-    pushDeviceRepository.saveAndFlush(pushDevice);
-    PushDevice transferredOwner =
-        pushDeviceRepository.saveAndFlush(
-            PushDevice.create(
-                USER_ID,
-                UUID.fromString("550e8400-e29b-41d4-a716-446655440021"),
-                AppPlatform.ANDROID,
-                true,
-                SENT_EXPO_PUSH_TOKEN));
-
-    pushDeliveryService.recordReceiptResult(
-        prepared.pushDeliveryId(), PushReceiptResult.failed("DeviceNotRegistered"));
-
-    assertThat(
-            pushDeviceRepository.findById(transferredOwner.getId()).orElseThrow().getTokenStatus())
-        .isEqualTo(PushTokenStatus.INVALID);
+    assertThat(userPushTokenRepository.findById(refreshedToken.getId()).orElseThrow().getStatus())
+        .isEqualTo(UserPushTokenStatus.ACTIVE);
   }
 
   /** 복습 리마인더 발송 선점 명령을 생성한다. */
@@ -162,9 +133,9 @@ class PushDeliveryServiceIntegrationTests {
     LocalDate reviewDate = LocalDate.of(2026, 7, 24);
     return new PreparePushDeliveryCommand(
         USER_ID,
-        pushDevice.getId(),
+        userPushToken.getId(),
         NotificationType.REVIEW_REMINDER,
-        "review-reminder:" + reviewDate + ":" + USER_ID + ":" + pushDevice.getId(),
+        "review-reminder:" + reviewDate + ":" + USER_ID + ":" + userPushToken.getId(),
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
         "/expressions");

@@ -6,13 +6,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.domain.PushDevice;
+import com.landit.landitbe.feature.notification.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
-import com.landit.landitbe.feature.notification.repository.PushDeviceRepository;
+import com.landit.landitbe.feature.notification.repository.UserPushTokenRepository;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDate;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,15 +34,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 class PushDeliveryRetryConcurrencyIntegrationTests {
 
   private static final long USER_ID = 996002L;
-  private static final UUID INSTALLATION_ID =
-      UUID.fromString("550e8400-e29b-41d4-a716-446655440022");
   private static final String EXPO_PUSH_TOKEN = "ExponentPushToken[retry-concurrency-token]";
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private PlatformTransactionManager transactionManager;
 
-  @Autowired private PushDeviceRepository pushDeviceRepository;
+  @Autowired private UserPushTokenRepository userPushTokenRepository;
 
   @Autowired private PushDeliveryRepository pushDeliveryRepository;
 
@@ -67,20 +64,20 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
             'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         USER_ID);
-    PushDevice pushDevice =
-        pushDeviceRepository.saveAndFlush(
-            PushDevice.create(USER_ID, INSTALLATION_ID, AppPlatform.IOS, true, EXPO_PUSH_TOKEN));
+    UserPushToken userPushToken =
+        userPushTokenRepository.saveAndFlush(
+            UserPushToken.register(USER_ID, AppPlatform.IOS, EXPO_PUSH_TOKEN));
     command =
         new PreparePushDeliveryCommand(
             USER_ID,
-            pushDevice.getId(),
+            userPushToken.getId(),
             NotificationType.REVIEW_REMINDER,
             "review-reminder:"
                 + LocalDate.of(2026, 7, 24)
                 + ":"
                 + USER_ID
                 + ":"
-                + pushDevice.getId(),
+                + userPushToken.getId(),
             "복습할 시간이에요",
             "오늘의 표현을 다시 볼까요?",
             "/expressions");
@@ -162,7 +159,7 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
     PreparePushDeliveryCommand firstSendCommand =
         new PreparePushDeliveryCommand(
             USER_ID,
-            command.pushDeviceId(),
+            command.userPushTokenId(),
             NotificationType.REVIEW_REMINDER,
             command.deduplicationKey() + ":first-send",
             command.title(),

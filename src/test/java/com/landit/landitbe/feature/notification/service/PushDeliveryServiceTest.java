@@ -48,8 +48,7 @@ class PushDeliveryServiceTest {
   /** 발송 직전에 설치가 비활성화되면 발송 이력을 만들지 않는다. */
   @Test
   void skipsTokenThatIsNoLongerSendable() {
-    when(userPushTokenDeliveryService.findLockedSendableDeliveryTarget(
-            USER_PUSH_TOKEN_ID, USER_ID))
+    when(userPushTokenDeliveryService.findLockedSendableDeliveryTarget(USER_PUSH_TOKEN_ID, USER_ID))
         .thenReturn(Optional.empty());
 
     assertThat(pushDeliveryService.prepare(command())).isEmpty();
@@ -77,8 +76,7 @@ class PushDeliveryServiceTest {
         PUSH_DELIVERY_ID, PushTicketResult.failed("DeviceNotRegistered"));
 
     verify(delivery).failTicket(any(), any());
-    verify(userPushTokenDeliveryService)
-        .revokeCurrentTokenOwner("ExponentPushToken[sent-token]");
+    verify(userPushTokenDeliveryService).revokeCurrentTokenOwner("ExponentPushToken[sent-token]");
   }
 
   /** Ticket 접수 상태의 발송 이력만 Receipt 조회 대상으로 반환한다. */
@@ -113,12 +111,7 @@ class PushDeliveryServiceTest {
         USER_ID,
         USER_PUSH_TOKEN_ID,
         NotificationType.REVIEW_REMINDER,
-        "review-reminder:"
-            + LocalDate.of(2026, 7, 24)
-            + ":"
-            + USER_ID
-            + ":"
-            + USER_PUSH_TOKEN_ID,
+        "review-reminder:" + LocalDate.of(2026, 7, 24) + ":" + USER_ID + ":" + USER_PUSH_TOKEN_ID,
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
         "/expressions");
