@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 class NotificationTargetPageQueryServiceIntegrationTests {
 
   private static final long USER_ID = 9_950_001L;
+  private static final long UNSENDABLE_USER_ID = 9_950_002L;
   private static final long CATEGORY_ID = 9_950_001L;
   private static final long FIRST_SCENARIO_ID = 9_950_001L;
   private static final long DAILY_SCENARIO_ID = 9_950_002L;
@@ -81,16 +83,74 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     assertThat(input.dailyScenarioCompleted()).isFalse();
   }
 
+  /** 활성·수신 허용·Token 보유 설치가 있는 사용자만 발송 가능 대상으로 조회한다. */
+  @Test
+  void loadsOnlyUsersWithSendablePushDevices() {
+    seedUser();
+    seedUser(UNSENDABLE_USER_ID, "unsendable-user");
+    insertPushDevice(
+        USER_ID,
+        "550e8400-e29b-41d4-a716-446655440101",
+        true,
+        "ExponentPushToken[sendable]",
+        "ACTIVE");
+    insertPushDevice(
+        UNSENDABLE_USER_ID,
+        "550e8400-e29b-41d4-a716-446655440102",
+        false,
+        "ExponentPushToken[disabled]",
+        "ACTIVE");
+    insertPushDevice(
+        UNSENDABLE_USER_ID, "550e8400-e29b-41d4-a716-446655440103", true, null, "ACTIVE");
+    insertPushDevice(
+        UNSENDABLE_USER_ID,
+        "550e8400-e29b-41d4-a716-446655440104",
+        true,
+        "ExponentPushToken[invalid]",
+        "INVALID");
+
+    NotificationTargetPage page = queryService.loadPage(USER_ID - 1, 2, SCHEDULED_DATE);
+
+    assertThat(page.userProfileIds()).containsExactly(USER_ID, UNSENDABLE_USER_ID);
+    assertThat(page.sendableUserProfileIds()).containsExactly(USER_ID);
+  }
+
   private void seedUser() {
+    seedUser(USER_ID, "notification-user");
+  }
+
+  private void seedUser(long userId, String nickname) {
     jdbcTemplate.update(
         """
         INSERT INTO user_profile (
             id, nickname, target_locale, base_locale, current_level,
             push_permission_status, status, created_at, updated_at
         )
-        VALUES (?, 'notification-user', 'EN', 'KR', 1, 'NOT_DETERMINED', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 'EN', 'KR', 1, 'NOT_DETERMINED', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
-        USER_ID);
+        userId,
+        nickname);
+  }
+
+  private void insertPushDevice(
+      long userId,
+      String installationId,
+      boolean pushEnabled,
+      String expoPushToken,
+      String status) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_push_token (
+            user_profile_id, platform, expo_push_token, status, installation_id,
+            push_enabled, created_at, updated_at
+        )
+        VALUES (?, 'IOS', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userId,
+        expoPushToken,
+        status,
+        UUID.fromString(installationId),
+        pushEnabled);
   }
 
   private void seedScenario(long scenarioId, int displayOrder) {

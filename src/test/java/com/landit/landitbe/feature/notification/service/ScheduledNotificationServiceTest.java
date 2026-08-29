@@ -14,6 +14,7 @@ import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.repository.UserNotificationStateRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +24,7 @@ import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -90,6 +92,39 @@ class ScheduledNotificationServiceTest {
     verify(notificationTargetSelectionService, times(501)).select(any());
     verify(notificationTargetPageQueryService, times(3))
         .loadPage(any(Long.class), eq(500), eq(scheduledDate));
+  }
+
+  /** 같은 날짜의 재처리에서 선정 유형이 바뀌어도 사용자 일일 이벤트 ID는 유지한다. */
+  @Test
+  @SuppressWarnings("unchecked")
+  void keepsDailyEventIdWhenSelectedNotificationTypeChangesOnRetry() {
+    LocalDate scheduledDate = LocalDate.of(2026, 7, 26);
+    NotificationTargetPage userPage = page(1L, 1);
+    NotificationTargetPage emptyPage = new NotificationTargetPage(List.of(), Map.of(), List.of());
+    when(notificationTargetPageQueryService.loadPage(0L, 500, scheduledDate)).thenReturn(userPage);
+    when(notificationTargetPageQueryService.loadPage(1L, 500, scheduledDate)).thenReturn(emptyPage);
+    when(userNotificationStateRepository.findAllByUserProfileIdIn(any())).thenReturn(List.of());
+    when(notificationTargetSelectionService.select(any()))
+        .thenReturn(
+            Optional.of(
+                new SelectedNotificationTarget(
+                    NotificationType.DAILY_SCENARIO_REMINDER, 11L, null)),
+            Optional.of(
+                new SelectedNotificationTarget(NotificationType.CONTINUE_EXPRESSION, 101L, 11L)));
+
+    scheduledNotificationService.process(Instant.parse("2026-07-26T11:00:00Z"), () -> {});
+    scheduledNotificationService.process(Instant.parse("2026-07-26T11:00:00Z"), () -> {});
+
+    ArgumentCaptor<List<SendPushNotificationCommand>> commandsCaptor =
+        ArgumentCaptor.forClass(List.class);
+    verify(notificationDispatchService, times(2)).sendAll(commandsCaptor.capture());
+    List<String> eventIds = new ArrayList<>();
+    commandsCaptor
+        .getAllValues()
+        .forEach(
+            commands ->
+                commands.stream().map(SendPushNotificationCommand::eventId).forEach(eventIds::add));
+    assertThat(eventIds).containsExactly("scheduled:2026-07-26:1", "scheduled:2026-07-26:1");
   }
 
   /** 지정한 ID 범위의 사용자를 같은 선정 입력과 발송 가능 상태로 구성한다. */

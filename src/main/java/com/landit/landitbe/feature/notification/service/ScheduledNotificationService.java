@@ -115,7 +115,7 @@ public class ScheduledNotificationService {
                 ScheduledNotificationContent content = ScheduledNotificationContent.from(target);
                 commands.add(
                     new SendPushNotificationCommand(
-                        eventId(scheduledDate, userProfileId, target.notificationType().name()),
+                        eventId(scheduledDate, userProfileId),
                         userProfileId,
                         target.notificationType(),
                         content.title(),
@@ -149,8 +149,8 @@ public class ScheduledNotificationService {
     return input.lastExpressionCompletedAt();
   }
 
-  /** 날짜·사용자·유형 조합으로 설치별 push_delivery 멱등성의 공통 이벤트 ID를 만든다. */
-  private String eventId(LocalDate scheduledDate, Long userProfileId, String notificationType) {
-    return "scheduled:" + scheduledDate + ":" + userProfileId + ":" + notificationType;
+  /** 날짜·사용자 조합으로 하루 한 건을 보장하는 설치별 push_delivery 공통 이벤트 ID를 만든다. */
+  private String eventId(LocalDate scheduledDate, Long userProfileId) {
+    return "scheduled:" + scheduledDate + ":" + userProfileId;
   }
 }

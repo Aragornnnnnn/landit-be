@@ -9,7 +9,7 @@
 - 당일 시나리오를 완료한 사용자에게 `DAILY_SCENARIO_REMINDER`를 보내지 않는다. 해당 시나리오의 미완료 표현이 있으면 `CONTINUE_EXPRESSION`으로 전환한다.
 - 시나리오와 표현을 모두 완료했고 당일 스몰톡을 한 번도 사용하지 않은 사용자에게만 `SMALL_TALK_REMINDER`를 보낸다.
 - 모든 조건을 소진했거나 알림할 수 있는 콘텐츠가 없으면 사용자 알림을 보내지 않는다. `REVIEW_LEARNING`은 예약 알림 정책에서 제거한다.
-- 계산 결과는 `user_notification_state`에 스냅샷으로 저장한다. 실제 발송은 기존 `push_delivery`의 날짜·사용자·Token·유형 멱등성으로 한 번만 처리한다.
+- 계산 결과는 `user_notification_state`에 스냅샷으로 저장한다. 실제 발송은 기존 `push_delivery`의 날짜·사용자·Token 멱등성으로 한 번만 처리한다. 같은 날짜의 재처리 중 알림 유형이 바뀌어도 추가 발송하지 않는다.
 - 페이지에서 선점한 Token별 발송 이력은 Expo Push 요청 최대 100건으로 묶어 직접 발송한다. 사용자별 `PUSH_SEND` 메시지를 Push Queue에 다시 넣지 않는다.
 - Listener는 `ON_SUCCESS`로 ack하며, 배치 처리 시작과 페이지 전환 시 `Visibility.changeTo(300)`으로 현재 SQS 메시지 visibility를 연장한다.
 - Scheduler payload는 `version`, `messageId`, `messageType`, `occurredAt`, 빈 `payload` 객체를 사용한다. Scheduler는 BE 호환 배포 전까지 비활성화한다.
