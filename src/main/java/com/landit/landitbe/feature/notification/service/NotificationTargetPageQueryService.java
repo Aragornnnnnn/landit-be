@@ -77,15 +77,13 @@ public class NotificationTargetPageQueryService {
         List.copyOf(sendableUserIds));
   }
 
-  /** 현재 발송 가능한 설치가 하나 이상 있는 사용자를 한 번에 조회한다. */
+  /** 현재 활성 UserPushToken이 하나 이상 있는 사용자를 한 번에 조회한다. */
   private List<Long> findSendableUserIds(MapSqlParameterSource parameters) {
     return jdbcTemplate.query(
         """
         select distinct user_profile_id
         from user_push_token
         where user_profile_id in (:userIds)
-          and push_enabled = true
-          and expo_push_token is not null
           and status = 'ACTIVE'
         """,
         parameters,

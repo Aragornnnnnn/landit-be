@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -83,31 +82,13 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     assertThat(input.dailyScenarioCompleted()).isFalse();
   }
 
-  /** 활성·수신 허용·Token 보유 설치가 있는 사용자만 발송 가능 대상으로 조회한다. */
+  /** ACTIVE 상태의 UserPushToken이 있는 사용자만 발송 가능 대상으로 조회한다. */
   @Test
-  void loadsOnlyUsersWithSendablePushDevices() {
+  void loadsOnlyUsersWithActiveUserPushTokens() {
     seedUser();
     seedUser(UNSENDABLE_USER_ID, "unsendable-user");
-    insertPushDevice(
-        USER_ID,
-        "550e8400-e29b-41d4-a716-446655440101",
-        true,
-        "ExponentPushToken[sendable]",
-        "ACTIVE");
-    insertPushDevice(
-        UNSENDABLE_USER_ID,
-        "550e8400-e29b-41d4-a716-446655440102",
-        false,
-        "ExponentPushToken[disabled]",
-        "ACTIVE");
-    insertPushDevice(
-        UNSENDABLE_USER_ID, "550e8400-e29b-41d4-a716-446655440103", true, null, "ACTIVE");
-    insertPushDevice(
-        UNSENDABLE_USER_ID,
-        "550e8400-e29b-41d4-a716-446655440104",
-        true,
-        "ExponentPushToken[invalid]",
-        "INVALID");
+    insertUserPushToken(USER_ID, "ExponentPushToken[sendable]", "ACTIVE");
+    insertUserPushToken(UNSENDABLE_USER_ID, "ExponentPushToken[revoked]", "REVOKED");
 
     NotificationTargetPage page = queryService.loadPage(USER_ID - 1, 2, SCHEDULED_DATE);
 
@@ -132,25 +113,17 @@ class NotificationTargetPageQueryServiceIntegrationTests {
         nickname);
   }
 
-  private void insertPushDevice(
-      long userId,
-      String installationId,
-      boolean pushEnabled,
-      String expoPushToken,
-      String status) {
+  private void insertUserPushToken(long userId, String expoPushToken, String status) {
     jdbcTemplate.update(
         """
         INSERT INTO user_push_token (
-            user_profile_id, platform, expo_push_token, status, installation_id,
-            push_enabled, created_at, updated_at
+            user_profile_id, platform, expo_push_token, status, created_at, updated_at
         )
-        VALUES (?, 'IOS', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'IOS', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         userId,
         expoPushToken,
-        status,
-        UUID.fromString(installationId),
-        pushEnabled);
+        status);
   }
 
   private void seedScenario(long scenarioId, int displayOrder) {
