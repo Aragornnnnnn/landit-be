@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
+import io.awspring.cloud.sqs.listener.Visibility;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,8 @@ class PushNotificationConsumerTest {
   @Test
   void configuresListenerConcurrencyAndAcknowledgement() throws Exception {
     Method consumeMethod =
-        PushNotificationConsumer.class.getDeclaredMethod("consume", PushQueueMessage.class);
+        PushNotificationConsumer.class.getDeclaredMethod(
+            "consume", PushQueueMessage.class, Visibility.class);
     SqsListener listener = consumeMethod.getAnnotation(SqsListener.class);
 
     assertThat(listener.value()).containsExactly("${landit.notification.queue-url}");
