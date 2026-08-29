@@ -69,7 +69,7 @@ class PushDeliveryTest {
   void recordsFailure() {
     PushDelivery delivery = requestedDelivery();
 
-    delivery.fail("DeviceNotRegistered", CHECKED_AT);
+    delivery.failTicket("DeviceNotRegistered", CHECKED_AT);
 
     assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
     assertThat(delivery.getErrorCode()).isEqualTo("DeviceNotRegistered");
@@ -80,7 +80,7 @@ class PushDeliveryTest {
   @Test
   void keepsTerminalStateWhenStaleResultArrives() {
     PushDelivery delivery = requestedDelivery();
-    delivery.fail("MessageTooBig", CHECKED_AT);
+    delivery.failTicket("MessageTooBig", CHECKED_AT);
 
     assertThat(delivery.acceptTicket("ticket-1")).isFalse();
     assertThat(delivery.delivered(CHECKED_AT)).isFalse();
@@ -104,6 +104,67 @@ class PushDeliveryTest {
 
     assertThat(delivery.isRetryable()).isFalse();
     assertThat(delivery.getErrorCode()).isNull();
+  }
+
+  /** 재시도 표식은 첫 선점만 성공시키고 즉시 소비한다. */
+  @Test
+  void claimsRetryOnlyOnce() {
+    PushDelivery delivery = requestedDelivery();
+    delivery.markRetryable();
+
+    assertThat(delivery.claimRetry()).isTrue();
+    assertThat(delivery.claimRetry()).isFalse();
+    assertThat(delivery.isRetryable()).isFalse();
+  }
+
+  /** Ticket 접수 뒤 도착한 오래된 Ticket 실패 결과는 접수 상태를 덮지 않는다. */
+  @Test
+  void ignoresStaleTicketFailureAfterAcceptedTicket() {
+    PushDelivery delivery = requestedDelivery();
+    delivery.acceptTicket("ticket-1");
+
+    delivery.failTicket("DeviceNotRegistered", CHECKED_AT);
+
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.TICKET_ACCEPTED);
+    assertThat(delivery.getExpoTicketId()).isEqualTo("ticket-1");
+    assertThat(delivery.getErrorCode()).isNull();
+  }
+
+  /** 중복 Ticket 접수 결과는 최초 Ticket ID를 덮지 않는다. */
+  @Test
+  void keepsFirstAcceptedTicketWhenDuplicateResultArrives() {
+    PushDelivery delivery = requestedDelivery();
+    delivery.acceptTicket("ticket-1");
+
+    delivery.acceptTicket("ticket-2");
+
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.TICKET_ACCEPTED);
+    assertThat(delivery.getExpoTicketId()).isEqualTo("ticket-1");
+  }
+
+  /** 실패가 확정된 뒤 도착한 오래된 Ticket 접수 결과는 최종 상태를 덮지 않는다. */
+  @Test
+  void ignoresStaleAcceptedTicketAfterFailure() {
+    PushDelivery delivery = requestedDelivery();
+    delivery.failTicket("MessageTooBig", CHECKED_AT);
+
+    delivery.acceptTicket("ticket-1");
+
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
+    assertThat(delivery.getExpoTicketId()).isNull();
+    assertThat(delivery.getErrorCode()).isEqualTo("MessageTooBig");
+  }
+
+  /** Ticket 접수 전 Receipt 결과는 요청 상태를 변경하지 않는다. */
+  @Test
+  void ignoresReceiptResultBeforeAcceptedTicket() {
+    PushDelivery delivery = requestedDelivery();
+
+    delivery.delivered(CHECKED_AT);
+    delivery.failReceipt("DeviceNotRegistered", CHECKED_AT);
+
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.REQUESTED);
+    assertThat(delivery.getReceiptCheckedAt()).isNull();
   }
 
   private PushDelivery requestedDelivery() {
