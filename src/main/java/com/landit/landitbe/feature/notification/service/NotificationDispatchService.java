@@ -88,7 +88,13 @@ public class NotificationDispatchService {
       return null;
     }
     for (int index = 0; index < deliveries.size(); index++) {
-      recordTicketResult(deliveries.get(index), results.get(index));
+      pushDeliveryService.recordTicketResult(
+          deliveries.get(index).pushDeliveryId(), results.get(index));
+    }
+    for (int index = 0; index < deliveries.size(); index++) {
+      if (results.get(index).accepted()) {
+        pushQueuePublisher.scheduleReceiptCheck(deliveries.get(index).pushDeliveryId(), 1);
+      }
     }
     return null;
   }
@@ -99,14 +105,6 @@ public class NotificationDispatchService {
         delivery ->
             pushDeliveryService.recordTicketResult(
                 delivery.pushDeliveryId(), PushTicketResult.failed(errorCode)));
-  }
-
-  /** Ticket 결과를 발송 이력에 기록하고 접수된 알림의 Receipt 확인을 예약한다. */
-  private void recordTicketResult(PreparedPushDelivery delivery, PushTicketResult result) {
-    pushDeliveryService.recordTicketResult(delivery.pushDeliveryId(), result);
-    if (result.accepted()) {
-      pushQueuePublisher.scheduleReceiptCheck(delivery.pushDeliveryId(), 1);
-    }
   }
 
   /** 먼저 발생한 실패를 유지해 모든 발송 대상 처리 뒤 SQS 재시도를 유도한다. */

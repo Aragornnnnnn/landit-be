@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -176,5 +177,26 @@ class NotificationDispatchServiceTest {
     verify(notificationSender, times(2)).send(anyList());
     verify(notificationSender).send(argThat(messages -> messages.size() == 100));
     verify(notificationSender).send(argThat(messages -> messages.size() == 1));
+  }
+
+  /** Receipt 예약이 실패해도 같은 Expo 응답의 모든 Ticket 결과를 먼저 기록한다. */
+  @Test
+  void recordsAllTicketResultsBeforeSchedulingReceipts() {
+    PreparedPushDelivery secondDelivery =
+        new PreparedPushDelivery(11L, "ExponentPushToken[second-token]", "두 번째 알림", "본문", "/home");
+    when(userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(List.of(1L)))
+        .thenReturn(Map.of(1L, List.of(2L, 3L)));
+    when(pushDeliveryService.prepare(any()))
+        .thenReturn(Optional.of(PREPARED_DELIVERY), Optional.of(secondDelivery));
+    when(notificationSender.send(anyList()))
+        .thenReturn(
+            List.of(PushTicketResult.accepted("ticket-1"), PushTicketResult.accepted("ticket-2")));
+    PushNotificationException failure = new PushNotificationException("Receipt 예약 실패");
+    doThrow(failure).when(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
+
+    assertThatThrownBy(() -> notificationDispatchService.send(COMMAND)).isSameAs(failure);
+
+    verify(pushDeliveryService).recordTicketResult(10L, PushTicketResult.accepted("ticket-1"));
+    verify(pushDeliveryService).recordTicketResult(11L, PushTicketResult.accepted("ticket-2"));
   }
 }
