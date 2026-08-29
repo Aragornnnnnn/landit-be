@@ -7,11 +7,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.domain.PushDelivery;
-import com.landit.landitbe.feature.notification.domain.PushDevice;
+import com.landit.landitbe.feature.notification.domain.UserPushToken;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,8 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 class PushDeliveryRepositoryIntegrationTests {
 
   private static final long USER_ID = 994001L;
-  private static final UUID INSTALLATION_ID =
-      UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
   private static final String EXPO_PUSH_TOKEN = "ExponentPushToken[repository-token]";
   private static final String SENT_EXPO_PUSH_TOKEN = "ExponentPushToken[delivery-snapshot]";
 
@@ -36,7 +33,7 @@ class PushDeliveryRepositoryIntegrationTests {
 
   @Autowired private EntityManager entityManager;
 
-  @Autowired private PushDeviceRepository pushDeviceRepository;
+  @Autowired private UserPushTokenRepository userPushTokenRepository;
 
   @Autowired private PushDeliveryRepository pushDeliveryRepository;
 
@@ -44,11 +41,11 @@ class PushDeliveryRepositoryIntegrationTests {
   @Test
   void rejectsDuplicateDeliveryKey() {
     seedUser();
-    PushDevice device =
-        pushDeviceRepository.saveAndFlush(
-            PushDevice.create(USER_ID, INSTALLATION_ID, AppPlatform.IOS, true, EXPO_PUSH_TOKEN));
-    PushDelivery first = delivery(device.getId());
-    PushDelivery duplicate = delivery(device.getId());
+    UserPushToken token =
+        userPushTokenRepository.saveAndFlush(
+            UserPushToken.register(USER_ID, AppPlatform.IOS, EXPO_PUSH_TOKEN));
+    PushDelivery first = delivery(token.getId());
+    PushDelivery duplicate = delivery(token.getId());
 
     pushDeliveryRepository.saveAndFlush(first);
 
@@ -60,29 +57,29 @@ class PushDeliveryRepositoryIntegrationTests {
   @Test
   void retainsSentExpoPushTokenAfterPersistence() {
     seedUser();
-    PushDevice device =
-        pushDeviceRepository.saveAndFlush(
-            PushDevice.create(USER_ID, INSTALLATION_ID, AppPlatform.IOS, true, EXPO_PUSH_TOKEN));
-    PushDelivery delivery = delivery(device.getId());
+    UserPushToken token =
+        userPushTokenRepository.saveAndFlush(
+            UserPushToken.register(USER_ID, AppPlatform.IOS, EXPO_PUSH_TOKEN));
+    PushDelivery delivery = delivery(token.getId());
 
     pushDeliveryRepository.saveAndFlush(delivery);
     entityManager.clear();
     PushDelivery persisted =
         pushDeliveryRepository
-            .findByDeduplicationKey("review-reminder:2026-07-24:" + USER_ID + ":" + device.getId())
+            .findByDeduplicationKey("review-reminder:2026-07-24:" + USER_ID + ":" + token.getId())
             .orElseThrow();
 
     assertThat(SENT_EXPO_PUSH_TOKEN.equals(persisted.getSentExpoPushToken())).isTrue();
   }
 
   /** 테스트용 푸시 발송 이력을 생성한다. */
-  private PushDelivery delivery(Long pushDeviceId) {
+  private PushDelivery delivery(Long userPushTokenId) {
     return PushDelivery.requested(
         USER_ID,
-        pushDeviceId,
+        userPushTokenId,
         SENT_EXPO_PUSH_TOKEN,
         NotificationType.REVIEW_REMINDER,
-        "review-reminder:2026-07-24:" + USER_ID + ":" + pushDeviceId,
+        "review-reminder:2026-07-24:" + USER_ID + ":" + userPushTokenId,
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
         "/expressions",

@@ -21,7 +21,7 @@ class PushDeliveryTest {
     PushDelivery delivery = requestedDelivery();
 
     assertThat(delivery.getUserProfileId()).isEqualTo(1L);
-    assertThat(delivery.getPushDeviceId()).isEqualTo(2L);
+    assertThat(delivery.getUserPushTokenId()).isEqualTo(2L);
     assertThat(delivery.getNotificationType()).isEqualTo(NotificationType.REVIEW_REMINDER);
     assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.REQUESTED);
     assertThat(delivery.getRequestedAt()).isEqualTo(REQUESTED_AT);

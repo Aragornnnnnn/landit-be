@@ -29,8 +29,8 @@ public class PushDelivery extends BaseTimeEntity {
   @Column(name = "user_profile_id", nullable = false)
   private Long userProfileId;
 
-  @Column(name = "push_device_id", nullable = false)
-  private Long pushDeviceId;
+  @Column(name = "user_push_token_id", nullable = false)
+  private Long userPushTokenId;
 
   @Column(name = "sent_expo_push_token", nullable = false, length = 500)
   private String sentExpoPushToken;
@@ -73,7 +73,7 @@ public class PushDelivery extends BaseTimeEntity {
   /** Expo 요청 전 선점할 발송 정보와 요청 시각을 받아 발송 이력을 생성한다. */
   private PushDelivery(
       Long userProfileId,
-      Long pushDeviceId,
+      Long userPushTokenId,
       String sentExpoPushToken,
       NotificationType notificationType,
       String deduplicationKey,
@@ -82,7 +82,7 @@ public class PushDelivery extends BaseTimeEntity {
       String deepLink,
       LocalDateTime requestedAt) {
     this.userProfileId = userProfileId;
-    this.pushDeviceId = pushDeviceId;
+    this.userPushTokenId = userPushTokenId;
     this.sentExpoPushToken = sentExpoPushToken;
     this.notificationType = notificationType;
     this.deduplicationKey = deduplicationKey;
@@ -97,7 +97,7 @@ public class PushDelivery extends BaseTimeEntity {
    * Expo에 발송을 요청하기 전 멱등 발송 이력을 생성한다.
    *
    * @param userProfileId 발송 대상 사용자 식별자
-   * @param pushDeviceId 발송 대상 기기 식별자
+   * @param userPushTokenId 발송 대상 사용자 Push Token 식별자
    * @param sentExpoPushToken 이번 발송에 사용한 Expo Push Token
    * @param notificationType 발송 알림 유형
    * @param deduplicationKey 중복 발송 방지 키
@@ -109,7 +109,7 @@ public class PushDelivery extends BaseTimeEntity {
    */
   public static PushDelivery requested(
       Long userProfileId,
-      Long pushDeviceId,
+      Long userPushTokenId,
       String sentExpoPushToken,
       NotificationType notificationType,
       String deduplicationKey,
@@ -119,7 +119,7 @@ public class PushDelivery extends BaseTimeEntity {
       LocalDateTime requestedAt) {
     return new PushDelivery(
         userProfileId,
-        pushDeviceId,
+        userPushTokenId,
         sentExpoPushToken,
         notificationType,
         deduplicationKey,

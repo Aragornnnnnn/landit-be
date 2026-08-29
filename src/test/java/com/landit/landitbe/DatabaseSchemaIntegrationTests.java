@@ -80,7 +80,7 @@ class DatabaseSchemaIntegrationTests {
   @Test
   void pushDeliverySchemaSupportsDeliveryTracking() {
     assertTableExists("push_delivery");
-    assertColumnExists("push_delivery", "push_device_id");
+    assertColumnExists("push_delivery", "user_push_token_id");
     assertColumnDefinition("push_delivery", "sent_expo_push_token", "CHARACTER VARYING", 500, "NO");
     assertColumnExists("push_delivery", "deduplication_key");
     assertColumnExists("push_delivery", "expo_ticket_id");
