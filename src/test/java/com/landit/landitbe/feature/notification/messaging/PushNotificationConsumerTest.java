@@ -22,9 +22,9 @@ class PushNotificationConsumerTest {
         new PushQueueMessage(
             1,
             "message-id",
-            "REVIEW_REMINDER_BATCH",
+            "PUSH_RECEIPT_CHECK",
             Instant.parse("2026-07-24T11:00:00Z"),
-            new PushQueuePayload(null, null));
+            PushQueuePayload.receipt(1L, 1));
 
     consumer.consume(message);
 

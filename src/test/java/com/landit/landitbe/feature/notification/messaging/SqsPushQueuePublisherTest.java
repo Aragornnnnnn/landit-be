@@ -10,8 +10,11 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
+import com.landit.landitbe.feature.notification.domain.NotificationType;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,11 +34,14 @@ class SqsPushQueuePublisherTest {
 
   @Mock private SqsAsyncClient sqsAsyncClient;
 
-  /** 같은 Push Queue에 Receipt 확인 payload와 900초 지연을 지정해 발행한다. */
-  @Test
-  void publishesDelayedReceiptCheckMessage() throws Exception {
-    JsonMapper jsonMapper = JsonMapper.builder().build();
-    NotificationProperties properties =
+  private final JsonMapper jsonMapper = JsonMapper.builder().build();
+  private NotificationProperties properties;
+  private SqsPushQueuePublisher publisher;
+
+  /** 각 테스트에서 발행 가능한 Push Queue 설정과 Publisher를 준비한다. */
+  @BeforeEach
+  void setUp() {
+    properties =
         new NotificationProperties(
             "https://exp.host",
             null,
@@ -43,12 +49,13 @@ class SqsPushQueuePublisherTest {
             Duration.ofSeconds(2),
             "https://sqs.ap-northeast-2.amazonaws.com/123/push",
             900);
-    when(sqsAsyncClient.sendMessage(any(SendMessageRequest.class)))
-        .thenReturn(
-            CompletableFuture.completedFuture(
-                SendMessageResponse.builder().messageId("sqs-message-id").build()));
-    SqsPushQueuePublisher publisher =
-        new SqsPushQueuePublisher(sqsAsyncClient, jsonMapper, properties);
+    publisher = new SqsPushQueuePublisher(sqsAsyncClient, jsonMapper, properties);
+  }
+
+  /** 같은 Push Queue에 Receipt 확인 payload와 900초 지연을 지정해 발행한다. */
+  @Test
+  void publishesDelayedReceiptCheckMessage() throws Exception {
+    stubSqsSendMessage();
 
     publisher.scheduleReceiptCheck(10L, 2);
 
@@ -65,6 +72,41 @@ class SqsPushQueuePublisherTest {
     assertThat(body.get("occurredAt").asString()).isNotBlank();
     assertThat(body.get("payload").get("pushDeliveryId").asLong()).isEqualTo(10L);
     assertThat(body.get("payload").get("receiptAttempt").asInt()).isEqualTo(2);
+  }
+
+  /** 사용자별 푸시 알림은 지연 없이 기존 Consumer가 처리하는 메시지 계약으로 발행한다. */
+  @Test
+  void publishesImmediatePushSendMessage() throws Exception {
+    stubSqsSendMessage();
+    Instant occurredAt = Instant.parse("2026-07-25T11:00:00Z");
+
+    publisher.publishNotification(
+        new PushNotificationRequest(
+            "event-1",
+            1L,
+            NotificationType.TEST_NOTIFICATION,
+            "Landit 알림 테스트",
+            "푸시 알림이 정상적으로 도착했어요.",
+            "/home",
+            occurredAt));
+
+    ArgumentCaptor<SendMessageRequest> requestCaptor =
+        ArgumentCaptor.forClass(SendMessageRequest.class);
+    verify(sqsAsyncClient).sendMessage(requestCaptor.capture());
+    SendMessageRequest request = requestCaptor.getValue();
+    JsonNode body = jsonMapper.readTree(request.messageBody());
+    assertThat(request.queueUrl()).isEqualTo(properties.queueUrl());
+    assertThat(request.delaySeconds()).isZero();
+    assertThat(body.get("version").asInt()).isEqualTo(1);
+    assertThat(body.get("messageId").asString()).isEqualTo("event-1");
+    assertThat(body.get("messageType").asString()).isEqualTo("PUSH_SEND");
+    assertThat(body.get("occurredAt").asString()).isEqualTo(occurredAt.toString());
+    assertThat(body.get("payload").get("userProfileId").asLong()).isEqualTo(1L);
+    assertThat(body.get("payload").get("notificationType").asString())
+        .isEqualTo("TEST_NOTIFICATION");
+    assertThat(body.get("payload").get("title").asString()).isEqualTo("Landit 알림 테스트");
+    assertThat(body.get("payload").get("body").asString()).isEqualTo("푸시 알림이 정상적으로 도착했어요.");
+    assertThat(body.get("payload").get("deepLink").asString()).isEqualTo("/home");
   }
 
   /** Receipt 확인 지연 시간은 Expo Receipt 조회 계약에 맞춰 900초만 허용한다. */
@@ -106,5 +148,12 @@ class SqsPushQueuePublisherTest {
     assertThatThrownBy(() -> publisher.scheduleReceiptCheck(10L, 1))
         .isInstanceOf(PushNotificationException.class)
         .hasMessage("Push Receipt 확인 메시지 발행에 실패했습니다.");
+
+  /** SQS 비동기 발행 성공 응답을 준비한다. */
+  private void stubSqsSendMessage() {
+    when(sqsAsyncClient.sendMessage(any(SendMessageRequest.class)))
+        .thenReturn(
+             CompletableFuture.completedFuture(
+                 SendMessageResponse.builder().messageId("sqs-message-id").build()));
   }
 }
