@@ -164,7 +164,8 @@ public class PushDelivery extends BaseTimeEntity {
     return status == PushDeliveryStatus.REQUESTED && RETRYABLE_ERROR_CODE.equals(errorCode);
   }
 
-  /** 재시도 표식을 원자적으로 소비한다.
+  /**
+   * 재시도 표식을 원자적으로 소비한다.
    *
    * @return 현재 재시도를 선점했으면 {@code true}
    */
@@ -179,8 +180,8 @@ public class PushDelivery extends BaseTimeEntity {
   /**
    * 요청 상태라면 Ticket 오류를 기록한다.
    *
-    * @param failureCode Expo Ticket 오류 코드
-    * @param checkedAt 결과 기록 시각
+   * @param failureCode Expo Ticket 오류 코드
+   * @param checkedAt 결과 기록 시각
    * @return Ticket 실패 상태로 전환했으면 {@code true}
    */
   public boolean failTicket(String failureCode, LocalDateTime checkedAt) {

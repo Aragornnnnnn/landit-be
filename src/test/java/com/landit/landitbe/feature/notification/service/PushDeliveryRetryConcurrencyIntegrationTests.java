@@ -184,7 +184,9 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
 
     start.countDown();
 
-    assertThat(first.get(5, TimeUnit.SECONDS).isPresent() ^ second.get(5, TimeUnit.SECONDS).isPresent())
+    assertThat(
+            first.get(5, TimeUnit.SECONDS).isPresent()
+                ^ second.get(5, TimeUnit.SECONDS).isPresent())
         .isTrue();
     assertThat(pushDeliveryRepository.count()).isEqualTo(2);
   }
