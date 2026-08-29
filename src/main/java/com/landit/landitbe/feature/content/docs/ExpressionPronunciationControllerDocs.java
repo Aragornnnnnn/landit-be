@@ -24,7 +24,7 @@ public interface ExpressionPronunciationControllerDocs {
    *
    * @param principal 인증된 사용자
    * @param expressionId Writing 표현 ID
-   * @param audio 사용자 발화 녹음 (m4a·wav·mp3, 최대 10MB·30초)
+   * @param audio 사용자 발화 녹음 (m4a·wav·mp3·webm, 최대 10MB·30초)
    * @return 점수·통과 여부·단어별 판정
    * @throws ApiException 오디오 형식·크기 위반(400), 표현 없음·발음 데이터 미구축(404), AI 분석 실패(502)
    */
@@ -36,5 +36,5 @@ public interface ExpressionPronunciationControllerDocs {
   ApiResponse<PronunciationAnalysisResponse> analyzeSentence(
       AuthUserPrincipal principal,
       @Parameter(description = "Writing 표현 ID", example = "101") Long expressionId,
-      @Parameter(description = "사용자 발화 녹음. m4a·wav·mp3, 최대 10MB·30초") MultipartFile audio);
+      @Parameter(description = "사용자 발화 녹음. m4a·wav·mp3·webm, 최대 10MB·30초") MultipartFile audio);
 }

@@ -9,7 +9,7 @@ import java.util.List;
  * AI 서버 발음 분석 요청을 표현한다.
  *
  * @param userAudio 유저 발화 녹음의 base64 문자열
- * @param userAudioFormat 녹음 파일 형식 (m4a·wav·mp3)
+ * @param userAudioFormat 녹음 파일 형식 (m4a·wav·mp3·webm)
  * @param sentenceText 정답 문장 (강제 정렬 기준)
  * @param referenceAudioUrl 대조 기준이 되는 원어민 문장 TTS URL
  * @param accentLocale 판정 기준 억양

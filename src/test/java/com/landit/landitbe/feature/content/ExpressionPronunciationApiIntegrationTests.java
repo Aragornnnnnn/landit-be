@@ -183,6 +183,22 @@ class ExpressionPronunciationApiIntegrationTests {
   }
 
   @Test
+  void analyzeAcceptsWebmRecording() throws Exception {
+    String accessToken = loginWithUsTutor("pron-analyze-webm");
+
+    // 크롬·안드로이드 웹뷰의 MediaRecorder는 webm으로만 녹음된다 (웹 버전 지원).
+    MockMultipartFile webmFile =
+        new MockMultipartFile("audio", "recording.webm", "audio/webm", "fake-audio".getBytes());
+    mockMvc
+        .perform(
+            multipart(analysisUrl(EXPRESSION_ID))
+                .file(webmFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.score").isNumber());
+  }
+
+  @Test
   void analyzeRequiresAuthentication() throws Exception {
     mockMvc
         .perform(multipart(analysisUrl(EXPRESSION_ID)).file(sampleAudio()))

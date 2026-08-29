@@ -41,7 +41,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class ExpressionPronunciationService {
 
   // 허용하는 녹음 파일 확장자와 최대 크기 (명세 확정값).
-  private static final Set<String> ALLOWED_AUDIO_FORMATS = Set.of("m4a", "wav", "mp3");
+  // webm은 크롬·안드로이드 웹뷰의 MediaRecorder 녹음 형식이다 (웹 버전 지원).
+  private static final Set<String> ALLOWED_AUDIO_FORMATS = Set.of("m4a", "wav", "mp3", "webm");
   private static final long MAX_AUDIO_BYTES = 10L * 1024 * 1024;
 
   private final WritingExpressionRepository writingExpressionRepository;
@@ -100,7 +101,7 @@ public class ExpressionPronunciationService {
     }
     String format = extractFormat(audio.getOriginalFilename());
     if (!ALLOWED_AUDIO_FORMATS.contains(format)) {
-      throw new ApiException(ErrorCode.INVALID_AUDIO, "m4a·wav·mp3 형식만 지원합니다.");
+      throw new ApiException(ErrorCode.INVALID_AUDIO, "m4a·wav·mp3·webm 형식만 지원합니다.");
     }
     return format;
   }
