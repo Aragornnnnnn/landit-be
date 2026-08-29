@@ -86,4 +86,25 @@ class SqsPushQueuePublisherTest {
         .isInstanceOf(PushNotificationException.class)
         .hasMessage("Push Queue 설정이 올바르지 않습니다.");
   }
+
+  /** SQS 응답이 지연되면 설정된 요청 제한 시간 뒤 발행 실패로 처리한다. */
+  @Test
+  void failsWhenSqsSendExceedsRequestTimeout() {
+    NotificationProperties properties =
+        new NotificationProperties(
+            "https://exp.host",
+            null,
+            Duration.ofSeconds(1),
+            Duration.ofMillis(1),
+            "https://sqs.ap-northeast-2.amazonaws.com/123/push",
+            900);
+    when(sqsAsyncClient.sendMessage(any(SendMessageRequest.class)))
+        .thenReturn(new CompletableFuture<>());
+    SqsPushQueuePublisher publisher =
+        new SqsPushQueuePublisher(sqsAsyncClient, JsonMapper.builder().build(), properties);
+
+    assertThatThrownBy(() -> publisher.scheduleReceiptCheck(10L, 1))
+        .isInstanceOf(PushNotificationException.class)
+        .hasMessage("Push Receipt 확인 메시지 발행에 실패했습니다.");
+  }
 }

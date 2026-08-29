@@ -156,6 +156,39 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
     }
   }
 
+  /** 같은 설치와 중복 키로 동시에 최초 발송을 선점해도 발송 이력은 한 건만 추가한다. */
+  @Test
+  void createsOnlyOneDeliveryForConcurrentFirstSend() throws Exception {
+    PreparePushDeliveryCommand firstSendCommand =
+        new PreparePushDeliveryCommand(
+            USER_ID,
+            command.pushDeviceId(),
+            NotificationType.REVIEW_REMINDER,
+            command.deduplicationKey() + ":first-send",
+            command.title(),
+            command.body(),
+            command.deepLink());
+    CountDownLatch start = new CountDownLatch(1);
+    Future<Optional<PreparedPushDelivery>> first =
+        executor.submit(
+            () -> {
+              awaitLatch(start);
+              return pushDeliveryService.prepare(firstSendCommand);
+            });
+    Future<Optional<PreparedPushDelivery>> second =
+        executor.submit(
+            () -> {
+              awaitLatch(start);
+              return pushDeliveryService.prepare(firstSendCommand);
+            });
+
+    start.countDown();
+
+    assertThat(first.get(5, TimeUnit.SECONDS).isPresent() ^ second.get(5, TimeUnit.SECONDS).isPresent())
+        .isTrue();
+    assertThat(pushDeliveryRepository.count()).isEqualTo(2);
+  }
+
   /** 제한시간 안에 동시 실행 단계가 열리지 않으면 테스트를 실패시킨다. */
   private void awaitLatch(CountDownLatch latch) {
     try {
