@@ -1,5 +1,15 @@
 # LAN-184 푸시 알림 백엔드 설계
 
+## 최종 정책 확장
+
+`SCHEDULED_NOTIFICATION_BATCH`는 EventBridge Scheduler가 매일 20시 `Asia/Seoul` 기준으로 Push Queue에 발행한다. 기존 API 서버의 Consumer가 500명 Keyset 페이지로 활성 사용자를 조회하고, 페이지마다 시나리오·표현·완료 이력·발송 가능한 설치를 일괄 조회한다.
+
+- 사용자별 최근 실제 완료 시각으로 `CONTINUE_SCENARIO`, `CONTINUE_EXPRESSION`, `REVIEW_LEARNING` 중 하루 한 건을 선정한다.
+- 시나리오는 카테고리별 순차 잠금을 유지하고, 표현은 부모 시나리오가 `CLEARED`인 경우만 알림 후보가 된다. 이 조건은 기존 표현 API의 접근 규칙을 바꾸지 않는다.
+- 계산 결과는 `user_notification_state`에 스냅샷으로 저장한다. 실제 발송은 기존 `push_delivery`의 날짜·사용자·기기·유형 멱등성으로 한 번만 처리한다.
+- Listener는 `ON_SUCCESS`로 ack하며, 배치 처리 시작과 페이지 전환 시 `Visibility.changeTo(300)`으로 현재 SQS 메시지 visibility를 연장한다.
+- Scheduler payload는 `version`, `messageId`, `messageType`, `occurredAt`, 빈 `payload` 객체를 사용한다. Scheduler는 BE 호환 배포 전까지 비활성화한다.
+
 ## 현재 범위
 
 이번 구현은 기존 Expo Push Token과 공통 Push 전달 인프라까지만 책임진다. 대상 선정, 반복 주기, 우선순위, 문구와 딥링크 같은 제품 정책은 후속 PR로 분리한다.
