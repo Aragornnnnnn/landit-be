@@ -1,6 +1,6 @@
 // AI 발음 판정에서 단어 1개의 판정 상태를 정의한다.
 
-package com.landit.landitbe.feature.content.client.ai;
+package com.landit.landitbe.feature.content.client.ai.dto;
 
 /** AI 발음 판정에서 단어 1개의 판정 상태를 정의한다. */
 public enum AiPronunciationWordStatus {

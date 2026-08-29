@@ -24,7 +24,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
     name = "manifest-mode",
     havingValue = "s3",
     matchIfMissing = true)
-public class S3PronunciationManifestReader implements PronunciationManifestReader {
+public class S3PronunciationManifestReader implements PronunciationManifestReadable {
 
   private final S3Client s3Client;
   private final ContentImageProperties properties;

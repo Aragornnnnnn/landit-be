@@ -80,9 +80,12 @@ class AdminPronunciationAssetApiIntegrationTests {
         EXPRESSION_ID);
   }
 
-  // 시드한 표현을 남기지 않는다. 다른 테스트(예: 스키마 테스트의 FREE_TALK 표현 카운트)가
-  // 전역 상태를 세기 때문에, 마지막 테스트 후에도 세상을 원래대로 돌려놓아야 한다.
-  // 자산 행은 FK CASCADE로 함께 삭제된다.
+  /**
+   * 시드한 표현을 남기지 않는다.
+   *
+   * <p>다른 테스트(예: 스키마 테스트의 FREE_TALK 표현 카운트)가 전역 상태를 세기 때문에, 마지막 테스트 후에도 세상을 원래대로 돌려놓아야 한다. 자산 행은 FK
+   * CASCADE로 함께 삭제된다.
+   */
   @AfterEach
   void tearDown() {
     jdbcTemplate.update("delete from writing_expression where id = ?", EXPRESSION_ID);
@@ -410,7 +413,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     mockMvc.perform(importFrom(IMPORT_TTS_URL, "", accessToken)).andExpect(status().isBadRequest());
   }
 
-  // 패턴형 표현(타겟 텍스트에 ~ 포함, 표현 음성 없음)을 시드한다.
+  /** 패턴형 표현(타겟 텍스트에 ~ 포함, 표현 음성 없음)을 시드한다. */
   private void seedPatternExpression() {
     jdbcTemplate.update(
         """
@@ -431,7 +434,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         PATTERN_EXPRESSION_ID);
   }
 
-  // 매니페스트 키로 임포트 요청을 만든다.
+  /** 매니페스트 키로 임포트 요청을 만든다. */
   private MockHttpServletRequestBuilder importFrom(
       String url, String manifestKey, String accessToken) {
     return post(url)
@@ -439,7 +442,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
   }
 
-  // 커버리지 응답의 data 노드를 조회한다.
+  /** 커버리지 응답의 data 노드를 조회한다. */
   private JsonNode coverageData(String accessToken) throws Exception {
     MvcResult result =
         mockMvc
@@ -449,7 +452,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     return objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("data");
   }
 
-  // 커버리지 응답에서 특정 억양의 결석 목록(referenceMissing 또는 audioMissing)을 꺼낸다.
+  /** 커버리지 응답에서 특정 억양의 결석 목록(referenceMissing 또는 audioMissing)을 꺼낸다. */
   private List<Long> missingOf(JsonNode data, String accentLocale, String fieldName) {
     for (JsonNode locale : data.get("locales")) {
       if (accentLocale.equals(locale.get("accentLocale").asText())) {

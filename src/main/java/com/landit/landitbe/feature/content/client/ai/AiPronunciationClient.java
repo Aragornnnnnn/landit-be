@@ -2,6 +2,10 @@
 
 package com.landit.landitbe.feature.content.client.ai;
 
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationAnalysisRequest;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationJudgedWord;
+import java.util.List;
+
 /**
  * AI 서버에 발음 분석을 요청하는 클라이언트를 정의한다.
  *
@@ -13,8 +17,8 @@ public interface AiPronunciationClient {
    * 유저 발화를 원어민 TTS와 대조해 단어별 발음·강세 판정을 받는다.
    *
    * @param request 발음 분석 요청
-   * @return 단어별 판정 결과
+   * @return 단어별 판정 목록 (order 오름차순, 요청 단어와 1:1)
    * @throws com.landit.landitbe.shared.exception.ApiException AI 서버 호출이 실패했을 때
    */
-  AiPronunciationAnalysisResult analyze(AiPronunciationAnalysisRequest request);
+  List<AiPronunciationJudgedWord> analyze(AiPronunciationAnalysisRequest request);
 }

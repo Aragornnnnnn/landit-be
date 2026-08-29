@@ -9,17 +9,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.content.client.ai.AiPronunciationAnalysisResult;
 import com.landit.landitbe.feature.content.client.ai.AiPronunciationClient;
-import com.landit.landitbe.feature.content.client.ai.AiPronunciationWordStatus;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationJudgedWord;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationWordStatus;
 import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.PronunciationAnalysisResponse;
+import com.landit.landitbe.feature.content.exception.AiPronunciationResponseInvalidException;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.ActiveStatus;
-import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.Optional;
@@ -157,15 +157,13 @@ class ExpressionPronunciationServiceTest {
     assertInvalidAiResponse();
   }
 
-  private void givenAiResponse(AiPronunciationAnalysisResult.Word... words) {
-    when(aiPronunciationClient.analyze(any()))
-        .thenReturn(new AiPronunciationAnalysisResult(List.of(words)));
+  private void givenAiResponse(AiPronunciationJudgedWord... judgedWords) {
+    when(aiPronunciationClient.analyze(any())).thenReturn(List.of(judgedWords));
   }
 
-  private AiPronunciationAnalysisResult.Word judged(
+  private AiPronunciationJudgedWord judged(
       int order, String word, AiPronunciationWordStatus status) {
-    return new AiPronunciationAnalysisResult.Word(
-        order, word, status, 100, 400, null, null, null, null);
+    return new AiPronunciationJudgedWord(order, word, status, 100, 400, null, null, null, null);
   }
 
   private PronunciationAnalysisResponse analyze() {
@@ -173,8 +171,9 @@ class ExpressionPronunciationServiceTest {
   }
 
   private void assertInvalidAiResponse() {
+    // 도메인 예외 타입과 오류 코드가 함께 맞아야 한다 (예외 파일럿 검증).
     assertThatThrownBy(this::analyze)
-        .isInstanceOf(ApiException.class)
+        .isInstanceOf(AiPronunciationResponseInvalidException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
   }

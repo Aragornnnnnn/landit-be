@@ -3,13 +3,16 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.landit.landitbe.feature.content.client.ai.AiPronunciationAnalysisRequest;
-import com.landit.landitbe.feature.content.client.ai.AiPronunciationAnalysisResult;
 import com.landit.landitbe.feature.content.client.ai.AiPronunciationClient;
-import com.landit.landitbe.feature.content.client.ai.AiPronunciationWordStatus;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationAnalysisRequest;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationJudgedWord;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationWordStatus;
 import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.dto.PronunciationAnalysisResponse;
+import com.landit.landitbe.feature.content.exception.AiPronunciationResponseInvalidException;
+import com.landit.landitbe.feature.content.exception.InvalidAudioException;
+import com.landit.landitbe.feature.content.exception.PronunciationDataNotFoundException;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
@@ -28,6 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -54,15 +58,15 @@ public class ExpressionPronunciationService {
   /**
    * 사용자 발화 녹음을 분석해 점수와 단어별 판정·코칭을 반환한다.
    *
+   * <p>의도적으로 {@code @Transactional}을 붙이지 않는다 — AI 호출(최대 20초) 동안 DB 커넥션을 점유하면 커넥션 풀이 고갈된다. 이 메서드의 DB
+   * 작업은 서로 독립적인 단건 조회뿐이다.
+   *
    * @param userId 사용자 ID
    * @param expressionId Writing 표현 ID
    * @param audio 사용자 발화 녹음 파일
    * @return 점수·통과 여부·단어별 판정
    * @throws ApiException 오디오가 잘못됐거나(400), 표현·발음 데이터가 없거나(404), AI 분석이 실패했을 때(502)
    */
-  // 의도적으로 @Transactional을 붙이지 않는다 — 트랜잭션으로 묶으면 AI 호출(최대 20초) 동안
-  // DB 커넥션을 점유해서, 동시 요청 몇 개만으로 커넥션 풀이 고갈된다. 이 메서드의 DB 작업은
-  // 서로 독립적인 단건 조회뿐이라 트랜잭션 묶음이 필요 없다.
   public PronunciationAnalysisResponse analyze(
       Long userId, Long expressionId, MultipartFile audio) {
     // 1단계: 녹음 파일이 형식·크기 제한에 맞는지 먼저 확인한다 (AI 호출 비용을 쓰기 전에 거른다).
@@ -72,41 +76,59 @@ public class ExpressionPronunciationService {
     // 자산은 TTS까지 완성된 것만 쓴다 (기준 데이터만 있는 반쪽 자산은 판정 기준 음성이 없다).
     WritingExpression expression = requireActiveExpression(expressionId);
     AccentLocale accentLocale = accentLocaleResolver.require(userId);
-    ExpressionPronunciationAsset asset = requireCompleteAsset(expressionId, accentLocale);
-    Map<Integer, AssetWord> assetWords = parseAssetWords(asset.getWords());
-    if (assetWords.isEmpty()) {
+    ExpressionPronunciationAsset expressionPronunciationAsset =
+        requireCompleteAsset(expressionId, accentLocale);
+    Map<Integer, AssetWord> assetWordMap = parseAssetWords(expressionPronunciationAsset.getWords());
+
+    if (assetWordMap.isEmpty()) {
       // 자산 행은 있는데 단어 데이터가 비어 있으면 데이터 불량이다.
       // 조용히 0단어로 채점(0÷0)하지 않고 명시적으로 거른다.
-      throw new ApiException(ErrorCode.PRONUNCIATION_DATA_NOT_FOUND);
+      throw new PronunciationDataNotFoundException();
     }
 
     // 3단계: AI 서버에 판정을 요청한다. 유저 오디오는 base64로 실어 보낸다.
     // 단어 목록은 퀴즈 배열이 아니라 자산 words 기준이다 — 발음 정렬은 "late-night"을 2단어로 나누는 등
     // 퀴즈와 토큰화가 다르다. 억양 대조 힌트(accentContrast)도 있는 단어만 같이 실어 보낸다.
-    AiPronunciationAnalysisResult aiResult =
+    List<AiPronunciationJudgedWord> judgedWordList =
         aiPronunciationClient.analyze(
-            buildAiRequest(expression, asset, accentLocale, assetWords, audio, audioFormat));
+            buildAiRequest(
+                expression,
+                expressionPronunciationAsset,
+                accentLocale,
+                assetWordMap,
+                audio,
+                audioFormat));
 
     // 4단계: AI 판정 + 자산 기준 데이터 + 코칭 문구를 합쳐 응답을 조립한다.
-    return buildResponse(assetWords, aiResult);
+    return buildResponse(assetWordMap, judgedWordList);
   }
 
-  // 녹음 파일의 형식과 크기를 검증하고, AI 서버에 알려줄 형식 문자열을 반환한다.
+  /**
+   * 녹음 파일의 형식과 크기를 검증하고, AI 서버에 알려줄 형식 문자열을 반환한다.
+   *
+   * @param audio 사용자 발화 녹음 파일
+   * @return 소문자 확장자 (예: "m4a")
+   */
   private String validateAudio(MultipartFile audio) {
     if (audio == null || audio.isEmpty()) {
-      throw new ApiException(ErrorCode.INVALID_AUDIO, "오디오 파일이 비어 있습니다.");
+      throw new InvalidAudioException("오디오 파일이 비어 있습니다.");
     }
     if (audio.getSize() > MAX_AUDIO_BYTES) {
-      throw new ApiException(ErrorCode.INVALID_AUDIO, "오디오 파일이 10MB를 초과했습니다.");
+      throw new InvalidAudioException("오디오 파일이 10MB를 초과했습니다.");
     }
     String format = extractFormat(audio.getOriginalFilename());
     if (!ALLOWED_AUDIO_FORMATS.contains(format)) {
-      throw new ApiException(ErrorCode.INVALID_AUDIO, "m4a·wav·mp3·webm 형식만 지원합니다.");
+      throw new InvalidAudioException("m4a·wav·mp3·webm 형식만 지원합니다.");
     }
     return format;
   }
 
-  // 파일명에서 확장자를 소문자로 뽑는다. 없으면 빈 문자열.
+  /**
+   * 파일명에서 확장자를 소문자로 뽑는다.
+   *
+   * @param filename 업로드 파일명
+   * @return 소문자 확장자. 없으면 빈 문자열
+   */
   private String extractFormat(String filename) {
     if (filename == null) {
       return "";
@@ -118,40 +140,62 @@ public class ExpressionPronunciationService {
     return filename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
   }
 
-  // 활성 표현을 조회한다. 없으면 404.
+  /**
+   * 활성 표현을 조회한다.
+   *
+   * @param expressionId Writing 표현 ID
+   * @return 활성 표현
+   * @throws ApiException 표현이 없거나 비활성일 때 (404)
+   */
   private WritingExpression requireActiveExpression(Long expressionId) {
     return writingExpressionRepository
         .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
-  // 표현·억양의 발음 자산을 조회한다. 자산이 없거나 TTS가 아직 없으면 404 — 반쪽 자산으로는 평가를 열지 않는다.
+  /**
+   * 표현·억양의 완성된 발음 자산을 조회한다. 반쪽 자산(TTS 미완성)으로는 평가를 열지 않는다.
+   *
+   * @param expressionId Writing 표현 ID
+   * @param accentLocale 유저의 목표 억양
+   * @return TTS까지 완성된 자산
+   */
   private ExpressionPronunciationAsset requireCompleteAsset(
       Long expressionId, AccentLocale accentLocale) {
-    ExpressionPronunciationAsset asset =
+    ExpressionPronunciationAsset expressionPronunciationAsset =
         assetRepository
             .findByWritingExpressionIdAndAccentLocale(expressionId, accentLocale)
-            .orElseThrow(() -> new ApiException(ErrorCode.PRONUNCIATION_DATA_NOT_FOUND));
-    if (!asset.hasTts()) {
-      throw new ApiException(ErrorCode.PRONUNCIATION_DATA_NOT_FOUND);
+            .orElseThrow(PronunciationDataNotFoundException::new);
+    if (!expressionPronunciationAsset.hasTts()) {
+      throw new PronunciationDataNotFoundException();
     }
-    return asset;
+    return expressionPronunciationAsset;
   }
 
-  // AI 서버 판정 요청을 조립한다. 단어 목록은 자산 words 기준이며 억양 대조 힌트를 함께 싣는다.
+  /**
+   * AI 서버 판정 요청을 조립한다. 단어 목록은 자산 words 기준이며 억양 대조 힌트를 함께 싣는다.
+   *
+   * @param expression 표현 (정답 문장 제공)
+   * @param expressionPronunciationAsset 유저 억양의 발음 자산 (판정 기준 음성 제공)
+   * @param accentLocale 판정 기준 억양
+   * @param assetWordMap order로 찾는 자산 단어들
+   * @param audio 사용자 발화 녹음 파일
+   * @param audioFormat 녹음 파일 형식
+   * @return AI 서버 판정 요청
+   */
   private AiPronunciationAnalysisRequest buildAiRequest(
       WritingExpression expression,
-      ExpressionPronunciationAsset asset,
+      ExpressionPronunciationAsset expressionPronunciationAsset,
       AccentLocale accentLocale,
-      Map<Integer, AssetWord> assetWords,
+      Map<Integer, AssetWord> assetWordMap,
       MultipartFile audio,
       String audioFormat) {
-    List<AiPronunciationAnalysisRequest.Word> words = new ArrayList<>();
-    assetWords.entrySet().stream()
+    List<AiPronunciationAnalysisRequest.Word> wordList = new ArrayList<>();
+    assetWordMap.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
         .forEach(
             entry ->
-                words.add(
+                wordList.add(
                     new AiPronunciationAnalysisRequest.Word(
                         entry.getKey(),
                         entry.getValue().word(),
@@ -160,68 +204,86 @@ public class ExpressionPronunciationService {
         encodeAudio(audio),
         audioFormat,
         expression.getRepresentativeSentenceText(),
-        asset.getSentenceAudioUrl(),
+        expressionPronunciationAsset.getSentenceAudioUrl(),
         accentLocale,
-        words);
+        wordList);
   }
 
-  // 녹음 파일을 base64 문자열로 바꾼다.
+  /**
+   * 녹음 파일을 base64 문자열로 바꾼다.
+   *
+   * @param audio 사용자 발화 녹음 파일
+   * @return base64 문자열
+   */
   private String encodeAudio(MultipartFile audio) {
     try {
       return Base64.getEncoder().encodeToString(audio.getBytes());
     } catch (IOException exception) {
-      throw new ApiException(ErrorCode.INVALID_AUDIO, "오디오 파일을 읽을 수 없습니다.");
+      throw new InvalidAudioException("오디오 파일을 읽을 수 없습니다.");
     }
   }
 
-  // AI 판정 + 자산 기준 데이터를 order로 병합하고 점수·코칭을 계산해 응답을 만든다.
+  /**
+   * AI 판정 + 자산 기준 데이터를 order로 병합하고 점수·코칭을 계산해 응답을 만든다.
+   *
+   * @param assetWordMap order로 찾는 자산 단어들
+   * @param judgedWordList AI 단어별 판정 목록
+   * @return 점수·통과 여부·단어별 응답
+   */
   private PronunciationAnalysisResponse buildResponse(
-      Map<Integer, AssetWord> assetWords, AiPronunciationAnalysisResult aiResult) {
-    int totalWords = assetWords.size();
+      Map<Integer, AssetWord> assetWordMap, List<AiPronunciationJudgedWord> judgedWordList) {
+    int totalWords = assetWordMap.size();
 
     // AI 판정이 자산 단어와 1:1이 아니면 조용히 넘기지 않고 응답 오류로 처리한다.
-    if (aiResult.words() == null || aiResult.words().size() != totalWords) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+    if (CollectionUtils.isEmpty(judgedWordList) || judgedWordList.size() != totalWords) {
+      throw new AiPronunciationResponseInvalidException();
     }
 
-    List<PronunciationAnalysisResponse.Word> responseWords = new ArrayList<>();
-    Set<Integer> judgedOrders = new HashSet<>();
+    List<PronunciationAnalysisResponse.Word> responseWordList = new ArrayList<>();
+    Set<Integer> judgedOrderSet = new HashSet<>();
     int errorCount = 0;
-    for (AiPronunciationAnalysisResult.Word judged : aiResult.words()) {
-      AssetWord assetWord = assetWords.get(judged.order());
+    for (AiPronunciationJudgedWord judgedWord : judgedWordList) {
+      AssetWord assetWord = assetWordMap.get(judgedWord.order());
       // 크기만 같아도 order가 중복([1,1,2])되거나 자산에 없는 order가 섞이면 병합이 엉뚱한
       // 단어에 붙는다. order 유일성·존재·단어 텍스트 일치·판정 상태 존재까지 전부 확인한다.
       if (assetWord == null
-          || !judgedOrders.add(judged.order())
-          || judged.status() == null
-          || !Objects.equals(assetWord.word(), judged.word())) {
-        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+          || !judgedOrderSet.add(judgedWord.order())
+          || judgedWord.status() == null
+          || !Objects.equals(assetWord.word(), judgedWord.word())) {
+        throw new AiPronunciationResponseInvalidException();
       }
-      if (judged.status() != AiPronunciationWordStatus.CORRECT) {
+      if (judgedWord.status() != AiPronunciationWordStatus.CORRECT) {
         errorCount++;
       }
-      responseWords.add(toResponseWord(judged, assetWord));
+      responseWordList.add(toResponseWord(judgedWord, assetWord));
     }
 
     // 점수는 BE가 계산한다: 정상 단어 비율. 오류가 하나도 없으면 자연히 100이고 통과다.
     int score = Math.round((totalWords - errorCount) * 100f / totalWords);
     boolean passed = errorCount == 0;
-    return new PronunciationAnalysisResponse(score, passed, responseWords);
+    return new PronunciationAnalysisResponse(score, passed, responseWordList);
   }
 
-  // 단어 1개의 응답을 만든다. 오류 유형에 따라 채우는 필드가 다르다.
-  // 저장 필드명(pronunciationDisplay·audioUrl)과 프론트 명세 필드명(nativeDisplay·nativeWordAudioUrl)이
-  // 달라서 여기서 매핑한다 — 프론트 계약은 동결, 내부 저장은 AI 파이프라인 계약을 따른 결과다.
+  /**
+   * 단어 1개의 응답을 만든다. 오류 유형에 따라 채우는 필드가 다르다.
+   *
+   * <p>저장 필드명(pronunciationDisplay·audioUrl)과 프론트 명세 필드명(nativeDisplay·nativeWordAudioUrl)이 달라서 여기서
+   * 매핑한다 — 프론트 계약은 동결, 내부 저장은 AI 파이프라인 계약을 따른 결과다.
+   *
+   * @param judgedWord AI 단어 판정
+   * @param assetWord 같은 order의 자산 단어 (호출 전에 존재가 검증됨)
+   * @return 단어별 응답
+   */
   private PronunciationAnalysisResponse.Word toResponseWord(
-      AiPronunciationAnalysisResult.Word judged, AssetWord assetWord) {
-    return switch (judged.status()) {
+      AiPronunciationJudgedWord judgedWord, AssetWord assetWord) {
+    return switch (judgedWord.status()) {
       case CORRECT ->
           new PronunciationAnalysisResponse.Word(
-              judged.order(),
-              judged.word(),
-              judged.status().name(),
-              judged.startMs(),
-              judged.endMs(),
+              judgedWord.order(),
+              judgedWord.word(),
+              judgedWord.status().name(),
+              judgedWord.startMs(),
+              judgedWord.endMs(),
               null,
               null,
               null,
@@ -233,52 +295,57 @@ public class ExpressionPronunciationService {
               null);
       case PHONEME_ERROR ->
           new PronunciationAnalysisResponse.Word(
-              judged.order(),
-              judged.word(),
-              judged.status().name(),
-              judged.startMs(),
-              judged.endMs(),
-              assetWord == null ? null : assetWord.audioUrl(),
-              assetWord == null ? null : assetWord.pronunciationDisplay(),
-              judged.userDisplay(),
-              judged.errorTargetSpan(),
-              judged.errorUserSpan(),
+              judgedWord.order(),
+              judgedWord.word(),
+              judgedWord.status().name(),
+              judgedWord.startMs(),
+              judgedWord.endMs(),
+              assetWord.audioUrl(),
+              assetWord.pronunciationDisplay(),
+              judgedWord.userDisplay(),
+              judgedWord.errorTargetSpan(),
+              judgedWord.errorUserSpan(),
               null,
               null,
               null,
-              coachingTemplate.phonemeCoaching(judged.errorTargetSpan(), judged.errorUserSpan()));
+              coachingTemplate.phonemeCoaching(
+                  judgedWord.errorTargetSpan(), judgedWord.errorUserSpan()));
       case STRESS_ERROR ->
           new PronunciationAnalysisResponse.Word(
-              judged.order(),
-              judged.word(),
-              judged.status().name(),
-              judged.startMs(),
-              judged.endMs(),
-              assetWord == null ? null : assetWord.audioUrl(),
+              judgedWord.order(),
+              judgedWord.word(),
+              judgedWord.status().name(),
+              judgedWord.startMs(),
+              judgedWord.endMs(),
+              assetWord.audioUrl(),
               null,
               null,
               null,
               null,
-              assetWord == null ? null : assetWord.syllables(),
-              assetWord == null ? null : assetWord.stressIndex(),
-              judged.userStressIndex(),
-              coachingTemplate.stressCoaching(
-                  assetWord == null ? null : assetWord.syllables(),
-                  assetWord == null ? null : assetWord.stressIndex()));
+              assetWord.syllables(),
+              assetWord.stressIndex(),
+              judgedWord.userStressIndex(),
+              coachingTemplate.stressCoaching(assetWord.syllables(), assetWord.stressIndex()));
     };
   }
 
-  // 자산 words JSONB를 order로 찾을 수 있게 파싱한다.
-  // 항목 계약: order, word, syllables[], stressIndex(무강세 -1), pronunciationDisplay,
-  //   accentContrast{expected, other, errorType}(억양 대조 단어에만), audioUrl(TTS 임포트가 채움)
+  /**
+   * 자산 words JSONB를 order로 찾을 수 있게 파싱한다.
+   *
+   * <p>항목 계약: order, word, syllables[], stressIndex(무강세 -1), pronunciationDisplay,
+   * accentContrast{expected, other, errorType}(억양 대조 단어에만), audioUrl(TTS 임포트가 채움).
+   *
+   * @param wordsNode 자산 words JSONB
+   * @return order로 찾는 자산 단어 Map
+   */
   private Map<Integer, AssetWord> parseAssetWords(JsonNode wordsNode) {
-    Map<Integer, AssetWord> assetWords = new HashMap<>();
+    Map<Integer, AssetWord> assetWordMap = new HashMap<>();
     for (JsonNode node : wordsNode) {
-      List<String> syllables = null;
+      List<String> syllableList = null;
       if (node.hasNonNull("syllables") && node.get("syllables").isArray()) {
-        syllables = new ArrayList<>();
+        syllableList = new ArrayList<>();
         for (JsonNode syllable : node.get("syllables")) {
-          syllables.add(syllable.asText());
+          syllableList.add(syllable.asText());
         }
       }
       AiPronunciationAnalysisRequest.AccentContrast accentContrast = null;
@@ -290,7 +357,7 @@ public class ExpressionPronunciationService {
                 contrastNode.path("other").asText(null),
                 contrastNode.path("errorType").asText(null));
       }
-      assetWords.put(
+      assetWordMap.put(
           node.path("order").asInt(),
           new AssetWord(
               node.path("word").asText(null),
@@ -298,14 +365,23 @@ public class ExpressionPronunciationService {
               node.hasNonNull("pronunciationDisplay")
                   ? node.get("pronunciationDisplay").asText()
                   : null,
-              syllables,
+              syllableList,
               node.hasNonNull("stressIndex") ? node.get("stressIndex").asInt() : null,
               accentContrast));
     }
-    return assetWords;
+    return assetWordMap;
   }
 
-  // 자산 words JSONB의 단어 1건이다. 원어민 기준 데이터와 AI 요청에 실을 억양 대조 힌트를 담는다.
+  /**
+   * 자산 words JSONB의 단어 1건이다. 원어민 기준 데이터와 AI 요청에 실을 억양 대조 힌트를 담는다.
+   *
+   * @param word 단어 표면형
+   * @param audioUrl 단어만 읽은 원어민 TTS URL
+   * @param pronunciationDisplay 원어민 발음 respelling
+   * @param syllables 음절 분해
+   * @param stressIndex 강세 음절 위치 (무강세 -1)
+   * @param accentContrast 억양 대조 힌트 (대조 단어에만)
+   */
   private record AssetWord(
       String word,
       String audioUrl,

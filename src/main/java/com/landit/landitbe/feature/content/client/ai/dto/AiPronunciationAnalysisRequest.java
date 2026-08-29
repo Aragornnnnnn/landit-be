@@ -1,6 +1,6 @@
 // AI 서버 발음 분석 요청을 표현한다.
 
-package com.landit.landitbe.feature.content.client.ai;
+package com.landit.landitbe.feature.content.client.ai.dto;
 
 import com.landit.landitbe.shared.domain.AccentLocale;
 import java.util.List;
@@ -15,7 +15,7 @@ import java.util.List;
  * @param accentLocale 판정 기준 억양
  * @param words 문장의 단어 목록 (order 오름차순)
  */
-// BE → AI 서버로 "보내는" 방향의 모델이다. 받는 방향은 AiPronunciationAnalysisResult.
+// BE → AI 서버로 "보내는" 방향의 모델이다.
 public record AiPronunciationAnalysisRequest(
     String userAudio,
     String userAudioFormat,
@@ -31,7 +31,7 @@ public record AiPronunciationAnalysisRequest(
    * 토큰화가 다르다.
    *
    * @param order 문장 내 순번 (1부터)
-   * @param word 단어 표면형
+   * @param word 단어
    * @param accentContrast 억양 대조 힌트. 억양 대조 단어에만 있고, 없으면 null (AI 서버는 null을 생략과 동일하게 처리)
    */
   public record Word(int order, String word, AccentContrast accentContrast) {}
