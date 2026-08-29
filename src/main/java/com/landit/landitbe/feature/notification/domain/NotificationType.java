@@ -7,6 +7,6 @@ public enum NotificationType {
   CONTINUE_SCENARIO,
   CONTINUE_EXPRESSION,
   REVIEW_LEARNING,
-  REVIEW_REMINDER,
+  /** 개발 환경에서만 사용하는 수동 발송 검증 유형이다. */
   TEST_NOTIFICATION
 }

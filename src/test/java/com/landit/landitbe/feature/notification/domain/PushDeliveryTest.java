@@ -22,7 +22,7 @@ class PushDeliveryTest {
 
     assertThat(delivery.getUserProfileId()).isEqualTo(1L);
     assertThat(delivery.getUserPushTokenId()).isEqualTo(2L);
-    assertThat(delivery.getNotificationType()).isEqualTo(NotificationType.REVIEW_REMINDER);
+    assertThat(delivery.getNotificationType()).isEqualTo(NotificationType.REVIEW_LEARNING);
     assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.REQUESTED);
     assertThat(delivery.getRequestedAt()).isEqualTo(REQUESTED_AT);
     assertThat(SENT_EXPO_PUSH_TOKEN.equals(delivery.getSentExpoPushToken())).isTrue();
@@ -172,7 +172,7 @@ class PushDeliveryTest {
         1L,
         2L,
         SENT_EXPO_PUSH_TOKEN,
-        NotificationType.REVIEW_REMINDER,
+        NotificationType.REVIEW_LEARNING,
         "review-reminder:2026-07-24:1:2",
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
