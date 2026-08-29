@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.notification.domain.PushDelivery;
 import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -74,6 +75,18 @@ public class PushDeliveryService {
         .filter(target -> delivery.getSentExpoPushToken().equals(target.expoPushToken()))
         .filter(target -> delivery.claimRetry())
         .map(target -> prepared(delivery));
+  }
+
+  /**
+   * Ticket 접수 상태인 발송 이력 ID를 중복 방지 키 접두어로 조회한다.
+   *
+   * @param deduplicationKeyPrefix 발송 이력 중복 방지 키 접두어
+   * @return Ticket 접수 상태인 발송 이력 ID 목록
+   */
+  @Transactional(readOnly = true)
+  public List<Long> findAcceptedDeliveryIds(String deduplicationKeyPrefix) {
+    return pushDeliveryRepository.findIdsByStatusAndDeduplicationKeyPrefix(
+        PushDeliveryStatus.TICKET_ACCEPTED, deduplicationKeyPrefix);
   }
 
   /**

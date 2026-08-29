@@ -19,7 +19,7 @@ public record PreparedPushDelivery(
   /**
    * Expo 발송 Port에 전달할 메시지로 변환한다.
    *
-   * @return Expo Push 발송 메시지
+   * @return 외부 Push 제공자에 전달할 메시지
    */
   public PushMessage toPushMessage() {
     return new PushMessage(expoPushToken, title, body, deepLink);

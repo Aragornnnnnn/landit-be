@@ -48,23 +48,24 @@ public class ExpoPushClient implements NotificationSender {
 
   /** {@inheritDoc} */
   @Override
-  public PushTicketResult send(PushMessage message) {
-    ExpoPushRequest request =
-        new ExpoPushRequest(
-            message.expoPushToken(),
-            message.title(),
-            message.body(),
-            new ExpoPushData(message.deepLink()),
-            "default",
-            "default");
+  public List<PushTicketResult> send(List<PushMessage> messages) {
+    if (messages.isEmpty()) {
+      return List.of();
+    }
+    if (messages.size() > 100) {
+      throw new IllegalArgumentException("Expo Push 발송은 한 요청에 최대 100건까지 가능합니다.");
+    }
+
+    List<ExpoPushRequest> request = messages.stream().map(this::request).toList();
     HttpResponse<String> response = post(SEND_PATH, request);
     if (isTemporaryFailure(response.statusCode())) {
       throw new RetryablePushNotificationException("Expo Push 발송 요청이 일시적으로 실패했습니다.");
     }
     if (!isSuccess(response.statusCode())) {
-      return PushTicketResult.failed(readRequestErrorCode(response.body()));
+      return java.util.Collections.nCopies(
+          messages.size(), PushTicketResult.failed(readRequestErrorCode(response.body())));
     }
-    return readTicket(response.body());
+    return readTickets(response.body(), messages.size());
   }
 
   /** {@inheritDoc} */
@@ -107,33 +108,51 @@ public class ExpoPushClient implements NotificationSender {
     }
   }
 
-  /** Expo 발송 응답에서 단일 Push Ticket 결과를 읽는다. */
-  private PushTicketResult readTicket(String responseBody) {
+  /** Push 메시지를 Expo 요청 형식으로 변환한다. */
+  private ExpoPushRequest request(PushMessage message) {
+    return new ExpoPushRequest(
+        message.expoPushToken(),
+        message.title(),
+        message.body(),
+        new ExpoPushData(message.deepLink()),
+        "default",
+        "default");
+  }
+
+  /** Expo 발송 응답에서 요청 순서와 같은 Push Ticket 결과 목록을 읽는다. */
+  private List<PushTicketResult> readTickets(String responseBody, int expectedTicketCount) {
     try {
       JsonNode root = jsonMapper.readTree(responseBody);
-      JsonNode ticket = root.get("data");
-      if (ticket != null && ticket.isArray()) {
-        ticket = ticket.isEmpty() ? null : ticket.get(0);
+      JsonNode data = root.get("data");
+      if (data != null && data.isObject() && expectedTicketCount == 1) {
+        return List.of(readTicket(data));
       }
-      if (ticket == null || !ticket.isObject()) {
+      if (data == null || !data.isArray() || data.size() != expectedTicketCount) {
         throw malformedResponse();
       }
-      if ("ok".equals(ticket.path("status").asString())) {
-        String ticketId = ticket.path("id").asString();
-        if (ticketId.isBlank()) {
-          throw malformedResponse();
-        }
-        return PushTicketResult.accepted(ticketId);
-      }
-      if ("error".equals(ticket.path("status").asString())) {
-        return PushTicketResult.failed(readDetailErrorCode(ticket));
-      }
-      throw malformedResponse();
+      return java.util.stream.StreamSupport.stream(data.spliterator(), false)
+          .map(this::readTicket)
+          .toList();
     } catch (PushNotificationException exception) {
       throw exception;
     } catch (JacksonException exception) {
       throw malformedResponse(exception);
     }
+  }
+
+  /** Expo Ticket JSON 하나를 Push Ticket 결과로 변환한다. */
+  private PushTicketResult readTicket(JsonNode ticket) {
+    if ("ok".equals(ticket.path("status").asString())) {
+      String ticketId = ticket.path("id").asString();
+      if (ticketId.isBlank()) {
+        throw malformedResponse();
+      }
+      return PushTicketResult.accepted(ticketId);
+    }
+    if ("error".equals(ticket.path("status").asString())) {
+      return PushTicketResult.failed(readDetailErrorCode(ticket));
+    }
+    throw malformedResponse();
   }
 
   /** Expo Receipt 응답에서 요청한 Ticket ID의 결과를 읽는다. */
