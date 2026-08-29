@@ -2,10 +2,13 @@
 
 ## 최종 정책 구현
 
-- `feat/LAN-184-notification-policy`는 기존 4개 스택 PR 위에서 최종 제품 정책을 구현한다. 기존 PR의 닫기·교체·강제 push는 이 브랜치의 검증과 분할 전까지 수행하지 않는다.
+- `feat/LAN-184-scheduled-learning`은 기존 4개 스택 PR 위에서 최종 제품 정책을 구현한다. 기존 PR의 닫기·교체·강제 push는 이 브랜치의 검증과 분할 전까지 수행하지 않는다.
 - 시나리오 마지막 완료 시각 `last_cleared_at`, 사용자별 계산 결과 `user_notification_state`, 세 가지 제품 알림 유형을 추가했다.
-- `SCHEDULED_NOTIFICATION_BATCH`는 Keyset 500명 단위로 대상 선정 데이터를 조회하고, 실제 대상만 `PUSH_SEND`로 발행한다. 중간 대상 배치 Queue 메시지는 만들지 않는다.
-- 2026-07-26 현재 `./gradlew check`가 통과했다. dev Scheduler는 IaC 계약에 따라 계속 비활성화 상태다.
+- `SCHEDULED_NOTIFICATION_BATCH`는 Keyset 500명 단위로 대상 선정 데이터를 조회한다. 각 페이지에서 기기별 `push_delivery`를 선점한 뒤, Expo Push 요청을 최대 100건씩 직접 호출한다. 사용자별 `PUSH_SEND` Queue 메시지는 만들지 않는다.
+- Expo의 일시 오류는 선점된 발송 이력에 재시도 표식을 남기고 배치 메시지 재전달로 복구한다. 이미 Ticket을 접수한 이력은 Expo에 다시 보내지 않고 Receipt 확인만 복구한다.
+- `PUSH_RECEIPT_CHECK`만 Push Queue에 지연 발행한다.
+- 검증 순서는 페이지 단위 다중 사용자 Expo 100건 분할, 재시도, 기존 dev 테스트 API, Queue 계약 정리, 전체 `./gradlew check`다.
+- 배포 전 Push Queue와 DLQ에 기존 `PUSH_SEND` 메시지가 남아 있지 않은지 확인한다. 새 Consumer는 이 유형을 처리하지 않으므로 남은 메시지는 DLQ로 이동한다.
 
 ## 구현 결과
 

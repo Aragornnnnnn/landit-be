@@ -11,7 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import com.landit.landitbe.feature.notification.repository.UserNotificationStateRepository;
 import java.time.Instant;
 import java.util.List;
@@ -38,7 +37,7 @@ class ScheduledNotificationServiceTest {
 
   @Mock private UserNotificationStateRepository userNotificationStateRepository;
 
-  @Mock private PushQueuePublisher pushQueuePublisher;
+  @Mock private NotificationDispatchService notificationDispatchService;
 
   @Mock private PlatformTransactionManager transactionManager;
 
@@ -54,13 +53,13 @@ class ScheduledNotificationServiceTest {
             notificationTargetPageQueryService,
             notificationTargetSelectionService,
             userNotificationStateRepository,
-            pushQueuePublisher,
+            notificationDispatchService,
             transactionManager);
   }
 
-  /** 500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 추가 조회 없이 발송 메시지를 만든다. */
+  /** 500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 SQS 재발행 없이 상태를 저장한다. */
   @Test
-  void processesUsersInFiveHundredSizeKeysetPagesWithoutPerUserRepositoryLookups() {
+  void processesUsersInFiveHundredSizeKeysetPagesWithoutPublishingPushSendMessages() {
     NotificationTargetPage firstPage = page(1L, 500);
     NotificationTargetPage secondPage = page(501L, 1);
     when(notificationTargetPageQueryService.loadPage(0L, 500)).thenReturn(firstPage);
@@ -81,7 +80,7 @@ class ScheduledNotificationServiceTest {
     verify(notificationTargetPageQueryService).loadPage(500L, 500);
     verify(notificationTargetPageQueryService).loadPage(501L, 500);
     verify(userNotificationStateRepository, times(2)).findAllByUserProfileIdIn(any());
-    verify(pushQueuePublisher, times(501)).publishNotification(any());
+    verify(notificationDispatchService, times(2)).sendAll(any());
     verify(userNotificationStateRepository, times(2)).saveAll(any());
     verify(notificationTargetSelectionService, times(501)).select(any());
     verify(notificationTargetPageQueryService, times(3)).loadPage(any(Long.class), eq(500));

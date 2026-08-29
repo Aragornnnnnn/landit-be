@@ -10,9 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
-import com.landit.landitbe.feature.notification.domain.NotificationType;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,41 +70,6 @@ class SqsPushQueuePublisherTest {
     assertThat(body.get("occurredAt").asString()).isNotBlank();
     assertThat(body.get("payload").get("pushDeliveryId").asLong()).isEqualTo(10L);
     assertThat(body.get("payload").get("receiptAttempt").asInt()).isEqualTo(2);
-  }
-
-  /** 사용자별 푸시 알림은 지연 없이 기존 Consumer가 처리하는 메시지 계약으로 발행한다. */
-  @Test
-  void publishesImmediatePushSendMessage() throws Exception {
-    stubSqsSendMessage();
-    Instant occurredAt = Instant.parse("2026-07-25T11:00:00Z");
-
-    publisher.publishNotification(
-        new PushNotificationRequest(
-            "event-1",
-            1L,
-            NotificationType.TEST_NOTIFICATION,
-            "Landit 알림 테스트",
-            "푸시 알림이 정상적으로 도착했어요.",
-            "/home",
-            occurredAt));
-
-    ArgumentCaptor<SendMessageRequest> requestCaptor =
-        ArgumentCaptor.forClass(SendMessageRequest.class);
-    verify(sqsAsyncClient).sendMessage(requestCaptor.capture());
-    SendMessageRequest request = requestCaptor.getValue();
-    JsonNode body = jsonMapper.readTree(request.messageBody());
-    assertThat(request.queueUrl()).isEqualTo(properties.queueUrl());
-    assertThat(request.delaySeconds()).isZero();
-    assertThat(body.get("version").asInt()).isEqualTo(1);
-    assertThat(body.get("messageId").asString()).isEqualTo("event-1");
-    assertThat(body.get("messageType").asString()).isEqualTo("PUSH_SEND");
-    assertThat(body.get("occurredAt").asString()).isEqualTo(occurredAt.toString());
-    assertThat(body.get("payload").get("userProfileId").asLong()).isEqualTo(1L);
-    assertThat(body.get("payload").get("notificationType").asString())
-        .isEqualTo("TEST_NOTIFICATION");
-    assertThat(body.get("payload").get("title").asString()).isEqualTo("Landit 알림 테스트");
-    assertThat(body.get("payload").get("body").asString()).isEqualTo("푸시 알림이 정상적으로 도착했어요.");
-    assertThat(body.get("payload").get("deepLink").asString()).isEqualTo("/home");
   }
 
   /** Receipt 확인 지연 시간은 Expo Receipt 조회 계약에 맞춰 900초만 허용한다. */
