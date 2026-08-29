@@ -114,6 +114,12 @@ public class ExpressionPronunciationAssetService {
     Set<AssetKey> processedKeySet = new HashSet<>();
 
     for (PronunciationReferenceManifest.Entry entry : manifest.entries()) {
+      // JSON 배열의 null 항목이 아래 접근에서 NPE로 임포트 전체를 죽이지 않게 실패 목록행으로 거른다.
+      if (entry == null) {
+        failureList.add(
+            new AdminPronunciationAssetImportResult.Failure(null, null, "매니페스트 항목이 비어 있습니다."));
+        continue;
+      }
       AssetKey key = new AssetKey(entry.expressionId(), entry.accentLocale());
       String failureReason = validateReference(entry, expressionMap, processedKeySet, key);
       if (StringUtils.isNotBlank(failureReason)) {
@@ -179,6 +185,12 @@ public class ExpressionPronunciationAssetService {
     List<AdminPronunciationAssetImportResult.Failure> failureList = new ArrayList<>();
 
     for (PronunciationTtsManifest.Asset ttsAsset : manifest.assets()) {
+      // JSON 배열의 null 항목이 아래 접근에서 NPE로 임포트 전체를 죽이지 않게 실패 목록행으로 거른다.
+      if (ttsAsset == null) {
+        failureList.add(
+            new AdminPronunciationAssetImportResult.Failure(null, null, "매니페스트 항목이 비어 있습니다."));
+        continue;
+      }
       AssetKey key = new AssetKey(ttsAsset.expressionId(), ttsAsset.accentLocale());
       ExpressionPronunciationAsset expressionPronunciationAsset = existingAssetMap.get(key);
       String failureReason =
@@ -387,10 +399,18 @@ public class ExpressionPronunciationAssetService {
         || ttsAsset.words().isEmpty()) {
       return "필수 값이 누락됐습니다.";
     }
-    // 단어 음성 URL이 비면 조인 단계에서 NPE로 임포트 전체가 죽는다. 여기서 실패 목록행으로 거른다.
+    // 단어 음성의 빈 항목·빈 URL·중복 order는 조인 단계에서 NPE나 조용한 URL 유실로 이어진다.
+    // 여기서 실패 목록행으로 거른다.
+    Set<Integer> orderSet = new HashSet<>();
     for (PronunciationTtsManifest.Asset.WordAudio wordAudio : ttsAsset.words()) {
+      if (wordAudio == null) {
+        return "TTS 매니페스트 words에 빈 항목이 있습니다.";
+      }
       if (StringUtils.isBlank(wordAudio.audioUrl())) {
         return "TTS 매니페스트 words 항목에 audioUrl이 없습니다.";
+      }
+      if (!orderSet.add(wordAudio.order())) {
+        return "TTS 매니페스트 words의 order가 중복됩니다.";
       }
     }
     if (existingAsset == null) {
@@ -433,6 +453,11 @@ public class ExpressionPronunciationAssetService {
                     PronunciationTtsManifest.Asset.WordAudio::order,
                     PronunciationTtsManifest.Asset.WordAudio::audioUrl,
                     (first, second) -> first));
+    // 기준 데이터에 없는 order가 섞여 있으면 조용히 버리지 않고 실패시킨다 — 낡거나 어긋난
+    // 매니페스트의 신호다. (중복 order는 validateTts에서 이미 걸렀으므로 개수 비교로 충분하다.)
+    if (audioUrlByOrderMap.size() != referenceWords.size()) {
+      return null;
+    }
     ArrayNode joinedWordArray = OBJECT_MAPPER.createArrayNode();
     for (JsonNode word : referenceWords) {
       int order = word.path("order").asInt();
@@ -481,7 +506,11 @@ public class ExpressionPronunciationAssetService {
    */
   private <T> Set<Long> collectIds(
       List<T> items, java.util.function.Function<T, Long> idExtractor) {
-    return items.stream().map(idExtractor).filter(Objects::nonNull).collect(Collectors.toSet());
+    return items.stream()
+        .filter(Objects::nonNull)
+        .map(idExtractor)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
   }
 
   /**

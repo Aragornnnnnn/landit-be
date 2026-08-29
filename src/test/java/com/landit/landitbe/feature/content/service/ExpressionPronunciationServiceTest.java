@@ -21,6 +21,7 @@ import com.landit.landitbe.feature.content.repository.WritingExpressionRepositor
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -153,6 +154,20 @@ class ExpressionPronunciationServiceTest {
         judged(1, "There's", AiPronunciationWordStatus.CORRECT),
         judged(2, "something", AiPronunciationWordStatus.CORRECT),
         judged(3, "like", AiPronunciationWordStatus.CORRECT));
+
+    assertInvalidAiResponse();
+  }
+
+  @Test
+  void rejectsNullJudgedWordEntry() {
+    // JSON 배열의 null 항목이 NPE(500)를 내는 대신 응답 오류로 처리돼야 한다.
+    // List.of는 null을 못 담으므로 이 테스트만 Arrays.asList로 스텁을 만든다.
+    when(aiPronunciationClient.analyze(any()))
+        .thenReturn(
+            Arrays.asList(
+                judged(1, "There's", AiPronunciationWordStatus.CORRECT),
+                null,
+                judged(3, "like", AiPronunciationWordStatus.CORRECT)));
 
     assertInvalidAiResponse();
   }

@@ -243,6 +243,10 @@ public class ExpressionPronunciationService {
     Set<Integer> judgedOrderSet = new HashSet<>();
     int errorCount = 0;
     for (AiPronunciationJudgedWord judgedWord : judgedWordList) {
+      // JSON 배열의 null 항목이 NPE로 500을 내지 않게 응답 오류로 처리한다.
+      if (judgedWord == null) {
+        throw new AiPronunciationResponseInvalidException();
+      }
       AssetWord assetWord = assetWordMap.get(judgedWord.order());
       // 크기만 같아도 order가 중복([1,1,2])되거나 자산에 없는 order가 섞이면 병합이 엉뚱한
       // 단어에 붙는다. order 유일성·존재·단어 텍스트 일치·판정 상태 존재까지 전부 확인한다.

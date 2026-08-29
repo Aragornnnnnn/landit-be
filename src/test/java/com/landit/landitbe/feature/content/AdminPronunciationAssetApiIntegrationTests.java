@@ -404,6 +404,52 @@ class AdminPronunciationAssetApiIntegrationTests {
   }
 
   @Test
+  void ttsImportRejectsDuplicateWordOrder() throws Exception {
+    String accessToken = loginAsAdmin("pron-tts-dup-order");
+
+    // order가 중복되면 조인이 한쪽 URL을 조용히 버리는 대신 실패 목록행으로 잡혀야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_duplicate_order.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(jsonPath("$.data.failures[0].reason").value("TTS 매니페스트 words의 order가 중복됩니다."));
+  }
+
+  @Test
+  void ttsImportRejectsExtraWordOrder() throws Exception {
+    String accessToken = loginAsAdmin("pron-tts-extra-order");
+
+    // 기준 데이터에 없는 order가 섞이면 조용히 버리는 대신 실패 목록행으로 잡혀야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_extra_order.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(
+            jsonPath("$.data.failures[0].reason").value("TTS 매니페스트의 단어 order가 기준 데이터와 맞지 않습니다."));
+  }
+
+  @Test
+  void ttsImportRejectsNullWordEntry() throws Exception {
+    String accessToken = loginAsAdmin("pron-tts-null-word");
+
+    // words 배열의 null 항목이 NPE로 임포트 전체를 죽이는 대신 실패 목록행으로 잡혀야 한다.
+    mockMvc
+        .perform(importFrom(IMPORT_REFERENCE_URL, "reference_us.json", accessToken))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(importFrom(IMPORT_TTS_URL, "tts_us_null_word_entry.json", accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.updated").value(0))
+        .andExpect(jsonPath("$.data.failures[0].reason").value("TTS 매니페스트 words에 빈 항목이 있습니다."));
+  }
+
+  @Test
   void importRejectsBlankManifestKey() throws Exception {
     String accessToken = loginAsAdmin("pron-blank-key");
 
