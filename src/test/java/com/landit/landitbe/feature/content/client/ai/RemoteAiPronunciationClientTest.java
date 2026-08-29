@@ -6,8 +6,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationAnalysisRequest;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationJudgedWord;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationWordStatus;
+import com.landit.landitbe.feature.content.exception.AiPronunciationResponseInvalidException;
+import com.landit.landitbe.feature.content.exception.PronunciationAnalysisFailedException;
 import com.landit.landitbe.shared.domain.AccentLocale;
-import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -70,7 +74,7 @@ class RemoteAiPronunciationClientTest {
           exchange.close();
         });
 
-    AiPronunciationAnalysisResult result = remoteClient().analyze(analysisRequest());
+    List<AiPronunciationJudgedWord> judgedWordList = remoteClient().analyze(analysisRequest());
 
     // 요청 본문에 오디오·정답 문장·억양·단어 목록이 실려야 한다.
     JsonNode sentRequest = jsonMapper.readTree(requestBody.get());
@@ -84,13 +88,13 @@ class RemoteAiPronunciationClientTest {
     assertThat(sentRequest.path("words").get(0).path("accentContrast").isNull()).isTrue();
 
     // 응답의 단어별 판정이 그대로 매핑돼야 한다.
-    assertThat(result.words()).hasSize(3);
-    assertThat(result.words().get(0).status()).isEqualTo(AiPronunciationWordStatus.CORRECT);
-    assertThat(result.words().get(1).status()).isEqualTo(AiPronunciationWordStatus.PHONEME_ERROR);
-    assertThat(result.words().get(1).userDisplay()).isEqualTo("nuh·ssing");
-    assertThat(result.words().get(1).errorTargetSpan()).isEqualTo("th");
-    assertThat(result.words().get(2).status()).isEqualTo(AiPronunciationWordStatus.STRESS_ERROR);
-    assertThat(result.words().get(2).userStressIndex()).isEqualTo(1);
+    assertThat(judgedWordList).hasSize(3);
+    assertThat(judgedWordList.get(0).status()).isEqualTo(AiPronunciationWordStatus.CORRECT);
+    assertThat(judgedWordList.get(1).status()).isEqualTo(AiPronunciationWordStatus.PHONEME_ERROR);
+    assertThat(judgedWordList.get(1).userDisplay()).isEqualTo("nuh·ssing");
+    assertThat(judgedWordList.get(1).errorTargetSpan()).isEqualTo("th");
+    assertThat(judgedWordList.get(2).status()).isEqualTo(AiPronunciationWordStatus.STRESS_ERROR);
+    assertThat(judgedWordList.get(2).userStressIndex()).isEqualTo(1);
   }
 
   @Test
@@ -106,8 +110,9 @@ class RemoteAiPronunciationClientTest {
           exchange.close();
         });
 
+    // 도메인 예외 타입과 오류 코드가 함께 맞아야 한다 (예외 파일럿 검증).
     assertThatThrownBy(() -> remoteClient().analyze(analysisRequest()))
-        .isInstanceOf(ApiException.class)
+        .isInstanceOf(PronunciationAnalysisFailedException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
   }
@@ -126,7 +131,7 @@ class RemoteAiPronunciationClientTest {
         });
 
     assertThatThrownBy(() -> remoteClient().analyze(analysisRequest()))
-        .isInstanceOf(ApiException.class)
+        .isInstanceOf(AiPronunciationResponseInvalidException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
   }
@@ -143,7 +148,7 @@ class RemoteAiPronunciationClientTest {
         });
 
     assertThatThrownBy(() -> remoteClient().analyze(analysisRequest()))
-        .isInstanceOf(ApiException.class)
+        .isInstanceOf(AiPronunciationResponseInvalidException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
   }

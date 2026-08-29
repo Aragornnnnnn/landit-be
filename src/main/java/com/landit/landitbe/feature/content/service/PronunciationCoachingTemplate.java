@@ -93,7 +93,12 @@ public class PronunciationCoachingTemplate {
     return "원어민과 강세의 위치가 달라요. '%s' 음절에 힘을 줘보세요!".formatted(syllables.get(stressIndex));
   }
 
-  // 음소 팁을 대소문자 무관하게 찾는다.
+  /**
+   * 음소 팁을 대소문자 무관하게 찾는다.
+   *
+   * @param errorTargetSpan 원어민 표기 기준의 오류 음소. null 허용
+   * @return 음소 팁. 매핑에 없으면 기본 팁
+   */
   private String lookupTip(String errorTargetSpan) {
     if (errorTargetSpan == null) {
       return DEFAULT_PHONEME_TIP;
