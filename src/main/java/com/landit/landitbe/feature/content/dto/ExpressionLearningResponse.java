@@ -20,6 +20,8 @@ import java.util.List;
  * @param representativeSentenceWords 정답 예문을 단어 단위로 나눈 배열(정답 순서 유지)
  * @param representativeSentenceWordChoices 정답 단어와 오답 단어를 섞은 선택지 배열(저장된 섞인 순서 그대로)
  * @param representativeImageUrl 대표 예문 이미지 URL
+ * @param representativeSentenceAudioUrl 대표 예문 원어민 TTS URL. 발음 자산이 없으면 null
+ * @param targetExpressionAudioUrl 타겟 표현만 읽은 원어민 TTS URL. 자산 미준비이거나 패턴형 표현이면 null
  */
 @Schema(description = "원어민 표현 학습 시작 응답")
 public record ExpressionLearningResponse(
@@ -56,17 +58,27 @@ public record ExpressionLearningResponse(
                     + " 사용자의 AI 튜터 억양 기준이며, 발음 자산이 아직 준비되지 않은 표현은 null"
                     + " (앱은 null이면 발음 듣기·발화 파트를 숨긴다)",
             example = "https://cdn.landit.com/content/expression-pronunciation-audio/101/abc.mp3")
-        String representativeSentenceAudioUrl) {
+        String representativeSentenceAudioUrl,
+    @Schema(
+            description =
+                "타겟 표현만 읽은 원어민 TTS URL. 표현 듣기 재생용."
+                    + " 사용자의 AI 튜터 억양 기준이며, 발음 자산이 아직 준비되지 않았거나"
+                    + " 패턴형 표현(발화 불가)이면 null (앱은 null이면 표현 듣기 버튼을 숨긴다)",
+            example = "https://cdn.landit.com/content/expression-pronunciation-audio/101/expr.mp3")
+        String targetExpressionAudioUrl) {
 
   /**
-   * 표현 엔티티와 대표 예문 TTS URL을 학습 시작 응답으로 변환한다.
+   * 표현 엔티티와 원어민 TTS URL들을 학습 시작 응답으로 변환한다.
    *
    * @param expression 변환할 표현 엔티티
    * @param representativeSentenceAudioUrl 대표 예문 원어민 TTS URL. 발음 자산이 없으면 null
+   * @param targetExpressionAudioUrl 타겟 표현만 읽은 원어민 TTS URL. 자산 미준비이거나 패턴형 표현이면 null
    * @return 표현 학습 시작 응답
    */
   public static ExpressionLearningResponse from(
-      WritingExpression expression, String representativeSentenceAudioUrl) {
+      WritingExpression expression,
+      String representativeSentenceAudioUrl,
+      String targetExpressionAudioUrl) {
     return new ExpressionLearningResponse(
         expression.getId(),
         expression.getTargetExpressionText(),
@@ -79,6 +91,7 @@ public record ExpressionLearningResponse(
         expression.getRepresentativeSentenceWords(),
         expression.getRepresentativeSentenceWordChoices(),
         expression.getRepresentativeImageUrl(),
-        representativeSentenceAudioUrl);
+        representativeSentenceAudioUrl,
+        targetExpressionAudioUrl);
   }
 }

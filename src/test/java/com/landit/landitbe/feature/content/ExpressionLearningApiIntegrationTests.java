@@ -134,7 +134,37 @@ class ExpressionLearningApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath("$.data.representativeSentenceAudioUrl")
-                .value("https://cdn.example.com/sentence.mp3"));
+                .value("https://cdn.example.com/sentence.mp3"))
+        .andExpect(
+            jsonPath("$.data.targetExpressionAudioUrl")
+                .value("https://cdn.example.com/expression.mp3"));
+  }
+
+  /** 패턴형 표현(발화 불가)은 표현 음성만 null이고 대표 예문 음성은 정상 응답되는지 검증한다. */
+  @Test
+  void learningStartReturnsNullExpressionAudioUrlForTemplatedExpression() throws Exception {
+    // given: 표현 음성 없이(TTS 배치가 패턴형에는 표현 음성을 만들지 않음) 문장 TTS만 완성된 자산
+    Long expressionId = seedExpression();
+    String accessToken =
+        login("google-learn-pattern", "learn-pattern@example.com", "Pattern User", "pattern-nonce");
+    assignUsTutor("learn-pattern@example.com");
+    jdbcTemplate.update(
+        "INSERT INTO expression_pronunciation_asset (writing_expression_id, accent_locale,"
+            + " expression_audio_url, sentence_audio_url, words, created_at, updated_at) VALUES (?,"
+            + " 'EN_US', NULL, 'https://cdn.example.com/sentence.mp3',"
+            + " CAST('[{\"order\":1,\"word\":\"w\"}]' AS jsonb), CURRENT_TIMESTAMP,"
+            + " CURRENT_TIMESTAMP)",
+        expressionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data.representativeSentenceAudioUrl")
+                .value("https://cdn.example.com/sentence.mp3"))
+        .andExpect(jsonPath("$.data.targetExpressionAudioUrl").isEmpty());
   }
 
   /** 발음 자산이 아직 없으면 음성 URL이 null이고 나머지 응답은 정상인지 검증한다 (단계적 자산 구축 대응). */
@@ -151,7 +181,8 @@ class ExpressionLearningApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.targetExpressionText").value("blow my mind"))
-        .andExpect(jsonPath("$.data.representativeSentenceAudioUrl").isEmpty());
+        .andExpect(jsonPath("$.data.representativeSentenceAudioUrl").isEmpty())
+        .andExpect(jsonPath("$.data.targetExpressionAudioUrl").isEmpty());
   }
 
   /** 사용자의 튜터를 EN_US 억양 튜터로 고정한다 (발음 자산 시드가 EN_US라서). */
