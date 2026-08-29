@@ -80,6 +80,7 @@ landit:
     connect-timeout: ${LANDIT_NOTIFICATION_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_NOTIFICATION_REQUEST_TIMEOUT:10s}
     consumer-enabled: ${LANDIT_NOTIFICATION_CONSUMER_ENABLED:false}
+    test-api-enabled: ${LANDIT_NOTIFICATION_TEST_API_ENABLED:false}
     queue-url: ${SQS_PUSH_NOTIFICATIONS_QUEUE_URL:}
     receipt-delay-seconds: ${LANDIT_NOTIFICATION_RECEIPT_DELAY_SECONDS:900}
 
