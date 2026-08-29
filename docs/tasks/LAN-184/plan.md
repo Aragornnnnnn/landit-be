@@ -42,6 +42,8 @@
 | 500명 페이지 처리와 Expo 100건 배치 | 구현·테스트 완료 |
 | Ticket·Receipt·Token 무효화·DLQ 계약 | 구현·테스트 완료 |
 | dev 테스트 API | 구현 완료 |
+| FE 20시 로컬 리마인더 제거·기존 예약 정리 | FE 작업 필요 |
+| 서버 푸시 UTM·`Page Viewed` 계측 정렬 | BE·FE 작업 필요 |
 | dev·prod Scheduler | IaC에서 `DISABLED` 유지 |
 
 현재 구현은 `feat/LAN-184-user-push-token-delivery`부터 `feat/LAN-184-scheduled-learning`까지의 스택 PR로 구성한다. 각 브랜치는 앞선 스택 PR을 기준으로 하며, 최종 병합 전에 스택 순서와 base branch를 다시 확인한다.
@@ -67,6 +69,11 @@
 
 - [ ] 다섯 스택 브랜치를 GitHub에 push하고 Ready PR을 생성한다.
 - [ ] 스택 PR을 순서대로 병합하고 dev에 배포한다.
+- [ ] FE에서 `ReminderSync`, 50일 로컬 리마인더 생성과 `SYNC_REMINDERS` 예약 경로를 제거한다.
+- [ ] 서버 푸시에 필요한 알림 권한, Expo Token 등록, `data.url` 딥링크 처리는 유지한다.
+- [ ] 기존 설치에 남은 `REMINDER_KIND` 예약·표시 알림을 한 번 제거하는 FE 정리 릴리스를 먼저 배포한다.
+- [ ] FE 정리 버전의 보급과 로컬 예약 제거를 확인하기 전에는 dev·prod Scheduler를 활성화하지 않는다.
+- [ ] BE UTM을 `utm_source=landit`, `utm_medium=push`로 맞추고 FE가 세 예약 알림 campaign을 `Page Viewed` 알림 유입으로 기록하게 한다.
 - [ ] 배포 전 Push Queue와 DLQ에 과거 `PUSH_SEND` 메시지가 남아 있지 않은지 확인한다. 새 Handler는 이를 처리하지 않으며, 남은 메시지는 DLQ로 이동한다.
 - [ ] dev Scheduler를 활성화하기 전에 인증 사용자·UserPushToken·Queue 소비·Expo 환경 변수를 확인한다.
 - [ ] iOS와 Android 실기기에서 dev 테스트 API와 20시 예약 알림을 수신한다.

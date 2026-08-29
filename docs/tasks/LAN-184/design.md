@@ -91,6 +91,27 @@ Authorization: Bearer {accessToken}
 status == ACTIVE
 ```
 
+## FE 로컬 알림에서 서버 푸시로 전환
+
+서버 예약 알림을 활성화할 때 FE의 기존 20시 로컬 리마인더는 함께 운영하지 않는다. 로컬 리마인더는 완료 상태와 관계없이 50일분을 예약하므로, 서버의 사용자별 선정 결과와 중복되거나 다른 유형의 알림을 표시할 수 있다.
+
+FE에서 제거할 범위는 다음과 같다.
+
+- 루트에 마운트된 `ReminderSync`와 50일분 로컬 리마인더 생성 로직.
+- `SYNC_REMINDERS` 브리지 메시지와 Native의 로컬 알림 예약 처리.
+- 로컬 리마인더 전용 문구, 예약 테스트와 관련 문서.
+
+서버 푸시 수신에 필요하므로 다음 기능은 유지한다.
+
+- 알림 권한 조회·요청과 Android 알림 채널 설정.
+- Expo Push Token 발급, `PUSH_TOKEN` 브리지와 `PushTokenSync`.
+- `PUT /api/v1/me/expo-push-token` 등록·비활성화 호출.
+- Expo 알림의 `data.url`을 읽는 콜드·웜 딥링크 처리.
+
+기존 앱에는 이미 최대 50일분의 로컬 알림이 OS에 예약돼 있을 수 있다. 따라서 로컬 예약 코드를 바로 삭제하지 않고, 먼저 기존 `REMINDER_KIND` 예약·표시 알림을 한 번 제거하는 FE 릴리스를 배포한다. 해당 버전의 보급과 정리 동작을 확인한 뒤 서버 Scheduler를 활성화한다.
+
+서버 푸시 딥링크의 UTM은 FE의 수집 규약에 맞춰 `utm_source=landit`, `utm_medium=push`로 통일한다. 알림 유형은 `utm_campaign`의 `daily_scenario_reminder`, `continue_expression`, `small_talk_reminder`로 구분하고, FE의 `Page Viewed`가 세 딥링크 모두를 알림 유입으로 기록하도록 함께 변경한다. 현재 BE 값인 `utm_source=push`, `utm_medium=notification`은 Scheduler 활성화 전에 수정한다.
+
 ## Queue와 발송
 
 EventBridge는 매일 20시 `SCHEDULED_NOTIFICATION_BATCH` 한 건만 Push Queue에 발행한다.
