@@ -29,6 +29,7 @@ public record SessionMessageSubmitResponse(
    * @param feedbackProcessingStatus 메시지별 피드백 처리 상태
    * @param nextMessage 다음 AI 메시지
    * @param ttsText TTS로 변환할 동적 메시지
+   * @param fixedQuestionText 이어서 재생할 고정 질문 텍스트
    * @param questionAudioUrl 이어서 재생할 고정 질문 음원 URL
    * @param totalQuestionCount 고정 질문 개수
    * @param completed 세션 완료 여부
@@ -40,13 +41,14 @@ public record SessionMessageSubmitResponse(
       ProcessingStatus feedbackProcessingStatus,
       SessionHistoryMessage nextMessage,
       String ttsText,
+      String fixedQuestionText,
       String questionAudioUrl,
       int totalQuestionCount,
       boolean completed) {
     return new SessionMessageSubmitResponse(
         sessionId,
         SubmittedMessageResponse.from(submittedMessage, feedbackProcessingStatus),
-        NextMessageResponse.from(nextMessage, ttsText, questionAudioUrl),
+        NextMessageResponse.from(nextMessage, ttsText, fixedQuestionText, questionAudioUrl),
         SessionProgressResponse.from(nextMessage, totalQuestionCount, completed));
   }
 
@@ -110,6 +112,7 @@ public record SessionMessageSubmitResponse(
    * @param content 메시지 본문
    * @param translatedContent 기준 locale 번역
    * @param ttsText TTS로 변환할 동적 메시지
+   * @param fixedQuestionText 이어서 재생할 고정 질문 텍스트
    * @param questionAudioUrl 이어서 재생할 고정 질문 음원 URL
    */
   @Schema(description = "다음 AI 메시지 응답")
@@ -121,6 +124,11 @@ public record SessionMessageSubmitResponse(
       @Schema(description = "메시지 본문") String content,
       @Schema(description = "기준 locale 번역") String translatedContent,
       @Schema(description = "TTS로 변환할 동적 메시지") String ttsText,
+      @Schema(
+              description = "이어서 재생할 고정 질문 텍스트",
+              nullable = true,
+              types = {"string", "null"})
+          String fixedQuestionText,
       @Schema(description = "이어서 재생할 고정 질문 음원 URL") String questionAudioUrl) {
 
     /**
@@ -128,11 +136,15 @@ public record SessionMessageSubmitResponse(
      *
      * @param message 저장된 AI 메시지
      * @param ttsText TTS로 변환할 동적 메시지
+     * @param fixedQuestionText 이어서 재생할 고정 질문 텍스트
      * @param questionAudioUrl 이어서 재생할 고정 질문 음원 URL
      * @return 다음 AI 메시지 응답
      */
     public static NextMessageResponse from(
-        SessionHistoryMessage message, String ttsText, String questionAudioUrl) {
+        SessionHistoryMessage message,
+        String ttsText,
+        String fixedQuestionText,
+        String questionAudioUrl) {
       return new NextMessageResponse(
           message.getId(),
           message.getTurnNumber(),
@@ -141,6 +153,7 @@ public record SessionMessageSubmitResponse(
           message.getContent(),
           message.getTranslatedContent(),
           ttsText,
+          fixedQuestionText,
           questionAudioUrl);
     }
   }
