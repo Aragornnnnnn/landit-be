@@ -130,14 +130,22 @@ public class PushDelivery extends BaseTimeEntity {
   }
 
   /**
-   * Expo가 접수한 Ticket ID를 기록한다.
+   * 요청 상태라면 Expo가 접수한 Ticket ID를 기록한다.
    *
    * @param ticketId Expo Ticket ID
+   * @return Ticket 접수 상태로 전환했으면 {@code true}
    */
-  public void acceptTicket(String ticketId) {
+  public boolean acceptTicket(String ticketId) {
+    if (ticketId == null || ticketId.isBlank()) {
+      throw new IllegalArgumentException("Expo Ticket ID는 비어 있을 수 없습니다.");
+    }
+    if (status != PushDeliveryStatus.REQUESTED) {
+      return false;
+    }
     expoTicketId = ticketId;
     status = PushDeliveryStatus.TICKET_ACCEPTED;
     errorCode = null;
+    return true;
   }
 
   /** 외부 Push 제공자의 일시 오류를 같은 발송 이력으로 재시도할 수 있게 표시한다. */
@@ -157,25 +165,35 @@ public class PushDelivery extends BaseTimeEntity {
   }
 
   /**
-   * Expo Receipt가 배달 성공을 확인한 상태로 전환한다.
+   * Ticket 접수 상태라면 Expo Receipt 배달 성공 상태로 전환한다.
    *
    * @param checkedAt Receipt 확인 시각
+   * @return 배달 완료 상태로 전환했으면 {@code true}
    */
-  public void delivered(LocalDateTime checkedAt) {
+  public boolean delivered(LocalDateTime checkedAt) {
+    if (status != PushDeliveryStatus.TICKET_ACCEPTED) {
+      return false;
+    }
     status = PushDeliveryStatus.DELIVERED;
     errorCode = null;
     receiptCheckedAt = checkedAt;
+    return true;
   }
 
   /**
-   * Ticket 또는 Receipt 오류를 기록한다.
+   * 요청 또는 Ticket 접수 상태라면 Ticket 또는 Receipt 오류를 기록한다.
    *
    * @param failureCode Expo 오류 코드
    * @param checkedAt 결과 기록 시각
+   * @return 실패 상태로 전환했으면 {@code true}
    */
-  public void fail(String failureCode, LocalDateTime checkedAt) {
+  public boolean fail(String failureCode, LocalDateTime checkedAt) {
+    if (status != PushDeliveryStatus.REQUESTED && status != PushDeliveryStatus.TICKET_ACCEPTED) {
+      return false;
+    }
     status = PushDeliveryStatus.FAILED;
     errorCode = failureCode;
     receiptCheckedAt = checkedAt;
+    return true;
   }
 }

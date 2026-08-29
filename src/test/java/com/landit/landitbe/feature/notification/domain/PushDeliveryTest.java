@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.notification.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,18 @@ class PushDeliveryTest {
     assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.TICKET_ACCEPTED);
   }
 
+  /** Expo Ticket ID가 없으면 접수 상태로 전환하지 않는다. */
+  @Test
+  void rejectsBlankExpoTicket() {
+    PushDelivery delivery = requestedDelivery();
+
+    assertThatThrownBy(() -> delivery.acceptTicket(" "))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Expo Ticket ID는 비어 있을 수 없습니다.");
+
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.REQUESTED);
+  }
+
   /** Receipt가 성공하면 배달 완료 시각을 기록한다. */
   @Test
   void marksReceiptDelivered() {
@@ -61,6 +74,20 @@ class PushDeliveryTest {
     assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
     assertThat(delivery.getErrorCode()).isEqualTo("DeviceNotRegistered");
     assertThat(delivery.getReceiptCheckedAt()).isEqualTo(CHECKED_AT);
+  }
+
+  /** 최종 상태가 된 발송 이력은 늦게 도착한 Ticket 결과로 덮어쓰지 않는다. */
+  @Test
+  void keepsTerminalStateWhenStaleResultArrives() {
+    PushDelivery delivery = requestedDelivery();
+    delivery.fail("MessageTooBig", CHECKED_AT);
+
+    assertThat(delivery.acceptTicket("ticket-1")).isFalse();
+    assertThat(delivery.delivered(CHECKED_AT)).isFalse();
+
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
+    assertThat(delivery.getExpoTicketId()).isNull();
+    assertThat(delivery.getErrorCode()).isEqualTo("MessageTooBig");
   }
 
   /** 일시적인 외부 제공자 오류는 같은 발송 이력을 재시도 가능한 요청 상태로 유지한다. */
