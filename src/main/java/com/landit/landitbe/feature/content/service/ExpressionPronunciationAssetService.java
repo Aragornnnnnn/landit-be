@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.service;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -60,12 +61,17 @@ public class ExpressionPronunciationAssetService {
   // 반드시 같이 바꿔야 한다.
   private static final Pattern TEMPLATED_EXPRESSION_CHARS = Pattern.compile("[~가-힣()+]");
 
+  // S3 매니페스트에 배치 메타데이터 같은 추가 필드가 있어도 파싱이 실패하지 않게 알 수 없는
+  // 필드를 무시한다. 빈으로 등록하지 않는 것은 레포 규칙이다 — HTTP 계층은 tools.jackson을 쓰고,
+  // fasterxml ObjectMapper 빈 부재를 LanditBeApplicationTests가 검증한다.
+  private static final ObjectMapper OBJECT_MAPPER =
+      new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
   private final ExpressionPronunciationAssetRepository assetRepository;
   private final WritingExpressionRepository writingExpressionRepository;
   private final AdminAuditService adminAuditService;
   private final PronunciationManifestReadable manifestReadable;
   private final PlatformTransactionManager transactionManager;
-  private final ObjectMapper objectMapper;
 
   /**
    * 1단계 — 기준 데이터 JSON(locale별)을 읽어 자산의 words를 upsert한다.
@@ -273,9 +279,9 @@ public class ExpressionPronunciationAssetService {
     List<PronunciationReferenceManifest.Entry> entryList;
     try {
       entryList =
-          objectMapper.readValue(
+          OBJECT_MAPPER.readValue(
               manifestJson,
-              objectMapper
+              OBJECT_MAPPER
                   .getTypeFactory()
                   .constructCollectionType(List.class, PronunciationReferenceManifest.Entry.class));
     } catch (Exception exception) {
@@ -294,7 +300,7 @@ public class ExpressionPronunciationAssetService {
   private PronunciationTtsManifest parseTts(String manifestJson) {
     PronunciationTtsManifest manifest;
     try {
-      manifest = objectMapper.readValue(manifestJson, PronunciationTtsManifest.class);
+      manifest = OBJECT_MAPPER.readValue(manifestJson, PronunciationTtsManifest.class);
     } catch (Exception exception) {
       throw new ApiException(ErrorCode.INVALID_REQUEST, "TTS 매니페스트 JSON 형식이 올바르지 않습니다.");
     }
@@ -427,7 +433,7 @@ public class ExpressionPronunciationAssetService {
                     PronunciationTtsManifest.Asset.WordAudio::order,
                     PronunciationTtsManifest.Asset.WordAudio::audioUrl,
                     (first, second) -> first));
-    ArrayNode joinedWordArray = objectMapper.createArrayNode();
+    ArrayNode joinedWordArray = OBJECT_MAPPER.createArrayNode();
     for (JsonNode word : referenceWords) {
       int order = word.path("order").asInt();
       String audioUrl = audioUrlByOrderMap.get(order);
