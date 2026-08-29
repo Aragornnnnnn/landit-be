@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
     prefix = "landit.pronunciation-asset",
     name = "manifest-mode",
     havingValue = "local")
-public class LocalPronunciationManifestReader implements PronunciationManifestReader {
+public class LocalPronunciationManifestReader implements PronunciationManifestReadable {
 
   private static final String RESOURCE_PREFIX = "/pronunciation-manifests/";
 

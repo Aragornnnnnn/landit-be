@@ -16,7 +16,8 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 /**
  * S3 콘텐츠 버킷에서 발음 평가 자산 매니페스트를 내려받는다.
  *
- * <p>ECS Task Role의 자격증명을 사용한다. 버킷·리전은 콘텐츠 이미지와 동일한 설정을 재사용한다.
+ * <p>ECS Task Role의 자격증명을 사용한다. 버킷·리전은 콘텐츠 이미지와 동일한 설정을 재사용한다. 매니페스트 키가 버킷에 없으면 {@code
+ * NoSuchKeyException}을 {@code ApiException(RESOURCE_NOT_FOUND)}으로 바꿔 던진다.
  */
 @Component
 @ConditionalOnProperty(
@@ -24,7 +25,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
     name = "manifest-mode",
     havingValue = "s3",
     matchIfMissing = true)
-public class S3PronunciationManifestReader implements PronunciationManifestReader {
+public class S3PronunciationManifestReader implements PronunciationManifestReadable {
 
   private final S3Client s3Client;
   private final ContentImageProperties properties;

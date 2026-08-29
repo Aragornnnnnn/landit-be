@@ -2,7 +2,10 @@
 
 package com.landit.landitbe.feature.content.client.ai;
 
-import java.util.ArrayList;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationAnalysisRequest;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationJudgedWord;
+import com.landit.landitbe.feature.content.client.ai.dto.AiPronunciationWordStatus;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -21,31 +24,32 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class LocalAiPronunciationClient implements AiPronunciationClient {
 
-  // 단어 구간 타임스탬프 스텁 값. 단어마다 500ms 간격으로 배치한다.
-  private static final int WORD_DURATION_MS = 400;
-  private static final int WORD_GAP_MS = 500;
+  // 단어 구간 타임스탬프 스텁 값. 단어마다 일정 간격으로 배치한다.
+  private static final Duration WORD_DURATION = Duration.ofMillis(400);
+  private static final Duration WORD_GAP = Duration.ofMillis(500);
 
   /**
    * 고정 판정을 반환한다. 2번째 단어는 PHONEME_ERROR, 4번째 단어는 STRESS_ERROR, 나머지는 CORRECT다.
    *
    * @param request 발음 분석 요청. 단어 목록의 order 기준으로 판정한다
-   * @return 요청 단어와 1:1로 대응하는 고정 판정 목록 (타임스탬프는 단어당 500ms 간격의 결정적 값)
+   * @return 요청 단어와 1:1로 대응하는 고정 판정 목록 (타임스탬프는 단어당 일정 간격의 결정적 값)
    */
   @Override
-  public AiPronunciationAnalysisResult analyze(AiPronunciationAnalysisRequest request) {
-    List<AiPronunciationAnalysisResult.Word> words = new ArrayList<>();
-    for (AiPronunciationAnalysisRequest.Word word : request.words()) {
-      words.add(judge(word));
-    }
-    return new AiPronunciationAnalysisResult(words);
+  public List<AiPronunciationJudgedWord> analyze(AiPronunciationAnalysisRequest request) {
+    return request.words().stream().map(this::judge).toList();
   }
 
-  // 단어 1개의 고정 판정을 만든다.
-  private AiPronunciationAnalysisResult.Word judge(AiPronunciationAnalysisRequest.Word word) {
-    int startMs = (word.order() - 1) * WORD_GAP_MS + 100;
-    int endMs = startMs + WORD_DURATION_MS;
+  /**
+   * 단어 1개의 고정 판정을 만든다.
+   *
+   * @param word 요청 단어
+   * @return order에 따라 정해지는 고정 판정
+   */
+  private AiPronunciationJudgedWord judge(AiPronunciationAnalysisRequest.Word word) {
+    int startMs = (int) ((word.order() - 1) * WORD_GAP.toMillis() + 100);
+    int endMs = startMs + (int) WORD_DURATION.toMillis();
     if (word.order() == 2) {
-      return new AiPronunciationAnalysisResult.Word(
+      return new AiPronunciationJudgedWord(
           word.order(),
           word.word(),
           AiPronunciationWordStatus.PHONEME_ERROR,
@@ -55,9 +59,8 @@ public class LocalAiPronunciationClient implements AiPronunciationClient {
           "th",
           "ss",
           null);
-    }
-    if (word.order() == 4) {
-      return new AiPronunciationAnalysisResult.Word(
+    } else if (word.order() == 4) {
+      return new AiPronunciationJudgedWord(
           word.order(),
           word.word(),
           AiPronunciationWordStatus.STRESS_ERROR,
@@ -67,16 +70,17 @@ public class LocalAiPronunciationClient implements AiPronunciationClient {
           null,
           null,
           1);
+    } else {
+      return new AiPronunciationJudgedWord(
+          word.order(),
+          word.word(),
+          AiPronunciationWordStatus.CORRECT,
+          startMs,
+          endMs,
+          null,
+          null,
+          null,
+          null);
     }
-    return new AiPronunciationAnalysisResult.Word(
-        word.order(),
-        word.word(),
-        AiPronunciationWordStatus.CORRECT,
-        startMs,
-        endMs,
-        null,
-        null,
-        null,
-        null);
   }
 }

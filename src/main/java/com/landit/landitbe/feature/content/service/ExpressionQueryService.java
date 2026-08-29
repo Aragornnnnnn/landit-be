@@ -163,9 +163,16 @@ public class ExpressionQueryService {
     return ExpressionLearningResponse.from(expression, findSentenceAudioUrl(userId, expressionId));
   }
 
-  // 사용자의 목표 억양에 맞는 대표 예문 TTS URL을 찾는다.
-  // 발음 자산이 아직 없거나 TTS 미완성이면 null — 표현 981개의 자산을 단계적으로 채우는 동안
-  // 학습 시작 화면이 깨지지 않게 하기 위한 의도된 동작이다 (앱은 null이면 발음 파트를 숨긴다).
+  /**
+   * 사용자의 목표 억양에 맞는 대표 예문 TTS URL을 찾는다.
+   *
+   * <p>발음 자산이 아직 없거나 TTS 미완성이면 null — 표현 981개의 자산을 단계적으로 채우는 동안 학습 시작 화면이 깨지지 않게 하기 위한 의도된 동작이다 (앱은
+   * null이면 발음 파트를 숨긴다).
+   *
+   * @param userId 사용자 ID
+   * @param expressionId Writing 표현 ID
+   * @return 대표 예문 TTS URL. 자산 미완성이면 null
+   */
   private String findSentenceAudioUrl(Long userId, Long expressionId) {
     return accentLocaleResolver
         .tryResolve(userId)

@@ -8,7 +8,7 @@ package com.landit.landitbe.feature.content.client;
  * <p>운영에서는 S3 콘텐츠 버킷에서 내려받고, 테스트·로컬에서는 클래스패스 리소스로 대체한다. 구현 선택은 {@code
  * landit.pronunciation-asset.manifest-mode} 설정을 따른다.
  */
-public interface PronunciationManifestReader {
+public interface PronunciationManifestReadable {
 
   /**
    * 매니페스트 키에 해당하는 JSON 원문을 읽는다.
