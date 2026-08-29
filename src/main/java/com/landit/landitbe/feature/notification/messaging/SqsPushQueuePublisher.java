@@ -27,8 +27,6 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   private static final int MESSAGE_VERSION = 1;
   private static final int RECEIPT_DELAY_SECONDS = 900;
-  private static final String PUSH_SEND = "PUSH_SEND";
-  private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
   private final SqsAsyncClient sqsAsyncClient;
   private final JsonMapper jsonMapper;
@@ -42,7 +40,7 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
         new PushQueueMessage(
             MESSAGE_VERSION,
             request.eventId(),
-            PUSH_SEND,
+            PushQueueMessage.PUSH_SEND,
             request.occurredAt(),
             PushQueuePayload.notification(request));
     send(message, 0, "Push 발송 메시지 발행에 실패했습니다.");
@@ -56,7 +54,7 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
         new PushQueueMessage(
             MESSAGE_VERSION,
             UUID.randomUUID().toString(),
-            PUSH_RECEIPT_CHECK,
+            PushQueueMessage.PUSH_RECEIPT_CHECK,
             Instant.now(),
             PushQueuePayload.receipt(pushDeliveryId, attempt));
     send(message, properties.receiptDelaySeconds(), "Push Receipt 확인 메시지 발행에 실패했습니다.");

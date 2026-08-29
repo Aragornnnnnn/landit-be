@@ -19,8 +19,6 @@ import org.springframework.stereotype.Component;
 public class PushQueueMessageHandler {
 
   private static final int SUPPORTED_VERSION = 1;
-  private static final String PUSH_SEND = "PUSH_SEND";
-  private static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 
   private final NotificationDispatchService notificationDispatchService;
   private final PushReceiptService pushReceiptService;
@@ -33,8 +31,8 @@ public class PushQueueMessageHandler {
   public void handle(PushQueueMessage message) {
     validateCommon(message);
     switch (message.messageType()) {
-      case PUSH_SEND -> handlePushSend(message);
-      case PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
+      case PushQueueMessage.PUSH_SEND -> handlePushSend(message);
+      case PushQueueMessage.PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
       default -> throw new IllegalArgumentException("지원하지 않는 Push 메시지 유형입니다.");
     }
   }
