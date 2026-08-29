@@ -442,7 +442,7 @@ public class ExpressionPronunciationAssetService {
   }
 
   /**
-   * words 배열 항목들의 order·word 품질을 검증한다.
+   * 기준 데이터 words 배열 항목들의 order·word 품질을 검증한다.
    *
    * <p>order 누락/중복이나 빈 word가 저장되면 런타임 병합(order 조인)이 그때서야 깨지므로 임포트 시점에 거른다.
    *
@@ -530,7 +530,7 @@ public class ExpressionPronunciationAssetService {
   }
 
   /**
-   * upsert 판별에 사용하는 (표현 ID, 억양) 복합 키다.
+   * 갱신·삽입(upsert) 판별에 사용하는 (표현 ID, 억양) 복합 키다.
    *
    * @param writingExpressionId Writing 표현 ID
    * @param accentLocale 억양 locale
