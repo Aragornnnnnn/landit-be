@@ -68,10 +68,11 @@ public class ScheduledNotificationService {
    */
   public void process(Instant occurredAt, Runnable visibilityExtender) {
     long lastUserProfileId = 0L;
+    LocalDate scheduledDate = occurredAt.atZone(KOREA_TIME_ZONE).toLocalDate();
     while (true) {
       visibilityExtender.run();
       NotificationTargetPage page =
-          notificationTargetPageQueryService.loadPage(lastUserProfileId, PAGE_SIZE);
+          notificationTargetPageQueryService.loadPage(lastUserProfileId, PAGE_SIZE, scheduledDate);
       if (page.userProfileIds().isEmpty()) {
         return;
       }

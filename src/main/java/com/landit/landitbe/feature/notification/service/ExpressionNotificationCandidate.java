@@ -2,11 +2,4 @@
 
 package com.landit.landitbe.feature.notification.service;
 
-record ExpressionNotificationCandidate(
-    Long userProfileId,
-    Long scenarioId,
-    int scenarioDisplayOrder,
-    Long expressionId,
-    int expressionDisplayOrder,
-    boolean parentScenarioCleared,
-    boolean completed) {}
+record ExpressionNotificationCandidate(Long scenarioId, Long expressionId, boolean completed) {}

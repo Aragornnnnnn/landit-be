@@ -2,11 +2,11 @@
 
 ## 2026-08-29 정책 변경 상태
 
-예약 알림 정책은 [design.md](design.md)의 `DAILY_SCENARIO_REMINDER → CONTINUE_EXPRESSION → SMALL_TALK_REMINDER` 우선순위로 변경하기로 결정했다. 아래 구현 기록은 정책 변경 전 브랜치 상태를 설명하며, 새 정책은 아직 코드와 테스트에 반영되지 않았다.
+예약 알림 정책은 [design.md](design.md)의 `DAILY_SCENARIO_REMINDER → CONTINUE_EXPRESSION → SMALL_TALK_REMINDER` 우선순위로 구현했다. Scheduler는 새 정책의 dev 검증 전까지 계속 비활성 상태로 둔다.
 
-- 현재 `CONTINUE_SCENARIO`, `CONTINUE_EXPRESSION`, `REVIEW_LEARNING` 선정 로직은 교체 대상이다.
-- 새 정책을 구현·검증하기 전에는 dev·prod Scheduler를 활성화하지 않는다.
-- 구현 후 이 문서의 학습 알림 정책, 현재 구현 상태, 검증 결과를 새 근거로 갱신한다.
+- 오늘 배정 시나리오와 KST 날짜별 스몰톡 사용량을 500명 페이지 조회에 포함했다.
+- 기존 전체 콘텐츠 기반 `CONTINUE_SCENARIO`·`REVIEW_LEARNING` 선정 로직을 제거했다.
+- 구현·테스트가 끝났지만 dev·prod Scheduler 활성화와 실기기 수신은 별도 E2E 승인 작업이다.
 
 ## 최종 구현 범위
 
@@ -19,18 +19,18 @@
 - 일시적인 Expo 오류는 발송 이력에 재시도 표식을 남기고 예약 배치 SQS 재전달로 복구한다. 이미 Ticket을 접수한 이력은 Expo에 다시 보내지 않고 Receipt 확인만 다시 예약한다.
 - dev 테스트 API는 로그인 사용자의 `TEST_NOTIFICATION`을 `NotificationDispatchService`로 직접 요청한다.
 
-## 현재 코드의 학습 알림 정책 변경 전 기록
+## 구현한 학습 알림 정책
 
 | 유형 | 선택 결과 | 딥링크 |
 | --- | --- | --- |
-| `CONTINUE_SCENARIO` | 접근 가능한 다음 미완료 시나리오 | `/conversation/{scenarioId}` |
-| `CONTINUE_EXPRESSION` | 부모 시나리오가 `CLEARED`인 다음 미완료 표현 | `/expressions/{expressionId}` |
-| `REVIEW_LEARNING` | 활성 콘텐츠가 있고 이어 하기 후보를 모두 완료한 상태 | `/home` |
+| `DAILY_SCENARIO_REMINDER` | 오늘 배정 시나리오 미완료 | `/conversation/scenario/{scenarioId}` |
+| `CONTINUE_EXPRESSION` | 오늘 완료한 시나리오의 다음 미완료 표현 | `/expressions/scenario/{scenarioId}/{expressionId}` |
+| `SMALL_TALK_REMINDER` | 오늘 시나리오·표현 완료 및 스몰톡 사용량 0ms | `/smalltalk` |
 
-- 최근 학습 활동은 실제 시나리오·표현 완료 시각만 사용한다. 조회·시작·알림 탭은 제외한다.
-- 최근 완료 유형의 후보를 우선하고, 후보가 없으면 다른 이어 하기 유형으로 대체한다.
-- 신규 사용자는 접근 가능한 첫 미완료 시나리오를 선택한다.
-- 활성 시나리오와 표현이 모두 없는 경우에는 `REVIEW_LEARNING`도 보내지 않는다.
+- 오늘의 시나리오 완료 여부는 `user_scenario_access.granted_at`의 KST 날짜로 판단한다.
+- 표현 완료 여부는 `learning_source = 'SCENARIO'`인 `user_writing_expression_completion`만 반영한다.
+- 오늘 시나리오를 결정할 수 없으면 다른 완료 이력으로 추론하지 않고 로그를 남긴 뒤 건너뛴다.
+- 발송 딥링크는 현재 프런트 라우트(`/conversation/scenario`, `/expressions/scenario`, `/smalltalk`)에 맞춘다.
 
 ## 현재 구현 상태
 
@@ -38,7 +38,7 @@
 | --- | --- |
 | Token 관리 | 기존 `UserPushToken`과 `ACTIVE`·`REVOKED` 상태, Token 소유권 이전 유지 |
 | 공개 API | 기존 `PUT /api/v1/me/expo-push-token` 계약 유지 |
-| 대상 선정과 `user_notification_state` | 구현·테스트 완료 |
+| 대상 선정과 `user_notification_state` | 새 정책 구현·테스트 완료 |
 | 500명 페이지 처리와 Expo 100건 배치 | 구현·테스트 완료 |
 | Ticket·Receipt·Token 무효화·DLQ 계약 | 구현·테스트 완료 |
 | dev 테스트 API | 구현 완료 |
@@ -68,6 +68,6 @@
 - [ ] 배포 전 Push Queue와 DLQ에 과거 `PUSH_SEND` 메시지가 남아 있지 않은지 확인한다. 새 Handler는 이를 처리하지 않으며, 남은 메시지는 DLQ로 이동한다.
 - [ ] dev Scheduler를 활성화하기 전에 인증 사용자·UserPushToken·Queue 소비·Expo 환경 변수를 확인한다.
 - [ ] iOS와 Android 실기기에서 dev 테스트 API와 20시 예약 알림을 수신한다.
-- [ ] 알림 탭 시 `/conversation/{id}`, `/expressions/{id}`, `/home` 딥링크와 UTM 값이 보존되는지 확인한다.
+- [ ] 알림 탭 시 `/conversation/scenario/{id}`, `/expressions/scenario/{scenarioId}/{expressionId}`, `/smalltalk` 딥링크와 UTM 값이 보존되는지 확인한다.
 - [ ] 중복 예약 배치, Expo 일시 오류, Receipt 지연과 Push DLQ 이동을 dev에서 확인한다.
 - [ ] dev E2E 이후 prod Scheduler 활성화 계획을 검토한다.

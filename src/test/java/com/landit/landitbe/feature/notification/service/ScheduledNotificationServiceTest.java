@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.repository.UserNotificationStateRepository;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,28 +63,33 @@ class ScheduledNotificationServiceTest {
   void processesUsersInFiveHundredSizeKeysetPagesWithoutPublishingPushSendMessages() {
     NotificationTargetPage firstPage = page(1L, 500);
     NotificationTargetPage secondPage = page(501L, 1);
-    when(notificationTargetPageQueryService.loadPage(0L, 500)).thenReturn(firstPage);
-    when(notificationTargetPageQueryService.loadPage(500L, 500)).thenReturn(secondPage);
-    when(notificationTargetPageQueryService.loadPage(501L, 500))
+    LocalDate scheduledDate = LocalDate.of(2026, 7, 26);
+    when(notificationTargetPageQueryService.loadPage(0L, 500, scheduledDate)).thenReturn(firstPage);
+    when(notificationTargetPageQueryService.loadPage(500L, 500, scheduledDate))
+        .thenReturn(secondPage);
+    when(notificationTargetPageQueryService.loadPage(501L, 500, scheduledDate))
         .thenReturn(new NotificationTargetPage(List.of(), Map.of(), List.of()));
     when(userNotificationStateRepository.findAllByUserProfileIdIn(any())).thenReturn(List.of());
     when(notificationTargetSelectionService.select(any()))
         .thenReturn(
-            Optional.of(new SelectedNotificationTarget(NotificationType.CONTINUE_SCENARIO, 11L)));
+            Optional.of(
+                new SelectedNotificationTarget(
+                    NotificationType.DAILY_SCENARIO_REMINDER, 11L, null)));
     AtomicInteger visibilityExtensionCount = new AtomicInteger();
 
     scheduledNotificationService.process(
         Instant.parse("2026-07-26T11:00:00Z"), visibilityExtensionCount::incrementAndGet);
 
     assertThat(visibilityExtensionCount).hasValue(5);
-    verify(notificationTargetPageQueryService).loadPage(0L, 500);
-    verify(notificationTargetPageQueryService).loadPage(500L, 500);
-    verify(notificationTargetPageQueryService).loadPage(501L, 500);
+    verify(notificationTargetPageQueryService).loadPage(0L, 500, scheduledDate);
+    verify(notificationTargetPageQueryService).loadPage(500L, 500, scheduledDate);
+    verify(notificationTargetPageQueryService).loadPage(501L, 500, scheduledDate);
     verify(userNotificationStateRepository, times(2)).findAllByUserProfileIdIn(any());
     verify(notificationDispatchService, times(2)).sendAll(any());
     verify(userNotificationStateRepository, times(2)).saveAll(any());
     verify(notificationTargetSelectionService, times(501)).select(any());
-    verify(notificationTargetPageQueryService, times(3)).loadPage(any(Long.class), eq(500));
+    verify(notificationTargetPageQueryService, times(3))
+        .loadPage(any(Long.class), eq(500), eq(scheduledDate));
   }
 
   /** 지정한 ID 범위의 사용자를 같은 선정 입력과 발송 가능 상태로 구성한다. */
@@ -99,6 +105,6 @@ class ScheduledNotificationServiceTest {
   /** 사용자별 선정 결과를 만들기 위한 최소 학습 입력을 구성한다. */
   private NotificationTargetSelectionInput input(Long userProfileId) {
     return new NotificationTargetSelectionInput(
-        userProfileId, null, null, null, null, List.of(), List.of());
+        userProfileId, 11L, false, 0L, null, null, List.of());
   }
 }

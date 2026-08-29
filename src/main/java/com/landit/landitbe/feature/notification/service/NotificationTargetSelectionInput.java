@@ -7,9 +7,9 @@ import java.util.List;
 
 record NotificationTargetSelectionInput(
     Long userProfileId,
+    Long dailyScenarioId,
+    boolean dailyScenarioCompleted,
+    long freeTalkUsedSpeakingDurationMs,
     LocalDateTime lastScenarioCompletedAt,
-    Long lastScenarioId,
     LocalDateTime lastExpressionCompletedAt,
-    Long lastExpressionScenarioId,
-    List<ScenarioNotificationCandidate> scenarios,
     List<ExpressionNotificationCandidate> expressions) {}

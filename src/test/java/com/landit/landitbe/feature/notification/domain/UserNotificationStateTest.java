@@ -17,11 +17,11 @@ class UserNotificationStateTest {
     LocalDateTime sentAt = LocalDateTime.of(2026, 7, 26, 20, 0);
 
     UserNotificationState state =
-        UserNotificationState.ready(1L, NotificationType.CONTINUE_SCENARIO, 10L, activityAt);
+        UserNotificationState.ready(1L, NotificationType.DAILY_SCENARIO_REMINDER, 10L, activityAt);
     state.markSent(sentAt);
 
     assertThat(state.getUserProfileId()).isEqualTo(1L);
-    assertThat(state.getNotificationType()).isEqualTo(NotificationType.CONTINUE_SCENARIO);
+    assertThat(state.getNotificationType()).isEqualTo(NotificationType.DAILY_SCENARIO_REMINDER);
     assertThat(state.getTargetId()).isEqualTo(10L);
     assertThat(state.getStatus()).isEqualTo(NotificationStateStatus.SENT);
     assertThat(state.getLastActivityAt()).isEqualTo(activityAt);

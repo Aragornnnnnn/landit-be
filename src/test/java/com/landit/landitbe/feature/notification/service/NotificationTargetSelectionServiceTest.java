@@ -1,123 +1,102 @@
-// 사용자별 하루 한 건의 학습 알림 대상 선정 규칙을 검증한다.
+// 오늘 배정된 시나리오와 스몰톡 사용량에 따른 예약 알림 우선순위를 검증한다.
 
 package com.landit.landitbe.feature.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** 사용자별 하루 한 건의 학습 알림 대상 선정 규칙을 검증한다. */
+/** 오늘의 학습 상태에 따라 사용자별 하루 한 건의 예약 알림을 선정하는 규칙을 검증한다. */
 class NotificationTargetSelectionServiceTest {
 
   private final NotificationTargetSelectionService selectionService =
       new NotificationTargetSelectionService();
 
-  /** 최근에 시나리오를 완료했으면 같은 카테고리의 다음 접근 가능한 시나리오를 우선한다. */
+  /** 오늘 배정된 시나리오가 미완료면 다른 상태보다 시나리오 알림을 우선한다. */
   @Test
-  void prioritizesNextScenarioInCategoryOfLatestScenarioCompletion() {
+  void selectsDailyScenarioReminderWhenTodaysScenarioIsIncomplete() {
     NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L,
-            LocalDateTime.of(2026, 7, 26, 19, 0),
-            10L,
-            LocalDateTime.of(2026, 7, 26, 18, 0),
-            10L,
-            List.of(
-                new ScenarioNotificationCandidate(1L, 1L, true, 10L, 1, true, true, true),
-                new ScenarioNotificationCandidate(1L, 1L, true, 11L, 2, true, true, false)),
-            List.of());
+        input(10L, false, 0L, List.of(new ExpressionNotificationCandidate(10L, 100L, false)));
 
     SelectedNotificationTarget result = selectionService.select(input).orElseThrow();
 
-    assertThat(result.notificationType()).isEqualTo(NotificationType.CONTINUE_SCENARIO);
-    assertThat(result.targetId()).isEqualTo(11L);
+    assertThat(result.notificationType()).isEqualTo(NotificationType.DAILY_SCENARIO_REMINDER);
+    assertThat(result.targetId()).isEqualTo(10L);
+    assertThat(result.scenarioId()).isNull();
   }
 
-  /** 최근 시나리오의 다음 후보가 없으면 완료한 부모 시나리오의 표현 학습으로 대체한다. */
+  /** 오늘 시나리오를 완료했으면 같은 시나리오의 첫 미완료 표현을 선택한다. */
   @Test
-  void fallsBackToExpressionWhenPreferredScenarioHasNoCandidate() {
+  void selectsIncompleteExpressionFromTodaysCompletedScenario() {
     NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L,
-            LocalDateTime.of(2026, 7, 26, 19, 0),
+        input(
             10L,
-            null,
-            null,
-            List.of(new ScenarioNotificationCandidate(1L, 1L, true, 10L, 1, true, true, true)),
-            List.of(new ExpressionNotificationCandidate(1L, 10L, 1, 100L, 1, true, false)));
+            true,
+            0L,
+            List.of(
+                new ExpressionNotificationCandidate(9L, 90L, false),
+                new ExpressionNotificationCandidate(10L, 100L, true),
+                new ExpressionNotificationCandidate(10L, 101L, false)));
 
     SelectedNotificationTarget result = selectionService.select(input).orElseThrow();
 
     assertThat(result.notificationType()).isEqualTo(NotificationType.CONTINUE_EXPRESSION);
-    assertThat(result.targetId()).isEqualTo(100L);
+    assertThat(result.targetId()).isEqualTo(101L);
+    assertThat(result.scenarioId()).isEqualTo(10L);
   }
 
-  /** 신규 사용자는 접근 가능한 첫 미완료 시나리오를 선택한다. */
+  /** 오늘 시나리오의 표현을 모두 완료했고 스몰톡을 쓰지 않았으면 스몰톡 알림을 선택한다. */
   @Test
-  void selectsFirstAccessibleScenarioForNewUser() {
+  void selectsSmallTalkReminderWhenLearningIsCompleteAndSmallTalkIsUnused() {
     NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L,
-            null,
-            null,
-            null,
-            null,
-            List.of(
-                new ScenarioNotificationCandidate(1L, 1L, true, 10L, 1, true, true, false),
-                new ScenarioNotificationCandidate(1L, 1L, true, 11L, 2, true, true, false)),
-            List.of());
+        input(10L, true, 0L, List.of(new ExpressionNotificationCandidate(10L, 100L, true)));
 
     SelectedNotificationTarget result = selectionService.select(input).orElseThrow();
 
-    assertThat(result.notificationType()).isEqualTo(NotificationType.CONTINUE_SCENARIO);
-    assertThat(result.targetId()).isEqualTo(10L);
-  }
-
-  /** 모든 활성 시나리오와 표현을 완료한 사용자는 ID 없이 복습 알림을 받는다. */
-  @Test
-  void selectsReviewLearningForUserWhoCompletedAllCurrentContent() {
-    NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L,
-            LocalDateTime.of(2026, 7, 26, 19, 0),
-            10L,
-            LocalDateTime.of(2026, 7, 26, 18, 0),
-            10L,
-            List.of(new ScenarioNotificationCandidate(1L, 1L, true, 10L, 1, true, true, true)),
-            List.of(new ExpressionNotificationCandidate(1L, 10L, 1, 100L, 1, true, true)));
-
-    SelectedNotificationTarget result = selectionService.select(input).orElseThrow();
-
-    assertThat(result.notificationType()).isEqualTo(NotificationType.REVIEW_LEARNING);
+    assertThat(result.notificationType()).isEqualTo(NotificationType.SMALL_TALK_REMINDER);
     assertThat(result.targetId()).isNull();
+    assertThat(result.scenarioId()).isNull();
   }
 
-  /** 현재 사용자 언어에 활성 콘텐츠가 하나도 없으면 복습 알림을 발송하지 않는다. */
+  /** 스몰톡을 일부라도 사용했으면 스몰톡 알림을 보내지 않는다. */
   @Test
-  void doesNotSelectReviewLearningWhenNoActiveContentExists() {
-    NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L, LocalDateTime.of(2026, 7, 26, 19, 0), 10L, null, null, List.of(), List.of());
+  void doesNotSelectSmallTalkReminderAfterAnyUsage() {
+    NotificationTargetSelectionInput input = input(10L, true, 1L, List.of());
 
     assertThat(selectionService.select(input)).isEmpty();
   }
 
-  /** 비활성 시나리오만 존재하고 표현이 없으면 복습 알림을 발송하지 않는다. */
+  /** 콘텐츠를 전부 완료한 이론적 상태에서도 스몰톡을 이미 썼으면 알림을 보내지 않는다. */
   @Test
-  void doesNotSelectReviewLearningWhenOnlyInactiveScenariosExist() {
-    NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L,
-            LocalDateTime.of(2026, 7, 26, 19, 0),
-            10L,
-            null,
-            null,
-            List.of(new ScenarioNotificationCandidate(1L, 1L, false, 10L, 1, true, true, true)),
-            List.of());
+  void doesNotSelectReminderAfterSmallTalkLimitIsExhausted() {
+    NotificationTargetSelectionInput input = input(10L, true, 60_000L, List.of());
 
     assertThat(selectionService.select(input)).isEmpty();
+  }
+
+  /** 오늘의 시나리오를 결정할 수 없으면 다른 유형으로 추론하지 않는다. */
+  @Test
+  void doesNotSelectFallbackWhenDailyScenarioIsUnavailable() {
+    NotificationTargetSelectionInput input = input(null, false, 0L, List.of());
+
+    assertThat(selectionService.select(input)).isEmpty();
+  }
+
+  /** 테스트에 필요한 오늘의 알림 선정 입력을 만든다. */
+  private NotificationTargetSelectionInput input(
+      Long dailyScenarioId,
+      boolean dailyScenarioCompleted,
+      long freeTalkUsedSpeakingDurationMs,
+      List<ExpressionNotificationCandidate> expressions) {
+    return new NotificationTargetSelectionInput(
+        1L,
+        dailyScenarioId,
+        dailyScenarioCompleted,
+        freeTalkUsedSpeakingDurationMs,
+        null,
+        null,
+        expressions);
   }
 }

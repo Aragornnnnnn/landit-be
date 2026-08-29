@@ -4,4 +4,5 @@ package com.landit.landitbe.feature.notification.service;
 
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 
-record SelectedNotificationTarget(NotificationType notificationType, Long targetId) {}
+record SelectedNotificationTarget(
+    NotificationType notificationType, Long targetId, Long scenarioId) {}
