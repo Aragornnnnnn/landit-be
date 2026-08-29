@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.notification.client.PushMessage;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.client.PushReceiptStatus;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
+import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -43,7 +44,9 @@ class ExpoPushClientTest {
   /** 테스트 종료 후 로컬 Expo 대역 서버를 중지한다. */
   @AfterEach
   void stopServer() {
-    server.stop(0);
+    if (server != null) {
+      server.stop(0);
+    }
   }
 
   /** 정해진 여섯 필드와 선택 Access Token으로 알림을 보내고 Ticket ID를 반환한다. */
@@ -182,28 +185,86 @@ class ExpoPushClientTest {
             respond(exchange, requestCount.getAndIncrement() == 0 ? 429 : 503, "{\"errors\":[]}"));
 
     assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
-        .isInstanceOf(PushNotificationException.class);
+        .isInstanceOf(RetryablePushNotificationException.class);
     assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
-        .isInstanceOf(PushNotificationException.class);
+        .isInstanceOf(RetryablePushNotificationException.class);
   }
 
-  /** Expo 응답 JSON이 계약과 다르면 재시도 가능한 예외로 변환한다. */
+  /** 요청 제한시간을 넘기면 명시적으로 재시도 가능한 예외로 변환한다. */
   @Test
-  void throwsRetryableExceptionForMalformedResponse() {
+  void throwsRetryableExceptionForRequestTimeout() {
+    server.createContext(
+        SEND_PATH,
+        exchange -> {
+          try {
+            Thread.sleep(200);
+            respond(exchange, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          }
+        });
+
+    assertThatThrownBy(
+            () ->
+                expoPushClient(
+                        "http://localhost:" + server.getAddress().getPort(), Duration.ofMillis(30))
+                    .send(reviewReminder()))
+        .isInstanceOf(RetryablePushNotificationException.class);
+  }
+
+  /** 연결 실패처럼 결과를 알 수 없는 일반 I/O 오류는 자동 재시도 예외로 분류하지 않는다. */
+  @Test
+  void throwsNonRetryableExceptionForConnectionFailure() {
+    String stoppedServerUrl = "http://localhost:" + server.getAddress().getPort();
+    server.stop(0);
+    server = null;
+
+    assertThatThrownBy(
+            () -> expoPushClient(stoppedServerUrl, Duration.ofSeconds(1)).send(reviewReminder()))
+        .isExactlyInstanceOf(PushNotificationException.class);
+  }
+
+  /** 요청 중단은 interrupt 상태를 복원하고 자동 재시도 예외로 분류하지 않는다. */
+  @Test
+  void restoresInterruptAndThrowsNonRetryableException() {
+    Thread.currentThread().interrupt();
+
+    try {
+      assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
+          .isExactlyInstanceOf(PushNotificationException.class)
+          .hasCauseInstanceOf(InterruptedException.class);
+      assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  /** Expo 응답 JSON이 계약과 다르면 자동 재시도하지 않는 예외로 변환한다. */
+  @Test
+  void throwsNonRetryableExceptionForMalformedResponse() {
     stubResponse(SEND_PATH, 200, "{\"data\":{}}");
 
     assertThatThrownBy(() -> expoPushClient(null).send(reviewReminder()))
-        .isInstanceOf(PushNotificationException.class);
+        .isExactlyInstanceOf(PushNotificationException.class);
   }
 
   /** 테스트용 설정으로 Expo Push Client를 생성한다. */
   private ExpoPushClient expoPushClient(String accessToken) {
+    return expoPushClient(
+        "http://localhost:" + server.getAddress().getPort(), Duration.ofSeconds(2), accessToken);
+  }
+
+  /** 테스트용 Expo URL과 요청 제한시간으로 Push Client를 생성한다. */
+  private ExpoPushClient expoPushClient(String expoBaseUrl, Duration requestTimeout) {
+    return expoPushClient(expoBaseUrl, requestTimeout, null);
+  }
+
+  /** 테스트용 Expo URL, 요청 제한시간, Access Token으로 Push Client를 생성한다. */
+  private ExpoPushClient expoPushClient(
+      String expoBaseUrl, Duration requestTimeout, String accessToken) {
     NotificationProperties properties =
         new NotificationProperties(
-            "http://localhost:" + server.getAddress().getPort(),
-            accessToken,
-            Duration.ofSeconds(1),
-            Duration.ofSeconds(2));
+            expoBaseUrl, accessToken, Duration.ofSeconds(1), requestTimeout, null, 900);
     return new ExpoPushClient(jsonMapper, properties);
   }
 
