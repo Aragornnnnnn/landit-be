@@ -148,12 +148,13 @@ class SqsPushQueuePublisherTest {
     assertThatThrownBy(() -> publisher.scheduleReceiptCheck(10L, 1))
         .isInstanceOf(PushNotificationException.class)
         .hasMessage("Push Receipt 확인 메시지 발행에 실패했습니다.");
+  }
 
   /** SQS 비동기 발행 성공 응답을 준비한다. */
   private void stubSqsSendMessage() {
     when(sqsAsyncClient.sendMessage(any(SendMessageRequest.class)))
         .thenReturn(
-             CompletableFuture.completedFuture(
-                 SendMessageResponse.builder().messageId("sqs-message-id").build()));
+            CompletableFuture.completedFuture(
+                SendMessageResponse.builder().messageId("sqs-message-id").build()));
   }
 }
