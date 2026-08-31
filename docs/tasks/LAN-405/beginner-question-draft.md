@@ -1,5 +1,5 @@
 <!-- LAN-405 초보용 시나리오 질문의 사용자 승인 초안 -->
-# LAN-405 초보용 시나리오 질문 초안
+# LAN-405 레벨별 시나리오 질문 비교 초안
 
 ## 배치 계약
 
@@ -11,11 +11,13 @@
 | 기존 난이도 | EASY 16, NORMAL 16, HARD 8 |
 | 시작 화자 | AI 30, USER 10 |
 | 신규 질문 그룹 | `LEVEL_1`, `LEVEL_2_TO_3` |
+| 비교 질문 그룹 | `LEVEL_4_TO_5` 현재 DB 원문 |
 | 그룹별 질문 | 시나리오당 3개 |
 | 전체 신규 질문 | 240개 |
+| 문서에 표시한 전체 질문 | 신규 240개 + 기존 120개 = 360개 |
 | 변경 금지 | 기존 `LEVEL_4_TO_5` 질문, 시나리오 메타데이터, Writing 표현 |
 
-영어 질문은 모두 25단어 이하로 작성한다. AI First 시나리오의 각 그룹 첫 질문에는 `GOOD` 속마음을 둔다. 질문 ID, 음원 URL, SQL은 텍스트 승인 후 확정한다.
+신규 `LEVEL_1`, `LEVEL_2_TO_3` 영어 질문은 모두 25단어 이하로 작성한다. AI First 시나리오의 신규 그룹 첫 질문에는 `GOOD` 속마음을 둔다. `LEVEL_4_TO_5`는 비교를 위해 현재 develop DB의 문구와 속마음 유형을 그대로 표시하며 수정 대상이 아니다. 질문 ID, 음원 URL, SQL은 텍스트 승인 후 확정한다.
 
 ## 기숙사
 
@@ -48,6 +50,19 @@
 3. **If I visit Korea, what place should I see first?**
    - 내가 한국에 가면 어디를 먼저 가보면 좋을까?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 드디어 룸메이트를 만났다! 좋은 친구가 되면 좋겠는데, 어떤 애일지 궁금하다.
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **Wait, you're my roommate? No way! I'm Marco, an exchange student from Spain. Nice to meet you! So what's your name? Tell me about yourself!**
+   - 잠깐, 네가 내 룸메야? 대박! 난 Marco고, 스페인에서 온 교환학생이야. 만나서 반가워! 넌 이름이 뭐야? 네 얘기 좀 해줘!
+2. **So what do you do for fun? What got you into it?**
+   - 넌 취미가 뭐야? 어쩌다 그거에 빠졌어?
+3. **I'm so into Korea right now — the food, the dramas, everything. If I ever visit, where do you take me first?**
+   - 나 요즘 한국에 완전 빠졌거든 — 음식이며 드라마며 전부 다. 내가 언젠가 한국 가면 어디부터 데려갈 거야?
+
 ### 시나리오 3. 카페 수다 — 주말 약속 잡기
 
 - 시작 화자. `AI`.
@@ -76,6 +91,19 @@
    - 카페에서 쉴래, 아니면 밖에서 뭔가 할래?
 3. **Tell me what time and place would be easy for you.**
    - 너한테 편한 시간과 장소를 말해줘.
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 이번 주말에 같이 놀면 재밌겠다 — 얘가 뭐 하고 싶어할지 궁금하네.
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **Hey, we should hang out this weekend! Does Saturday work, or is Sunday better for you?**
+   - 야, 우리 이번 주말에 놀자! 토요일 괜찮아, 아니면 일요일이 나아?
+2. **Is there anything you've been wanting to do since you got here? Maybe we can do it this weekend.**
+   - 여기 와서 해보고 싶었던 거 있어? 이번 주말에 같이 하자.
+3. **So what do you usually do when you hang out with your friends?**
+   - 넌 평소에 친구들이랑 만나면 뭐하고 놀아?
 
 ### 시나리오 6. 인터내셔널 파티 — 처음 만난 Chloe
 
@@ -106,6 +134,19 @@
 3. **My friend has a party next week. Would you like to join us?**
    - 내 친구가 다음 주에 파티를 해. 우리랑 같이 갈래?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 새로운 사람 만나는 거 항상 재밌어 — 이 친구랑도 잘 통했으면 좋겠다.
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **Hey, I don't think we've met — I'm Chloe. How do you know the host?**
+   - 안녕, 우리 초면이지? 난 Chloe야. 파티 주최한 애랑은 어떻게 아는 사이야?
+2. **By the way, your English is really good! Did you study abroad before?**
+   - 근데 너 영어 진짜 잘한다! 전에 유학한 적 있어?
+3. **My friend's having a potluck next week — you should come! Everyone brings something. What would you make?**
+   - 다음 주에 내 친구가 포틀럭 파티 하는데, 너도 와! 다들 음식 하나씩 가져오거든. 넌 뭐 만들어 올래?
+
 ### 시나리오 21. 방 키를 잃어버려 임시 출입 요청하기
 
 - 시작 화자. `USER`.
@@ -129,6 +170,16 @@
    - 새 키는 내일 오전이나 오후에 준비돼요. 언제 찾으러 오실 수 있나요?
 3. **Would you like a text or a phone call when it's ready?**
    - 준비되면 문자와 전화 중 어떤 방법으로 알려드릴까요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **No worries, it happens all the time. I can give you a temporary key, or someone can walk up and let you in. Which works better for you?**
+   - 걱정 마세요, 자주 있는 일이에요. 임시 키를 드리거나 직원이 올라가서 문을 열어드릴 수 있어요. 어느 쪽이 나으세요?
+2. **For the replacement, we can have it ready tomorrow morning, or the day after in the afternoon. When would you like to pick it up?**
+   - 새 키는 내일 오전이나 모레 오후에 준비돼요. 언제 찾으러 오시겠어요?
+3. **And we'll let you know when it's ready — would you rather get a text or an email?**
+   - 준비되면 알려드릴게요 — 문자가 나아요, 이메일이 나아요?
 
 ### 시나리오 23. 세탁물이 뒤섞인 문제 해결하기
 
@@ -159,6 +210,19 @@
 3. **If this happens again, should we text each other or leave the clothes by the door?**
    - 다음에 또 이러면 서로 문자할까, 아니면 방문 앞에 옷을 둘까?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 내 파란 셔츠가 안 보이네… 옆방 애 빨래에 섞인 것 같은데, 기분 안 나쁘게 말해봐야지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hey, sorry — I think our laundry got mixed up. I've got your white T-shirt, and I think my blue shirt's in your pile. Could you take a look for me?**
+   - 저기, 미안한데 — 우리 빨래가 섞인 것 같아. 네 흰 티셔츠가 나한테 있고, 내 파란 셔츠가 네 빨래에 있는 것 같은데. 한번 찾아봐줄 수 있어?
+2. **Oh, are you done with your drying? If not, wanna throw our stuff in together? It's cheaper that way. Totally fine if you'd rather do yours separately, though!**
+   - 아, 너 건조기 다 돌렸어? 아직이면 같이 돌릴래? 그게 더 싸거든. 따로 하고 싶으면 편하게 말해도 돼!
+3. **And if our stuff gets mixed up again, should we just leave it by each other's door, or text and meet up?**
+   - 다음에 또 섞이면 그냥 서로 방문 앞에 둘까, 아니면 문자하고 만나서 줄까?
+
 ### 시나리오 5. 소음, 손님, 경계 정하기
 
 - 시작 화자. `AI`.
@@ -187,6 +251,19 @@
    - 어떤 물건은 같이 써도 되고, 어떤 건 꼭 물어봐야 할까?
 3. **How quiet should we keep the room on weeknights?**
    - 평일 밤에는 방을 어느 정도 조용히 해야 할까?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 이런 거 미리 확실히 안 해두면 나중에 서운해질 수도 있으니까 지금 짚고 넘어가야지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hey, heads up — I was gonna have a couple friends over at our room on Friday. That's cool with you, right?**
+   - 아 맞다, 미리 말해두는데 — 금요일에 우리 기숙사 방에 친구 몇 명 부르려고. 너 괜찮지?
+2. **Oh, and I used your charger yesterday — mine died and it was kind of an emergency. Is it okay if I use your stuff like that sometimes, or would you rather I ask every time?**
+   - 아, 그리고 어제 네 충전기 썼어 — 내 게 방전됐는데 너무 급했거든. 가끔 그렇게 네 물건 써도 돼? 아니면 매번 물어보는 게 좋아?
+3. **What do you like the room to be like on weeknights? Music on, totally quiet...?**
+   - 평일 밤엔 방 분위기 어떤 게 좋아? 음악 틀어놓는 거? 완전 조용한 거?
 
 ### 시나리오 22. 공용 냉장고 공간 정리하기
 
@@ -217,6 +294,19 @@
 3. **Would Friday or Sunday be better for cleaning the fridge?**
    - 냉장고 정리는 금요일과 일요일 중 언제가 더 좋아?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 냉장고 얘기 꺼내기 좀 눈치 보였는데, 규칙 정해두면 서로 편해질 거야.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So, the fridge has been getting out of hand lately. I was thinking — we could put names on our own stuff, and a green sticker on anything that's up for grabs. What do you think?**
+   - 요즘 냉장고 정리가 좀 어려워져서 말이야. 생각해봤는데 — 각자 음식엔 이름 쓰고, 같이 먹어도 되는 건 초록 스티커 붙이면 어때?
+2. **And for stuff with no name on it — how about we post a photo in the group chat and give it 24 hours before tossing it? Is that fair?**
+   - 이름 없는 건 단톡방에 사진 올리고 24시간 기다렸다가 버리는 걸로 하면 어때? 그 정도면 괜찮지?
+3. **We should probably clean the fridge out regularly too. Would Friday or Sunday work better for you?**
+   - 냉장고 정리도 주기적으로 하는 게 좋을 것 같은데. 금요일이랑 일요일 중 언제가 나아?
+
 ### 시나리오 2. 집안일과 생활 규칙 정하기
 
 - 시작 화자. `AI`.
@@ -246,6 +336,19 @@
 3. **I'm often awake late. What quiet-time rule would work for both of us?**
    - 나는 자주 늦게까지 깨어 있어. 우리 둘에게 맞는 조용한 시간 규칙은 뭘까?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 같이 살 사람이랑 이런 얘기 미리 해두는 게 편한데, 너무 깐깐해 보이진 않았으면 좋겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Are you a clean person? Like, how often do you actually clean your room?**
+   - 너 깔끔한 편이야? 방 청소는 실제로 얼마나 자주 해?
+2. **How do you wanna split the chores? You don't mind doing dishes, do you?**
+   - 집안일은 어떻게 나눌까? 너 설거지 하는 거 싫진 않지?
+3. **Are you a morning person or a night owl? I stay up way too late, so I'm a little worried, haha.**
+   - 넌 아침형이야, 야행성이야? 난 맨날 엄청 늦게 자서 좀 걱정되네 ㅋㅋ
+
 ### 시나리오 24. 세면대 누수 수리 요청하기
 
 - 시작 화자. `USER`.
@@ -270,6 +373,16 @@
 3. **Should the worker call first, and may they enter if you are away?**
    - 직원이 먼저 전화드릴까요? 안 계시면 들어가도 될까요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Okay, please don't use the sink for now. Do you need anything while you wait — towels, a bucket? I can also walk you through shutting off the water.**
+   - 네, 일단 세면대는 쓰지 말아 주세요. 기다리시는 동안 필요한 거 있으세요 — 수건이나 양동이? 물 잠그는 방법도 알려드릴 수 있어요.
+2. **We can send someone at six this evening or nine tomorrow morning. Which time works for you?**
+   - 오늘 저녁 6시나 내일 오전 9시에 기사님을 보낼 수 있어요. 어느 시간이 괜찮으세요?
+3. **Should the technician call you first, or just knock? And if you're not in, is it okay for them to go in?**
+   - 기사님이 미리 전화드릴까요, 아니면 그냥 노크할까요? 그리고 안 계시면 들어가서 작업해도 될까요?
+
 ### 시나리오 4. 기숙사 에어컨 요금 문제 — 프론트에 전화하기
 
 - 시작 화자. `USER`.
@@ -293,6 +406,16 @@
    - 방을 비웠다는 증빙이 필요해요. 항공권이나 예약 확인서를 보내주시겠어요?
 3. **After we check it, the refund will take about two weeks. Would that work for you?**
    - 확인 후 환불까지 약 2주 걸려요. 괜찮으시겠어요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Ah, I see. Let me check your account… yes, I do see the $100 A/C charge for July. Could you tell me a bit more about when you were away?**
+   - 아, 그러시군요. 계정 확인해 볼게요… 네, 7월 에어컨 요금 100달러 있네요. 언제 방을 비우셨는지 좀 더 자세히 말씀해 주시겠어요?
+2. **Got it. We'd just need some proof that you were away — plane tickets, booking confirmations, anything like that. What do you have?**
+   - 알겠습니다. 방을 비우셨다는 증빙이 필요해서요 — 항공권, 예약 확인서 같은 거요. 어떤 게 있으세요?
+3. **Perfect. Once we confirm it, we'll credit it back — it usually takes about two weeks though. Would that be alright?**
+   - 좋아요. 확인되면 환급해 드릴게요 — 다만 보통 2주 정도 걸려요. 괜찮으시겠어요?
 
 ### 시나리오 7. 서로 더 알아가는 밤
 
@@ -323,6 +446,19 @@
 3. **Is there anything simple that has made you happy lately?**
    - 최근에 너를 기분 좋게 한 소소한 일이 있어?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 이제 좀 친해진 것 같은데, 더 깊은 얘기도 나눌 수 있을까?
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Do you have any siblings? I'm an only child, so I've always wondered what that's like.**
+   - 너 형제자매 있어? 난 외동이라 그게 어떤 건지 항상 궁금했거든.
+2. **What do you actually want to do with your life? Like, your real dream — not the one you tell professors.**
+   - 넌 진짜 하고 싶은 게 뭐야? 교수님한테 말하는 거 말고, 진짜 꿈.
+3. **Hey, you've seemed a little down lately. Is everything okay?**
+   - 야, 너 요즘 좀 기운 없어 보여. 무슨 일 있어?
+
 ### 시나리오 25. 퇴실 점검과 보증금 확인하기
 
 - 시작 화자. `AI`.
@@ -351,6 +487,19 @@
    - 점검 시간은 오늘 3시와 내일 10시예요. 언제로 예약해 드릴까요?
 3. **Damage may reduce your deposit. Please prepare move-in photos if the damage was already there.**
    - 파손이 있으면 보증금이 줄 수 있어요. 원래 있던 파손이라면 입주 때 사진을 준비해 주세요.
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 퇴실 시즌이라 정신없네. 이 학생도 문제없이 보증금 잘 돌려받고 가면 좋겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Before the inspection, you'll need to clear out your things and give the room a good clean. Would you like a checklist, or should we do a quick walk-through together first?**
+   - 점검 전에 짐을 다 빼고 방을 청소해 두셔야 해요. 체크리스트를 드릴까요, 아니면 먼저 같이 한번 둘러볼까요?
+2. **We have slots today at three or tomorrow at ten. Which one should I book you in for?**
+   - 오늘 3시랑 내일 10시에 자리가 있어요. 언제로 잡아드릴까요?
+3. **One more thing — if anything's damaged, like the furniture or the walls, it may come out of your deposit. You knew that, right? If there's any damage that wasn't your fault, have some proof ready — photos from move-in, anything like that.**
+   - 한 가지 더요 — 가구나 벽 같은 게 파손돼 있으면 보증금에서 차감될 수 있어요. 알고 계시죠? 본인이 그런 게 아닌 파손이 있다면 증빙을 미리 준비해 두세요 — 입주 때 찍은 사진 같은 거요.
 
 ## 여행
 
@@ -383,6 +532,19 @@
 3. **Is that for here or to go? We also have fresh cookies today.**
    - 드시고 가세요, 포장이세요? 오늘 갓 나온 쿠키도 있어요.
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 오늘 손님은 뭐 주문할지 궁금하네, 친절하게 안내해드려야지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hi, what can I get for you?**
+   - 안녕하세요, 뭐 드릴까요?
+2. **For here or to go? And would you like anything else with that?**
+   - 드시고 가세요, 포장이세요? 더 필요하신 건 없으세요?
+3. **By the way, our chocolate cookies just came out of the oven. Wanna add one?**
+   - 아 참, 초코쿠키가 방금 나왔어요. 하나 추가하실래요?
+
 ### 시나리오 16. 마음에 안 드는 사람 정중히 거절하기
 
 - 시작 화자. `AI`.
@@ -411,6 +573,19 @@
    - 괜찮아요. 제가 더 이상 말을 걸지 않는 게 좋을까요?
 3. **I understand. Thanks for being clear, and have a good day.**
    - 알겠어요. 분명히 말씀해 주셔서 감사하고, 좋은 하루 보내세요.
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 오늘따라 왠지 말 걸고 싶은 사람이 보이네 — 용기 내서 한번 다가가볼까.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hi, sorry to just come up to you like this — I just thought you were really cute. Are you free tonight? Maybe we could grab a coffee?**
+   - 안녕하세요, 이렇게 갑자기 말 걸어서 미안한데 — 너무 제 스타일이라서요. 오늘 저녁에 시간 있어요? 커피 한잔 어때요?
+2. **By the way, are you from around here, or just visiting?**
+   - 그런데 이 근처 사세요, 아니면 여행 중이세요?
+3. **So… could I get your Instagram? I'd love to keep in touch.**
+   - 저기… 인스타 알려줄 수 있어요? 계속 연락하고 싶어서요.
 
 ### 시나리오 20. 친구와 여행 수다 떨기
 
@@ -441,6 +616,19 @@
 3. **Choose one place you want to visit next and tell me why.**
    - 다음에 가고 싶은 곳 하나와 그 이유를 말해줘.
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 여행 얘기는 언제 들어도 재밌어 — 이번엔 또 어떤 얘기가 나올까.
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **I just got back from Portugal and it was unreal. What about you — what's the best place you've ever been?**
+   - 나 포르투갈 갔다 왔는데 진짜 미쳤었어. 넌 어때 — 여태 가본 곳 중에 어디가 최고였어?
+2. **Tell me about a trip that went wrong — anything counts, even a school trip. Those stories are the best.**
+   - 망했던 여행 얘기 해줘 — 수학여행도 좋아, 뭐든. 그런 얘기가 제일 재밌잖아.
+3. **If money wasn't an issue, where would you go next?**
+   - 돈 걱정 없으면 다음엔 어디 가고 싶어?
+
 ### 시나리오 26. 일정에 맞는 기차표 구매하기
 
 - 시작 화자. `USER`.
@@ -464,6 +652,16 @@
    - 표를 출력해 드릴까요, 휴대폰으로 보내드릴까요?
 3. **Window and aisle seats are available. Tell me your seat preference.**
    - 창가와 통로 좌석이 남아 있어요. 원하는 좌석을 말씀해 주세요.
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **So the direct train gets you there at four and it's $45. The one with a transfer arrives at five, but it's only $30. Which one would you like?**
+   - 직행은 4시 도착에 45달러고요, 환승편은 5시 도착인데 30달러예요. 어떤 걸로 드릴까요?
+2. **Would you like the ticket printed, or sent to your phone?**
+   - 표는 출력해 드릴까요, 휴대폰으로 보내 드릴까요?
+3. **And any seat preference — window, aisle?**
+   - 좌석은 원하시는 거 있으세요 — 창가, 통로?
 
 ### 시나리오 13. 비행기 옆자리 승객과의 대화
 
@@ -494,6 +692,19 @@
 3. **What is one thing you enjoy doing when you travel?**
    - 여행할 때 즐겨 하는 일 한 가지가 뭐예요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 장거리 비행이라 심심했는데, 옆자리 사람이랑 얘기하면 시간 잘 갈 것 같다.
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **Hi! I'm in 23B, right next to you. Looks like we're stuck together for the next eleven hours, haha. Where are you headed?**
+   - 안녕하세요! 저 23B, 바로 옆자리예요. 앞으로 11시간 동안 붙어 가겠네요 ㅎㅎ 어디까지 가세요?
+2. **Do you usually go for the window seat or the aisle? I always fight for the window.**
+   - 보통 창가 좌석 좋아하세요, 복도 좌석 좋아하세요? 전 무조건 창가파거든요.
+3. **What's the best trip you've ever been on?**
+   - 여태까지 한 여행 중에 뭐가 제일 좋았어요?
+
 ### 시나리오 15. 호텔 체크인 하기
 
 - 시작 화자. `AI`.
@@ -522,6 +733,19 @@
    - 객실 준비에 한 시간 더 필요해요. 여기서 기다리실래요, 짐을 맡기실래요?
 3. **Would you prefer a higher floor or a room away from the elevator?**
    - 높은 층과 엘리베이터에서 먼 방 중 어느 쪽을 원하세요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 오늘 손님도 편하게 체크인할 수 있게 잘 안내해드려야지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hi, welcome! Are you checking in? Can I get your name, please?**
+   - 안녕하세요, 어서 오세요! 체크인이신가요? 성함 말씀해 주시겠어요?
+2. **I'm so sorry, but your room won't be ready for another hour or so. Would that be alright?**
+   - 정말 죄송한데, 객실 준비가 한 시간 정도 더 걸릴 것 같아요. 괜찮으시겠어요?
+3. **Do you have any preferences for your room? Higher floor, away from the elevator, anything like that.**
+   - 객실 관련해서 원하시는 거 있으세요? 높은 층이라든지, 엘리베이터에서 먼 방이라든지요.
 
 ### 시나리오 28. 여행 일정에 맞는 박물관 패스 고르기
 
@@ -552,6 +776,19 @@
 3. **Would you like a paper pass or a digital pass on your phone?**
    - 종이 패스와 휴대폰 디지털 패스 중 어떤 걸 드릴까요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 여행자들은 늘 패스 고민을 하지. 이분한텐 뭐가 좋으려나.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Sure! The museum pass gets you into two museums, and the city pass includes public transit too. Which sounds more like your day?**
+   - 네! 박물관 패스는 박물관 두 곳 입장이고, 도시 패스는 대중교통까지 포함이에요. 오늘 일정엔 어느 쪽이 맞을 것 같으세요?
+2. **They're both $30, and for $15 more you can add the lunch set. Would you like to include it?**
+   - 둘 다 30달러고요, 15달러를 추가하시면 점심 세트까지 포함돼요. 추가하시겠어요?
+3. **And would you like a paper pass, or the digital one on your phone?**
+   - 패스는 종이로 드릴까요, 휴대폰 디지털로 드릴까요?
+
 ### 시나리오 27. 식당에서 메뉴 비교하고 주문하기
 
 - 시작 화자. `AI`.
@@ -581,6 +818,19 @@
 3. **Would you like water, juice, or another drink with your meal?**
    - 식사와 함께 물, 주스, 다른 음료 중 무엇을 드릴까요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 우리 식당은 모든 메뉴가 다 자신 있지. 이 손님은 뭘 시키실까?
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **Honestly, everything here is good. The pasta's mild and creamy, and the curry's got a real kick to it. What are you in the mood for?**
+   - 솔직히 저희 음식은 다 맛있어요. 파스타는 부드럽고 크리미하고, 커리는 확실히 매콤해요. 어떤 맛이 당기세요?
+2. **Just so you know, we can do the pasta without cheese, or the curry without fish sauce. Want it as is, or should we adjust anything?**
+   - 참고로 파스타는 치즈 빼고, 커리는 피시소스 빼고도 돼요. 그대로 드릴까요, 아니면 빼드릴까요?
+3. **Oh, and we're doing a little event — leave us a Google review and you get a free side. Wanna do it? Salad or rice?**
+   - 아, 그리고 저희 이벤트 하나 하고 있는데 — 구글 리뷰 남겨주시면 사이드가 무료예요. 하시겠어요? 샐러드랑 밥 중에 뭘로 드릴까요?
+
 ### 시나리오 19. 길 잃고 현지인에게 길 묻기
 
 - 시작 화자. `USER`.
@@ -605,6 +855,16 @@
 3. **I can mark the route on your map if that would help.**
    - 도움이 된다면 지도에 길을 표시해 드릴게요.
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Is this your first time in London? How are you finding it?**
+   - 런던은 처음이세요? 지내보니까 어때요?
+2. **If you haven't eaten yet, I can recommend some great places around here — what are you in the mood for?**
+   - 아직 식사 전이면 이 근처 맛집 제가 추천해 드릴게요 — 뭐가 당기세요?
+3. **So where are you visiting from? What's it like there?**
+   - 그런데 어디서 오셨어요? 거긴 어떤 곳이에요?
+
 ### 시나리오 29. 날씨 때문에 야외 투어 일정 변경하기
 
 - 시작 화자. `USER`.
@@ -628,6 +888,16 @@
    - 새 예약 확인서를 이메일과 문자 중 어디로 보내드릴까요?
 3. **If the weather changes again, would you prefer a phone call or a text update?**
    - 날씨가 또 바뀌면 전화와 문자 중 어떤 방법으로 알려드릴까요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Of course, let's find you another time. The morning tour is a smaller group, and the evening one includes the city lights. Which would you prefer?**
+   - 그럼요, 다른 시간으로 잡아드릴게요. 오전 투어는 소규모고, 저녁 투어는 야경까지 볼 수 있어요. 어느 쪽이 좋으세요?
+2. **Just so you know, the evening tour is $10 more than your original booking. Is that okay with you?**
+   - 참고로 저녁 투어는 원래 예약보다 10달러 더 비싸요. 괜찮으세요?
+3. **By the way, we also run a food tour and a night river cruise — people love them. Want to try one while you're here? I can get you a discount.**
+   - 그런데 저희가 푸드 투어랑 야간 리버 크루즈도 하거든요 — 반응 진짜 좋아요. 계시는 동안 하나 해보실래요? 할인해 드릴 수 있어요.
 
 ### 시나리오 18. 약국에서 증상 설명하고 약 사기
 
@@ -658,6 +928,19 @@
 3. **Take one pill after each meal, up to three times a day. Is that clear?**
    - 식후에 한 알씩, 하루 최대 세 번 드세요. 이해되셨나요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 안색이 안 좋아 보이는데 어디가 안 좋은지 잘 들어봐야겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hi, what can I help you with? You don't look so great — what's going on?**
+   - 안녕하세요, 뭘 도와드릴까요? 안색이 안 좋아 보이는데 — 어디가 안 좋으세요?
+2. **When did it start? Do you have a fever, or is it more of an achy, tired feeling?**
+   - 언제부터 그랬어요? 열이 나요, 아니면 몸살처럼 쑤시고 피곤한 느낌이에요?
+3. **Take two of these after meals, no more than six a day. Are you allergic to anything?**
+   - 이거 식후에 두 알씩 드시고, 하루 여섯 알은 넘기지 마세요. 알레르기 있는 거 있어요?
+
 ### 시나리오 30. 공항에서 더 편한 좌석으로 변경하기
 
 - 시작 화자. `AI`.
@@ -687,6 +970,19 @@
 3. **Would you like the updated boarding pass printed or sent to your phone?**
    - 새 탑승권을 출력해 드릴까요, 휴대폰으로 보내드릴까요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 이분한테 안내할 수 있는 좌석이 뭐가 있으려나. 넓은 좌석 옵션이 남아 있나 봐야겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **For an extra $50, I can move you up to extra-legroom economy — you can actually stretch your legs. Would you like to do that?**
+   - 50달러만 추가하시면 레그룸 넓은 이코노미로 올려드릴 수 있어요 — 다리를 쭉 뻗으실 수 있죠. 하시겠어요?
+2. **There's also an exit-row seat available for free, but you'd need to help the crew in an emergency. Would you be comfortable with that?**
+   - 비상구 좌석은 무료로 바꿔드릴 수 있는데, 비상시엔 승무원을 도와주셔야 해요. 괜찮으시겠어요?
+3. **Boarding starts in about twenty minutes. Overhead space is tight today, so we're checking carry-ons for free — do you want to check yours?**
+   - 탑승은 20분 뒤에 시작해요. 오늘 기내 짐칸이 부족해서 캐리어를 무료로 부쳐드리고 있는데 — 부치시겠어요?
+
 ### 시나리오 14. 수하물 파손 — 카운터에 항의하기
 
 - 시작 화자. `USER`.
@@ -710,6 +1006,16 @@
    - 현금, 마일리지, 여행 바우처로 보상할 수 있어요. 어떤 보상을 원하세요?
 3. **Would you like the confirmation sent by email or text message?**
    - 처리 확인서를 이메일과 문자 중 어디로 보내드릴까요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **I'm so sorry about that. Could you show me the damage and tell me what happened?**
+   - 정말 죄송합니다. 파손된 부분을 보여주시고 어떤 상황이었는지 말씀해 주시겠어요?
+2. **We can offer a cash refund, mileage points, or a travel voucher — the voucher's worth the most, but it expires in six months. Which would you prefer?**
+   - 보상은 현금 환불, 마일리지, 여행 바우처 중에 선택하실 수 있어요 — 바우처 금액이 제일 크긴 한데 6개월 뒤에 만료돼요. 어떤 걸로 하시겠어요?
+3. **Alright, that's all done. Is there anything else I can help you with?**
+   - 네, 처리 다 됐습니다. 더 도와드릴 건 없으세요?
 
 ## 수업
 
@@ -742,6 +1048,19 @@
 3. **What is one thing you like about school in Korea?**
    - 한국 학교생활에서 좋아하는 점 한 가지가 뭐야?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 이 수업 아는 사람이 없어서 좀 긴장되네 — 옆에 앉는 사람이랑 친해지면 좋겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Hey, is anyone sitting here? Mind if I sit down? I'm Marco, by the way.**
+   - 안녕, 여기 자리 있어? 앉아도 될까? 아, 난 Marco야.
+2. **So why'd you take this class? I'm kind of regretting it already, haha.**
+   - 근데 이 수업 왜 신청했어? 난 벌써 좀 후회 중이야 ㅋㅋ
+3. **What's school like in Korea? I've heard it's pretty intense.**
+   - 한국 학교는 어때? 엄청 빡세다고 들었는데.
+
 ### 시나리오 11. 시험 공부 수다
 
 - 시작 화자. `AI`.
@@ -770,6 +1089,19 @@
    - 나는 5단원이 어려워. 수업 후에 같이 복습할 수 있을까?
 3. **Would the library at four or the cafe at five work better?**
    - 4시에 도서관과 5시에 카페 중 어디가 더 좋아?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 시험 기간만 되면 늘 마음이 붕 뜨는 기분이야 — 같이 공부하면 좀 나을 것 같은데.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **I can't believe finals are next week. Do you cram everything the night before, or are you one of those people who plans ahead?**
+   - 다음 주가 기말이라니 말도 안 돼. 넌 전날 밤에 몰아서 하는 타입이야, 미리미리 하는 타입이야?
+2. **I'm so lost on chapter five. Could you help me after class? Are you good at explaining stuff?**
+   - 나 5챕터 완전 모르겠어. 수업 끝나고 나 좀 도와줄 수 있어? 너 설명 잘해주는 편이야?
+3. **We should study together. Where do you usually study, and when are you free?**
+   - 우리 같이 공부하자. 넌 보통 어디서 공부해? 언제 시간 돼?
 
 ### 시나리오 32. 결석한 수업 노트 부탁하기
 
@@ -800,6 +1132,19 @@
 3. **I helped you today, so how about buying me a snack later?**
    - 오늘 내가 도와줬으니까 나중에 간식 하나 사주는 건 어때?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 아파서 결석했다니 걱정되네. 내 필기가 도움이 되면 좋겠다 — 밥 한 끼 얻어먹을 기회일지도? ㅎㅎ
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **Hey, I heard you were out sick today — you okay? I took notes on the example problems and the assignment changes. What do you want to see first?**
+   - 야, 오늘 아파서 못 나왔다며 — 괜찮아? 예제 풀이랑 과제 바뀐 거 필기해놨어. 뭐부터 볼래?
+2. **I can snap photos and send them now, or just lend you my whole notebook later. What helps more?**
+   - 지금 찍어서 보내줄 수도 있고, 나중에 노트 통째로 빌려줄 수도 있어. 뭐가 더 도움 돼?
+3. **Hey, I'm basically saving your life here — you're buying me dinner later, right? Something fancy, obviously. Deal?**
+   - 야, 이거 거의 내가 목숨 구해주는 거다? 나중에 밥 사는 거지? 당연히 비싼 걸로. 콜?
+
 ### 시나리오 9. 조별 발표 준비하기
 
 - 시작 화자. `AI`.
@@ -828,6 +1173,19 @@
    - 나는 말할 때 긴장해. 우리 발표를 같이 연습할 수 있을까?
 3. **Monday afternoon and Tuesday evening both work for me. When should we meet?**
    - 나는 월요일 오후와 화요일 저녁에 가능해. 언제 만날까?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 발표 진짜 떨리는데 팀원이랑 잘 맞춰서 준비하면 좀 나아지겠지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So we've got the presentation next week. Which part do you want to take? Honestly, I'm terrified of public speaking.**
+   - 우리 다음 주에 발표 있잖아. 넌 어떤 파트 하고 싶어? 난 솔직히 발표 공포증이 좀 있어.
+2. **Have you ever presented in English before? How did it go?**
+   - 너 영어로 발표해본 적 있어? 어땠어?
+3. **When should we meet up to practice? How's your week looking?**
+   - 연습은 언제 만나서 할까? 이번 주 일정 어때?
 
 ### 시나리오 33. 과제 제출 방식 선택하고 준비하기
 
@@ -858,6 +1216,19 @@
 3. **The deadline is Friday at five. Tell me how you will make sure it is ready.**
    - 마감은 금요일 5시예요. 제때 준비하려면 어떻게 할지 말해 주세요.
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 보고서랑 발표 중에 다들 고민하지. 이 학생은 어느 쪽이 맞을까.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So for this assignment, you've got two options — a three-page report, or a five-minute presentation. Which way are you leaning?**
+   - 이번 과제는 둘 중에 고르면 돼요 — 3쪽 보고서 아니면 5분 발표. 어느 쪽으로 마음이 기울어요?
+2. **What made you go with that one?**
+   - 그걸 고른 이유가 있어요?
+3. **And this time, the deadline is the deadline. Remember last time you were one minute late and I let it slide? Not this time — I'll take points off. Okay?**
+   - 그리고 이번엔 마감 꼭 지켜야 해요. 저번에 1분 늦게 냈는데 제가 봐준 거 기억하죠? 이번엔 안 봐줘요 — 점수 깎을 거예요. 알겠죠?
+
 ### 시나리오 31. 수강 과목을 지도교수와 상담하기
 
 - 시작 화자. `AI`.
@@ -886,6 +1257,19 @@
    - 한 과목은 매주 프로젝트가 있고, 다른 과목은 시험이 두 번 있어요. 어느 과목을 고르겠어요?
 3. **The class meets Tuesday morning or Thursday afternoon. Which time works with your schedule?**
    - 수업은 화요일 오전이나 목요일 오후예요. 어느 시간이 시간표에 맞나요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 이 학생에겐 어떤 수업 방식이 맞을까. 본인 생각부터 들어봐야겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So, one course runs on weekly projects, and the other comes down to two big exams. Which style suits you better?**
+   - 자, 한 과목은 매주 프로젝트로 진행되고, 다른 과목은 큰 시험 두 번으로 결정돼요. 어느 방식이 더 잘 맞을 것 같아요?
+2. **And why that one? I'd like to hear your thinking.**
+   - 왜 그쪽인가요? 학생 생각을 듣고 싶어요.
+3. **That course has two sections — Tuesday mornings or Thursday afternoons. Which fits your schedule better?**
+   - 그 과목은 분반이 둘이에요 — 화요일 오전과 목요일 오후. 어느 쪽이 시간표에 맞아요?
 
 ### 시나리오 12. 토론 수업 — 돈과 행복
 
@@ -916,6 +1300,19 @@
 3. **What free activity can make a person happy? Give one example.**
    - 돈이 들지 않으면서 사람을 행복하게 하는 활동은 뭐가 있을까? 예를 하나 들어줘.
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 오늘 주제 흥미로운데, 다른 사람들은 어떻게 생각하는지 궁금하다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So today's topic is whether money can buy happiness. What do you think — can it?**
+   - 오늘 주제는 '돈으로 행복을 살 수 있는가'야. 넌 어떻게 생각해 — 살 수 있을 것 같아?
+2. **Honestly, I feel like people who say money can't buy happiness have just never been broke. Am I wrong?**
+   - 솔직히 돈으로 행복 못 산다는 사람들은 진짜 돈 없어본 적이 없는 것 같아. 내 말이 틀렸어?
+3. **Okay, say you won a million dollars tomorrow. Do you think you'd actually be happier a year from now?**
+   - 그럼 내일 백만 달러에 당첨됐다고 쳐봐. 1년 뒤에 진짜 더 행복해져 있을 것 같아?
+
 ### 시나리오 10. 교수님 오피스아워 방문
 
 - 시작 화자. `USER`.
@@ -939,6 +1336,16 @@
    - 중심 생각은 분명했지만 더 좋은 예시가 필요했어요. 다음에는 어떻게 보완할 수 있을까요?
 3. **I can send detailed feedback by email or meet tomorrow. Which would help you more?**
    - 자세한 피드백을 이메일로 보내거나 내일 만날 수 있어요. 어느 쪽이 더 도움이 될까요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Come on in, have a seat. So, you emailed me about your grade — what's on your mind?**
+   - 들어와서 앉아요. 성적 때문에 메일 보냈죠 — 어떤 얘기를 하고 싶어요?
+2. **Before I say anything — how did you feel about this essay yourself? Be honest.**
+   - 내가 말하기 전에 — 학생은 이 에세이 스스로 어땠던 것 같아요? 솔직하게요.
+3. **Tell you what — I'll reread it tonight and put together some feedback. Do you want to come by tomorrow, or should I just email you?**
+   - 이렇게 하죠 — 오늘 밤에 다시 읽어보고 피드백 정리해 둘게요. 내일 연구실로 올래요, 아니면 그냥 이메일로 보낼까요?
 
 ## 쇼핑
 
@@ -965,6 +1372,16 @@
    - 10기가 요금제는 30달러, 무제한은 45달러예요. 어느 요금제가 더 잘 맞나요?
 3. **Would you like automatic monthly payment, or would you rather add money yourself?**
    - 매달 자동 결제로 할까요, 아니면 직접 충전하시겠어요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Sure! How long are you staying here, and do you use a lot of data?**
+   - 네! 여기 얼마나 계실 예정이에요? 데이터는 많이 쓰시는 편이에요?
+2. **So the prepaid plan is $30 for ten gigs, and unlimited is $45 a month. Which one fits you better?**
+   - 선불 요금제는 30달러에 10기가고, 무제한은 한 달에 45달러예요. 어느 쪽이 맞을 것 같으세요?
+3. **I'll need your passport to register the SIM. And should I set up auto-pay, or will you top it up yourself each month?**
+   - 유심 등록에 여권이 필요해요. 그리고 자동 결제로 해드릴까요, 아니면 매달 직접 충전하시겠어요?
 
 ### 시나리오 34. 식료품점에서 대체 재료 찾기
 
@@ -995,6 +1412,19 @@
 3. **Tomatoes are 20 percent off with either one. Would you like to add them?**
    - 둘 중 하나와 같이 사면 토마토가 20% 할인돼요. 추가하시겠어요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 하필 생바질이 다 떨어진 날이네. 요리에 맞는 대체 재료를 찾아드려야겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Ah, we're actually out of fresh basil today, sorry! What are you cooking? I can help you find a good substitute.**
+   - 아, 오늘 생바질이 다 나갔어요, 죄송해요! 어떤 요리에 쓰시려고요? 맞는 대체 재료 찾아드릴게요.
+2. **The big pack is cheaper, but it's a lot — if you live alone, some might go to waste. The small one costs a bit more, but you'll finish it before it expires. It doesn't keep long, so — which one would you go with?**
+   - 큰 포장은 저렴한데 양이 많아서 혼자 사시면 남을 수 있어요. 작은 포장은 좀 비싸지만 유통기한 안에 다 드실 수 있고요. 유통기한이 짧은 제품이라 — 어떤 걸로 하시겠어요?
+3. **Oh, and tomatoes are 20% off if you buy them together. Want to grab some?**
+   - 아, 그리고 같이 사시면 토마토가 20% 할인이에요. 좀 담아드릴까요?
+
 ### 시나리오 35. 상황에 맞는 옷 추천받기
 
 - 시작 화자. `AI`.
@@ -1023,6 +1453,19 @@
    - 두 옷 모두 네이비와 베이지가 있어요. 어떤 색부터 입어보시겠어요?
 3. **We have small, medium, and large sizes. Which size should I bring?**
    - 작은, 중간, 큰 사이즈가 있어요. 어떤 사이즈로 가져다드릴까요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 주말 행사용 옷을 찾으시는 것 같은데 — 행사 분위기부터 물어봐야 실패가 없지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So we've got this casual jacket, or a dressier blazer. What's the vibe for the event — pretty relaxed, or a bit more formal?**
+   - 캐주얼한 재킷이랑 좀 더 격식 있는 블레이저가 있어요. 행사 분위기가 어때요 — 편한 자리예요, 좀 갖춰 입는 자리예요?
+2. **Both come in navy and beige. Which color do you want to try on first?**
+   - 둘 다 네이비랑 베이지가 있어요. 어떤 색부터 입어보실래요?
+3. **One thing to know — the jacket's final sale, but the blazer you can return within three days. Which one are you going with?**
+   - 하나만 참고하세요 — 재킷은 반품이 안 되고, 블레이저는 3일 안에 반품돼요. 어떤 걸로 하시겠어요?
 
 ### 시나리오 37. 기능과 가격을 비교해 헤드폰 고르기
 
@@ -1053,6 +1496,19 @@
 3. **The model comes in black, white, and gray. Which color should I bring?**
    - 검정, 흰색, 회색이 있어요. 어떤 색으로 가져다드릴까요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 헤드폰 사러 오셨네. 딱 맞는 모델 찾게 잘 도와드려야겠다.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **So Model A is $120 with stronger noise canceling, and Model B is $80 and a lot lighter. Which one sounds more like what you need?**
+   - A 모델은 120달러에 노이즈 캔슬링이 더 세고, B 모델은 80달러에 훨씬 가벼워요. 어느 쪽이 더 필요에 맞을 것 같으세요?
+2. **What matters most to you in headphones — the sound, the weight, or the price?**
+   - 헤드폰 고를 때 뭐가 제일 중요하세요 — 음질, 무게, 가격?
+3. **It comes in black, white, and gray. Which color should I grab for you?**
+   - 색상은 검정, 흰색, 회색이 있어요. 어떤 색으로 가져다드릴까요?
+
 ### 시나리오 39. 불량 상품 교환 또는 환불 요청하기
 
 - 시작 화자. `USER`.
@@ -1076,6 +1532,16 @@
    - 오늘 교환하거나 5일 안에 환불할 수 있어요. 어느 쪽을 원하세요?
 3. **We'd like to offer you a box of tea for the trouble. Would you accept it?**
    - 불편을 드려 차 한 상자를 드리고 싶어요. 받아주시겠어요?
+
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+1. **Oh no, sorry about that. Do you mind if we test it real quick to see if it cuts out? It won't affect your return either way.**
+   - 아이고, 죄송해요. 금방 꺼지는지 저희가 잠깐 테스트해봐도 될까요? 어느 쪽이든 반품에는 영향 없어요.
+2. **Either way, here are your options — I can swap it for a new one today, or do a refund, which takes up to five days. Which would you prefer?**
+   - 어느 쪽이든 선택지는 이래요 — 오늘 새 제품으로 바로 교환하거나, 환불은 최대 5일 걸려요. 어떤 게 나으세요?
+3. **Again, I'm so sorry about the trouble. Here — we'd like to give you a box of tea as an apology. I hope that makes up for it a little!**
+   - 다시 한번 정말 죄송해요. 이건 사과의 의미로 차 한 박스 드릴게요. 이걸로 마음이 조금 풀리시면 좋겠어요!
 
 ### 시나리오 38. 중고 자전거 상태 확인하고 가격 협상하기
 
@@ -1106,6 +1572,19 @@
 3. **If we agree, can you pay the full price in cash today?**
    - 가격에 합의하면 오늘 전액을 현금으로 낼 수 있나요?
 
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 드디어 내 중고 자전거를 사겠다는 사람이 나타났다. 오늘 꼭 팔아야지.
+- 첫 질문 속마음 유형. `NORMAL`.
+
+1. **Here it is! Feel free to take it for a spin, or look it over first — there are a couple of scratches I'll show you. What do you want to do first?**
+   - 이게 그 자전거예요! 한번 타보셔도 되고, 먼저 살펴보셔도 돼요 — 긁힌 데 몇 군데는 보여드릴게요. 뭐부터 해보실래요?
+2. **I'm asking $200, but I'm open to offers if you've got a fair reason. What were you thinking?**
+   - 200달러 생각하고 있는데, 합당한 이유가 있으면 조정할 의향 있어요. 얼마 생각하세요?
+3. **Alright — you can pay the full amount in cash today, right? Then we've got a deal.**
+   - 좋아요 — 오늘 전액 현금으로 주실 수 있는 거 맞죠? 그럼 거래하시죠.
+
 ### 시나리오 36. 가격과 특징을 비교해 선물 고르기
 
 - 시작 화자. `AI`.
@@ -1134,3 +1613,15 @@
    - 무료 메시지 카드를 넣을 수 있어요. 어떤 짧은 문구를 적을까요?
 3. **Standard wrapping is free, and gift wrapping costs $3. Which would you prefer?**
    - 기본 포장은 무료이고 선물 포장은 3달러예요. 어느 쪽을 원하세요?
+
+#### `LEVEL_4_TO_5` (현재 DB)
+
+- 첫 질문 속마음. 친구 선물 고르러 온 마음이 예쁘네. 딱 맞는 선물을 찾아드려야겠다.
+- 첫 질문 속마음 유형. `GOOD`.
+
+1. **For a friend? Okay — the snack set is $15 and easy to share, or there's this handmade mug for $25, something they'd keep. Which feels more like your friend?**
+   - 친구 선물이요? 그럼 — 과자 세트는 15달러에 나눠 먹기 좋고, 수제 머그잔은 25달러인데 오래 간직할 수 있어요. 친구분한텐 어느 쪽이 어울릴 것 같아요?
+2. **We can pop in a message card for free. What would you like it to say?**
+   - 메시지 카드는 무료로 넣어드려요. 뭐라고 적어드릴까요?
+3. **And wrapping — standard is free, or gift wrapping is $3 extra. How should I wrap it?**
+   - 포장은 기본이 무료고, 선물 포장은 3달러 추가예요. 어떻게 포장해 드릴까요?
