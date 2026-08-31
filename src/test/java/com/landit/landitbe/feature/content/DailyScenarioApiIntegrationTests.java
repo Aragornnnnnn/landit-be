@@ -127,10 +127,10 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completedAt").value(nullValue()))
         .andExpect(jsonPath("$.data.scenario.expressionCount").value(2))
         .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1))
-        .andExpect(jsonPath("$.data.scenario.openingPreview.characterId").value("chloe"))
+        .andExpect(jsonPath("$.data.scenario.openingPreview.character.characterId").value("chloe"))
         .andExpect(jsonPath("$.data.scenario.openingPreview.questionAudioUrl").value(nullValue()))
         .andExpect(
-            jsonPath("$.data.scenario.openingPreview.ttsVoice.providerVoiceId")
+            jsonPath("$.data.scenario.openingPreview.character.ttsVoice.providerVoiceId")
                 .value("aura-2-luna-en"));
   }
 
