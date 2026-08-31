@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.content.service.ScenarioProgressionService;
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
@@ -167,10 +168,11 @@ public class ScenarioSessionStartService {
                 startedAt));
 
     scenarioSessionService.save(
-        ScenarioSession.start(
-            learningSession.getId(),
-            startRow.variantId(),
-            startRow.firstSpeaker() == ConversationSpeaker.USER
+            ScenarioSession.start(
+                learningSession.getId(),
+                startRow.variantId(),
+                ContentLearningLevel.LEVEL_4_TO_5,
+                startRow.firstSpeaker() == ConversationSpeaker.USER
                 ? startRow.userOpeningInstruction()
                 : null));
 

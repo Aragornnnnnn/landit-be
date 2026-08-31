@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.domain;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,6 +28,10 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "scenario_language_variant_id", nullable = false)
   private Long scenarioLanguageVariantId;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "question_level_group", nullable = false, length = 30)
+  private ContentLearningLevel questionLevelGroup;
+
   @Column(name = "user_opening_instruction_snapshot", columnDefinition = "text")
   private String userOpeningInstructionSnapshot;
 
@@ -40,10 +45,12 @@ public class ScenarioSession extends BaseTimeEntity {
   private ScenarioSession(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
+      ContentLearningLevel questionLevelGroup,
       String userOpeningInstructionSnapshot,
       GoalCompletionStatus goalCompletionStatus) {
     this.learningSessionId = learningSessionId;
     this.scenarioLanguageVariantId = scenarioLanguageVariantId;
+    this.questionLevelGroup = questionLevelGroup;
     this.userOpeningInstructionSnapshot = userOpeningInstructionSnapshot;
     this.goalCompletionStatus = goalCompletionStatus;
   }
@@ -59,10 +66,12 @@ public class ScenarioSession extends BaseTimeEntity {
   public static ScenarioSession start(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
+      ContentLearningLevel questionLevelGroup,
       String userOpeningInstructionSnapshot) {
     return new ScenarioSession(
         learningSessionId,
         scenarioLanguageVariantId,
+        questionLevelGroup,
         userOpeningInstructionSnapshot,
         GoalCompletionStatus.NOT_STARTED);
   }
