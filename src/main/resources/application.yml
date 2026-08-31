@@ -1,6 +1,12 @@
 spring:
   application:
     name: landit-be
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+      sqs:
+        enabled: ${LANDIT_NOTIFICATION_CONSUMER_ENABLED:false}
   jackson:
     time-zone: Asia/Seoul
   servlet:
@@ -73,6 +79,9 @@ landit:
     expo-access-token: ${LANDIT_NOTIFICATION_EXPO_ACCESS_TOKEN:}
     connect-timeout: ${LANDIT_NOTIFICATION_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_NOTIFICATION_REQUEST_TIMEOUT:10s}
+    consumer-enabled: ${LANDIT_NOTIFICATION_CONSUMER_ENABLED:false}
+    queue-url: ${SQS_PUSH_NOTIFICATIONS_QUEUE_URL:}
+    receipt-delay-seconds: ${LANDIT_NOTIFICATION_RECEIPT_DELAY_SECONDS:900}
 
 sentry:
   dsn: ${SENTRY_DSN:}
