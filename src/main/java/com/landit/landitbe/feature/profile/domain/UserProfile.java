@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.profile.domain;
 
+import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import com.landit.landitbe.shared.domain.Locale;
 import jakarta.persistence.Column;
@@ -55,6 +56,10 @@ public class UserProfile extends BaseTimeEntity {
   private Long aiTutorId;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "accent_locale", nullable = false, length = 35)
+  private AccentLocale accentLocale;
+
+  @Enumerated(EnumType.STRING)
   @Column(name = "push_permission_status", nullable = false, length = 30)
   private PushPermissionStatus pushPermissionStatus;
 
@@ -86,6 +91,7 @@ public class UserProfile extends BaseTimeEntity {
     this.baseLocale = DEFAULT_BASE_LOCALE;
     this.currentLevel = 1;
     this.aiTutorId = aiTutorId;
+    this.accentLocale = AccentLocale.EN_US;
     this.pushPermissionStatus = PushPermissionStatus.NOT_DETERMINED;
     this.status = UserProfileStatus.ACTIVE;
     this.role = UserRole.USER;
@@ -104,6 +110,15 @@ public class UserProfile extends BaseTimeEntity {
   /** 온보딩에서 선택한 학습 수준으로 갱신한다. */
   public void updateLearningLevel(int learningLevel) {
     this.learningLevel = learningLevel;
+  }
+
+  /**
+   * 온보딩에서 선택한 영어 억양으로 갱신한다.
+   *
+   * @param accentLocale 선택한 영어 억양
+   */
+  public void updateAccentLocale(AccentLocale accentLocale) {
+    this.accentLocale = accentLocale;
   }
 
   /**
