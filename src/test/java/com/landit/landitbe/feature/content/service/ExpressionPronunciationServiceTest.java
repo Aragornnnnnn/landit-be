@@ -178,7 +178,7 @@ class ExpressionPronunciationServiceTest {
 
   private AiPronunciationJudgedWord judged(
       int order, String word, AiPronunciationWordStatus status) {
-    return new AiPronunciationJudgedWord(order, word, status, 100, 400, null, null, null, null);
+    return new AiPronunciationJudgedWord(order, word, status, null, null, null, null);
   }
 
   private PronunciationAnalysisResponse analyze() {

@@ -111,10 +111,12 @@ class ExpressionPronunciationApiIntegrationTests {
             .path("words");
     assertThat(words).hasSize(8);
 
-    // 정상 단어(1번): 판정·타임스탬프만 있고 오류 관련 필드는 비어 있어야 한다.
+    // 정상 단어(1번): 판정만 있고 오류 관련 필드는 비어 있어야 한다.
+    // 단어별 타임스탬프는 계약에서 제거됐다 — 키 자체가 없어야 한다 (단어별 다시 듣기 폐지).
     JsonNode correct = words.get(0);
     assertThat(correct.path("status").asText()).isEqualTo("CORRECT");
-    assertThat(correct.path("startTimeMs").isNumber()).isTrue();
+    assertThat(correct.has("startTimeMs")).isFalse();
+    assertThat(correct.has("endTimeMs")).isFalse();
     assertThat(correct.hasNonNull("coachingText")).isFalse();
     assertThat(correct.hasNonNull("nativeWordAudioUrl")).isFalse();
 
