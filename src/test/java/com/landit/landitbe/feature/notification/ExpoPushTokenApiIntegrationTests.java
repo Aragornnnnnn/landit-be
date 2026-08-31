@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,7 +14,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.notification.dto.ExpoPushTokenUpdateRequest;
 import com.landit.landitbe.feature.notification.service.ExpoPushTokenService;
+import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.shared.domain.AppPlatform;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -62,13 +65,30 @@ class ExpoPushTokenApiIntegrationTests {
 
     updateToken(accessToken, AppPlatform.IOS, expoPushToken, true);
     assertTokenStatus(expoPushToken, "ACTIVE");
+    assertThat(pushPermissionStatus(userKey)).isEqualTo("GRANTED");
 
     updateToken(accessToken, AppPlatform.IOS, expoPushToken, false);
     assertTokenStatus(expoPushToken, "REVOKED");
+    assertThat(pushPermissionStatus(userKey)).isEqualTo("GRANTED");
 
     updateToken(accessToken, AppPlatform.ANDROID, expoPushToken, true);
     assertTokenStatus(expoPushToken, "ACTIVE");
     assertTokenPlatform(expoPushToken, "ANDROID");
+  }
+
+  /** Expo Push Token을 활성화하면 사용자의 푸시 권한을 허용 상태로 기록한다. */
+  @Test
+  void grantsPushPermissionWhenExpoPushTokenIsEnabled() throws Exception {
+    String userKey = "expo-push-permission-granted";
+    String accessToken = login(userKey);
+
+    assertThat(pushPermissionStatus(userKey)).isEqualTo("NOT_DETERMINED");
+    assertThat(pushPermissionUpdatedAt(userKey)).isNull();
+
+    updateToken(accessToken, AppPlatform.IOS, "ExponentPushToken[permission-granted]", true);
+
+    assertThat(pushPermissionStatus(userKey)).isEqualTo("GRANTED");
+    assertThat(pushPermissionUpdatedAt(userKey)).isNotNull();
   }
 
   /** 다른 사용자는 본인 소유가 아닌 Expo Push Token을 비활성화할 수 없다. */
@@ -179,6 +199,23 @@ class ExpoPushTokenApiIntegrationTests {
     assertTokenStatus(expoPushToken, "ACTIVE");
   }
 
+  /** 사용자 프로필 권한 갱신에 실패하면 Expo Push Token 등록도 함께 롤백한다. */
+  @Test
+  void rollsBackExpoPushTokenWhenPermissionGrantFails() throws Exception {
+    String userKey = "expo-push-permission-grant-failure";
+    login(userKey);
+    Long userProfileId = userProfileId(userKey);
+    jdbcTemplate.update("update user_profile set status = 'WITHDRAWN' where id = ?", userProfileId);
+    String expoPushToken = "ExponentPushToken[permission-grant-failure]";
+    ExpoPushTokenUpdateRequest request =
+        new ExpoPushTokenUpdateRequest(AppPlatform.IOS, expoPushToken, true);
+
+    assertThatThrownBy(() -> expoPushTokenService.update(userProfileId, request))
+        .isInstanceOf(UserProfileException.class);
+
+    assertThat(tokenCount(expoPushToken)).isZero();
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
@@ -246,6 +283,22 @@ class ExpoPushTokenApiIntegrationTests {
   private Long userProfileId(String userKey) {
     return jdbcTemplate.queryForObject(
         "select id from user_profile where email = ?", Long.class, userKey + "@example.com");
+  }
+
+  /** 테스트 사용자의 푸시 권한 상태를 조회한다. */
+  private String pushPermissionStatus(String userKey) {
+    return jdbcTemplate.queryForObject(
+        "select push_permission_status from user_profile where email = ?",
+        String.class,
+        userKey + "@example.com");
+  }
+
+  /** 테스트 사용자의 푸시 권한 갱신 시각을 조회한다. */
+  private LocalDateTime pushPermissionUpdatedAt(String userKey) {
+    return jdbcTemplate.queryForObject(
+        "select push_permission_updated_at from user_profile where email = ?",
+        LocalDateTime.class,
+        userKey + "@example.com");
   }
 
   /** 지정한 Expo Push Token 값의 저장 행 수를 조회한다. */

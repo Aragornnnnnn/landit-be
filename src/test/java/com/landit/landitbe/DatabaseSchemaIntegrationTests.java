@@ -691,6 +691,48 @@ class DatabaseSchemaIntegrationTests {
         .isEqualTo(1);
   }
 
+  /** Repeatable migration은 활성 Expo Push Token 보유자의 푸시 권한을 허용 상태로 보정한다. */
+  @Test
+  void repeatableMigrationBackfillsGrantedPushPermissionForActiveTokenOwners() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "32");
+    migrationJdbcTemplate.update(
+        """
+        delete from flyway_schema_history
+        where version is null
+          and description = 'grant push permission for active tokens'
+        """);
+    insertUserProfile(migrationJdbcTemplate, 990501L, null);
+    migrationJdbcTemplate.update(
+        "update user_profile set nickname = 'active-token-owner' where id = 990501");
+    insertUserProfile(migrationJdbcTemplate, 990502L, null);
+    insertExpoPushToken(migrationJdbcTemplate, 990503L, 990501L, "ACTIVE");
+    insertExpoPushToken(migrationJdbcTemplate, 990504L, 990502L, "REVOKED");
+
+    migrateToLatestVersion(databaseUrl);
+
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select push_permission_status from user_profile where id = 990501", String.class))
+        .isEqualTo("GRANTED");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select push_permission_updated_at from user_profile where id = 990501",
+                Object.class))
+        .isNotNull();
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select push_permission_status from user_profile where id = 990502", String.class))
+        .isEqualTo("NOT_DETERMINED");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select push_permission_updated_at from user_profile where id = 990502",
+                Object.class))
+        .isNull();
+  }
+
   /** 사용자 학습 수준 CHECK 제약은 1과 5를 허용하고 범위를 벗어난 값을 거절한다. */
   @Test
   void userLearningLevelConstraintAllowsOneToFiveOnly() {
@@ -1175,6 +1217,22 @@ class DatabaseSchemaIntegrationTests {
         """,
         userProfileId,
         aiTutorId);
+  }
+
+  /** 마이그레이션 검증용 Expo Push Token을 저장한다. */
+  private void insertExpoPushToken(
+      JdbcTemplate migrationJdbcTemplate, long tokenId, long userProfileId, String status) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO user_push_token (
+            id, user_profile_id, platform, expo_push_token, status, created_at, updated_at
+        )
+        VALUES (?, ?, 'IOS', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        tokenId,
+        userProfileId,
+        "ExponentPushToken[migration-" + tokenId + "]",
+        status);
   }
 
   /** 기존 문자열 학습 수준을 가진 마이그레이션 검증용 사용자 프로필을 저장한다. */
