@@ -60,6 +60,7 @@ public class ScenarioSession extends BaseTimeEntity {
    *
    * @param learningSessionId 연결할 학습 세션 ID
    * @param scenarioLanguageVariantId 시작한 시나리오 언어 variant ID
+   * @param questionLevelGroup 세션 시작 시점의 질문 레벨 그룹
    * @param userOpeningInstructionSnapshot 사용자 선톡 시작 안내 스냅샷
    * @return 생성된 시나리오 세션 보조 정보
    */
