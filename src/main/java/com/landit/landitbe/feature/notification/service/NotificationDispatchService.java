@@ -1,4 +1,4 @@
-// 한 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송한다.
+// 여러 사용자의 발송 가능한 Token에 일반 푸시를 멱등 발송한다.
 
 package com.landit.landitbe.feature.notification.service;
 
@@ -9,11 +9,12 @@ import com.landit.landitbe.feature.notification.client.RetryablePushNotification
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-/** 한 사용자의 발송 가능한 설치에 일반 푸시를 멱등 발송한다. */
+/** 여러 사용자의 발송 가능한 Token에 일반 푸시를 멱등 발송한다. */
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
@@ -32,25 +33,40 @@ public class NotificationDispatchService {
   private final PushQueuePublisher pushQueuePublisher;
 
   /**
-   * 지정한 사용자의 발송 가능한 모든 설치에 같은 이벤트 알림을 보낸다.
+   * 지정한 사용자의 발송 가능한 모든 Token에 같은 이벤트 알림을 보낸다.
    *
    * @param command 이벤트 식별자, 대상 사용자와 표시 내용
    */
   public void send(SendPushNotificationCommand command) {
-    scheduleAcceptedDeliveryReceipts(command.eventId());
+    sendAll(List.of(command));
+  }
+
+  /**
+   * 여러 사용자의 발송 가능한 Token을 한 번에 조회해 Expo 요청 제한에 맞춰 발송한다.
+   *
+   * @param commands 이벤트 식별자, 대상 사용자와 표시 내용 목록
+   */
+  public void sendAll(List<SendPushNotificationCommand> commands) {
+    if (commands.isEmpty()) {
+      return;
+    }
+    List<Long> userProfileIds =
+        commands.stream().map(SendPushNotificationCommand::userProfileId).distinct().toList();
+    Map<Long, List<Long>> userPushTokenIdsByUserProfileId =
+        userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(userProfileIds);
     List<PreparedPushDelivery> deliveries = new ArrayList<>(EXPO_BATCH_SIZE);
     RetryablePushNotificationException firstFailure = null;
-    List<Long> userPushTokenIds =
-        userPushTokenDeliveryService
-            .findSendableTokenIdsByUserProfileIds(List.of(command.userProfileId()))
-            .getOrDefault(command.userProfileId(), List.of());
-    for (Long userPushTokenId : userPushTokenIds) {
-      pushDeliveryService
-          .prepare(prepareCommand(command, userPushTokenId))
-          .ifPresent(deliveries::add);
-      if (deliveries.size() == EXPO_BATCH_SIZE) {
-        firstFailure = retainFirstFailure(firstFailure, sendPreparedDeliveries(deliveries));
-        deliveries.clear();
+    for (SendPushNotificationCommand command : commands) {
+      scheduleAcceptedDeliveryReceipts(command.eventId());
+      for (Long userPushTokenId :
+          userPushTokenIdsByUserProfileId.getOrDefault(command.userProfileId(), List.of())) {
+        pushDeliveryService
+            .prepare(prepareCommand(command, userPushTokenId))
+            .ifPresent(deliveries::add);
+        if (deliveries.size() == EXPO_BATCH_SIZE) {
+          firstFailure = retainFirstFailure(firstFailure, sendPreparedDeliveries(deliveries));
+          deliveries.clear();
+        }
       }
     }
     if (!deliveries.isEmpty()) {
@@ -61,7 +77,7 @@ public class NotificationDispatchService {
     }
   }
 
-  /** 같은 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 먼저 예약한다. */
+  /** 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다. */
   private void scheduleAcceptedDeliveryReceipts(String eventId) {
     pushDeliveryService
         .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId))
@@ -113,7 +129,7 @@ public class NotificationDispatchService {
     return firstFailure == null ? failure : firstFailure;
   }
 
-  /** 이벤트·설치 조합의 발송 이력 선점 명령을 생성한다. */
+  /** 이벤트·Token 조합의 발송 이력 선점 명령을 생성한다. */
   private PreparePushDeliveryCommand prepareCommand(
       SendPushNotificationCommand command, Long userPushTokenId) {
     return new PreparePushDeliveryCommand(

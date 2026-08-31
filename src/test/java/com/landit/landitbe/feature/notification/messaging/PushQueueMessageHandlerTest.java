@@ -3,66 +3,27 @@
 package com.landit.landitbe.feature.notification.messaging;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
-import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.service.PushReceiptService;
-import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.service.ScheduledNotificationService;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.json.JsonMapper;
 
 /** Push Queue 메시지 검증과 유형별 Service 위임을 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class PushQueueMessageHandlerTest {
 
-  @Mock private NotificationDispatchService notificationDispatchService;
-
   @Mock private PushReceiptService pushReceiptService;
 
+  @Mock private ScheduledNotificationService scheduledNotificationService;
+
   @InjectMocks private PushQueueMessageHandler pushQueueMessageHandler;
-
-  /** 사용자별 푸시 발송 JSON 계약을 역직렬화하고 일반 발송 Service에 전달한다. */
-  @Test
-  void handlesPushSendJsonContract() throws Exception {
-    PushQueueMessage message =
-        JsonMapper.builder()
-            .build()
-            .readValue(
-                """
-                {
-                  "version": 1,
-                  "messageId": "event-id",
-                  "messageType": "PUSH_SEND",
-                  "occurredAt": "2026-07-23T15:00:00Z",
-                  "payload": {
-                    "userProfileId": 1,
-                    "notificationType": "TEST_NOTIFICATION",
-                    "title": "테스트 알림",
-                    "body": "정상적으로 도착했어요.",
-                    "deepLink": "/home"
-                  }
-                }
-                """,
-                PushQueueMessage.class);
-
-    pushQueueMessageHandler.handle(message);
-
-    verify(notificationDispatchService)
-        .send(
-            new SendPushNotificationCommand(
-                "event-id",
-                1L,
-                NotificationType.TEST_NOTIFICATION,
-                "테스트 알림",
-                "정상적으로 도착했어요.",
-                "/home"));
-  }
 
   /** Receipt 확인 메시지의 발송 이력 ID와 시도 횟수를 Service에 전달한다. */
   @Test
@@ -78,6 +39,24 @@ class PushQueueMessageHandlerTest {
     pushQueueMessageHandler.handle(message);
 
     verify(pushReceiptService).check(10L, 2);
+  }
+
+  /** EventBridge Scheduler 배치 메시지는 예정 시각을 기준으로 대상 계산 Service에 위임한다. */
+  @Test
+  void handlesScheduledNotificationBatch() {
+    Instant occurredAt = Instant.parse("2026-07-26T11:00:00Z");
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "scheduler-execution",
+            "SCHEDULED_NOTIFICATION_BATCH",
+            occurredAt,
+            new PushQueuePayload(null, null));
+
+    pushQueueMessageHandler.handle(message);
+
+    verify(scheduledNotificationService)
+        .process(org.mockito.ArgumentMatchers.eq(occurredAt), any());
   }
 
   /** Receipt 확인 횟수 정책은 Handler가 아닌 Receipt Service가 판단한다. */
@@ -103,17 +82,9 @@ class PushQueueMessageHandlerTest {
         new PushQueueMessage(
             2,
             "unsupported-version",
-            "PUSH_SEND",
+            "PUSH_RECEIPT_CHECK",
             Instant.parse("2026-07-24T11:00:00Z"),
-            PushQueuePayload.notification(
-                new PushNotificationRequest(
-                    "unsupported-version",
-                    1L,
-                    NotificationType.TEST_NOTIFICATION,
-                    "제목",
-                    "본문",
-                    "/home",
-                    Instant.parse("2026-07-24T11:00:00Z"))));
+            PushQueuePayload.receipt(1L, 1));
 
     assertThatThrownBy(() -> pushQueueMessageHandler.handle(message))
         .isInstanceOf(IllegalArgumentException.class);
@@ -126,17 +97,9 @@ class PushQueueMessageHandlerTest {
         new PushQueueMessage(
             1,
             " ",
-            "PUSH_SEND",
+            "PUSH_RECEIPT_CHECK",
             Instant.parse("2026-07-24T11:00:00Z"),
-            PushQueuePayload.notification(
-                new PushNotificationRequest(
-                    "blank-message-id",
-                    1L,
-                    NotificationType.TEST_NOTIFICATION,
-                    "제목",
-                    "본문",
-                    "/home",
-                    Instant.parse("2026-07-24T11:00:00Z"))));
+            PushQueuePayload.receipt(1L, 1));
     PushQueueMessage unsupportedType =
         new PushQueueMessage(
             1,
@@ -161,22 +124,6 @@ class PushQueueMessageHandlerTest {
             "PUSH_RECEIPT_CHECK",
             Instant.parse("2026-07-24T11:15:00Z"),
             PushQueuePayload.receipt(null, 0));
-
-    assertThatThrownBy(() -> pushQueueMessageHandler.handle(message))
-        .isInstanceOf(IllegalArgumentException.class);
-  }
-
-  /** 사용자 ID나 표시 내용이 없는 푸시 발송 payload를 거부한다. */
-  @Test
-  void rejectsInvalidPushSendPayload() {
-    PushQueueMessage message =
-        new PushQueueMessage(
-            1,
-            "invalid-push-send",
-            "PUSH_SEND",
-            Instant.parse("2026-07-24T11:15:00Z"),
-            new PushQueuePayload(
-                null, NotificationType.TEST_NOTIFICATION, "제목", "본문", "/home", null, null));
 
     assertThatThrownBy(() -> pushQueueMessageHandler.handle(message))
         .isInstanceOf(IllegalArgumentException.class);

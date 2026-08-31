@@ -126,7 +126,7 @@ class PushNotificationRepositoryIntegrationTests {
         USER_ID,
         userPushTokenId,
         SENT_EXPO_PUSH_TOKEN,
-        NotificationType.REVIEW_REMINDER,
+        NotificationType.SMALL_TALK_REMINDER,
         deduplicationKey,
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",

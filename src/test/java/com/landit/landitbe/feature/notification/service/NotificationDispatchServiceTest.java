@@ -1,4 +1,4 @@
-// 한 사용자의 발송 가능한 Token에 일반 푸시를 멱등 발송하는 흐름을 검증한다.
+// 여러 사용자의 발송 가능한 Token에 일반 푸시를 멱등 발송하는 흐름을 검증한다.
 
 package com.landit.landitbe.feature.notification.service;
 
@@ -30,7 +30,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** 한 사용자의 발송 가능한 Token에 일반 푸시를 멱등 발송하는 흐름을 검증한다. */
+/** 여러 사용자의 발송 가능한 Token에 일반 푸시를 멱등 발송하는 흐름을 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class NotificationDispatchServiceTest {
 
@@ -74,9 +74,9 @@ class NotificationDispatchServiceTest {
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
   }
 
-  /** 같은 이벤트에서 이미 Ticket이 접수된 이력은 Expo 재발송 없이 Receipt만 다시 예약한다. */
+  /** 같은 사용자의 과거 알림은 제외하고 현재 이벤트의 접수 Ticket만 Receipt를 다시 예약한다. */
   @Test
-  void reschedulesAcceptedReceiptWithoutResendingExpo() {
+  void reschedulesOnlyCurrentEventAcceptedReceiptWithoutResendingExpo() {
     when(pushDeliveryService.findAcceptedDeliveryIds("push:event-1:")).thenReturn(List.of(10L));
     when(userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(List.of(1L)))
         .thenReturn(Map.of());
@@ -84,6 +84,7 @@ class NotificationDispatchServiceTest {
     notificationDispatchService.send(COMMAND);
 
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
+    verify(pushQueuePublisher, never()).scheduleReceiptCheck(11L, 1);
     verify(notificationSender, never()).send(anyList());
   }
 
@@ -198,5 +199,33 @@ class NotificationDispatchServiceTest {
 
     verify(pushDeliveryService).recordTicketResult(10L, PushTicketResult.accepted("ticket-1"));
     verify(pushDeliveryService).recordTicketResult(11L, PushTicketResult.accepted("ticket-2"));
+  }
+
+  /** 같은 페이지의 여러 사용자 Token을 모아 하나의 Expo 요청으로 전송한다. */
+  @Test
+  void batchesPreparedDeliveriesAcrossUsers() {
+    PreparedPushDelivery secondDelivery =
+        new PreparedPushDelivery(11L, "ExponentPushToken[second-token]", "두 번째 알림", "본문", "/home");
+    when(userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(List.of(1L, 2L)))
+        .thenReturn(Map.of(1L, List.of(2L), 2L, List.of(3L)));
+    when(pushDeliveryService.prepare(any()))
+        .thenReturn(Optional.of(PREPARED_DELIVERY), Optional.of(secondDelivery));
+    when(notificationSender.send(anyList()))
+        .thenReturn(
+            List.of(PushTicketResult.accepted("ticket-1"), PushTicketResult.accepted("ticket-2")));
+    SendPushNotificationCommand secondCommand =
+        new SendPushNotificationCommand(
+            "event-2", 2L, NotificationType.TEST_NOTIFICATION, "두 번째 알림", "본문", "/home");
+
+    notificationDispatchService.sendAll(List.of(COMMAND, secondCommand));
+
+    verify(notificationSender)
+        .send(List.of(PREPARED_DELIVERY.toPushMessage(), secondDelivery.toPushMessage()));
+    verify(userPushTokenDeliveryService, times(1))
+        .findSendableTokenIdsByUserProfileIds(List.of(1L, 2L));
+    verify(pushDeliveryService).findAcceptedDeliveryIds("push:event-1:");
+    verify(pushDeliveryService).findAcceptedDeliveryIds("push:event-2:");
+    verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
+    verify(pushQueuePublisher).scheduleReceiptCheck(11L, 1);
   }
 }
