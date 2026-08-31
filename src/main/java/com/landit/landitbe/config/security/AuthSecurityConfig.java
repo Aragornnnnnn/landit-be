@@ -94,6 +94,11 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/learning-level")
                     .authenticated()
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/accent-locales", "/api/v1/me/accent-locale")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/me/accent-locale")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/internal/test/push")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios")
