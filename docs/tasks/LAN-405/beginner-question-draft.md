@@ -277,10 +277,10 @@
 
 1. **Let's write our names on our food. Is that okay?**
    - 음식에 우리 이름을 쓰자. 괜찮아?
-2. **Should we throw away old food every Friday?**
-   - 매주 금요일에 오래된 음식을 버릴까?
-3. **Which shelf do you want to use?**
-   - 넌 어느 칸을 쓰고 싶어?
+2. **If food has no name, should we ask before throwing it away?**
+   - 음식에 이름이 없으면 버리기 전에 물어볼까?
+3. **Should we clean the fridge on Friday or Sunday?**
+   - 냉장고는 금요일과 일요일 중 언제 정리할까?
 
 #### `LEVEL_2_TO_3`
 
@@ -370,8 +370,8 @@
    - 지금은 세면대를 쓰지 마세요. 양동이를 드릴까요, 아니면 물 잠그는 걸 도와드릴까요?
 2. **A worker can visit at six today or nine tomorrow. Which appointment works for you?**
    - 직원이 오늘 6시나 내일 9시에 방문할 수 있어요. 어느 시간이 괜찮으세요?
-3. **Should the worker call first, and may they enter if you are away?**
-   - 직원이 먼저 전화드릴까요? 안 계시면 들어가도 될까요?
+3. **Would you like the worker to call or text before arriving?**
+   - 직원이 방문하기 전에 전화와 문자 중 어떤 방법으로 연락드릴까요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -529,8 +529,8 @@
    - 어서 오세요! 오늘 어떤 음료를 드릴까요?
 2. **Would you like it hot or iced, and what size would you like?**
    - 따뜻하게 드릴까요, 아이스로 드릴까요? 크기는 어떻게 하시겠어요?
-3. **Is that for here or to go? We also have fresh cookies today.**
-   - 드시고 가세요, 포장이세요? 오늘 갓 나온 쿠키도 있어요.
+3. **Is that for here or to go?**
+   - 드시고 가세요, 포장이세요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -597,10 +597,10 @@
 - 첫 질문 속마음. 좋아하는 여행 장소를 물으면 쉽게 이야기를 시작할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **What kind of places do you like to visit?**
-   - 어떤 곳으로 여행 가는 걸 좋아해?
-2. **Do you like mountains or beaches?**
-   - 산이 좋아, 바다가 좋아?
+1. **What was your favorite trip?**
+   - 가장 좋았던 여행은 뭐야?
+2. **What did you like there?**
+   - 그곳에서 어떤 점이 좋았어?
 3. **Where do you want to go next?**
    - 다음에는 어디에 가고 싶어?
 
@@ -609,10 +609,10 @@
 - 첫 질문 속마음. 좋아하는 여행지를 물으면 부담 없이 경험과 취향을 나눌 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **What kind of place do you enjoy visiting, and what do you like about it?**
-   - 어떤 곳으로 여행 가는 걸 좋아하고, 그곳의 어떤 점이 좋아?
-2. **Do you prefer a busy city trip or a quiet nature trip?**
-   - 바쁜 도시 여행과 조용한 자연 여행 중 어떤 걸 더 좋아해?
+1. **Tell me about a trip you enjoyed. Where did you go?**
+   - 즐거웠던 여행 이야기를 해줘. 어디에 갔어?
+2. **What did you enjoy most about that trip?**
+   - 그 여행에서 무엇이 가장 좋았어?
 3. **Choose one place you want to visit next and tell me why.**
    - 다음에 가고 싶은 곳 하나와 그 이유를 말해줘.
 
@@ -637,8 +637,8 @@
 
 #### `LEVEL_1`
 
-1. **The direct train is $45, and the slower train is $30. Which ticket do you want?**
-   - 직행 열차는 45달러이고, 느린 열차는 30달러예요. 어떤 표를 원하세요?
+1. **The direct train arrives at four and costs $45. The slower train arrives at five and costs $30. Which ticket do you want?**
+   - 직행 열차는 4시에 도착하고 45달러예요. 느린 열차는 5시에 도착하고 30달러예요. 어떤 표를 원하세요?
 2. **Do you want a paper ticket or a phone ticket?**
    - 종이 표와 휴대폰 표 중 어떤 걸 원하세요?
 3. **Would you like a window seat or an aisle seat?**
@@ -670,27 +670,27 @@
 
 #### `LEVEL_1`
 
-- 첫 질문 속마음. 목적지를 물으면 옆자리 사람과 쉽게 대화를 시작할 수 있겠다.
+- 첫 질문 속마음. 조용히 가고 싶은지 이야기하고 싶은지 물으면 편하게 대화를 시작할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
 1. **Hi! Do you like quiet flights or talking with the person next to you?**
    - 안녕하세요! 조용히 가는 것과 옆 사람과 이야기하는 것 중 어느 쪽을 좋아하세요?
 2. **Do you like window seats or aisle seats?**
    - 창가 좌석과 통로 좌석 중 어디를 좋아하세요?
-3. **What do you like to do on a trip?**
-   - 여행에서 무엇을 하는 걸 좋아하세요?
+3. **Where are you going, and what will you do there?**
+   - 어디로 가시고, 그곳에서 무엇을 할 예정이세요?
 
 #### `LEVEL_2_TO_3`
 
-- 첫 질문 속마음. 여행 목적을 가볍게 물으면 자연스럽게 대화를 시작할 수 있겠다.
+- 첫 질문 속마음. 대화를 원하는지 먼저 확인하면 옆자리에서도 부담 없이 말을 걸 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
 1. **Hi, I'm sitting next to you. Do you prefer a quiet flight or some conversation?**
    - 안녕하세요, 옆자리에 앉게 됐네요. 조용히 가는 것과 이야기하는 것 중 어느 쪽이 좋아요?
 2. **Do you prefer window or aisle seats, and what do you like about them?**
    - 창가와 통로 좌석 중 어디를 더 좋아하고, 어떤 점이 좋아요?
-3. **What is one thing you enjoy doing when you travel?**
-   - 여행할 때 즐겨 하는 일 한 가지가 뭐예요?
+3. **Where are you headed, and what are you planning to do there?**
+   - 어디로 가시고, 그곳에서 무엇을 할 계획이세요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -803,8 +803,8 @@
    - 파스타는 맵지 않고 커리는 매워요. 어떤 걸 원하세요?
 2. **Would you like a regular size or a large size?**
    - 보통 크기와 큰 크기 중 어떤 걸 원하세요?
-3. **Would you like water or juice?**
-   - 물과 주스 중 어떤 걸 드릴까요?
+3. **Write a review and get a free side. Do you want to join?**
+   - 리뷰를 쓰면 사이드 메뉴가 무료예요. 참여하시겠어요?
 
 #### `LEVEL_2_TO_3`
 
@@ -815,8 +815,8 @@
    - 파스타는 부드럽고 크리미하고, 커리는 맵고 진해요. 오늘은 어떤 게 더 당기세요?
 2. **Both dishes come in regular and large sizes. Which size would you like?**
    - 두 메뉴 모두 보통 크기와 큰 크기가 있어요. 어떤 크기로 드릴까요?
-3. **Would you like water, juice, or another drink with your meal?**
-   - 식사와 함께 물, 주스, 다른 음료 중 무엇을 드릴까요?
+3. **If you leave a review, you can choose a free salad or rice. Would you like to join?**
+   - 리뷰를 남기면 샐러드나 밥을 무료로 고를 수 있어요. 참여하시겠어요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -843,8 +843,8 @@
    - 동쪽 출구로 가세요. 파란 표지판이 보이나요?
 2. **Walk straight for five minutes, then turn left. Is that clear?**
    - 5분 동안 곧장 간 뒤 왼쪽으로 도세요. 이해되셨나요?
-3. **Do you want me to show you the way on a map?**
-   - 지도에서 길을 보여드릴까요?
+3. **Is this your first time in London?**
+   - 런던은 처음이세요?
 
 #### `LEVEL_2_TO_3`
 
@@ -852,8 +852,8 @@
    - 파란 표지판 옆 동쪽 출구로 나가세요. 여기서 보이시나요?
 2. **Walk straight for five minutes and turn left at the bank. Would you like me to repeat that?**
    - 5분쯤 곧장 가서 은행에서 왼쪽으로 도세요. 다시 말씀드릴까요?
-3. **I can mark the route on your map if that would help.**
-   - 도움이 된다면 지도에 길을 표시해 드릴게요.
+3. **Is this your first visit to London? How are you enjoying it so far?**
+   - 런던은 처음이세요? 지금까지 지내보니 어떠세요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -877,8 +877,8 @@
    - 오전 투어는 같은 가격이고, 저녁 투어는 10달러가 더 들어요. 어느 쪽이 좋으세요?
 2. **Should we send your new ticket by email or text?**
    - 새 표를 이메일과 문자 중 어디로 보내드릴까요?
-3. **If the weather changes again, should we call you or send a text?**
-   - 날씨가 또 바뀌면 전화드릴까요, 문자를 보내드릴까요?
+3. **We also have a food tour. Do you want to try it?**
+   - 푸드 투어도 있어요. 한번 해보시겠어요?
 
 #### `LEVEL_2_TO_3`
 
@@ -886,8 +886,8 @@
    - 오전은 인원이 적어요. 저녁은 야경이 포함되고 10달러가 더 들어요. 어느 시간이 더 좋으세요?
 2. **Would you like the new booking confirmation by email or text?**
    - 새 예약 확인서를 이메일과 문자 중 어디로 보내드릴까요?
-3. **If the weather changes again, would you prefer a phone call or a text update?**
-   - 날씨가 또 바뀌면 전화와 문자 중 어떤 방법으로 알려드릴까요?
+3. **We also offer a food tour and a night river cruise. Would you like to book one at a discount?**
+   - 푸드 투어와 야간 리버 크루즈도 있어요. 할인받아 하나를 예약하시겠어요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -1157,8 +1157,8 @@
 
 1. **Do you want to speak or make the slides?**
    - 발표할래, 자료를 만들래?
-2. **Can you practice with me after class?**
-   - 수업 후에 나와 같이 연습할 수 있어?
+2. **Have you spoken in front of a class before?**
+   - 수업에서 사람들 앞에 서서 말해본 적 있어?
 3. **Should we meet on Monday or Tuesday?**
    - 월요일과 화요일 중 언제 만날까?
 
@@ -1169,8 +1169,8 @@
 
 1. **Would you rather present, make the slides, or find information for our project?**
    - 발표, 자료 만들기, 정보 찾기 중 어떤 역할을 하고 싶어?
-2. **I get nervous when speaking. Could we practice the presentation together?**
-   - 나는 말할 때 긴장해. 우리 발표를 같이 연습할 수 있을까?
+2. **Have you presented in English before? How did it go?**
+   - 영어로 발표해본 적 있어? 어땠어?
 3. **Monday afternoon and Tuesday evening both work for me. When should we meet?**
    - 나는 월요일 오후와 화요일 저녁에 가능해. 언제 만날까?
 
@@ -1197,10 +1197,10 @@
 - 첫 질문 속마음. 보고서와 발표를 짧게 비교하면 쉽게 고를 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **You can write three pages or give a five-minute talk. Which do you want?**
+1. **You can write three pages or give a five-minute talk. Which one is better for you?**
    - 세 쪽을 쓰거나 5분 발표를 할 수 있어요. 어느 쪽이 좋아요?
-2. **Would an example or a checklist help you more?**
-   - 예시와 확인 목록 중 어떤 게 더 도움이 될까요?
+2. **Why is that choice better for you?**
+   - 왜 그 선택이 더 편한가요?
 3. **The work is due Friday. Can you finish by then?**
    - 과제는 금요일까지예요. 그때까지 끝낼 수 있나요?
 
@@ -1211,8 +1211,8 @@
 
 1. **You can write a three-page report or give a five-minute presentation. Which format suits you better?**
    - 세 쪽 보고서나 5분 발표 중 하나를 할 수 있어요. 어느 형식이 더 잘 맞나요?
-2. **I can show you an example or give you a checklist. Which would help more?**
-   - 예시를 보여드리거나 확인 목록을 드릴 수 있어요. 어느 쪽이 더 도움이 될까요?
+2. **What makes that format a better fit for you?**
+   - 그 형식이 더 잘 맞는 이유는 무엇인가요?
 3. **The deadline is Friday at five. Can you submit it by then?**
    - 마감은 금요일 5시예요. 그때까지 제출할 수 있나요?
 
@@ -1236,13 +1236,13 @@
 
 #### `LEVEL_1`
 
-- 첫 질문 속마음. 프로젝트와 시험 중 편한 방식을 물으면 과목을 쉽게 고를 수 있겠다.
+- 첫 질문 속마음. 두 과목의 평가 방식을 알려주면 자신에게 맞는 과목을 쉽게 고를 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **Do you like doing projects each week or studying for big tests?**
-   - 매주 프로젝트 하는 것과 큰 시험을 준비하는 것 중 어느 쪽이 좋아요?
-2. **The project class needs weekly work. The test class has two exams. Which class do you choose?**
-   - 프로젝트 수업은 매주 과제가 있고, 시험 수업은 시험이 두 번 있어요. 어느 수업을 고르겠어요?
+1. **One class has a project every week. The other has two big tests. Which class sounds better?**
+   - 한 수업은 매주 프로젝트가 있고, 다른 수업은 큰 시험이 두 번 있어요. 어느 수업이 더 좋아 보여요?
+2. **Why is that class better for you?**
+   - 왜 그 수업이 더 잘 맞나요?
 3. **Can you study Tuesday morning or Thursday afternoon?**
    - 화요일 오전과 목요일 오후 중 언제 수업을 들을 수 있나요?
 
@@ -1251,10 +1251,10 @@
 - 첫 질문 속마음. 평가 방식을 비교해서 알려주면 자신에게 맞는 과목을 판단하기 쉽겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **Do you prefer steady weekly projects or studying for a few large exams?**
-   - 매주 꾸준히 프로젝트를 하는 것과 몇 번의 큰 시험을 준비하는 것 중 어느 쪽이 좋아요?
-2. **One course has weekly projects, and the other has two exams. Which course would you choose?**
-   - 한 과목은 매주 프로젝트가 있고, 다른 과목은 시험이 두 번 있어요. 어느 과목을 고르겠어요?
+1. **One course has weekly projects, while the other has two large exams. Which course would suit you better?**
+   - 한 과목은 매주 프로젝트가 있고, 다른 과목은 큰 시험이 두 번 있어요. 어느 과목이 더 잘 맞나요?
+2. **What makes that course a better fit for you?**
+   - 그 과목이 더 잘 맞는 이유는 무엇인가요?
 3. **The class meets Tuesday morning or Thursday afternoon. Which time works with your schedule?**
    - 수업은 화요일 오전이나 목요일 오후예요. 어느 시간이 시간표에 맞나요?
 
@@ -1357,21 +1357,21 @@
 
 #### `LEVEL_1`
 
-1. **Do you use your phone mostly for messages or for videos?**
-   - 휴대폰을 주로 메시지에 쓰세요, 영상에 쓰세요?
+1. **Are you staying for one month or longer, and do you use more data for messages or videos?**
+   - 한 달 정도 계실 예정인가요, 더 오래 계실 예정인가요? 데이터는 메시지와 영상 중 어디에 더 많이 쓰세요?
 2. **Ten gigabytes costs $30. Unlimited data costs $45. Which do you want?**
    - 10기가는 30달러, 무제한은 45달러예요. 어떤 걸 원하세요?
-3. **Do you want to pay now or pay automatically each month?**
-   - 지금 결제할까요, 매달 자동으로 결제할까요?
+3. **I need your passport for the SIM. Do you want to pay now or pay automatically each month?**
+   - 유심 등록에 여권이 필요해요. 지금 결제할까요, 매달 자동으로 결제할까요?
 
 #### `LEVEL_2_TO_3`
 
-1. **Do you mainly use mobile data for messages, maps, or watching videos?**
-   - 휴대폰 데이터를 주로 메시지, 지도, 영상 보기 중 어디에 쓰시나요?
+1. **How long are you staying, and do you mainly use data for messages, maps, or videos?**
+   - 얼마나 머무를 예정이고, 데이터는 주로 메시지, 지도, 영상 보기 중 어디에 쓰시나요?
 2. **The 10-gigabyte plan is $30, and unlimited data is $45. Which plan fits you better?**
    - 10기가 요금제는 30달러, 무제한은 45달러예요. 어느 요금제가 더 잘 맞나요?
-3. **Would you like automatic monthly payment, or would you rather add money yourself?**
-   - 매달 자동 결제로 할까요, 아니면 직접 충전하시겠어요?
+3. **I need your passport to register the SIM. Would you like automatic payment or to add money yourself each month?**
+   - 유심 등록에 여권이 필요해요. 자동 결제로 할까요, 아니면 매달 직접 충전하시겠어요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -1390,25 +1390,25 @@
 
 #### `LEVEL_1`
 
-- 첫 질문 속마음. 두 가지 대체 재료를 알려주면 쉽게 하나를 고를 수 있겠다.
+- 첫 질문 속마음. 만들 요리를 먼저 물으면 알맞은 대체 재료를 쉽게 안내할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **We have no fresh basil. We have dried basil or parsley. Which do you want?**
-   - 생바질이 없어요. 말린 바질과 파슬리가 있어요. 어떤 걸 원하세요?
-2. **Do you want a small pack or a large pack?**
-   - 작은 포장과 큰 포장 중 어떤 걸 원하세요?
+1. **We have no fresh basil. Are you making pasta, pizza, or something else?**
+   - 생바질이 없어요. 파스타나 피자를 만드시나요, 아니면 다른 요리인가요?
+2. **We have dried basil and parsley in small and large packs. Which one and what size do you want?**
+   - 말린 바질과 파슬리는 작은 포장과 큰 포장이 있어요. 어떤 재료와 크기를 원하세요?
 3. **Tomatoes are on sale. Do you want some?**
    - 토마토가 할인 중이에요. 좀 필요하세요?
 
 #### `LEVEL_2_TO_3`
 
-- 첫 질문 속마음. 두 대체 재료의 맛을 비교하면 알맞은 것을 고르기 쉽겠다.
+- 첫 질문 속마음. 만들 요리를 확인하면 맛과 양에 맞는 대체 재료를 안내하기 쉽겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **We're out of fresh basil today. Dried basil tastes similar, while parsley tastes fresher. Which would you prefer?**
-   - 오늘 생바질이 다 나갔어요. 말린 바질은 맛이 비슷하고, 파슬리는 더 산뜻해요. 어느 쪽을 원하세요?
-2. **The small pack is easier to finish, while the large pack gives you more. Which size would you like?**
-   - 작은 포장은 다 먹기 쉽고, 큰 포장은 양이 더 많아요. 어떤 크기를 원하세요?
+1. **We're out of fresh basil today. What are you cooking so I can suggest a substitute?**
+   - 오늘 생바질이 다 나갔어요. 대체 재료를 추천할 수 있게 어떤 요리인지 알려주시겠어요?
+2. **Dried basil tastes similar, while parsley tastes fresher. Both come in two sizes. Which ingredient and size would you prefer?**
+   - 말린 바질은 맛이 비슷하고 파슬리는 더 산뜻해요. 둘 다 두 가지 크기가 있어요. 어떤 재료와 크기를 원하세요?
 3. **Tomatoes are 20 percent off with either one. Would you like to add them?**
    - 둘 중 하나와 같이 사면 토마토가 20% 할인돼요. 추가하시겠어요?
 
@@ -1432,27 +1432,27 @@
 
 #### `LEVEL_1`
 
-- 첫 질문 속마음. 편한 옷과 격식 있는 옷 중 필요한 것을 물으면 쉽게 추천할 수 있겠다.
+- 첫 질문 속마음. 행사가 편한 자리인지 격식 있는 자리인지 물으면 쉽게 추천할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **The casual jacket cannot be returned. The dressy jacket can. Which do you want?**
-   - 편한 재킷은 반품할 수 없고, 격식 있는 재킷은 가능해요. 어떤 걸 원하세요?
+1. **Is your event casual or formal?**
+   - 행사가 편한 자리인가요, 격식 있는 자리인가요?
 2. **Would you like navy or beige?**
    - 네이비와 베이지 중 어떤 색이 좋으세요?
-3. **Would you like a small, medium, or large size?**
-   - 작은, 중간, 큰 사이즈 중 어떤 걸 원하세요?
+3. **The casual jacket cannot be returned. The dressy jacket can. Which one do you want to try?**
+   - 편한 재킷은 반품할 수 없고, 격식 있는 재킷은 가능해요. 어떤 옷을 입어보시겠어요?
 
 #### `LEVEL_2_TO_3`
 
 - 첫 질문 속마음. 행사의 분위기를 물으면 맞는 옷을 추천하기 쉽겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **The casual jacket cannot be returned, while the formal blazer can. Which suits your event better?**
-   - 편한 재킷은 반품할 수 없고, 격식 있는 블레이저는 가능해요. 행사에는 어느 쪽이 더 잘 맞나요?
+1. **Would you describe the event as casual or formal?**
+   - 행사가 편한 분위기인가요, 격식 있는 분위기인가요?
 2. **Both styles come in navy and beige. Which color would you like to try first?**
    - 두 옷 모두 네이비와 베이지가 있어요. 어떤 색부터 입어보시겠어요?
-3. **We have small, medium, and large sizes. Which size should I bring?**
-   - 작은, 중간, 큰 사이즈가 있어요. 어떤 사이즈로 가져다드릴까요?
+3. **The casual jacket is final sale, but the formal blazer can be returned. Which one would you like to try?**
+   - 편한 재킷은 반품할 수 없지만 격식 있는 블레이저는 반품할 수 있어요. 어떤 옷을 입어보시겠어요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -1555,8 +1555,8 @@
 
 1. **Do you want to ride the bike or look at it first?**
    - 자전거를 먼저 타볼래요, 살펴볼래요?
-2. **The price is $200. What price can you pay?**
-   - 가격은 200달러예요. 얼마까지 낼 수 있나요?
+2. **I'm asking $200, but the bike has some scratches. What price can you pay, and why?**
+   - 가격은 200달러지만 자전거에 긁힌 자국이 있어요. 얼마까지 낼 수 있어요? 왜 그 가격을 생각했나요?
 3. **Can you pay in cash today?**
    - 오늘 현금으로 낼 수 있나요?
 
@@ -1597,8 +1597,8 @@
 
 1. **The snack set is $15. The mug is $25. Which gift do you want?**
    - 과자 세트는 15달러, 머그잔은 25달러예요. 어떤 선물을 원하세요?
-2. **Do you want a short message card?**
-   - 짧은 메시지 카드를 넣을까요?
+2. **What short message should I write on the card?**
+   - 카드에 어떤 짧은 문구를 적을까요?
 3. **Do you want free wrapping or gift wrapping for $3?**
    - 무료 포장과 3달러짜리 선물 포장 중 어떤 걸 원하세요?
 
