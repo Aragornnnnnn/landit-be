@@ -113,6 +113,26 @@ class ExpressionLearningApiIntegrationTests {
         .andExpect(jsonPath("$.data.completed").value(false));
   }
 
+  @Test
+  void learningStartRejectsExpressionAboveLearningLevel() throws Exception {
+    Long expressionId = seedExpression();
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", expressionId);
+    String accessToken =
+        login("google-learn-level", "learn-level@example.com", "Learn Level", "learn-level-nonce");
+    Long userProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM user_profile WHERE email = ?", Long.class, "learn-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
   /** 학습을 완료한 표현은 다시 조회했을 때 완료 여부가 true로 내려가는지 검증한다. */
   @Test
   void learningStartReturnsCompletedAfterFinishingLearning() throws Exception {

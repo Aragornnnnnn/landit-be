@@ -131,6 +131,32 @@ class ExpressionPracticeApiIntegrationTests {
             "noise-" + index + "-3");
   }
 
+  @Test
+  void practiceRejectsExpressionAboveLearningLevel() throws Exception {
+    Long expressionId = seedExpressionWithPracticeExamples();
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", expressionId);
+    String accessToken =
+        login(
+            "google-practice-level",
+            "practice-level@example.com",
+            "Practice Level",
+            "practice-level-nonce");
+    Long userProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM user_profile WHERE email = ?",
+            Long.class,
+            "practice-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
   @Test
   void practiceRejectsUnknownExpression() throws Exception {

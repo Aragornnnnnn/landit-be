@@ -85,6 +85,30 @@ class ExpressionLearningFinishApiIntegrationTests {
     assertThat(countCompletions(userProfileId, firstExpressionId)).isEqualTo(1);
   }
 
+  @Test
+  void learningFinishRejectsExpressionAboveLearningLevel() throws Exception {
+    Long scenarioId = seedScenarioWithExpressions();
+    Long expressionId = findExpressionIdByDisplayOrder(scenarioId, 1);
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", expressionId);
+    String accessToken =
+        login(
+            "google-finish-level",
+            "finish-level@example.com",
+            "Finish Level",
+            "finish-level-nonce");
+    Long userProfileId = findUserProfileIdByEmail("finish-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    assertThat(countCompletions(userProfileId, expressionId)).isZero();
+  }
+
   /**
    * 이미 완료한 표현을 다시 완료하면 새 기록 없이(1건 유지), 최초 완료 시각(completed_at)은 보존하고 마지막 완료 시각(last_completed_at)만
    * 갱신하는지 검증한다.

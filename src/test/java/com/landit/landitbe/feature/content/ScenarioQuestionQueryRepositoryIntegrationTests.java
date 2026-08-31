@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +58,9 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         .get()
         .extracting(ScenarioQuestionProjection::questionId)
         .isEqualTo(991205L);
+    assertThatThrownBy(
+            () -> seedQuestion(991206L, 991101L, 2, ContentLearningLevel.LEVEL_1, "ACTIVE"))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test

@@ -106,6 +106,30 @@ class ExpressionApiIntegrationTests {
         .andExpect(jsonPath("$.data[4].locked").value(true));
   }
 
+  @Test
+  void getExpressionsExcludesDifficultyAboveLearningLevel() throws Exception {
+    Long scenarioId = seedScenarioWithExpressions();
+    Long advancedExpressionId = findExpressionIdByDisplayOrder(scenarioId, 5);
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", advancedExpressionId);
+    String accessToken =
+        login("google-expr-level", "expr-level@example.com", "Expr Level", "expr-level-nonce");
+    Long userProfileId = findUserProfileIdByEmail("expr-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{scenarioId}", scenarioId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(4))
+        .andExpect(
+            jsonPath("$.data[*].expressionId")
+                .value(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem(advancedExpressionId.intValue()))));
+  }
+
   /** 모든 표현을 완료한 사용자는 전부 completed=true, locked=false로 받는지 검증한다. (해금 대상이 없는 엣지 케이스) */
   @Test
   void getExpressionsUnlocksEveryExpressionWhenAllCompleted() throws Exception {
