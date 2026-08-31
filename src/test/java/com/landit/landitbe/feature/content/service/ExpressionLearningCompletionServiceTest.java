@@ -17,10 +17,12 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
+import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
+import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
@@ -39,6 +41,7 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -75,6 +78,13 @@ class ExpressionLearningCompletionServiceTest {
   @Mock private FreeTalkSessionExpressionRepository sessionExpressionRepository;
 
   @InjectMocks private ExpressionLearningCompletionService expressionLearningCompletionService;
+
+  @BeforeEach
+  void allowAllExistingScenarioExpressions() {
+    lenient()
+        .when(userProfileService.getLearningLevel(USER_ID))
+        .thenReturn(new UserLearningLevelResponse(null));
+  }
 
   /** 존재하지 않거나 비활성인 표현은 완료 이력을 저장하지 않는다. */
   @Test
@@ -177,6 +187,25 @@ class ExpressionLearningCompletionServiceTest {
             });
 
     logger.detachAppender(logAppender);
+  }
+
+  @Test
+  void shouldRejectScenarioExpressionAboveUserDifficulty() {
+    WritingExpression expression = expressionInScenario();
+    when(expression.getDifficultyLevel()).thenReturn(4);
+    when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+
+    assertThatThrownBy(
+            () ->
+                expressionLearningCompletionService.completeLearning(USER_ID, LOCKED_EXPRESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+
+    verify(writingExpressionRepository, never())
+        .findByIdAndStatusForUpdate(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
   }
 
   /** 프리톡 추천 표현은 시나리오 학습 순서와 관계없이 완료한다. */
@@ -301,9 +330,8 @@ class ExpressionLearningCompletionServiceTest {
   private void givenUserLocaleExpressionList(WritingExpression... expressions) {
     when(userProfileService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(TARGET_LOCALE, BASE_LOCALE));
-    when(writingExpressionRepository
-            .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-                SCENARIO_ID, TARGET_LOCALE, BASE_LOCALE, ActiveStatus.ACTIVE))
+    when(writingExpressionRepository.findScenarioExpressions(
+            SCENARIO_ID, TARGET_LOCALE, BASE_LOCALE, 5, ActiveStatus.ACTIVE))
         .thenReturn(List.of(expressions));
   }
 
@@ -311,6 +339,7 @@ class ExpressionLearningCompletionServiceTest {
   private WritingExpression expressionInScenario() {
     WritingExpression expression = mock(WritingExpression.class);
     when(expression.getScenarioId()).thenReturn(SCENARIO_ID);
+    lenient().when(expression.getExpressionSource()).thenReturn(WritingExpressionSource.SCENARIO);
     return expression;
   }
 

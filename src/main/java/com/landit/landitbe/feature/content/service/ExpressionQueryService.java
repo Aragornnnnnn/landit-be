@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
@@ -98,12 +99,12 @@ public class ExpressionQueryService {
     // 사용자 로케일에 맞는 표현을 로케일별 노출 순서로 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
     List<WritingExpression> expressions =
-        writingExpressionRepository
-            .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-                scenarioId,
-                userLocale.targetLocale(),
-                userLocale.baseLocale(),
-                ActiveStatus.ACTIVE);
+        writingExpressionRepository.findScenarioExpressions(
+            scenarioId,
+            userLocale.targetLocale(),
+            userLocale.baseLocale(),
+            maximumExpressionDifficulty(userId),
+            ActiveStatus.ACTIVE);
 
     // 해당 유저가 클리어한 Writing 표현의 ID를 Set으로 수집한다.
     CompletedExpressionIds completedExpressionIds =
@@ -131,12 +132,12 @@ public class ExpressionQueryService {
   public ExpressionProgress getExpressionProgress(Long userId, Long scenarioId) {
     UserLocale userLocale = userProfileService.getUserLocale(userId);
     List<WritingExpression> expressions =
-        writingExpressionRepository
-            .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-                scenarioId,
-                userLocale.targetLocale(),
-                userLocale.baseLocale(),
-                ActiveStatus.ACTIVE);
+        writingExpressionRepository.findScenarioExpressions(
+            scenarioId,
+            userLocale.targetLocale(),
+            userLocale.baseLocale(),
+            maximumExpressionDifficulty(userId),
+            ActiveStatus.ACTIVE);
     Set<Long> completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId).values();
     int completedExpressionCount =
@@ -327,7 +328,17 @@ public class ExpressionQueryService {
                   log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
+    if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
+        && expression.getDifficultyLevel() > maximumExpressionDifficulty(userId)) {
+      throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
     return expression;
+  }
+
+  /** 사용자 학습 레벨에서 조회 가능한 최대 표현 난이도를 계산한다. */
+  private int maximumExpressionDifficulty(Long userId) {
+    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel())
+        .maximumExpressionDifficulty();
   }
 
   /**

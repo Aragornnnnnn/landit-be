@@ -25,12 +25,26 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
    * @param scenarioId 표현이 속한 시나리오 ID
    * @param targetLocale 학습 언어 locale
    * @param baseLocale 기준 언어 locale
+   * @param maximumDifficulty 최대 표현 난이도
    * @param status 조회할 콘텐츠 상태
    * @return 표시 순서 오름차순의 Writing 표현 목록
    */
-  List<WritingExpression>
-      findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-          Long scenarioId, Locale targetLocale, Locale baseLocale, ActiveStatus status);
+  @Query(
+      """
+      SELECT expression FROM WritingExpression expression
+      WHERE expression.scenarioId = :scenarioId
+        AND expression.targetLocale = :targetLocale
+        AND expression.baseLocale = :baseLocale
+        AND expression.difficultyLevel <= :maximumDifficulty
+        AND expression.status = :status
+      ORDER BY expression.displayOrder ASC
+      """)
+  List<WritingExpression> findScenarioExpressions(
+      @Param("scenarioId") Long scenarioId,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("baseLocale") Locale baseLocale,
+      @Param("maximumDifficulty") int maximumDifficulty,
+      @Param("status") ActiveStatus status);
 
   /**
    * 특정 상태의 Writing 표현을 PK로 조회한다.

@@ -82,14 +82,14 @@
 - Test: `src/test/java/com/landit/landitbe/feature/content/service/ExpressionLearningCompletionServiceTest.java`
 - Test: `src/test/java/com/landit/landitbe/feature/notification/service/NotificationTargetPageQueryServiceIntegrationTests.java`
 
-- [ ] 시나리오 표현 목록 조회에 `difficultyLevel <= maximumDifficulty` 조건을 추가한다.
-- [ ] 목록과 진행도는 현재 사용자 레벨의 최대 난이도를 같은 repository 메서드에 전달한다.
-- [ ] 상세·추가 연습은 시나리오 표현의 난이도가 사용자 한도를 넘으면 `RESOURCE_NOT_FOUND`로 처리한다.
-- [ ] 완료 처리는 같은 난이도 검증과 필터된 학습 순서를 사용한다.
-- [ ] FreeTalk 표현 조회·완료에는 시나리오 난이도 필터를 적용하지 않는다.
-- [ ] 알림 집계 SQL에 `coalesce(up.learning_level, 5)` 기준 최대 난이도 조건을 한 줄 추가한다.
-- [ ] 난이도 2·3·4 fixture로 레벨 1~3과 4~5·`null`의 목록·진행도·완료 차이를 검증한다.
-- [ ] 다음 검증을 통과시킨다.
+- [x] 시나리오 표현 목록 조회에 `difficultyLevel <= maximumDifficulty` 조건을 추가한다.
+- [x] 목록과 진행도는 현재 사용자 레벨의 최대 난이도를 같은 repository 메서드에 전달한다.
+- [x] 상세·추가 연습은 시나리오 표현의 난이도가 사용자 한도를 넘으면 `RESOURCE_NOT_FOUND`로 처리한다.
+- [x] 완료 처리는 같은 난이도 검증과 필터된 학습 순서를 사용한다.
+- [x] FreeTalk 표현 조회·완료에는 시나리오 난이도 필터를 적용하지 않는다.
+- [x] 알림 집계 SQL에 `coalesce(up.learning_level, 5)` 기준 최대 난이도 조건을 한 줄 추가한다.
+- [x] 난이도 2·3·4 fixture로 레벨 1~3과 4~5·`null`의 목록·진행도·완료 차이를 검증한다.
+- [x] 다음 검증을 통과시킨다.
 
 ```bash
 ./gradlew test --tests '*ExpressionQueryServiceTest' \
