@@ -28,8 +28,6 @@ public record PronunciationAnalysisResponse(
    * @param order 문장 내 순번 (1부터)
    * @param word 단어 표면형
    * @param status CORRECT, PHONEME_ERROR, STRESS_ERROR
-   * @param startTimeMs 사용자 녹음에서 이 단어 구간 시작(ms). 컷 보정 적용 완료 값
-   * @param endTimeMs 사용자 녹음에서 이 단어 구간 끝(ms). 컷 보정 적용 완료 값
    * @param nativeWordAudioUrl 원어민 단어 TTS CDN URL. 오류 단어만
    * @param nativeDisplay 원어민 발음 respelling. PHONEME_ERROR만
    * @param userDisplay 사용자 발음 respelling. PHONEME_ERROR만
@@ -45,8 +43,6 @@ public record PronunciationAnalysisResponse(
       @Schema(description = "문장 내 단어 순번", example = "2") int order,
       @Schema(description = "단어 표면형", example = "nothing") String word,
       @Schema(description = "판정 상태", example = "PHONEME_ERROR") String status,
-      @Schema(description = "사용자 녹음에서 단어 구간 시작(ms)", example = "500") Integer startTimeMs,
-      @Schema(description = "사용자 녹음에서 단어 구간 끝(ms)", example = "940") Integer endTimeMs,
       @Schema(description = "원어민 단어 TTS CDN URL. 오류 단어만") String nativeWordAudioUrl,
       @Schema(description = "원어민 발음 respelling. PHONEME_ERROR만", example = "nuh·thing")
           String nativeDisplay,
@@ -64,6 +60,6 @@ public record PronunciationAnalysisResponse(
           Integer userStressIndex,
       @Schema(
               description = "코칭 문구. 오류 단어만",
-              example = "'th'가 'ss'처럼 들렸어요. 혀끝을 윗니 뒤에 살짝 대고 소리 내보세요.")
+              example = "'th'가 'ss'처럼 들렸어요. 혀끝을 윗니와 아랫니 사이에 살짝 내밀어 대고 바람을 내보내세요.")
           String coachingText) {}
 }
