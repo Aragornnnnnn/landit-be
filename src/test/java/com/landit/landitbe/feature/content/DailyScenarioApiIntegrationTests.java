@@ -416,9 +416,9 @@ class DailyScenarioApiIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question (
-            id, scenario_id, display_order, status, created_at, updated_at
+            id, scenario_id, display_order, question_level_group, status, created_at, updated_at
         )
-        VALUES (?, ?, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 1, 'LEVEL_4_TO_5', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId);

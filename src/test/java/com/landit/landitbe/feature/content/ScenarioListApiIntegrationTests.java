@@ -558,11 +558,12 @@ class ScenarioListApiIntegrationTests {
                             id,
                             scenario_id,
                             display_order,
+                            question_level_group,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, 'LEVEL_4_TO_5', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId,

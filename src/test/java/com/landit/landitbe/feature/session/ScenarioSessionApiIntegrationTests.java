@@ -873,7 +873,7 @@ class ScenarioSessionApiIntegrationTests {
   void scenarioSessionKeepsQuestionLevelGroupFromStart() throws Exception {
     JsonNode loginBody = login("question-level-snapshot@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
-    String accessToken = loginBody.get("data").get("accessToken").asText();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
     jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
     seedCategory(1131, 1, "ACTIVE", "카페");
     seedScenario(2131, 1131, 1, "USER", "ACTIVE", 2);
