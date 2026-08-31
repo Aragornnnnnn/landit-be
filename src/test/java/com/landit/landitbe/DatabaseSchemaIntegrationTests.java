@@ -708,8 +708,11 @@ class DatabaseSchemaIntegrationTests {
     migrationJdbcTemplate.update(
         "update user_profile set nickname = 'active-token-owner' where id = 990501");
     insertUserProfile(migrationJdbcTemplate, 990502L, null);
+    insertUserProfile(migrationJdbcTemplate, 990505L, null);
+    migrationJdbcTemplate.update("update user_profile set status = 'WITHDRAWN' where id = 990505");
     insertExpoPushToken(migrationJdbcTemplate, 990503L, 990501L, "ACTIVE");
     insertExpoPushToken(migrationJdbcTemplate, 990504L, 990502L, "REVOKED");
+    insertExpoPushToken(migrationJdbcTemplate, 990506L, 990505L, "ACTIVE");
 
     migrateToLatestVersion(databaseUrl);
 
@@ -729,6 +732,15 @@ class DatabaseSchemaIntegrationTests {
     assertThat(
             migrationJdbcTemplate.queryForObject(
                 "select push_permission_updated_at from user_profile where id = 990502",
+                Object.class))
+        .isNull();
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select push_permission_status from user_profile where id = 990505", String.class))
+        .isEqualTo("NOT_DETERMINED");
+    assertThat(
+            migrationJdbcTemplate.queryForObject(
+                "select push_permission_updated_at from user_profile where id = 990505",
                 Object.class))
         .isNull();
   }

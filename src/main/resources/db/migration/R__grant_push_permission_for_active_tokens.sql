@@ -4,6 +4,7 @@ UPDATE user_profile
 SET push_permission_status = 'GRANTED',
     push_permission_updated_at = CURRENT_TIMESTAMP
 WHERE push_permission_status = 'NOT_DETERMINED'
+  AND user_profile.status = 'ACTIVE'
   AND EXISTS (
       SELECT 1
       FROM user_push_token token

@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.notification.service;
 import com.landit.landitbe.feature.notification.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.dto.ExpoPushTokenUpdateRequest;
 import com.landit.landitbe.feature.notification.repository.UserPushTokenRepository;
+import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class ExpoPushTokenPersistenceService {
    *
    * @param userProfileId 인증된 사용자 프로필 ID
    * @param request Expo Push Token 상태 변경 요청
+   * @throws UserProfileException 활성 사용자 프로필이 없을 때
    */
   @Transactional
   public void registerOrClaim(Long userProfileId, ExpoPushTokenUpdateRequest request) {
@@ -53,6 +55,7 @@ public class ExpoPushTokenPersistenceService {
    * @param userProfileId 인증된 사용자 프로필 ID
    * @param request Expo Push Token 상태 변경 요청
    * @return 먼저 생성된 Token을 찾았으면 {@code true}
+   * @throws UserProfileException Token을 찾았지만 활성 사용자 프로필이 없을 때
    */
   @Transactional
   public boolean claimExisting(Long userProfileId, ExpoPushTokenUpdateRequest request) {
