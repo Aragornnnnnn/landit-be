@@ -64,14 +64,14 @@ class AdminPronunciationAssetApiIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            id, expression_source, expression_type, usage_frequency_level, target_locale,
+            id, expression_source, expression_type, usage_frequency_level, difficulty_level, target_locale,
             base_locale, display_order, target_expression_text, base_expression_meaning_text,
             usage_summary, usage_description, representative_sentence_text,
             representative_sentence_translation, representative_sentence_words,
             representative_sentence_word_choices, practice_examples_payload, status,
             created_at, updated_at
         )
-        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 990301,
+        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 990301,
             'There is nothing like', '~만 한 게 없다', 'summary', 'description',
             'There''s nothing like hiking.', '하이킹만 한 게 없어.',
             ARRAY['There''s','nothing','like','hiking.'], ARRAY['There''s','nothing'],
@@ -464,14 +464,14 @@ class AdminPronunciationAssetApiIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            id, expression_source, expression_type, usage_frequency_level, target_locale,
+            id, expression_source, expression_type, usage_frequency_level, difficulty_level, target_locale,
             base_locale, display_order, target_expression_text, base_expression_meaning_text,
             usage_summary, usage_description, representative_sentence_text,
             representative_sentence_translation, representative_sentence_words,
             representative_sentence_word_choices, practice_examples_payload, status,
             created_at, updated_at
         )
-        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 990304,
+        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 990304,
             'be busy ~ing', '~하느라 바쁘다', 'summary', 'description',
             'I''m busy studying now.', '지금 공부하느라 바빠.',
             ARRAY['I''m','busy','studying','now.'], ARRAY['I''m','busy'],

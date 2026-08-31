@@ -220,14 +220,14 @@ class ExpressionPronunciationApiIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            id, expression_source, expression_type, usage_frequency_level, target_locale,
+            id, expression_source, expression_type, usage_frequency_level, difficulty_level, target_locale,
             base_locale, display_order, target_expression_text, base_expression_meaning_text,
             usage_summary, usage_description, representative_sentence_text,
             representative_sentence_translation, representative_sentence_words,
             representative_sentence_word_choices, practice_examples_payload, status,
             created_at, updated_at
         )
-        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', ?,
+        values (?, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', ?,
             'sample expression', '샘플', 'summary', 'description', ?, '해석',
             %s, ARRAY['choice'],
             CAST('[]' AS jsonb), 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)

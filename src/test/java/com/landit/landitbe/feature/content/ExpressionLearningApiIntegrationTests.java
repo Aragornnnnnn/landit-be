@@ -322,7 +322,8 @@ class ExpressionLearningApiIntegrationTests {
     //    테스트가 검증할 값들(blow my mind 등)을 여기서 심는다.
     return insertAndGetId(
         "INSERT INTO writing_expression "
-            + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
+            + "(scenario_id, expression_type, usage_frequency_level, difficulty_level, "
+            + "target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
             + "usage_description, representative_question_text, "
             + "representative_question_translation, "
@@ -330,7 +331,7 @@ class ExpressionLearningApiIntegrationTests {
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "representative_image_url, "
             + "practice_examples_payload, status, created_at, updated_at) "
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
+            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
             + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
             + "'What should I definitely see in Korea?', '한국에서 뭘 꼭 봐야 해?', "
             + "'Gyeongbokgung Palace will blow your mind.', '경복궁은 널 완전 놀라게 할 거야.', "

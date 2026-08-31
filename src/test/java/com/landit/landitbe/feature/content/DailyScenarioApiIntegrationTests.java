@@ -440,13 +440,13 @@ class DailyScenarioApiIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
-            scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            scenario_id, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', ?, 'expression', '표현',
+        VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', ?, 'expression', '표현',
                 'usage summary', 'usage description', 'sample sentence', '샘플 문장',
                 ARRAY['sample'], ARRAY['sample', 'choice'], CAST('[]' AS jsonb), 'ACTIVE',
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)

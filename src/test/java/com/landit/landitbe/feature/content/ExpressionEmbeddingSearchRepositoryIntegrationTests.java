@@ -109,14 +109,14 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            id, scenario_id, expression_source, expression_type, usage_frequency_level,
+            id, scenario_id, expression_source, expression_type, usage_frequency_level, difficulty_level,
             target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, embedding, status, created_at, updated_at
         )
-        values (?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', ?, ?, 1, 'piece of cake',
+        values (?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, ?, ?, 1, 'piece of cake',
             '식은 죽 먹기', 'usage summary', 'usage description',
             'It was a piece of cake.', '그건 식은 죽 먹기였어.',
             ARRAY['It','was','a','piece','of','cake'], ARRAY['It','was','a','piece','of','cake'],

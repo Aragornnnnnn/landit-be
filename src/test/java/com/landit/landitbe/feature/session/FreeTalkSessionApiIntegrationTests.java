@@ -1214,14 +1214,14 @@ class FreeTalkSessionApiIntegrationTests {
         """
         INSERT INTO writing_expression (
             id, scenario_id, expression_source, expression_type,
-            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            usage_frequency_level, difficulty_level, target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, embedding, status, created_at, updated_at
         )
         VALUES (
-            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1,
+            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 1,
             'piece of cake', '식은 죽 먹기', '쉬운 일을 말할 때 사용한다.',
             '아주 쉬운 일이었다고 말할 때 사용하는 표현이다.',
             'It was a piece of cake.', '그건 식은 죽 먹기였어.',
@@ -1250,7 +1250,7 @@ class FreeTalkSessionApiIntegrationTests {
         """
         INSERT INTO writing_expression (
             id, scenario_id, expression_source, expression_type,
-            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            usage_frequency_level, difficulty_level, target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_question_text, representative_question_translation,
             representative_sentence_text, representative_sentence_translation,
@@ -1258,7 +1258,7 @@ class FreeTalkSessionApiIntegrationTests {
             representative_image_url, practice_examples_payload, status, created_at, updated_at
         )
         VALUES (
-            ?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
+            ?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 1, 'hit it off',
             '죽이 잘 맞다', '처음 만난 사람과 잘 통할 때 사용한다.',
             '서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.',
             'How was meeting your new teammate?', '새 팀원을 만나 보니 어땠어?',
@@ -1387,7 +1387,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
-            id, scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            id, scenario_id, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_question_text, representative_question_translation,
             representative_sentence_text, representative_sentence_translation,
@@ -1395,7 +1395,7 @@ class FreeTalkSessionApiIntegrationTests {
             representative_image_url, practice_examples_payload, status, created_at, updated_at
         )
         VALUES (
-            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1,
+            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', 1,
             'make up for', '만회하다', '부족했던 부분을 보완한다.',
             '부족하거나 잘못된 일을 다른 행동으로 보완할 때 쓴다.',
             'How will you fix it?', '어떻게 만회할 거야?',
