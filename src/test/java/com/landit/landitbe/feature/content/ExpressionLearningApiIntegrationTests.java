@@ -108,7 +108,57 @@ class ExpressionLearningApiIntegrationTests {
                         "mind")))
         .andExpect(
             jsonPath("$.data.representativeImageUrl")
-                .value("https://cdn.example.com/images/101.png"));
+                .value("https://cdn.example.com/images/101.png"))
+        // 아직 학습을 마치지 않았으므로 완료 여부는 false다.
+        .andExpect(jsonPath("$.data.completed").value(false));
+  }
+
+  /** 학습을 완료한 표현은 다시 조회했을 때 완료 여부가 true로 내려가는지 검증한다. */
+  @Test
+  void learningStartReturnsCompletedAfterFinishingLearning() throws Exception {
+    // given: 표현을 심고 로그인한 뒤, 학습 완료 API로 해당 표현을 완료한 상태
+    Long expressionId = seedExpression();
+    String accessToken = login("google-learn-done", "done@example.com", "Done User", "done-nonce");
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk());
+
+    // when: 같은 표현의 학습 시작 API를 다시 호출하면
+    // then: 완료 여부가 true로 내려간다
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.completed").value(true));
+  }
+
+  /** 완료 여부는 사용자별로 갈린다 — 남이 완료해도 내 응답은 false여야 한다. */
+  @Test
+  void learningStartReturnsNotCompletedForAnotherUser() throws Exception {
+    // given: 한 사용자가 표현 학습을 완료한 상태
+    Long expressionId = seedExpression();
+    String ownerToken =
+        login("google-learn-owner", "owner@example.com", "Owner User", "owner-nonce");
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+        .andExpect(status().isOk());
+
+    // when: 같은 표현을 아직 학습하지 않은 다른 사용자가 조회하면
+    String otherToken =
+        login("google-learn-other", "other@example.com", "Other User", "other-nonce");
+
+    // then: 완료 여부는 false다
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.completed").value(false));
   }
 
   /** 발음 자산(TTS 완성)이 있으면 사용자 억양에 맞는 대표 예문 음성 URL이 내려가는지 검증한다. */

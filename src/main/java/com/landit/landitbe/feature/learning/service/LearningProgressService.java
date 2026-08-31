@@ -46,6 +46,22 @@ public class LearningProgressService {
   }
 
   /**
+   * 사용자가 표현을 완료한 적이 있는지 학습 경로와 관계없이 확인한다.
+   *
+   * <p>표현은 {@code expression_source}로 시나리오·프리톡 중 한쪽에만 속하므로 완료 이력도 자기 경로로만 남는다. 경로를 나눠 조회하지 않고 존재
+   * 여부만 확인한다. 시나리오 표현이라면 시나리오 목록의 완료 여부({@link #findCompletedExpressionIds})와 같은 값이다.
+   *
+   * @param userId 사용자 ID
+   * @param expressionId 표현 ID
+   * @return 완료 이력이 있으면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean hasCompletedExpression(Long userId, Long expressionId) {
+    return expressionCompletionRepository.existsByUserProfileIdAndWritingExpressionId(
+        userId, expressionId);
+  }
+
+  /**
    * 표현을 처음 완료하거나 기존 완료 시각을 갱신한다.
    *
    * @param userId 사용자 ID

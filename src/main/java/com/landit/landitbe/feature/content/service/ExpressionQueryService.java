@@ -154,7 +154,7 @@ public class ExpressionQueryService {
    *
    * @param userId 표현을 조회할 사용자 ID
    * @param expressionId 학습을 시작할 표현 ID
-   * @return 학습 화면에 필요한 표현 상세 정보
+   * @return 학습 화면에 필요한 표현 상세 정보와 완료 여부
    * @throws ApiException 표현이 없거나 비활성 상태일 때, 다른 사용자의 전용 표현일 때
    */
   @Transactional(readOnly = true)
@@ -165,7 +165,8 @@ public class ExpressionQueryService {
     return ExpressionLearningResponse.from(
         expression,
         asset.map(ExpressionPronunciationAsset::getSentenceAudioUrl).orElse(null),
-        asset.map(ExpressionPronunciationAsset::getExpressionAudioUrl).orElse(null));
+        asset.map(ExpressionPronunciationAsset::getExpressionAudioUrl).orElse(null),
+        learningProgressService.hasCompletedExpression(userId, expressionId));
   }
 
   /**
