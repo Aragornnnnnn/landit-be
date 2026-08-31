@@ -12,10 +12,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 /** 사용자 디바이스의 Expo Push Token을 저장한다. */
 @Entity
 @Table(name = "user_push_token")
+@Getter
 public class UserPushToken extends BaseTimeEntity {
 
   @Id
