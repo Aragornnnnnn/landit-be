@@ -424,13 +424,13 @@ class DatabaseSchemaIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            expression_source, expression_type, usage_frequency_level, target_locale, base_locale,
+            expression_source, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        values ('FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 990204,
+        values ('FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 990204,
             'free-talk sample', '프리톡 샘플', 'summary', 'description', 'sentence', '문장',
             ARRAY['sentence'], ARRAY['sentence','choice'], CAST('[]' AS jsonb), 'ACTIVE',
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -742,13 +742,13 @@ class DatabaseSchemaIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            scenario_id, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        values (990202, ?, ?, 'EN', 'KR', 990203, 'sample', '샘플', 'summary',
+        values (990202, ?, ?, 3, 'EN', 'KR', 990203, 'sample', '샘플', 'summary',
             'description', 'sentence', '문장', ARRAY['sample'], ARRAY['sample','choice'],
             CAST('[]' AS jsonb), 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,

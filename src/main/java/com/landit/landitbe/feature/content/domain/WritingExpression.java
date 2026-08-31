@@ -44,6 +44,12 @@ public class WritingExpression extends BaseTimeEntity {
   @Column(name = "usage_frequency_level", nullable = false, length = 20)
   private ExpressionUsageFrequencyLevel usageFrequencyLevel;
 
+  // difficulty_level은 표현의 난이도이자 노출 하한선이다. 수준이 1-3인 유저에게는
+  // difficulty_level 1-3인 표현들만 보여주고, 수준이 4-5인 유저에게는
+  // difficulty_level 1-5인 표현 전부를 보여준다.
+  @Column(name = "difficulty_level", nullable = false)
+  private int difficultyLevel;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "target_locale", nullable = false, length = 35)
   private Locale targetLocale;
