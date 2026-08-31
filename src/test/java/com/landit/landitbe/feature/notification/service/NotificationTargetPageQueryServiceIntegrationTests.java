@@ -127,6 +127,21 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     assertThat(page.sendableUserProfileIds()).containsExactly(USER_ID);
   }
 
+  /** 최신 프리톡 사용자별 조회를 위한 인덱스를 Flyway로 생성한다. */
+  @Test
+  void createsLatestFreeTalkLookupIndex() {
+    Integer indexCount =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.INDEXES
+            WHERE LOWER(INDEX_NAME) = 'idx_learning_session_user_profile_started_at'
+            """,
+            Integer.class);
+
+    assertThat(indexCount).isEqualTo(1);
+  }
+
   private void seedUser() {
     seedUser(USER_ID, "notification-user");
   }

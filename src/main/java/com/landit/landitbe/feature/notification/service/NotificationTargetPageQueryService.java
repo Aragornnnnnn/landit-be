@@ -267,21 +267,24 @@ public class NotificationTargetPageQueryService {
       MapSqlParameterSource parameters, Map<Long, UserTargetRows> rowsByUserId) {
     jdbcTemplate.query(
         """
-        select learning_session.user_profile_id, free_talk_session.title
-        from learning_session
-        join free_talk_session on free_talk_session.learning_session_id = learning_session.id
-        where learning_session.user_profile_id in (:userIds)
-        order by learning_session.user_profile_id, learning_session.started_at desc,
-                 learning_session.id desc
+        select user_profile_id, title
+        from (
+          select learning_session.user_profile_id, free_talk_session.title,
+                 row_number() over (
+                   partition by learning_session.user_profile_id
+                   order by learning_session.started_at desc, learning_session.id desc
+                 ) as session_rank
+          from learning_session
+          join free_talk_session on free_talk_session.learning_session_id = learning_session.id
+          where learning_session.user_profile_id in (:userIds)
+        ) latest_free_talk
+        where session_rank = 1
         """,
         parameters,
         (RowCallbackHandler)
             resultSet -> {
               UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
-              if (!rows.latestFreeTalkTitleFound) {
-                rows.latestFreeTalkTitleFound = true;
-                rows.latestFreeTalkTitle = resultSet.getString("title");
-              }
+              rows.latestFreeTalkTitle = resultSet.getString("title");
             });
   }
 
@@ -369,7 +372,6 @@ public class NotificationTargetPageQueryService {
     private boolean priorActiveDayHistory;
     private LocalDate lastActiveDate;
     private String latestFreeTalkTitle;
-    private boolean latestFreeTalkTitleFound;
 
     private NotificationTargetSelectionInput toInput(Long userProfileId, LocalDate scheduledDate) {
       Long resolvedDailyScenarioId = dailyScenarioId;
