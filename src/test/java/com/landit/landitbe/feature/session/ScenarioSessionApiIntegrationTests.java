@@ -870,6 +870,51 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void scenarioSessionKeepsQuestionLevelGroupFromStart() throws Exception {
+    JsonNode loginBody = login("question-level-snapshot@example.com");
+    long userId = loginBody.get("data").get("user").get("userId").asLong();
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
+    seedCategory(1131, 1, "ACTIVE", "카페");
+    seedScenario(2131, 1131, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3131,
+        2131,
+        "카페 주문",
+        "카페에서 음료를 주문합니다.",
+        "원하는 음료를 주문합니다.",
+        "주문하고 싶은 음료를 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(4133, 2131, 1, "What do you want?", "무엇을 원해요?", "LEVEL_1");
+    seedScenarioQuestion(
+        4134,
+        2131,
+        1,
+        "Could you describe your preferred beverage?",
+        "선호하는 음료를 설명해 주시겠어요?",
+        "LEVEL_4_TO_5");
+
+    long sessionId = startScenario(accessToken, 2131);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 5 WHERE id = ?", userId);
+
+    submitMessage(accessToken, sessionId, "I want coffee.");
+
+    assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().questionId())
+        .isEqualTo(4133L);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT question_level_group FROM scenario_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("LEVEL_1");
+  }
+
+  @Test
   void userFirstMessageUsesOpeningInstructionSnapshot() throws Exception {
     JsonNode loginBody = login("user-first-opening-snapshot@example.com");
     final String accessToken = loginBody.get("data").get("accessToken").asText();
@@ -2470,7 +2515,32 @@ class ScenarioSessionApiIntegrationTests {
       String questionText,
       String questionTranslation) {
     seedScenarioQuestion(
-        questionId, scenarioId, displayOrder, questionText, questionTranslation, null, null);
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        null,
+        null,
+        "LEVEL_4_TO_5");
+  }
+
+  private void seedScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      String questionText,
+      String questionTranslation,
+      String questionLevelGroup) {
+    seedScenarioQuestion(
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        null,
+        null,
+        questionLevelGroup);
   }
 
   private void seedScenarioQuestion(
@@ -2481,21 +2551,43 @@ class ScenarioSessionApiIntegrationTests {
       String questionTranslation,
       String innerThought,
       String innerThoughtType) {
+    seedScenarioQuestion(
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        innerThought,
+        innerThoughtType,
+        "LEVEL_4_TO_5");
+  }
+
+  private void seedScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      String questionText,
+      String questionTranslation,
+      String innerThought,
+      String innerThoughtType,
+      String questionLevelGroup) {
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question (
             id,
             scenario_id,
             display_order,
+            question_level_group,
             status,
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId,
-        displayOrder);
+        displayOrder,
+        questionLevelGroup);
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question_language_variant (

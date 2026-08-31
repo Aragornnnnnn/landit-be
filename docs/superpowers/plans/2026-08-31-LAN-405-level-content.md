@@ -55,15 +55,15 @@
 - Modify: `src/main/java/com/landit/landitbe/feature/session/service/ScenarioSessionStartService.java`
 - Modify: `src/main/java/com/landit/landitbe/feature/session/service/SubmittedMessageService.java`
 
-- [ ] DB 테스트에 두 `question_level_group` 컬럼, 체크 제약, 새 질문 유일 제약, 기존 행 백필을 추가해 실패를 확인한다.
-- [ ] V74에서 질문·시나리오 세션 컬럼을 추가하고 기존 행을 `LEVEL_4_TO_5`로 백필한다.
-- [ ] 질문 유일 제약을 `(scenario_id, question_level_group, display_order)`로 바꾼다.
-- [ ] 목록·일일·관리자·세션 시작 쿼리에 `questionLevelGroup` 파라미터와 동일 그룹 조건을 추가한다.
-- [ ] 세션 시작 시 프로필에서 계산한 그룹을 `ScenarioSession.start(...)`에 저장한다.
-- [ ] 메시지 컨텍스트에 세션 그룹을 포함하고 후속 질문 조회에 전달한다.
-- [ ] 저장소 통합 테스트에서 같은 시나리오·순서의 다른 그룹 질문을 구분해 조회하는지 검증한다.
-- [ ] 세션 통합 테스트에서 프로필 레벨을 중간에 바꿔도 시작 그룹의 후속 질문을 반환하는지 검증한다.
-- [ ] 다음 검증을 통과시킨다.
+- [x] DB 테스트에 두 `question_level_group` 컬럼, 체크 제약, 새 질문 유일 제약, 기존 행 백필을 추가해 실패를 확인한다.
+- [x] V74에서 질문·시나리오 세션 컬럼을 추가하고 기존 행을 `LEVEL_4_TO_5`로 백필한다.
+- [x] 질문 유일 제약을 `(scenario_id, question_level_group, display_order)`로 바꾼다.
+- [x] 목록·일일·관리자·세션 시작 쿼리에 `questionLevelGroup` 파라미터와 동일 그룹 조건을 추가한다.
+- [x] 세션 시작 시 프로필에서 계산한 그룹을 `ScenarioSession.start(...)`에 저장한다.
+- [x] 메시지 컨텍스트에 세션 그룹을 포함하고 후속 질문 조회에 전달한다.
+- [x] 저장소 통합 테스트에서 같은 시나리오·순서의 다른 그룹 질문을 구분해 조회하는지 검증한다.
+- [x] 세션 통합 테스트에서 프로필 레벨을 중간에 바꿔도 시작 그룹의 후속 질문을 반환하는지 검증한다.
+- [x] 다음 검증을 통과시킨다.
 
 ```bash
 ./gradlew test --tests '*DatabaseSchemaIntegrationTests' \

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.repository;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ScenarioQuestion;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
@@ -30,6 +31,7 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
               ON questionVariant.scenarioQuestionId = scenarioQuestion.id
             WHERE scenarioQuestion.scenarioId = :scenarioId
               AND scenarioQuestion.displayOrder = :displayOrder
+              AND scenarioQuestion.questionLevelGroup = :questionLevelGroup
               AND scenarioQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
               AND questionVariant.targetLocale = :targetLocale
               AND questionVariant.baseLocale = :baseLocale
@@ -38,6 +40,7 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
   Optional<ScenarioQuestionProjection> findActiveQuestion(
       @Param("scenarioId") long scenarioId,
       @Param("displayOrder") int displayOrder,
+      @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup,
       @Param("targetLocale") Locale targetLocale,
       @Param("baseLocale") Locale baseLocale);
 }

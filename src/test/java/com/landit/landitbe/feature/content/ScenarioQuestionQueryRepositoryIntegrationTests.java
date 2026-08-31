@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
@@ -28,15 +29,19 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
   @Test
   void findsActiveQuestionByScenarioDisplayOrderAndLocale() {
     seedScenario(991101L);
-    seedQuestion(991201L, 991101L, 1, "ACTIVE");
-    seedQuestion(991202L, 991101L, 2, "ACTIVE");
+    seedQuestion(991201L, 991101L, 1, ContentLearningLevel.LEVEL_4_TO_5, "ACTIVE");
+    seedQuestion(991202L, 991101L, 2, ContentLearningLevel.LEVEL_4_TO_5, "ACTIVE");
+    seedQuestion(991205L, 991101L, 2, ContentLearningLevel.LEVEL_1, "ACTIVE");
     seedQuestionLanguageVariant(
         991301L, 991201L, "EN", "KR", "What food do you like?", "좋아하는 음식이 뭐야?", "ACTIVE");
     seedQuestionLanguageVariant(
         991302L, 991202L, "EN", "KR", "Do you cook often?", "요리를 자주 해?", "ACTIVE");
+    seedQuestionLanguageVariant(
+        991305L, 991205L, "EN", "KR", "What food is good?", "어떤 음식이 좋아?", "ACTIVE");
 
     Optional<ScenarioQuestionProjection> question =
-        scenarioQuestionQueryRepository.findActiveQuestion(991101L, 2, Locale.EN, Locale.KR);
+        scenarioQuestionQueryRepository.findActiveQuestion(
+            991101L, 2, ContentLearningLevel.LEVEL_4_TO_5, Locale.EN, Locale.KR);
 
     assertThat(question).isPresent();
     assertThat(question.get().questionId()).isEqualTo(991202L);
@@ -45,21 +50,31 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
     assertThat(question.get().questionTranslation()).isEqualTo("요리를 자주 해?");
     assertThat(question.get().questionAudioUrl())
         .isEqualTo("https://cdn.example.com/questions/991302.mp3");
+    assertThat(
+            scenarioQuestionQueryRepository.findActiveQuestion(
+                991101L, 2, ContentLearningLevel.LEVEL_1, Locale.EN, Locale.KR))
+        .get()
+        .extracting(ScenarioQuestionProjection::questionId)
+        .isEqualTo(991205L);
   }
 
   @Test
   void doesNotReturnInactiveQuestionOrInactiveVariant() {
     seedScenario(991102L);
-    seedQuestion(991203L, 991102L, 1, "INACTIVE");
-    seedQuestion(991204L, 991102L, 2, "ACTIVE");
+    seedQuestion(991203L, 991102L, 1, ContentLearningLevel.LEVEL_4_TO_5, "INACTIVE");
+    seedQuestion(991204L, 991102L, 2, ContentLearningLevel.LEVEL_4_TO_5, "ACTIVE");
     seedQuestionLanguageVariant(
         991303L, 991203L, "EN", "KR", "Inactive question", "비활성 질문", "ACTIVE");
     seedQuestionLanguageVariant(
         991304L, 991204L, "EN", "KR", "Inactive variant", "비활성 번역", "INACTIVE");
 
-    assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 1, Locale.EN, Locale.KR))
+    assertThat(
+            scenarioQuestionQueryRepository.findActiveQuestion(
+                991102L, 1, ContentLearningLevel.LEVEL_4_TO_5, Locale.EN, Locale.KR))
         .isEmpty();
-    assertThat(scenarioQuestionQueryRepository.findActiveQuestion(991102L, 2, Locale.EN, Locale.KR))
+    assertThat(
+            scenarioQuestionQueryRepository.findActiveQuestion(
+                991102L, 2, ContentLearningLevel.LEVEL_4_TO_5, Locale.EN, Locale.KR))
         .isEmpty();
   }
 
@@ -99,22 +114,29 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         scenarioId);
   }
 
-  private void seedQuestion(long questionId, long scenarioId, int displayOrder, String status) {
+  private void seedQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      ContentLearningLevel questionLevelGroup,
+      String status) {
     jdbcTemplate.update(
         """
                         insert into scenario_question (
                             id,
                             scenario_id,
                             display_order,
+                            question_level_group,
                             status,
                             created_at,
                             updated_at
                         )
-                        values (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        values (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId,
         displayOrder,
+        questionLevelGroup.name(),
         status);
   }
 
