@@ -52,7 +52,8 @@ public class PronunciationCoachingTemplate {
   /**
    * 음소 오류 코칭 문구를 만든다.
    *
-   * <p>예: targetSpan "th", userSpan "ss" → "'th'가 'ss'처럼 들렸어요. 혀끝을 윗니 뒤에 살짝 대고 소리 내보세요."
+   * <p>예: targetSpan "th", userSpan "ss" → "'th'가 'ss'처럼 들렸어요. 혀끝을 윗니와 아랫니 사이에 살짝 내밀어 대고 바람을
+   * 내보내세요."
    *
    * <p>한 단어에 오류가 여러 곳이어도 span은 AI가 고른 가장 두드러진 1곳만 온다. 나머지 차이는 화면의 respelling 대조(원어민 표기 vs 유저 표기)에서
    * 드러난다.

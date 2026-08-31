@@ -60,6 +60,6 @@ public record PronunciationAnalysisResponse(
           Integer userStressIndex,
       @Schema(
               description = "코칭 문구. 오류 단어만",
-              example = "'th'가 'ss'처럼 들렸어요. 혀끝을 윗니 뒤에 살짝 대고 소리 내보세요.")
+              example = "'th'가 'ss'처럼 들렸어요. 혀끝을 윗니와 아랫니 사이에 살짝 내밀어 대고 바람을 내보내세요.")
           String coachingText) {}
 }
