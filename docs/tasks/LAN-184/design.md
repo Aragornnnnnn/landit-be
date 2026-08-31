@@ -210,7 +210,7 @@ scheduled-notification:content:v1
 - `NotificationContentVariant` enum 값은 A1-A4, R0-R6, 표현 동적/일반, 스몰톡 동적/일반을 명시한다.
 - structured log에는 `userProfileId`, `scheduledDate`, `notificationType`, `contentVariant`만 기록하고 닉네임·표현·주제·전체 제목·본문은 기록하지 않는다.
 
-Flyway는 `classpath:db/migration`과 `classpath:db/{vendor}`를 함께 읽는다. 현재 체크아웃의 전체 위치를 합치면 최고 버전은 공통 migration의 V71이므로 새 migration은 `V72__add_push_delivery_content_variant.sql`로 만든다. H2와 PostgreSQL에 동일한 `ALTER TABLE ... ADD COLUMN`을 적용할 수 있어 vendor별 파일은 추가하지 않는다.
+Flyway는 `classpath:db/migration`과 `classpath:db/{vendor}`를 함께 읽는다. 최신 `origin/develop`의 전체 위치를 합치면 최고 버전은 공통 migration의 V73이므로 이번 migration은 `V74__add_push_delivery_content_variant.sql`과 `V75__add_learning_session_user_started_index.sql`로 만든다. 두 SQL은 H2와 PostgreSQL에 동일하게 적용할 수 있어 vendor별 파일은 추가하지 않는다.
 
 ## 재시도와 상태 변경
 
