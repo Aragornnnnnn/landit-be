@@ -59,6 +59,7 @@ public class NotificationTargetPageQueryService {
         new MapSqlParameterSource()
             .addValue("userIds", userIds)
             .addValue("scheduledDate", scheduledDate)
+            .addValue("yesterdayDate", scheduledDate.minusDays(1))
             .addValue("dayStart", scheduledDate.atStartOfDay())
             .addValue("nextDayStart", scheduledDate.plusDays(1).atStartOfDay());
     loadProfileRows(parameters, rowsByUserId);
@@ -226,14 +227,21 @@ public class NotificationTargetPageQueryService {
       LocalDate scheduledDate) {
     jdbcTemplate.query(
         """
-        select user_profile_id, activity_date, active_day
+        select user_profile_id,
+               max(case when activity_date = :scheduledDate and active_day = true then 1 else 0 end)
+                   as active_today,
+               max(case when activity_date = :yesterdayDate and active_day = true then 1 else 0 end)
+                   as active_yesterday,
+               max(case
+                     when activity_date < :scheduledDate and active_day = true then activity_date
+                   end) as last_active_date
         from user_daily_activity
         where user_profile_id in (:userIds)
           and activity_date <= :scheduledDate
-        order by user_profile_id, activity_date desc
+        group by user_profile_id
         """,
         parameters,
-        (RowCallbackHandler) resultSet -> addActivityRow(resultSet, rowsByUserId, scheduledDate));
+        (RowCallbackHandler) resultSet -> addActivityRow(resultSet, rowsByUserId));
   }
 
   /** 사용자별 현재·최장 스트릭 요약을 일괄 조회한다. */
@@ -307,23 +315,15 @@ public class NotificationTargetPageQueryService {
             resultSet.getString("target_expression_text")));
   }
 
-  private void addActivityRow(
-      ResultSet resultSet, Map<Long, UserTargetRows> rowsByUserId, LocalDate scheduledDate)
+  private void addActivityRow(ResultSet resultSet, Map<Long, UserTargetRows> rowsByUserId)
       throws SQLException {
     UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
-    LocalDate activityDate = resultSet.getObject("activity_date", LocalDate.class);
-    boolean activeDay = resultSet.getBoolean("active_day");
-    if (activityDate.equals(scheduledDate)) {
-      rows.activeToday = activeDay;
-    }
-    if (activityDate.equals(scheduledDate.minusDays(1))) {
-      rows.activeYesterday = activeDay;
-    }
-    if (activeDay && activityDate.isBefore(scheduledDate)) {
+    rows.activeToday = resultSet.getInt("active_today") == 1;
+    rows.activeYesterday = resultSet.getInt("active_yesterday") == 1;
+    java.sql.Date lastActiveSqlDate = resultSet.getDate("last_active_date");
+    if (lastActiveSqlDate != null) {
       rows.priorActiveDayHistory = true;
-      if (rows.lastActiveDate == null || activityDate.isAfter(rows.lastActiveDate)) {
-        rows.lastActiveDate = activityDate;
-      }
+      rows.lastActiveDate = lastActiveSqlDate.toLocalDate();
     }
   }
 
