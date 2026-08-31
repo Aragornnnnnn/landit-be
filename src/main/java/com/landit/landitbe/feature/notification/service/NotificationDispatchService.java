@@ -136,6 +136,7 @@ public class NotificationDispatchService {
         command.userProfileId(),
         userPushTokenId,
         command.notificationType(),
+        command.contentVariant(),
         deduplicationKeyPrefix(command.eventId()) + userPushTokenId,
         command.title(),
         command.body(),

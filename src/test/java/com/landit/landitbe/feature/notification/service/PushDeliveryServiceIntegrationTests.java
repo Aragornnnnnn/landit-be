@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
+import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
 import com.landit.landitbe.feature.notification.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
@@ -68,6 +69,15 @@ class PushDeliveryServiceIntegrationTests {
     assertThat(pushDeliveryService.prepare(command)).isPresent();
     assertThat(pushDeliveryService.prepare(command)).isEmpty();
     assertThat(pushDeliveryRepository.count()).isEqualTo(1);
+  }
+
+  /** 예약 알림의 문구 변형을 동일한 발송 이력에 저장한다. */
+  @Test
+  void persistsContentVariantSnapshot() {
+    PreparedPushDelivery prepared = pushDeliveryService.prepare(commandWithVariant()).orElseThrow();
+
+    assertThat(pushDeliveryRepository.findById(prepared.pushDeliveryId()).orElseThrow().getContentVariant())
+        .isEqualTo(NotificationContentVariant.EXPRESSION_DYNAMIC);
   }
 
   /** 일시 오류가 기록된 발송은 같은 이력 ID로 재시도하고 새 행을 만들지 않는다. */
@@ -139,5 +149,18 @@ class PushDeliveryServiceIntegrationTests {
         "복습할 시간이에요",
         "오늘의 표현을 다시 볼까요?",
         "/expressions");
+  }
+
+  private PreparePushDeliveryCommand commandWithVariant() {
+    LocalDate reviewDate = LocalDate.of(2026, 7, 24);
+    return new PreparePushDeliveryCommand(
+        USER_ID,
+        userPushToken.getId(),
+        NotificationType.CONTINUE_EXPRESSION,
+        NotificationContentVariant.EXPRESSION_DYNAMIC,
+        "review-reminder:" + reviewDate + ":" + USER_ID + ":" + userPushToken.getId(),
+        "“break the ice”, 어떤 상황에서 쓸까요?",
+        "오늘 시나리오에서 이어지는 표현을 배워보세요.",
+        "/expressions/scenario/10/100");
   }
 }

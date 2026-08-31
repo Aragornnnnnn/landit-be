@@ -39,6 +39,10 @@ public class PushDelivery extends BaseTimeEntity {
   @Column(name = "notification_type", nullable = false, length = 40)
   private NotificationType notificationType;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "content_variant", length = 40)
+  private NotificationContentVariant contentVariant;
+
   @Column(name = "deduplication_key", nullable = false, length = 255, unique = true)
   private String deduplicationKey;
 
@@ -76,6 +80,7 @@ public class PushDelivery extends BaseTimeEntity {
       Long userPushTokenId,
       String sentExpoPushToken,
       NotificationType notificationType,
+      NotificationContentVariant contentVariant,
       String deduplicationKey,
       String title,
       String body,
@@ -85,6 +90,7 @@ public class PushDelivery extends BaseTimeEntity {
     this.userPushTokenId = userPushTokenId;
     this.sentExpoPushToken = sentExpoPushToken;
     this.notificationType = notificationType;
+    this.contentVariant = contentVariant;
     this.deduplicationKey = deduplicationKey;
     this.title = title;
     this.body = body;
@@ -100,6 +106,7 @@ public class PushDelivery extends BaseTimeEntity {
    * @param userPushTokenId 발송 대상 사용자 Push Token 식별자
    * @param sentExpoPushToken 이번 발송에 사용한 Expo Push Token
    * @param notificationType 발송 알림 유형
+   * @param contentVariant 알림 문구 변형. 정책이 없는 수동 발송은 {@code null}
    * @param deduplicationKey 중복 발송 방지 키
    * @param title 알림 제목
    * @param body 알림 본문
@@ -112,6 +119,7 @@ public class PushDelivery extends BaseTimeEntity {
       Long userPushTokenId,
       String sentExpoPushToken,
       NotificationType notificationType,
+      NotificationContentVariant contentVariant,
       String deduplicationKey,
       String title,
       String body,
@@ -122,6 +130,31 @@ public class PushDelivery extends BaseTimeEntity {
         userPushTokenId,
         sentExpoPushToken,
         notificationType,
+        contentVariant,
+        deduplicationKey,
+        title,
+        body,
+        deepLink,
+        requestedAt);
+  }
+
+  /** 기존 호출자의 문구 변형 없는 발송 이력을 생성한다. */
+  public static PushDelivery requested(
+      Long userProfileId,
+      Long userPushTokenId,
+      String sentExpoPushToken,
+      NotificationType notificationType,
+      String deduplicationKey,
+      String title,
+      String body,
+      String deepLink,
+      LocalDateTime requestedAt) {
+    return requested(
+        userProfileId,
+        userPushTokenId,
+        sentExpoPushToken,
+        notificationType,
+        null,
         deduplicationKey,
         title,
         body,

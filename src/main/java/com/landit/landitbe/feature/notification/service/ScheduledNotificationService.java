@@ -112,12 +112,15 @@ public class ScheduledNotificationService {
                 } else {
                   state.refresh(target.notificationType(), target.targetId(), latestActivityAt);
                 }
-                ScheduledNotificationContent content = ScheduledNotificationContent.from(target);
+                ScheduledNotificationContent content =
+                    ScheduledNotificationContent.from(
+                        target, page.inputs().get(userProfileId), scheduledDate);
                 commands.add(
                     new SendPushNotificationCommand(
                         eventId(scheduledDate, userProfileId),
                         userProfileId,
                         target.notificationType(),
+                        content.contentVariant(),
                         content.title(),
                         content.body(),
                         content.deepLink()));

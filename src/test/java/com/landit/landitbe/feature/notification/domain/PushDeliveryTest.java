@@ -28,6 +28,26 @@ class PushDeliveryTest {
     assertThat(SENT_EXPO_PUSH_TOKEN.equals(delivery.getSentExpoPushToken())).isTrue();
   }
 
+  /** 예약 알림 문구 변형을 발송 이력에 함께 스냅샷한다. */
+  @Test
+  void storesContentVariantInRequestedDelivery() {
+    PushDelivery delivery =
+        PushDelivery.requested(
+            1L,
+            2L,
+            SENT_EXPO_PUSH_TOKEN,
+            NotificationType.DAILY_SCENARIO_REMINDER,
+            NotificationContentVariant.SCENARIO_A1,
+            "scheduled:2026-07-24:1",
+            "오늘만 가능한 시나리오 도착 💌",
+            "자기 전 5분으로 래디에게 열매를 먹여주세요",
+            "/conversation/scenario/10",
+            REQUESTED_AT);
+
+    assertThat(delivery.getContentVariant())
+        .isEqualTo(NotificationContentVariant.SCENARIO_A1);
+  }
+
   /** Expo Ticket ID를 기록하면 접수 완료 상태로 전환한다. */
   @Test
   void acceptsExpoTicket() {

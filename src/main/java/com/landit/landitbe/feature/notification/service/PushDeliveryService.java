@@ -56,6 +56,7 @@ public class PushDeliveryService {
                 command.userPushTokenId(),
                 deliveryTarget.get().expoPushToken(),
                 command.notificationType(),
+                command.contentVariant(),
                 command.deduplicationKey(),
                 command.title(),
                 command.body(),
