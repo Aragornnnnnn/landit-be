@@ -63,8 +63,7 @@ class ScheduledNotificationPolicyTest {
   /** 최신 스몰톡 주제가 없으면 미해결 치환 문자열 없이 일반 문구로 대체한다. */
   @Test
   void fallsBackToGenericSmallTalkContentWithoutTitle() {
-    NotificationTargetSelectionInput input =
-        input(1L, "민수", true, 0L, List.of());
+    NotificationTargetSelectionInput input = input(1L, "민수", true, 0L, List.of());
     ScheduledNotificationContent content =
         ScheduledNotificationContent.from(
             new SelectedNotificationTarget(NotificationType.SMALL_TALK_REMINDER, null, null),
@@ -82,19 +81,7 @@ class ScheduledNotificationPolicyTest {
   void usesA4WhenYesterdayActivitySetsNewRecord() {
     NotificationTargetSelectionInput input =
         new NotificationTargetSelectionInput(
-            1L,
-            "민수",
-            10L,
-            false,
-            0L,
-            false,
-            true,
-            4,
-            4,
-            true,
-            0,
-            null,
-            List.of());
+            1L, "민수", 10L, false, 0L, false, true, 4, 4, true, 0, null, List.of());
 
     ScheduledNotificationContent content =
         ScheduledNotificationContent.from(

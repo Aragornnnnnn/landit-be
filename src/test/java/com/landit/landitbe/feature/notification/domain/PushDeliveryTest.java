@@ -44,8 +44,7 @@ class PushDeliveryTest {
             "/conversation/scenario/10",
             REQUESTED_AT);
 
-    assertThat(delivery.getContentVariant())
-        .isEqualTo(NotificationContentVariant.SCENARIO_A1);
+    assertThat(delivery.getContentVariant()).isEqualTo(NotificationContentVariant.SCENARIO_A1);
   }
 
   /** Expo Ticket ID를 기록하면 접수 완료 상태로 전환한다. */

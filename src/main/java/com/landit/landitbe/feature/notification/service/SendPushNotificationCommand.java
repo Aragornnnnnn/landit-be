@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.notification.service;
 
-import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
+import com.landit.landitbe.feature.notification.domain.NotificationType;
 
 /**
  * 한 사용자에게 보낼 푸시 알림의 이벤트와 표시 내용을 전달한다.
@@ -25,6 +25,7 @@ public record SendPushNotificationCommand(
     String body,
     String deepLink) {
 
+  /** 문구 변형이 없는 기존 발송 호출을 위한 명령을 생성한다. */
   public SendPushNotificationCommand(
       String eventId,
       Long userProfileId,

@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.notification.service;
 
-import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
+import com.landit.landitbe.feature.notification.domain.NotificationType;
 
 /**
  * 푸시 발송 이력을 선점하는 데 필요한 메시지 정보를 정의한다.
@@ -27,6 +27,7 @@ public record PreparePushDeliveryCommand(
     String body,
     String deepLink) {
 
+  /** 문구 변형이 없는 기존 발송 호출을 위한 명령을 생성한다. */
   public PreparePushDeliveryCommand(
       Long userProfileId,
       Long userPushTokenId,

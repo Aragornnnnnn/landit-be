@@ -72,7 +72,7 @@ class ScheduledNotificationServiceTest {
     when(notificationTargetPageQueryService.loadPage(501L, 500, scheduledDate))
         .thenReturn(new NotificationTargetPage(List.of(), Map.of(), List.of()));
     when(userNotificationStateRepository.findAllByUserProfileIdIn(any())).thenReturn(List.of());
-    when(notificationTargetSelectionService.select(any()))
+    when(notificationTargetSelectionService.select(any(), any(LocalDate.class)))
         .thenReturn(
             Optional.of(
                 new SelectedNotificationTarget(
@@ -89,7 +89,7 @@ class ScheduledNotificationServiceTest {
     verify(userNotificationStateRepository, times(2)).findAllByUserProfileIdIn(any());
     verify(notificationDispatchService, times(2)).sendAll(any());
     verify(userNotificationStateRepository, times(2)).saveAll(any());
-    verify(notificationTargetSelectionService, times(501)).select(any());
+    verify(notificationTargetSelectionService, times(501)).select(any(), eq(scheduledDate));
     verify(notificationTargetPageQueryService, times(3))
         .loadPage(any(Long.class), eq(500), eq(scheduledDate));
   }
@@ -104,7 +104,7 @@ class ScheduledNotificationServiceTest {
     when(notificationTargetPageQueryService.loadPage(0L, 500, scheduledDate)).thenReturn(userPage);
     when(notificationTargetPageQueryService.loadPage(1L, 500, scheduledDate)).thenReturn(emptyPage);
     when(userNotificationStateRepository.findAllByUserProfileIdIn(any())).thenReturn(List.of());
-    when(notificationTargetSelectionService.select(any()))
+    when(notificationTargetSelectionService.select(any(), any(LocalDate.class)))
         .thenReturn(
             Optional.of(
                 new SelectedNotificationTarget(

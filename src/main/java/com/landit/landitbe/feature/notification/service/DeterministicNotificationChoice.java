@@ -18,8 +18,7 @@ final class DeterministicNotificationChoice {
     if (count <= 0) {
       throw new IllegalArgumentException("후보 수는 0보다 커야 합니다.");
     }
-    String canonicalKey =
-        "v1|" + decisionScope + "|" + scheduledDate + "|" + userProfileId;
+    String canonicalKey = "v1|" + decisionScope + "|" + scheduledDate + "|" + userProfileId;
     byte[] digest = sha256(canonicalKey);
     long value = ByteBuffer.wrap(digest, 0, Long.BYTES).getLong();
     return (int) Math.floorMod(value, (long) count);
@@ -27,8 +26,7 @@ final class DeterministicNotificationChoice {
 
   private static byte[] sha256(String value) {
     try {
-      return MessageDigest.getInstance("SHA-256")
-          .digest(value.getBytes(StandardCharsets.UTF_8));
+      return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
     } catch (NoSuchAlgorithmException exception) {
       throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", exception);
     }

@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.notification.service;
 
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
-import com.landit.landitbe.feature.notification.domain.NotificationType;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -12,8 +11,7 @@ record ScheduledNotificationContent(
     NotificationContentVariant contentVariant, String title, String body, String deepLink) {
 
   private static final String CONTENT_DECISION_SCOPE = "scheduled-notification:content:v1";
-  private static final String SCENARIO_A2_BODY =
-      "오늘이 지나면 이 시나리오가 사라진대요😵‍💫\n자기 전 5분만 투자하세요";
+  private static final String SCENARIO_A2_BODY = "오늘이 지나면 이 시나리오가 사라진대요😵‍💫\n자기 전 5분만 투자하세요";
   private static final String SCENARIO_R0_TITLE = "어떤 하얀 뱁새가 그러는데,,";
   private static final List<NotificationContentVariant> SCENARIO_DEFAULT_VARIANTS =
       List.of(
@@ -127,12 +125,10 @@ record ScheduledNotificationContent(
       case SCENARIO_A1 -> "오늘만 가능한 시나리오 도착 💌";
       case SCENARIO_A2 -> SCENARIO_R0_TITLE;
       case SCENARIO_A3 -> "오늘 학습 포기하실 건가요? 🥺";
-      case SCENARIO_A4 ->
-          "🚨 오늘의 시나리오를 깨면 연속 " + (input.currentStreakDays() + 1) + "일 달성";
+      case SCENARIO_A4 -> "🚨 오늘의 시나리오를 깨면 연속 " + (input.currentStreakDays() + 1) + "일 달성";
       case SCENARIO_R0 -> SCENARIO_R0_TITLE;
       case SCENARIO_R1 -> "공든 탑이 무너지랴";
-      case SCENARIO_R2 ->
-          input.missedDayCount() + "일째 " + input.nickname() + "님을 기다리고 있어요…";
+      case SCENARIO_R2 -> input.missedDayCount() + "일째 " + input.nickname() + "님을 기다리고 있어요…";
       case SCENARIO_R3 -> "포기도 습관이다!";
       case SCENARIO_R4 -> "우리가 마음에 안 드시나요..?";
       case SCENARIO_R5 -> "어라 이상하다 왜 공부하러 안 오지?";
@@ -146,14 +142,11 @@ record ScheduledNotificationContent(
     return switch (variant) {
       case SCENARIO_A1 -> "자기 전 5분으로 래디에게 열매를 먹여주세요";
       case SCENARIO_A2, SCENARIO_R0 -> SCENARIO_A2_BODY;
-      case SCENARIO_A3 ->
-          "5분만 투자하면 열매를 얻을 수 있어요.\n오늘만 할 수 있는 시나리오가 당신을 기다리고 있어요 💌";
+      case SCENARIO_A3 -> "5분만 투자하면 열매를 얻을 수 있어요.\n오늘만 할 수 있는 시나리오가 당신을 기다리고 있어요 💌";
       case SCENARIO_A4 -> "5분 투자로 최고 기록을 달성해보세요!";
-      case SCENARIO_R1 ->
-          "어제 못했어도 오늘 공부하면 돼요‼️\n자기 전 5분으로 다시 학습을 시작하세요";
+      case SCENARIO_R1 -> "어제 못했어도 오늘 공부하면 돼요‼️\n자기 전 5분으로 다시 학습을 시작하세요";
       case SCENARIO_R2 -> "배고픈 래디에게 열매를 주세요😭";
-      case SCENARIO_R3 ->
-          input.nickname() + "님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺";
+      case SCENARIO_R3 -> input.nickname() + "님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺";
       case SCENARIO_R4 -> "영어 공부를 안 하시는 이유가 궁금해요.";
       case SCENARIO_R5 -> input.nickname() + "님이 이럴 사람이 아닌데…";
       case SCENARIO_R6 -> "제발 5분만 영어 공부해요 우리";
@@ -179,9 +172,7 @@ record ScheduledNotificationContent(
             : NotificationContentVariant.EXPRESSION_GENERIC;
     return new ScheduledNotificationContent(
         variant,
-        variant == NotificationContentVariant.EXPRESSION_DYNAMIC
-            ? title
-            : "표현 학습을 이어가 볼까요?",
+        variant == NotificationContentVariant.EXPRESSION_DYNAMIC ? title : "표현 학습을 이어가 볼까요?",
         "오늘 시나리오에서 이어지는 표현을 배워보세요.",
         "/expressions/scenario/"
             + target.scenarioId()

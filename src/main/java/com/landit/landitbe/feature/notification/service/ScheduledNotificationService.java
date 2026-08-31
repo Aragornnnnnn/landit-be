@@ -96,7 +96,7 @@ public class ScheduledNotificationService {
         continue;
       }
       notificationTargetSelectionService
-          .select(page.inputs().get(userProfileId))
+          .select(page.inputs().get(userProfileId), scheduledDate)
           .ifPresent(
               target -> {
                 LocalDateTime latestActivityAt = latestActivityAt(page.inputs().get(userProfileId));

@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
-import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
+import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
@@ -76,7 +76,11 @@ class PushDeliveryServiceIntegrationTests {
   void persistsContentVariantSnapshot() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(commandWithVariant()).orElseThrow();
 
-    assertThat(pushDeliveryRepository.findById(prepared.pushDeliveryId()).orElseThrow().getContentVariant())
+    assertThat(
+            pushDeliveryRepository
+                .findById(prepared.pushDeliveryId())
+                .orElseThrow()
+                .getContentVariant())
         .isEqualTo(NotificationContentVariant.EXPRESSION_DYNAMIC);
   }
 

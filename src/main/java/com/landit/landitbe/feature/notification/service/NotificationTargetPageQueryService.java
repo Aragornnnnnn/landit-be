@@ -371,8 +371,7 @@ public class NotificationTargetPageQueryService {
     private String latestFreeTalkTitle;
     private boolean latestFreeTalkTitleFound;
 
-    private NotificationTargetSelectionInput toInput(
-        Long userProfileId, LocalDate scheduledDate) {
+    private NotificationTargetSelectionInput toInput(Long userProfileId, LocalDate scheduledDate) {
       Long resolvedDailyScenarioId = dailyScenarioId;
       boolean dailyScenarioCompleted = dailyScenarioCompletionFound;
       if (!dailyScenarioCompletionFound) {
@@ -407,8 +406,7 @@ public class NotificationTargetPageQueryService {
       if (!priorActiveDayHistory || lastActiveDate == null) {
         return null;
       }
-      long count =
-          java.time.temporal.ChronoUnit.DAYS.between(lastActiveDate, scheduledDate) - 1;
+      long count = java.time.temporal.ChronoUnit.DAYS.between(lastActiveDate, scheduledDate) - 1;
       return count >= 0 && count <= Integer.MAX_VALUE ? (int) count : null;
     }
   }
