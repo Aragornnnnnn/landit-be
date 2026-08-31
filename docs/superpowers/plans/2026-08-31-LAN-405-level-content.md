@@ -99,8 +99,8 @@
 
 ### Task 4: 전체 검증과 기능 PR 준비
 
-- [ ] `./gradlew check`를 통과시킨다.
-- [ ] `git diff origin/develop...HEAD --check`를 통과시킨다.
-- [ ] diff에 `expression_level_group`, 신규 질문 데이터, 음원 URL이 없는지 확인한다.
-- [ ] 변경 성격별 논리 커밋을 남기고 작업 트리가 깨끗한지 확인한다.
+- [x] `./gradlew check`를 통과시킨다.
+- [x] `git diff origin/develop...HEAD --check`를 통과시킨다.
+- [x] diff에 `expression_level_group`, 신규 질문 데이터, 음원 URL이 없는지 확인한다.
+- [x] 변경 성격별 논리 커밋을 남기고 작업 트리가 깨끗한지 확인한다.
 - [ ] `develop` 대상 기능 PR에 기존 feature label과 assignee를 지정한다.
