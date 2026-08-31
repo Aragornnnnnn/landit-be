@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
@@ -185,6 +186,18 @@ public class UserProfileService {
     UserProfile userProfile = requireActive(userId);
 
     return new UserLocale(userProfile.getTargetLocale(), userProfile.getBaseLocale());
+  }
+
+  /**
+   * 활성 사용자의 학습 수준을 조회한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 사용자가 선택한 학습 수준. 미설정이면 {@code null}
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public UserLearningLevelResponse getLearningLevel(Long userId) {
+    return new UserLearningLevelResponse(requireActive(userId).getLearningLevel());
   }
 
   /**
