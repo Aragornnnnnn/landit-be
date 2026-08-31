@@ -13,4 +13,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "대화 캐릭터 정보")
 public record ConversationCharacterResponse(
     @Schema(description = "캐릭터 식별자", example = "chloe") String characterId,
-    @Schema(description = "활성 TTS 음성. 미설정 또는 비활성 음성이면 null") TtsVoiceResponse ttsVoice) {}
+    @Schema(
+            description = "활성 TTS 음성. 미설정 또는 비활성 음성이면 null",
+            nullable = true,
+            types = {"object", "null"})
+        TtsVoiceResponse ttsVoice) {}
