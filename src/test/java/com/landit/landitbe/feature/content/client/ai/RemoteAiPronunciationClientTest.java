@@ -56,12 +56,13 @@ class RemoteAiPronunciationClientTest {
                       "success": true,
                       "data": {
                         "words": [
-                          {"order": 1, "word": "There's", "status": "CORRECT"},
+                          {"order": 1, "word": "There's", "status": "CORRECT",
+                           "startMs": 120, "endMs": 480},
                           {"order": 2, "word": "nothing", "status": "PHONEME_ERROR",
-                           "userDisplay": "nuh·ssing",
+                           "startMs": 500, "endMs": 940, "userDisplay": "nuh·ssing",
                            "errorTargetSpan": "th", "errorUserSpan": "ss"},
                           {"order": 3, "word": "hiking", "status": "STRESS_ERROR",
-                           "userStressIndex": 1}
+                           "startMs": 1000, "endMs": 1400, "userStressIndex": 1}
                         ]
                       },
                       "error": null
