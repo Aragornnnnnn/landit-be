@@ -6,7 +6,14 @@ import com.landit.landitbe.feature.notification.domain.NotificationContentVarian
 import java.time.LocalDate;
 import java.util.List;
 
-/** 예약 학습 알림의 결정적 문구 변형과 유형별 딥링크를 정의한다. */
+/**
+ * 예약 학습 알림의 결정적 문구 변형과 유형별 딥링크다.
+ *
+ * @param contentVariant 선정된 문구 변형
+ * @param title 푸시 제목
+ * @param body 푸시 본문
+ * @param deepLink 알림 선택 시 이동할 앱 딥링크
+ */
 record ScheduledNotificationContent(
     NotificationContentVariant contentVariant, String title, String body, String deepLink) {
 

@@ -23,7 +23,13 @@ public class NotificationTargetSelectionService {
     return selectWithExpressionPriority(input);
   }
 
-  /** 예약 날짜를 포함한 학습 상태에서 결정적으로 예약 알림 하나를 선정한다. */
+  /**
+   * 예약 날짜를 포함한 학습 상태에서 결정적으로 예약 알림 하나를 선정한다.
+   *
+   * @param input 사용자별 일괄 조회 결과
+   * @param scheduledDate 예약 알림을 계산할 KST 날짜
+   * @return 발송할 알림 대상. 오늘의 시나리오를 결정할 수 없거나 모든 알림 조건이 소진되면 빈 값
+   */
   public Optional<SelectedNotificationTarget> select(
       NotificationTargetSelectionInput input, LocalDate scheduledDate) {
     if (input.dailyScenarioId() == null) {

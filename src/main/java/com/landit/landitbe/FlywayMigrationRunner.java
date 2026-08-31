@@ -2,6 +2,7 @@
 
 package com.landit.landitbe;
 
+import java.util.Map;
 import org.flywaydb.core.Flyway;
 
 /** GitHub Actions에서 애플리케이션 배포 전 Flyway 마이그레이션만 실행한다. */
@@ -17,6 +18,7 @@ public final class FlywayMigrationRunner {
    */
   public static void main(String[] args) {
     Flyway.configure()
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
         .dataSource(requiredEnv("DB_URL"), requiredEnv("DB_USERNAME"), requiredEnv("DB_PASSWORD"))
         .locations("classpath:db/migration", "classpath:db/postgresql")
         .load()
