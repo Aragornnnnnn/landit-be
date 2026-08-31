@@ -13,6 +13,14 @@ record ScheduledNotificationContent(
   private static final String CONTENT_DECISION_SCOPE = "scheduled-notification:content:v1";
   private static final String SCENARIO_A2_BODY = "오늘이 지나면 이 시나리오가 사라진대요😵‍💫\n자기 전 5분만 투자하세요";
   private static final String SCENARIO_R0_TITLE = "어떤 하얀 뱁새가 그러는데,,";
+  private static final List<String> RESERVATION_MARKERS =
+      List.of(
+          "OO",
+          "{nickname}",
+          "{missedDayCount}",
+          "{expectedStreakDays}",
+          "{targetExpressionText}",
+          "{latestFreeTalkTitle}");
   private static final List<NotificationContentVariant> SCENARIO_DEFAULT_VARIANTS =
       List.of(
           NotificationContentVariant.SCENARIO_A1,
@@ -102,7 +110,9 @@ record ScheduledNotificationContent(
     } else {
       variants = List.of(NotificationContentVariant.SCENARIO_R0);
     }
-    if (input.nickname() == null || input.nickname().isBlank()) {
+    if (input.nickname() == null
+        || input.nickname().isBlank()
+        || containsReservationMarker(input.nickname())) {
       variants =
           variants.stream()
               .filter(
@@ -165,7 +175,9 @@ record ScheduledNotificationContent(
             .findFirst()
             .orElse(null);
     String title =
-        targetExpressionText == null || targetExpressionText.isBlank()
+        targetExpressionText == null
+                || targetExpressionText.isBlank()
+                || containsReservationMarker(targetExpressionText)
             ? null
             : "“" + targetExpressionText + "”, 어떤 상황에서 쓸까요?";
     NotificationContentVariant variant =
@@ -186,11 +198,15 @@ record ScheduledNotificationContent(
   private static ScheduledNotificationContent smallTalkContent(
       SelectedNotificationTarget target, NotificationTargetSelectionInput input) {
     String title = "하던 얘기 이어서 해봐요";
-    String body = input.latestFreeTalkTitle() + " 이야기, 테디와 조금 더 나눠볼까요?";
-    boolean dynamic =
-        input.latestFreeTalkTitle() != null
-            && !input.latestFreeTalkTitle().isBlank()
-            && codePointCount(body) <= 500;
+    String latestFreeTalkTitle = input.latestFreeTalkTitle();
+    String dynamicBody =
+        latestFreeTalkTitle != null
+                && !latestFreeTalkTitle.isBlank()
+                && !containsReservationMarker(latestFreeTalkTitle)
+            ? latestFreeTalkTitle + " 이야기, 테디와 조금 더 나눠볼까요?"
+            : null;
+    boolean dynamic = dynamicBody != null && codePointCount(dynamicBody) <= 500;
+    String body = dynamic ? dynamicBody : "테디가 당신과의 대화를 애타게 기다려요.";
     NotificationContentVariant variant =
         dynamic
             ? NotificationContentVariant.SMALL_TALK_DYNAMIC
@@ -198,8 +214,12 @@ record ScheduledNotificationContent(
     return new ScheduledNotificationContent(
         variant,
         dynamic ? title : "오늘은 스몰톡 안 하시나요? 🥺",
-        dynamic ? body : "테디가 당신과의 대화를 애타게 기다려요.",
+        body,
         "/smalltalk" + campaign("small_talk_reminder"));
+  }
+
+  private static boolean containsReservationMarker(String value) {
+    return RESERVATION_MARKERS.stream().anyMatch(value::contains);
   }
 
   private static int codePointCount(String value) {

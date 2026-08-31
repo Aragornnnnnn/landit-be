@@ -8,7 +8,10 @@ import com.landit.landitbe.feature.notification.domain.NotificationContentVarian
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** 예약 푸시 개인화 정책의 유형 선택과 문구 fallback을 검증한다. */
 class ScheduledNotificationPolicyTest {
@@ -76,6 +79,41 @@ class ScheduledNotificationPolicyTest {
     assertThat(content.body()).doesNotContain("null", "{latestFreeTalkTitle}");
   }
 
+  /** 예약 표식이 최신 프리톡 제목에 들어오면 개인화하지 않고 일반 문구를 사용한다. */
+  @Test
+  void fallsBackToGenericSmallTalkContentWithReservationMarker() {
+    NotificationTargetSelectionInput input = inputWithLatestFreeTalkTitle("{latestFreeTalkTitle}");
+    ScheduledNotificationContent content =
+        ScheduledNotificationContent.from(
+            new SelectedNotificationTarget(NotificationType.SMALL_TALK_REMINDER, null, null),
+            input,
+            SCHEDULED_DATE);
+
+    assertThat(content.contentVariant()).isEqualTo(NotificationContentVariant.SMALL_TALK_GENERIC);
+    assertNoReservationMarkers(content);
+  }
+
+  /** 예약 표식이 표현 원문에 들어오면 개인화하지 않고 일반 문구를 사용한다. */
+  @Test
+  void fallsBackToGenericExpressionContentWithReservationMarker() {
+    NotificationTargetSelectionInput input =
+        input(
+            1L,
+            "민수",
+            true,
+            1L,
+            List.of(
+                new ExpressionNotificationCandidate(10L, 100L, false, "{targetExpressionText}")));
+    ScheduledNotificationContent content =
+        ScheduledNotificationContent.from(
+            new SelectedNotificationTarget(NotificationType.CONTINUE_EXPRESSION, 100L, 10L),
+            input,
+            SCHEDULED_DATE);
+
+    assertThat(content.contentVariant()).isEqualTo(NotificationContentVariant.EXPRESSION_GENERIC);
+    assertNoReservationMarkers(content);
+  }
+
   /** 표현 제목은 Unicode code point 255자까지 허용하고 초과하면 일반 문구를 사용한다. */
   @Test
   void appliesExpressionCodePointBoundary() {
@@ -130,9 +168,8 @@ class ScheduledNotificationPolicyTest {
   /** R3은 닉네임 치환 결과의 고정된 문구와 개행을 유지한다. */
   @Test
   void preservesR3MessageWording() {
-    NotificationTargetSelectionInput input =
-        new NotificationTargetSelectionInput(
-            1L, "민수", 10L, false, 0L, false, false, null, null, true, 4, null, List.of());
+    long userProfileId = findUserProfileIdForVariant(NotificationContentVariant.SCENARIO_R3, "민수");
+    NotificationTargetSelectionInput input = missedScenarioInput(userProfileId, "민수");
 
     ScheduledNotificationContent content =
         ScheduledNotificationContent.from(
@@ -140,9 +177,35 @@ class ScheduledNotificationPolicyTest {
             input,
             SCHEDULED_DATE);
 
-    if (content.contentVariant() == NotificationContentVariant.SCENARIO_R3) {
-      assertThat(content.body()).isEqualTo("하지만 민수님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺");
-    }
+    assertThat(content.contentVariant()).isEqualTo(NotificationContentVariant.SCENARIO_R3);
+    assertThat(content.body()).isEqualTo("하지만 민수님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺");
+  }
+
+  /** 닉네임에 예약 표식이 들어오면 닉네임 사용 변형을 후보에서 제외한다. */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "OO",
+        "{nickname}",
+        "{missedDayCount}",
+        "{expectedStreakDays}",
+        "{targetExpressionText}",
+        "{latestFreeTalkTitle}"
+      })
+  void excludesNicknameVariantsWhenNicknameContainsReservationMarker(String marker) {
+    long userProfileId = findUserProfileIdForNicknameVariant("민수");
+    ScheduledNotificationContent content =
+        ScheduledNotificationContent.from(
+            new SelectedNotificationTarget(NotificationType.DAILY_SCENARIO_REMINDER, 10L, null),
+            missedScenarioInput(userProfileId, marker),
+            SCHEDULED_DATE);
+
+    assertThat(content.contentVariant())
+        .isNotIn(
+            NotificationContentVariant.SCENARIO_R2,
+            NotificationContentVariant.SCENARIO_R3,
+            NotificationContentVariant.SCENARIO_R5);
+    assertNoReservationMarkers(content);
   }
 
   /** 어제 활동으로 최고 기록을 갱신하면 시나리오 A4를 강제한다. */
@@ -195,5 +258,75 @@ class ScheduledNotificationPolicyTest {
   private NotificationTargetSelectionInput inputWithLatestFreeTalkTitle(String latestTitle) {
     return new NotificationTargetSelectionInput(
         1L, "민수", 10L, true, 0L, false, false, null, null, false, null, latestTitle, List.of());
+  }
+
+  private NotificationTargetSelectionInput missedScenarioInput(
+      long userProfileId, String nickname) {
+    return new NotificationTargetSelectionInput(
+        userProfileId,
+        nickname,
+        10L,
+        false,
+        0L,
+        false,
+        false,
+        null,
+        null,
+        true,
+        4,
+        null,
+        List.of());
+  }
+
+  private long findUserProfileIdForVariant(
+      NotificationContentVariant expectedVariant, String nickname) {
+    return LongStream.rangeClosed(1L, 10_000L)
+        .filter(
+            userProfileId ->
+                ScheduledNotificationContent.from(
+                            new SelectedNotificationTarget(
+                                NotificationType.DAILY_SCENARIO_REMINDER, 10L, null),
+                            missedScenarioInput(userProfileId, nickname),
+                            SCHEDULED_DATE)
+                        .contentVariant()
+                    == expectedVariant)
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private long findUserProfileIdForNicknameVariant(String nickname) {
+    return LongStream.rangeClosed(1L, 10_000L)
+        .filter(
+            userProfileId ->
+                List.of(
+                        NotificationContentVariant.SCENARIO_R2,
+                        NotificationContentVariant.SCENARIO_R3,
+                        NotificationContentVariant.SCENARIO_R5)
+                    .contains(
+                        ScheduledNotificationContent.from(
+                                new SelectedNotificationTarget(
+                                    NotificationType.DAILY_SCENARIO_REMINDER, 10L, null),
+                                missedScenarioInput(userProfileId, nickname),
+                                SCHEDULED_DATE)
+                            .contentVariant()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private void assertNoReservationMarkers(ScheduledNotificationContent content) {
+    for (String marker : reservationMarkers()) {
+      assertThat(content.title()).doesNotContain(marker);
+      assertThat(content.body()).doesNotContain(marker);
+    }
+  }
+
+  private List<String> reservationMarkers() {
+    return List.of(
+        "OO",
+        "{nickname}",
+        "{missedDayCount}",
+        "{expectedStreakDays}",
+        "{targetExpressionText}",
+        "{latestFreeTalkTitle}");
   }
 }
