@@ -106,6 +106,16 @@ public class UserProfile extends BaseTimeEntity {
     this.learningLevel = learningLevel;
   }
 
+  /**
+   * 푸시 권한을 허용 상태로 갱신한다.
+   *
+   * @param updatedAt 권한 상태 갱신 시각
+   */
+  public void grantPushPermission(LocalDateTime updatedAt) {
+    this.pushPermissionStatus = PushPermissionStatus.GRANTED;
+    this.pushPermissionUpdatedAt = updatedAt;
+  }
+
   /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
   public void withdraw() {
     this.profileImageUrl = null;

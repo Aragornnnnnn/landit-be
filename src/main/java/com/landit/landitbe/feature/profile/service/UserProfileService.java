@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -196,6 +197,17 @@ public class UserProfileService {
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
     requireActive(userId).updateLearningLevel(learningLevel);
+  }
+
+  /**
+   * 활성 사용자의 푸시 권한을 허용 상태로 갱신한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional
+  public void grantPushPermission(Long userId) {
+    requireActiveForUpdate(userId).grantPushPermission(LocalDateTime.now());
   }
 
   /**
