@@ -44,6 +44,7 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
                 slv.userOpeningInstruction,
                 openingQuestionVariant.innerThought,
                 openingQuestionVariant.innerThoughtType,
+                s.characterId,
                 tv.provider,
                 tv.model,
                 tv.providerVoiceId,
