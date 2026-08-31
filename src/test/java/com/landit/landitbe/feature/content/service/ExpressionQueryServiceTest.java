@@ -237,6 +237,8 @@ class ExpressionQueryServiceTest {
     WritingExpression expression = learningExpression();
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
+    // 완료 이력이 있는 사용자로 가정해 완료 여부가 응답에 실리는지 함께 본다.
+    when(learningProgressService.hasCompletedExpression(USER_ID, EXPRESSION_ID)).thenReturn(true);
 
     // when: getExpressionForLearning()를 호출하면
     ExpressionLearningResponse response =
@@ -244,6 +246,7 @@ class ExpressionQueryServiceTest {
 
     // then: 응답에 표현 상세 정보가 담겨서 반환된다.
     assertThat(response.expressionId()).isEqualTo(EXPRESSION_ID);
+    assertThat(response.completed()).isTrue();
     assertThat(response.targetExpressionText()).isEqualTo("blow my mind");
     assertThat(response.baseExpressionMeaningText()).isEqualTo("끝내주게 놀랍다");
     assertThat(response.usageDescription()).isEqualTo("usage-description입니다.");
