@@ -5,15 +5,20 @@ package com.landit.landitbe.feature.profile.service;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
+import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
+import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
+import com.landit.landitbe.shared.domain.AccentLocale;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class UserProfileService {
+
+  private static final List<AccentLocale> SUPPORTED_ACCENT_LOCALES =
+      List.of(AccentLocale.EN_US, AccentLocale.EN_GB, AccentLocale.EN_AU);
 
   private final UserProfileRepository userProfileRepository;
 
@@ -188,6 +196,18 @@ public class UserProfileService {
   }
 
   /**
+   * 활성 사용자의 학습 수준을 조회한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 사용자가 선택한 학습 수준. 미설정이면 {@code null}
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public UserLearningLevelResponse getLearningLevel(Long userId) {
+    return new UserLearningLevelResponse(requireActive(userId).getLearningLevel());
+  }
+
+  /**
    * 활성 사용자의 학습 수준을 갱신한다.
    *
    * @param userId 갱신할 사용자 ID
@@ -197,6 +217,40 @@ public class UserProfileService {
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
     requireActive(userId).updateLearningLevel(learningLevel);
+  }
+
+  /**
+   * 지원하는 영어 억양 목록을 반환한다.
+   *
+   * @return 미국, 영국, 호주 억양 선택지
+   */
+  @Transactional(readOnly = true)
+  public List<AccentLocaleOptionResponse> getAccentLocales() {
+    return SUPPORTED_ACCENT_LOCALES.stream().map(AccentLocaleOptionResponse::from).toList();
+  }
+
+  /**
+   * 활성 사용자의 현재 영어 억양을 반환한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 사용자의 현재 영어 억양
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public UserAccentLocaleResponse getAccentLocale(Long userId) {
+    return UserAccentLocaleResponse.from(requireActive(userId).getAccentLocale());
+  }
+
+  /**
+   * 활성 사용자의 영어 억양을 갱신한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param accentLocale 선택한 영어 억양
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional
+  public void updateAccentLocale(Long userId, AccentLocale accentLocale) {
+    requireActive(userId).updateAccentLocale(accentLocale);
   }
 
   /**

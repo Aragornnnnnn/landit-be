@@ -198,11 +198,12 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
             .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
-            .andExpect(jsonPath("$.data.characterId").value("chloe"))
+            .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
             .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
-            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
             .andExpect(
                 jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
             .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
@@ -260,9 +261,10 @@ class FreeTalkSessionApiIntegrationTests {
                     .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"marco\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.startMode").value("USER_FIRST"))
-            .andExpect(jsonPath("$.data.characterId").value("marco"))
-            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
+            .andExpect(jsonPath("$.data.character.characterId").value("marco"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
             .andExpect(jsonPath("$.data.title").value(nullValue()))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andReturn();
@@ -299,7 +301,8 @@ class FreeTalkSessionApiIntegrationTests {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"teddy\"}"))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-draco-en"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-draco-en"))
             .andReturn();
     long sessionId =
         objectMapper

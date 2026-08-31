@@ -350,16 +350,21 @@ class ScenarioListApiIntegrationTests {
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThoughtType")
                 .value("GOOD"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.provider")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.characterId")
+                .value("chloe"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.provider")
                 .value("OPENROUTER"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.model")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.model")
                 .value("deepgram/aura-2"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
+            jsonPath(
+                    "$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice"
+                        + ".providerVoiceId")
                 .value("aura-2-luna-en"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.gender")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.gender")
                 .value("FEMALE"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
@@ -436,10 +441,10 @@ class ScenarioListApiIntegrationTests {
                     "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice")
                 .value(nullValue()))
         .andExpect(
-            jsonPath("$.data.categories[1].scenarios[0].openingPreview.ttsVoice")
+            jsonPath("$.data.categories[1].scenarios[0].openingPreview.character.ttsVoice")
                 .value(nullValue()));
   }
 

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.dto;
 
+import com.landit.landitbe.feature.content.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.domain.SessionType;
@@ -13,10 +14,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param sessionId 생성된 학습 세션 ID
  * @param sessionType 세션 타입
  * @param startMode 첫 발화 주체
- * @param characterId 선택한 프리톡 캐릭터 식별자
+ * @param character 선택한 프리톡 캐릭터 정보
  * @param title 대화 제목
  * @param speakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
- * @param ttsVoice AI 상대의 TTS 음성
  * @param currentMessage AI 선시작의 첫 메시지
  */
 @Schema(description = "프리톡 세션 시작 응답")
@@ -24,10 +24,9 @@ public record FreeTalkSessionStartResponse(
     @Schema(description = "생성된 학습 세션 ID") Long sessionId,
     @Schema(description = "세션 타입", example = "FREE_TALK") String sessionType,
     @Schema(description = "첫 발화 주체") String startMode,
-    @Schema(description = "프리톡 캐릭터 식별자", example = "chloe") String characterId,
+    @Schema(description = "프리톡 캐릭터 정보") ConversationCharacterResponse character,
     @Schema(description = "AI 선시작 주제명. 사용자 선시작은 null") String title,
     @Schema(description = "사용자 일일 발화 시간 제한 밀리초", example = "60000") long speakingTimeLimitMs,
-    @Schema(description = "프리톡 AI 상대의 TTS 음성") TtsVoiceResponse ttsVoice,
     @Schema(description = "AI 선시작의 첫 AI 메시지. 사용자 선시작은 null")
         CurrentMessageResponse currentMessage) {
 
@@ -55,10 +54,9 @@ public record FreeTalkSessionStartResponse(
         sessionId,
         SessionType.FREE_TALK.name(),
         startMode,
-        characterId,
+        new ConversationCharacterResponse(characterId, ttsVoice),
         title,
         SPEAKING_TIME_LIMIT_MS,
-        ttsVoice,
         currentMessage);
   }
 

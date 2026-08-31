@@ -149,14 +149,15 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.error").value(nullValue()))
             .andExpect(jsonPath("$.data.sessionId").value(notNullValue()))
             .andExpect(jsonPath("$.data.scenarioId").value(2001))
-            .andExpect(jsonPath("$.data.characterId").value("chloe"))
+            .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"))
             .andExpect(jsonPath("$.data.firstSpeaker").value("AI"))
             .andExpect(jsonPath("$.data.userOpeningInstruction").value(nullValue()))
-            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(jsonPath("$.data.ttsVoice.model").value("deepgram/aura-2"))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
-            .andExpect(jsonPath("$.data.ttsVoice.gender").value("FEMALE"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.model").value("deepgram/aura-2"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.gender").value("FEMALE"))
             .andExpect(jsonPath("$.data.currentMessage.messageId").value(notNullValue()))
             .andExpect(jsonPath("$.data.currentMessage.turnNumber").value(1))
             .andExpect(jsonPath("$.data.currentMessage.messageSequence").value(1))
@@ -1871,9 +1872,11 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.firstSpeaker").value("USER"))
             .andExpect(
                 jsonPath("$.data.userOpeningInstruction").value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
-            .andExpect(jsonPath("$.data.ttsVoice.model").value("deepgram/aura-2"))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
-            .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
+            .andExpect(jsonPath("$.data.character.characterId").value("marco"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.model").value("deepgram/aura-2"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.gender").value("MALE"))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
             .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(3))
@@ -1927,7 +1930,8 @@ class ScenarioSessionApiIntegrationTests {
             post("/api/v1/scenarios/2011/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.data.ttsVoice").value(nullValue()));
+        .andExpect(jsonPath("$.data.character.characterId").value("test-990201"))
+        .andExpect(jsonPath("$.data.character.ttsVoice").value(nullValue()));
   }
 
   @Test
