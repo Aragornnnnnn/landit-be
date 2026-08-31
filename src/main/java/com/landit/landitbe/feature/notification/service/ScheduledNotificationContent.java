@@ -97,8 +97,10 @@ record ScheduledNotificationContent(
               NotificationContentVariant.SCENARIO_R4,
               NotificationContentVariant.SCENARIO_R5,
               NotificationContentVariant.SCENARIO_R6);
-    } else {
+    } else if (missedDayCount == 0) {
       variants = SCENARIO_DEFAULT_VARIANTS;
+    } else {
+      variants = List.of(NotificationContentVariant.SCENARIO_R0);
     }
     if (input.nickname() == null || input.nickname().isBlank()) {
       variants =
@@ -125,7 +127,7 @@ record ScheduledNotificationContent(
       case SCENARIO_A1 -> "오늘만 가능한 시나리오 도착 💌";
       case SCENARIO_A2 -> SCENARIO_R0_TITLE;
       case SCENARIO_A3 -> "오늘 학습 포기하실 건가요? 🥺";
-      case SCENARIO_A4 -> "🚨 오늘의 시나리오를 깨면 연속 " + (input.currentStreakDays() + 1) + "일 달성";
+      case SCENARIO_A4 -> "🚨 오늘의 시나리오를 깨면 연속 " + ((long) input.currentStreakDays() + 1) + "일 달성";
       case SCENARIO_R0 -> SCENARIO_R0_TITLE;
       case SCENARIO_R1 -> "공든 탑이 무너지랴";
       case SCENARIO_R2 -> input.missedDayCount() + "일째 " + input.nickname() + "님을 기다리고 있어요…";
@@ -146,7 +148,7 @@ record ScheduledNotificationContent(
       case SCENARIO_A4 -> "5분 투자로 최고 기록을 달성해보세요!";
       case SCENARIO_R1 -> "어제 못했어도 오늘 공부하면 돼요‼️\n자기 전 5분으로 다시 학습을 시작하세요";
       case SCENARIO_R2 -> "배고픈 래디에게 열매를 주세요😭";
-      case SCENARIO_R3 -> input.nickname() + "님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺";
+      case SCENARIO_R3 -> "하지만 " + input.nickname() + "님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺";
       case SCENARIO_R4 -> "영어 공부를 안 하시는 이유가 궁금해요.";
       case SCENARIO_R5 -> input.nickname() + "님이 이럴 사람이 아닌데…";
       case SCENARIO_R6 -> "제발 5분만 영어 공부해요 우리";
