@@ -39,7 +39,7 @@
 - Produces: `AppleUserMigrationCandidate(long migrationId, long oauthIdentityId, String providerUserId, String transferSub)`
 - Produces: `AppleUserMigrationSummary(long targetCount, long successCount, long failureCount, long unresolvedCount)` and `boolean completed()`
 
-- [ ] **Step 1: Write failing repository integration tests**
+- [x] **Step 1: Write failing repository integration tests**
 
 Create an H2 schema containing `user_profile` and `oauth_identity`, apply `V74`, and use literal fixtures to verify:
 
@@ -66,13 +66,13 @@ void completeKeepsUserProfileAndUpdatesTheSameIdentityAtomically() {
 
 Also verify duplicate new `sub` and non-active/non-Apple identity leave the old identity unchanged, phase failures remain retry candidates, completed rows are skipped, and phase-aware counts are literal expected values.
 
-- [ ] **Step 2: Run the repository test and verify RED**
+- [x] **Step 2: Run the repository test and verify RED**
 
 Run: `./gradlew test --tests '*AppleUserMigrationRepositoryTest'`
 
 Expected: compilation fails because the migration repository types do not exist.
 
-- [ ] **Step 3: Add the V74 schema and minimal JDBC implementation**
+- [x] **Step 3: Add the V74 schema and minimal JDBC implementation**
 
 Create `apple_user_migration` with a unique FK to `oauth_identity`, unique nullable `transfer_sub`, constrained statuses `PENDING`, `PREPARED`, `COMPLETED`, `PREPARE_FAILED`, `COMPLETE_FAILED`, sanitized `failure_code`, attempt count, and timestamps. Use conditional updates and a JDBC transaction in `complete` so the identity change and `COMPLETED` state commit together.
 
@@ -88,7 +88,7 @@ public void complete(long migrationId, String providerUserId, String providerEma
 }
 ```
 
-- [ ] **Step 4: Run the repository test and verify GREEN**
+- [x] **Step 4: Run the repository test and verify GREEN**
 
 Run: `./gradlew test --tests '*AppleUserMigrationRepositoryTest'`
 
