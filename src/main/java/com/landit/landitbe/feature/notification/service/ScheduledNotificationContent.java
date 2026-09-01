@@ -47,7 +47,7 @@ record ScheduledNotificationContent(
       NotificationTargetSelectionInput input,
       LocalDate scheduledDate) {
     return switch (target.notificationType()) {
-      case DAILY_SCENARIO_REMINDER -> scenarioContent(target, input, scheduledDate);
+      case DAILY_SCENARIO_REMINDER -> scenarioContent(input, scheduledDate);
       case CONTINUE_EXPRESSION -> expressionContent(target, input);
       case SMALL_TALK_REMINDER -> smallTalkContent(target, input);
       default -> throw new IllegalArgumentException("예약 알림에 지원하지 않는 유형입니다.");
@@ -55,17 +55,12 @@ record ScheduledNotificationContent(
   }
 
   private static ScheduledNotificationContent scenarioContent(
-      SelectedNotificationTarget target,
-      NotificationTargetSelectionInput input,
-      LocalDate scheduledDate) {
+      NotificationTargetSelectionInput input, LocalDate scheduledDate) {
     NotificationContentVariant variant = scenarioVariant(input, scheduledDate);
     String title = scenarioTitle(variant, input);
     String body = scenarioBody(variant, input);
     return new ScheduledNotificationContent(
-        variant,
-        title,
-        body,
-        "/conversation/scenario/" + target.targetId() + campaign("daily_scenario_reminder"));
+        variant, title, body, "/scenario" + campaign("daily_scenario_reminder"));
   }
 
   private static NotificationContentVariant scenarioVariant(

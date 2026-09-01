@@ -33,7 +33,7 @@ flowchart LR
 - `status = 'ACTIVE'`인 Expo Token이 하나 이상 있는 사용자만 발송 후보로 처리한다.
 - 별도 Worker와 사용자별 `PUSH_SEND` Queue 메시지를 추가하지 않는다.
 - Expo Ticket·Receipt 상태 전이, 100건 배치, 재시도 정책과 Token 무효화 정책을 유지한다.
-- 딥링크 경로 `/conversation/scenario/{scenarioId}`, `/expressions/scenario/{scenarioId}/{expressionId}`, `/smalltalk`를 유지한다.
+- 시나리오 알림은 시나리오 홈 `/scenario`로, 표현과 스몰톡 알림은 기존 학습 경로로 연결한다.
 - UTM 변경과 FE 로컬 알림 제거는 이 정책 구현 범위에 포함하지 않는다.
 
 ## 예약 날짜와 일일 멱등성
@@ -194,7 +194,7 @@ scheduled-notification:content:v1
 
 | 유형 | 딥링크 |
 | --- | --- |
-| `DAILY_SCENARIO_REMINDER` | `/conversation/scenario/{scenarioId}?utm_source=push&utm_medium=notification&utm_campaign=daily_scenario_reminder` |
+| `DAILY_SCENARIO_REMINDER` | `/scenario?utm_source=push&utm_medium=notification&utm_campaign=daily_scenario_reminder` |
 | `CONTINUE_EXPRESSION` | `/expressions/scenario/{scenarioId}/{expressionId}?utm_source=push&utm_medium=notification&utm_campaign=continue_expression` |
 | `SMALL_TALK_REMINDER` | `/smalltalk?utm_source=push&utm_medium=notification&utm_campaign=small_talk_reminder` |
 

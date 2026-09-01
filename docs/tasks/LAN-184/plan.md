@@ -23,14 +23,14 @@
 
 | 유형 | 선택 결과 | 딥링크 |
 | --- | --- | --- |
-| `DAILY_SCENARIO_REMINDER` | 오늘 배정 시나리오 미완료 | `/conversation/scenario/{scenarioId}` |
+| `DAILY_SCENARIO_REMINDER` | 오늘 배정 시나리오 미완료 | `/scenario` |
 | `CONTINUE_EXPRESSION` | 오늘 완료한 시나리오의 다음 미완료 표현 | `/expressions/scenario/{scenarioId}/{expressionId}` |
 | `SMALL_TALK_REMINDER` | 오늘 시나리오·표현 완료 및 스몰톡 사용량 0ms | `/smalltalk` |
 
 - 오늘의 시나리오 완료 여부는 `user_scenario_access.granted_at`의 KST 날짜로 판단한다.
 - 표현 완료 여부는 `learning_source = 'SCENARIO'`인 `user_writing_expression_completion`만 반영한다.
 - 오늘 시나리오를 결정할 수 없으면 다른 완료 이력으로 추론하지 않고 로그를 남긴 뒤 건너뛴다.
-- 발송 딥링크는 현재 프런트 라우트(`/conversation/scenario`, `/expressions/scenario`, `/smalltalk`)에 맞춘다.
+- 시나리오 알림은 시나리오 홈(`/scenario`)으로 보내고, 표현과 스몰톡은 기존 학습 경로를 유지한다.
 
 ## 현재 구현 상태
 
@@ -77,6 +77,6 @@
 - [ ] 배포 전 Push Queue와 DLQ에 과거 `PUSH_SEND` 메시지가 남아 있지 않은지 확인한다. 새 Handler는 이를 처리하지 않으며, 남은 메시지는 DLQ로 이동한다.
 - [ ] dev Scheduler를 활성화하기 전에 인증 사용자·UserPushToken·Queue 소비·Expo 환경 변수를 확인한다.
 - [ ] iOS와 Android 실기기에서 dev 테스트 API와 20시 예약 알림을 수신한다.
-- [ ] 알림 탭 시 `/conversation/scenario/{id}`, `/expressions/scenario/{scenarioId}/{expressionId}`, `/smalltalk` 딥링크와 UTM 값이 보존되는지 확인한다.
+- [ ] 알림 탭 시 `/scenario`, `/expressions/scenario/{scenarioId}/{expressionId}`, `/smalltalk` 딥링크와 UTM 값이 보존되는지 확인한다.
 - [ ] 중복 예약 배치, Expo 일시 오류, Receipt 지연과 Push DLQ 이동을 dev에서 확인한다.
 - [ ] dev E2E 이후 prod Scheduler 활성화 계획을 검토한다.
