@@ -117,7 +117,7 @@ git commit -m "feat: Apple 사용자 이전 상태 저장소 추가"
 - Produces: `AppleRecipientUser(String providerUserId, String providerEmail)`
 - Produces: `AppleUserMigrationException.failureCode()` containing only a fixed internal classification such as `APPLE_HTTP_400` or `APPLE_RESPONSE_INVALID`
 
-- [ ] **Step 1: Write failing HTTP contract tests**
+- [x] **Step 1: Write failing HTTP contract tests**
 
 Use a local JDK `HttpServer` and assert real request bodies and parsed results without printing secrets.
 
@@ -146,13 +146,13 @@ void exchangesTransferIdentifierForRecipientUser() {
 
 Also verify PREPARE includes `sub` and `target`, both migration calls include bearer authorization and credentials, missing JSON fields are rejected, and non-2xx responses expose only sanitized failure codes.
 
-- [ ] **Step 2: Run the client test and verify RED**
+- [x] **Step 2: Run the client test and verify RED**
 
 Run: `./gradlew test --tests '*HttpAppleUserMigrationClientTest'`
 
 Expected: compilation fails because the client types do not exist.
 
-- [ ] **Step 3: Implement the minimal JDK HttpClient adapter**
+- [x] **Step 3: Implement the minimal JDK HttpClient adapter**
 
 Encode `application/x-www-form-urlencoded` values with UTF-8, set a finite request timeout, parse only required JSON fields with Jackson, and throw sanitized exceptions without response bodies or request values.
 
@@ -166,7 +166,7 @@ public interface AppleUserMigrationClient {
 }
 ```
 
-- [ ] **Step 4: Run the client test and verify GREEN**
+- [x] **Step 4: Run the client test and verify GREEN**
 
 Run: `./gradlew test --tests '*HttpAppleUserMigrationClientTest'`
 
