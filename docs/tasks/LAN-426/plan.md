@@ -196,7 +196,7 @@ git commit -m "feat: Apple 사용자 이전 API 클라이언트 추가"
 - Produces: `static int run(Map<String, String> environment)` returning `0` only when the selected phase has no unresolved rows
 - Produces: Gradle task `migrateAppleUsers`
 
-- [ ] **Step 1: Write failing service and settings tests**
+- [x] **Step 1: Write failing service and settings tests**
 
 Use an H2 repository and an in-memory fake `AppleUserMigrationClient` that returns literal results or throws a sanitized exception.
 
@@ -224,13 +224,13 @@ void completeSkipsCompletedUsersWhenRetried() {
 
 Also verify token failure aborts before user processing, COMPLETE updates all successful rows, missing required environment values fail without echoing their values, and target Team ID is required only for PREPARE.
 
-- [ ] **Step 2: Run service/settings tests and verify RED**
+- [x] **Step 2: Run service/settings tests and verify RED**
 
 Run: `./gradlew test --tests '*AppleUserMigrationServiceTest' --tests '*AppleUserMigrationSettingsTest'`
 
 Expected: compilation fails because the service, settings, and runner do not exist.
 
-- [ ] **Step 3: Implement the minimal orchestration and runner**
+- [x] **Step 3: Implement the minimal orchestration and runner**
 
 PREPARE initializes target rows, requests one access token, continues after per-user failures, and marks successful rows prepared. COMPLETE does not discover new users, exchanges only retryable rows, and delegates the atomic identity update to the repository.
 
@@ -249,7 +249,7 @@ public AppleUserMigrationSummary run(AppleUserMigrationPhase phase) {
 
 The runner prints only `phase`, `target`, `success`, `failure`, and `unresolved`, and returns non-zero when `summary.completed()` is false. Add a JavaExec task using the main runtime classpath.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run: `./gradlew test --tests '*AppleUserMigration*Test' --tests '*HttpAppleUserMigrationClientTest'`
 
