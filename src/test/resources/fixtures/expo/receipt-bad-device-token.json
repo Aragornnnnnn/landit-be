@@ -1,0 +1,15 @@
+{
+  "data": {
+    "ticket-1": {
+      "status": "error",
+      "message": "The Apple Push Notification service failed to send the notification (reason: BadDeviceToken, status code: 400).",
+      "details": {
+        "apns": {
+          "reason": "BadDeviceToken",
+          "statusCode": 400
+        },
+        "error": "DeveloperError"
+      }
+    }
+  }
+}

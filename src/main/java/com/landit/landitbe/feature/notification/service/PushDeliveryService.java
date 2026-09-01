@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PushDeliveryService {
 
   private static final String DEVICE_NOT_REGISTERED = "DeviceNotRegistered";
+  private static final String BAD_DEVICE_TOKEN = "BadDeviceToken";
 
   private final PushDeliveryRepository pushDeliveryRepository;
   private final UserPushTokenDeliveryService userPushTokenDeliveryService;
@@ -104,7 +105,7 @@ public class PushDeliveryService {
       return;
     }
     if (delivery.failTicket(result.errorCode(), LocalDateTime.now())) {
-      invalidateDeviceWhenUnregistered(delivery, result.errorCode());
+      revokeWhenDeviceNotRegistered(delivery, result.errorCode());
     }
   }
 
@@ -153,7 +154,7 @@ public class PushDeliveryService {
       return;
     }
     if (delivery.failReceipt(result.errorCode(), LocalDateTime.now())) {
-      invalidateDeviceWhenUnregistered(delivery, result.errorCode());
+      revokeWhenInvalidReceiptToken(delivery, result.errorCode());
     }
   }
 
@@ -174,9 +175,17 @@ public class PushDeliveryService {
         .orElseThrow(() -> new IllegalArgumentException("푸시 발송 이력이 존재하지 않습니다."));
   }
 
-  /** Expo가 등록 해제된 기기라고 응답하면 연결된 Token을 무효화한다. */
-  private void invalidateDeviceWhenUnregistered(PushDelivery delivery, String errorCode) {
+  /** Expo가 등록 해제된 기기라고 응답하면 현재 연결된 Token을 무효화한다. */
+  private void revokeWhenDeviceNotRegistered(PushDelivery delivery, String errorCode) {
     if (!DEVICE_NOT_REGISTERED.equals(errorCode)) {
+      return;
+    }
+    userPushTokenDeliveryService.revokeCurrentTokenOwner(delivery.getSentExpoPushToken());
+  }
+
+  /** Receipt에서 Expo 또는 APNs가 기기 Token 오류를 반환하면 현재 연결된 Token을 무효화한다. */
+  private void revokeWhenInvalidReceiptToken(PushDelivery delivery, String errorCode) {
+    if (!DEVICE_NOT_REGISTERED.equals(errorCode) && !BAD_DEVICE_TOKEN.equals(errorCode)) {
       return;
     }
     userPushTokenDeliveryService.revokeCurrentTokenOwner(delivery.getSentExpoPushToken());

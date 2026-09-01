@@ -8,6 +8,8 @@ import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
+import com.landit.landitbe.feature.notification.domain.PushDelivery;
+import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
 import com.landit.landitbe.feature.notification.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
@@ -121,8 +123,48 @@ class PushDeliveryServiceIntegrationTests {
     pushDeliveryService.recordReceiptResult(
         prepared.pushDeliveryId(), PushReceiptResult.failed("DeviceNotRegistered"));
 
+    PushDelivery delivery =
+        pushDeliveryRepository.findById(prepared.pushDeliveryId()).orElseThrow();
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
+    assertThat(delivery.getErrorCode()).isEqualTo("DeviceNotRegistered");
     assertThat(userPushTokenRepository.findById(userPushToken.getId()).orElseThrow().getStatus())
         .isEqualTo(UserPushTokenStatus.REVOKED);
+  }
+
+  /** BadDeviceToken Receipt는 실패 원인을 기록하고 현재 Token을 REVOKED로 변경한다. */
+  @Test
+  void revokesTokenAfterBadDeviceTokenReceipt() {
+    PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
+    pushDeliveryService.recordTicketResult(
+        prepared.pushDeliveryId(), PushTicketResult.accepted("ticket-1"));
+
+    pushDeliveryService.recordReceiptResult(
+        prepared.pushDeliveryId(), PushReceiptResult.failed("BadDeviceToken"));
+
+    PushDelivery delivery =
+        pushDeliveryRepository.findById(prepared.pushDeliveryId()).orElseThrow();
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
+    assertThat(delivery.getErrorCode()).isEqualTo("BadDeviceToken");
+    assertThat(userPushTokenRepository.findById(userPushToken.getId()).orElseThrow().getStatus())
+        .isEqualTo(UserPushTokenStatus.REVOKED);
+  }
+
+  /** 일반 DeveloperError Receipt는 실패만 기록하고 현재 Token을 ACTIVE로 유지한다. */
+  @Test
+  void keepsTokenActiveAfterGenericDeveloperErrorReceipt() {
+    PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
+    pushDeliveryService.recordTicketResult(
+        prepared.pushDeliveryId(), PushTicketResult.accepted("ticket-1"));
+
+    pushDeliveryService.recordReceiptResult(
+        prepared.pushDeliveryId(), PushReceiptResult.failed("DeveloperError"));
+
+    PushDelivery delivery =
+        pushDeliveryRepository.findById(prepared.pushDeliveryId()).orElseThrow();
+    assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.FAILED);
+    assertThat(delivery.getErrorCode()).isEqualTo("DeveloperError");
+    assertThat(userPushTokenRepository.findById(userPushToken.getId()).orElseThrow().getStatus())
+        .isEqualTo(UserPushTokenStatus.ACTIVE);
   }
 
   /** 오래된 Token의 Receipt 실패가 새로 등록된 다른 Token을 비활성화하지 않는다. */
