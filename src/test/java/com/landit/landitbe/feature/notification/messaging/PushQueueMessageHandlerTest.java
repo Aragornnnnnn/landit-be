@@ -2,15 +2,20 @@
 
 package com.landit.landitbe.feature.notification.messaging;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
+import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.service.PushReceiptService;
 import com.landit.landitbe.feature.notification.service.ScheduledNotificationService;
+import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +27,8 @@ class PushQueueMessageHandlerTest {
   @Mock private PushReceiptService pushReceiptService;
 
   @Mock private ScheduledNotificationService scheduledNotificationService;
+
+  @Mock private NotificationDispatchService notificationDispatchService;
 
   @InjectMocks private PushQueueMessageHandler pushQueueMessageHandler;
 
@@ -57,6 +64,75 @@ class PushQueueMessageHandlerTest {
 
     verify(scheduledNotificationService)
         .process(org.mockito.ArgumentMatchers.eq(occurredAt), any());
+  }
+
+  @Test
+  void handlesMailboxReplyNotificationBatch() {
+    Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
+    String expectedDeepLink =
+        "/mailbox/received/10"
+            + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply";
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "mailbox-reply:10",
+            "MAILBOX_REPLY_NOTIFICATION_BATCH",
+            occurredAt,
+            PushQueuePayload.mailboxReply(
+                new MailboxReplyNotificationRequest(10L, List.of(1L, 2L), "답변 제목", occurredAt)));
+
+    pushQueueMessageHandler.handle(message);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<SendPushNotificationCommand>> commandsCaptor =
+        ArgumentCaptor.forClass(List.class);
+    verify(notificationDispatchService).sendAll(commandsCaptor.capture());
+    assertThat(commandsCaptor.getValue())
+        .extracting(
+            SendPushNotificationCommand::eventId,
+            SendPushNotificationCommand::userProfileId,
+            command -> command.notificationType().name(),
+            SendPushNotificationCommand::title,
+            SendPushNotificationCommand::body,
+            SendPushNotificationCommand::deepLink)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                "mailbox-reply:10:1",
+                1L,
+                "MAILBOX_REPLY",
+                "문의에 답변이 도착했어요",
+                "답변 제목",
+                expectedDeepLink),
+            org.assertj.core.groups.Tuple.tuple(
+                "mailbox-reply:10:2",
+                2L,
+                "MAILBOX_REPLY",
+                "문의에 답변이 도착했어요",
+                "답변 제목",
+                expectedDeepLink));
+  }
+
+  @Test
+  void rejectsInvalidMailboxReplyNotificationPayload() {
+    Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
+    List<PushQueuePayload> invalidPayloads =
+        List.of(
+            new PushQueuePayload(null, null, null, List.of(1L), "답변 제목"),
+            new PushQueuePayload(null, null, 10L, null, "답변 제목"),
+            new PushQueuePayload(null, null, 10L, List.of(), "답변 제목"),
+            new PushQueuePayload(
+                null, null, 10L, java.util.Collections.singletonList(null), "답변 제목"),
+            new PushQueuePayload(null, null, 10L, List.of(1L), null),
+            new PushQueuePayload(null, null, 10L, List.of(1L), " "));
+
+    invalidPayloads.forEach(
+        payload -> {
+          PushQueueMessage message =
+              new PushQueueMessage(
+                  1, "mailbox-reply:10", "MAILBOX_REPLY_NOTIFICATION_BATCH", occurredAt, payload);
+          assertThatThrownBy(() -> pushQueueMessageHandler.handle(message))
+              .isInstanceOf(IllegalArgumentException.class);
+        });
   }
 
   /** Receipt 확인 횟수 정책은 Handler가 아닌 Receipt Service가 판단한다. */
