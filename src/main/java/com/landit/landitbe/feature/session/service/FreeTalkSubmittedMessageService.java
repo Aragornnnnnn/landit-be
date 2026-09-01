@@ -46,7 +46,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkSubmittedMessageService {
 
-  private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
   private static final long PROCESSING_TIMEOUT_SECONDS = 90;
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
@@ -788,7 +787,7 @@ public class FreeTalkSubmittedMessageService {
         new ProgressResponse(
             session.getConversationStatus(),
             session.getAccumulatedSpeakingDurationMs(),
-            SPEAKING_TIME_LIMIT_MS,
+            dailySpeakingUsageService.speakingTimeLimitMs(),
             dailyUsage.usedSpeakingDurationMs(),
             dailyUsage.remainingMs(),
             session.getExpressionGenerationStatus()));
@@ -815,7 +814,7 @@ public class FreeTalkSubmittedMessageService {
         new ProgressResponse(
             conversationStatus,
             accumulatedSpeakingDurationMs,
-            SPEAKING_TIME_LIMIT_MS,
+            dailySpeakingUsageService.speakingTimeLimitMs(),
             dailyUsage.usedSpeakingDurationMs(),
             dailyUsage.remainingMs(),
             expressionGenerationStatus));

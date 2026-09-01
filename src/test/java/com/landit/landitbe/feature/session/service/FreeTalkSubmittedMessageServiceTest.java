@@ -99,6 +99,17 @@ class FreeTalkSubmittedMessageServiceTest {
   }
 
   @Test
+  void returnsConfiguredSpeakingTimeLimitAfterFinalization() {
+    stubSuccessfulFinalization("old-owner");
+    realFinalizationSession("old-owner");
+    when(dailySpeakingUsageService.speakingTimeLimitMs()).thenReturn(9_999_999L);
+
+    var response = service.finalizeTimeLimit(messageReservation(), closingResult());
+
+    assertThat(response.progress().speakingTimeLimitMs()).isEqualTo(9_999_999L);
+  }
+
+  @Test
   void doesNotPrepareMemoryGenerationWhenWriteIsDisabledForUserConfirmedCompletion() {
     stubSuccessfulFinalization("decision-7");
     FreeTalkSession session = realFinalizationSession("decision-7");
