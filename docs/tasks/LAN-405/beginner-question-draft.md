@@ -191,8 +191,8 @@
 - 첫 질문 속마음. 서로의 옷 색을 알려주면 쉽게 찾아볼 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **I have your white shirt. Do you see my blue shirt?**
-   - 네 흰 셔츠가 나한테 있어. 내 파란 셔츠 보여?
+1. **I have your white shirt, and I think you have my blue one. Can you see it?**
+   - 네 흰 셔츠가 나한테 있고, 내 파란 셔츠는 너한테 있는 것 같아. 보여?
 2. **Do you want to use the dryer together?**
    - 건조기를 같이 쓸래?
 3. **Next time, should we send a text when clothes get mixed up?**
@@ -333,8 +333,8 @@
    - 어떤 집안일이 더 편해? 나는 설거지나 바닥 청소를 할 수 있어.
 2. **How often should we clean the room, and which day works best?**
    - 방을 얼마나 자주 청소하고, 어느 날 하는 게 좋을까?
-3. **I'm often awake late. What quiet-time rule would work for both of us?**
-   - 나는 자주 늦게까지 깨어 있어. 우리 둘에게 맞는 조용한 시간 규칙은 뭘까?
+3. **I'm often awake late. What time should quiet hours start? I can take phone calls outside after that.**
+   - 나는 자주 늦게까지 깨어 있어. 몇 시부터 조용히 하면 좋을까? 그 뒤에는 전화도 밖에서 받을게.
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -801,8 +801,8 @@
 
 1. **The pasta is not spicy. The curry is spicy. Which one do you want?**
    - 파스타는 맵지 않고 커리는 매워요. 어떤 걸 원하세요?
-2. **Would you like a regular size or a large size?**
-   - 보통 크기와 큰 크기 중 어떤 걸 원하세요?
+2. **Do you want to add chicken or extra vegetables?**
+   - 닭고기나 채소를 더 추가하시겠어요?
 3. **Write a review and get a free side. Do you want to join?**
    - 리뷰를 쓰면 사이드 메뉴가 무료예요. 참여하시겠어요?
 
@@ -813,8 +813,8 @@
 
 1. **The pasta is mild and creamy, while the curry is hot and spicy. Which sounds better today?**
    - 파스타는 부드럽고 크리미하고, 커리는 맵고 진해요. 오늘은 어떤 게 더 당기세요?
-2. **Both dishes come in regular and large sizes. Which size would you like?**
-   - 두 메뉴 모두 보통 크기와 큰 크기가 있어요. 어떤 크기로 드릴까요?
+2. **You can add chicken or extra vegetables to either dish. Would you like to add one?**
+   - 두 메뉴 모두 닭고기나 채소를 더 추가할 수 있어요. 하나 추가하시겠어요?
 3. **If you leave a review, you can choose a free salad or rice. Would you like to join?**
    - 리뷰를 남기면 샐러드나 밥을 무료로 고를 수 있어요. 참여하시겠어요?
 
@@ -951,8 +951,8 @@
 - 첫 질문 속마음. 넓은 좌석의 가격을 바로 알려주면 쉽게 결정할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **A wider seat costs $50. A seat by the exit is free, but you must help if something goes wrong. Which do you want?**
-   - 더 넓은 좌석은 50달러예요. 무료 비상구 좌석은 문제가 생기면 도와야 해요. 어느 쪽이 좋으세요?
+1. **A wider seat costs $50. The exit-row seat is free, but you must help in an emergency. Which do you want?**
+   - 더 넓은 좌석은 50달러예요. 비상구 좌석은 무료인데, 비상시에는 도와주셔야 해요. 어느 쪽이 좋으세요?
 2. **We can check your bag for free. Would you like that?**
    - 가방을 무료로 부쳐드릴 수 있어요. 원하세요?
 3. **Do you want your new boarding pass on paper or on your phone?**
@@ -995,8 +995,8 @@
    - 죄송합니다. 파손된 부분을 보여주시겠어요?
 2. **We can give you money or a travel coupon. Which do you want?**
    - 현금이나 여행 쿠폰으로 보상해 드릴 수 있어요. 어느 쪽이 좋으세요?
-3. **Should we send the confirmation by email or text?**
-   - 처리 확인서를 이메일과 문자 중 어디로 보내드릴까요?
+3. **Is there anything else I can help you with?**
+   - 더 도와드릴 건 없을까요?
 
 #### `LEVEL_2_TO_3`
 
@@ -1004,8 +1004,8 @@
    - 파손되어 죄송합니다. 부서진 부분을 보여주시고 문제를 설명해 주세요.
 2. **We can offer cash, miles, or a travel voucher. Which kind of compensation would you prefer?**
    - 현금, 마일리지, 여행 바우처로 보상할 수 있어요. 어떤 보상을 원하세요?
-3. **Would you like the confirmation sent by email or text message?**
-   - 처리 확인서를 이메일과 문자 중 어디로 보내드릴까요?
+3. **Is there anything else I can help you with?**
+   - 더 도와드릴 건 없을까요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -1110,11 +1110,11 @@
 
 #### `LEVEL_1`
 
-- 첫 질문 속마음. 필요한 필기를 두 가지로 나누어 알려주면 쉽게 고를 수 있겠다.
+- 첫 질문 속마음. 아파서 결석한 친구에게 과제와 예제 필기가 있다고 알려주면 필요한 내용을 쉽게 고를 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **I have notes about the homework and examples. Which do you need first?**
-   - 과제와 예제 필기가 있어. 뭐부터 필요해?
+1. **I heard you were sick and missed class. I have notes on the homework and examples. Which do you need first?**
+   - 아파서 수업에 못 왔다며. 과제와 예제 필기가 있어. 뭐부터 필요해?
 2. **Should I send photos or lend you my notebook?**
    - 사진을 보내줄까, 노트를 빌려줄까?
 3. **Can you buy me a snack later?**
@@ -1122,11 +1122,11 @@
 
 #### `LEVEL_2_TO_3`
 
-- 첫 질문 속마음. 놓친 내용을 나누어 알려주면 필요한 필기를 바로 정할 수 있겠다.
+- 첫 질문 속마음. 아파서 결석한 친구에게 놓친 내용을 나누어 알려주면 필요한 필기를 바로 정할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **I took notes on the example problems and homework changes. Which part do you need first?**
-   - 예제 문제와 과제 변경 내용을 필기했어. 어떤 부분이 먼저 필요해?
+1. **I heard you were sick and missed class. I took notes on the examples and homework changes. Which part do you need first?**
+   - 아파서 수업에 못 왔다며. 예제와 과제 변경 내용을 필기했어. 어떤 부분이 먼저 필요해?
 2. **I can send photos now or lend you the notebook later. Which would be easier?**
    - 지금 사진을 보내거나 나중에 노트를 빌려줄 수 있어. 뭐가 더 편해?
 3. **I helped you today, so how about buying me a snack later?**
@@ -1197,8 +1197,8 @@
 - 첫 질문 속마음. 보고서와 발표를 짧게 비교하면 쉽게 고를 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **You can write three pages or give a five-minute talk. Which one is better for you?**
-   - 세 쪽을 쓰거나 5분 발표를 할 수 있어요. 어느 쪽이 좋아요?
+1. **You can write a three-page report or give a five-minute talk. Which one is better for you?**
+   - 세 쪽짜리 보고서를 쓰거나 5분 발표를 할 수 있어요. 어느 쪽이 좋아요?
 2. **Why is that choice better for you?**
    - 왜 그 선택이 더 편한가요?
 3. **The work is due Friday. Can you finish by then?**
@@ -1361,8 +1361,8 @@
    - 한 달 정도 계실 예정인가요, 더 오래 계실 예정인가요? 데이터는 메시지와 영상 중 어디에 더 많이 쓰세요?
 2. **Ten gigabytes costs $30. Unlimited data costs $45. Which do you want?**
    - 10기가는 30달러, 무제한은 45달러예요. 어떤 걸 원하세요?
-3. **I need your passport for the SIM. Do you want to pay now or pay automatically each month?**
-   - 유심 등록에 여권이 필요해요. 지금 결제할까요, 매달 자동으로 결제할까요?
+3. **I need your passport for the SIM. Do you want to pay the full amount now or pay automatically each month?**
+   - 유심 등록에 여권이 필요해요. 요금을 지금 전부 내시겠어요, 아니면 매달 자동 결제하시겠어요?
 
 #### `LEVEL_2_TO_3`
 
