@@ -237,8 +237,8 @@
    - 금요일 저녁에 내 친구들이 우리 방에 와도 돼?
 2. **Should I ask before I use your things?**
    - 내가 네 물건을 쓰기 전에 물어봐야 할까?
-3. **Do you want the room quiet at night?**
-   - 밤에는 방이 조용하면 좋겠어?
+3. **Should we keep the room quiet after ten at night?**
+   - 밤 10시부터 방을 조용히 할까?
 
 #### `LEVEL_2_TO_3`
 
@@ -249,8 +249,8 @@
    - 금요일 저녁에 친구 두 명을 부르고 싶어. 괜찮아, 아니면 다른 시간으로 할까?
 2. **What things can we share, and what should we always ask before using?**
    - 어떤 물건은 같이 써도 되고, 어떤 건 꼭 물어봐야 할까?
-3. **How quiet should we keep the room on weeknights?**
-   - 평일 밤에는 방을 어느 정도 조용히 해야 할까?
+3. **What time should quiet hours start on weeknights? I can use headphones after that.**
+   - 평일에는 몇 시부터 조용히 할까? 그 뒤에는 이어폰을 쓸게.
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -473,8 +473,8 @@
    - 방을 청소하고 짐을 빼주세요. 확인 목록을 드릴까요?
 2. **We can check the room today at three or tomorrow at ten. Which time is good?**
    - 오늘 3시나 내일 10시에 방을 확인할 수 있어요. 어느 시간이 좋으세요?
-3. **Please take photos of any old damage. Can you do that?**
-   - 원래 있던 파손은 사진을 찍어주세요. 그렇게 할 수 있나요?
+3. **If you have photos from move-in, please bring them. If not, tell us about the old damage.**
+   - 입주 때 찍은 사진이 있으면 가져와 주세요. 없다면 원래 있던 파손을 알려주세요.
 
 #### `LEVEL_2_TO_3`
 
@@ -485,8 +485,8 @@
    - 점검 전에 짐을 빼고 방을 청소해 주세요. 확인 목록이 필요하세요?
 2. **Inspection times are three today and ten tomorrow. Which one should I reserve?**
    - 점검 시간은 오늘 3시와 내일 10시예요. 언제로 예약해 드릴까요?
-3. **Damage may reduce your deposit. Please prepare move-in photos if the damage was already there.**
-   - 파손이 있으면 보증금이 줄 수 있어요. 원래 있던 파손이라면 입주 때 사진을 준비해 주세요.
+3. **Damage may reduce your deposit. Bring any move-in photos you have. If you have none, tell us the damage was already there.**
+   - 파손이 있으면 보증금이 줄 수 있어요. 입주 때 찍은 사진이 있으면 가져오고, 없다면 원래부터 있던 파손이라고 알려주세요.
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -759,8 +759,8 @@
 
 1. **The museum pass lets you visit two museums. The city pass also includes buses. Which do you want?**
    - 박물관 패스는 박물관 두 곳에 갈 수 있어요. 도시 패스는 버스도 탈 수 있어요. 어떤 걸 원하세요?
-2. **Lunch costs $15 more. Do you want to add it?**
-   - 점심은 15달러가 더 들어요. 추가하시겠어요?
+2. **You can add lunch for $15. Do you want it?**
+   - 15달러를 추가하면 점심도 포함할 수 있어요. 추가하시겠어요?
 3. **Do you want a paper pass or a phone pass?**
    - 종이 패스와 휴대폰 패스 중 어떤 걸 원하세요?
 
@@ -873,21 +873,21 @@
 
 #### `LEVEL_1`
 
-1. **The morning tour is the same price. The evening tour costs $10 more. Which do you want?**
-   - 오전 투어는 같은 가격이고, 저녁 투어는 10달러가 더 들어요. 어느 쪽이 좋으세요?
+1. **The morning tour costs the same as your original booking. The evening tour costs $10 more. Which do you want?**
+   - 오전 투어는 원래 예약과 같은 가격이고, 저녁 투어는 10달러가 더 들어요. 어느 쪽이 좋으세요?
 2. **Should we send your new ticket by email or text?**
    - 새 표를 이메일과 문자 중 어디로 보내드릴까요?
-3. **We also have a food tour. Do you want to try it?**
-   - 푸드 투어도 있어요. 한번 해보시겠어요?
+3. **We also have a food tour. Would you like more information?**
+   - 푸드 투어도 있어요. 더 알아보시겠어요?
 
 #### `LEVEL_2_TO_3`
 
-1. **Morning has a smaller group. Evening includes city lights and costs $10 more. Which time would you prefer?**
-   - 오전은 인원이 적어요. 저녁은 야경이 포함되고 10달러가 더 들어요. 어느 시간이 더 좋으세요?
+1. **Morning has a smaller group. Evening includes city lights and costs $10 more than your original booking. Which time would you prefer?**
+   - 오전은 인원이 적어요. 저녁은 야경이 포함되고 원래 예약보다 10달러가 더 들어요. 어느 시간이 더 좋으세요?
 2. **Would you like the new booking confirmation by email or text?**
    - 새 예약 확인서를 이메일과 문자 중 어디로 보내드릴까요?
-3. **We also offer a food tour and a night river cruise. Would you like to book one at a discount?**
-   - 푸드 투어와 야간 리버 크루즈도 있어요. 할인받아 하나를 예약하시겠어요?
+3. **We also offer a food tour and a night river cruise. Would you like to hear about either one?**
+   - 푸드 투어와 야간 리버 크루즈도 있어요. 둘 중 하나를 더 알아보시겠어요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -963,8 +963,8 @@
 - 첫 질문 속마음. 추가 공간과 가격을 함께 알려주면 좌석을 판단하기 쉽겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **More legroom costs $50. A free exit-row seat requires emergency help. Which option would you prefer?**
-   - 다리 공간이 넓은 좌석은 50달러예요. 무료 비상구 좌석은 비상시에 도와야 해요. 어느 쪽을 원하세요?
+1. **A seat with more legroom costs $50. The exit-row seat is free, but you must help in an emergency. Which would you prefer?**
+   - 다리 공간이 넓은 좌석은 50달러예요. 비상구 좌석은 무료인데, 비상시에는 도와주셔야 해요. 어느 쪽을 원하세요?
 2. **Overhead space is limited, so we can check your carry-on for free. Would you like that?**
    - 기내 짐칸이 부족해서 가방을 무료로 부쳐드릴 수 있어요. 원하시나요?
 3. **Would you like the updated boarding pass printed or sent to your phone?**
@@ -1075,8 +1075,8 @@
    - 아침에 공부해, 밤에 공부해?
 2. **Can we study chapter five together?**
    - 우리 5단원을 같이 공부할래?
-3. **Should we meet at the library after class?**
-   - 수업 후에 도서관에서 만날까?
+3. **If we study together, should we meet at the library after class?**
+   - 같이 공부한다면 수업 후에 도서관에서 만날까?
 
 #### `LEVEL_2_TO_3`
 
@@ -1087,8 +1087,8 @@
    - 언제 공부가 가장 잘되고, 보통 어디서 공부해?
 2. **Chapter five is difficult for me. Could we review it together after class?**
    - 나는 5단원이 어려워. 수업 후에 같이 복습할 수 있을까?
-3. **Would the library at four or the cafe at five work better?**
-   - 4시에 도서관과 5시에 카페 중 어디가 더 좋아?
+3. **If we study together, would the library at four or the cafe at five work better?**
+   - 같이 공부한다면 4시에 도서관과 5시에 카페 중 어디가 더 좋아?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -1243,8 +1243,8 @@
    - 한 수업은 매주 프로젝트가 있고, 다른 수업은 큰 시험이 두 번 있어요. 어느 수업이 더 좋아 보여요?
 2. **Why is that class better for you?**
    - 왜 그 수업이 더 잘 맞나요?
-3. **Can you study Tuesday morning or Thursday afternoon?**
-   - 화요일 오전과 목요일 오후 중 언제 수업을 들을 수 있나요?
+3. **The class meets Tuesday morning or Thursday afternoon. Which time can you attend?**
+   - 수업은 화요일 오전이나 목요일 오후에 있어요. 언제 들을 수 있나요?
 
 #### `LEVEL_2_TO_3`
 
@@ -1370,8 +1370,8 @@
    - 얼마나 머무를 예정이고, 데이터는 주로 메시지, 지도, 영상 보기 중 어디에 쓰시나요?
 2. **The 10-gigabyte plan is $30, and unlimited data is $45. Which plan fits you better?**
    - 10기가 요금제는 30달러, 무제한은 45달러예요. 어느 요금제가 더 잘 맞나요?
-3. **I need your passport to register the SIM. Would you like automatic payment or to add money yourself each month?**
-   - 유심 등록에 여권이 필요해요. 자동 결제로 할까요, 아니면 매달 직접 충전하시겠어요?
+3. **I need your passport to register the SIM. Would you rather pay the full amount now or set up automatic monthly payments?**
+   - 유심 등록에 여권이 필요해요. 요금을 지금 전부 내시겠어요, 아니면 매달 자동 결제를 설정하시겠어요?
 
 
 #### `LEVEL_4_TO_5` (현재 DB)
@@ -1395,10 +1395,10 @@
 
 1. **We have no fresh basil. Are you making pasta, pizza, or something else?**
    - 생바질이 없어요. 파스타나 피자를 만드시나요, 아니면 다른 요리인가요?
-2. **We have dried basil and parsley in small and large packs. Which one and what size do you want?**
-   - 말린 바질과 파슬리는 작은 포장과 큰 포장이 있어요. 어떤 재료와 크기를 원하세요?
-3. **Tomatoes are on sale. Do you want some?**
-   - 토마토가 할인 중이에요. 좀 필요하세요?
+2. **Do you want dried basil or parsley? Do you want a small or large pack?**
+   - 말린 바질과 파슬리 중 어떤 걸 원하세요? 작은 포장과 큰 포장 중 어떤 크기가 좋으세요?
+3. **Tomatoes are 20 percent off. Do you want some?**
+   - 토마토가 20% 할인 중이에요. 좀 필요하세요?
 
 #### `LEVEL_2_TO_3`
 
@@ -1439,8 +1439,8 @@
    - 행사가 편한 자리인가요, 격식 있는 자리인가요?
 2. **Would you like navy or beige?**
    - 네이비와 베이지 중 어떤 색이 좋으세요?
-3. **The casual jacket cannot be returned. The dressy jacket can. Which one do you want to try?**
-   - 편한 재킷은 반품할 수 없고, 격식 있는 재킷은 가능해요. 어떤 옷을 입어보시겠어요?
+3. **The casual jacket cannot be returned. The dressy jacket can be returned. Which one do you want to try?**
+   - 편한 재킷은 반품할 수 없고, 격식 있는 재킷은 반품할 수 있어요. 어떤 옷을 입어보시겠어요?
 
 #### `LEVEL_2_TO_3`
 
@@ -1477,8 +1477,8 @@
 - 첫 질문 속마음. 가격과 무게를 간단히 알려주면 쉽게 비교할 수 있겠다.
 - 첫 질문 속마음 유형. `GOOD`.
 
-1. **Is a low price, light weight, or better sound most important to you?**
-   - 낮은 가격, 가벼운 무게, 더 좋은 소리 중 무엇이 가장 중요하세요?
+1. **Is price, weight, or sound most important to you?**
+   - 가격, 무게, 소리 중 무엇이 가장 중요하세요?
 2. **Model A has better sound for $120. Model B is lighter for $80. Which do you want?**
    - A 모델은 소리가 더 좋고 120달러예요. B 모델은 더 가볍고 80달러예요. 어떤 걸 원하세요?
 3. **Do you want black, white, or gray?**
