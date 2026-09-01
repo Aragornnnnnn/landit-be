@@ -94,7 +94,7 @@ Run: `./gradlew test --tests '*AppleUserMigrationRepositoryTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add src/main/resources/db/migration/V74__add_apple_user_migration.sql src/main/java/com/landit/landitbe/feature/auth/migration src/test/java/com/landit/landitbe/feature/auth/migration/AppleUserMigrationRepositoryTest.java
@@ -172,7 +172,7 @@ Run: `./gradlew test --tests '*HttpAppleUserMigrationClientTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add src/main/java/com/landit/landitbe/feature/auth/migration src/test/java/com/landit/landitbe/feature/auth/migration/HttpAppleUserMigrationClientTest.java
@@ -255,7 +255,7 @@ Run: `./gradlew test --tests '*AppleUserMigration*Test' --tests '*HttpAppleUserM
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 git add build.gradle src/main/java/com/landit/landitbe/feature/auth/migration src/test/java/com/landit/landitbe/feature/auth/migration
@@ -273,7 +273,7 @@ git commit -m "feat: Apple 사용자 이전 CLI 추가"
 - Consumes SSM: `/landit/prod/DB_URL`, `/landit/prod/DB_USERNAME`, `/landit/prod/DB_PASSWORD`, `/landit/prod/APPLE_MIGRATION_CLIENT_ID`, `/landit/prod/APPLE_MIGRATION_CLIENT_SECRET`, `/landit/prod/APPLE_MIGRATION_TARGET_TEAM_ID`
 - Produces: manual inputs `phase` and `confirmation`, where confirmation must equal `RUN-PREPARE` or `RUN-COMPLETE`
 
-- [ ] **Step 1: Add the manually dispatched production workflow**
+- [x] **Step 1: Add the manually dispatched production workflow**
 
 Use `environment: prod`, `contents: read`, `id-token: write`, one non-cancelling concurrency group, reject non-main refs, validate the confirmation string, read encrypted SSM values without echoing them, omit target Team ID retrieval for COMPLETE, and invoke:
 
@@ -282,11 +282,11 @@ export APPLE_MIGRATION_PHASE="${{ inputs.phase }}"
 ./gradlew migrateAppleUsers
 ```
 
-- [ ] **Step 2: Review workflow behavior and secret boundaries**
+- [x] **Step 2: Review workflow behavior and secret boundaries**
 
 Check the complete YAML diff rather than matching one source line. Confirm there is no `pull_request`, `push`, develop option, shell tracing, secret echo, or application deployment step, and that the job fails on CLI non-zero exit.
 
-- [ ] **Step 3: Run focused and full verification**
+- [x] **Step 3: Run focused and full verification**
 
 Run:
 
@@ -298,7 +298,7 @@ git diff --check
 
 Expected: all commands PASS.
 
-- [ ] **Step 4: Record exact verification results in this plan**
+- [x] **Step 4: Record exact verification results in this plan**
 
 Under a `## Verification Results` section, record the commands, exit results, and any operational checks that remain unverified without production credentials. Do not claim the workflow was executed against production.
 
@@ -312,3 +312,12 @@ git commit -m "ci: Apple 사용자 이전 수동 workflow 추가"
 - [ ] **Step 6: Run independent high-risk review**
 
 Have a reviewer inspect the complete diff, design/plan coverage, test evidence, identity continuity, transaction boundaries, retry behavior, and secret handling. Fix blocking findings with a reproducing test, rerun affected checks, and commit the fix separately.
+
+## Verification Results
+
+- `./gradlew test --tests '*AppleUserMigration*Test' --tests '*HttpAppleUserMigrationClientTest'`: 성공, Apple 사용자 이전 집중 테스트 통과.
+- `./gradlew check`: 성공, Spotless·Checkstyle·전체 애플리케이션 테스트 통과.
+- `git diff --check`: 성공, 공백 오류 없음.
+- `./gradlew tasks --group database`: 성공, `migrateAppleUsers`와 기존 `migrateDatabase` task 등록 확인.
+- workflow 정적 검토: `workflow_dispatch`와 `main`·`prod` 제한, 단계별 확인 문자열, 단일 concurrency group, 비밀값 비출력, 배포 단계 미포함 확인.
+- 미검증 운영 항목: 실제 `/landit/prod/APPLE_MIGRATION_*` SSM Parameter 존재·권한, Apple 운영 API 응답, 운영 DB 대상 건수, 앱 이전 전후 PREPARE·COMPLETE 실행 결과.
