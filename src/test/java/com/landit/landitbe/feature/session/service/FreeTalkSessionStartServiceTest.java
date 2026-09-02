@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -21,6 +22,7 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
+import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
@@ -44,6 +46,33 @@ class FreeTalkSessionStartServiceTest {
           aiFreeTalkClient,
           dailySpeakingUsageService,
           memoryRetrievalService);
+
+  @Test
+  void returnsConfiguredSpeakingTimeLimit() {
+    FreeTalkSessionService.StartedFreeTalkSession startedSession =
+        new FreeTalkSessionService.StartedFreeTalkSession(
+            100L,
+            200L,
+            300L,
+            FreeTalkStartMode.USER_FIRST,
+            "chloe",
+            null,
+            null,
+            null,
+            "EN",
+            "KO",
+            null);
+    when(freeTalkSessionService.createStart(
+            1L, new FreeTalkSessionStartRequest(FreeTalkStartMode.USER_FIRST, null, "chloe")))
+        .thenReturn(startedSession);
+    when(dailySpeakingUsageService.speakingTimeLimitMs()).thenReturn(9_999_999L);
+
+    FreeTalkSessionStartResponse response =
+        service.startFreeTalkSession(
+            1L, new FreeTalkSessionStartRequest(FreeTalkStartMode.USER_FIRST, null, "chloe"));
+
+    assertThat(response.speakingTimeLimitMs()).isEqualTo(9_999_999L);
+  }
 
   @Test
   void retrievesOpeningMemoryWithTopicAndCharacterQuery() {

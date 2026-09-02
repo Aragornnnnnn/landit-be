@@ -30,8 +30,6 @@ public record FreeTalkSessionStartResponse(
     @Schema(description = "AI 선시작의 첫 AI 메시지. 사용자 선시작은 null")
         CurrentMessageResponse currentMessage) {
 
-  private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
-
   /**
    * 생성된 프리톡 세션을 공개 응답으로 변환한다.
    *
@@ -40,6 +38,7 @@ public record FreeTalkSessionStartResponse(
    * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param title 대화 제목
    * @param ttsVoice AI 상대의 TTS 음성
+   * @param speakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
    * @param currentMessage AI 선시작의 첫 메시지
    * @return 프리톡 세션 시작 응답
    */
@@ -49,6 +48,7 @@ public record FreeTalkSessionStartResponse(
       String characterId,
       String title,
       TtsVoiceResponse ttsVoice,
+      long speakingTimeLimitMs,
       CurrentMessageResponse currentMessage) {
     return new FreeTalkSessionStartResponse(
         sessionId,
@@ -56,7 +56,7 @@ public record FreeTalkSessionStartResponse(
         startMode,
         new ConversationCharacterResponse(characterId, ttsVoice),
         title,
-        SPEAKING_TIME_LIMIT_MS,
+        speakingTimeLimitMs,
         currentMessage);
   }
 

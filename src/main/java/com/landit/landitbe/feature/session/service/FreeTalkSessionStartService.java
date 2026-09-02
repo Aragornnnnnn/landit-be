@@ -115,6 +115,7 @@ public class FreeTalkSessionStartService {
         startedSession.characterId(),
         startedSession.title(),
         startedSession.ttsVoice(),
+        dailySpeakingUsageService.speakingTimeLimitMs(),
         currentMessage);
   }
 }
