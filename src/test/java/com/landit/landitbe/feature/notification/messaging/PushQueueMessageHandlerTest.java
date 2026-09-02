@@ -5,6 +5,8 @@ package com.landit.landitbe.feature.notification.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
@@ -16,6 +18,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -110,6 +113,28 @@ class PushQueueMessageHandlerTest {
                 "문의에 답변이 도착했어요",
                 "답변 제목",
                 expectedDeepLink));
+  }
+
+  /** 편지함 답장 배치를 발송하는 동안 SQS visibility를 발송 전후로 연장한다. */
+  @Test
+  void extendsVisibilityAroundMailboxReplyBatchDispatch() {
+    Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "mailbox-reply:10",
+            "MAILBOX_REPLY_NOTIFICATION_BATCH",
+            occurredAt,
+            PushQueuePayload.mailboxReply(
+                new MailboxReplyNotificationRequest(10L, List.of(1L), "답변 제목", occurredAt)));
+    Runnable visibilityExtender = mock(Runnable.class);
+
+    pushQueueMessageHandler.handle(message, visibilityExtender);
+
+    InOrder dispatchOrder = inOrder(visibilityExtender, notificationDispatchService);
+    dispatchOrder.verify(visibilityExtender).run();
+    dispatchOrder.verify(notificationDispatchService).sendAll(any());
+    dispatchOrder.verify(visibilityExtender).run();
   }
 
   @Test

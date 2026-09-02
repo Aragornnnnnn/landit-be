@@ -48,7 +48,7 @@ public class PushQueueMessageHandler {
     validateCommon(message);
     switch (message.messageType()) {
       case PushQueueMessage.MAILBOX_REPLY_NOTIFICATION_BATCH ->
-          handleMailboxReplyNotificationBatch(message);
+          handleMailboxReplyNotificationBatch(message, visibilityExtender);
       case PushQueueMessage.PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
       case SCHEDULED_NOTIFICATION_BATCH ->
           scheduledNotificationService.process(message.occurredAt(), visibilityExtender);
@@ -80,10 +80,12 @@ public class PushQueueMessageHandler {
   }
 
   /** 편지함 답장 payload를 검증하고 사용자별 발송 명령으로 전달한다. */
-  private void handleMailboxReplyNotificationBatch(PushQueueMessage message) {
+  private void handleMailboxReplyNotificationBatch(
+      PushQueueMessage message, Runnable visibilityExtender) {
     PushQueuePayload payload = message.payload();
     validateMailboxReplyPayload(payload);
     String deepLink = mailboxReplyDeepLink(payload.mailboxLetterId());
+    visibilityExtender.run();
     notificationDispatchService.sendAll(
         payload.userProfileIds().stream()
             .map(
@@ -96,6 +98,7 @@ public class PushQueueMessageHandler {
                         payload.replyTitle(),
                         deepLink))
             .toList());
+    visibilityExtender.run();
   }
 
   /** 답장 알림 발송에 필요한 편지, 수신자와 제목을 검증한다. */
