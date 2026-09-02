@@ -55,6 +55,14 @@ class AppleUserMigrationRepositoryTest {
   }
 
   @Test
+  void migrationCanBeAppliedRepeatedly() throws Exception {
+    applyMigration();
+
+    assertThat(repository.summarize(AppleUserMigrationPhase.PREPARE))
+        .isEqualTo(new AppleUserMigrationSummary(0, 0, 0, 0));
+  }
+
+  @Test
   void preparedAndFailedRowsAreSelectedOnlyForTheirRetryablePhase() throws Exception {
     insertIdentity(1L, "APPLE", "old-sub-1", null, "ACTIVE");
     insertIdentity(2L, "APPLE", "old-sub-2", null, "ACTIVE");
@@ -193,7 +201,7 @@ class AppleUserMigrationRepositoryTest {
   private void applyMigration() throws SQLException, IOException {
     String migration;
     try (var input =
-        getClass().getResourceAsStream("/db/migration/V74__add_apple_user_migration.sql")) {
+        getClass().getResourceAsStream("/db/migration/R__create_apple_user_migration.sql")) {
       if (input == null) {
         throw new IOException("migration resource is missing");
       }

@@ -50,7 +50,7 @@ workflow는 운영 GitHub Environment와 AWS OIDC를 사용하고 `/landit/prod`
 
 ## 저장 설계
 
-공통 Flyway 마이그레이션 `V74__add_apple_user_migration.sql`로 `apple_user_migration` 테이블을 추가한다. `V74`는 `develop`에 존재하는 다른 마이그레이션과 hotfix 역병합 시 버전이 충돌하지 않도록 현재 전체 저장소의 다음 번호를 사용한다.
+공통 Flyway repeatable 마이그레이션 `R__create_apple_user_migration.sql`로 `apple_user_migration` 테이블을 추가한다. 운영 `main`과 이미 더 높은 버전이 적용된 `develop` 양쪽에서 순서 충돌 없이 실행되도록 버전 번호를 사용하지 않으며, 같은 SQL이 다시 실행돼도 실패하지 않도록 테이블과 인덱스를 멱등하게 생성한다. 최초 적용 후 이 파일은 동결하고, 컬럼·제약·인덱스 변경은 새 versioned `ALTER` 마이그레이션으로만 반영한다.
 
 테이블은 다음 정보를 저장한다.
 
@@ -106,7 +106,7 @@ workflow는 운영 GitHub Environment와 AWS OIDC를 사용하고 `/landit/prod`
 
 ## 운영 순서
 
-1. hotfix를 운영에 배포하고 `V74`가 적용됐는지 확인한다.
+1. hotfix를 운영에 배포하고 `R__create_apple_user_migration.sql`이 적용됐는지 확인한다.
 2. 운영 Apple 로그인을 차단한다.
 3. 이전 Team 자격 증명과 새 Team ID로 `PREPARE` workflow를 실행한다.
 4. 모든 대상이 `PREPARED`인지 집계 결과와 DB 상태로 확인한다.

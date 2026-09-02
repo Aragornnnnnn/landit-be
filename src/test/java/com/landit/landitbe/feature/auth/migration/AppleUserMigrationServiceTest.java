@@ -156,7 +156,7 @@ class AppleUserMigrationServiceTest {
   private void applyMigration() throws SQLException, IOException {
     String migration;
     try (var input =
-        getClass().getResourceAsStream("/db/migration/V74__add_apple_user_migration.sql")) {
+        getClass().getResourceAsStream("/db/migration/R__create_apple_user_migration.sql")) {
       if (input == null) {
         throw new IOException("migration resource is missing");
       }
