@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.config.content.ExpressionSearchProperties;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.repository.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.shared.domain.Locale;
@@ -33,6 +34,7 @@ public class ExpressionCandidateSelectionService {
    * @param userProfileId 학습 완료 표현을 제외할 사용자 ID
    * @param targetLocale 학습 언어
    * @param baseLocale 기준 언어
+   * @param maxDifficultyLevel 노출할 표현 난이도의 상한
    * @return 코사인 거리 오름차순의 후보 표현 ID 목록
    * @throws ApiException 검색할 수 있는 공용 표현 후보가 하나도 없을 때
    */
@@ -40,17 +42,20 @@ public class ExpressionCandidateSelectionService {
       List<AiConversationExcerpt> excerpts,
       long userProfileId,
       Locale targetLocale,
-      Locale baseLocale) {
+      Locale baseLocale,
+      int maxDifficultyLevel) {
     // 같은 표현이 여러 추출 발화에 걸리면 가장 가까운 거리 하나로 병합한다.
     Map<Long, Double> bestDistanceByExpressionId = new HashMap<>();
     for (AiConversationExcerpt excerpt : excerpts) {
       for (ExpressionEmbeddingMatch match :
           expressionQueryService.searchFreeTalkCandidatesByEmbedding(
-              excerpt.embedding(),
-              userProfileId,
-              targetLocale,
-              baseLocale,
-              properties.maxCandidates())) {
+              new FreeTalkCandidateSearch(
+                  excerpt.embedding(),
+                  userProfileId,
+                  targetLocale,
+                  baseLocale,
+                  maxDifficultyLevel,
+                  properties.maxCandidates()))) {
         bestDistanceByExpressionId.merge(match.expressionId(), match.distance(), Math::min);
       }
     }

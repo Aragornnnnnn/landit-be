@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.content.repository;
 
-import com.landit.landitbe.shared.domain.Locale;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -33,6 +32,7 @@ public class PgVectorExpressionEmbeddingSearchRepository
         AND we.status = 'ACTIVE'
         AND we.target_locale = ?
         AND we.base_locale = ?
+        AND we.difficulty_level <= ?
         AND we.embedding IS NOT NULL
         AND NOT EXISTS (
           SELECT 1
@@ -57,23 +57,19 @@ public class PgVectorExpressionEmbeddingSearchRepository
 
   /** {@inheritDoc} */
   @Override
-  public List<ExpressionEmbeddingMatch> searchFreeTalkCandidates(
-      List<Float> embedding,
-      long userProfileId,
-      Locale targetLocale,
-      Locale baseLocale,
-      int limit) {
-    String vectorLiteral = toVectorLiteral(embedding);
+  public List<ExpressionEmbeddingMatch> searchFreeTalkCandidates(FreeTalkCandidateSearch search) {
+    String vectorLiteral = toVectorLiteral(search.embedding());
     return jdbcTemplate.query(
         SEARCH_SQL,
         (resultSet, rowNumber) ->
             new ExpressionEmbeddingMatch(resultSet.getLong("id"), resultSet.getDouble("distance")),
         vectorLiteral,
-        targetLocale.name(),
-        baseLocale.name(),
-        userProfileId,
+        search.targetLocale().name(),
+        search.baseLocale().name(),
+        search.maxDifficultyLevel(),
+        search.userProfileId(),
         vectorLiteral,
-        limit);
+        search.limit());
   }
 
   // 임베딩 벡터를 pgvector 리터럴 형식('[0.1,0.2,...]')으로 변환한다.

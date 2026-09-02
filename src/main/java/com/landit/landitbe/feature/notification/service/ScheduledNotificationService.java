@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -20,6 +21,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 매일 예약된 학습 알림 대상을 페이지 단위로 계산하고 직접 발송한다. */
+@Slf4j
 @Service
 @ConditionalOnProperty(
     prefix = "landit.notification",
@@ -96,7 +98,7 @@ public class ScheduledNotificationService {
         continue;
       }
       notificationTargetSelectionService
-          .select(page.inputs().get(userProfileId))
+          .select(page.inputs().get(userProfileId), scheduledDate)
           .ifPresent(
               target -> {
                 LocalDateTime latestActivityAt = latestActivityAt(page.inputs().get(userProfileId));
@@ -112,12 +114,22 @@ public class ScheduledNotificationService {
                 } else {
                   state.refresh(target.notificationType(), target.targetId(), latestActivityAt);
                 }
-                ScheduledNotificationContent content = ScheduledNotificationContent.from(target);
+                ScheduledNotificationContent content =
+                    ScheduledNotificationContent.from(
+                        target, page.inputs().get(userProfileId), scheduledDate);
+                log.info(
+                    "scheduled_notification_selected userProfileId={} scheduledDate={} "
+                        + "notificationType={} contentVariant={}",
+                    userProfileId,
+                    scheduledDate,
+                    target.notificationType(),
+                    content.contentVariant());
                 commands.add(
                     new SendPushNotificationCommand(
                         eventId(scheduledDate, userProfileId),
                         userProfileId,
                         target.notificationType(),
+                        content.contentVariant(),
                         content.title(),
                         content.body(),
                         content.deepLink()));

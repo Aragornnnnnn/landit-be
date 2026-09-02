@@ -1,4 +1,4 @@
-// Expo Receipt 확인 메시지를 Push 전용 SQS에 15분 지연 발행한다.
+// 편지함 답장과 Expo Receipt 확인 메시지를 Push 전용 SQS에 발행한다.
 
 package com.landit.landitbe.feature.notification.messaging;
 
@@ -16,7 +16,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Expo Receipt 확인 메시지를 Push 전용 SQS에 15분 지연 발행한다. */
+/** 편지함 답장과 Expo Receipt 확인 메시지를 Push 전용 SQS에 발행한다. */
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(
@@ -31,6 +31,20 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
   private final SqsAsyncClient sqsAsyncClient;
   private final JsonMapper jsonMapper;
   private final NotificationProperties properties;
+
+  /** {@inheritDoc} */
+  @Override
+  public void publishMailboxReply(MailboxReplyNotificationRequest request) {
+    validateConfiguration();
+    PushQueueMessage message =
+        new PushQueueMessage(
+            MESSAGE_VERSION,
+            "mailbox-reply:" + request.letterId(),
+            PushQueueMessage.MAILBOX_REPLY_NOTIFICATION_BATCH,
+            request.occurredAt(),
+            PushQueuePayload.mailboxReply(request));
+    send(message, 0, "편지함 답장 Push 메시지 발행에 실패했습니다.");
+  }
 
   /** {@inheritDoc} */
   @Override

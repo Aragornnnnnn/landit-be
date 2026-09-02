@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -58,6 +59,7 @@ public class AdminMailboxService {
   private final AdminMailboxLetterRecipientRepository recipientRepository;
   private final AdminAuditService adminAuditService;
   private final EntityManager entityManager;
+  private final ApplicationEventPublisher applicationEventPublisher;
 
   /**
    * 편지함 어드민 저장소와 감사 Service를 주입받는다.
@@ -67,18 +69,21 @@ public class AdminMailboxService {
    * @param recipientRepository 편지 수신자 저장소
    * @param adminAuditService 관리자 감사 Service
    * @param entityManager 영속 상태를 DB 저장 값과 동기화할 EntityManager
+   * @param applicationEventPublisher 답장 커밋 후 알림 이벤트를 전달할 Publisher
    */
   public AdminMailboxService(
       AdminMailboxLetterRepository letterRepository,
       AdminMailboxFeedbackRepository feedbackRepository,
       AdminMailboxLetterRecipientRepository recipientRepository,
       AdminAuditService adminAuditService,
-      EntityManager entityManager) {
+      EntityManager entityManager,
+      ApplicationEventPublisher applicationEventPublisher) {
     this.letterRepository = letterRepository;
     this.feedbackRepository = feedbackRepository;
     this.recipientRepository = recipientRepository;
     this.adminAuditService = adminAuditService;
     this.entityManager = entityManager;
+    this.applicationEventPublisher = applicationEventPublisher;
   }
 
   /**
@@ -312,6 +317,11 @@ public class AdminMailboxService {
         null,
         "recipientCount=%d,completedFeedbackCount=%d,representativeFeedbackIds=%s"
             .formatted(recipients.size(), completedFeedbackCount, representativeFeedbackIds));
+    applicationEventPublisher.publishEvent(
+        new MailboxReplyCreatedEvent(
+            reply.getId(),
+            recipients.stream().map(MailboxLetterRecipient::getUserProfileId).toList(),
+            reply.getTitle()));
     return new AdminMailboxReplyResponse(
         reply.getId(), recipients.size(), completedFeedbackCount, representativeFeedbackIds);
   }

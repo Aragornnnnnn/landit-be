@@ -30,6 +30,7 @@ import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
+import com.landit.landitbe.feature.content.repository.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -110,13 +111,12 @@ class ExpressionQueryServiceTest {
   @Test
   void delegatesEmbeddingSearchToOwnedRepository() {
     List<ExpressionEmbeddingMatch> matches = List.of(new ExpressionEmbeddingMatch(101L, 0.2));
-    when(expressionEmbeddingSearchRepository.searchFreeTalkCandidates(
-            List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 30))
-        .thenReturn(matches);
+    FreeTalkCandidateSearch search =
+        new FreeTalkCandidateSearch(List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 3, 30);
+    when(expressionEmbeddingSearchRepository.searchFreeTalkCandidates(search)).thenReturn(matches);
 
     List<ExpressionEmbeddingMatch> result =
-        expressionQueryService.searchFreeTalkCandidatesByEmbedding(
-            List.of(1.0f), USER_ID, Locale.EN, Locale.KR, 30);
+        expressionQueryService.searchFreeTalkCandidatesByEmbedding(search);
 
     assertThat(result).isEqualTo(matches);
   }

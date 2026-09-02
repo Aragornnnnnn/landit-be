@@ -40,6 +40,8 @@ management:
         step: ${MANAGEMENT_OTLP_METRICS_EXPORT_STEP:30s}
 
 landit:
+  free-talk:
+    speaking-time-limit-ms: ${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:60000}
   cors:
     allowed-origins: ${LANDIT_CORS_ALLOWED_ORIGINS:}
   auth:

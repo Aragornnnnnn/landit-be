@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 /** 예약 알림 유형별 문구와 프런트 딥링크 계약을 검증한다. */
 class ScheduledNotificationContentTest {
 
-  /** 오늘의 시나리오 알림은 시나리오 대화 화면으로 연결한다. */
+  /** 오늘의 시나리오 알림은 시나리오 홈으로 연결한다. */
   @Test
   void createsDailyScenarioReminderContent() {
     SelectedNotificationTarget target =
@@ -19,7 +19,7 @@ class ScheduledNotificationContentTest {
 
     assertThat(content.deepLink())
         .isEqualTo(
-            "/conversation/scenario/10?utm_source=push&utm_medium=notification&"
+            "/scenario?utm_source=push&utm_medium=notification&"
                 + "utm_campaign=daily_scenario_reminder");
   }
 

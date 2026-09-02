@@ -194,6 +194,36 @@ class ExpoPushClientTest {
     assertThat(result.errorCode()).isEqualTo("DeviceNotRegistered");
   }
 
+  /** APNs가 BadDeviceToken을 반환하면 포괄적인 DeveloperError 대신 실제 원인을 보존한다. */
+  @Test
+  void mapsApnsBadDeviceTokenReceiptError() throws Exception {
+    stubResponse(RECEIPT_PATH, 200, fixture("/fixtures/expo/receipt-bad-device-token.json"));
+
+    var result = expoPushClient(null).getReceipt("ticket-1");
+
+    assertThat(result.status()).isEqualTo(PushReceiptStatus.FAILED);
+    assertThat(result.errorCode()).isEqualTo("BadDeviceToken");
+  }
+
+  /** APNs BadDeviceToken이 아닌 DeveloperError는 기존 포괄 오류 코드를 유지한다. */
+  @Test
+  void keepsGenericDeveloperErrorReceipt() {
+    stubResponse(
+        RECEIPT_PATH,
+        200,
+        """
+        {"data":{"ticket-1":{"status":"error","details":{
+          "apns":{"reason":"InvalidProviderToken","statusCode":403},
+          "error":"DeveloperError"
+        }}}}
+        """);
+
+    var result = expoPushClient(null).getReceipt("ticket-1");
+
+    assertThat(result.status()).isEqualTo(PushReceiptStatus.FAILED);
+    assertThat(result.errorCode()).isEqualTo("DeveloperError");
+  }
+
   /** HTTP 400 전체 요청 오류는 Ticket 실패 결과로 변환한다. */
   @Test
   void mapsNonRetryableRequestError() {
@@ -342,6 +372,17 @@ class ExpoPushClientTest {
   /** 고정된 Expo HTTP 응답을 반환하도록 테스트 서버를 설정한다. */
   private void stubResponse(String path, int status, String response) {
     server.createContext(path, exchange -> respond(exchange, status, response));
+  }
+
+  /** 실제 Expo Receipt 응답 구조를 보존한 JSON fixture를 읽는다. */
+  private String fixture(String path) throws IOException {
+    var inputStream = ExpoPushClientTest.class.getResourceAsStream(path);
+    if (inputStream == null) {
+      throw new IllegalArgumentException("Expo 테스트 fixture가 존재하지 않습니다: " + path);
+    }
+    try (inputStream) {
+      return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+    }
   }
 
   /** 로컬 Expo 대역 서버의 HTTP 응답을 작성한다. */

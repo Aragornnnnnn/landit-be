@@ -20,5 +20,6 @@ public record PushQueueMessage(
     Instant occurredAt,
     PushQueuePayload payload) {
 
+  public static final String MAILBOX_REPLY_NOTIFICATION_BATCH = "MAILBOX_REPLY_NOTIFICATION_BATCH";
   public static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
 }

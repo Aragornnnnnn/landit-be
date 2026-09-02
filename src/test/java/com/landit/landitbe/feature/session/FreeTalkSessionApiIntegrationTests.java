@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -808,6 +809,56 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void excludesCandidatesAboveLearnerDifficultyLevel() throws Exception {
+    // 난이도 4 표현만 심어두면 학습 수준 2(상한 3) 사용자에게는 후보가 남지 않아 실패로 전환된다.
+    seedEmbeddedCandidateExpression(4);
+    String accessToken =
+        login("free-talk-difficulty-excluded@example.com").get("data").get("accessToken").asText();
+    updateLearningLevel(accessToken, 2);
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
+  }
+
+  @Test
+  void keepsCandidatesWithinLearnerDifficultyLevel() throws Exception {
+    // 같은 난이도 4 표현이라도 학습 수준 4(상한 5) 사용자에게는 후보로 남는다.
+    seedEmbeddedCandidateExpression(4);
+    String accessToken =
+        login("free-talk-difficulty-kept@example.com").get("data").get("accessToken").asText();
+    updateLearningLevel(accessToken, 4);
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
+  }
+
+  @Test
   void failsExpressionGenerationWhenNoEmbeddedCandidateExists() throws Exception {
     // 임베딩이 있는 공용 후보를 심지 않으면 유사도 검색이 빈손이 되어 실패로 전환된다.
     String accessToken =
@@ -1213,6 +1264,10 @@ class FreeTalkSessionApiIntegrationTests {
 
   // 유사도 검색이 찾을 수 있도록 Fake 임베딩과 같은 방향의 벡터를 가진 공용 후보 표현을 심는다.
   private void seedEmbeddedCandidateExpression() {
+    seedEmbeddedCandidateExpression(3);
+  }
+
+  private void seedEmbeddedCandidateExpression(int difficultyLevel) {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
@@ -1224,7 +1279,7 @@ class FreeTalkSessionApiIntegrationTests {
             practice_examples_payload, embedding, status, created_at, updated_at
         )
         VALUES (
-            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 1,
+            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', ?, 'EN', 'KR', 1,
             'piece of cake', '식은 죽 먹기', '쉬운 일을 말할 때 사용한다.',
             '아주 쉬운 일이었다고 말할 때 사용하는 표현이다.',
             'It was a piece of cake.', '그건 식은 죽 먹기였어.',
@@ -1233,6 +1288,7 @@ class FreeTalkSessionApiIntegrationTests {
             '[]' FORMAT JSON, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         """,
+        difficultyLevel,
         firstAxisEmbeddingLiteral());
   }
 
@@ -1415,6 +1471,17 @@ class FreeTalkSessionApiIntegrationTests {
         """,
         practiceExamples("https://cdn/practice.png").toString());
     return 994103L;
+  }
+
+  // 온보딩에서 고르는 학습 수준을 실제 API로 설정한다.
+  private void updateLearningLevel(String accessToken, int learningLevel) throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/me/learning-level")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"learningLevel\":%d}".formatted(learningLevel)))
+        .andExpect(status().isOk());
   }
 
   private JsonNode login(String email) throws Exception {

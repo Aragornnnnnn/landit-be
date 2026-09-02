@@ -1,0 +1,292 @@
+// Apple 사용자 이전 서비스의 단계별 처리와 재실행 동작을 검증한다.
+
+package com.landit.landitbe.feature.auth.migration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class AppleUserMigrationServiceTest {
+
+  private String databaseUrl;
+  private Connection databaseKeeper;
+  private AppleUserMigrationRepository repository;
+  private FakeAppleUserMigrationClient client;
+  private AppleUserMigrationService service;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    databaseUrl =
+        "jdbc:h2:mem:apple-service-" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+    databaseKeeper = openConnection();
+    createOauthIdentityTable();
+    applyMigration();
+    repository = new AppleUserMigrationRepository(databaseUrl, "sa", "");
+    client = new FakeAppleUserMigrationClient();
+    service = new AppleUserMigrationService(repository, client);
+  }
+
+  @AfterEach
+  void tearDown() throws SQLException {
+    databaseKeeper.close();
+  }
+
+  @Test
+  void prepareContinuesAfterOneUserFailsAndReturnsFailedSummary() throws Exception {
+    insertIdentity(1L, "old-sub-1");
+    insertIdentity(2L, "old-sub-2");
+    client.failCreateFor("old-sub-1");
+
+    AppleUserMigrationSummary summary = service.run(AppleUserMigrationPhase.PREPARE);
+
+    assertThat(summary).isEqualTo(new AppleUserMigrationSummary(2, 1, 1, 1));
+    assertThat(repository.findCandidates(AppleUserMigrationPhase.PREPARE))
+        .extracting(AppleUserMigrationCandidate::providerUserId)
+        .containsExactly("old-sub-1");
+    assertThat(client.createCallCount).isEqualTo(2);
+  }
+
+  @Test
+  void prepareRetryCallsOnlyPreviouslyFailedUser() throws Exception {
+    insertIdentity(1L, "old-sub-1");
+    insertIdentity(2L, "old-sub-2");
+    client.failCreateFor("old-sub-1");
+    service.run(AppleUserMigrationPhase.PREPARE);
+    client.clearFailuresAndCounts();
+
+    AppleUserMigrationSummary summary = service.run(AppleUserMigrationPhase.PREPARE);
+
+    assertThat(summary).isEqualTo(new AppleUserMigrationSummary(2, 2, 0, 0));
+    assertThat(client.createCallCount).isEqualTo(1);
+  }
+
+  @Test
+  void tokenFailureAbortsBeforeAnyUserRequest() throws Exception {
+    insertIdentity(1L, "old-sub-1");
+    client.failToken = true;
+
+    assertThatThrownBy(() -> service.run(AppleUserMigrationPhase.PREPARE))
+        .isInstanceOf(AppleUserMigrationException.class)
+        .extracting("failureCode")
+        .isEqualTo("APPLE_TOKEN_FAILED");
+
+    assertThat(client.createCallCount).isZero();
+    assertThat(repository.findCandidates(AppleUserMigrationPhase.PREPARE)).hasSize(1);
+  }
+
+  @Test
+  void completeChangesOnlyProviderIdentityAndKeepsUserProfile() throws Exception {
+    insertIdentity(77L, "old-sub");
+    service.run(AppleUserMigrationPhase.PREPARE);
+
+    AppleUserMigrationSummary summary = service.run(AppleUserMigrationPhase.COMPLETE);
+
+    assertThat(summary).isEqualTo(new AppleUserMigrationSummary(1, 1, 0, 0));
+    assertThat(readIdentity())
+        .isEqualTo(
+            new IdentityRow(
+                77L, "new-transfer-old-sub", "new@privaterelay.appleid.com", "APPLE", "ACTIVE"));
+  }
+
+  @Test
+  void completeSkipsCompletedUsersAndTokenRequestWhenRetried() throws Exception {
+    insertIdentity(77L, "old-sub");
+    service.run(AppleUserMigrationPhase.PREPARE);
+    service.run(AppleUserMigrationPhase.COMPLETE);
+    client.rejectAllCalls = true;
+    client.clearCounts();
+
+    AppleUserMigrationSummary summary = service.run(AppleUserMigrationPhase.COMPLETE);
+
+    assertThat(summary.completed()).isTrue();
+    assertThat(client.totalCallCount()).isZero();
+  }
+
+  @Test
+  void completeMarksOneFailureAndContinuesWithRemainingUsers() throws Exception {
+    insertIdentity(1L, "old-sub-1");
+    insertIdentity(2L, "old-sub-2");
+    service.run(AppleUserMigrationPhase.PREPARE);
+    client.failExchangeFor("transfer-old-sub-1");
+
+    AppleUserMigrationSummary summary = service.run(AppleUserMigrationPhase.COMPLETE);
+
+    assertThat(summary).isEqualTo(new AppleUserMigrationSummary(2, 1, 1, 1));
+    assertThat(repository.findCandidates(AppleUserMigrationPhase.COMPLETE))
+        .extracting(AppleUserMigrationCandidate::transferSub)
+        .containsExactly("transfer-old-sub-1");
+    assertThat(client.exchangeCallCount).isEqualTo(2);
+  }
+
+  private void createOauthIdentityTable() throws SQLException {
+    try (Statement statement = databaseKeeper.createStatement()) {
+      statement.execute(
+          """
+          CREATE TABLE oauth_identity (
+              id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+              user_profile_id BIGINT NOT NULL,
+              provider VARCHAR(20) NOT NULL,
+              provider_user_id VARCHAR(255) NOT NULL,
+              provider_email VARCHAR(255),
+              status VARCHAR(20) NOT NULL,
+              created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )
+          """);
+      statement.execute(
+          "CREATE UNIQUE INDEX uk_oauth_identity_active_provider_user "
+              + "ON oauth_identity (provider, provider_user_id)");
+    }
+  }
+
+  private void applyMigration() throws SQLException, IOException {
+    String migration;
+    try (var input =
+        getClass().getResourceAsStream("/db/migration/R__create_apple_user_migration.sql")) {
+      if (input == null) {
+        throw new IOException("migration resource is missing");
+      }
+      migration = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    try (Statement statement = databaseKeeper.createStatement()) {
+      for (String sql : migration.split(";")) {
+        if (!sql.isBlank()) {
+          statement.execute(sql);
+        }
+      }
+    }
+  }
+
+  private void insertIdentity(long userProfileId, String providerUserId) throws SQLException {
+    try (Connection connection = openConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                """
+                INSERT INTO oauth_identity (
+                    user_profile_id, provider, provider_user_id, provider_email, status
+                ) VALUES (?, 'APPLE', ?, 'old@privaterelay.appleid.com', 'ACTIVE')
+                """)) {
+      statement.setLong(1, userProfileId);
+      statement.setString(2, providerUserId);
+      statement.executeUpdate();
+    }
+  }
+
+  private IdentityRow readIdentity() throws SQLException {
+    try (Connection connection = openConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                """
+                SELECT user_profile_id, provider_user_id, provider_email, provider, status
+                FROM oauth_identity
+                ORDER BY id
+                LIMIT 1
+                """)) {
+      try (ResultSet resultSet = statement.executeQuery()) {
+        resultSet.next();
+        return new IdentityRow(
+            resultSet.getLong("user_profile_id"),
+            resultSet.getString("provider_user_id"),
+            resultSet.getString("provider_email"),
+            resultSet.getString("provider"),
+            resultSet.getString("status"));
+      }
+    }
+  }
+
+  private Connection openConnection() throws SQLException {
+    return DriverManager.getConnection(databaseUrl, "sa", "");
+  }
+
+  private record IdentityRow(
+      long userProfileId,
+      String providerUserId,
+      String providerEmail,
+      String provider,
+      String status) {}
+
+  private static final class FakeAppleUserMigrationClient implements AppleUserMigrationClient {
+
+    private final Set<String> createFailures = new HashSet<>();
+    private final Set<String> exchangeFailures = new HashSet<>();
+    private boolean failToken;
+    private boolean rejectAllCalls;
+    private int tokenCallCount;
+    private int createCallCount;
+    private int exchangeCallCount;
+
+    @Override
+    public String requestAccessToken() {
+      rejectIfNeeded();
+      tokenCallCount++;
+      if (failToken) {
+        throw new AppleUserMigrationException("APPLE_TOKEN_FAILED");
+      }
+      return "access-token";
+    }
+
+    @Override
+    public String createTransferSub(String accessToken, String providerUserId) {
+      rejectIfNeeded();
+      createCallCount++;
+      if (createFailures.contains(providerUserId)) {
+        throw new AppleUserMigrationException("APPLE_HTTP_400");
+      }
+      return "transfer-" + providerUserId;
+    }
+
+    @Override
+    public AppleRecipientUser exchangeTransferSub(String accessToken, String transferSub) {
+      rejectIfNeeded();
+      exchangeCallCount++;
+      if (exchangeFailures.contains(transferSub)) {
+        throw new AppleUserMigrationException("APPLE_HTTP_400");
+      }
+      return new AppleRecipientUser("new-" + transferSub, "new@privaterelay.appleid.com");
+    }
+
+    private void failCreateFor(String providerUserId) {
+      createFailures.add(providerUserId);
+    }
+
+    private void failExchangeFor(String transferSub) {
+      exchangeFailures.add(transferSub);
+    }
+
+    private void clearFailuresAndCounts() {
+      createFailures.clear();
+      exchangeFailures.clear();
+      clearCounts();
+    }
+
+    private void clearCounts() {
+      tokenCallCount = 0;
+      createCallCount = 0;
+      exchangeCallCount = 0;
+    }
+
+    private int totalCallCount() {
+      return tokenCallCount + createCallCount + exchangeCallCount;
+    }
+
+    private void rejectIfNeeded() {
+      if (rejectAllCalls) {
+        throw new AssertionError("completed migration must not call Apple again");
+      }
+    }
+  }
+}

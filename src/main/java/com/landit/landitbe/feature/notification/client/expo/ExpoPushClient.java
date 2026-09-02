@@ -28,6 +28,7 @@ public class ExpoPushClient implements NotificationSender {
 
   private static final String SEND_PATH = "/--/api/v2/push/send";
   private static final String RECEIPT_PATH = "/--/api/v2/push/getReceipts";
+  private static final String APNS_BAD_DEVICE_TOKEN = "BadDeviceToken";
   private static final String UNKNOWN_ERROR_CODE = "EXPO_REQUEST_REJECTED";
 
   private final HttpClient httpClient;
@@ -168,7 +169,7 @@ public class ExpoPushClient implements NotificationSender {
         return PushReceiptResult.delivered();
       }
       if ("error".equals(receipt.path("status").asString())) {
-        return PushReceiptResult.failed(readDetailErrorCode(receipt));
+        return PushReceiptResult.failed(readReceiptErrorCode(receipt));
       }
       throw malformedResponse();
     } catch (PushNotificationException exception) {
@@ -198,6 +199,14 @@ public class ExpoPushClient implements NotificationSender {
   private String readDetailErrorCode(JsonNode result) {
     String errorCode = result.path("details").path("error").asString();
     return errorCode.isBlank() ? UNKNOWN_ERROR_CODE : errorCode;
+  }
+
+  /** Receipt의 APNs BadDeviceToken 원인을 우선하고 나머지는 Expo 오류 코드를 유지한다. */
+  private String readReceiptErrorCode(JsonNode receipt) {
+    String apnsReason = receipt.path("details").path("apns").path("reason").asString();
+    return APNS_BAD_DEVICE_TOKEN.equals(apnsReason)
+        ? APNS_BAD_DEVICE_TOKEN
+        : readDetailErrorCode(receipt);
   }
 
   /** HTTP 상태가 성공 범위인지 확인한다. */

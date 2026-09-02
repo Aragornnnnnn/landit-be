@@ -208,6 +208,20 @@ public class UserProfileService {
   }
 
   /**
+   * 프로필 상태와 무관하게 학습 수준을 조회한다.
+   *
+   * <p>사용자 요청이 아니라 백그라운드 콘텐츠 추천에서 쓰는 조회다. 프로필이 비활성이라는 이유로 추천 작업을 실패시키지 않도록 {@link
+   * #requireActive(Long)}와 달리 예외를 던지지 않는다. 값이 없으면 호출부가 학습 수준을 모르는 경우로 처리한다.
+   *
+   * @param userProfileId 조회할 사용자 ID
+   * @return 사용자가 선택한 학습 수준. 프로필이 없거나 학습 수준이 미설정이면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<Integer> findLearningLevel(Long userProfileId) {
+    return userProfileRepository.findById(userProfileId).map(UserProfile::getLearningLevel);
+  }
+
+  /**
    * 활성 사용자의 학습 수준을 갱신한다.
    *
    * @param userId 갱신할 사용자 ID
