@@ -55,7 +55,7 @@ class FreeTalkMemoryRetrievalServiceTest {
 
   @Test
   void returnsTopThreeScopedMemoriesWhenUseIsEnabled() {
-    when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v1"))
+    when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v2"))
         .thenReturn(true);
     when(aiClient.embedMemoryQuery(any(AiMemoryQueryEmbeddingRequest.class)))
         .thenReturn(new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", embedding()));
@@ -78,7 +78,7 @@ class FreeTalkMemoryRetrievalServiceTest {
         .isEqualTo(LocalDateTime.of(2026, 8, 1, 10, 30));
     verify(traceRepository)
         .saveCandidates(
-            eq(10L), eq(MemoryRetrievalStage.OPENING), any(), eq("memory-retrieval-v1"));
+            eq(10L), eq(MemoryRetrievalStage.OPENING), any(), eq("memory-retrieval-v2"));
 
     service.recordUsage(result, List.of(2L), 99L);
 
@@ -86,8 +86,27 @@ class FreeTalkMemoryRetrievalServiceTest {
   }
 
   @Test
+  void excludesMemoriesBelowMinimumCosineSimilarity() {
+    when(traceRepository.claim(10L, MemoryRetrievalStage.FIRST_USER_TURN, "memory-retrieval-v2"))
+        .thenReturn(true);
+    when(aiClient.embedMemoryQuery(any(AiMemoryQueryEmbeddingRequest.class)))
+        .thenReturn(new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", embedding()));
+    when(searchRepository.searchActive(20L, "chloe", embedding(), 3))
+        .thenReturn(List.of(match(1L, 0.79), match(2L, 0.81), match(3L, 0.95)));
+
+    FreeTalkMemoryRetrievalService.RetrievalResult result =
+        service.retrieve(
+            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+                10L, 20L, "chloe", MemoryRetrievalStage.FIRST_USER_TURN, "Saturday routine"));
+
+    assertThat(result.contexts())
+        .extracting(AiFreeTalkMemoryContext::memoryId)
+        .containsExactly(1L);
+  }
+
+  @Test
   void returnsEmptyContextWhenMemorySearchFails() {
-    when(traceRepository.claim(10L, MemoryRetrievalStage.FIRST_USER_TURN, "memory-retrieval-v1"))
+    when(traceRepository.claim(10L, MemoryRetrievalStage.FIRST_USER_TURN, "memory-retrieval-v2"))
         .thenReturn(true);
     when(aiClient.embedMemoryQuery(any())).thenThrow(new RuntimeException("AI unavailable"));
 
@@ -109,7 +128,7 @@ class FreeTalkMemoryRetrievalServiceTest {
 
   @Test
   void doesNotSearchTwiceWhenSessionTraceAlreadyExists() {
-    when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v1"))
+    when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v2"))
         .thenReturn(false);
 
     FreeTalkMemoryRetrievalService.RetrievalResult result =
