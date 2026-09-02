@@ -38,7 +38,7 @@
 ### Task 2: 질문 그룹 스키마와 조회 흐름
 
 **Files:**
-- Create: `src/main/resources/db/migration/V74__add_scenario_question_level_group.sql`
+- Create: `src/main/resources/db/migration/V76__add_scenario_question_level_group.sql`
 - Modify: `src/test/java/com/landit/landitbe/DatabaseSchemaIntegrationTests.java`
 - Modify: `src/main/java/com/landit/landitbe/feature/content/repository/ScenarioListQueryRepository.java`
 - Modify: `src/main/java/com/landit/landitbe/feature/content/repository/DailyScenarioQueryRepository.java`
@@ -56,7 +56,7 @@
 - Modify: `src/main/java/com/landit/landitbe/feature/session/service/SubmittedMessageService.java`
 
 - [x] DB 테스트에 두 `question_level_group` 컬럼, 체크 제약, 새 질문 유일 제약, 기존 행 백필을 추가해 실패를 확인한다.
-- [x] V74에서 질문·시나리오 세션 컬럼을 추가하고 기존 행을 `LEVEL_4_TO_5`로 백필한다.
+- [x] V76에서 질문·시나리오 세션 컬럼을 추가하고 기존 행을 `LEVEL_4_TO_5`로 백필한다.
 - [x] 질문 유일 제약을 `(scenario_id, question_level_group, display_order)`로 바꾼다.
 - [x] 목록·일일·관리자·세션 시작 쿼리에 `questionLevelGroup` 파라미터와 동일 그룹 조건을 추가한다.
 - [x] 세션 시작 시 프로필에서 계산한 그룹을 `ScenarioSession.start(...)`에 저장한다.
