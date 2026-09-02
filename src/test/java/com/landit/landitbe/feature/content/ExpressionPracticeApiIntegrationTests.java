@@ -263,7 +263,78 @@ class ExpressionPracticeApiIntegrationTests {
         .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
         .andExpect(
             jsonPath("$.data.practiceSentence[*].highlightingPart")
-                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("invalid"))));
+                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("invalid"))))
+        // 불량 예문이 작문 문제 쪽으로 뽑히는 경우도 함께 막는다
+        .andExpect(
+            jsonPath("$.data.writingSentence[*].writingSentenceTranslation")
+                .value(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem("sentenceText 키가 없는 불량 예문"))));
+  }
+
+  /**
+   * 불량 예문을 제외하고 나면 유효 예문이 4건에 못 미치는 경우를 검증한다.
+   *
+   * <p>정상 3건과 불량 1건을 심으면, 제외가 동작할 때만 유효 예문이 3건이 되어 404가 된다. 제외가 깨지면 4건이 되어 200이 나오므로 무작위 분배와 무관하게
+   * 결정적으로 판별된다.
+   */
+  @Test
+  void practiceRejectsExpressionWithTooFewValidSentences() throws Exception {
+    // given: 정상 예문 3개 + sentenceText가 없는 불량 예문 1개
+    String payload =
+        """
+        [
+          {
+            "sentenceText": "valid-sentence-0",
+            "highlightingPart": "valid-0",
+            "sentenceTranslation": "정상 예문 0",
+            "practiceQuestion": "question-0?",
+            "practiceQuestionTranslation": "질문 0?",
+            "sentenceWords": ["valid", "sentence", "0"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "0"],
+            "sentenceTranslateWords": ["정상", "예문", "0"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "0"]
+          },
+          {
+            "sentenceText": "valid-sentence-1",
+            "highlightingPart": "valid-1",
+            "sentenceTranslation": "정상 예문 1",
+            "practiceQuestion": "question-1?",
+            "practiceQuestionTranslation": "질문 1?",
+            "sentenceWords": ["valid", "sentence", "1"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "1"],
+            "sentenceTranslateWords": ["정상", "예문", "1"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "1"]
+          },
+          {
+            "sentenceText": "valid-sentence-2",
+            "highlightingPart": "valid-2",
+            "sentenceTranslation": "정상 예문 2",
+            "practiceQuestion": "question-2?",
+            "practiceQuestionTranslation": "질문 2?",
+            "sentenceWords": ["valid", "sentence", "2"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "2"],
+            "sentenceTranslateWords": ["정상", "예문", "2"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "2"]
+          },
+          {
+            "highlightingPart": "invalid",
+            "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
+            "practiceQuestion": "invalid?",
+            "practiceQuestionTranslation": "불량?"
+          }
+        ]
+        """;
+    Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload);
+    String accessToken =
+        login("google-practice-5", "practice5@example.com", "Practice User5", "practice-nonce-5");
+
+    // when & then: 유효 예문이 3건이라 2+2로 나눌 수 없으므로 404
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound());
   }
 
   /**
