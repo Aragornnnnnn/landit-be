@@ -310,7 +310,7 @@ git add .github/workflows/apple-user-migration.yml docs/tasks/LAN-426/plan.md
 git commit -m "ci: Apple 사용자 이전 수동 workflow 추가"
 ```
 
-- [ ] **Step 6: Run independent high-risk review**
+- [x] **Step 6: Run independent high-risk review**
 
 Have a reviewer inspect the complete diff, design/plan coverage, test evidence, identity continuity, transaction boundaries, retry behavior, and secret handling. Fix blocking findings with a reproducing test, rerun affected checks, and commit the fix separately.
 
@@ -321,5 +321,6 @@ Have a reviewer inspect the complete diff, design/plan coverage, test evidence, 
 - `git diff --check`: 성공, 공백 오류 없음.
 - `./gradlew tasks --group database`: 성공, `migrateAppleUsers`와 기존 `migrateDatabase` task 등록 확인.
 - repeatable migration 회귀 검증: 기존 V74는 두 번째 적용에서 테이블 중복으로 실패함을 확인했고, `R__create_apple_user_migration.sql` 전환 후 반복 적용 테스트와 `./gradlew check` 통과.
+- 독립 고위험 리뷰: 배포 차단 finding 없음. repeatable 생성 파일 동결과 후속 versioned `ALTER` 원칙을 설계·계획에 반영함.
 - workflow 정적 검토: `workflow_dispatch`와 `main`·`prod` 제한, 단계별 확인 문자열, 단일 concurrency group, 비밀값 비출력, 배포 단계 미포함 확인.
 - 미검증 운영 항목: 실제 `/landit/prod/APPLE_MIGRATION_*` SSM Parameter 존재·권한, Apple 운영 API 응답, 운영 DB 대상 건수, 앱 이전 전후 PREPARE·COMPLETE 실행 결과.
