@@ -247,6 +247,21 @@ class ExpressionQueryServiceTest {
   }
 
   @Test
+  void shouldReturnScenarioExpressionAtUserMaximumDifficulty() {
+    WritingExpression expression = learningExpression();
+    when(expression.getExpressionSource()).thenReturn(WritingExpressionSource.SCENARIO);
+    when(expression.getDifficultyLevel()).thenReturn(3);
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+
+    ExpressionLearningResponse response =
+        expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID);
+
+    assertThat(response.expressionId()).isEqualTo(EXPRESSION_ID);
+  }
+
+  @Test
   void shouldReturnLearningStartDetailsWhenExpressionFound() {
     // given: DB에 학습하려는 표현 데이터가 있는 상황 가정
     // (learningExpression() 내부의 getter 스터빙이 findById 스터빙과 중첩되지 않도록 mock을 먼저 만든다)
