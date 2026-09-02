@@ -1,0 +1,86 @@
+# 운영자가 Apple 앱 이전 전후의 사용자 식별자 변환 단계를 수동 실행합니다.
+name: Apple user migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'PREPARE는 앱 이전 전, COMPLETE는 앱 이전 후 실행합니다.'
+        required: true
+        type: choice
+        options:
+          - PREPARE
+          - COMPLETE
+      confirmation:
+        description: 'RUN-PREPARE 또는 RUN-COMPLETE를 입력합니다.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: prod-apple-user-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Run ${{ inputs.phase }} for Apple users
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      APPLE_MIGRATION_PHASE: ${{ inputs.phase }}
+      MIGRATION_CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - name: Validate production migration request
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Apple user migration must run from main branch"
+            exit 1
+          fi
+
+          expected_confirmation="RUN-$APPLE_MIGRATION_PHASE"
+          if [ "$MIGRATION_CONFIRMATION" != "$expected_confirmation" ]; then
+            echo "Confirmation must match $expected_confirmation"
+            exit 1
+          fi
+
+          test -n "$AWS_ROLE_ARN"
+          test -n "$AWS_REGION"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Apple user migration
+        run: |
+          parameter_prefix="/landit/prod"
+
+          read_parameter() {
+            aws ssm get-parameter \
+              --name "$parameter_prefix/$1" \
+              --with-decryption \
+              --query 'Parameter.Value' \
+              --output text
+          }
+
+          export DB_URL="$(read_parameter DB_URL)"
+          export DB_USERNAME="$(read_parameter DB_USERNAME)"
+          export DB_PASSWORD="$(read_parameter DB_PASSWORD)"
+          export APPLE_MIGRATION_CLIENT_ID="$(read_parameter APPLE_MIGRATION_CLIENT_ID)"
+          export APPLE_MIGRATION_CLIENT_SECRET="$(read_parameter APPLE_MIGRATION_CLIENT_SECRET)"
+
+          if [ "$APPLE_MIGRATION_PHASE" = "PREPARE" ]; then
+            export APPLE_MIGRATION_TARGET_TEAM_ID="$(read_parameter APPLE_MIGRATION_TARGET_TEAM_ID)"
+          fi
+
+          ./gradlew migrateAppleUsers

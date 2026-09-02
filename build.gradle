@@ -79,3 +79,10 @@ tasks.register('migrateDatabase', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 	mainClass = 'com.landit.landitbe.FlywayMigrationRunner'
 }
+
+tasks.register('migrateAppleUsers', JavaExec) {
+	group = 'database'
+	description = 'Run one phase of Apple user account migration.'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.landit.landitbe.feature.auth.migration.AppleUserMigrationRunner'
+}
