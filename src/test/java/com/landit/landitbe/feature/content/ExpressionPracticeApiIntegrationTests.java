@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,24 +81,16 @@ class ExpressionPracticeApiIntegrationTests {
             .andExpect(jsonPath("$.data.targetExpressionText").value("blow my mind"))
             .andExpect(jsonPath("$.data.baseExpressionMeaningText").value("끝내주게 놀랍다"))
             .andExpect(jsonPath("$.data.usageDescription").value("강렬한 인상을 받았을 때 최고의 리액션이에요."))
-            .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
-            // 첫 번째 예문으로 전 필드 매핑 검증 (payload에 넣은 값 그대로인지)
-            .andExpect(
-                jsonPath("$.data.practiceSentence[0].sentenceText").value("practice-sentence-0"))
-            .andExpect(jsonPath("$.data.practiceSentence[0].highlightingPart").value("highlight-0"))
-            .andExpect(jsonPath("$.data.practiceSentence[0].sentenceTranslation").value("예문해석-0"))
-            .andExpect(jsonPath("$.data.practiceSentence[0].practiceQuestion").value("question-0"))
-            .andExpect(
-                jsonPath("$.data.practiceSentence[0].practiceQuestionTranslation").value("질문해석-0"))
-            .andExpect(
-                jsonPath("$.data.practiceSentence[0].imageUrl")
-                    .value("https://cdn.example.com/practice/0.png"))
+            .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+            .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
+            // imageUrl은 응답 계약에서 빠졌다
+            .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").doesNotExist())
             .andReturn();
 
     // then: writingSentence는 랜덤이라 특정 값 고정 검증이 불가능하므로,
-    //       "예문 4개 중 하나에서 만들어졌는지"(문장/해석/질문 세트가 일치하는지)를 검증한다
+    //       "예문 4개 중 서로 다른 2개에서 만들어졌는지"와 출제 언어 배정을 검증한다
     JsonNode data = objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("data");
-    JsonNode writingSentence = data.get("writingSentence");
+    JsonNode writingSentences = data.get("writingSentence");
     List<String> seededSentenceTexts =
         List.of(
             "practice-sentence-0",
@@ -105,30 +98,58 @@ class ExpressionPracticeApiIntegrationTests {
             "practice-sentence-2",
             "practice-sentence-3");
 
-    String pickedText = writingSentence.get("writingSentenceText").asText();
-    assertThat(seededSentenceTexts).contains(pickedText);
+    List<String> pickedTexts = new ArrayList<>();
+    List<String> quizLanguages = new ArrayList<>();
+    for (JsonNode writingSentence : writingSentences) {
+      String pickedText = writingSentence.get("writingSentenceText").asText();
+      assertThat(seededSentenceTexts).contains(pickedText);
+      pickedTexts.add(pickedText);
+      quizLanguages.add(writingSentence.get("quizLanguage").asText());
 
-    // 뽑힌 예문의 인덱스(끝자리 숫자)를 알아내서, 해석/질문도 같은 예문에서 왔는지 확인
-    String index = pickedText.substring(pickedText.length() - 1);
-    assertThat(writingSentence.get("writingSentenceTranslation").asText())
-        .isEqualTo("예문해석-" + index);
-    assertThat(writingSentence.get("writingQuestion").asText()).isEqualTo("question-" + index);
-    assertThat(writingSentence.get("writingQuestionTranslation").asText())
-        .isEqualTo("질문해석-" + index);
+      // 뽑힌 예문의 인덱스(끝자리 숫자)를 알아내서, 해석/질문도 같은 예문에서 왔는지 확인
+      String index = pickedText.substring(pickedText.length() - 1);
+      assertThat(writingSentence.get("writingSentenceTranslation").asText())
+          .isEqualTo("예문해석-" + index);
+      assertThat(writingSentence.get("writingQuestion").asText()).isEqualTo("question-" + index);
+      assertThat(writingSentence.get("writingQuestionTranslation").asText())
+          .isEqualTo("질문해석-" + index);
 
-    // 단어 칩 배열(LAN-229)도 같은 예문의 payload 값 그대로(순서 포함) 내려오는지 확인
-    assertThat(
-            objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class))
-        .containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
-    assertThat(
-            objectMapper.convertValue(
-                writingSentence.get("writingSentenceWordChoices"), String[].class))
-        .containsExactly(
-            "chip-" + index + "-b",
-            "noise-" + index + "-1",
-            "chip-" + index + "-a",
-            "noise-" + index + "-2",
-            "noise-" + index + "-3");
+      // 단어 칩 배열은 출제 언어에 맞는 쪽이 payload 값 그대로(순서 포함) 내려온다
+      String[] words =
+          objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class);
+      String[] choices =
+          objectMapper.convertValue(
+              writingSentence.get("writingSentenceWordChoices"), String[].class);
+      if ("EN".equals(writingSentence.get("quizLanguage").asText())) {
+        assertThat(words).containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
+        assertThat(choices)
+            .containsExactly(
+                "chip-" + index + "-b",
+                "noise-" + index + "-1",
+                "chip-" + index + "-a",
+                "noise-" + index + "-2",
+                "noise-" + index + "-3");
+      } else {
+        assertThat(words).containsExactly("조각-" + index + "-가", "조각-" + index + "-나");
+        assertThat(choices)
+            .containsExactly(
+                "조각-" + index + "-나",
+                "오답-" + index + "-1",
+                "조각-" + index + "-가",
+                "오답-" + index + "-2",
+                "오답-" + index + "-3");
+      }
+    }
+
+    // 작문 문제 2건은 서로 다른 예문이며 출제 언어가 영어와 한국어 하나씩이다
+    assertThat(pickedTexts).doesNotHaveDuplicates();
+    assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
+
+    // 눈으로 익히는 예문과 작문 문제는 겹치지 않는다
+    List<String> practiceTexts = new ArrayList<>();
+    data.get("practiceSentence")
+        .forEach(node -> practiceTexts.add(node.get("sentenceText").asText()));
+    assertThat(practiceTexts).doesNotContainAnyElementsOf(pickedTexts);
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
@@ -232,13 +253,14 @@ class ExpressionPracticeApiIntegrationTests {
         login("google-practice-4", "practice4@example.com", "Practice User4", "practice-nonce-4");
 
     // when: 조회하면
-    // then: 불량 예문은 제외되어 정상 4개만 반환된다.
+    // then: 불량 예문은 제외되고 정상 4개가 2+2로 나뉘어 반환된다.
     mockMvc
         .perform(
             get("/api/v1/expressions/{expressionId}/practice", expressionId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+        .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
         .andExpect(
             jsonPath("$.data.practiceSentence[*].highlightingPart")
                 .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("invalid"))));
@@ -330,8 +352,7 @@ class ExpressionPracticeApiIntegrationTests {
                       "sentenceTranslateWordChoices": ["조각-%d-나", "오답-%d-1", "조각-%d-가", "오답-%d-2", "오답-%d-3"]
                     }
           """
-              .formatted(
-                  i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
+              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return json.append("]").toString();
   }

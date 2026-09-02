@@ -851,9 +851,12 @@ class FreeTalkSessionApiIntegrationTests {
             get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
-        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
-        .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+        // imageUrl은 응답 계약에서 빠졌다
+        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").doesNotExist())
+        .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
+        .andExpect(jsonPath("$.data.writingSentence[0].writingSentenceWords").isArray())
+        .andExpect(jsonPath("$.data.writingSentence[*].quizLanguage").isArray());
   }
 
   @Test

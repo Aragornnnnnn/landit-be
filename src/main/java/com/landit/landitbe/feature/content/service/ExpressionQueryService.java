@@ -11,7 +11,6 @@ import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
-import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
@@ -26,6 +25,7 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,7 +63,24 @@ public class ExpressionQueryService {
    * <p>배열이 없거나 비어 있거나 공백 원소가 있으면 해당 예문을 제외한다.
    */
   private static final List<String> REQUIRED_PRACTICE_SENTENCE_WORD_ARRAY_KEYS =
-      List.of("sentenceWords", "sentenceWordChoices");
+      List.of(
+          "sentenceWords",
+          "sentenceWordChoices",
+          "sentenceTranslateWords",
+          "sentenceTranslateWordChoices");
+
+  /**
+   * 추가 예문 조회에 필요한 유효 예문 개수다.
+   *
+   * <p>2건은 눈으로 익히는 예문으로, 2건은 직접 푸는 작문 문제로 나눈다. 이보다 적으면 응답을 만들 수 없다.
+   */
+  private static final int REQUIRED_PRACTICE_SENTENCE_COUNT = 4;
+
+  /** 작문 문제로 내보낼 예문 개수다. 나머지가 눈으로 익히는 예문이 된다. */
+  private static final int WRITING_SENTENCE_COUNT = 2;
+
+  private static final String NOT_ENOUGH_PRACTICE_SENTENCE_LOG =
+      "추가 예문 조회 실패: 유효한 추가 예문이 {}건뿐입니다. {}건이 필요합니다. expressionId={}";
 
   private static final String EXPRESSION_NOT_FOUND_LOG =
       "추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}";
@@ -314,15 +331,27 @@ public class ExpressionQueryService {
       log.warn(NO_VALID_PRACTICE_SENTENCE_LOG, expressionId);
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
+    if (parsedSentences.size() < REQUIRED_PRACTICE_SENTENCE_COUNT) {
+      // 예문을 나눠 담을 수 없는 상태는 콘텐츠 결함이므로 줄여서 내보내지 않고 드러낸다.
+      log.warn(
+          NOT_ENOUGH_PRACTICE_SENTENCE_LOG,
+          parsedSentences.size(),
+          REQUIRED_PRACTICE_SENTENCE_COUNT,
+          expressionId);
+      throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
 
-    List<PracticeSentenceResponse> extraPracticeSentences =
-        parsedSentences.stream().map(ParsedPracticeSentence::sentence).toList();
+    // 매번 다른 조합이 나오도록 섞은 뒤 앞쪽을 작문 문제로, 나머지를 눈으로 익히는 예문으로 쓴다.
+    List<ParsedPracticeSentence> shuffled = new ArrayList<>(parsedSentences);
+    Collections.shuffle(shuffled, random);
     return new ExpressionPracticeResponse(
         targetExpressionText,
         baseExpressionMeaningText,
         usageDescription,
-        extraPracticeSentences,
-        pickRandomWritingSentence(parsedSentences));
+        shuffled.subList(WRITING_SENTENCE_COUNT, REQUIRED_PRACTICE_SENTENCE_COUNT).stream()
+            .map(ParsedPracticeSentence::sentence)
+            .toList(),
+        writingSentences(shuffled.subList(0, WRITING_SENTENCE_COUNT)));
   }
 
   // 사용자가 접근할 수 있는 활성 표현을 조회한다.
@@ -388,12 +417,16 @@ public class ExpressionQueryService {
     return false;
   }
 
-  /** 예문 목록에서 무작위로 한 개를 골라 작문 연습 문제로 변환한다. */
-  private WritingSentenceResponse pickRandomWritingSentence(
-      List<ParsedPracticeSentence> parsedSentences) {
-    ParsedPracticeSentence picked = parsedSentences.get(random.nextInt(parsedSentences.size()));
-
-    return WritingSentenceResponse.from(picked);
+  /**
+   * 작문 문제로 뽑힌 예문 2건에 출제 언어를 하나씩 배정한다.
+   *
+   * <p>어느 예문이 영어 문제가 될지는 무작위로 정한다. 두 문제의 출제 언어는 항상 서로 다르다.
+   */
+  private List<WritingSentenceResponse> writingSentences(List<ParsedPracticeSentence> picked) {
+    boolean firstIsEnglish = random.nextBoolean();
+    return List.of(
+        WritingSentenceResponse.from(picked.get(0), firstIsEnglish ? Locale.EN : Locale.KR),
+        WritingSentenceResponse.from(picked.get(1), firstIsEnglish ? Locale.KR : Locale.EN));
   }
 
   /** 가장 앞선 미완료 표현의 ID를 반환하며, 모두 완료했으면 빈 값을 반환한다. */
