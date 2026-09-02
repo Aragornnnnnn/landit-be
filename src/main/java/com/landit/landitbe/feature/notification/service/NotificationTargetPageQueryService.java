@@ -59,22 +59,45 @@ public class NotificationTargetPageQueryService {
         new MapSqlParameterSource()
             .addValue("userIds", userIds)
             .addValue("scheduledDate", scheduledDate)
+            .addValue("yesterdayDate", scheduledDate.minusDays(1))
             .addValue("dayStart", scheduledDate.atStartOfDay())
             .addValue("nextDayStart", scheduledDate.plusDays(1).atStartOfDay());
+    loadProfileRows(parameters, rowsByUserId);
     loadScenarioRows(parameters, rowsByUserId);
     loadDailyScenarioCompletionRows(parameters, rowsByUserId);
     loadExpressionRows(parameters, rowsByUserId);
     loadLatestScenarioCompletionRows(parameters, rowsByUserId);
     loadLatestExpressionCompletionRows(parameters, rowsByUserId);
     loadFreeTalkUsageRows(parameters, rowsByUserId);
+    loadActivityRows(parameters, rowsByUserId, scheduledDate);
+    loadLearningSummaryRows(parameters, rowsByUserId);
+    loadLatestFreeTalkTitleRows(parameters, rowsByUserId);
     List<Long> sendableUserIds = findSendableUserIds(parameters);
     return new NotificationTargetPage(
         List.copyOf(userIds),
         rowsByUserId.entrySet().stream()
             .collect(
                 java.util.stream.Collectors.toMap(
-                    Map.Entry::getKey, entry -> entry.getValue().toInput(entry.getKey()))),
+                    Map.Entry::getKey,
+                    entry -> entry.getValue().toInput(entry.getKey(), scheduledDate))),
         List.copyOf(sendableUserIds));
+  }
+
+  /** 사용자 닉네임을 페이지 단위로 조회한다. */
+  private void loadProfileRows(
+      MapSqlParameterSource parameters, Map<Long, UserTargetRows> rowsByUserId) {
+    jdbcTemplate.query(
+        """
+        select id as user_profile_id, nickname
+        from user_profile
+        where id in (:userIds)
+        """,
+        parameters,
+        (RowCallbackHandler)
+            resultSet -> {
+              UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
+              rows.nickname = resultSet.getString("nickname");
+            });
   }
 
   /** 현재 활성 UserPushToken이 하나 이상 있는 사용자를 한 번에 조회한다. */
@@ -136,7 +159,8 @@ public class NotificationTargetPageQueryService {
     jdbcTemplate.query(
         """
         select up.id as user_profile_id, s.id as scenario_id, we.id as expression_id,
-               case when uwec.id is not null then true else false end as completed
+               case when uwec.id is not null then true else false end as completed,
+               we.target_expression_text
         from user_profile up
         join category_language_variant clv on clv.base_locale = up.base_locale
         join category c on c.id = clv.category_id and c.status = 'ACTIVE'
@@ -196,6 +220,74 @@ public class NotificationTargetPageQueryService {
         (RowCallbackHandler) resultSet -> addFreeTalkUsageRow(resultSet, rowsByUserId));
   }
 
+  /** 예약 날짜와 직전 날짜의 활동, 과거 활성 학습일을 한 번에 조회한다. */
+  private void loadActivityRows(
+      MapSqlParameterSource parameters,
+      Map<Long, UserTargetRows> rowsByUserId,
+      LocalDate scheduledDate) {
+    jdbcTemplate.query(
+        """
+        select user_profile_id,
+               max(case when activity_date = :scheduledDate and active_day = true then 1 else 0 end)
+                   as active_today,
+               max(case when activity_date = :yesterdayDate and active_day = true then 1 else 0 end)
+                   as active_yesterday,
+               max(case
+                     when activity_date < :scheduledDate and active_day = true then activity_date
+                   end) as last_active_date
+        from user_daily_activity
+        where user_profile_id in (:userIds)
+          and activity_date <= :scheduledDate
+        group by user_profile_id
+        """,
+        parameters,
+        (RowCallbackHandler) resultSet -> addActivityRow(resultSet, rowsByUserId));
+  }
+
+  /** 사용자별 현재·최장 스트릭 요약을 일괄 조회한다. */
+  private void loadLearningSummaryRows(
+      MapSqlParameterSource parameters, Map<Long, UserTargetRows> rowsByUserId) {
+    jdbcTemplate.query(
+        """
+        select user_profile_id, current_streak_days, longest_streak_days
+        from user_learning_activity_summary
+        where user_profile_id in (:userIds)
+        """,
+        parameters,
+        (RowCallbackHandler)
+            resultSet -> {
+              UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
+              rows.currentStreakDays = resultSet.getInt("current_streak_days");
+              rows.longestStreakDays = resultSet.getInt("longest_streak_days");
+            });
+  }
+
+  /** 가장 최근에 시작한 프리톡 하나의 제목만 사용자별로 일괄 조회한다. */
+  private void loadLatestFreeTalkTitleRows(
+      MapSqlParameterSource parameters, Map<Long, UserTargetRows> rowsByUserId) {
+    jdbcTemplate.query(
+        """
+        select user_profile_id, title
+        from (
+          select learning_session.user_profile_id, free_talk_session.title,
+                 row_number() over (
+                   partition by learning_session.user_profile_id
+                   order by learning_session.started_at desc, learning_session.id desc
+                 ) as session_rank
+          from learning_session
+          join free_talk_session on free_talk_session.learning_session_id = learning_session.id
+          where learning_session.user_profile_id in (:userIds)
+        ) latest_free_talk
+        where session_rank = 1
+        """,
+        parameters,
+        (RowCallbackHandler)
+            resultSet -> {
+              UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
+              rows.latestFreeTalkTitle = resultSet.getString("title");
+            });
+  }
+
   private void addScenarioRow(ResultSet resultSet, Map<Long, UserTargetRows> rowsByUserId)
       throws SQLException {
     UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
@@ -222,7 +314,20 @@ public class NotificationTargetPageQueryService {
         new ExpressionNotificationCandidate(
             resultSet.getLong("scenario_id"),
             resultSet.getLong("expression_id"),
-            resultSet.getBoolean("completed")));
+            resultSet.getBoolean("completed"),
+            resultSet.getString("target_expression_text")));
+  }
+
+  private void addActivityRow(ResultSet resultSet, Map<Long, UserTargetRows> rowsByUserId)
+      throws SQLException {
+    UserTargetRows rows = rowsByUserId.get(resultSet.getLong("user_profile_id"));
+    rows.activeToday = resultSet.getInt("active_today") == 1;
+    rows.activeYesterday = resultSet.getInt("active_yesterday") == 1;
+    java.sql.Date lastActiveSqlDate = resultSet.getDate("last_active_date");
+    if (lastActiveSqlDate != null) {
+      rows.priorActiveDayHistory = true;
+      rows.lastActiveDate = lastActiveSqlDate.toLocalDate();
+    }
   }
 
   private void addLatestScenarioCompletionRow(
@@ -251,6 +356,7 @@ public class NotificationTargetPageQueryService {
   }
 
   private static class UserTargetRows {
+    private String nickname;
     private final List<Long> scenarioIds = new ArrayList<>();
     private final Set<Long> clearedScenarioIds = new HashSet<>();
     private final List<ExpressionNotificationCandidate> expressions = new ArrayList<>();
@@ -259,8 +365,15 @@ public class NotificationTargetPageQueryService {
     private long freeTalkUsedSpeakingDurationMs;
     private LocalDateTime lastScenarioCompletedAt;
     private LocalDateTime lastExpressionCompletedAt;
+    private boolean activeToday;
+    private boolean activeYesterday;
+    private Integer currentStreakDays;
+    private Integer longestStreakDays;
+    private boolean priorActiveDayHistory;
+    private LocalDate lastActiveDate;
+    private String latestFreeTalkTitle;
 
-    private NotificationTargetSelectionInput toInput(Long userProfileId) {
+    private NotificationTargetSelectionInput toInput(Long userProfileId, LocalDate scheduledDate) {
       Long resolvedDailyScenarioId = dailyScenarioId;
       boolean dailyScenarioCompleted = dailyScenarioCompletionFound;
       if (!dailyScenarioCompletionFound) {
@@ -275,12 +388,28 @@ public class NotificationTargetPageQueryService {
       }
       return new NotificationTargetSelectionInput(
           userProfileId,
+          nickname,
           resolvedDailyScenarioId,
           dailyScenarioCompleted,
           freeTalkUsedSpeakingDurationMs,
+          activeToday,
+          activeYesterday,
+          currentStreakDays,
+          longestStreakDays,
+          priorActiveDayHistory,
+          missedDayCount(scheduledDate),
+          latestFreeTalkTitle,
           lastScenarioCompletedAt,
           lastExpressionCompletedAt,
           List.copyOf(expressions));
+    }
+
+    private Integer missedDayCount(LocalDate scheduledDate) {
+      if (!priorActiveDayHistory || lastActiveDate == null) {
+        return null;
+      }
+      long count = java.time.temporal.ChronoUnit.DAYS.between(lastActiveDate, scheduledDate) - 1;
+      return count >= 0 && count <= Integer.MAX_VALUE ? (int) count : null;
     }
   }
 }

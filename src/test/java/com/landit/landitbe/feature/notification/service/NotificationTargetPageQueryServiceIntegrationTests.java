@@ -64,6 +64,37 @@ class NotificationTargetPageQueryServiceIntegrationTests {
         .containsExactly(completedExpressionId, freeTalkOnlyExpressionId);
     assertThat(input.expressions().get(0).completed()).isTrue();
     assertThat(input.expressions().get(1).completed()).isFalse();
+    assertThat(input.expressions().get(0).targetExpressionText()).isEqualTo("표현");
+  }
+
+  /** 닉네임, 날짜별 활동과 저장된 스트릭 요약을 예약 날짜 기준으로 조립한다. */
+  @Test
+  void loadsActivityAndStreakFieldsForScheduledDate() {
+    seedUser();
+    insertDailyActivity(LocalDate.of(2026, 7, 28), true);
+    insertDailyActivity(LocalDate.of(2026, 7, 29), false);
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_learning_activity_summary (
+            user_profile_id, total_session_count, completed_scenario_count,
+            completed_free_talk_count, completed_review_count, total_turn_count,
+            total_study_seconds, learned_expression_count, current_streak_days,
+            longest_streak_days, created_at, updated_at
+        )
+        VALUES (?, 2, 2, 0, 0, 2, 60, 0, 2, 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        USER_ID);
+
+    NotificationTargetSelectionInput input =
+        queryService.loadPage(USER_ID - 1, 1, SCHEDULED_DATE).inputs().get(USER_ID);
+
+    assertThat(input.nickname()).isEqualTo("notification-user");
+    assertThat(input.activeToday()).isFalse();
+    assertThat(input.activeYesterday()).isFalse();
+    assertThat(input.currentStreakDays()).isEqualTo(2);
+    assertThat(input.longestStreakDays()).isEqualTo(4);
+    assertThat(input.priorActiveDayHistory()).isTrue();
+    assertThat(input.missedDayCount()).isEqualTo(1);
   }
 
   /** 오늘 완료 이력이 없으면 기존 접근 상태에서 첫 미완료 시나리오를 오늘 배정으로 계산한다. */
@@ -96,6 +127,21 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     assertThat(page.sendableUserProfileIds()).containsExactly(USER_ID);
   }
 
+  /** 최신 프리톡 사용자별 조회를 위한 인덱스를 Flyway로 생성한다. */
+  @Test
+  void createsLatestFreeTalkLookupIndex() {
+    Integer indexCount =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.INDEXES
+            WHERE LOWER(INDEX_NAME) = 'idx_learning_session_user_profile_started_at'
+            """,
+            Integer.class);
+
+    assertThat(indexCount).isEqualTo(1);
+  }
+
   private void seedUser() {
     seedUser(USER_ID, "notification-user");
   }
@@ -124,6 +170,20 @@ class NotificationTargetPageQueryServiceIntegrationTests {
         userId,
         expoPushToken,
         status);
+  }
+
+  private void insertDailyActivity(LocalDate activityDate, boolean activeDay) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_daily_activity (
+            user_profile_id, activity_date, completed_session_count, completed_review_count,
+            study_seconds, review_all_correct_reward_xp, active_day, created_at, updated_at
+        )
+        VALUES (?, ?, 0, 0, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        USER_ID,
+        activityDate,
+        activeDay);
   }
 
   private void seedScenario(long scenarioId, int displayOrder) {
