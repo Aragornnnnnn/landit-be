@@ -42,19 +42,28 @@ class Lan405BeginnerQuestionMigrationTests {
     Matcher matcher = QUESTION_ROW_PATTERN.matcher(readMigrationSql());
     Set<Integer> questionIds = new HashSet<>();
     Map<String, List<Integer>> ordersByScenarioAndGroup = new HashMap<>();
+    Map<Integer, Set<String>> groupsByScenario = new HashMap<>();
 
     while (matcher.find()) {
       questionIds.add(Integer.parseInt(matcher.group(1)));
-      String key = matcher.group(2) + ":" + matcher.group(4);
+      int scenarioId = Integer.parseInt(matcher.group(2));
+      String levelGroup = matcher.group(4);
+      String key = scenarioId + ":" + levelGroup;
       ordersByScenarioAndGroup
           .computeIfAbsent(key, ignored -> new ArrayList<>())
           .add(Integer.parseInt(matcher.group(3)));
+      groupsByScenario.computeIfAbsent(scenarioId, ignored -> new HashSet<>()).add(levelGroup);
     }
 
     assertThat(questionIds).containsExactlyInAnyOrderElementsOf(inclusiveRange(121, 360));
     assertThat(ordersByScenarioAndGroup).hasSize(80);
     assertThat(ordersByScenarioAndGroup.values())
         .allSatisfy(orders -> assertThat(orders).containsExactly(1, 2, 3));
+    assertThat(groupsByScenario.keySet())
+        .containsExactlyInAnyOrderElementsOf(inclusiveRange(1, 40));
+    assertThat(groupsByScenario.values())
+        .allSatisfy(
+            groups -> assertThat(groups).containsExactlyInAnyOrder("LEVEL_1", "LEVEL_2_TO_3"));
   }
 
   @Test
