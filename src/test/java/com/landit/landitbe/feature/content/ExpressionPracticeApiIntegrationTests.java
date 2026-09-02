@@ -182,7 +182,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-0?",
                     "practiceQuestionTranslation": "질문 0?",
                     "sentenceWords": ["valid", "sentence", "0"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "0"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "0", "오답-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-1",
@@ -191,7 +193,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-1?",
                     "practiceQuestionTranslation": "질문 1?",
                     "sentenceWords": ["valid", "sentence", "1"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "1"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-2",
@@ -200,7 +204,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-2?",
                     "practiceQuestionTranslation": "질문 2?",
                     "sentenceWords": ["valid", "sentence", "2"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "2"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-3",
@@ -209,7 +215,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-3?",
                     "practiceQuestionTranslation": "질문 3?",
                     "sentenceWords": ["valid", "sentence", "3"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "3"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3", "오답-3"]
                   },
                   {
                     "highlightingPart": "invalid",
@@ -317,10 +325,13 @@ class ExpressionPracticeApiIntegrationTests {
                       "practiceQuestionTranslation": "질문해석-%d",
                       "imageUrl": "https://cdn.example.com/practice/%d.png",
                       "sentenceWords": ["chip-%d-a", "chip-%d-b"],
-                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"]
+                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"],
+                      "sentenceTranslateWords": ["조각-%d-가", "조각-%d-나"],
+                      "sentenceTranslateWordChoices": ["조각-%d-나", "오답-%d-1", "조각-%d-가", "오답-%d-2", "오답-%d-3"]
                     }
           """
-              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i));
+              .formatted(
+                  i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return json.append("]").toString();
   }

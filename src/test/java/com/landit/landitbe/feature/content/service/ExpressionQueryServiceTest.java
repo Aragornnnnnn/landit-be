@@ -522,7 +522,9 @@ class ExpressionQueryServiceTest {
                     "practiceQuestion": "question?",
                     "practiceQuestionTranslation": "질문?",
                     "sentenceWords": ["no-image", "sentence"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "no-image", "noise-2", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "no-image", "noise-2", "noise-3"],
+                    "sentenceTranslateWords": ["이미지", "없음"],
+                    "sentenceTranslateWordChoices": ["없음", "오답-1", "이미지", "오답-2", "오답-3"]
                   },
                   {
                     "sentenceText": "with-image sentence",
@@ -532,7 +534,9 @@ class ExpressionQueryServiceTest {
                     "practiceQuestionTranslation": "질문2?",
                     "imageUrl": "https://cdn.example.com/practice/1.png",
                     "sentenceWords": ["with-image", "sentence"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "with-image", "noise-2", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "with-image", "noise-2", "noise-3"],
+                    "sentenceTranslateWords": ["이미지", "있음"],
+                    "sentenceTranslateWordChoices": ["있음", "오답-1", "이미지", "오답-2", "오답-3"]
                   }
                 ]
                 """));
@@ -575,7 +579,9 @@ class ExpressionQueryServiceTest {
                     "practiceQuestion": "question-1?",
                     "practiceQuestionTranslation": "질문 1?",
                     "sentenceWords": ["valid", "sentence", "1"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "1"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
                   },
                   {
                     "highlightingPart": "missing-text",
@@ -604,7 +610,9 @@ class ExpressionQueryServiceTest {
                     "practiceQuestion": "question-2?",
                     "practiceQuestionTranslation": "질문 2?",
                     "sentenceWords": ["valid", "sentence", "2"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "2"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
                   }
                 ]
                 """));
@@ -687,7 +695,9 @@ class ExpressionQueryServiceTest {
                     "practiceQuestion": "question?",
                     "practiceQuestionTranslation": "질문?",
                     "sentenceWords": ["valid", "sentence"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "오답-3"]
                   },
                   {
                     "sentenceText": "missing words sentence",
@@ -801,10 +811,13 @@ class ExpressionQueryServiceTest {
                       "practiceQuestionTranslation": "질문해석-%d",
                       "imageUrl": "https://cdn.example.com/practice/%d.png",
                       "sentenceWords": ["chip-%d-a", "chip-%d-b"],
-                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"]
+                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"],
+                      "sentenceTranslateWords": ["조각-%d-가", "조각-%d-나"],
+                      "sentenceTranslateWordChoices": ["조각-%d-나", "오답-%d-1", "조각-%d-가", "오답-%d-2", "오답-%d-3"]
                     }
           """
-              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i));
+              .formatted(
+                  i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return toJson(json.append("]").toString());
   }

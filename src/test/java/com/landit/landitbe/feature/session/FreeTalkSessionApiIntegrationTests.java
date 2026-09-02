@@ -1335,6 +1335,8 @@ class FreeTalkSessionApiIntegrationTests {
           "practiceQuestion": "How did the introduction go?",
           "sentenceTranslation": "그들은 바로 죽이 잘 맞았어.",
           "sentenceWordChoices": ["hit", "They", "miss", "it", "off", "right", "away", "."],
+          "sentenceTranslateWords": ["그들은", "바로", "죽이", "잘", "맞았어"],
+          "sentenceTranslateWordChoices": ["맞았어", "그들은", "안", "죽이", "바로", "잘"],
           "practiceQuestionTranslation": "소개는 어땠어?"%s
         }
         """
@@ -1353,6 +1355,8 @@ class FreeTalkSessionApiIntegrationTests {
             "practiceQuestion": "Is this valid?",
             "sentenceTranslation": "정상 문장.",
             "sentenceWordChoices": ["sentence", "Valid", "."],
+            "sentenceTranslateWords": ["정상", "문장"],
+            "sentenceTranslateWordChoices": ["문장", "오답", "정상"],
             "practiceQuestionTranslation": "이 문장은 정상이야?"
           },
           {
