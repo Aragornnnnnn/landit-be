@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.content.repository;
 
-import com.landit.landitbe.shared.domain.Locale;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,6 +30,7 @@ public class InMemoryExpressionEmbeddingSearchRepository
         AND we.status = 'ACTIVE'
         AND we.target_locale = ?
         AND we.base_locale = ?
+        AND we.difficulty_level <= ?
         AND we.embedding IS NOT NULL
         AND NOT EXISTS (
           SELECT 1
@@ -53,25 +53,22 @@ public class InMemoryExpressionEmbeddingSearchRepository
 
   /** {@inheritDoc} */
   @Override
-  public List<ExpressionEmbeddingMatch> searchFreeTalkCandidates(
-      List<Float> embedding,
-      long userProfileId,
-      Locale targetLocale,
-      Locale baseLocale,
-      int limit) {
+  public List<ExpressionEmbeddingMatch> searchFreeTalkCandidates(FreeTalkCandidateSearch search) {
     return jdbcTemplate
         .query(
             CANDIDATE_SQL,
             (resultSet, rowNumber) ->
                 new ExpressionEmbeddingMatch(
                     resultSet.getLong("id"),
-                    cosineDistance(embedding, parseVector(resultSet.getString("embedding")))),
-            targetLocale.name(),
-            baseLocale.name(),
-            userProfileId)
+                    cosineDistance(
+                        search.embedding(), parseVector(resultSet.getString("embedding")))),
+            search.targetLocale().name(),
+            search.baseLocale().name(),
+            search.maxDifficultyLevel(),
+            search.userProfileId())
         .stream()
         .sorted(Comparator.comparingDouble(ExpressionEmbeddingMatch::distance))
-        .limit(limit)
+        .limit(search.limit())
         .toList();
   }
 
