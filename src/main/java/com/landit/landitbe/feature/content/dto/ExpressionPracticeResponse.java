@@ -20,6 +20,7 @@ public record ExpressionPracticeResponse(
     @Schema(description = "타겟 표현 뜻", example = "끝내주게 놀랍다") String baseExpressionMeaningText,
     @Schema(description = "표현 상세 설명", example = "강렬한 인상을 받았을 때 최고의 리액션이에요.")
         String usageDescription,
-    @Schema(description = "문제 안 풀고, 눈으로 익히는 추가 예문 2건") List<PracticeSentenceResponse> practiceSentence,
+    @Schema(description = "문제 안 풀고, 눈으로 익히는 추가 예문 2건")
+        List<PracticeSentenceResponse> practiceSentence,
     @Schema(description = "직접 푸는 작문 문제 2건. 영어 문제와 한국어 문제가 한 건씩이다")
         List<WritingSentenceResponse> writingSentence) {}
