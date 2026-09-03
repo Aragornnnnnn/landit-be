@@ -312,8 +312,7 @@ public class ExpressionPronunciationService {
               null,
               null,
               null,
-              coachingTemplate.phonemeCoaching(
-                  judgedWord.errorTargetSpan(), judgedWord.errorUserSpan()));
+              phonemeErrorCoaching(judgedWord, assetWord));
       case STRESS_ERROR ->
           new PronunciationAnalysisResponse.Word(
               judgedWord.order(),
@@ -331,6 +330,39 @@ public class ExpressionPronunciationService {
               judgedWord.userStressIndex(),
               coachingTemplate.stressCoaching(assetWord.syllables(), assetWord.stressIndex()));
     };
+  }
+
+  /**
+   * 음소 오류의 코칭 문구를 고른다.
+   *
+   * <p>유저 respelling(음절을 '·'로 구분)의 음절 수가 자산의 정답 음절 수보다 많으면 음절 삽입 (한국식 'ㅡ' 끼워 넣기: bus→"버스",
+   * honestly→"어네스틀리")으로 보고 삽입 코칭을 쓴다. span 모양으로 추측하지 않는 이유: 모음 대치(i→ee)도 span이 길어지고, 자음 뭉치 삽입은
+   * span이 자음으로 끝날 수 있어 구분이 안 된다 — 음절 수 비교가 정의 그 자체다 (LAN-435).
+   *
+   * @param judgedWord AI 판정 단어
+   * @param assetWord 자산 단어
+   * @return 코칭 문구
+   */
+  private String phonemeErrorCoaching(AiPronunciationJudgedWord judgedWord, AssetWord assetWord) {
+    if (isSyllableInsertion(judgedWord.userDisplay(), assetWord.syllables())) {
+      return coachingTemplate.syllableInsertionCoaching(assetWord.syllables());
+    }
+    return coachingTemplate.phonemeCoaching(
+        judgedWord.errorTargetSpan(), judgedWord.errorUserSpan());
+  }
+
+  /**
+   * 유저 respelling의 음절 수가 정답 음절 수를 넘는지 판정한다.
+   *
+   * @param userDisplay 유저 발음 respelling (음절 '·' 구분). null 허용
+   * @param syllables 자산의 정답 음절 분해. null 허용
+   * @return 음절 삽입이면 true
+   */
+  private boolean isSyllableInsertion(String userDisplay, List<String> syllables) {
+    if (userDisplay == null || userDisplay.isBlank() || syllables == null || syllables.isEmpty()) {
+      return false;
+    }
+    return userDisplay.split("·").length > syllables.size();
   }
 
   /**

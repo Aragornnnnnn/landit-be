@@ -117,6 +117,50 @@ class ExpressionPronunciationServiceTest {
   }
 
   @Test
+  void usesSyllableInsertionCoachingWhenUserSyllablesExceedAsset() {
+    // like(1음절)를 "라이크"처럼 3음절로 발음 — 음소 팁 대신 음절 삽입 코칭이 나가야 한다 (LAN-435)
+    givenAiResponse(
+        judged(1, "There's", AiPronunciationWordStatus.CORRECT),
+        judged(2, "nothing", AiPronunciationWordStatus.CORRECT),
+        new AiPronunciationJudgedWord(
+            3,
+            "like",
+            AiPronunciationWordStatus.PHONEME_ERROR,
+            100,
+            400,
+            "la·i·keu",
+            "k",
+            "keu",
+            null));
+
+    PronunciationAnalysisResponse response = analyze();
+
+    assertThat(response.words().get(2).coachingText()).contains("음절이 늘었어요").contains("1음절(like)");
+  }
+
+  @Test
+  void keepsPhonemeCoachingWhenSyllableCountMatches() {
+    // 음절 수가 같으면(nuh·ssing 2 = 자산 2) 기존 음소 팁 경로를 유지한다
+    givenAiResponse(
+        judged(1, "There's", AiPronunciationWordStatus.CORRECT),
+        new AiPronunciationJudgedWord(
+            2,
+            "nothing",
+            AiPronunciationWordStatus.PHONEME_ERROR,
+            100,
+            400,
+            "nuh·ssing",
+            "th",
+            "ss",
+            null),
+        judged(3, "like", AiPronunciationWordStatus.CORRECT));
+
+    PronunciationAnalysisResponse response = analyze();
+
+    assertThat(response.words().get(1).coachingText()).startsWith("'th'가 'ss'처럼 들렸어요.");
+  }
+
+  @Test
   void rejectsDuplicatedOrderEvenWhenSizeMatches() {
     // 크기는 3으로 같지만 order가 [1, 1, 2]다 — 크기 검증만으로는 통과해버리는 응답.
     givenAiResponse(
