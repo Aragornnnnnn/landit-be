@@ -24,8 +24,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class FreeTalkMemoryRetrievalService {
 
-  static final String POLICY_VERSION = "memory-retrieval-v1";
+  static final String POLICY_VERSION = "memory-retrieval-v2";
   private static final int MAX_RESULTS = 3;
+  private static final double MAX_DISTANCE = 0.8;
   private static final int EMBEDDING_DIMENSION = 1536;
   private static final String EMBEDDING_MODEL = "openai/text-embedding-3-small";
 
@@ -79,7 +80,10 @@ public class FreeTalkMemoryRetrievalService {
     if (matches == null) {
       throw new IllegalArgumentException("장기기억 검색 후보 개수가 유효하지 않습니다.");
     }
-    return matches.stream().limit(MAX_RESULTS).toList();
+    return matches.stream()
+        .filter(match -> match.distance() <= MAX_DISTANCE)
+        .limit(MAX_RESULTS)
+        .toList();
   }
 
   private static List<AiFreeTalkMemoryContext> toContexts(List<ConversationMemoryMatch> matches) {
