@@ -80,14 +80,14 @@ public class PronunciationCoachingTemplate {
    * <p>한국 학습자가 끝 자음 뒤나 자음 뭉치 사이에 'ㅡ'를 끼워 음절을 늘리는 오류(bus→"버스", honestly→"어네스틀리")는 특정 음소의 조음 문제가 아니라서
    * 음소 팁으로는 핵심을 못 짚는다. 정답 음절 수를 보여주며 이어서 발음하도록 유도한다 (LAN-435).
    *
-   * <p>예: syllables ["bad"] → "'으' 같은 소리가 끼어들어 음절이 늘었어요. 원어민처럼 1음절(bad)로 이어서 발음해보세요!" ('으 같은'인 이유:
-   * bridge→"브리지"처럼 '이'가 끼는 단어도 있다)
+   * <p>예: syllables ["bad"] → "'으' 같은 모음 소리가 끼어들어 음절이 늘었어요. 원어민처럼 1음절(bad)로 이어서 발음해보세요!" ('으 같은'인
+   * 이유: bridge→"브리지"처럼 '이'가 끼는 단어도 있다)
    *
    * @param syllables 음절 분해 배열 (자산 기준 데이터, 비어 있지 않음)
    * @return 코칭 문구
    */
   public String syllableInsertionCoaching(List<String> syllables) {
-    return "'으' 같은 소리가 끼어들어 음절이 늘었어요. 원어민처럼 %d음절(%s)로 이어서 발음해보세요!"
+    return "'으' 같은 모음 소리가 끼어들어 음절이 늘었어요. 원어민처럼 %d음절(%s)로 이어서 발음해보세요!"
         .formatted(syllables.size(), String.join("·", syllables));
   }
 

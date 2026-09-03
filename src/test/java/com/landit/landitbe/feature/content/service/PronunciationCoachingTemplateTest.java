@@ -37,7 +37,7 @@ class PronunciationCoachingTemplateTest {
   void syllableInsertionCoachingNamesTargetSyllables() {
     String coaching = template.syllableInsertionCoaching(List.of("bad"));
 
-    assertThat(coaching).isEqualTo("'으' 같은 소리가 끼어들어 음절이 늘었어요. 원어민처럼 1음절(bad)로 이어서 발음해보세요!");
+    assertThat(coaching).isEqualTo("'으' 같은 모음 소리가 끼어들어 음절이 늘었어요. 원어민처럼 1음절(bad)로 이어서 발음해보세요!");
   }
 
   @Test
