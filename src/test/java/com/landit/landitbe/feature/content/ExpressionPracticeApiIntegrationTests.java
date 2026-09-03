@@ -83,8 +83,10 @@ class ExpressionPracticeApiIntegrationTests {
             .andExpect(jsonPath("$.data.usageDescription").value("강렬한 인상을 받았을 때 최고의 리액션이에요."))
             .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
             .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
-            // imageUrl은 응답 계약에서 빠졌다
-            .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").doesNotExist())
+            // 예문 이미지는 payload 값 그대로 내려온다
+            .andExpect(
+                jsonPath("$.data.practiceSentence[0].imageUrl")
+                    .value("https://cdn.example.com/practice/0.png"))
             .andReturn();
 
     // then: writingSentence는 랜덤이라 특정 값 고정 검증이 불가능하므로,

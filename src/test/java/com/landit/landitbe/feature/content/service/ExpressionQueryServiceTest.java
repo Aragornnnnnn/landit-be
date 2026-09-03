@@ -523,6 +523,26 @@ class ExpressionQueryServiceTest {
   }
 
   /**
+   * 선택 필드인 imageUrl의 매핑을 검증한다. payload에 키가 없어도 파싱이 깨지지 않고 null로 매핑되며, 있으면 값 그대로 내려간다.
+   *
+   * <p>분배가 payload 순서 고정이므로 [0]은 키가 없는 예문, [1]은 키가 있는 예문으로 둔다.
+   */
+  @Test
+  void shouldMapMissingImageUrlToNull() {
+    WritingExpression expression =
+        makeWritingExpressionMockWithInfo(makePracticeExamplesPayloadWithoutFirstImage());
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+
+    ExpressionPracticeResponse response =
+        expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
+
+    assertThat(response.practiceSentence().get(0).imageUrl()).isNull();
+    assertThat(response.practiceSentence().get(1).imageUrl())
+        .isEqualTo("https://cdn.example.com/practice/1.png");
+  }
+
+  /**
    * 기획자가 시딩한 예문에 필수 키가 빠졌거나 값이 비어 있으면, 그 예문만 응답에서 제외하고 경고 로그를 남긴다. (빈 예문 카드/빈 작문 문제가 사용자에게 노출되는 것을
    * 막고, 로그로 데이터 오류를 추적한다)
    */
@@ -879,6 +899,14 @@ class ExpressionQueryServiceTest {
               .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return toJson(json.append("]").toString());
+  }
+
+  /** 첫 예문에만 imageUrl 키가 없는 payload를 만든다. 선택 필드의 null 매핑을 확인할 때 쓴다. */
+  private JsonNode makePracticeExamplesPayloadWithoutFirstImage() {
+    return toJson(
+        makePracticeExamplesPayload(4)
+            .toString()
+            .replace("\"imageUrl\":\"https://cdn.example.com/practice/0.png\",", ""));
   }
 
   /** JSON 문자열을 JsonNode로 변환한다. (체크 예외를 테스트에서 편하게 쓰기 위한 래퍼) */

@@ -904,8 +904,8 @@ class FreeTalkSessionApiIntegrationTests {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
-            // imageUrl은 응답 계약에서 빠졌다
-            .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").doesNotExist())
+            // 이미지가 없는 예문은 null로 내려온다
+            .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
             .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
             .andReturn();
 
