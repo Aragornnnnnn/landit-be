@@ -420,7 +420,7 @@ class ExpressionQueryServiceTest {
     assertThat(response.baseExpressionMeaningText()).isEqualTo("끝내주게 놀랍다");
     assertThat(response.usageDescription()).isEqualTo("강렬한 인상을 받았을 때 최고의 리액션이에요.");
 
-    // then: 예문 4개 중 2개만 눈으로 익히는 예문으로 내려간다 (어느 2개인지는 랜덤)
+    // then: 예문 4개 중 앞 2개가 눈으로 익히는 예문으로 내려간다
     assertThat(response.practiceSentence()).hasSize(2);
     assertThat(response.practiceSentence())
         .allSatisfy(
@@ -439,44 +439,50 @@ class ExpressionQueryServiceTest {
         .extracting(WritingSentenceResponse::quizLanguage)
         .containsExactlyInAnyOrder(Locale.EN, Locale.KR);
 
-    // then: 작문 문제로 쓰인 예문은 눈으로 익히는 예문과 겹치지 않는다
-    List<String> practiceTexts =
-        response.practiceSentence().stream().map(PracticeSentenceResponse::sentenceText).toList();
+    // then: 분배는 payload 순서로 고정이다. 앞 2건이 예문, 뒤 2건이 작문 문제다.
+    assertThat(response.practiceSentence())
+        .extracting(PracticeSentenceResponse::sentenceText)
+        .containsExactly("sentence-0", "sentence-1");
     assertThat(response.writingSentence())
         .extracting(WritingSentenceResponse::writingSentenceText)
-        .doesNotContainAnyElementsOf(practiceTexts)
-        .doesNotHaveDuplicates();
+        .containsExactly("sentence-2", "sentence-3");
   }
 
   /**
-   * 같은 표현 ID를 여러 번 호출하면 작문 문제로 뽑히는 예문이 고정되지 않는지 검증한다. 랜덤이라 "항상 다름"은 보장할 수 없으므로, 100회 호출해 3가지 이상
-   * 등장하는지 확인한다. (예문 4개 중 매번 같은 2개만 뽑힐 확률은 사실상 0)
+   * 예문 분배는 payload 순서로 고정하되 출제 언어만 매 요청 달라지는지 검증한다. 랜덤이라 "항상 다름"은 보장할 수 없으므로 100회 호출해 두 언어가 모두
+   * 등장하는지 확인한다.
    */
   @Test
-  void shouldSelectDifferentWritingSentencesForRepeatedQueries() {
+  void shouldKeepSentenceSplitFixedAndVaryQuizLanguage() {
     // given
     WritingExpression expression =
         makeWritingExpressionMockWithInfo(makePracticeExamplesPayload(4));
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
 
-    // when: 100회 호출하며 작문 문제로 뽑힌 문장 텍스트를 Set에 수집 (Set이라 중복은 1개로 합쳐짐)
-    Set<String> pickedSentences = new HashSet<>();
+    // when: 100회 호출하며 분배 결과와 출제 언어를 모은다
+    Set<List<String>> practiceSplits = new HashSet<>();
+    Set<List<String>> writingSplits = new HashSet<>();
     Set<Locale> pickedLanguages = new HashSet<>();
     for (int i = 0; i < 100; i++) {
       ExpressionPracticeResponse response =
           expressionQueryService.getExtraPracticeExamples(USER_ID, EXPRESSION_ID);
-      response
-          .writingSentence()
-          .forEach(
-              writing -> {
-                pickedSentences.add(writing.writingSentenceText());
-                pickedLanguages.add(writing.quizLanguage());
-              });
+      practiceSplits.add(
+          response.practiceSentence().stream()
+              .map(PracticeSentenceResponse::sentenceText)
+              .toList());
+      writingSplits.add(
+          response.writingSentence().stream()
+              .map(WritingSentenceResponse::writingSentenceText)
+              .toList());
+      response.writingSentence().forEach(writing -> pickedLanguages.add(writing.quizLanguage()));
     }
 
-    // then: 예문 4개가 골고루 뽑히고 두 출제 언어가 모두 등장한다 = 랜덤 배정이 동작한다
-    assertThat(pickedSentences.size()).isGreaterThan(2);
+    // then: 분배는 payload 순서 그대로 고정이다
+    assertThat(practiceSplits).containsExactly(List.of("sentence-0", "sentence-1"));
+    assertThat(writingSplits).containsExactly(List.of("sentence-2", "sentence-3"));
+
+    // then: 출제 언어는 매번 달라져 두 언어가 모두 등장한다
     assertThat(pickedLanguages).containsExactlyInAnyOrder(Locale.EN, Locale.KR);
   }
 

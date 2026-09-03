@@ -145,11 +145,12 @@ class ExpressionPracticeApiIntegrationTests {
     assertThat(pickedTexts).doesNotHaveDuplicates();
     assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
 
-    // 눈으로 익히는 예문과 작문 문제는 겹치지 않는다
+    // 분배는 payload 순서로 고정이다. 앞 2건이 예문, 뒤 2건이 작문 문제다.
     List<String> practiceTexts = new ArrayList<>();
     data.get("practiceSentence")
         .forEach(node -> practiceTexts.add(node.get("sentenceText").asText()));
-    assertThat(practiceTexts).doesNotContainAnyElementsOf(pickedTexts);
+    assertThat(practiceTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
+    assertThat(pickedTexts).containsExactly("practice-sentence-2", "practice-sentence-3");
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */

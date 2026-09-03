@@ -26,7 +26,6 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -73,12 +72,12 @@ public class ExpressionQueryService {
   /**
    * 추가 예문 조회에 필요한 유효 예문 개수다.
    *
-   * <p>2건은 눈으로 익히는 예문으로, 2건은 직접 푸는 작문 문제로 나눈다. 이보다 적으면 응답을 만들 수 없다.
+   * <p>payload 순서대로 앞 2건은 눈으로 익히는 예문, 뒤 2건은 직접 푸는 작문 문제로 쓴다. 이보다 적으면 응답을 만들 수 없다.
    */
   private static final int REQUIRED_PRACTICE_SENTENCE_COUNT = 4;
 
-  /** 작문 문제로 내보낼 예문 개수다. 나머지가 눈으로 익히는 예문이 된다. */
-  private static final int WRITING_SENTENCE_COUNT = 2;
+  /** 눈으로 익히는 예문으로 내보낼 개수다. payload의 앞에서부터 이만큼을 쓴다. */
+  private static final int PRACTICE_SENTENCE_COUNT = 2;
 
   private static final String NOT_ENOUGH_PRACTICE_SENTENCE_LOG =
       "추가 예문 조회 실패: 유효한 추가 예문이 {}건뿐입니다. {}건이 필요합니다. expressionId={}";
@@ -333,17 +332,16 @@ public class ExpressionQueryService {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
-    // 매번 다른 조합이 나오도록 섞은 뒤 앞쪽을 작문 문제로, 나머지를 눈으로 익히는 예문으로 쓴다.
-    List<ParsedPracticeSentence> shuffled = new ArrayList<>(parsedSentences);
-    Collections.shuffle(shuffled, random);
+    // payload 순서를 그대로 따른다. 앞 2건은 눈으로 익히는 예문, 뒤 2건은 작문 문제로 고정한다.
     return new ExpressionPracticeResponse(
         targetExpressionText,
         baseExpressionMeaningText,
         usageDescription,
-        shuffled.subList(WRITING_SENTENCE_COUNT, REQUIRED_PRACTICE_SENTENCE_COUNT).stream()
+        parsedSentences.subList(0, PRACTICE_SENTENCE_COUNT).stream()
             .map(ParsedPracticeSentence::sentence)
             .toList(),
-        writingSentences(shuffled.subList(0, WRITING_SENTENCE_COUNT)));
+        writingSentences(
+            parsedSentences.subList(PRACTICE_SENTENCE_COUNT, REQUIRED_PRACTICE_SENTENCE_COUNT)));
   }
 
   // 사용자가 접근할 수 있는 활성 표현을 조회한다.
@@ -410,9 +408,9 @@ public class ExpressionQueryService {
   }
 
   /**
-   * 작문 문제로 뽑힌 예문 2건에 출제 언어를 하나씩 배정한다.
+   * 작문 문제로 쓰는 예문 2건에 출제 언어를 하나씩 배정한다.
    *
-   * <p>어느 예문이 영어 문제가 될지는 무작위로 정한다. 두 문제의 출제 언어는 항상 서로 다르다.
+   * <p>어느 예문이 영어 문제가 될지는 매 요청마다 무작위로 정한다. 난수를 한 번만 뽑아 서로 뒤집어 배정하므로 두 문제의 출제 언어는 항상 서로 다르다.
    */
   private List<WritingSentenceResponse> writingSentences(List<ParsedPracticeSentence> picked) {
     boolean firstIsEnglish = random.nextBoolean();
