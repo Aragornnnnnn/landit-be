@@ -2,6 +2,9 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.dto.NextQuestionContext;
+import com.landit.landitbe.feature.content.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
@@ -29,6 +32,7 @@ class SessionFeedbackContextService {
   private final SessionMessageService sessionMessageService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
+  private final ScenarioContentService scenarioContentService;
   private final AiConversationSettings aiConversationSettings;
 
   /**
@@ -58,6 +62,7 @@ class SessionFeedbackContextService {
         sessionHistory.getId(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
+        scenarioContext.questionLevelGroup(),
         AiScenarioContext.from(scenarioContext, aiConversationSettings),
         userMessages(historyMessages, scenarioContext),
         sessionFeedbackDataService
@@ -86,17 +91,52 @@ class SessionFeedbackContextService {
       if (message.getRole() != ConversationSpeaker.USER) {
         continue;
       }
+      var evaluationContext =
+          SessionMessageFeedbackRequester.evaluationContext(
+              scenarioContext, conversationHistory.subList(0, index + 1));
+      NextQuestionContext question = questionFor(message.getTurnNumber(), scenarioContext);
       userMessages.add(
           new UserMessageContext(
               message.getId(),
               message.getTurnNumber(),
               message.getContent(),
-              SessionMessageFeedbackRequester.evaluationContext(
-                  scenarioContext, conversationHistory.subList(0, index + 1))));
+              evaluationContext,
+              question == null
+                  ? defaultDemand(scenarioContext.questionLevelGroup())
+                  : question.responseDemand(),
+              List.of(
+                  question == null
+                      ? evaluationContext.content()
+                      : question.requiredResponseElement())));
     }
     if (userMessages.isEmpty()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return List.copyOf(userMessages);
+  }
+
+  /** 첫 발화 이후 질문은 사용자 턴 번호 직전 순서의 고정 질문 메타데이터를 사용한다. */
+  private NextQuestionContext questionFor(
+      int userTurnNumber, ScenarioSessionMessageContextProjection scenarioContext) {
+    if (userTurnNumber <= 1) {
+      return null;
+    }
+    return scenarioContentService
+        .findActiveQuestion(
+            scenarioContext.scenarioId(),
+            userTurnNumber - 1,
+            scenarioContext.questionLevelGroup(),
+            scenarioContext.targetLocale(),
+            scenarioContext.baseLocale())
+        .orElse(null);
+  }
+
+  private ResponseDemand defaultDemand(
+      com.landit.landitbe.feature.content.domain.ContentLearningLevel group) {
+    return switch (group) {
+      case LEVEL_1 -> ResponseDemand.LOW;
+      case LEVEL_2_TO_3 -> ResponseDemand.MEDIUM;
+      case LEVEL_4_TO_5 -> ResponseDemand.HIGH;
+    };
   }
 }
