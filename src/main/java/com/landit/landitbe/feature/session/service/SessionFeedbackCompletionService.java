@@ -30,6 +30,7 @@ class SessionFeedbackCompletionService {
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final SessionMessageService sessionMessageService;
   private final LearningProgressService learningProgressService;
+  private final SessionLevelAssessmentService sessionLevelAssessmentService;
 
   /** 유효한 AI 최종 피드백을 저장하고 세션 결과를 최초 한 번 확정한다. */
   @Transactional
@@ -37,7 +38,7 @@ class SessionFeedbackCompletionService {
     validateResult(context, result);
     BigDecimal starRating = result.starRating();
     // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
-    LearningSession learningSession =
+    final LearningSession learningSession =
         learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
     SessionHistorySummaryFeedback existing =
         sessionFeedbackDataService.findSummaryByHistoryId(context.sessionHistoryId()).orElse(null);
@@ -45,6 +46,7 @@ class SessionFeedbackCompletionService {
       return ExistingSummaryFeedbackContext.from(existing).summaryFeedbackId();
     }
 
+    sessionLevelAssessmentService.assessApplyAndSave(userId, context, result.levelAssessment());
     SessionHistorySummaryFeedback summaryFeedback =
         saveSummaryFeedback(context, result, starRating);
     saveMessageFeedbacks(context, result, summaryFeedback.getId());
@@ -58,9 +60,26 @@ class SessionFeedbackCompletionService {
     return summaryFeedback.getId();
   }
 
+  /** 수준 평가 도입 전 저장된 세션 요약에 결정적 fallback 결과를 보완한다. */
+  @Transactional
+  void attachLegacyFallback(long userId, LoadedSessionFeedbackContext context) {
+    learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
+    sessionFeedbackDataService.requireSummary(
+        context.existingSummary().orElseThrow().summaryFeedbackId());
+    if (sessionLevelAssessmentService.findBySessionId(context.sessionId()) != null) {
+      return;
+    }
+    sessionLevelAssessmentService.assessApplyAndSave(userId, context, null);
+  }
+
   /** AI 응답의 세션 식별자, 점수, 필수 요약 필드가 계약을 만족하는지 검증한다. */
   private void validateResult(
       LoadedSessionFeedbackContext context, AiSessionFeedbackResult result) {
+    if (result != null
+        && result.generationFallback()
+        && context.sessionId().equals(result.sessionId())) {
+      return;
+    }
     if (result == null
         || !context.sessionId().equals(result.sessionId())
         || result.nativeScore() < 0
@@ -140,6 +159,12 @@ class SessionFeedbackCompletionService {
       LoadedSessionFeedbackContext context,
       AiSessionFeedbackResult result,
       Long summaryFeedbackId) {
+    if (result.generationFallback()) {
+      context
+          .userMessages()
+          .forEach(message -> sessionMessageService.failFeedback(message.messageId()));
+      return;
+    }
     List<SessionHistoryMessageFeedback> feedbacks = new java.util.ArrayList<>();
     for (int index = 0; index < context.userMessages().size(); index++) {
       UserMessageContext userMessage = context.userMessages().get(index);
