@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleUpdateRequest;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelUpdateRequest;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -72,6 +73,26 @@ public interface UserProfileControllerDocs {
         description = "인증 실패")
   })
   ApiResponse<UserAccentLocaleResponse> getAccentLocale(AuthUserPrincipal principal);
+
+  /**
+   * 인증된 사용자의 서버 기준 구독 상태를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @return 구독 상태, 프리미엄 적용 여부, 만료 시각
+   */
+  @Operation(
+      summary = "사용자 구독 상태 조회",
+      description = "RevenueCat 웹훅으로 갱신된 서버 기준 구독 상태를 조회합니다. premium이 true면 프리미엄 혜택이 적용 중입니다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패")
+  })
+  ApiResponse<UserSubscriptionResponse> getSubscription(AuthUserPrincipal principal);
 
   /**
    * 인증된 사용자의 학습 수준을 저장하거나 변경한다.
