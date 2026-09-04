@@ -1194,8 +1194,8 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.starRating").value(3.0))
         .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
         .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(3))
-        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(3))
-        .andExpect(jsonPath("$.data.levelAssessment.changeType").value("INITIALIZED"))
+        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
+        .andExpect(jsonPath("$.data.levelAssessment.changeType").value("NOT_APPLIED"))
         .andExpect(jsonPath("$.data.levelAssessment.grammar.confidence").value(0.0))
         .andExpect(jsonPath("$.data.messageFeedbacks[0].messageId").isNumber())
         .andExpect(jsonPath("$.data.messageFeedbacks[0].messageFeedbackId").isNumber())
@@ -1205,6 +1205,17 @@ class ScenarioSessionApiIntegrationTests {
             jsonPath("$.data.messageFeedbacks[0].evaluationContext.content")
                 .value("What food do you like?"))
         .andExpect(jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT learning_level FROM user_profile WHERE id = ?", Integer.class, userId))
+        .isNull();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT current_level FROM user_level_assessment WHERE learning_session_id = ?",
+                Integer.class,
+                sessionId))
+        .isNull();
 
     final Map<String, Object> historyBeforeSecondRequest =
         jdbcTemplate.queryForMap(
@@ -1321,7 +1332,7 @@ class ScenarioSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
-        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(3))
+        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
         .andExpect(jsonPath("$.data.messageFeedbacks.length()").value(0));
 
     assertThat(

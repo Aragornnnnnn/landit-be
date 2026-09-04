@@ -45,8 +45,14 @@ class SessionLevelAssessmentService {
         modelResult ? modelScore : fallbackScore(previousLevel == null ? 3 : previousLevel);
     LearningLevelPolicy.Decision decision =
         LearningLevelPolicy.apply(
-            previousLevel, profile.getPromotionStreak(), score.overallScore(), modelResult);
-    profile.applyAssessedLearningLevel(decision.level(), decision.promotionStreak());
+            previousLevel,
+            profile.getPromotionStreak(),
+            score.overallScore(),
+            score.overallConfidence(),
+            modelResult);
+    if (modelResult) {
+      profile.applyAssessedLearningLevel(decision.level(), decision.promotionStreak());
+    }
 
     AiSessionLevelAssessment.Details details = modelResult ? aiAssessment.details() : null;
     SessionLevelAssessment assessment =
@@ -151,7 +157,7 @@ class SessionLevelAssessmentService {
     TextLevelAssessmentPolicy.DomainScore domain =
         new TextLevelAssessmentPolicy.DomainScore(value, new BigDecimal("0.00"));
     return new TextLevelAssessmentPolicy.Score(
-        domain, domain, domain, domain, domain, value, level);
+        domain, domain, domain, domain, domain, value, BigDecimal.ZERO.setScale(2), level);
   }
 
   private SessionLevelAssessment.DomainScore domain(TextLevelAssessmentPolicy.DomainScore domain) {

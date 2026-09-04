@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ResponseDemand;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,20 @@ class TextLevelAssessmentPolicyTest {
             TextLevelAssessmentPolicy.calculate(
                 List.of(observation(ResponseDemand.HIGH, 5)), ContentLearningLevel.LEVEL_4_TO_5))
         .isEmpty();
+  }
+
+  @Test
+  void calculatesOverallConfidenceFromObservedAnswerWeight() {
+    TextLevelAssessmentPolicy.Score score =
+        TextLevelAssessmentPolicy.calculate(
+                List.of(
+                    observation(ResponseDemand.HIGH, 4),
+                    new TextLevelAssessmentPolicy.Observation(
+                        ResponseDemand.HIGH, null, null, null, null, null)),
+                ContentLearningLevel.LEVEL_4_TO_5)
+            .orElseThrow();
+
+    assertThat(score.overallConfidence()).isEqualByComparingTo(new BigDecimal("0.50"));
   }
 
   private TextLevelAssessmentPolicy.Observation observation(ResponseDemand demand, int level) {

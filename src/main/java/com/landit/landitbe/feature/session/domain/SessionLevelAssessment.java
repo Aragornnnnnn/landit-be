@@ -16,7 +16,7 @@ public record SessionLevelAssessment(
     Source source,
     LearningLevelPolicy.ChangeType changeType,
     Integer previousLevel,
-    int currentLevel,
+    Integer currentLevel,
     Details details,
     String assessmentVersion) {
 

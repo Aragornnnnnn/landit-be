@@ -35,6 +35,7 @@ public final class TextLevelAssessmentPolicy {
       DomainScore discourse,
       DomainScore interactionPragmatics,
       BigDecimal overallScore,
+      BigDecimal overallConfidence,
       int assessedLevel) {}
 
   /** 두 답변 이상에서 다섯 영역이 모두 관찰됐을 때만 모델 점수를 반환한다. */
@@ -65,9 +66,26 @@ public final class TextLevelAssessmentPolicy {
             .add(interaction.score().multiply(new BigDecimal("0.15")));
     BigDecimal overall =
         rawOverall.min(observationCap(questionLevelGroup)).setScale(2, RoundingMode.HALF_UP);
+    BigDecimal overallConfidence =
+        situation
+            .confidence()
+            .multiply(new BigDecimal("0.30"))
+            .add(grammar.confidence().multiply(new BigDecimal("0.20")))
+            .add(vocabulary.confidence().multiply(new BigDecimal("0.20")))
+            .add(discourse.confidence().multiply(new BigDecimal("0.15")))
+            .add(interaction.confidence().multiply(new BigDecimal("0.15")))
+            .setScale(2, RoundingMode.HALF_UP);
     int assessedLevel = overall.setScale(0, RoundingMode.HALF_UP).intValue();
     return Optional.of(
-        new Score(situation, grammar, vocabulary, discourse, interaction, overall, assessedLevel));
+        new Score(
+            situation,
+            grammar,
+            vocabulary,
+            discourse,
+            interaction,
+            overall,
+            overallConfidence,
+            assessedLevel));
   }
 
   private static DomainScore average(

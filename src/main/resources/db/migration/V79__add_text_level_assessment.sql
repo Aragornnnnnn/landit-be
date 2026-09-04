@@ -39,7 +39,7 @@ CREATE TABLE user_level_assessment (
     source VARCHAR(20) NOT NULL,
     change_type VARCHAR(20) NOT NULL,
     previous_level INTEGER,
-    current_level INTEGER NOT NULL,
+    current_level INTEGER,
     promotion_streak_after INTEGER NOT NULL,
     core_payload JSONB,
     details_payload JSONB,
@@ -52,7 +52,8 @@ CREATE TABLE user_level_assessment (
     CONSTRAINT fk_user_level_assessment_learning_session_id
         FOREIGN KEY (learning_session_id) REFERENCES learning_session (id),
     CONSTRAINT chk_user_level_assessment_level
-        CHECK (assessed_level BETWEEN 1 AND 5 AND current_level BETWEEN 1 AND 5),
+        CHECK (assessed_level BETWEEN 1 AND 5
+            AND (current_level IS NULL OR current_level BETWEEN 1 AND 5)),
     CONSTRAINT chk_user_level_assessment_source
         CHECK (source IN ('MODEL', 'FALLBACK')),
     CONSTRAINT chk_user_level_assessment_promotion_streak

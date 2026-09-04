@@ -11,7 +11,7 @@ class LearningLevelPolicyTest {
 
   @Test
   void initializesUnsetLevelFromFirstModelAssessment() {
-    assertThat(LearningLevelPolicy.apply(null, 0, new BigDecimal("4.20"), true))
+    assertThat(LearningLevelPolicy.apply(null, 0, new BigDecimal("4.20"), BigDecimal.ONE, true))
         .isEqualTo(
             new LearningLevelPolicy.Decision(4, 0, LearningLevelPolicy.ChangeType.INITIALIZED));
   }
@@ -19,10 +19,10 @@ class LearningLevelPolicyTest {
   @Test
   void promotesOneLevelAfterTwoConsecutiveHigherAssessments() {
     LearningLevelPolicy.Decision first =
-        LearningLevelPolicy.apply(3, 0, new BigDecimal("3.70"), true);
+        LearningLevelPolicy.apply(3, 0, new BigDecimal("3.70"), BigDecimal.ONE, true);
     LearningLevelPolicy.Decision second =
         LearningLevelPolicy.apply(
-            first.level(), first.promotionStreak(), new BigDecimal("4.10"), true);
+            first.level(), first.promotionStreak(), new BigDecimal("4.10"), BigDecimal.ONE, true);
 
     assertThat(first)
         .isEqualTo(
@@ -33,8 +33,23 @@ class LearningLevelPolicyTest {
 
   @Test
   void fallbackDoesNotChangeLevelOrPromotionStreak() {
-    assertThat(LearningLevelPolicy.apply(3, 1, new BigDecimal("5.00"), false))
+    assertThat(LearningLevelPolicy.apply(3, 1, new BigDecimal("5.00"), BigDecimal.ZERO, false))
         .isEqualTo(
-            new LearningLevelPolicy.Decision(3, 1, LearningLevelPolicy.ChangeType.UNCHANGED));
+            new LearningLevelPolicy.Decision(3, 1, LearningLevelPolicy.ChangeType.NOT_APPLIED));
+  }
+
+  @Test
+  void fallbackDoesNotInitializeUnsetLevel() {
+    assertThat(LearningLevelPolicy.apply(null, 0, new BigDecimal("3.00"), BigDecimal.ZERO, false))
+        .isEqualTo(
+            new LearningLevelPolicy.Decision(null, 0, LearningLevelPolicy.ChangeType.NOT_APPLIED));
+  }
+
+  @Test
+  void lowConfidenceAssessmentDoesNotAdvancePromotionStreak() {
+    assertThat(
+            LearningLevelPolicy.apply(3, 0, new BigDecimal("4.00"), new BigDecimal("0.74"), true))
+        .isEqualTo(
+            new LearningLevelPolicy.Decision(3, 0, LearningLevelPolicy.ChangeType.UNCHANGED));
   }
 }

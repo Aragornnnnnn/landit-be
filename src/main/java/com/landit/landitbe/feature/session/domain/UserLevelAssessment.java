@@ -80,8 +80,8 @@ public class UserLevelAssessment extends BaseTimeEntity {
   @Column(name = "previous_level")
   private Integer previousLevel;
 
-  @Column(name = "current_level", nullable = false)
-  private int currentLevel;
+  @Column(name = "current_level")
+  private Integer currentLevel;
 
   @Column(name = "promotion_streak_after", nullable = false)
   private int promotionStreakAfter;

@@ -9,6 +9,7 @@ import java.math.RoundingMode;
 public final class LearningLevelPolicy {
 
   private static final BigDecimal PROMOTION_GAP = new BigDecimal("0.70");
+  private static final BigDecimal PROMOTION_CONFIDENCE = new BigDecimal("0.75");
 
   private LearningLevelPolicy() {}
 
@@ -16,24 +17,30 @@ public final class LearningLevelPolicy {
   public enum ChangeType {
     INITIALIZED,
     PROMOTED,
-    UNCHANGED
+    UNCHANGED,
+    NOT_APPLIED
   }
 
   /** 평가 적용 후 수준과 승급 연속 횟수다. */
-  public record Decision(int level, int promotionStreak, ChangeType changeType) {}
+  public record Decision(Integer level, int promotionStreak, ChangeType changeType) {}
 
   /** 현재 수준과 모델 점수에서 이번 세션 이후 적용 상태를 반환한다. */
   public static Decision apply(
-      Integer currentLevel, int promotionStreak, BigDecimal assessedScore, boolean modelResult) {
+      Integer currentLevel,
+      int promotionStreak,
+      BigDecimal assessedScore,
+      BigDecimal assessmentConfidence,
+      boolean modelResult) {
+    if (!modelResult) {
+      return new Decision(currentLevel, promotionStreak, ChangeType.NOT_APPLIED);
+    }
     if (currentLevel == null) {
       int initializedLevel =
           Math.max(1, Math.min(5, assessedScore.setScale(0, RoundingMode.HALF_UP).intValue()));
       return new Decision(initializedLevel, 0, ChangeType.INITIALIZED);
     }
-    if (!modelResult) {
-      return new Decision(currentLevel, promotionStreak, ChangeType.UNCHANGED);
-    }
     if (currentLevel < 5
+        && assessmentConfidence.compareTo(PROMOTION_CONFIDENCE) >= 0
         && assessedScore.compareTo(BigDecimal.valueOf(currentLevel).add(PROMOTION_GAP)) >= 0) {
       int nextStreak = promotionStreak + 1;
       return nextStreak >= 2
