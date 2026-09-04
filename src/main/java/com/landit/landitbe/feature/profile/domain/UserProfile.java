@@ -67,6 +67,16 @@ public class UserProfile extends BaseTimeEntity {
   private LocalDateTime pushPermissionUpdatedAt;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "subscription_status", nullable = false, length = 30)
+  private SubscriptionStatus subscriptionStatus;
+
+  @Column(name = "subscription_expires_at")
+  private LocalDateTime subscriptionExpiresAt;
+
+  @Column(name = "subscription_event_at")
+  private LocalDateTime subscriptionEventAt;
+
+  @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private UserProfileStatus status;
 
@@ -93,6 +103,7 @@ public class UserProfile extends BaseTimeEntity {
     this.aiTutorId = aiTutorId;
     this.accentLocale = AccentLocale.EN_US;
     this.pushPermissionStatus = PushPermissionStatus.NOT_DETERMINED;
+    this.subscriptionStatus = SubscriptionStatus.NONE;
     this.status = UserProfileStatus.ACTIVE;
     this.role = UserRole.USER;
   }
@@ -129,6 +140,39 @@ public class UserProfile extends BaseTimeEntity {
   public void grantPushPermission(LocalDateTime updatedAt) {
     this.pushPermissionStatus = PushPermissionStatus.GRANTED;
     this.pushPermissionUpdatedAt = updatedAt;
+  }
+
+  /**
+   * 결제 제공자 이벤트로 구독 상태를 갱신한다.
+   *
+   * @param subscriptionStatus 갱신할 구독 상태
+   * @param expiresAt 구독 만료 시각. 알 수 없으면 null
+   * @param eventAt 이벤트 발생 시각
+   */
+  public void updateSubscription(
+      SubscriptionStatus subscriptionStatus, LocalDateTime expiresAt, LocalDateTime eventAt) {
+    this.subscriptionStatus = subscriptionStatus;
+    this.subscriptionExpiresAt = expiresAt;
+    this.subscriptionEventAt = eventAt;
+  }
+
+  /**
+   * 이미 반영한 구독 이벤트보다 오래된 이벤트인지 확인한다.
+   *
+   * @param eventAt 확인할 이벤트 발생 시각
+   * @return 마지막으로 반영한 이벤트보다 이전이면 {@code true}
+   */
+  public boolean isSubscriptionEventStale(LocalDateTime eventAt) {
+    return subscriptionEventAt != null && eventAt.isBefore(subscriptionEventAt);
+  }
+
+  /**
+   * 프리미엄 혜택이 켜진 사용자인지 확인한다.
+   *
+   * @return 프리미엄이 켜져 있으면 {@code true}
+   */
+  public boolean isPremium() {
+    return subscriptionStatus.isPremium();
   }
 
   /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
