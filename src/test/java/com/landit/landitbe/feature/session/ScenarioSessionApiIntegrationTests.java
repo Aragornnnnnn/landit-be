@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.domain.ResponseDemand;
 import com.landit.landitbe.feature.session.client.ai.AiClosingMessageRequest;
 import com.landit.landitbe.feature.session.client.ai.AiClosingMessageResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
@@ -1283,6 +1284,29 @@ class ScenarioSessionApiIntegrationTests {
             userId);
     assertThat(progress.get("STATUS")).isEqualTo("CLEARED");
     assertThat(progress.get("COMPLETED_COUNT")).isEqualTo(1);
+  }
+
+  @Test
+  void getSessionFeedbackUsesOpeningQuestionMetadataForAiFirstAnswer() throws Exception {
+    StartedSession startedSession =
+        startCompletedAiFirstSession("session-feedback-ai-first-metadata@example.com");
+    jdbcTemplate.update(
+        "UPDATE scenario_question SET response_demand = 'LOW' WHERE scenario_id = 2120");
+    jdbcTemplate.update(
+        """
+        UPDATE scenario_question_language_variant
+        SET required_response_element = 'name a food'
+        WHERE scenario_question_id = (SELECT id FROM scenario_question WHERE scenario_id = 2120)
+        """);
+
+    mockMvc.perform(
+        post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()));
+
+    AiSessionFeedbackRequest.AssessmentMessage assessmentMessage =
+        fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages().getFirst();
+    assertThat(assessmentMessage.responseDemand()).isEqualTo(ResponseDemand.LOW);
+    assertThat(assessmentMessage.requiredElements()).containsExactly("name a food");
   }
 
   @Test

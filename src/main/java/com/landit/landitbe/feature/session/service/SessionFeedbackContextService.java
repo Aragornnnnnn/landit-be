@@ -115,16 +115,20 @@ class SessionFeedbackContextService {
     return List.copyOf(userMessages);
   }
 
-  /** 첫 발화 이후 질문은 사용자 턴 번호 직전 순서의 고정 질문 메타데이터를 사용한다. */
+  /** AI first는 같은 턴, USER first는 첫 발화 이후 직전 순서의 질문 메타데이터를 사용한다. */
   private NextQuestionContext questionFor(
       int userTurnNumber, ScenarioSessionMessageContextProjection scenarioContext) {
-    if (userTurnNumber <= 1) {
+    if (scenarioContext.firstSpeaker() == ConversationSpeaker.USER && userTurnNumber <= 1) {
       return null;
     }
+    int questionOrder =
+        scenarioContext.firstSpeaker() == ConversationSpeaker.AI
+            ? userTurnNumber
+            : userTurnNumber - 1;
     return scenarioContentService
         .findActiveQuestion(
             scenarioContext.scenarioId(),
-            userTurnNumber - 1,
+            questionOrder,
             scenarioContext.questionLevelGroup(),
             scenarioContext.targetLocale(),
             scenarioContext.baseLocale())
