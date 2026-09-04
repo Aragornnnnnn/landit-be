@@ -24,6 +24,7 @@ import com.landit.landitbe.feature.session.client.ai.AiNextMessageRequest;
 import com.landit.landitbe.feature.session.client.ai.AiNextMessageResult;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackResult;
+import com.landit.landitbe.feature.session.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.client.ai.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
@@ -94,6 +95,7 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
     jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
+    jdbcTemplate.update("DELETE FROM user_level_assessment");
     jdbcTemplate.update("DELETE FROM session_history_artifact");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM scenario_session");
@@ -1189,6 +1191,11 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessionId").value(sessionId))
         .andExpect(jsonPath("$.data.nativeScore").value(90))
         .andExpect(jsonPath("$.data.starRating").value(3.0))
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(3))
+        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(3))
+        .andExpect(jsonPath("$.data.levelAssessment.changeType").value("INITIALIZED"))
+        .andExpect(jsonPath("$.data.levelAssessment.grammar.confidence").value(0.0))
         .andExpect(jsonPath("$.data.messageFeedbacks[0].messageId").isNumber())
         .andExpect(jsonPath("$.data.messageFeedbacks[0].messageFeedbackId").isNumber())
         .andExpect(
@@ -1198,7 +1205,7 @@ class ScenarioSessionApiIntegrationTests {
                 .value("What food do you like?"))
         .andExpect(jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
 
-    Map<String, Object> historyBeforeSecondRequest =
+    final Map<String, Object> historyBeforeSecondRequest =
         jdbcTemplate.queryForMap(
             """
             SELECT ended_at, duration_seconds, user_message_count
@@ -1206,7 +1213,7 @@ class ScenarioSessionApiIntegrationTests {
             WHERE learning_session_id = ?
             """,
             sessionId);
-    Map<String, Object> progressBeforeSecondRequest =
+    final Map<String, Object> progressBeforeSecondRequest =
         jdbcTemplate.queryForMap(
             """
             SELECT status, completed_count, first_cleared_at, last_played_at,
@@ -1217,13 +1224,16 @@ class ScenarioSessionApiIntegrationTests {
               AND target_locale = 'EN'
             """,
             userId);
+    jdbcTemplate.update(
+        "DELETE FROM user_level_assessment WHERE learning_session_id = ?", sessionId);
 
     mockMvc
         .perform(
             post("/api/v1/sessions/%d/feedback".formatted(sessionId))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.nativeScore").value(90));
+        .andExpect(jsonPath("$.data.nativeScore").value(90))
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
 
     assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(1);
     assertThat(
@@ -1233,6 +1243,12 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_message_feedback", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_level_assessment WHERE learning_session_id = ?",
+                Integer.class,
+                sessionId))
         .isEqualTo(1);
     assertThat(
             jdbcTemplate.queryForMap(
@@ -1267,6 +1283,33 @@ class ScenarioSessionApiIntegrationTests {
             userId);
     assertThat(progress.get("STATUS")).isEqualTo("CLEARED");
     assertThat(progress.get("COMPLETED_COUNT")).isEqualTo(1);
+  }
+
+  @Test
+  void getSessionFeedbackReturnsLevelFallbackWhenFinalAiGenerationFails() throws Exception {
+    StartedSession startedSession =
+        startCompletedAiFirstSession("session-feedback-fallback@example.com");
+    fakeAiConversationClient.failSessionFeedbackGeneration();
+
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
+        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(3))
+        .andExpect(jsonPath("$.data.messageFeedbacks.length()").value(0));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_summary_feedback", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT source FROM user_level_assessment WHERE learning_session_id = ?",
+                String.class,
+                startedSession.sessionId()))
+        .isEqualTo("FALLBACK");
   }
 
   @Test
@@ -1308,7 +1351,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
-  void getSessionFeedbackRejectsUnsupportedAiStarRating() throws Exception {
+  void getSessionFeedbackFallsBackForUnsupportedAiStarRating() throws Exception {
     StartedSession startedSession =
         startCompletedAiFirstSession("session-feedback-unsupported-star-rating@example.com");
     fakeAiConversationClient.returnSessionFeedbackStarRating(new BigDecimal("4.0"));
@@ -1317,13 +1360,19 @@ class ScenarioSessionApiIntegrationTests {
         .perform(
             post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
-        .andExpect(status().isBadGateway())
-        .andExpect(jsonPath("$.error.code").value("AI_RESPONSE_INVALID"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
 
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_summary_feedback", Integer.class))
-        .isZero();
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT source FROM user_level_assessment WHERE learning_session_id = ?",
+                String.class,
+                startedSession.sessionId()))
+        .isEqualTo("FALLBACK");
   }
 
   @Test
@@ -1370,7 +1419,37 @@ class ScenarioSessionApiIntegrationTests {
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.type").value("AI_MESSAGE"))
         .andExpect(
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.content")
-                .value("Oh, you like spicy pizza. Would you like anything else?"));
+                .value("Oh, you like spicy pizza. Would you like anything else?"))
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(5.0))
+        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(5));
+
+    assertThat(
+            jdbcTemplate.queryForMap(
+                """
+                SELECT situation_performance_score, grammar_score, vocabulary_score,
+                       discourse_score, interaction_pragmatics_score, assessed_score,
+                       assessed_level, source, previous_level, current_level,
+                       promotion_streak_after,
+                       core_payload IS NOT NULL AS has_core,
+                       details_payload IS NOT NULL AS has_details
+                FROM user_level_assessment
+                WHERE learning_session_id = ?
+                """,
+                sessionId))
+        .containsEntry("SITUATION_PERFORMANCE_SCORE", new BigDecimal("5.00"))
+        .containsEntry("GRAMMAR_SCORE", new BigDecimal("5.00"))
+        .containsEntry("VOCABULARY_SCORE", new BigDecimal("5.00"))
+        .containsEntry("DISCOURSE_SCORE", new BigDecimal("5.00"))
+        .containsEntry("INTERACTION_PRAGMATICS_SCORE", new BigDecimal("5.00"))
+        .containsEntry("ASSESSED_SCORE", new BigDecimal("5.00"))
+        .containsEntry("ASSESSED_LEVEL", 5)
+        .containsEntry("SOURCE", "MODEL")
+        .containsEntry("PREVIOUS_LEVEL", null)
+        .containsEntry("CURRENT_LEVEL", 5)
+        .containsEntry("PROMOTION_STREAK_AFTER", 0)
+        .containsEntry("HAS_CORE", true)
+        .containsEntry("HAS_DETAILS", true);
 
     assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().expectedMessageIds())
         .containsExactlyElementsOf(userMessageIds(sessionId));
@@ -2941,6 +3020,7 @@ class ScenarioSessionApiIntegrationTests {
     private boolean failMessageFeedbackRequest;
 
     private BigDecimal sessionFeedbackStarRating = new BigDecimal("3.0");
+    private boolean failSessionFeedbackGeneration;
 
     private int sessionFeedbackCallCount;
 
@@ -3034,6 +3114,9 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackTransactionActive.add(
           TransactionSynchronizationManager.isActualTransactionActive());
       sessionFeedbackCallCount++;
+      if (failSessionFeedbackGeneration) {
+        throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+      }
       return new AiSessionFeedbackResult(
           request.sessionId(),
           90,
@@ -3052,7 +3135,31 @@ class ScenarioSessionApiIntegrationTests {
                           null,
                           null,
                           "Your message clearly communicates the main idea."))
-              .toList());
+              .toList(),
+          request.assessmentMessages().size() < 2
+              ? null
+              : new AiSessionLevelAssessment(
+                  new AiSessionLevelAssessment.Core(
+                      request.assessmentMessages().stream()
+                          .map(
+                              message ->
+                                  new AiSessionLevelAssessment.Message(
+                                      message.messageId(),
+                                      AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
+                                      observedDomains(message.userMessage())))
+                          .toList()),
+                  new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요.")));
+    }
+
+    private void failSessionFeedbackGeneration() {
+      failSessionFeedbackGeneration = true;
+    }
+
+    private AiSessionLevelAssessment.Domains observedDomains(String evidence) {
+      AiSessionLevelAssessment.Domain domain =
+          new AiSessionLevelAssessment.Domain(
+              5, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
+      return new AiSessionLevelAssessment.Domains(domain, domain, domain, domain, domain);
     }
 
     private void reset() {
@@ -3072,6 +3179,7 @@ class ScenarioSessionApiIntegrationTests {
       innerThoughtResponseMessageId = null;
       failMessageFeedbackRequest = false;
       sessionFeedbackStarRating = new BigDecimal("3.0");
+      failSessionFeedbackGeneration = false;
       sessionFeedbackCallCount = 0;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;
