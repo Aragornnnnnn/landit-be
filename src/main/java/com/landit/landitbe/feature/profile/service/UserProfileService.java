@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.profile.service;
 
-import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
@@ -10,6 +9,7 @@ import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
@@ -73,26 +73,22 @@ public class UserProfileService {
    * <p>탈퇴한 사용자도 대상에 포함해 환불·만료 이벤트가 유실되지 않게 한다. 이미 반영한 이벤트보다 오래된 이벤트는 무시한다.
    *
    * @param userId 갱신할 사용자 ID
-   * @param subscriptionStatus 갱신할 구독 상태
-   * @param expiresAt 구독 만료 시각. 알 수 없으면 null
-   * @param eventAt 이벤트 발생 시각
+   * @param command 갱신할 구독 정보
    * @return 갱신 처리 결과
    */
   @Transactional
   public SubscriptionUpdateResult updateSubscription(
-      Long userId,
-      SubscriptionStatus subscriptionStatus,
-      LocalDateTime expiresAt,
-      LocalDateTime eventAt) {
+      Long userId, SubscriptionUpdateCommand command) {
     Optional<UserProfile> found = userProfileRepository.findById(userId);
     if (found.isEmpty()) {
       return SubscriptionUpdateResult.USER_NOT_FOUND;
     }
     UserProfile userProfile = found.get();
-    if (userProfile.isSubscriptionEventStale(eventAt)) {
+    if (userProfile.isSubscriptionEventStale(command.eventAt())) {
       return SubscriptionUpdateResult.STALE_EVENT;
     }
-    userProfile.updateSubscription(subscriptionStatus, expiresAt, eventAt);
+    userProfile.updateSubscription(
+        command.status(), command.periodType(), command.expiresAt(), command.eventAt());
     return SubscriptionUpdateResult.APPLIED;
   }
 

@@ -128,6 +128,78 @@ class RevenueCatWebhookApiIntegrationTests {
     assertThat(subscriptionExpiresAt(userId)).isNull();
   }
 
+  /** 무료 체험 시작은 TRIAL 기간 종류로, 유료 전환 갱신은 NORMAL로 저장한다. */
+  @Test
+  void storesPeriodTypeFromTrialToPaid() throws Exception {
+    Long userId = createUser("rc-trial");
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "INITIAL_PURCHASE",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS,
+                Map.of("period_type", "TRIAL")))
+        .andExpect(status().isOk());
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionPeriodType(userId)).isEqualTo("TRIAL");
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "RENEWAL",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 1_000,
+                Map.of("period_type", "NORMAL", "is_trial_conversion", "true")))
+        .andExpect(status().isOk());
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionPeriodType(userId)).isEqualTo("NORMAL");
+  }
+
+  /** 프리미엄이 꺼지면 기간 종류를 비운다. */
+  @Test
+  void clearsPeriodTypeWhenPremiumTurnsOff() throws Exception {
+    Long userId = createUser("rc-trial-expire");
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "INITIAL_PURCHASE",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS,
+                Map.of("period_type", "TRIAL")))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "EXPIRATION",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 1_000,
+                Map.of("period_type", "TRIAL")))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("EXPIRED");
+    assertThat(subscriptionPeriodType(userId)).isNull();
+  }
+
+  /** 알 수 없는 period_type은 기간 종류만 비우고 상태 갱신은 그대로 진행한다. */
+  @Test
+  void storesNullPeriodTypeForUnknownValue() throws Exception {
+    Long userId = createUser("rc-period-unknown");
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "INITIAL_PURCHASE",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS,
+                Map.of("period_type", "SOMETHING_NEW")))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionPeriodType(userId)).isNull();
+  }
+
   /** 이미 반영한 이벤트보다 오래된 이벤트가 뒤늦게 도착하면 무시한다. */
   @Test
   void ignoresStaleEvent() throws Exception {
@@ -257,6 +329,11 @@ class RevenueCatWebhookApiIntegrationTests {
   private String subscriptionStatus(Long userId) {
     return jdbcTemplate.queryForObject(
         "select subscription_status from user_profile where id = ?", String.class, userId);
+  }
+
+  private String subscriptionPeriodType(Long userId) {
+    return jdbcTemplate.queryForObject(
+        "select subscription_period_type from user_profile where id = ?", String.class, userId);
   }
 
   private Timestamp subscriptionExpiresAt(Long userId) {

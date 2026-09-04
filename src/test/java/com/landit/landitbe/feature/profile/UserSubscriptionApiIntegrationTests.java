@@ -59,10 +59,11 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.subscriptionStatus").value("NONE"))
         .andExpect(jsonPath("$.data.premium").value(false))
+        .andExpect(jsonPath("$.data.periodType").isEmpty())
         .andExpect(jsonPath("$.data.expiresAt").isEmpty());
   }
 
-  /** 웹훅으로 구매가 반영되면 ACTIVE 상태와 만료 시각이 조회된다. */
+  /** 웹훅으로 무료 체험 구매가 반영되면 ACTIVE 상태, TRIAL 기간 종류, 만료 시각이 조회된다. */
   @Test
   void returnsActiveSubscriptionAfterWebhookPurchase() throws Exception {
     String userKey = "subscription-active";
@@ -78,6 +79,7 @@ class UserSubscriptionApiIntegrationTests {
             "id": "%s",
             "type": "INITIAL_PURCHASE",
             "app_user_id": "%d",
+            "period_type": "TRIAL",
             "event_timestamp_ms": %d,
             "expiration_at_ms": %d
           }
@@ -99,6 +101,7 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.subscriptionStatus").value("ACTIVE"))
         .andExpect(jsonPath("$.data.premium").value(true))
+        .andExpect(jsonPath("$.data.periodType").value("TRIAL"))
         .andExpect(jsonPath("$.data.expiresAt").isNotEmpty());
   }
 

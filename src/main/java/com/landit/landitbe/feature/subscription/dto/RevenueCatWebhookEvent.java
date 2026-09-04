@@ -18,6 +18,7 @@ import java.util.List;
  * @param originalAppUserId 처음 사용한 App User ID
  * @param aliases 지금까지 사용한 모든 App User ID
  * @param productId 구독 상품 ID
+ * @param periodType 현재 결제 기간 종류. TRIAL, INTRO, NORMAL, PROMOTIONAL, PREPAID
  * @param environment SANDBOX 또는 PRODUCTION
  * @param cancelReason CANCELLATION 이벤트의 해지 사유. 환불이면 CUSTOMER_SUPPORT
  * @param expirationReason EXPIRATION 이벤트의 만료 사유
@@ -32,6 +33,7 @@ public record RevenueCatWebhookEvent(
     @JsonProperty("original_app_user_id") String originalAppUserId,
     @JsonProperty("aliases") List<String> aliases,
     @JsonProperty("product_id") String productId,
+    @JsonProperty("period_type") String periodType,
     @JsonProperty("environment") String environment,
     @JsonProperty("cancel_reason") String cancelReason,
     @JsonProperty("expiration_reason") String expirationReason,

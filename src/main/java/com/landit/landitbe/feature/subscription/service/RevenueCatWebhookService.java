@@ -3,7 +3,9 @@
 package com.landit.landitbe.feature.subscription.service;
 
 import com.landit.landitbe.config.subscription.RevenueCatProperties;
+import com.landit.landitbe.feature.profile.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.subscription.dto.RevenueCatWebhookEvent;
@@ -110,21 +112,17 @@ public class RevenueCatWebhookService {
           event.appUserId());
       return;
     }
-    LocalDateTime eventAt =
-        toLocalDateTime(event.eventTimestampMs()).orElseGet(() -> LocalDateTime.now(clock));
-    // 프리미엄이 꺼지는 상태에서는 만료 시각을 비워 응답에서 남은 기간처럼 보이지 않게 한다.
-    LocalDateTime expiresAt =
-        targetStatus.isPremium() ? toLocalDateTime(event.expirationAtMs()).orElse(null) : null;
+    SubscriptionUpdateCommand command = toCommand(event, targetStatus);
     for (Long userId : candidateUserIds) {
-      SubscriptionUpdateResult result =
-          userProfileService.updateSubscription(userId, targetStatus, expiresAt, eventAt);
+      SubscriptionUpdateResult result = userProfileService.updateSubscription(userId, command);
       if (result != SubscriptionUpdateResult.USER_NOT_FOUND) {
         log.info(
-            "RevenueCat 웹훅 처리: result={}, userId={}, status={}, eventId={}, type={},"
-                + " environment={}",
+            "RevenueCat 웹훅 처리: result={}, userId={}, status={}, periodType={}, eventId={},"
+                + " type={}, environment={}",
             result,
             userId,
-            targetStatus,
+            command.status(),
+            command.periodType(),
             event.id(),
             event.type(),
             event.environment());
@@ -136,6 +134,34 @@ public class RevenueCatWebhookService {
         event.id(),
         event.type(),
         candidateUserIds);
+  }
+
+  /** 프리미엄이 꺼지는 상태에서는 기간 종류와 만료 시각을 비워 응답에서 남은 기간처럼 보이지 않게 한다. */
+  private SubscriptionUpdateCommand toCommand(
+      RevenueCatWebhookEvent event, SubscriptionStatus targetStatus) {
+    LocalDateTime eventAt =
+        toLocalDateTime(event.eventTimestampMs()).orElseGet(() -> LocalDateTime.now(clock));
+    if (!targetStatus.isPremium()) {
+      return new SubscriptionUpdateCommand(targetStatus, null, null, eventAt);
+    }
+    return new SubscriptionUpdateCommand(
+        targetStatus,
+        resolvePeriodType(event),
+        toLocalDateTime(event.expirationAtMs()).orElse(null),
+        eventAt);
+  }
+
+  /** RevenueCat period_type을 기간 종류로 바꾼다. 알 수 없는 값은 경고를 남기고 null로 저장해 상태 갱신은 계속 진행한다. */
+  private static SubscriptionPeriodType resolvePeriodType(RevenueCatWebhookEvent event) {
+    Optional<SubscriptionPeriodType> periodType =
+        SubscriptionPeriodType.fromRevenueCat(event.periodType());
+    if (periodType.isEmpty() && event.periodType() != null) {
+      log.warn(
+          "RevenueCat 웹훅 period_type 해석 실패: 알 수 없는 값이라 기간 종류를 비운다. eventId={}, periodType={}",
+          event.id(),
+          event.periodType());
+    }
+    return periodType.orElse(null);
   }
 
   /** App User ID, original App User ID, aliases 순으로 숫자 형태의 Landit 사용자 ID 후보를 모은다. */

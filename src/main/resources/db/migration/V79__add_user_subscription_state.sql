@@ -4,6 +4,9 @@ ALTER TABLE user_profile
     ADD COLUMN subscription_status VARCHAR(30) NOT NULL DEFAULT 'NONE';
 
 ALTER TABLE user_profile
+    ADD COLUMN subscription_period_type VARCHAR(30);
+
+ALTER TABLE user_profile
     ADD COLUMN subscription_expires_at TIMESTAMP(6);
 
 ALTER TABLE user_profile

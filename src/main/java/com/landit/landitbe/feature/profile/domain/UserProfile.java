@@ -70,6 +70,10 @@ public class UserProfile extends BaseTimeEntity {
   @Column(name = "subscription_status", nullable = false, length = 30)
   private SubscriptionStatus subscriptionStatus;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "subscription_period_type", length = 30)
+  private SubscriptionPeriodType subscriptionPeriodType;
+
   @Column(name = "subscription_expires_at")
   private LocalDateTime subscriptionExpiresAt;
 
@@ -146,12 +150,17 @@ public class UserProfile extends BaseTimeEntity {
    * 결제 제공자 이벤트로 구독 상태를 갱신한다.
    *
    * @param subscriptionStatus 갱신할 구독 상태
+   * @param subscriptionPeriodType 현재 결제 기간 종류. 알 수 없으면 null
    * @param expiresAt 구독 만료 시각. 알 수 없으면 null
    * @param eventAt 이벤트 발생 시각
    */
   public void updateSubscription(
-      SubscriptionStatus subscriptionStatus, LocalDateTime expiresAt, LocalDateTime eventAt) {
+      SubscriptionStatus subscriptionStatus,
+      SubscriptionPeriodType subscriptionPeriodType,
+      LocalDateTime expiresAt,
+      LocalDateTime eventAt) {
     this.subscriptionStatus = subscriptionStatus;
+    this.subscriptionPeriodType = subscriptionPeriodType;
     this.subscriptionExpiresAt = expiresAt;
     this.subscriptionEventAt = eventAt;
   }
