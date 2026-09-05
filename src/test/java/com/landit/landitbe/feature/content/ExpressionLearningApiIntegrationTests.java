@@ -113,6 +113,26 @@ class ExpressionLearningApiIntegrationTests {
         .andExpect(jsonPath("$.data.completed").value(false));
   }
 
+  @Test
+  void learningStartRejectsExpressionAboveLearningLevel() throws Exception {
+    Long expressionId = seedExpression();
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", expressionId);
+    String accessToken =
+        login("google-learn-level", "learn-level@example.com", "Learn Level", "learn-level-nonce");
+    Long userProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM user_profile WHERE email = ?", Long.class, "learn-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
   /** 학습을 완료한 표현은 다시 조회했을 때 완료 여부가 true로 내려가는지 검증한다. */
   @Test
   void learningStartReturnsCompletedAfterFinishingLearning() throws Exception {
@@ -331,7 +351,7 @@ class ExpressionLearningApiIntegrationTests {
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "representative_image_url, "
             + "practice_examples_payload, status, created_at, updated_at) "
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
+            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 4, 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
             + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
             + "'What should I definitely see in Korea?', '한국에서 뭘 꼭 봐야 해?', "
             + "'Gyeongbokgung Palace will blow your mind.', '경복궁은 널 완전 놀라게 할 거야.', "

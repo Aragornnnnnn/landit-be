@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.shared.domain.Locale;
@@ -21,14 +22,19 @@ public class ScenarioContentService {
    *
    * @param scenarioId 시나리오 ID
    * @param displayOrder 질문 순서
+   * @param questionLevelGroup 질문 레벨 그룹
    * @param targetLocale 학습 대상 locale
    * @param baseLocale 기준 locale
    * @return 조건에 맞는 다음 질문 컨텍스트
    */
   public Optional<NextQuestionContext> findActiveQuestion(
-      long scenarioId, int displayOrder, Locale targetLocale, Locale baseLocale) {
+      long scenarioId,
+      int displayOrder,
+      ContentLearningLevel questionLevelGroup,
+      Locale targetLocale,
+      Locale baseLocale) {
     return scenarioQuestionQueryRepository
-        .findActiveQuestion(scenarioId, displayOrder, targetLocale, baseLocale)
+        .findActiveQuestion(scenarioId, displayOrder, questionLevelGroup, targetLocale, baseLocale)
         .map(NextQuestionContext::from);
   }
 }

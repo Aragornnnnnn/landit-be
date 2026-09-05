@@ -270,8 +270,12 @@ class DatabaseSchemaIntegrationTests {
     assertTableExists("scenario_question");
     assertColumnExists("scenario_question", "scenario_id");
     assertColumnExists("scenario_question", "display_order");
+    assertColumnExists("scenario_question", "question_level_group");
+    assertNotNullableColumn("scenario_question", "question_level_group");
     assertColumnExists("scenario_question", "status");
-    assertTableConstraintExists("scenario_question", "uk_scenario_question_scenario_order");
+    assertTableConstraintDoesNotExist("scenario_question", "uk_scenario_question_scenario_order");
+    assertTableConstraintExists("scenario_question", "uk_scenario_question_scenario_level_order");
+    assertTableConstraintExists("scenario_question", "chk_scenario_question_level_group");
 
     assertTableExists("scenario_question_language_variant");
     assertColumnExists("scenario_question_language_variant", "scenario_question_id");
@@ -289,6 +293,30 @@ class DatabaseSchemaIntegrationTests {
             "select count(*) from scenario_question_language_variant where audio_url is null",
             Integer.class);
     assertThat(missingAudioUrlCount).isZero();
+
+    Integer nonAdvancedQuestionCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from scenario_question where question_level_group <> 'LEVEL_4_TO_5'",
+            Integer.class);
+    assertThat(nonAdvancedQuestionCount).isZero();
+
+    assertColumnExists("scenario_session", "question_level_group");
+    assertNotNullableColumn("scenario_session", "question_level_group");
+    assertTableConstraintExists("scenario_session", "chk_scenario_session_level_group");
+  }
+
+  @DisplayName("V76 migration은 기존 시나리오 표현을 레벨 4~5용 난이도로 옮긴다.")
+  @Test
+  void v76MovesExistingScenarioExpressionsToAdvancedDifficulty() throws Exception {
+    String migrationSql =
+        readMigrationSql("db/migration/V76__add_scenario_question_level_group.sql");
+
+    assertThat(migrationSql)
+        .contains(
+            "UPDATE writing_expression",
+            "SET difficulty_level = 4",
+            "WHERE expression_source = 'SCENARIO'",
+            "AND difficulty_level < 4");
   }
 
   @DisplayName("V18 migration은 첫 질문 속마음을 질문 Variant로 옮긴다.")

@@ -51,7 +51,8 @@ public class PushQueueMessageHandler {
           handleMailboxReplyNotificationBatch(message, visibilityExtender);
       case PushQueueMessage.PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
       case SCHEDULED_NOTIFICATION_BATCH ->
-          scheduledNotificationService.process(message.occurredAt(), visibilityExtender);
+          scheduledNotificationService.process(
+              message.messageId(), message.occurredAt(), visibilityExtender);
       default -> throw new IllegalArgumentException("지원하지 않는 Push 메시지 유형입니다.");
     }
   }

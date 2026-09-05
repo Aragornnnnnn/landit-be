@@ -897,14 +897,41 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.representativeSentenceWords.length()").value(6))
         .andExpect(jsonPath("$.data.representativeImageUrl").value(nullValue()));
 
-    mockMvc
-        .perform(
-            get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
-        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
-        .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+    MvcResult practiceResult =
+        mockMvc
+            .perform(
+                get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+            // 이미지가 없는 예문은 null로 내려온다
+            .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
+            .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
+            .andReturn();
+
+    // 작문 문제 2건에 출제 언어가 하나씩 배정되고, 언어에 맞는 단어 배열이 실렸는지 값으로 확인한다.
+    JsonNode writingSentences =
+        objectMapper
+            .readTree(practiceResult.getResponse().getContentAsByteArray())
+            .at("/data/writingSentence");
+    List<String> quizLanguages = new ArrayList<>();
+    for (JsonNode writingSentence : writingSentences) {
+      String quizLanguage = writingSentence.get("quizLanguage").asText();
+      quizLanguages.add(quizLanguage);
+
+      List<String> words = new ArrayList<>();
+      writingSentence.get("writingSentenceWords").forEach(word -> words.add(word.asText()));
+      if ("EN".equals(quizLanguage)) {
+        assertThat(words).containsExactly("They", "hit", "it", "off", "right", "away", ".");
+      } else {
+        assertThat(words).containsExactly("그들은", "바로", "죽이", "잘", "맞았어");
+      }
+      // 선택지는 정답 단어를 빠짐없이 포함해야 조립이 가능하다.
+      List<String> choices = new ArrayList<>();
+      writingSentence.get("writingSentenceWordChoices").forEach(word -> choices.add(word.asText()));
+      assertThat(choices).containsAll(words);
+    }
+    assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
   }
 
   @Test
@@ -1391,6 +1418,8 @@ class FreeTalkSessionApiIntegrationTests {
           "practiceQuestion": "How did the introduction go?",
           "sentenceTranslation": "그들은 바로 죽이 잘 맞았어.",
           "sentenceWordChoices": ["hit", "They", "miss", "it", "off", "right", "away", "."],
+          "sentenceTranslateWords": ["그들은", "바로", "죽이", "잘", "맞았어"],
+          "sentenceTranslateWordChoices": ["맞았어", "그들은", "안", "죽이", "바로", "잘"],
           "practiceQuestionTranslation": "소개는 어땠어?"%s
         }
         """
@@ -1409,6 +1438,8 @@ class FreeTalkSessionApiIntegrationTests {
             "practiceQuestion": "Is this valid?",
             "sentenceTranslation": "정상 문장.",
             "sentenceWordChoices": ["sentence", "Valid", "."],
+            "sentenceTranslateWords": ["정상", "문장"],
+            "sentenceTranslateWordChoices": ["문장", "오답", "정상"],
             "practiceQuestionTranslation": "이 문장은 정상이야?"
           },
           {

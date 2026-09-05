@@ -107,9 +107,11 @@ class DailyScenarioApiIntegrationTests {
       throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userId);
     seedDailyScenarios();
     long firstExpressionId = insertWritingExpression(100, 1);
     insertWritingExpression(100, 2);
+    insertWritingExpression(100, 3, 4);
     markExpressionCompleted(userId, 100, firstExpressionId);
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
 
@@ -137,7 +139,9 @@ class DailyScenarioApiIntegrationTests {
   @Test
   void dailyScenarioPrefersDisplayOrderOverIdWhenOrdersDiverge() throws Exception {
     JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
     insertCategory(10, 1);
     // ID 오름차순과 노출 순서가 어긋나도 노출 순서가 우선한다.
     insertScenario(100, 10, 2, "USER", "EASY");
@@ -145,6 +149,7 @@ class DailyScenarioApiIntegrationTests {
     insertScenario(101, 10, 1, "AI", "NORMAL");
     insertScenarioVariant(101, "두 번째 시나리오", "두 번째 시나리오 설명", "두 번째 목표", null);
     insertScenarioQuestion(1001, 101, "How was your day?", "오늘 하루 어땠어?");
+    insertScenarioQuestion(1002, 101, "Are you happy?", "기분이 좋아?", "LEVEL_1");
 
     mockMvc
         .perform(
@@ -157,7 +162,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.dailyScenarioType").value("NEW"))
         .andExpect(
             jsonPath("$.data.scenario.openingPreview.questionAudioUrl")
-                .value("https://cdn.example.com/questions/1001.mp3"));
+                .value("https://cdn.example.com/questions/1002.mp3"));
   }
 
   @Test
@@ -413,15 +418,26 @@ class DailyScenarioApiIntegrationTests {
 
   private void insertScenarioQuestion(
       long questionId, long scenarioId, String questionText, String questionTranslation) {
+    insertScenarioQuestion(
+        questionId, scenarioId, questionText, questionTranslation, "LEVEL_4_TO_5");
+  }
+
+  private void insertScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      String questionText,
+      String questionTranslation,
+      String questionLevelGroup) {
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question (
-            id, scenario_id, display_order, status, created_at, updated_at
+            id, scenario_id, display_order, question_level_group, status, created_at, updated_at
         )
-        VALUES (?, ?, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 1, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
-        scenarioId);
+        scenarioId,
+        questionLevelGroup);
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question_language_variant (
@@ -437,6 +453,10 @@ class DailyScenarioApiIntegrationTests {
   }
 
   private long insertWritingExpression(long scenarioId, int displayOrder) {
+    return insertWritingExpression(scenarioId, displayOrder, 3);
+  }
+
+  private long insertWritingExpression(long scenarioId, int displayOrder, int difficultyLevel) {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
@@ -446,12 +466,13 @@ class DailyScenarioApiIntegrationTests {
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', ?, 'expression', '표현',
+        VALUES (?, 'DAILY_ROUTINE', 'BASIC', ?, 'EN', 'KR', ?, 'expression', '표현',
                 'usage summary', 'usage description', 'sample sentence', '샘플 문장',
                 ARRAY['sample'], ARRAY['sample', 'choice'], CAST('[]' AS jsonb), 'ACTIVE',
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
+        difficultyLevel,
         displayOrder);
     return jdbcTemplate.queryForObject(
         "SELECT id FROM writing_expression WHERE scenario_id = ? AND display_order = ?",

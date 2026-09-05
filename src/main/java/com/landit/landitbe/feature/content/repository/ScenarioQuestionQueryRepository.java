@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.repository;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ScenarioQuestion;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
@@ -15,7 +16,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQuestion, Long> {
 
-  /** 시나리오, 순서, 언어 조합에 맞는 활성 고정 질문을 조회한다. */
+  /**
+   * 시나리오, 순서, 질문 레벨 그룹, 언어 조합이 정확히 일치하는 활성 고정 질문을 조회한다.
+   *
+   * @param scenarioId 질문이 속한 시나리오 ID
+   * @param displayOrder 시나리오 안에서의 질문 순서
+   * @param questionLevelGroup 사용자 학습 레벨에 대응하는 질문 레벨 그룹
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @return 모든 조회 조건과 정확히 일치하는 활성 고정 질문. 없으면 빈 값
+   */
   @Query(
       """
             SELECT new com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection(
@@ -30,6 +40,7 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
               ON questionVariant.scenarioQuestionId = scenarioQuestion.id
             WHERE scenarioQuestion.scenarioId = :scenarioId
               AND scenarioQuestion.displayOrder = :displayOrder
+              AND scenarioQuestion.questionLevelGroup = :questionLevelGroup
               AND scenarioQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
               AND questionVariant.targetLocale = :targetLocale
               AND questionVariant.baseLocale = :baseLocale
@@ -38,6 +49,7 @@ public interface ScenarioQuestionQueryRepository extends JpaRepository<ScenarioQ
   Optional<ScenarioQuestionProjection> findActiveQuestion(
       @Param("scenarioId") long scenarioId,
       @Param("displayOrder") int displayOrder,
+      @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup,
       @Param("targetLocale") Locale targetLocale,
       @Param("baseLocale") Locale baseLocale);
 }

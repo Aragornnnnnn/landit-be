@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.notification.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,10 +10,11 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.feature.notification.client.NotificationSender;
 import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,7 +30,17 @@ class PushReceiptServiceTest {
 
   @Mock private PushQueuePublisher pushQueuePublisher;
 
-  @InjectMocks private PushReceiptService pushReceiptService;
+  private PushReceiptService pushReceiptService;
+
+  private SimpleMeterRegistry meterRegistry;
+
+  @BeforeEach
+  void setUp() {
+    meterRegistry = new SimpleMeterRegistry();
+    pushReceiptService =
+        new PushReceiptService(
+            pushDeliveryService, notificationSender, pushQueuePublisher, meterRegistry);
+  }
 
   /** Receipt가 준비되지 않았고 시도 횟수가 남으면 다음 확인을 예약한다. */
   @Test
@@ -43,6 +55,14 @@ class PushReceiptServiceTest {
     verify(pushDeliveryService, never())
         .recordReceiptResult(
             org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+    assertThat(
+            meterRegistry
+                .find("landit.notification.delivery")
+                .tag("stage", "receipt")
+                .tag("outcome", "not_ready")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   /** 세 번째 확인에도 Receipt가 없으면 발송 실패로 종료한다. */
@@ -75,6 +95,14 @@ class PushReceiptServiceTest {
     verify(pushQueuePublisher, never())
         .scheduleReceiptCheck(
             org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt());
+    assertThat(
+            meterRegistry
+                .find("landit.notification.delivery")
+                .tag("stage", "receipt")
+                .tag("outcome", "delivered")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   /** 이미 종료된 발송 이력은 Expo Receipt를 다시 조회하지 않는다. */

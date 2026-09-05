@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
@@ -27,12 +28,14 @@ public class ScenarioSessionService {
    *
    * @param userId 사용자 ID
    * @param scenarioId 시나리오 ID
+   * @param questionLevelGroup 질문 레벨 그룹
    * @return 세션 시작 Projection
    * @throws ApiException 시나리오 시작 정보를 찾을 수 없을 때
    */
-  public ScenarioSessionStartProjection requireStartProjection(long userId, long scenarioId) {
+  public ScenarioSessionStartProjection requireStartProjection(
+      long userId, long scenarioId, ContentLearningLevel questionLevelGroup) {
     return startQueryRepository
-        .findStartRow(userId, scenarioId)
+        .findStartRow(userId, scenarioId, questionLevelGroup)
         .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
   }
 

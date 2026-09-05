@@ -26,7 +26,8 @@ public interface ScenarioSessionMessageQueryRepository
                 scenarioSession.userOpeningInstructionSnapshot,
                 scenario.totalQuestionCount,
                 scenarioVariant.targetLocale,
-                scenarioVariant.baseLocale
+                scenarioVariant.baseLocale,
+                scenarioSession.questionLevelGroup
             )
             FROM ScenarioSession scenarioSession
             JOIN ScenarioLanguageVariant scenarioVariant
