@@ -1193,7 +1193,10 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.nativeScore").value(90))
         .andExpect(jsonPath("$.data.starRating").value(3.0))
         .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
-        .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(3))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
+        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3))
+        .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(false))
+        .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(nullValue()))
         .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
         .andExpect(jsonPath("$.data.levelAssessment.changeType").value("NOT_APPLIED"))
         .andExpect(jsonPath("$.data.levelAssessment.grammar.confidence").value(0.0))
@@ -1457,6 +1460,7 @@ class ScenarioSessionApiIntegrationTests {
                 .value("Oh, you like spicy pizza. Would you like anything else?"))
         .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
         .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(5.0))
+        .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(true))
         .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(5));
 
     assertThat(
@@ -1496,6 +1500,66 @@ class ScenarioSessionApiIntegrationTests {
               assertThat(statuses.get("DETAILED_FEEDBACK_STATUS")).isEqualTo("COMPLETED");
               assertThat(statuses.get("SOURCE_MESSAGE_STATUS")).isEqualTo("COMPLETED");
             });
+  }
+
+  @Test
+  void partialAssessmentSurvivesStorageAndRetryWithoutInitializingProfile() throws Exception {
+    JsonNode loginBody = login("partial-assessment@example.com");
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1121, 1, "ACTIVE", "카페");
+    seedScenario(2121, 1121, 1, "USER", "ACTIVE", 1);
+    seedScenarioVariant(
+        3121,
+        2121,
+        "카페 주문",
+        "음료를 주문합니다.",
+        "음료 주문",
+        "음료를 주문하세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(4121, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?");
+    long sessionId = startScenario(accessToken, 2121);
+    submitMessage(accessToken, sessionId, "Can I get an iced americano?");
+    submitMessage(accessToken, sessionId, "That is all, thank you.");
+    fakeAiConversationClient.unobservedPragmatics = true;
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
+          .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(5.0))
+          .andExpect(
+              jsonPath("$.data.levelAssessment.interactionPragmatics.score").value(nullValue()))
+          .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
+          .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(false))
+          .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3))
+          .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
+          .andExpect(jsonPath("$.data.levelAssessment.changeType").value("NOT_APPLIED"))
+          .andExpect(jsonPath("$.data.levelAssessment.details.strength").isNotEmpty());
+    }
+    assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForMap(
+                """
+                SELECT a.grammar_score, a.interaction_pragmatics_score, a.sufficient_evidence,
+                       a.core_payload IS NOT NULL AS has_core, p.learning_level, p.promotion_streak
+                FROM user_level_assessment a JOIN user_profile p ON p.id = a.user_profile_id
+                WHERE a.learning_session_id = ?
+                """,
+                sessionId))
+        .containsEntry("GRAMMAR_SCORE", new BigDecimal("5.00"))
+        .containsEntry("INTERACTION_PRAGMATICS_SCORE", null)
+        .containsEntry("SUFFICIENT_EVIDENCE", false)
+        .containsEntry("HAS_CORE", true)
+        .containsEntry("LEARNING_LEVEL", null)
+        .containsEntry("PROMOTION_STREAK", 0);
   }
 
   @Test
@@ -3058,6 +3122,7 @@ class ScenarioSessionApiIntegrationTests {
     private boolean failSessionFeedbackGeneration;
 
     private int sessionFeedbackCallCount;
+    private boolean unobservedPragmatics;
 
     private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
 
@@ -3194,7 +3259,15 @@ class ScenarioSessionApiIntegrationTests {
       AiSessionLevelAssessment.Domain domain =
           new AiSessionLevelAssessment.Domain(
               5, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
-      return new AiSessionLevelAssessment.Domains(domain, domain, domain, domain, domain);
+      return new AiSessionLevelAssessment.Domains(
+          domain,
+          domain,
+          domain,
+          domain,
+          unobservedPragmatics
+              ? new AiSessionLevelAssessment.Domain(
+                  null, AiSessionLevelAssessment.EvidenceStatus.NOT_OBSERVED, null)
+              : domain);
     }
 
     private void reset() {
@@ -3216,6 +3289,7 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackStarRating = new BigDecimal("3.0");
       failSessionFeedbackGeneration = false;
       sessionFeedbackCallCount = 0;
+      unobservedPragmatics = false;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;
       messageFeedbackResponseSessionId = null;

@@ -50,6 +50,23 @@ class LearningLevelPolicyTest {
     assertThat(
             LearningLevelPolicy.apply(3, 0, new BigDecimal("4.00"), new BigDecimal("0.74"), true))
         .isEqualTo(
-            new LearningLevelPolicy.Decision(3, 0, LearningLevelPolicy.ChangeType.UNCHANGED));
+            new LearningLevelPolicy.Decision(3, 0, LearningLevelPolicy.ChangeType.NOT_APPLIED));
+  }
+
+  @Test
+  void lowCoverageCannotInitializeLevel() {
+    assertThat(
+            LearningLevelPolicy.apply(
+                null, 0, new BigDecimal("5.00"), new BigDecimal("0.50"), true))
+        .isEqualTo(
+            new LearningLevelPolicy.Decision(null, 0, LearningLevelPolicy.ChangeType.NOT_APPLIED));
+  }
+
+  @Test
+  void insufficientEvidencePreservesExistingPromotionSignal() {
+    assertThat(
+            LearningLevelPolicy.apply(3, 1, new BigDecimal("5.00"), new BigDecimal("0.50"), true))
+        .isEqualTo(
+            new LearningLevelPolicy.Decision(3, 1, LearningLevelPolicy.ChangeType.NOT_APPLIED));
   }
 }

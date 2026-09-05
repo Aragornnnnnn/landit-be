@@ -30,8 +30,10 @@ public final class LearningLevelPolicy {
       int promotionStreak,
       BigDecimal assessedScore,
       BigDecimal assessmentConfidence,
-      boolean modelResult) {
-    if (!modelResult) {
+      boolean sufficientEvidence) {
+    if (!sufficientEvidence
+        || assessedScore == null
+        || assessmentConfidence.compareTo(PROMOTION_CONFIDENCE) < 0) {
       return new Decision(currentLevel, promotionStreak, ChangeType.NOT_APPLIED);
     }
     if (currentLevel == null) {
@@ -40,7 +42,6 @@ public final class LearningLevelPolicy {
       return new Decision(initializedLevel, 0, ChangeType.INITIALIZED);
     }
     if (currentLevel < 5
-        && assessmentConfidence.compareTo(PROMOTION_CONFIDENCE) >= 0
         && assessedScore.compareTo(BigDecimal.valueOf(currentLevel).add(PROMOTION_GAP)) >= 0) {
       int nextStreak = promotionStreak + 1;
       return nextStreak >= 2

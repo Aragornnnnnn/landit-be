@@ -28,11 +28,27 @@ class TextLevelAssessmentPolicyTest {
   }
 
   @Test
-  void requiresTwoAnswersAndEveryDomainObservation() {
-    assertThat(
-            TextLevelAssessmentPolicy.calculate(
-                List.of(observation(ResponseDemand.HIGH, 5)), ContentLearningLevel.LEVEL_4_TO_5))
-        .isEmpty();
+  void preservesSingleAnswerForDisplayWithoutTreatingItAsSufficient() {
+    var score =
+        TextLevelAssessmentPolicy.calculate(
+                List.of(observation(ResponseDemand.HIGH, 5)), ContentLearningLevel.LEVEL_4_TO_5)
+            .orElseThrow();
+    assertThat(score.grammar().score()).isEqualByComparingTo("5.00");
+    assertThat(score.sufficientEvidence()).isFalse();
+  }
+
+  @Test
+  void preservesObservedDomainsWhenPragmaticsWasNotObserved() {
+    var answer = new TextLevelAssessmentPolicy.Observation(ResponseDemand.HIGH, 3, 3, 3, 3, null);
+    var score =
+        TextLevelAssessmentPolicy.calculate(
+                List.of(answer, answer), ContentLearningLevel.LEVEL_4_TO_5)
+            .orElseThrow();
+    assertThat(score.grammar().score()).isEqualByComparingTo("3.00");
+    assertThat(score.interactionPragmatics().score()).isNull();
+    assertThat(score.overallScore()).isNull();
+    assertThat(score.assessedLevel()).isNull();
+    assertThat(score.sufficientEvidence()).isFalse();
   }
 
   @Test
@@ -47,6 +63,25 @@ class TextLevelAssessmentPolicyTest {
             .orElseThrow();
 
     assertThat(score.overallConfidence()).isEqualByComparingTo(new BigDecimal("0.50"));
+    assertThat(score.sufficientEvidence()).isFalse();
+  }
+
+  @Test
+  void requiresEnoughObservationsInEachDomainRatherThanOnlyOverallCoverage() {
+    var complete = observation(ResponseDemand.HIGH, 4);
+    var partial = new TextLevelAssessmentPolicy.Observation(ResponseDemand.HIGH, 4, 4, 4, 4, null);
+    var score =
+        TextLevelAssessmentPolicy.calculate(
+                List.of(complete, partial), ContentLearningLevel.LEVEL_4_TO_5)
+            .orElseThrow();
+    assertThat(score.overallConfidence()).isEqualByComparingTo("0.93");
+    assertThat(score.sufficientEvidence()).isFalse();
+    assertThat(
+            TextLevelAssessmentPolicy.calculate(
+                    List.of(complete, complete), ContentLearningLevel.LEVEL_4_TO_5)
+                .orElseThrow()
+                .sufficientEvidence())
+        .isTrue();
   }
 
   private TextLevelAssessmentPolicy.Observation observation(ResponseDemand demand, int level) {

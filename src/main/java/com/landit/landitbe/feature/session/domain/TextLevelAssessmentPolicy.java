@@ -25,7 +25,11 @@ public final class TextLevelAssessmentPolicy {
       Integer interactionPragmatics) {}
 
   /** 사용자에게 제공할 세션 단위 다섯 영역 점수와 종합 수준이다. */
-  public record DomainScore(BigDecimal score, BigDecimal confidence) {}
+  public record DomainScore(BigDecimal score, BigDecimal confidence, int observedCount) {
+    boolean sufficientEvidence() {
+      return observedCount >= 2 && confidence.compareTo(new BigDecimal("0.75")) >= 0;
+    }
+  }
 
   /** 사용자에게 제공할 세션 단위 다섯 영역 점수와 종합 수준이다. */
   public record Score(
@@ -36,12 +40,19 @@ public final class TextLevelAssessmentPolicy {
       DomainScore interactionPragmatics,
       BigDecimal overallScore,
       BigDecimal overallConfidence,
-      int assessedLevel) {}
+      Integer assessedLevel) {
+    /** 모든 영역에 서로 다른 답변 두 개 이상과 충분한 관찰 비율이 있는지 반환한다. */
+    public boolean sufficientEvidence() {
+      return List.of(situationPerformance, grammar, vocabulary, discourse, interactionPragmatics)
+          .stream()
+          .allMatch(DomainScore::sufficientEvidence);
+    }
+  }
 
-  /** 두 답변 이상에서 다섯 영역이 모두 관찰됐을 때만 모델 점수를 반환한다. */
+  /** 관찰된 영역을 보존하고, 다섯 영역이 관찰됐을 때만 종합 점수를 계산한다. */
   public static Optional<Score> calculate(
       List<Observation> observations, ContentLearningLevel questionLevelGroup) {
-    if (observations == null || observations.size() < 2) {
+    if (observations == null || observations.isEmpty()) {
       return Optional.empty();
     }
     DomainScore situation = average(observations, Observation::situationPerformance);
@@ -49,23 +60,23 @@ public final class TextLevelAssessmentPolicy {
     DomainScore vocabulary = average(observations, Observation::vocabulary);
     DomainScore discourse = average(observations, Observation::discourse);
     DomainScore interaction = average(observations, Observation::interactionPragmatics);
-    if (situation == null
-        || grammar == null
-        || vocabulary == null
-        || discourse == null
-        || interaction == null) {
-      return Optional.empty();
-    }
+    boolean complete =
+        List.of(situation, grammar, vocabulary, discourse, interaction).stream()
+            .allMatch(domain -> domain.score() != null);
     BigDecimal rawOverall =
-        situation
-            .score()
-            .multiply(new BigDecimal("0.30"))
-            .add(grammar.score().multiply(new BigDecimal("0.20")))
-            .add(vocabulary.score().multiply(new BigDecimal("0.20")))
-            .add(discourse.score().multiply(new BigDecimal("0.15")))
-            .add(interaction.score().multiply(new BigDecimal("0.15")));
+        !complete
+            ? null
+            : situation
+                .score()
+                .multiply(new BigDecimal("0.30"))
+                .add(grammar.score().multiply(new BigDecimal("0.20")))
+                .add(vocabulary.score().multiply(new BigDecimal("0.20")))
+                .add(discourse.score().multiply(new BigDecimal("0.15")))
+                .add(interaction.score().multiply(new BigDecimal("0.15")));
     BigDecimal overall =
-        rawOverall.min(observationCap(questionLevelGroup)).setScale(2, RoundingMode.HALF_UP);
+        rawOverall == null
+            ? null
+            : rawOverall.min(observationCap(questionLevelGroup)).setScale(2, RoundingMode.HALF_UP);
     BigDecimal overallConfidence =
         situation
             .confidence()
@@ -75,7 +86,8 @@ public final class TextLevelAssessmentPolicy {
             .add(discourse.confidence().multiply(new BigDecimal("0.15")))
             .add(interaction.confidence().multiply(new BigDecimal("0.15")))
             .setScale(2, RoundingMode.HALF_UP);
-    int assessedLevel = overall.setScale(0, RoundingMode.HALF_UP).intValue();
+    Integer assessedLevel =
+        overall == null ? null : overall.setScale(0, RoundingMode.HALF_UP).intValue();
     return Optional.of(
         new Score(
             situation,
@@ -93,6 +105,7 @@ public final class TextLevelAssessmentPolicy {
     BigDecimal weightedLevels = BigDecimal.ZERO;
     BigDecimal observedWeights = BigDecimal.ZERO;
     BigDecimal totalWeights = BigDecimal.ZERO;
+    int observedCount = 0;
     for (Observation observation : observations) {
       if (observation.responseDemand() == null) {
         continue;
@@ -106,12 +119,14 @@ public final class TextLevelAssessmentPolicy {
           weightedLevels.add(
               observation.responseDemand().weight().multiply(BigDecimal.valueOf(value)));
       observedWeights = observedWeights.add(observation.responseDemand().weight());
+      observedCount++;
     }
     return observedWeights.signum() == 0
-        ? null
+        ? new DomainScore(null, BigDecimal.ZERO.setScale(2), 0)
         : new DomainScore(
             weightedLevels.divide(observedWeights, 2, RoundingMode.HALF_UP),
-            observedWeights.divide(totalWeights, 2, RoundingMode.HALF_UP));
+            observedWeights.divide(totalWeights, 2, RoundingMode.HALF_UP),
+            observedCount);
   }
 
   private static BigDecimal observationCap(ContentLearningLevel group) {

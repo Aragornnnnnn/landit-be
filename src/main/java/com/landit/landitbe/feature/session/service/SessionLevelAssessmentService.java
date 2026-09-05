@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionLevelAssessmentService {
 
-  private static final String ASSESSMENT_VERSION = "text-level-v1";
+  private static final String ASSESSMENT_VERSION = "text-level-v1.1";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final UserProfileRepository userProfileRepository;
@@ -41,16 +41,15 @@ class SessionLevelAssessmentService {
     Integer previousLevel = profile.getLearningLevel();
     TextLevelAssessmentPolicy.Score modelScore = modelScore(context, aiAssessment);
     boolean modelResult = modelScore != null;
-    TextLevelAssessmentPolicy.Score score =
-        modelResult ? modelScore : fallbackScore(previousLevel == null ? 3 : previousLevel);
+    TextLevelAssessmentPolicy.Score score = modelResult ? modelScore : fallbackScore();
     LearningLevelPolicy.Decision decision =
         LearningLevelPolicy.apply(
             previousLevel,
             profile.getPromotionStreak(),
             score.overallScore(),
             score.overallConfidence(),
-            modelResult);
-    if (modelResult) {
+            score.sufficientEvidence());
+    if (score.sufficientEvidence()) {
       profile.applyAssessedLearningLevel(decision.level(), decision.promotionStreak());
     }
 
@@ -64,6 +63,7 @@ class SessionLevelAssessmentService {
             domain(score.interactionPragmatics()),
             score.overallScore(),
             score.assessedLevel(),
+            score.sufficientEvidence(),
             modelResult
                 ? SessionLevelAssessment.Source.MODEL
                 : SessionLevelAssessment.Source.FALLBACK,
@@ -152,12 +152,11 @@ class SessionLevelAssessmentService {
         : null;
   }
 
-  private TextLevelAssessmentPolicy.Score fallbackScore(int level) {
-    BigDecimal value = BigDecimal.valueOf(level).setScale(2);
+  private TextLevelAssessmentPolicy.Score fallbackScore() {
     TextLevelAssessmentPolicy.DomainScore domain =
-        new TextLevelAssessmentPolicy.DomainScore(value, new BigDecimal("0.00"));
+        new TextLevelAssessmentPolicy.DomainScore(null, new BigDecimal("0.00"), 0);
     return new TextLevelAssessmentPolicy.Score(
-        domain, domain, domain, domain, domain, value, BigDecimal.ZERO.setScale(2), level);
+        domain, domain, domain, domain, domain, null, BigDecimal.ZERO.setScale(2), null);
   }
 
   private SessionLevelAssessment.DomainScore domain(TextLevelAssessmentPolicy.DomainScore domain) {
