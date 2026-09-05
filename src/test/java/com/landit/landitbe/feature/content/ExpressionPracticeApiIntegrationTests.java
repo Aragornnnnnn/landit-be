@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,24 +81,18 @@ class ExpressionPracticeApiIntegrationTests {
             .andExpect(jsonPath("$.data.targetExpressionText").value("blow my mind"))
             .andExpect(jsonPath("$.data.baseExpressionMeaningText").value("끝내주게 놀랍다"))
             .andExpect(jsonPath("$.data.usageDescription").value("강렬한 인상을 받았을 때 최고의 리액션이에요."))
-            .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
-            // 첫 번째 예문으로 전 필드 매핑 검증 (payload에 넣은 값 그대로인지)
-            .andExpect(
-                jsonPath("$.data.practiceSentence[0].sentenceText").value("practice-sentence-0"))
-            .andExpect(jsonPath("$.data.practiceSentence[0].highlightingPart").value("highlight-0"))
-            .andExpect(jsonPath("$.data.practiceSentence[0].sentenceTranslation").value("예문해석-0"))
-            .andExpect(jsonPath("$.data.practiceSentence[0].practiceQuestion").value("question-0"))
-            .andExpect(
-                jsonPath("$.data.practiceSentence[0].practiceQuestionTranslation").value("질문해석-0"))
+            .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+            .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
+            // 예문 이미지는 payload 값 그대로 내려온다
             .andExpect(
                 jsonPath("$.data.practiceSentence[0].imageUrl")
-                    .value("https://cdn.example.com/practice/0.png"))
+                    .value("https://cdn.example.com/practice/2.png"))
             .andReturn();
 
     // then: writingSentence는 랜덤이라 특정 값 고정 검증이 불가능하므로,
-    //       "예문 4개 중 하나에서 만들어졌는지"(문장/해석/질문 세트가 일치하는지)를 검증한다
+    //       "예문 4개 중 서로 다른 2개에서 만들어졌는지"와 출제 언어 배정을 검증한다
     JsonNode data = objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("data");
-    JsonNode writingSentence = data.get("writingSentence");
+    JsonNode writingSentences = data.get("writingSentence");
     List<String> seededSentenceTexts =
         List.of(
             "practice-sentence-0",
@@ -105,30 +100,59 @@ class ExpressionPracticeApiIntegrationTests {
             "practice-sentence-2",
             "practice-sentence-3");
 
-    String pickedText = writingSentence.get("writingSentenceText").asText();
-    assertThat(seededSentenceTexts).contains(pickedText);
+    List<String> pickedTexts = new ArrayList<>();
+    List<String> quizLanguages = new ArrayList<>();
+    for (JsonNode writingSentence : writingSentences) {
+      String pickedText = writingSentence.get("writingSentenceText").asText();
+      assertThat(seededSentenceTexts).contains(pickedText);
+      pickedTexts.add(pickedText);
+      quizLanguages.add(writingSentence.get("quizLanguage").asText());
 
-    // 뽑힌 예문의 인덱스(끝자리 숫자)를 알아내서, 해석/질문도 같은 예문에서 왔는지 확인
-    String index = pickedText.substring(pickedText.length() - 1);
-    assertThat(writingSentence.get("writingSentenceTranslation").asText())
-        .isEqualTo("예문해석-" + index);
-    assertThat(writingSentence.get("writingQuestion").asText()).isEqualTo("question-" + index);
-    assertThat(writingSentence.get("writingQuestionTranslation").asText())
-        .isEqualTo("질문해석-" + index);
+      // 뽑힌 예문의 인덱스(끝자리 숫자)를 알아내서, 해석/질문도 같은 예문에서 왔는지 확인
+      String index = pickedText.substring(pickedText.length() - 1);
+      assertThat(writingSentence.get("writingSentenceTranslation").asText())
+          .isEqualTo("예문해석-" + index);
+      assertThat(writingSentence.get("writingQuestion").asText()).isEqualTo("question-" + index);
+      assertThat(writingSentence.get("writingQuestionTranslation").asText())
+          .isEqualTo("질문해석-" + index);
 
-    // 단어 칩 배열(LAN-229)도 같은 예문의 payload 값 그대로(순서 포함) 내려오는지 확인
-    assertThat(
-            objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class))
-        .containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
-    assertThat(
-            objectMapper.convertValue(
-                writingSentence.get("writingSentenceWordChoices"), String[].class))
-        .containsExactly(
-            "chip-" + index + "-b",
-            "noise-" + index + "-1",
-            "chip-" + index + "-a",
-            "noise-" + index + "-2",
-            "noise-" + index + "-3");
+      // 단어 칩 배열은 출제 언어에 맞는 쪽이 payload 값 그대로(순서 포함) 내려온다
+      String[] words =
+          objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class);
+      String[] choices =
+          objectMapper.convertValue(
+              writingSentence.get("writingSentenceWordChoices"), String[].class);
+      if ("EN".equals(writingSentence.get("quizLanguage").asText())) {
+        assertThat(words).containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
+        assertThat(choices)
+            .containsExactly(
+                "chip-" + index + "-b",
+                "noise-" + index + "-1",
+                "chip-" + index + "-a",
+                "noise-" + index + "-2",
+                "noise-" + index + "-3");
+      } else {
+        assertThat(words).containsExactly("조각-" + index + "-가", "조각-" + index + "-나");
+        assertThat(choices)
+            .containsExactly(
+                "조각-" + index + "-나",
+                "오답-" + index + "-1",
+                "조각-" + index + "-가",
+                "오답-" + index + "-2",
+                "오답-" + index + "-3");
+      }
+    }
+
+    // 작문 문제 2건은 서로 다른 예문이며 출제 언어가 영어와 한국어 하나씩이다
+    assertThat(pickedTexts).doesNotHaveDuplicates();
+    assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
+
+    // 분배는 payload 순서로 고정이다. 뒤 2건이 예문, 앞 2건이 작문 문제다.
+    List<String> practiceTexts = new ArrayList<>();
+    data.get("practiceSentence")
+        .forEach(node -> practiceTexts.add(node.get("sentenceText").asText()));
+    assertThat(practiceTexts).containsExactly("practice-sentence-2", "practice-sentence-3");
+    assertThat(pickedTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
   }
 
   @Test
@@ -208,7 +232,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-0?",
                     "practiceQuestionTranslation": "질문 0?",
                     "sentenceWords": ["valid", "sentence", "0"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "0"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "0", "오답-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-1",
@@ -217,7 +243,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-1?",
                     "practiceQuestionTranslation": "질문 1?",
                     "sentenceWords": ["valid", "sentence", "1"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "1"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-2",
@@ -226,7 +254,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-2?",
                     "practiceQuestionTranslation": "질문 2?",
                     "sentenceWords": ["valid", "sentence", "2"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "2"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
                   },
                   {
                     "sentenceText": "valid-sentence-3",
@@ -235,7 +265,9 @@ class ExpressionPracticeApiIntegrationTests {
                     "practiceQuestion": "question-3?",
                     "practiceQuestionTranslation": "질문 3?",
                     "sentenceWords": ["valid", "sentence", "3"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"]
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "3"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3", "오답-3"]
                   },
                   {
                     "highlightingPart": "invalid",
@@ -250,16 +282,88 @@ class ExpressionPracticeApiIntegrationTests {
         login("google-practice-4", "practice4@example.com", "Practice User4", "practice-nonce-4");
 
     // when: 조회하면
-    // then: 불량 예문은 제외되어 정상 4개만 반환된다.
+    // then: 불량 예문은 제외되고 정상 4개가 2+2로 나뉘어 반환된다.
     mockMvc
         .perform(
             get("/api/v1/expressions/{expressionId}/practice", expressionId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
+        .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+        .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
         .andExpect(
             jsonPath("$.data.practiceSentence[*].highlightingPart")
-                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("invalid"))));
+                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("invalid"))))
+        // 불량 예문이 작문 문제 쪽으로 뽑히는 경우도 함께 막는다
+        .andExpect(
+            jsonPath("$.data.writingSentence[*].writingSentenceTranslation")
+                .value(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem("sentenceText 키가 없는 불량 예문"))));
+  }
+
+  /**
+   * 불량 예문을 제외하고 나면 유효 예문이 4건에 못 미치는 경우를 검증한다.
+   *
+   * <p>정상 3건과 불량 1건을 심으면, 제외가 동작할 때만 유효 예문이 3건이 되어 404가 된다. 제외가 깨지면 4건이 되어 200이 나오므로 무작위 분배와 무관하게
+   * 결정적으로 판별된다.
+   */
+  @Test
+  void practiceRejectsExpressionWithTooFewValidSentences() throws Exception {
+    // given: 정상 예문 3개 + sentenceText가 없는 불량 예문 1개
+    String payload =
+        """
+        [
+          {
+            "sentenceText": "valid-sentence-0",
+            "highlightingPart": "valid-0",
+            "sentenceTranslation": "정상 예문 0",
+            "practiceQuestion": "question-0?",
+            "practiceQuestionTranslation": "질문 0?",
+            "sentenceWords": ["valid", "sentence", "0"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "0"],
+            "sentenceTranslateWords": ["정상", "예문", "0"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "0"]
+          },
+          {
+            "sentenceText": "valid-sentence-1",
+            "highlightingPart": "valid-1",
+            "sentenceTranslation": "정상 예문 1",
+            "practiceQuestion": "question-1?",
+            "practiceQuestionTranslation": "질문 1?",
+            "sentenceWords": ["valid", "sentence", "1"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "1"],
+            "sentenceTranslateWords": ["정상", "예문", "1"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "1"]
+          },
+          {
+            "sentenceText": "valid-sentence-2",
+            "highlightingPart": "valid-2",
+            "sentenceTranslation": "정상 예문 2",
+            "practiceQuestion": "question-2?",
+            "practiceQuestionTranslation": "질문 2?",
+            "sentenceWords": ["valid", "sentence", "2"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "2"],
+            "sentenceTranslateWords": ["정상", "예문", "2"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "2"]
+          },
+          {
+            "highlightingPart": "invalid",
+            "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
+            "practiceQuestion": "invalid?",
+            "practiceQuestionTranslation": "불량?"
+          }
+        ]
+        """;
+    Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload);
+    String accessToken =
+        login("google-practice-5", "practice5@example.com", "Practice User5", "practice-nonce-5");
+
+    // when & then: 유효 예문이 3건이라 2+2로 나눌 수 없으므로 404
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound());
   }
 
   /**
@@ -343,10 +447,12 @@ class ExpressionPracticeApiIntegrationTests {
                       "practiceQuestionTranslation": "질문해석-%d",
                       "imageUrl": "https://cdn.example.com/practice/%d.png",
                       "sentenceWords": ["chip-%d-a", "chip-%d-b"],
-                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"]
+                      "sentenceWordChoices": ["chip-%d-b", "noise-%d-1", "chip-%d-a", "noise-%d-2", "noise-%d-3"],
+                      "sentenceTranslateWords": ["조각-%d-가", "조각-%d-나"],
+                      "sentenceTranslateWordChoices": ["조각-%d-나", "오답-%d-1", "조각-%d-가", "오답-%d-2", "오답-%d-3"]
                     }
           """
-              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i));
+              .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return json.append("]").toString();
   }

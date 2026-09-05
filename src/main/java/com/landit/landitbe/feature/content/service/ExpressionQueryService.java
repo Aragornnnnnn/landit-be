@@ -12,7 +12,6 @@ import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
-import com.landit.landitbe.feature.content.dto.PracticeSentenceResponse;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
@@ -65,7 +64,24 @@ public class ExpressionQueryService {
    * <p>배열이 없거나 비어 있거나 공백 원소가 있으면 해당 예문을 제외한다.
    */
   private static final List<String> REQUIRED_PRACTICE_SENTENCE_WORD_ARRAY_KEYS =
-      List.of("sentenceWords", "sentenceWordChoices");
+      List.of(
+          "sentenceWords",
+          "sentenceWordChoices",
+          "sentenceTranslateWords",
+          "sentenceTranslateWordChoices");
+
+  /**
+   * 추가 예문 조회에 필요한 유효 예문 개수다.
+   *
+   * <p>payload 순서대로 앞 2건은 눈으로 익히는 예문, 뒤 2건은 직접 푸는 작문 문제로 쓴다. 이보다 적으면 응답을 만들 수 없다.
+   */
+  private static final int REQUIRED_PRACTICE_SENTENCE_COUNT = 4;
+
+  /** 눈으로 익히는 예문으로 내보낼 개수다. payload의 앞에서부터 이만큼을 쓴다. */
+  private static final int PRACTICE_SENTENCE_COUNT = 2;
+
+  private static final String NOT_ENOUGH_PRACTICE_SENTENCE_LOG =
+      "추가 예문 조회 실패: 유효한 추가 예문이 {}건뿐입니다. {}건이 필요합니다. expressionId={}";
 
   private static final String EXPRESSION_NOT_FOUND_LOG =
       "추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}";
@@ -311,15 +327,25 @@ public class ExpressionQueryService {
       log.warn(NO_VALID_PRACTICE_SENTENCE_LOG, expressionId);
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
+    if (parsedSentences.size() < REQUIRED_PRACTICE_SENTENCE_COUNT) {
+      // 예문을 나눠 담을 수 없는 상태는 콘텐츠 결함이므로 줄여서 내보내지 않고 드러낸다.
+      log.warn(
+          NOT_ENOUGH_PRACTICE_SENTENCE_LOG,
+          parsedSentences.size(),
+          REQUIRED_PRACTICE_SENTENCE_COUNT,
+          expressionId);
+      throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
 
-    List<PracticeSentenceResponse> extraPracticeSentences =
-        parsedSentences.stream().map(ParsedPracticeSentence::sentence).toList();
+    // payload 순서를 그대로 따른다. 뒤 2건은 눈으로 익히는 예문, 앞 2건은 작문 문제로 고정한다.
     return new ExpressionPracticeResponse(
         targetExpressionText,
         baseExpressionMeaningText,
         usageDescription,
-        extraPracticeSentences,
-        pickRandomWritingSentence(parsedSentences));
+        parsedSentences.subList(PRACTICE_SENTENCE_COUNT, REQUIRED_PRACTICE_SENTENCE_COUNT).stream()
+            .map(ParsedPracticeSentence::sentence)
+            .toList(),
+        writingSentences(parsedSentences.subList(0, PRACTICE_SENTENCE_COUNT)));
   }
 
   // 사용자가 접근할 수 있는 활성 표현을 조회한다.
@@ -395,12 +421,16 @@ public class ExpressionQueryService {
     return false;
   }
 
-  /** 예문 목록에서 무작위로 한 개를 골라 작문 연습 문제로 변환한다. */
-  private WritingSentenceResponse pickRandomWritingSentence(
-      List<ParsedPracticeSentence> parsedSentences) {
-    ParsedPracticeSentence picked = parsedSentences.get(random.nextInt(parsedSentences.size()));
-
-    return WritingSentenceResponse.from(picked);
+  /**
+   * 작문 문제로 쓰는 예문 2건에 출제 언어를 하나씩 배정한다.
+   *
+   * <p>어느 예문이 영어 문제가 될지는 매 요청마다 무작위로 정한다. 난수를 한 번만 뽑아 서로 뒤집어 배정하므로 두 문제의 출제 언어는 항상 서로 다르다.
+   */
+  private List<WritingSentenceResponse> writingSentences(List<ParsedPracticeSentence> picked) {
+    boolean firstIsEnglish = random.nextBoolean();
+    return List.of(
+        WritingSentenceResponse.from(picked.get(0), firstIsEnglish ? Locale.EN : Locale.KR),
+        WritingSentenceResponse.from(picked.get(1), firstIsEnglish ? Locale.KR : Locale.EN));
   }
 
   /** 가장 앞선 미완료 표현의 ID를 반환하며, 모두 완료했으면 빈 값을 반환한다. */

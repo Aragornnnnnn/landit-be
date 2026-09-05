@@ -64,7 +64,7 @@ public interface ExpressionControllerDocs {
    */
   @Operation(
       summary = "원어민 표현 학습 추가 예문 조회",
-      description = "추가 예문 목록과 무작위 작문 문제를 조회한다.",
+      description = "눈으로 익히는 추가 예문 2건과 직접 푸는 작문 문제 2건(영어·한국어 각 1건)을 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
       AuthUserPrincipal principal, Long expressionId);
