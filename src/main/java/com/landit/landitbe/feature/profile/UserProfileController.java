@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleUpdateRequest;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelUpdateRequest;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionResponse;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -58,6 +59,14 @@ public class UserProfileController implements UserProfileControllerDocs {
   public ApiResponse<UserAccentLocaleResponse> getAccentLocale(
       @AuthenticationPrincipal AuthUserPrincipal principal) {
     return ApiResponse.success(userProfileService.getAccentLocale(principal.userId()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/me/subscription")
+  public ApiResponse<UserSubscriptionResponse> getSubscription(
+      @AuthenticationPrincipal AuthUserPrincipal principal) {
+    return ApiResponse.success(userProfileService.getSubscription(principal.userId()));
   }
 
   /** {@inheritDoc} */

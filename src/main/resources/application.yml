@@ -76,6 +76,9 @@ landit:
     region: ${AWS_REGION:ap-northeast-2}
   pronunciation-asset:
     manifest-mode: ${LANDIT_PRONUNCIATION_MANIFEST_MODE:s3}
+  subscription:
+    revenuecat:
+      webhook-authorization: ${LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION:}
   notification:
     expo-base-url: ${LANDIT_NOTIFICATION_EXPO_BASE_URL:https://exp.host}
     expo-access-token: ${LANDIT_NOTIFICATION_EXPO_ACCESS_TOKEN:}
