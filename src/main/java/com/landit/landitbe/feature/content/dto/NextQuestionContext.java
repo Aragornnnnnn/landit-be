@@ -13,6 +13,8 @@ import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestio
  * @param questionText 질문 본문
  * @param questionTranslation 질문 번역
  * @param questionAudioUrl 질문 음원 URL
+ * @param responseDemand 답변에 요구되는 정보량
+ * @param requiredResponseElement 수준 평가에 필요한 응답 요소
  */
 public record NextQuestionContext(
     Long questionId,

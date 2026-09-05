@@ -116,7 +116,12 @@ public class UserProfile extends BaseTimeEntity {
     this.promotionStreak = 0;
   }
 
-  /** 세션 평가 정책이 계산한 적용 수준과 승급 연속 횟수를 반영한다. */
+  /**
+   * 세션 평가 정책이 계산한 적용 수준과 승급 연속 횟수를 반영한다.
+   *
+   * @param learningLevel 새로 적용할 학습 수준
+   * @param promotionStreak 평가 후 유지할 연속 승급 신호 횟수
+   */
   public void applyAssessedLearningLevel(int learningLevel, int promotionStreak) {
     this.learningLevel = learningLevel;
     this.promotionStreak = promotionStreak;
