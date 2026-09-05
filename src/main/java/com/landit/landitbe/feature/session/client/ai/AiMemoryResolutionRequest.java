@@ -20,6 +20,7 @@ public record AiMemoryResolutionRequest(List<Candidate> candidates) {
    * @param content 상태를 판정할 기억 본문
    * @param memoryType 장기기억 의미 유형
    * @param sourceMessageIds 기억의 근거가 되는 원본 메시지 ID 목록
+   * @param sourceMessages 정정 근거로 사용할 원본 사용자 메시지 목록
    * @param observedAt 기억을 관찰한 시각
    * @param comparableMemories 비교할 기존 활성 장기기억 목록
    */
@@ -28,6 +29,7 @@ public record AiMemoryResolutionRequest(List<Candidate> candidates) {
       String content,
       ConversationMemoryType memoryType,
       List<Long> sourceMessageIds,
+      List<AiConversationHistoryMessage> sourceMessages,
       OffsetDateTime observedAt,
       List<ComparableMemory> comparableMemories) {}
 

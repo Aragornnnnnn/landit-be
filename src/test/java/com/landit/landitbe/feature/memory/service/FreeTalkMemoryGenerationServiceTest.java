@@ -146,6 +146,11 @@ class FreeTalkMemoryGenerationServiceTest {
         ArgumentCaptor.forClass(AiMemoryResolutionRequest.class);
     verify(aiClient).resolveMemory(request.capture());
     assertThat(request.getValue().candidates()).hasSize(2);
+    assertThat(request.getValue().candidates().getFirst().sourceMessages())
+        .containsExactlyElementsOf(
+            context().history().stream()
+                .filter(message -> message.messageId().equals(USER_MESSAGE_ID))
+                .toList());
     verify(writeService)
         .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), any());
   }

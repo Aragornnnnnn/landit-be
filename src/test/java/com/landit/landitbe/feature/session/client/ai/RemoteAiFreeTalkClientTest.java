@@ -212,6 +212,11 @@ class RemoteAiFreeTalkClientTest {
                 .get("memoryId")
                 .asLong())
         .isEqualTo(77L);
+    JsonNode source = request.get("candidates").get(0).get("sourceMessages").get(0);
+    assertThat(source.get("messageId").asLong()).isEqualTo(3002L);
+    assertThat(source.get("role").asText()).isEqualTo("USER");
+    assertThat(source.get("content").asText()).isEqualTo("I passed the interview.");
+    assertThat(source.get("occurredAt").asText()).isEqualTo("2026-08-29T19:20:00+09:00");
     assertThat(result.resolutions().getFirst().operation()).isEqualTo(AiMemoryOperation.SUPERSEDE);
     assertThat(result.resolutions().getFirst().supersededMemoryIds()).containsExactly(77L);
   }
@@ -781,6 +786,14 @@ class RemoteAiFreeTalkClientTest {
                 "사용자는 면접에 합격했다.",
                 ConversationMemoryType.EVENT,
                 List.of(3002L),
+                List.of(
+                    new AiConversationHistoryMessage(
+                        3002L,
+                        1,
+                        "USER",
+                        "I passed the interview.",
+                        null,
+                        OffsetDateTime.parse("2026-08-29T19:20:00+09:00"))),
                 OffsetDateTime.parse("2026-08-29T19:20:00+09:00"),
                 List.of(
                     new AiMemoryResolutionRequest.ComparableMemory(
