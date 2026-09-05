@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.domain;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,6 +28,10 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "scenario_language_variant_id", nullable = false)
   private Long scenarioLanguageVariantId;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "question_level_group", nullable = false, length = 30)
+  private ContentLearningLevel questionLevelGroup;
+
   @Column(name = "user_opening_instruction_snapshot", columnDefinition = "text")
   private String userOpeningInstructionSnapshot;
 
@@ -40,10 +45,12 @@ public class ScenarioSession extends BaseTimeEntity {
   private ScenarioSession(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
+      ContentLearningLevel questionLevelGroup,
       String userOpeningInstructionSnapshot,
       GoalCompletionStatus goalCompletionStatus) {
     this.learningSessionId = learningSessionId;
     this.scenarioLanguageVariantId = scenarioLanguageVariantId;
+    this.questionLevelGroup = questionLevelGroup;
     this.userOpeningInstructionSnapshot = userOpeningInstructionSnapshot;
     this.goalCompletionStatus = goalCompletionStatus;
   }
@@ -53,16 +60,19 @@ public class ScenarioSession extends BaseTimeEntity {
    *
    * @param learningSessionId 연결할 학습 세션 ID
    * @param scenarioLanguageVariantId 시작한 시나리오 언어 variant ID
+   * @param questionLevelGroup 세션 시작 시점의 질문 레벨 그룹
    * @param userOpeningInstructionSnapshot 사용자 선톡 시작 안내 스냅샷
    * @return 생성된 시나리오 세션 보조 정보
    */
   public static ScenarioSession start(
       Long learningSessionId,
       Long scenarioLanguageVariantId,
+      ContentLearningLevel questionLevelGroup,
       String userOpeningInstructionSnapshot) {
     return new ScenarioSession(
         learningSessionId,
         scenarioLanguageVariantId,
+        questionLevelGroup,
         userOpeningInstructionSnapshot,
         GoalCompletionStatus.NOT_STARTED);
   }

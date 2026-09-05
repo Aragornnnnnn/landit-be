@@ -57,6 +57,11 @@ class AdminScenarioApiIntegrationTests {
   @Test
   void listsOnlyActiveScenariosWithoutUserProgressionFields() throws Exception {
     String accessToken = loginAdmin("admin-scenario-list", "관리자");
+    Long adminUserId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM user_profile WHERE role = 'ADMIN' ORDER BY id DESC LIMIT 1",
+            Long.class);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", adminUserId);
     seedScenarioContent();
 
     mockMvc
@@ -69,6 +74,9 @@ class AdminScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios.length()").value(1))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioId").value(601))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].scenarioTitle").value("공개 시나리오"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessage")
+                .value("What drink do you want?"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.characterId")
                 .value("chloe"))
@@ -111,8 +119,11 @@ class AdminScenarioApiIntegrationTests {
 
   private void seedScenarioContent() {
     insertCategory(501, 1, "ACTIVE", "공개 카테고리");
-    insertScenario(601, 501, 601, "USER", "EASY", "ACTIVE");
+    insertScenario(601, 501, 601, "AI", "EASY", "ACTIVE");
     insertScenarioVariant(601, "공개 시나리오", "공개 설명", "대화 목표", "먼저 말해보세요.", "ACTIVE");
+    insertScenarioQuestion(
+        6011, 601, "What beverage would you prefer?", "어떤 음료를 선호하세요?", "LEVEL_4_TO_5");
+    insertScenarioQuestion(6012, 601, "What drink do you want?", "어떤 음료를 원해요?", "LEVEL_2_TO_3");
 
     insertScenario(602, 501, 602, "USER", "EASY", "INACTIVE");
     insertScenarioVariant(602, "비공개 시나리오", "비공개 설명", "대화 목표", "먼저 말해보세요.", "ACTIVE");
@@ -220,5 +231,33 @@ class AdminScenarioApiIntegrationTests {
         userOpeningInstruction,
         conversationGoal,
         status);
+  }
+
+  private void insertScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      String questionText,
+      String questionTranslation,
+      String questionLevelGroup) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_question (
+            id, scenario_id, display_order, question_level_group, status, created_at, updated_at)
+        VALUES (?, ?, 1, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        questionId,
+        scenarioId,
+        questionLevelGroup);
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_question_language_variant (
+            scenario_question_id, target_locale, base_locale, question_text,
+            question_translation, audio_url, status, created_at, updated_at)
+        VALUES (?, 'EN', 'KR', ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        questionId,
+        questionText,
+        questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId));
   }
 }

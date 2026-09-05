@@ -97,7 +97,7 @@ class ScenarioListApiIntegrationTests {
       throws Exception {
     JsonNode loginResponseBody = login();
     final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
-    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
     seedScenarioListData(userId);
 
     mockMvc
@@ -300,8 +300,9 @@ class ScenarioListApiIntegrationTests {
   void scenariosReturnOrderedAccessStatusAndOpeningPreview() throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
-    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
     seedScenarioListData(userId);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
     insertScenarioAccess(userId, 202);
 
     mockMvc
@@ -336,16 +337,16 @@ class ScenarioListApiIntegrationTests {
             jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessage")
-                .value("What is your favorite food?"))
+                .value("What food do you like?"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessageTranslation")
-                .value("가장 좋아하는 음식이 뭐예요?"))
+                .value("어떤 음식을 좋아해요?"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.userOpeningInstruction")
                 .value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThought")
-                .value("질문 1번의 속마음"))
+                .value("쉬운 질문의 속마음"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThoughtType")
                 .value("GOOD"))
@@ -491,6 +492,8 @@ class ScenarioListApiIntegrationTests {
         202, "AI 먼저 말하기", "AI가 먼저 질문합니다.", "좋아하는 음식을 설명한다.", null, harperVoiceId, "ACTIVE");
     insertScenarioQuestion(
         9202, 202, 1, "What is your favorite food?", "가장 좋아하는 음식이 뭐예요?", "질문 1번의 속마음", "GOOD");
+    insertScenarioQuestion(
+        9203, 202, 1, "What food do you like?", "어떤 음식을 좋아해요?", "쉬운 질문의 속마음", "GOOD", "LEVEL_1");
 
     insertScenario(203, 100, 3, "AI", "HARD", "INACTIVE", null);
     insertScenarioVariant(203, "잠긴 시나리오", "비활성 시나리오입니다.", "잠긴 시나리오를 확인한다.", null, null, "ACTIVE");
@@ -552,21 +555,43 @@ class ScenarioListApiIntegrationTests {
       String questionTranslation,
       String innerThought,
       String innerThoughtType) {
+    insertScenarioQuestion(
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        innerThought,
+        innerThoughtType,
+        "LEVEL_4_TO_5");
+  }
+
+  private void insertScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      String questionText,
+      String questionTranslation,
+      String innerThought,
+      String innerThoughtType,
+      String questionLevelGroup) {
     jdbcTemplate.update(
         """
                         INSERT INTO scenario_question (
                             id,
                             scenario_id,
                             display_order,
+                            question_level_group,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId,
-        displayOrder);
+        displayOrder,
+        questionLevelGroup);
     jdbcTemplate.update(
         """
                         INSERT INTO scenario_question_language_variant (

@@ -171,6 +171,11 @@ public class NotificationTargetPageQueryService {
         join writing_expression we on we.scenario_id = s.id
           and we.target_locale = up.target_locale and we.base_locale = up.base_locale
           and we.status = 'ACTIVE'
+          and we.difficulty_level between
+              case when coalesce(up.learning_level, 5) = 1 then 1
+                   when up.learning_level <= 3 then 2 else 4 end
+              and case when coalesce(up.learning_level, 5) = 1 then 1
+                       when up.learning_level <= 3 then 3 else 5 end
         left join user_writing_expression_completion uwec on uwec.user_profile_id = up.id
           and uwec.writing_expression_id = we.id and uwec.learning_source = 'SCENARIO'
         where up.id in (:userIds)
