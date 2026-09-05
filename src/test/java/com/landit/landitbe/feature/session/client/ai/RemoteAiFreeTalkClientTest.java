@@ -242,6 +242,51 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void memoryQueryTimesOutBeforeDelayedSuccessfulResponse() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/memory-query-embedding",
+        3_000,
+        successResponse(
+            "{\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
+                + embeddingJson()
+                + "}"));
+    long started = System.nanoTime();
+    assertGenerationError(
+        () ->
+            remoteClient(Duration.ofSeconds(5))
+                .embedMemoryQuery(new AiMemoryQueryEmbeddingRequest("weekend plans")),
+        ErrorCode.AI_GENERATION_FAILED);
+    assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(2_900));
+  }
+
+  @Test
+  void normalOpeningWaitsBeyondMemoryTimeout() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/opening",
+        2_300,
+        successResponse("{\"aiMessage\":\"Hello!\",\"translatedMessage\":\"안녕!\"}"));
+    assertThat(remoteClient(Duration.ofSeconds(5)).generateOpening(openingRequest()).aiMessage())
+        .isEqualTo("Hello!");
+  }
+
+  private void registerDelayedResponse(String path, long delayMillis, String response) {
+    server.createContext(
+        path,
+        exchange -> {
+          try {
+            Thread.sleep(delayMillis);
+            byte[] body = response.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          } finally {
+            exchange.close();
+          }
+        });
+  }
+
+  @Test
   void mapsUsedMemoryIdsAndSendsMemoryContextForOpening() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(

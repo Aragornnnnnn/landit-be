@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private static final String MEMORY_CANDIDATES_PATH = "/api/v1/free-talk/memory-candidates";
   private static final String MEMORY_RESOLUTION_PATH = "/api/v1/free-talk/memory-resolution";
   private static final int MAX_CONVERSATION_EXCERPTS = 4;
+  private static final Duration MEMORY_QUERY_TIMEOUT = Duration.ofSeconds(2);
   private static final String AI_CALL_ELAPSED_LOG = "AI 호출 소요 시간. path={}, elapsedMs={}";
 
   private final HttpClient httpClient;
@@ -76,7 +78,11 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   /** {@inheritDoc} */
   @Override
   public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
-    return post(MEMORY_QUERY_EMBEDDING_PATH, request, RemoteMemoryQueryEmbeddingResponse.class)
+    return post(
+            MEMORY_QUERY_EMBEDDING_PATH,
+            request,
+            RemoteMemoryQueryEmbeddingResponse.class,
+            MEMORY_QUERY_TIMEOUT)
         .toResult();
   }
 
@@ -134,6 +140,10 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   }
 
   private <T> T post(String path, Object payload, Class<T> responseType) {
+    return post(path, payload, responseType, properties.requestTimeout());
+  }
+
+  private <T> T post(String path, Object payload, Class<T> responseType, Duration requestTimeout) {
     long startNanos = System.nanoTime();
     try {
       HttpRequest request =
@@ -141,7 +151,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
-              .timeout(properties.requestTimeout())
+              .timeout(requestTimeout)
               .POST(
                   HttpRequest.BodyPublishers.ofString(
                       jsonMapper.writeValueAsString(payload), StandardCharsets.UTF_8))
