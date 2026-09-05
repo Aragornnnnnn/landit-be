@@ -36,6 +36,23 @@ class Lan405BeginnerQuestionMigrationTests {
               + "([^']+\\.mp3)', 'ACTIVE', now\\(\\), now\\(\\), "
               + "(NULL|'(?:[^']|'')*'), (NULL|'GOOD')\\)[,;]$",
           Pattern.MULTILINE);
+  private static final Pattern EXPRESSION_ROW_PATTERN =
+      Pattern.compile(
+          "^\\((\\d+),(\\d+),'[^']+','[^']+','EN','KR',(\\d+),.*,'SCENARIO','ACTIVE',"
+              + "([123]),now\\(\\),now\\(\\)\\)[,;]$",
+          Pattern.MULTILINE);
+  private static final Pattern REPRESENTATIVE_IMAGE_PATTERN =
+      Pattern.compile(
+          "https://d19azau1un4t7r\\.cloudfront\\.net/content/writing-expressions/(\\d+)/representative/[0-9a-f-]{36}\\.webp");
+  private static final Pattern PRACTICE_IMAGE_PATTERN =
+      Pattern.compile(
+          "https://d19azau1un4t7r\\.cloudfront\\.net/content/scenarios/(\\d+)/expressions/(\\d+)/practice-examples/[0-9a-f-]{36}\\.webp");
+  private static final Pattern PRONUNCIATION_ROW_PATTERN =
+      Pattern.compile(
+          "^\\((\\d+),'(EN_US|EN_GB|EN_AU)',(NULL|'[^']+'),'"
+              + "https://d19azau1un4t7r\\.cloudfront\\.net/content/"
+              + "expression-pronunciation-audio/\\1/\\2/sentence/[^']+\\.mp3',",
+          Pattern.MULTILINE);
 
   @Test
   void insertsThreeQuestionsForEachBeginnerLevelGroupAndScenario() throws Exception {
@@ -100,8 +117,97 @@ class Lan405BeginnerQuestionMigrationTests {
         .contains(
             "setval(pg_get_serial_sequence('scenario_question', 'id')",
             "setval(pg_get_serial_sequence('scenario_question_language_variant', 'id')")
-        .doesNotContain(
-            "LEVEL_4_TO_5", "UPDATE scenario_question", "DELETE FROM scenario_question");
+        .doesNotContain("UPDATE scenario_question", "DELETE FROM scenario_question");
+  }
+
+  @Test
+  void insertsFourExpressionsForEachBeginnerLevelGroupAndScenario() throws Exception {
+    Matcher matcher = EXPRESSION_ROW_PATTERN.matcher(readMigrationSql());
+    Set<Integer> expressionIds = new HashSet<>();
+    Map<String, List<Integer>> ordersByScenarioAndGroup = new HashMap<>();
+
+    while (matcher.find()) {
+      expressionIds.add(Integer.parseInt(matcher.group(1)));
+      int scenarioId = Integer.parseInt(matcher.group(2));
+      int difficultyLevel = Integer.parseInt(matcher.group(4));
+      String key = scenarioId + ":" + (difficultyLevel == 1 ? "LEVEL_1" : "LEVEL_2_TO_3");
+      ordersByScenarioAndGroup
+          .computeIfAbsent(key, ignored -> new ArrayList<>())
+          .add(Integer.parseInt(matcher.group(3)));
+    }
+
+    assertThat(expressionIds).containsExactlyInAnyOrderElementsOf(inclusiveRange(1939, 2258));
+    assertThat(ordersByScenarioAndGroup).hasSize(80);
+    assertThat(ordersByScenarioAndGroup.values())
+        .allSatisfy(orders -> assertThat(orders).containsExactlyInAnyOrder(1, 2, 3, 4));
+    assertThat(readMigrationSql())
+        .contains(
+            "DROP CONSTRAINT uk_writing_expression_scenario_order",
+            "CREATE UNIQUE INDEX uk_writing_expression_scenario_level_order",
+            "WHEN difficulty_level BETWEEN 2 AND 3 THEN 'LEVEL_2_TO_3'");
+  }
+
+  @Test
+  void insertsVerifiedRepresentativeAndPracticeImages() throws Exception {
+    String migrationSql = readMigrationSql();
+    Matcher representativeMatcher = REPRESENTATIVE_IMAGE_PATTERN.matcher(migrationSql);
+    Matcher practiceMatcher = PRACTICE_IMAGE_PATTERN.matcher(migrationSql);
+    Matcher expressionMatcher = EXPRESSION_ROW_PATTERN.matcher(migrationSql);
+    Set<Integer> representativeExpressionIds = new HashSet<>();
+    Set<String> practiceImageUrls = new HashSet<>();
+    Map<Integer, Integer> practiceImageCountByExpression = new HashMap<>();
+    Map<Integer, Integer> scenarioByExpression = new HashMap<>();
+
+    while (expressionMatcher.find()) {
+      scenarioByExpression.put(
+          Integer.parseInt(expressionMatcher.group(1)),
+          Integer.parseInt(expressionMatcher.group(2)));
+    }
+    while (representativeMatcher.find()) {
+      representativeExpressionIds.add(Integer.parseInt(representativeMatcher.group(1)));
+    }
+    while (practiceMatcher.find()) {
+      int scenarioId = Integer.parseInt(practiceMatcher.group(1));
+      int expressionId = Integer.parseInt(practiceMatcher.group(2));
+      assertThat(scenarioId).isEqualTo(scenarioByExpression.get(expressionId));
+      practiceImageUrls.add(practiceMatcher.group());
+      practiceImageCountByExpression.merge(expressionId, 1, Integer::sum);
+    }
+
+    assertThat(representativeExpressionIds)
+        .containsExactlyInAnyOrderElementsOf(inclusiveRange(1939, 2258));
+    assertThat(practiceImageUrls).hasSize(640);
+    assertThat(practiceImageCountByExpression.keySet())
+        .containsExactlyInAnyOrderElementsOf(inclusiveRange(1939, 2258));
+    assertThat(practiceImageCountByExpression.values()).allMatch(count -> count == 2);
+    assertThat(migrationSql.split("\\\"imageUrl\\\": null", -1)).hasSize(641);
+  }
+
+  @Test
+  void insertsThreePronunciationAccentsForEveryExpression() throws Exception {
+    String migrationSql = readMigrationSql();
+    Matcher matcher = PRONUNCIATION_ROW_PATTERN.matcher(migrationSql);
+    Map<Integer, Set<String>> accentsByExpression = new HashMap<>();
+    int nullExpressionAudioCount = 0;
+
+    while (matcher.find()) {
+      accentsByExpression
+          .computeIfAbsent(Integer.parseInt(matcher.group(1)), ignored -> new HashSet<>())
+          .add(matcher.group(2));
+      if ("NULL".equals(matcher.group(3))) {
+        nullExpressionAudioCount++;
+      }
+    }
+
+    assertThat(accentsByExpression.keySet())
+        .containsExactlyInAnyOrderElementsOf(inclusiveRange(1939, 2258));
+    assertThat(accentsByExpression.values())
+        .allSatisfy(
+            accents -> assertThat(accents).containsExactlyInAnyOrder("EN_US", "EN_GB", "EN_AU"));
+    assertThat(nullExpressionAudioCount).isEqualTo(183);
+    assertThat(migrationSql)
+        .contains("setval(pg_get_serial_sequence('writing_expression', 'id')")
+        .doesNotContain("__SCN_");
   }
 
   private List<Integer> inclusiveRange(int start, int end) {
