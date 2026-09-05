@@ -85,6 +85,30 @@ class ExpressionLearningFinishApiIntegrationTests {
     assertThat(countCompletions(userProfileId, firstExpressionId)).isEqualTo(1);
   }
 
+  @Test
+  void learningFinishRejectsExpressionAboveLearningLevel() throws Exception {
+    Long scenarioId = seedScenarioWithExpressions();
+    Long expressionId = findExpressionIdByDisplayOrder(scenarioId, 1);
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", expressionId);
+    String accessToken =
+        login(
+            "google-finish-level",
+            "finish-level@example.com",
+            "Finish Level",
+            "finish-level-nonce");
+    Long userProfileId = findUserProfileIdByEmail("finish-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    assertThat(countCompletions(userProfileId, expressionId)).isZero();
+  }
+
   /**
    * 이미 완료한 표현을 다시 완료하면 새 기록 없이(1건 유지), 최초 완료 시각(completed_at)은 보존하고 마지막 완료 시각(last_completed_at)만
    * 갱신하는지 검증한다.
@@ -196,14 +220,15 @@ class ExpressionLearningFinishApiIntegrationTests {
   private void insertWritingExpression(Long scenarioId, int displayOrder, LocalDateTime now) {
     jdbcTemplate.update(
         "INSERT INTO writing_expression "
-            + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
+            + "(scenario_id, expression_type, usage_frequency_level, difficulty_level, "
+            + "target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
             + "usage_description, representative_sentence_text, "
             + "representative_sentence_translation, "
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "practice_examples_payload, status, "
             + "created_at, updated_at) "
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', ?, ?, ?, 'usage summary', "
+            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 4, 'EN', 'KR', ?, ?, ?, 'usage summary', "
             + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], "
             + "ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
         scenarioId,

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.config.memory.MemoryProperties;
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
@@ -45,7 +46,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkSubmittedMessageService {
 
-  private static final long SPEAKING_TIME_LIMIT_MS = 60_000L;
   private static final long PROCESSING_TIMEOUT_SECONDS = 90;
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
@@ -57,6 +57,7 @@ public class FreeTalkSubmittedMessageService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
   private final StreakService streakService;
+  private final MemoryProperties memoryProperties;
   private final Clock clock;
 
   /**
@@ -411,6 +412,7 @@ public class FreeTalkSubmittedMessageService {
     userMessage.recordFreeTalkTurnStatus(FreeTalkTurnStatus.COMPLETED);
     userMessage.prepareInnerThought();
     session.completeByTimeLimit();
+    prepareMemoryGeneration(session);
     session.clearProcessing();
     LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
     records.learningSession().completeFreeTalkByTimeLimit(completedAt);
@@ -576,6 +578,7 @@ public class FreeTalkSubmittedMessageService {
                 result.translatedMessage(),
                 result.emotion()));
     records.freeTalkSession().completeByUserExit();
+    prepareMemoryGeneration(records.freeTalkSession());
     records.freeTalkSession().clearProcessing();
     LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
     records.learningSession().completeFreeTalkByUser(completedAt);
@@ -711,6 +714,12 @@ public class FreeTalkSubmittedMessageService {
     session.clearProcessingIfExpired(LocalDateTime.now().minusSeconds(PROCESSING_TIMEOUT_SECONDS));
   }
 
+  private void prepareMemoryGeneration(FreeTalkSession session) {
+    if (memoryProperties.writeEnabled()) {
+      session.prepareMemoryGeneration();
+    }
+  }
+
   private int nextUserTurnNumber(List<SessionHistoryMessage> messages) {
     if (messages.isEmpty()) {
       return 1;
@@ -778,7 +787,7 @@ public class FreeTalkSubmittedMessageService {
         new ProgressResponse(
             session.getConversationStatus(),
             session.getAccumulatedSpeakingDurationMs(),
-            SPEAKING_TIME_LIMIT_MS,
+            dailySpeakingUsageService.speakingTimeLimitMs(),
             dailyUsage.usedSpeakingDurationMs(),
             dailyUsage.remainingMs(),
             session.getExpressionGenerationStatus()));
@@ -805,7 +814,7 @@ public class FreeTalkSubmittedMessageService {
         new ProgressResponse(
             conversationStatus,
             accumulatedSpeakingDurationMs,
-            SPEAKING_TIME_LIMIT_MS,
+            dailySpeakingUsageService.speakingTimeLimitMs(),
             dailyUsage.usedSpeakingDurationMs(),
             dailyUsage.remainingMs(),
             expressionGenerationStatus));

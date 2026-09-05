@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.repository;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.Scenario;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
 import java.util.List;
@@ -16,6 +17,7 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
    * 관리자 테스트에 사용할 활성 콘텐츠만 조회한다.
    *
    * @param userId 관리자 사용자 ID
+   * @param questionLevelGroup 질문 레벨 그룹
    * @return 사용자 언어 설정에 맞는 활성 시나리오 목록
    */
   @Query(
@@ -40,6 +42,7 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
                 slv.userOpeningInstruction,
                 openingQuestionVariant.innerThought,
                 openingQuestionVariant.innerThoughtType,
+                s.characterId,
                 tv.provider,
                 tv.model,
                 tv.providerVoiceId,
@@ -63,6 +66,7 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
             LEFT JOIN ScenarioQuestion openingQuestion
               ON openingQuestion.scenarioId = s.id
              AND openingQuestion.displayOrder = 1
+             AND openingQuestion.questionLevelGroup = :questionLevelGroup
              AND openingQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN ScenarioQuestionLanguageVariant openingQuestionVariant
               ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id
@@ -83,5 +87,7 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
             WHERE up.id = :userId
             ORDER BY c.displayOrder ASC, s.displayOrder ASC, s.id ASC
       """)
-  List<ScenarioListProjection> findActiveScenarioList(@Param("userId") long userId);
+  List<ScenarioListProjection> findActiveScenarioList(
+      @Param("userId") long userId,
+      @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup);
 }

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.service.ScenarioProgressionService;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
@@ -64,7 +65,9 @@ public class ScenarioSessionStartService {
       long userId, long scenarioId, boolean enforceProgression) {
     Instant startedInstant = clock.instant();
     UserProfile userProfile = findActiveUser(userId);
-    ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId);
+    ContentLearningLevel questionLevelGroup =
+        ContentLearningLevel.from(userProfile.getLearningLevel());
+    ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId, questionLevelGroup);
 
     assertContentActive(startRow);
 
@@ -77,7 +80,8 @@ public class ScenarioSessionStartService {
 
     // 관리자 테스트도 실제 학습과 동일한 진행도와 세션 기록을 남긴다.
     ensureProgress(userProfile, startRow, now);
-    LearningSession learningSession = createLearningSession(userId, userProfile, startRow, now);
+    LearningSession learningSession =
+        createLearningSession(userId, userProfile, startRow, questionLevelGroup, now);
 
     CurrentMessageResponse currentMessage = null;
     if (startRow.firstSpeaker() == ConversationSpeaker.AI) {
@@ -107,8 +111,9 @@ public class ScenarioSessionStartService {
   }
 
   /** 사용자 언어 설정에 맞는 시나리오 시작 콘텐츠와 TTS 정보를 조회한다. */
-  private ScenarioSessionStartProjection findStartRow(long userId, long scenarioId) {
-    return scenarioSessionService.requireStartProjection(userId, scenarioId);
+  private ScenarioSessionStartProjection findStartRow(
+      long userId, long scenarioId, ContentLearningLevel questionLevelGroup) {
+    return scenarioSessionService.requireStartProjection(userId, scenarioId, questionLevelGroup);
   }
 
   /** 학습 세션에 반드시 연결할 AI 튜터 ID의 존재를 검증한다. */
@@ -156,6 +161,7 @@ public class ScenarioSessionStartService {
       long userId,
       UserProfile userProfile,
       ScenarioSessionStartProjection startRow,
+      ContentLearningLevel questionLevelGroup,
       LocalDateTime startedAt) {
     LearningSession learningSession =
         learningSessionService.save(
@@ -170,6 +176,7 @@ public class ScenarioSessionStartService {
         ScenarioSession.start(
             learningSession.getId(),
             startRow.variantId(),
+            questionLevelGroup,
             startRow.firstSpeaker() == ConversationSpeaker.USER
                 ? startRow.userOpeningInstruction()
                 : null));
@@ -188,7 +195,7 @@ public class ScenarioSessionStartService {
     SessionHistoryMessage message =
         saveAiOpeningHistoryMessage(learningSessionId, userProfile, startRow, startedAt);
 
-    return CurrentMessageResponse.from(message);
+    return CurrentMessageResponse.from(message, startRow.openingQuestionAudioUrl());
   }
 
   /** AI first 시작 데이터가 비어 있으면 콘텐츠 설정 오류로 본다. */

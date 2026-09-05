@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,11 +27,19 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -190,12 +199,12 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
             .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
-            .andExpect(jsonPath("$.data.characterId").value("chloe"))
+            .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
             .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
-            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
             .andExpect(
-                jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
             .andExpect(
                 jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
             .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
@@ -253,9 +262,10 @@ class FreeTalkSessionApiIntegrationTests {
                     .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"marco\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.startMode").value("USER_FIRST"))
-            .andExpect(jsonPath("$.data.characterId").value("marco"))
-            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
+            .andExpect(jsonPath("$.data.character.characterId").value("marco"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
             .andExpect(jsonPath("$.data.title").value(nullValue()))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andReturn();
@@ -292,7 +302,8 @@ class FreeTalkSessionApiIntegrationTests {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"teddy\"}"))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-draco-en"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-draco-en"))
             .andReturn();
     long sessionId =
         objectMapper
@@ -798,6 +809,56 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   @Test
+  void excludesCandidatesAboveLearnerDifficultyLevel() throws Exception {
+    // 난이도 4 표현만 심어두면 학습 수준 2(상한 3) 사용자에게는 후보가 남지 않아 실패로 전환된다.
+    seedEmbeddedCandidateExpression(4);
+    String accessToken =
+        login("free-talk-difficulty-excluded@example.com").get("data").get("accessToken").asText();
+    updateLearningLevel(accessToken, 2);
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
+  }
+
+  @Test
+  void keepsCandidatesWithinLearnerDifficultyLevel() throws Exception {
+    // 같은 난이도 4 표현이라도 학습 수준 4(상한 5) 사용자에게는 후보로 남는다.
+    seedEmbeddedCandidateExpression(4);
+    String accessToken =
+        login("free-talk-difficulty-kept@example.com").get("data").get("accessToken").asText();
+    updateLearningLevel(accessToken, 4);
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long submittedMessageId = submitForExit(accessToken, sessionId);
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
+                        .formatted(submittedMessageId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
+  }
+
+  @Test
   void failsExpressionGenerationWhenNoEmbeddedCandidateExists() throws Exception {
     // 임베딩이 있는 공용 후보를 심지 않으면 유사도 검색이 빈손이 되어 실패로 전환된다.
     String accessToken =
@@ -836,14 +897,41 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.representativeSentenceWords.length()").value(6))
         .andExpect(jsonPath("$.data.representativeImageUrl").value(nullValue()));
 
-    mockMvc
-        .perform(
-            get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.practiceSentence.length()").value(4))
-        .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
-        .andExpect(jsonPath("$.data.writingSentence.writingSentenceWords").isArray());
+    MvcResult practiceResult =
+        mockMvc
+            .perform(
+                get("/api/v1/expressions/{expressionId}/practice", link.expressionId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.practiceSentence.length()").value(2))
+            // 이미지가 없는 예문은 null로 내려온다
+            .andExpect(jsonPath("$.data.practiceSentence[0].imageUrl").value(nullValue()))
+            .andExpect(jsonPath("$.data.writingSentence.length()").value(2))
+            .andReturn();
+
+    // 작문 문제 2건에 출제 언어가 하나씩 배정되고, 언어에 맞는 단어 배열이 실렸는지 값으로 확인한다.
+    JsonNode writingSentences =
+        objectMapper
+            .readTree(practiceResult.getResponse().getContentAsByteArray())
+            .at("/data/writingSentence");
+    List<String> quizLanguages = new ArrayList<>();
+    for (JsonNode writingSentence : writingSentences) {
+      String quizLanguage = writingSentence.get("quizLanguage").asText();
+      quizLanguages.add(quizLanguage);
+
+      List<String> words = new ArrayList<>();
+      writingSentence.get("writingSentenceWords").forEach(word -> words.add(word.asText()));
+      if ("EN".equals(quizLanguage)) {
+        assertThat(words).containsExactly("They", "hit", "it", "off", "right", "away", ".");
+      } else {
+        assertThat(words).containsExactly("그들은", "바로", "죽이", "잘", "맞았어");
+      }
+      // 선택지는 정답 단어를 빠짐없이 포함해야 조립이 가능하다.
+      List<String> choices = new ArrayList<>();
+      writingSentence.get("writingSentenceWordChoices").forEach(word -> choices.add(word.asText()));
+      assertThat(choices).containsAll(words);
+    }
+    assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
   }
 
   @Test
@@ -1200,18 +1288,22 @@ class FreeTalkSessionApiIntegrationTests {
 
   // 유사도 검색이 찾을 수 있도록 Fake 임베딩과 같은 방향의 벡터를 가진 공용 후보 표현을 심는다.
   private void seedEmbeddedCandidateExpression() {
+    seedEmbeddedCandidateExpression(3);
+  }
+
+  private void seedEmbeddedCandidateExpression(int difficultyLevel) {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
             id, scenario_id, expression_source, expression_type,
-            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            usage_frequency_level, difficulty_level, target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, embedding, status, created_at, updated_at
         )
         VALUES (
-            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1,
+            994201, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', ?, 'EN', 'KR', 1,
             'piece of cake', '식은 죽 먹기', '쉬운 일을 말할 때 사용한다.',
             '아주 쉬운 일이었다고 말할 때 사용하는 표현이다.',
             'It was a piece of cake.', '그건 식은 죽 먹기였어.',
@@ -1220,6 +1312,7 @@ class FreeTalkSessionApiIntegrationTests {
             '[]' FORMAT JSON, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
         """,
+        difficultyLevel,
         firstAxisEmbeddingLiteral());
   }
 
@@ -1240,7 +1333,7 @@ class FreeTalkSessionApiIntegrationTests {
         """
         INSERT INTO writing_expression (
             id, scenario_id, expression_source, expression_type,
-            usage_frequency_level, target_locale, base_locale, display_order, target_expression_text,
+            usage_frequency_level, difficulty_level, target_locale, base_locale, display_order, target_expression_text,
             base_expression_meaning_text, usage_summary, usage_description,
             representative_question_text, representative_question_translation,
             representative_sentence_text, representative_sentence_translation,
@@ -1248,7 +1341,7 @@ class FreeTalkSessionApiIntegrationTests {
             representative_image_url, practice_examples_payload, status, created_at, updated_at
         )
         VALUES (
-            ?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 1, 'hit it off',
+            ?, NULL, 'FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 1, 'hit it off',
             '죽이 잘 맞다', '처음 만난 사람과 잘 통할 때 사용한다.',
             '서로 대화가 잘 통하고 금방 친해졌을 때 사용하는 표현이다.',
             'How was meeting your new teammate?', '새 팀원을 만나 보니 어땠어?',
@@ -1325,6 +1418,8 @@ class FreeTalkSessionApiIntegrationTests {
           "practiceQuestion": "How did the introduction go?",
           "sentenceTranslation": "그들은 바로 죽이 잘 맞았어.",
           "sentenceWordChoices": ["hit", "They", "miss", "it", "off", "right", "away", "."],
+          "sentenceTranslateWords": ["그들은", "바로", "죽이", "잘", "맞았어"],
+          "sentenceTranslateWordChoices": ["맞았어", "그들은", "안", "죽이", "바로", "잘"],
           "practiceQuestionTranslation": "소개는 어땠어?"%s
         }
         """
@@ -1343,6 +1438,8 @@ class FreeTalkSessionApiIntegrationTests {
             "practiceQuestion": "Is this valid?",
             "sentenceTranslation": "정상 문장.",
             "sentenceWordChoices": ["sentence", "Valid", "."],
+            "sentenceTranslateWords": ["정상", "문장"],
+            "sentenceTranslateWordChoices": ["문장", "오답", "정상"],
             "practiceQuestionTranslation": "이 문장은 정상이야?"
           },
           {
@@ -1377,7 +1474,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
-            id, scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            id, scenario_id, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_question_text, representative_question_translation,
             representative_sentence_text, representative_sentence_translation,
@@ -1385,7 +1482,7 @@ class FreeTalkSessionApiIntegrationTests {
             representative_image_url, practice_examples_payload, status, created_at, updated_at
         )
         VALUES (
-            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1,
+            994103, 994102, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', 1,
             'make up for', '만회하다', '부족했던 부분을 보완한다.',
             '부족하거나 잘못된 일을 다른 행동으로 보완할 때 쓴다.',
             'How will you fix it?', '어떻게 만회할 거야?',
@@ -1398,6 +1495,17 @@ class FreeTalkSessionApiIntegrationTests {
         """,
         practiceExamples("https://cdn/practice.png").toString());
     return 994103L;
+  }
+
+  // 온보딩에서 고르는 학습 수준을 실제 API로 설정한다.
+  private void updateLearningLevel(String accessToken, int learningLevel) throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/me/learning-level")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"learningLevel\":%d}".formatted(learningLevel)))
+        .andExpect(status().isOk());
   }
 
   private JsonNode login(String email) throws Exception {
@@ -1464,7 +1572,7 @@ class FreeTalkSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       return new AiFreeTalkOpeningResult(
-          "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY);
+          "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY, List.of());
     }
 
     @Override
@@ -1484,14 +1592,22 @@ class FreeTalkSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       if (exitIntentDetected && request.responseMode().name().equals("NORMAL")) {
-        return new AiFreeTalkTurnResult(true, null, null, null, null);
+        return new AiFreeTalkTurnResult(true, null, null, null, null, List.of());
       }
       return new AiFreeTalkTurnResult(
           false,
           request.isFirstUserTurn() ? "Hiking with friends" : null,
           "That sounds fun! Where are you going next?",
           "재밌겠다! 다음에는 어디로 갈 거야?",
-          CharacterEmotion.HAPPY);
+          CharacterEmotion.HAPPY,
+          List.of());
+    }
+
+    @Override
+    public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
+      List<Float> embedding = new ArrayList<>(Collections.nCopies(1536, 0.0f));
+      embedding.set(0, 1.0f);
+      return new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", embedding);
     }
 
     @Override
@@ -1532,6 +1648,22 @@ class FreeTalkSessionApiIntegrationTests {
       embedding.set(0, 1.0f);
       return new AiConversationEmbeddingsResult(
           List.of(new AiConversationExcerpt("That sounds interesting.", List.copyOf(embedding))));
+    }
+
+    @Override
+    public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+      return new AiMemoryCandidatesResult("memory-candidate-v1", List.of());
+    }
+
+    @Override
+    public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+      return new AiMemoryResolutionResult(
+          request.candidates().stream()
+              .map(
+                  candidate ->
+                      new AiMemoryResolutionResult.Resolution(
+                          candidate.candidateIndex(), AiMemoryOperation.ADD, List.of()))
+              .toList());
     }
 
     void reset() {

@@ -21,6 +21,7 @@ import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.service.AiTutorService;
+import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
@@ -28,6 +29,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,8 @@ class AuthServiceTest {
   private final RefreshTokenRepository refreshTokenRepository = mock(RefreshTokenRepository.class);
   private final OidcTokenVerifier oidcTokenVerifier = mock(OidcTokenVerifier.class);
   private final LanditTokenService tokenService = mock(LanditTokenService.class);
+  private final ConversationMemoryDeletionService conversationMemoryDeletionService =
+      mock(ConversationMemoryDeletionService.class);
 
   private AuthService authService;
 
@@ -60,6 +64,7 @@ class AuthServiceTest {
             oauthIdentityRepository,
             refreshTokenRepository,
             oidcTokenVerifier,
+            conversationMemoryDeletionService,
             tokenService,
             new TokenProperties("test-secret", 1800, 1209600));
   }
@@ -138,5 +143,22 @@ class AuthServiceTest {
     lockOrder
         .verify(refreshTokenRepository)
         .revokeActiveByTokenHash(eq(CURRENT_TOKEN_HASH), any(LocalDateTime.class));
+  }
+
+  @Test
+  void withdrawDeletesMemoryBeforeRevokingAuthenticationArtifacts() {
+    when(userProfileService.withdrawIfActiveForUpdate(USER_ID)).thenReturn(true);
+    when(oauthIdentityRepository.findAllByUserProfileIdAndStatus(any(), any()))
+        .thenReturn(List.of());
+
+    authService.withdraw(USER_ID);
+
+    InOrder withdrawalOrder =
+        inOrder(userProfileService, conversationMemoryDeletionService, refreshTokenRepository);
+    withdrawalOrder.verify(userProfileService).withdrawIfActiveForUpdate(USER_ID);
+    withdrawalOrder.verify(conversationMemoryDeletionService).deleteAllByUserProfileId(USER_ID);
+    withdrawalOrder
+        .verify(refreshTokenRepository)
+        .revokeAllActiveByUserProfileId(eq(USER_ID), any(LocalDateTime.class));
   }
 }

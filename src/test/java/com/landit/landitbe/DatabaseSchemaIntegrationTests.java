@@ -9,9 +9,16 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.landit.landitbe.feature.content.domain.TtsVoice;
 import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;
+import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +40,8 @@ class DatabaseSchemaIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private TtsVoiceRepository ttsVoiceRepository;
+
+  @Autowired private FreeTalkMemoryRetrievalTraceRepository memoryRetrievalTraceRepository;
 
   @Test
   void dbmlCoreTablesExist() {
@@ -65,6 +74,18 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("admin_audit_log", "before_value");
     assertColumnExists("admin_audit_log", "after_value");
     assertTableConstraintExists("admin_audit_log", "fk_admin_audit_log_admin_user_profile_id");
+  }
+
+  /** Expo 발송 추적에 필요한 스키마를 생성한다. */
+  @Test
+  void pushDeliverySchemaSupportsDeliveryTracking() {
+    assertTableExists("push_delivery");
+    assertColumnExists("push_delivery", "user_push_token_id");
+    assertColumnDefinition("push_delivery", "sent_expo_push_token", "CHARACTER VARYING", 500, "NO");
+    assertColumnExists("push_delivery", "deduplication_key");
+    assertColumnExists("push_delivery", "expo_ticket_id");
+    assertColumnExists("push_delivery", "receipt_checked_at");
+    assertTableConstraintExists("push_delivery", "uk_push_delivery_deduplication_key");
   }
 
   @Test
@@ -139,6 +160,21 @@ class DatabaseSchemaIntegrationTests {
         .doesNotContain("CREATE TABLE nps_response");
     assertThat(v6MigrationSql)
         .contains("CREATE TABLE nps_response", "DROP TABLE session_nps_response");
+  }
+
+  @Test
+  void expressionPronunciationAssetStoresOneRowPerExpressionAndAccent() {
+    assertTableExists("expression_pronunciation_asset");
+    assertColumnExists("expression_pronunciation_asset", "writing_expression_id");
+    assertColumnExists("expression_pronunciation_asset", "accent_locale");
+    assertColumnExists("expression_pronunciation_asset", "expression_audio_url");
+    assertColumnExists("expression_pronunciation_asset", "sentence_audio_url");
+    assertColumnExists("expression_pronunciation_asset", "words");
+    assertTableConstraintExists(
+        "expression_pronunciation_asset", "uk_expression_pronunciation_asset_expression_accent");
+    assertTableConstraintExists(
+        "expression_pronunciation_asset",
+        "fk_expression_pronunciation_asset_writing_expression_id");
   }
 
   @Test
@@ -234,8 +270,12 @@ class DatabaseSchemaIntegrationTests {
     assertTableExists("scenario_question");
     assertColumnExists("scenario_question", "scenario_id");
     assertColumnExists("scenario_question", "display_order");
+    assertColumnExists("scenario_question", "question_level_group");
+    assertNotNullableColumn("scenario_question", "question_level_group");
     assertColumnExists("scenario_question", "status");
-    assertTableConstraintExists("scenario_question", "uk_scenario_question_scenario_order");
+    assertTableConstraintDoesNotExist("scenario_question", "uk_scenario_question_scenario_order");
+    assertTableConstraintExists("scenario_question", "uk_scenario_question_scenario_level_order");
+    assertTableConstraintExists("scenario_question", "chk_scenario_question_level_group");
 
     assertTableExists("scenario_question_language_variant");
     assertColumnExists("scenario_question_language_variant", "scenario_question_id");
@@ -243,8 +283,40 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("scenario_question_language_variant", "base_locale");
     assertColumnExists("scenario_question_language_variant", "question_text");
     assertColumnExists("scenario_question_language_variant", "question_translation");
+    assertColumnExists("scenario_question_language_variant", "audio_url");
+    assertNotNullableColumn("scenario_question_language_variant", "audio_url");
     assertColumnExists("scenario_question_language_variant", "status");
     assertTableConstraintExists("scenario_question_language_variant", "uk_scenario_question_lang");
+
+    Integer missingAudioUrlCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from scenario_question_language_variant where audio_url is null",
+            Integer.class);
+    assertThat(missingAudioUrlCount).isZero();
+
+    Integer nonAdvancedQuestionCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from scenario_question where question_level_group <> 'LEVEL_4_TO_5'",
+            Integer.class);
+    assertThat(nonAdvancedQuestionCount).isZero();
+
+    assertColumnExists("scenario_session", "question_level_group");
+    assertNotNullableColumn("scenario_session", "question_level_group");
+    assertTableConstraintExists("scenario_session", "chk_scenario_session_level_group");
+  }
+
+  @DisplayName("V76 migration은 기존 시나리오 표현을 레벨 4~5용 난이도로 옮긴다.")
+  @Test
+  void v76MovesExistingScenarioExpressionsToAdvancedDifficulty() throws Exception {
+    String migrationSql =
+        readMigrationSql("db/migration/V76__add_scenario_question_level_group.sql");
+
+    assertThat(migrationSql)
+        .contains(
+            "UPDATE writing_expression",
+            "SET difficulty_level = 4",
+            "WHERE expression_source = 'SCENARIO'",
+            "AND difficulty_level < 4");
   }
 
   @DisplayName("V18 migration은 첫 질문 속마음을 질문 Variant로 옮긴다.")
@@ -380,13 +452,13 @@ class DatabaseSchemaIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            expression_source, expression_type, usage_frequency_level, target_locale, base_locale,
+            expression_source, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        values ('FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 'EN', 'KR', 990204,
+        values ('FREE_TALK', 'CONVERSATION_SKILL', 'BASIC', 3, 'EN', 'KR', 990204,
             'free-talk sample', '프리톡 샘플', 'summary', 'description', 'sentence', '문장',
             ARRAY['sentence'], ARRAY['sentence','choice'], CAST('[]' AS jsonb), 'ACTIVE',
             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -418,6 +490,131 @@ class DatabaseSchemaIntegrationTests {
             "embedding extensions.vector(1536)",
             "chk_writing_expression_scenario_source");
     assertThat(h2MigrationSql).contains("embedding VARCHAR(32767)");
+  }
+
+  @DisplayName("V65 장기기억 스키마는 범위·상태·원본 계보 제약을 유지한다.")
+  @Test
+  void conversationMemorySchemaPreservesScopeStateAndLineage() {
+    assertTableExists("conversation_memory");
+    assertTableExists("conversation_memory_source");
+    assertColumnExists("conversation_memory", "embedding");
+    assertTableConstraintExists("conversation_memory", "chk_conversation_memory_scope");
+    assertTableConstraintExists("conversation_memory", "chk_conversation_memory_state");
+    assertTableConstraintExists(
+        "conversation_memory_source", "fk_conversation_memory_source_message");
+  }
+
+  @DisplayName("V67 프리톡 기억 검색 trace는 세션·기억 계보와 후보 순위를 연결한다.")
+  @Test
+  void freeTalkMemoryRetrievalTraceSchemaPreservesLineage() {
+    assertTableExists("free_talk_memory_retrieval");
+    assertColumnExists("free_talk_memory_retrieval", "candidate_rank");
+    assertColumnExists("free_talk_memory_retrieval", "response_message_id");
+    assertTableConstraintExists(
+        "free_talk_memory_retrieval", "fk_free_talk_memory_retrieval_session");
+    assertTableConstraintExists(
+        "free_talk_memory_retrieval", "fk_free_talk_memory_retrieval_memory");
+    assertIndexExists("uk_free_talk_memory_retrieval_session_stage_rank");
+  }
+
+  @DisplayName("V65 장기기억 제약은 잘못된 범위·상태·시간·신뢰도를 거부한다.")
+  @Test
+  @Transactional
+  void conversationMemoryConstraintsRejectInvalidScopeStateAndRange() {
+    insertConversationMemoryFixtures();
+
+    insertConversationMemory(new MemoryFixture(994103L));
+    List<InvalidMemoryCase> invalidCases =
+        List.of(
+            new InvalidMemoryCase(994101L, fixture -> fixture.characterId = "chloe"),
+            new InvalidMemoryCase(
+                994102L,
+                fixture -> {
+                  fixture.memoryType = "EVENT";
+                  fixture.characterId = null;
+                }),
+            new InvalidMemoryCase(994104L, fixture -> fixture.supersededById = 994103L),
+            new InvalidMemoryCase(
+                994105L,
+                fixture -> {
+                  fixture.status = "SUPERSEDED";
+                  fixture.supersededAt = Timestamp.valueOf("2026-08-25 20:10:00");
+                }),
+            new InvalidMemoryCase(
+                994106L,
+                fixture -> {
+                  fixture.status = "SUPERSEDED";
+                  fixture.supersededById = 994103L;
+                }),
+            new InvalidMemoryCase(
+                994107L,
+                fixture -> {
+                  fixture.status = "INVALIDATED";
+                  fixture.invalidatedAt = Timestamp.valueOf("2026-08-25 20:10:00");
+                }),
+            new InvalidMemoryCase(
+                994108L,
+                fixture -> {
+                  fixture.status = "INVALIDATED";
+                  fixture.invalidationReason = "INCORRECT_EXTRACTION";
+                }),
+            new InvalidMemoryCase(
+                994109L, fixture -> fixture.validTo = Timestamp.valueOf("2026-08-25 19:00:00")),
+            new InvalidMemoryCase(
+                994110L, fixture -> fixture.confidence = BigDecimal.valueOf(-0.01)),
+            new InvalidMemoryCase(
+                994111L, fixture -> fixture.confidence = BigDecimal.valueOf(1.01)));
+
+    invalidCases.forEach(this::assertInvalidMemory);
+  }
+
+  @DisplayName("V65 원본 메시지 계보는 삭제 순서와 링크를 제한한다.")
+  @Test
+  @Transactional
+  void conversationMemorySourceConstraintsRejectInvalidLinks() {
+    insertConversationMemoryFixtures();
+    insertConversationMemory(new MemoryFixture(994120L));
+    jdbcTemplate.update(
+        "insert into conversation_memory_source (memory_id, session_history_message_id) "
+            + "values (?, ?)",
+        994120L,
+        994005L);
+
+    assertThatThrownBy(
+            () -> jdbcTemplate.update("delete from session_history_message where id = ?", 994005L))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @DisplayName("프리톡 기억 검색 선점 marker는 후보 저장 후에도 세션별 1회를 보장한다.")
+  @Test
+  @Transactional
+  void freeTalkMemoryRetrievalClaimRemainsAfterCandidatesAreSaved() {
+    insertConversationMemoryFixtures();
+    insertConversationMemory(new MemoryFixture(994103L));
+
+    assertThat(
+            memoryRetrievalTraceRepository.claim(
+                994003L, MemoryRetrievalStage.OPENING, "memory-retrieval-v1"))
+        .isTrue();
+    memoryRetrievalTraceRepository.saveCandidates(
+        994003L,
+        MemoryRetrievalStage.OPENING,
+        List.of(
+            new ConversationMemoryMatch(
+                994103L, ConversationMemoryType.PROFILE, "memory", null, null, null, 0.1)),
+        "memory-retrieval-v1");
+
+    assertThat(
+            memoryRetrievalTraceRepository.claim(
+                994003L, MemoryRetrievalStage.OPENING, "memory-retrieval-v1"))
+        .isFalse();
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select candidate_rank from free_talk_memory_retrieval "
+                    + "where free_talk_session_id = 994003 and retrieval_stage = 'OPENING' "
+                    + "order by candidate_rank",
+                Integer.class))
+        .containsExactly(0, 1);
   }
 
   @DisplayName("V32 migration은 사용자 Push Token을 Expo Push Token 전용 컬럼으로 전환한다.")
@@ -573,13 +770,13 @@ class DatabaseSchemaIntegrationTests {
     jdbcTemplate.update(
         """
         insert into writing_expression (
-            scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            scenario_id, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        values (990202, ?, ?, 'EN', 'KR', 990203, 'sample', '샘플', 'summary',
+        values (990202, ?, ?, 3, 'EN', 'KR', 990203, 'sample', '샘플', 'summary',
             'description', 'sentence', '문장', ARRAY['sample'], ARRAY['sample','choice'],
             CAST('[]' AS jsonb), 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
@@ -630,7 +827,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(mappings)
         .extracting(row -> row.get("CHARACTER_ID"), row -> row.get("PROVIDER_VOICE_ID"))
         .containsExactly(
-            tuple("chloe", "en-US-Harper:MAI-Voice-2"),
+            tuple("chloe", "aura-2-luna-en"),
             tuple("marco", "aura-2-hyperion-en"),
             tuple("teddy", "aura-2-draco-en"));
   }
@@ -933,9 +1130,9 @@ class DatabaseSchemaIntegrationTests {
         .containsEntry("STATUS", "ACTIVE");
   }
 
-  @DisplayName("V50 migration이 Marco와 Teddy의 TTS 음성을 변경하고 Chloe는 유지한다.")
+  @DisplayName("V59 migration 이후 세 캐릭터의 TTS 음성이 Aura 2로 통일된다.")
   @Test
-  void v50MigrationUpdatesMarcoAndTeddyVoicesAndKeepsChloe() {
+  void v59MigrationUnifiesCharacterVoicesWithAura2() {
     List<Map<String, Object>> voices =
         jdbcTemplate.queryForList(
             """
@@ -953,7 +1150,7 @@ class DatabaseSchemaIntegrationTests {
             row -> row.get("DESCRIPTION"),
             row -> row.get("ACCENT_LOCALE"))
         .containsExactly(
-            tuple(1L, "microsoft/mai-voice-2", "en-US-Harper:MAI-Voice-2", "미국 영어 여성 음성", "EN_US"),
+            tuple(1L, "deepgram/aura-2", "aura-2-luna-en", "미국 영어 여성 음성", "EN_US"),
             tuple(2L, "deepgram/aura-2", "aura-2-hyperion-en", "호주 영어 남성 음성", "EN_AU"),
             tuple(3L, "deepgram/aura-2", "aura-2-draco-en", "영국 영어 굵은 남성 음성", "EN_GB"));
   }
@@ -1303,6 +1500,114 @@ class DatabaseSchemaIntegrationTests {
     assertThat(tableCount).as("table %s", tableName).isEqualTo(1);
   }
 
+  private void insertConversationMemoryFixtures() {
+    Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
+    jdbcTemplate.update(
+        """
+        insert into user_profile (id, nickname, target_locale, base_locale, current_level,
+            ai_tutor_id, push_permission_status, status, created_at, updated_at)
+        values (994001, 'conversation-memory-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED',
+            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into learning_session (id, user_profile_id, session_type, ai_tutor_id,
+            target_locale, base_locale, input_mode, status, ended_by, completion_reason,
+            started_at, ended_at, created_at, updated_at)
+        values (994002, 994001, 'FREE_TALK', ?, 'EN', 'KR', 'MIXED', 'COMPLETED',
+            'USER', 'USER_EXIT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into free_talk_session (id, learning_session_id, start_mode, character_id,
+            conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)
+        values (994003, 994002, 'USER_FIRST', 'chloe', 'COMPLETED', 0,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history (id, learning_session_id, user_profile_id, session_type,
+            target_locale, base_locale, started_at, ended_at, duration_seconds, user_message_count,
+            created_at)
+        values (994004, 994002, 994001, 'FREE_TALK', 'EN', 'KR', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP, 0, 2, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, input_type, created_at, updated_at)
+        values (994005, 994004, 1, 1, 'USER', 'hello', 'TEXT', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, input_type, created_at, updated_at)
+        values (994006, 994004, 2, 1, 'AI', 'Hi there', 'TEXT', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """);
+  }
+
+  private void assertInvalidMemory(InvalidMemoryCase invalidCase) {
+    assertThatThrownBy(() -> insertConversationMemory(invalidCase.fixture()))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  private void insertConversationMemory(MemoryFixture fixture) {
+    jdbcTemplate.update(
+        """
+        insert into conversation_memory (
+            id, user_profile_id, character_id, memory_type, content, content_locale,
+            confidence, status, valid_from, valid_to, observed_at, recorded_at, superseded_at,
+            superseded_by_id, invalidated_at, invalidation_reason, extractor_version,
+            embedding_model, embedding)
+        values (?, 994001, ?, ?, '사용자는 장기기억 스키마를 검증한다.', 'KR', ?, ?, ?, ?,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, 'memory-test-v1',
+            'openai/text-embedding-3-small', '[0.1]')
+        """,
+        fixture.id,
+        fixture.characterId,
+        fixture.memoryType,
+        fixture.confidence,
+        fixture.status,
+        fixture.validFrom,
+        fixture.validTo,
+        fixture.supersededAt,
+        fixture.supersededById,
+        fixture.invalidatedAt,
+        fixture.invalidationReason);
+  }
+
+  private record InvalidMemoryCase(long id, Consumer<MemoryFixture> customize) {
+
+    private MemoryFixture fixture() {
+      MemoryFixture fixture = new MemoryFixture(id);
+      customize.accept(fixture);
+      return fixture;
+    }
+  }
+
+  private static final class MemoryFixture {
+    private final long id;
+    private String characterId;
+    private String memoryType = "PROFILE";
+    private BigDecimal confidence = BigDecimal.valueOf(0.8);
+    private String status = "ACTIVE";
+    private Timestamp validFrom = Timestamp.valueOf("2026-08-25 20:00:00");
+    private Timestamp validTo;
+    private Timestamp supersededAt;
+    private Long supersededById;
+    private Timestamp invalidatedAt;
+    private String invalidationReason;
+
+    private MemoryFixture(long id) {
+      this.id = id;
+    }
+  }
+
   private void assertTableDoesNotExist(String tableName) {
     Integer tableCount =
         jdbcTemplate.queryForObject(
@@ -1363,6 +1668,45 @@ class DatabaseSchemaIntegrationTests {
             columnName);
 
     assertThat(nullable).as("column %s.%s is nullable", tableName, columnName).isEqualTo("YES");
+  }
+
+  private void assertNotNullableColumn(String tableName, String columnName) {
+    String nullable =
+        jdbcTemplate.queryForObject(
+            """
+            select is_nullable
+            from information_schema.columns
+            where lower(table_name) = ?
+              and lower(column_name) = ?
+            """,
+            String.class,
+            tableName,
+            columnName);
+
+    assertThat(nullable).as("column %s.%s is not nullable", tableName, columnName).isEqualTo("NO");
+  }
+
+  private void assertColumnDefinition(
+      String tableName,
+      String columnName,
+      String expectedDataType,
+      int expectedMaximumLength,
+      String expectedNullable) {
+    Map<String, Object> column =
+        jdbcTemplate.queryForMap(
+            """
+            select data_type, character_maximum_length, is_nullable
+            from information_schema.columns
+            where lower(table_name) = ?
+              and lower(column_name) = ?
+            """,
+            tableName,
+            columnName);
+
+    assertThat((String) column.get("DATA_TYPE")).isEqualToIgnoringCase(expectedDataType);
+    assertThat(((Number) column.get("CHARACTER_MAXIMUM_LENGTH")).intValue())
+        .isEqualTo(expectedMaximumLength);
+    assertThat(column.get("IS_NULLABLE")).isEqualTo(expectedNullable);
   }
 
   private void assertIndexExists(String indexName) {

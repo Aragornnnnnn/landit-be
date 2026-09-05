@@ -25,12 +25,28 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
    * @param scenarioId 표현이 속한 시나리오 ID
    * @param targetLocale 학습 언어 locale
    * @param baseLocale 기준 언어 locale
+   * @param minimumDifficulty 최소 표현 난이도
+   * @param maximumDifficulty 최대 표현 난이도
    * @param status 조회할 콘텐츠 상태
    * @return 표시 순서 오름차순의 Writing 표현 목록
    */
-  List<WritingExpression>
-      findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-          Long scenarioId, Locale targetLocale, Locale baseLocale, ActiveStatus status);
+  @Query(
+      """
+      SELECT expression FROM WritingExpression expression
+      WHERE expression.scenarioId = :scenarioId
+        AND expression.targetLocale = :targetLocale
+        AND expression.baseLocale = :baseLocale
+        AND expression.difficultyLevel BETWEEN :minimumDifficulty AND :maximumDifficulty
+        AND expression.status = :status
+      ORDER BY expression.displayOrder ASC
+      """)
+  List<WritingExpression> findScenarioExpressions(
+      @Param("scenarioId") Long scenarioId,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("baseLocale") Locale baseLocale,
+      @Param("minimumDifficulty") int minimumDifficulty,
+      @Param("maximumDifficulty") int maximumDifficulty,
+      @Param("status") ActiveStatus status);
 
   /**
    * 특정 상태의 Writing 표현을 PK로 조회한다.
@@ -53,6 +69,15 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
       "select expression from WritingExpression expression "
           + "where expression.id = :id and expression.status = :status")
   Optional<WritingExpression> findByIdAndStatusForUpdate(Long id, ActiveStatus status);
+
+  /**
+   * 상태가 일치하는 표현의 ID만 조회한다. 발음 자산 커버리지 계산에 사용한다.
+   *
+   * @param status 조회할 활성 상태
+   * @return 조건에 맞는 표현 ID 목록
+   */
+  @Query("select expression.id from WritingExpression expression where expression.status = :status")
+  List<Long> findIdsByStatus(ActiveStatus status);
 
   /**
    * 학습 언어와 기준 언어에 맞는 활성 Writing 표현을 조회한다.

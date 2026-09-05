@@ -47,6 +47,18 @@ public interface UserWritingExpressionCompletionRepository
       Long userProfileId, Collection<Long> writingExpressionIds);
 
   /**
+   * 사용자가 표현을 완료한 적이 있는지 학습 경로와 관계없이 확인한다.
+   *
+   * <p>표현은 {@code expression_source}로 시나리오·프리톡 중 한쪽에만 속하고(DB 제약), 프리톡 추천 후보도 프리톡 표현으로 한정된다. 따라서 한
+   * 표현의 완료 이력은 자기 경로 하나로만 남아 경로를 나눠 조회할 필요가 없다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param writingExpressionId Writing 표현 ID
+   * @return 완료 이력이 있으면 true
+   */
+  boolean existsByUserProfileIdAndWritingExpressionId(Long userProfileId, Long writingExpressionId);
+
+  /**
    * 사용자가 특정 경로로 완료한 표현 목록을 조회한다.
    *
    * @param userProfileId 사용자 프로필 ID

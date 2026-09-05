@@ -65,3 +65,8 @@ knowledge_base:
       instructions: >-
         AI 생성 서버다. AI Port와 원격 클라이언트의 요청·응답 DTO, enum,
         nullability, 오류 계약 호환성을 검증할 때 참고한다.
+    - repository: "Aragornnnnnn/landit-iac"
+      instructions: >-
+        AWS 인프라 저장소다. SQS·EventBridge Scheduler·ECS 환경 변수와 Task Role,
+        SSM SecureString, CloudWatch Alarm 변경이 BE의 환경 변수명·메시지 계약·권한
+        요구사항과 일치하는지 검증할 때 참고한다.

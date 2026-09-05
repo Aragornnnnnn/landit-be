@@ -46,11 +46,11 @@ public interface ExpressionControllerDocs {
    *
    * @param principal 인증된 사용자
    * @param expressionId 학습할 표현 ID
-   * @return 표현 학습 시작 상세
+   * @return 표현 학습 시작 상세와 학습 완료 여부
    */
   @Operation(
       summary = "원어민 표현 학습 시작",
-      description = "선택한 표현의 뜻, 설명과 대표 예문을 조회한다.",
+      description = "선택한 표현의 뜻, 설명과 대표 예문에 사용자의 학습 완료 여부를 더해 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
       AuthUserPrincipal principal, Long expressionId);
@@ -64,7 +64,7 @@ public interface ExpressionControllerDocs {
    */
   @Operation(
       summary = "원어민 표현 학습 추가 예문 조회",
-      description = "추가 예문 목록과 무작위 작문 문제를 조회한다.",
+      description = "눈으로 익히는 추가 예문 2건과 직접 푸는 작문 문제 2건(영어·한국어 각 1건)을 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
       AuthUserPrincipal principal, Long expressionId);

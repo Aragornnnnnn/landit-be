@@ -4,6 +4,12 @@ package com.landit.landitbe.feature.mailbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,11 +21,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,15 +38,22 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import software.amazon.awssdk.services.sqs.SqsAsyncClient;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 
 /** 편지함 어드민 API의 콘텐츠 관리와 피드백 일괄 처리를 통합 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
+@Import(AdminMailboxApiIntegrationTests.TestSqsClientConfiguration.class)
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
-      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
+      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough",
+      "landit.notification.consumer-enabled=true",
+      "landit.notification.queue-url=https://sqs.ap-northeast-2.amazonaws.com/123456789012/test-push",
+      "spring.cloud.aws.sqs.enabled=false"
     })
 class AdminMailboxApiIntegrationTests {
 
@@ -43,10 +61,15 @@ class AdminMailboxApiIntegrationTests {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  @Autowired private SqsAsyncClient sqsAsyncClient;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeEach
   void clearMailboxData() {
+    reset(sqsAsyncClient);
+    when(sqsAsyncClient.sendMessage(any(SendMessageRequest.class)))
+        .thenReturn(CompletableFuture.completedFuture(SendMessageResponse.builder().build()));
     jdbcTemplate.update("delete from mailbox_letter_recipient");
     jdbcTemplate.update("delete from mailbox_letter_read");
     jdbcTemplate.update("delete from mailbox_letter");
@@ -364,6 +387,97 @@ class AdminMailboxApiIntegrationTests {
   }
 
   @Test
+  void adminFeedbackDetailReturnsFeedbackAndNullReplyWhenUnanswered() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-unanswered");
+    Long userId = loginAndFindUserId("mailbox-feedback-detail-unanswered-user");
+    long feedbackId = insertFeedback(userId, "답변 없는 상세 문의", "QUESTION", "PENDING", 10);
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks/{feedbackId}", feedbackId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.feedbackId").value(feedbackId))
+        .andExpect(jsonPath("$.data.userProfileId").value(userId))
+        .andExpect(
+            jsonPath("$.data.email").value("mailbox-feedback-detail-unanswered-user@example.com"))
+        .andExpect(jsonPath("$.data.nickname").value("Admin User"))
+        .andExpect(jsonPath("$.data.type").value("QUESTION"))
+        .andExpect(jsonPath("$.data.content").value("답변 없는 상세 문의"))
+        .andExpect(jsonPath("$.data.status").value("PENDING"))
+        .andExpect(jsonPath("$.data.resolvedByFeedbackId").value(nullValue()))
+        .andExpect(jsonPath("$.data.reply").value(nullValue()));
+  }
+
+  @Test
+  void adminFeedbackDetailReturnsLatestReplyForRepresentativeFeedback() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-latest");
+    Long userId = loginAndFindUserId("mailbox-feedback-detail-latest-user");
+    long feedbackId = insertFeedback(userId, "최신 답장 상세 문의", "QUESTION", "PENDING", 10);
+
+    long firstReplyId =
+        responseData(sendReply(adminToken, List.of(feedbackId), "첫 번째 답장"))
+            .get("letterId")
+            .asLong();
+    long secondReplyId =
+        responseData(sendReply(adminToken, List.of(feedbackId), "두 번째 답장"))
+            .get("letterId")
+            .asLong();
+
+    assertThat(secondReplyId).isNotEqualTo(firstReplyId);
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks/{feedbackId}", feedbackId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.reply.letterId").value(secondReplyId))
+        .andExpect(jsonPath("$.data.reply.title").value("두 번째 답장"))
+        .andExpect(jsonPath("$.data.reply.bodyText").value("답장 본문"))
+        .andExpect(jsonPath("$.data.reply.sentAt").isNotEmpty());
+  }
+
+  @Test
+  void adminFeedbackDetailReturnsRepresentativeReplyForBatchNonRepresentativeFeedback()
+      throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-batch");
+    Long userId = loginAndFindUserId("mailbox-feedback-detail-batch-user");
+    long representativeFeedbackId =
+        insertFeedback(userId, "일괄 답장 대표 문의", "QUESTION", "PENDING", 10);
+    long nonRepresentativeFeedbackId =
+        insertFeedback(userId, "일괄 답장 비대표 문의", "QUESTION", "PENDING", 11);
+
+    long replyId =
+        responseData(
+                sendReply(
+                    adminToken,
+                    List.of(nonRepresentativeFeedbackId, representativeFeedbackId),
+                    "일괄 답장"))
+            .get("letterId")
+            .asLong();
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks/{feedbackId}", nonRepresentativeFeedbackId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.resolvedByFeedbackId").value(representativeFeedbackId))
+        .andExpect(jsonPath("$.data.reply.letterId").value(replyId))
+        .andExpect(jsonPath("$.data.reply.title").value("일괄 답장"));
+  }
+
+  @Test
+  void adminFeedbackDetailReturnsNotFoundForMissingFeedback() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-missing");
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks/{feedbackId}", 999999L)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
+  @Test
   void adminFeedbackSearchOmitsMissingCreatedToCondition() throws Exception {
     String adminToken = loginAsAdmin("mailbox-feedback-created-from-only");
     Long userId = loginAndFindUserId("mailbox-feedback-created-from-only-user");
@@ -444,6 +558,57 @@ class AdminMailboxApiIntegrationTests {
   }
 
   @Test
+  void publishesPushOnlyAfterCommittedReply() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-reply-notification");
+    Long userId = loginAndFindUserId("mailbox-reply-notification-user");
+    long feedbackId = insertFeedback(userId, "알림 대상 문의", "QUESTION", "PENDING", 10);
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/mailbox/replies")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        Map.of(
+                            "feedbackIds", List.of(feedbackId, 999999L),
+                            "title", "실패 답장",
+                            "bodyText", "저장되면 안 됩니다."))))
+        .andExpect(status().isNotFound());
+
+    MvcResult result = sendReply(adminToken, List.of(feedbackId), "답변 제목");
+    long replyId = responseData(result).get("letterId").asLong();
+
+    ArgumentCaptor<SendMessageRequest> requestCaptor =
+        ArgumentCaptor.forClass(SendMessageRequest.class);
+    verify(sqsAsyncClient).sendMessage(requestCaptor.capture());
+    SendMessageRequest pushRequest = requestCaptor.getValue();
+    JsonNode message = objectMapper.readTree(pushRequest.messageBody());
+    assertThat(pushRequest.delaySeconds()).isZero();
+    assertThat(message.get("messageType").asText()).isEqualTo("MAILBOX_REPLY_NOTIFICATION_BATCH");
+    assertThat(message.get("payload").get("mailboxLetterId").asLong()).isEqualTo(replyId);
+    assertThat(message.get("payload").get("userProfileIds"))
+        .extracting(JsonNode::asLong)
+        .containsExactly(userId);
+    assertThat(message.get("payload").get("replyTitle").asText()).isEqualTo("답변 제목");
+  }
+
+  @Test
+  void preservesCommittedReplyWhenPushQueuePublicationFails() throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-reply-push-failure");
+    Long userId = loginAndFindUserId("mailbox-reply-push-failure-user");
+    long feedbackId = insertFeedback(userId, "알림 실패 문의", "QUESTION", "PENDING", 10);
+    when(sqsAsyncClient.sendMessage(any(SendMessageRequest.class)))
+        .thenReturn(CompletableFuture.failedFuture(new RuntimeException("SQS unavailable")));
+
+    MvcResult result = sendReply(adminToken, List.of(feedbackId), "저장할 답변");
+    long replyId = responseData(result).get("letterId").asLong();
+
+    assertReplyStoredAndAudited(replyId, 1);
+    verify(sqsAsyncClient).sendMessage(any(SendMessageRequest.class));
+  }
+
+  @Test
   void adminPreservesExistingCompletedFeedbackRelation() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-completed-relation");
     Long userId = loginAndFindUserId("mailbox-completed-relation-user");
@@ -458,6 +623,37 @@ class AdminMailboxApiIntegrationTests {
 
     assertThat(responseData(result).get("completedFeedbackCount").asInt()).isZero();
     assertCompletedFeedback(completedFeedbackId, representativeId);
+  }
+
+  @Test
+  void adminFeedbackDetailReturnsLatestAdditionalReplyForNonRepresentativeFeedback()
+      throws Exception {
+    String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-additional-reply");
+    Long userId = loginAndFindUserId("mailbox-feedback-detail-additional-reply-user");
+    long representativeId = insertFeedback(userId, "추가 답변 대표 문의", "QUESTION", "COMPLETED", 10);
+    long nonRepresentativeId = insertFeedback(userId, "추가 답변 비대표 문의", "QUESTION", "COMPLETED", 11);
+    jdbcTemplate.update(
+        "update mailbox_feedback set resolved_by_feedback_id = ? where id = ?",
+        representativeId,
+        nonRepresentativeId);
+
+    long canonicalReplyId =
+        responseData(sendReply(adminToken, List.of(representativeId), "기존 대표 답변"))
+            .get("letterId")
+            .asLong();
+    long additionalReplyId =
+        responseData(sendReply(adminToken, List.of(nonRepresentativeId), "비대표 추가 답변"))
+            .get("letterId")
+            .asLong();
+
+    assertThat(additionalReplyId).isNotEqualTo(canonicalReplyId);
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/feedbacks/{feedbackId}", nonRepresentativeId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.reply.letterId").value(additionalReplyId))
+        .andExpect(jsonPath("$.data.reply.title").value("비대표 추가 답변"));
   }
 
   @Test
@@ -570,6 +766,21 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(
             jsonPath(schemas + "AdminMailboxLetterResponse.properties.contentBlocks.type")
                 .value("array"));
+  }
+
+  @Test
+  void documentsAdminFeedbackDetailReplyAsNullableObject() throws Exception {
+    String schemas = "$.components.schemas.";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(schemas + "AdminMailboxFeedbackDetailResponse").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminMailboxFeedbackDetailResponse.properties.reply.type[0]")
+                .value("object"))
+        .andExpect(
+            jsonPath(schemas + "AdminMailboxFeedbackDetailResponse.properties.reply.type[1]")
+                .value("null"));
   }
 
   private MvcResult createNotice(String accessToken, String title) throws Exception {
@@ -712,4 +923,14 @@ class AdminMailboxApiIntegrationTests {
   }
 
   private record LoginResult(Long userProfileId, String accessToken) {}
+
+  /** Push Queue 발행 요청을 기록할 테스트용 SQS Client를 등록한다. */
+  @TestConfiguration
+  static class TestSqsClientConfiguration {
+
+    @Bean
+    SqsAsyncClient sqsAsyncClient() {
+      return mock(SqsAsyncClient.class);
+    }
+  }
 }

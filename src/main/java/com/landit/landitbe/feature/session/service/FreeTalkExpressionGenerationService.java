@@ -2,7 +2,9 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.ExpressionDifficultyPolicy;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
@@ -62,6 +64,7 @@ public class FreeTalkExpressionGenerationService {
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionQueryService expressionQueryService;
   private final ExpressionCandidateSelectionService candidateSelectionService;
+  private final UserProfileService userProfileService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
 
@@ -132,7 +135,8 @@ public class FreeTalkExpressionGenerationService {
                     conversationEmbeddings.excerpts(),
                     context.userProfileId(),
                     context.targetLocale(),
-                    context.baseLocale()));
+                    context.baseLocale(),
+                    context.maxDifficultyLevel()));
     List<AiFreeTalkExistingExpression> existingExpressions =
         timings.measure(CANDIDATE_LOAD_STAGE, () -> candidateExpressions(context, candidateIds));
     if (existingExpressions.isEmpty()) {
@@ -213,6 +217,8 @@ public class FreeTalkExpressionGenerationService {
         learningSession.getUserProfileId(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
+        ExpressionDifficultyPolicy.maxDifficultyFor(
+            userProfileService.findLearningLevel(learningSession.getUserProfileId()).orElse(null)),
         sessionHistoryMessageRepository
             .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
             .stream()
@@ -276,6 +282,7 @@ public class FreeTalkExpressionGenerationService {
       long userProfileId,
       Locale targetLocale,
       Locale baseLocale,
+      int maxDifficultyLevel,
       List<AiConversationHistoryMessage> history) {}
 
   private record GenerationOutcome(

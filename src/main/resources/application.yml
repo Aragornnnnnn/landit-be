@@ -1,8 +1,19 @@
 spring:
   application:
     name: landit-be
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+      sqs:
+        enabled: ${LANDIT_NOTIFICATION_CONSUMER_ENABLED:false}
   jackson:
     time-zone: Asia/Seoul
+  servlet:
+    multipart:
+      # 발음 평가 녹음 업로드 상한. 오디오 10MB + 여유분
+      max-file-size: 10MB
+      max-request-size: 11MB
   jpa:
     hibernate:
       ddl-auto: validate
@@ -29,6 +40,8 @@ management:
         step: ${MANAGEMENT_OTLP_METRICS_EXPORT_STEP:30s}
 
 landit:
+  free-talk:
+    speaking-time-limit-ms: ${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:60000}
   cors:
     allowed-origins: ${LANDIT_CORS_ALLOWED_ORIGINS:}
   auth:
@@ -47,14 +60,31 @@ landit:
     connect-timeout: ${LANDIT_AI_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_AI_REQUEST_TIMEOUT:60s}
     session-feedback-request-timeout: ${LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT:120s}
+    pronunciation-request-timeout: ${LANDIT_AI_PRONUNCIATION_REQUEST_TIMEOUT:20s}
   expression-search:
     mode: ${LANDIT_EXPRESSION_SEARCH_MODE:pgvector}
     max-candidates: ${LANDIT_EXPRESSION_SEARCH_MAX_CANDIDATES:30}
     distance-threshold: ${LANDIT_EXPRESSION_SEARCH_DISTANCE_THRESHOLD:0.6}
+  memory-search:
+    mode: ${LANDIT_MEMORY_SEARCH_MODE:pgvector}
+  memory:
+    write-enabled: ${LANDIT_MEMORY_WRITE_ENABLED:false}
+    use-enabled: ${LANDIT_MEMORY_USE_ENABLED:false}
   content-image:
     bucket-name: ${CONTENT_BUCKET_NAME:}
     cloudfront-url: ${CONTENT_CLOUDFRONT_URL:}
     region: ${AWS_REGION:ap-northeast-2}
+  pronunciation-asset:
+    manifest-mode: ${LANDIT_PRONUNCIATION_MANIFEST_MODE:s3}
+  notification:
+    expo-base-url: ${LANDIT_NOTIFICATION_EXPO_BASE_URL:https://exp.host}
+    expo-access-token: ${LANDIT_NOTIFICATION_EXPO_ACCESS_TOKEN:}
+    connect-timeout: ${LANDIT_NOTIFICATION_CONNECT_TIMEOUT:5s}
+    request-timeout: ${LANDIT_NOTIFICATION_REQUEST_TIMEOUT:10s}
+    consumer-enabled: ${LANDIT_NOTIFICATION_CONSUMER_ENABLED:false}
+    test-api-enabled: ${LANDIT_NOTIFICATION_TEST_API_ENABLED:false}
+    queue-url: ${SQS_PUSH_NOTIFICATIONS_QUEUE_URL:}
+    receipt-delay-seconds: ${LANDIT_NOTIFICATION_RECEIPT_DELAY_SECONDS:900}
 
 sentry:
   dsn: ${SENTRY_DSN:}
