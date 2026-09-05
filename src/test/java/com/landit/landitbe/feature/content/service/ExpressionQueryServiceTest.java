@@ -420,7 +420,7 @@ class ExpressionQueryServiceTest {
     assertThat(response.baseExpressionMeaningText()).isEqualTo("끝내주게 놀랍다");
     assertThat(response.usageDescription()).isEqualTo("강렬한 인상을 받았을 때 최고의 리액션이에요.");
 
-    // then: 예문 4개 중 앞 2개가 눈으로 익히는 예문으로 내려간다
+    // then: 예문 4개 중 뒤 2개가 눈으로 익히는 예문으로 내려간다
     assertThat(response.practiceSentence()).hasSize(2);
     assertThat(response.practiceSentence())
         .allSatisfy(
@@ -439,13 +439,13 @@ class ExpressionQueryServiceTest {
         .extracting(WritingSentenceResponse::quizLanguage)
         .containsExactlyInAnyOrder(Locale.EN, Locale.KR);
 
-    // then: 분배는 payload 순서로 고정이다. 앞 2건이 예문, 뒤 2건이 작문 문제다.
+    // then: 분배는 payload 순서로 고정이다. 뒤 2건이 예문, 앞 2건이 작문 문제다.
     assertThat(response.practiceSentence())
         .extracting(PracticeSentenceResponse::sentenceText)
-        .containsExactly("sentence-0", "sentence-1");
+        .containsExactly("sentence-2", "sentence-3");
     assertThat(response.writingSentence())
         .extracting(WritingSentenceResponse::writingSentenceText)
-        .containsExactly("sentence-2", "sentence-3");
+        .containsExactly("sentence-0", "sentence-1");
   }
 
   /**
@@ -479,8 +479,8 @@ class ExpressionQueryServiceTest {
     }
 
     // then: 분배는 payload 순서 그대로 고정이다
-    assertThat(practiceSplits).containsExactly(List.of("sentence-0", "sentence-1"));
-    assertThat(writingSplits).containsExactly(List.of("sentence-2", "sentence-3"));
+    assertThat(practiceSplits).containsExactly(List.of("sentence-2", "sentence-3"));
+    assertThat(writingSplits).containsExactly(List.of("sentence-0", "sentence-1"));
 
     // then: 출제 언어는 매번 달라져 두 언어가 모두 등장한다
     assertThat(pickedLanguages).containsExactlyInAnyOrder(Locale.EN, Locale.KR);
@@ -525,12 +525,12 @@ class ExpressionQueryServiceTest {
   /**
    * 선택 필드인 imageUrl의 매핑을 검증한다. payload에 키가 없어도 파싱이 깨지지 않고 null로 매핑되며, 있으면 값 그대로 내려간다.
    *
-   * <p>분배가 payload 순서 고정이므로 [0]은 키가 없는 예문, [1]은 키가 있는 예문으로 둔다.
+   * <p>분배가 payload 순서 고정이므로 [2]는 키가 없는 예문, [3]은 키가 있는 예문으로 둔다.
    */
   @Test
   void shouldMapMissingImageUrlToNull() {
     WritingExpression expression =
-        makeWritingExpressionMockWithInfo(makePracticeExamplesPayloadWithoutFirstImage());
+        makeWritingExpressionMockWithInfo(makePracticeExamplesPayloadWithoutThirdImage());
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
 
@@ -539,7 +539,7 @@ class ExpressionQueryServiceTest {
 
     assertThat(response.practiceSentence().get(0).imageUrl()).isNull();
     assertThat(response.practiceSentence().get(1).imageUrl())
-        .isEqualTo("https://cdn.example.com/practice/1.png");
+        .isEqualTo("https://cdn.example.com/practice/3.png");
   }
 
   /**
@@ -901,12 +901,12 @@ class ExpressionQueryServiceTest {
     return toJson(json.append("]").toString());
   }
 
-  /** 첫 예문에만 imageUrl 키가 없는 payload를 만든다. 선택 필드의 null 매핑을 확인할 때 쓴다. */
-  private JsonNode makePracticeExamplesPayloadWithoutFirstImage() {
+  /** 세 번째 예문에만 imageUrl 키가 없는 payload를 만든다. 선택 필드의 null 매핑을 확인할 때 쓴다. */
+  private JsonNode makePracticeExamplesPayloadWithoutThirdImage() {
     return toJson(
         makePracticeExamplesPayload(4)
             .toString()
-            .replace("\"imageUrl\":\"https://cdn.example.com/practice/0.png\",", ""));
+            .replace("\"imageUrl\":\"https://cdn.example.com/practice/2.png\",", ""));
   }
 
   /** JSON 문자열을 JsonNode로 변환한다. (체크 예외를 테스트에서 편하게 쓰기 위한 래퍼) */

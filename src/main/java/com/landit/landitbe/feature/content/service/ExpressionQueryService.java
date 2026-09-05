@@ -332,16 +332,15 @@ public class ExpressionQueryService {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
-    // payload 순서를 그대로 따른다. 앞 2건은 눈으로 익히는 예문, 뒤 2건은 작문 문제로 고정한다.
+    // payload 순서를 그대로 따른다. 뒤 2건은 눈으로 익히는 예문, 앞 2건은 작문 문제로 고정한다.
     return new ExpressionPracticeResponse(
         targetExpressionText,
         baseExpressionMeaningText,
         usageDescription,
-        parsedSentences.subList(0, PRACTICE_SENTENCE_COUNT).stream()
+        parsedSentences.subList(PRACTICE_SENTENCE_COUNT, REQUIRED_PRACTICE_SENTENCE_COUNT).stream()
             .map(ParsedPracticeSentence::sentence)
             .toList(),
-        writingSentences(
-            parsedSentences.subList(PRACTICE_SENTENCE_COUNT, REQUIRED_PRACTICE_SENTENCE_COUNT)));
+        writingSentences(parsedSentences.subList(0, PRACTICE_SENTENCE_COUNT)));
   }
 
   // 사용자가 접근할 수 있는 활성 표현을 조회한다.

@@ -86,7 +86,7 @@ class ExpressionPracticeApiIntegrationTests {
             // 예문 이미지는 payload 값 그대로 내려온다
             .andExpect(
                 jsonPath("$.data.practiceSentence[0].imageUrl")
-                    .value("https://cdn.example.com/practice/0.png"))
+                    .value("https://cdn.example.com/practice/2.png"))
             .andReturn();
 
     // then: writingSentence는 랜덤이라 특정 값 고정 검증이 불가능하므로,
@@ -147,12 +147,12 @@ class ExpressionPracticeApiIntegrationTests {
     assertThat(pickedTexts).doesNotHaveDuplicates();
     assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
 
-    // 분배는 payload 순서로 고정이다. 앞 2건이 예문, 뒤 2건이 작문 문제다.
+    // 분배는 payload 순서로 고정이다. 뒤 2건이 예문, 앞 2건이 작문 문제다.
     List<String> practiceTexts = new ArrayList<>();
     data.get("practiceSentence")
         .forEach(node -> practiceTexts.add(node.get("sentenceText").asText()));
-    assertThat(practiceTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
-    assertThat(pickedTexts).containsExactly("practice-sentence-2", "practice-sentence-3");
+    assertThat(practiceTexts).containsExactly("practice-sentence-2", "practice-sentence-3");
+    assertThat(pickedTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
