@@ -99,9 +99,7 @@ class FreeTalkMemoryRetrievalServiceTest {
             new FreeTalkMemoryRetrievalService.RetrievalRequest(
                 10L, 20L, "chloe", MemoryRetrievalStage.FIRST_USER_TURN, "Saturday routine"));
 
-    assertThat(result.contexts())
-        .extracting(AiFreeTalkMemoryContext::memoryId)
-        .containsExactly(1L);
+    assertThat(result.contexts()).extracting(AiFreeTalkMemoryContext::memoryId).containsExactly(1L);
   }
 
   @Test

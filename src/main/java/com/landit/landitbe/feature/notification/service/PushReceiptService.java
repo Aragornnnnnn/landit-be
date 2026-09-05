@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.notification.client.NotificationSender;
 import com.landit.landitbe.feature.notification.client.PushReceiptResult;
 import com.landit.landitbe.feature.notification.client.PushReceiptStatus;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class PushReceiptService {
   private final PushDeliveryService pushDeliveryService;
   private final NotificationSender notificationSender;
   private final PushQueuePublisher pushQueuePublisher;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Ticket의 Receipt를 조회하고 결과 기록 또는 다음 확인 예약을 처리한다.
@@ -42,6 +44,14 @@ public class PushReceiptService {
   /** Expo Receipt 결과에 따라 완료 기록 또는 다음 확인 예약을 처리한다. */
   private void checkReceipt(PushReceiptTarget target, int attempt) {
     PushReceiptResult result = notificationSender.getReceipt(target.ticketId());
+    meterRegistry
+        .counter(
+            "landit.notification.delivery",
+            "stage",
+            "receipt",
+            "outcome",
+            receiptOutcome(result.status()))
+        .increment();
     if (result.status() != PushReceiptStatus.NOT_READY) {
       pushDeliveryService.recordReceiptResult(target.pushDeliveryId(), result);
       return;
@@ -59,5 +69,14 @@ public class PushReceiptService {
     if (attempt < 1 || attempt > MAX_ATTEMPTS) {
       throw new IllegalArgumentException("Receipt 확인 시도 횟수가 올바르지 않습니다.");
     }
+  }
+
+  /** Receipt 상태를 고정된 저카디널리티 지표 값으로 변환한다. */
+  private String receiptOutcome(PushReceiptStatus status) {
+    return switch (status) {
+      case NOT_READY -> "not_ready";
+      case DELIVERED -> "delivered";
+      case FAILED -> "failed";
+    };
   }
 }
