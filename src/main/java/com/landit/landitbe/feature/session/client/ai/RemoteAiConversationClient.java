@@ -271,7 +271,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
       BigDecimal starRating,
       String highlightMessage,
       String summaryMessage,
-      List<AiSessionMessageFeedbackResult> messageFeedbacks) {
+      List<AiSessionMessageFeedbackResult> messageFeedbacks,
+      AiSessionLevelAssessment levelAssessment) {
 
     /** 응답의 최상위 필수 필드를 확인한 뒤 애플리케이션 포트 결과로 변환한다. */
     private AiSessionFeedbackResult toResult() {
@@ -284,7 +285,14 @@ public class RemoteAiConversationClient implements AiConversationClient {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiSessionFeedbackResult(
-          sessionId, nativeScore, starRating, highlightMessage, summaryMessage, messageFeedbacks);
+          sessionId,
+          nativeScore,
+          starRating,
+          highlightMessage,
+          summaryMessage,
+          messageFeedbacks,
+          levelAssessment,
+          false);
     }
   }
 

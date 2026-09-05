@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackEvaluation
 import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.session.domain.SessionHistorySummaryFeedback;
+import com.landit.landitbe.feature.session.domain.SessionLevelAssessment;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -18,6 +19,7 @@ import java.util.List;
  * @param highlightMessage 최종 피드백 강조 메시지
  * @param summaryMessage 최종 피드백 요약
  * @param messageFeedbacks 메시지별 피드백 목록
+ * @param levelAssessment 세션 텍스트 수준 평가
  */
 public record SessionFeedbackResponse(
     Long sessionId,
@@ -25,7 +27,8 @@ public record SessionFeedbackResponse(
     BigDecimal starRating,
     String highlightMessage,
     String summaryMessage,
-    List<MessageFeedbackResponse> messageFeedbacks) {
+    List<MessageFeedbackResponse> messageFeedbacks,
+    SessionLevelAssessment levelAssessment) {
 
   /**
    * 저장된 세션 요약 피드백과 메시지별 응답을 최종 피드백 응답으로 변환한다.
@@ -33,19 +36,22 @@ public record SessionFeedbackResponse(
    * @param sessionId 학습 세션 ID
    * @param summary 저장된 세션 요약 피드백
    * @param messageFeedbacks 메시지별 피드백 응답
+   * @param levelAssessment 저장된 세션 수준 평가
    * @return 세션 최종 피드백 응답
    */
   public static SessionFeedbackResponse from(
       Long sessionId,
       SessionHistorySummaryFeedback summary,
-      List<MessageFeedbackResponse> messageFeedbacks) {
+      List<MessageFeedbackResponse> messageFeedbacks,
+      SessionLevelAssessment levelAssessment) {
     return new SessionFeedbackResponse(
         sessionId,
         summary.getNativeScore(),
         summary.getStarRating(),
         summary.getHighlightMessage(),
         summary.getSummaryMessage(),
-        messageFeedbacks);
+        messageFeedbacks,
+        levelAssessment);
   }
 
   /**
