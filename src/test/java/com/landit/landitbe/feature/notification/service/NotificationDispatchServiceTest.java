@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.notification.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -19,14 +20,15 @@ import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -49,7 +51,21 @@ class NotificationDispatchServiceTest {
 
   @Mock private PushQueuePublisher pushQueuePublisher;
 
-  @InjectMocks private NotificationDispatchService notificationDispatchService;
+  private NotificationDispatchService notificationDispatchService;
+
+  private SimpleMeterRegistry meterRegistry;
+
+  @BeforeEach
+  void setUp() {
+    meterRegistry = new SimpleMeterRegistry();
+    notificationDispatchService =
+        new NotificationDispatchService(
+            userPushTokenDeliveryService,
+            pushDeliveryService,
+            notificationSender,
+            pushQueuePublisher,
+            meterRegistry);
+  }
 
   /** 사용자의 발송 가능한 Token별 Ticket을 기록하고 Receipt 확인을 예약한다. */
   @Test
@@ -72,6 +88,21 @@ class NotificationDispatchServiceTest {
                         && command.deduplicationKey().equals("push:event-1:2")));
     verify(pushDeliveryService).recordTicketResult(10L, PushTicketResult.accepted("ticket-1"));
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
+    assertThat(
+            meterRegistry
+                .find("landit.notification.expo.request.duration")
+                .tag("outcome", "success")
+                .timer()
+                .count())
+        .isEqualTo(1L);
+    assertThat(
+            meterRegistry
+                .find("landit.notification.delivery")
+                .tag("stage", "ticket")
+                .tag("outcome", "accepted")
+                .counter()
+                .count())
+        .isEqualTo(1.0);
   }
 
   /** 같은 사용자의 과거 알림은 제외하고 현재 이벤트의 접수 Ticket만 Receipt를 다시 예약한다. */
@@ -101,6 +132,13 @@ class NotificationDispatchServiceTest {
     assertThatThrownBy(() -> notificationDispatchService.send(COMMAND)).isSameAs(failure);
 
     verify(pushDeliveryService).markRetryable(10L);
+    assertThat(
+            meterRegistry
+                .find("landit.notification.expo.request.duration")
+                .tag("outcome", "retryable_failure")
+                .timer()
+                .count())
+        .isEqualTo(1L);
   }
 
   /** Expo 수신 여부를 확정할 수 없는 오류는 재전달하지 않고 발송 이력을 종료한다. */
@@ -217,7 +255,8 @@ class NotificationDispatchServiceTest {
         new SendPushNotificationCommand(
             "event-2", 2L, NotificationType.TEST_NOTIFICATION, "두 번째 알림", "본문", "/home");
 
-    notificationDispatchService.sendAll(List.of(COMMAND, secondCommand));
+    NotificationDispatchResult result =
+        notificationDispatchService.sendAll(List.of(COMMAND, secondCommand));
 
     verify(notificationSender)
         .send(List.of(PREPARED_DELIVERY.toPushMessage(), secondDelivery.toPushMessage()));
@@ -227,5 +266,6 @@ class NotificationDispatchServiceTest {
     verify(pushDeliveryService).findAcceptedDeliveryIds("push:event-2:");
     verify(pushQueuePublisher).scheduleReceiptCheck(10L, 1);
     verify(pushQueuePublisher).scheduleReceiptCheck(11L, 1);
+    assertThat(result).isEqualTo(new NotificationDispatchResult(2, 1, 2, 0));
   }
 }

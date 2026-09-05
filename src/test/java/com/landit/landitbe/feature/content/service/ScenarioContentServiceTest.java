@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
@@ -26,10 +27,13 @@ class ScenarioContentServiceTest {
     ScenarioQuestionProjection projection =
         new ScenarioQuestionProjection(
             10L, 2, "question", "translation", "https://cdn.example.com/question.mp3");
-    when(repository.findActiveQuestion(1L, 2, Locale.EN, Locale.KR))
+    when(repository.findActiveQuestion(
+            1L, 2, ContentLearningLevel.LEVEL_2_TO_3, Locale.EN, Locale.KR))
         .thenReturn(Optional.of(projection));
 
-    assertThat(service.findActiveQuestion(1L, 2, Locale.EN, Locale.KR))
+    assertThat(
+            service.findActiveQuestion(
+                1L, 2, ContentLearningLevel.LEVEL_2_TO_3, Locale.EN, Locale.KR))
         .contains(
             new NextQuestionContext(
                 10L, 2, "question", "translation", "https://cdn.example.com/question.mp3"));

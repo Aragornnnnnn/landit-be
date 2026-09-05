@@ -34,6 +34,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   @Test
   void loadsCompletedDailyScenarioAndScenarioExpressionProgress() {
     seedUser();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", USER_ID);
     seedCategory();
     seedScenario(FIRST_SCENARIO_ID, 1);
     seedScenario(DAILY_SCENARIO_ID, 2);
@@ -41,6 +42,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     insertScenarioAccess(DAILY_SCENARIO_ID, LocalDateTime.of(2026, 7, 30, 9, 0));
     long completedExpressionId = insertExpression(DAILY_SCENARIO_ID, 1);
     long freeTalkOnlyExpressionId = insertExpression(DAILY_SCENARIO_ID, 2);
+    insertExpression(DAILY_SCENARIO_ID, 3, 4);
     insertExpressionCompletion(completedExpressionId, DAILY_SCENARIO_ID, "SCENARIO");
     insertExpressionCompletion(freeTalkOnlyExpressionId, DAILY_SCENARIO_ID, "FREE_TALK");
     jdbcTemplate.update(
@@ -95,6 +97,38 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     assertThat(input.longestStreakDays()).isEqualTo(4);
     assertThat(input.priorActiveDayHistory()).isTrue();
     assertThat(input.missedDayCount()).isEqualTo(1);
+  }
+
+  @Test
+  void nullLearningLevelIncludesAdvancedExpressions() {
+    seedUser();
+    seedCategory();
+    seedScenario(DAILY_SCENARIO_ID, 1);
+    long advancedExpressionId = insertExpression(DAILY_SCENARIO_ID, 1, 4);
+
+    NotificationTargetPage page = queryService.loadPage(USER_ID - 1, 1, SCHEDULED_DATE);
+
+    assertThat(page.inputs().get(USER_ID).expressions())
+        .extracting(ExpressionNotificationCandidate::expressionId)
+        .containsExactly(advancedExpressionId);
+  }
+
+  @Test
+  void learningLevelTwoIncludesOnlyLevelTwoToThreeExpressions() {
+    seedUser();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", USER_ID);
+    seedCategory();
+    seedScenario(DAILY_SCENARIO_ID, 1);
+    insertExpression(DAILY_SCENARIO_ID, 1, 1);
+    long levelTwoExpressionId = insertExpression(DAILY_SCENARIO_ID, 2, 2);
+    long levelThreeExpressionId = insertExpression(DAILY_SCENARIO_ID, 3, 3);
+    insertExpression(DAILY_SCENARIO_ID, 4, 4);
+
+    NotificationTargetPage page = queryService.loadPage(USER_ID - 1, 1, SCHEDULED_DATE);
+
+    assertThat(page.inputs().get(USER_ID).expressions())
+        .extracting(ExpressionNotificationCandidate::expressionId)
+        .containsExactly(levelTwoExpressionId, levelThreeExpressionId);
   }
 
   /** 오늘 완료 이력이 없으면 기존 접근 상태에서 첫 미완료 시나리오를 오늘 배정으로 계산한다. */
@@ -213,7 +247,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO category (id, display_order, status, created_at, updated_at)
-        VALUES (?, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 9950001, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         CATEGORY_ID);
     jdbcTemplate.update(
@@ -225,6 +259,10 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   }
 
   private long insertExpression(long scenarioId, int displayOrder) {
+    return insertExpression(scenarioId, displayOrder, 3);
+  }
+
+  private long insertExpression(long scenarioId, int displayOrder, int difficultyLevel) {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
@@ -234,11 +272,12 @@ class NotificationTargetPageQueryServiceIntegrationTests {
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', ?, '표현', '뜻', '요약', '설명',
+        VALUES (?, 'DAILY_ROUTINE', 'BASIC', ?, 'EN', 'KR', ?, '표현', '뜻', '요약', '설명',
                 '예문', '예문 번역', ARRAY['예문'], ARRAY['예문', '선택'], CAST('[]' AS jsonb),
                 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
+        difficultyLevel,
         displayOrder);
     return jdbcTemplate.queryForObject(
         "SELECT id FROM writing_expression WHERE scenario_id = ? AND display_order = ?",

@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.notification.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -66,7 +67,7 @@ class PushQueueMessageHandlerTest {
     pushQueueMessageHandler.handle(message);
 
     verify(scheduledNotificationService)
-        .process(org.mockito.ArgumentMatchers.eq(occurredAt), any());
+        .process(org.mockito.ArgumentMatchers.eq("scheduler-execution"), eq(occurredAt), any());
   }
 
   @Test

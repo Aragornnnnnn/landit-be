@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
@@ -33,17 +34,21 @@ class ScenarioSessionServiceTest {
   @Test
   void returnsStartProjection() {
     ScenarioSessionStartProjection projection = mock(ScenarioSessionStartProjection.class);
-    when(startQueryRepository.findStartRow(1L, 2L)).thenReturn(Optional.of(projection));
+    when(startQueryRepository.findStartRow(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
+        .thenReturn(Optional.of(projection));
 
-    assertThat(service.requireStartProjection(1L, 2L)).isSameAs(projection);
+    assertThat(service.requireStartProjection(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
+        .isSameAs(projection);
   }
 
   /** 시작 Projection이 없으면 시나리오 없음 오류로 변환한다. */
   @Test
   void rejectsMissingStartProjection() {
-    when(startQueryRepository.findStartRow(1L, 2L)).thenReturn(Optional.empty());
+    when(startQueryRepository.findStartRow(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
+        .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.requireStartProjection(1L, 2L))
+    assertThatThrownBy(
+            () -> service.requireStartProjection(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.SCENARIO_NOT_FOUND);
