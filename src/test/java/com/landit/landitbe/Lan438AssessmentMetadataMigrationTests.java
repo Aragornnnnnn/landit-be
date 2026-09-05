@@ -33,7 +33,7 @@ class Lan438AssessmentMetadataMigrationTests {
       }
       ScriptUtils.executeSqlScript(
           connection,
-          new ClassPathResource("db/migration/V82__refine_onboarding_assessment_metadata.sql"));
+          new ClassPathResource("db/migration/V85__refine_onboarding_assessment_metadata.sql"));
       assertThat(
               jdbc.queryForObject(
                       "SELECT required_response_element FROM scenario_question_language_variant "
