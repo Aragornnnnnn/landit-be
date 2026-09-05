@@ -25,6 +25,7 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
    * @param scenarioId 표현이 속한 시나리오 ID
    * @param targetLocale 학습 언어 locale
    * @param baseLocale 기준 언어 locale
+   * @param minimumDifficulty 최소 표현 난이도
    * @param maximumDifficulty 최대 표현 난이도
    * @param status 조회할 콘텐츠 상태
    * @return 표시 순서 오름차순의 Writing 표현 목록
@@ -35,7 +36,7 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
       WHERE expression.scenarioId = :scenarioId
         AND expression.targetLocale = :targetLocale
         AND expression.baseLocale = :baseLocale
-        AND expression.difficultyLevel <= :maximumDifficulty
+        AND expression.difficultyLevel BETWEEN :minimumDifficulty AND :maximumDifficulty
         AND expression.status = :status
       ORDER BY expression.displayOrder ASC
       """)
@@ -43,6 +44,7 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
       @Param("scenarioId") Long scenarioId,
       @Param("targetLocale") Locale targetLocale,
       @Param("baseLocale") Locale baseLocale,
+      @Param("minimumDifficulty") int minimumDifficulty,
       @Param("maximumDifficulty") int maximumDifficulty,
       @Param("status") ActiveStatus status);
 

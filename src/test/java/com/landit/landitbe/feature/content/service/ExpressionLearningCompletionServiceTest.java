@@ -208,6 +208,25 @@ class ExpressionLearningCompletionServiceTest {
         .findByIdAndStatusForUpdate(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
   }
 
+  @Test
+  void shouldRejectScenarioExpressionBelowUserDifficultyGroup() {
+    WritingExpression expression = expressionInScenario();
+    when(expression.getDifficultyLevel()).thenReturn(1);
+    when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+
+    assertThatThrownBy(
+            () ->
+                expressionLearningCompletionService.completeLearning(USER_ID, LOCKED_EXPRESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+
+    verify(writingExpressionRepository, never())
+        .findByIdAndStatusForUpdate(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
+  }
+
   /** 프리톡 추천 표현은 시나리오 학습 순서와 관계없이 완료한다. */
   @Test
   void shouldCompleteScenarioExpressionFromFreeTalkWithoutOrderLock() {
@@ -331,7 +350,7 @@ class ExpressionLearningCompletionServiceTest {
     when(userProfileService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(TARGET_LOCALE, BASE_LOCALE));
     when(writingExpressionRepository.findScenarioExpressions(
-            SCENARIO_ID, TARGET_LOCALE, BASE_LOCALE, 5, ActiveStatus.ACTIVE))
+            SCENARIO_ID, TARGET_LOCALE, BASE_LOCALE, 4, 5, ActiveStatus.ACTIVE))
         .thenReturn(List.of(expressions));
   }
 
@@ -340,6 +359,7 @@ class ExpressionLearningCompletionServiceTest {
     WritingExpression expression = mock(WritingExpression.class);
     when(expression.getScenarioId()).thenReturn(SCENARIO_ID);
     lenient().when(expression.getExpressionSource()).thenReturn(WritingExpressionSource.SCENARIO);
+    lenient().when(expression.getDifficultyLevel()).thenReturn(4);
     return expression;
   }
 

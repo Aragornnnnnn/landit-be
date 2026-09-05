@@ -98,12 +98,14 @@ public class ExpressionQueryService {
 
     // 사용자 로케일에 맞는 표현을 로케일별 노출 순서로 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
+    ContentLearningLevel contentLevel = contentLearningLevel(userId);
     List<WritingExpression> expressions =
         writingExpressionRepository.findScenarioExpressions(
             scenarioId,
             userLocale.targetLocale(),
             userLocale.baseLocale(),
-            maximumExpressionDifficulty(userId),
+            contentLevel.minimumExpressionDifficulty(),
+            contentLevel.maximumExpressionDifficulty(),
             ActiveStatus.ACTIVE);
 
     // 해당 유저가 클리어한 Writing 표현의 ID를 Set으로 수집한다.
@@ -131,12 +133,14 @@ public class ExpressionQueryService {
   @Transactional(readOnly = true)
   public ExpressionProgress getExpressionProgress(Long userId, Long scenarioId) {
     UserLocale userLocale = userProfileService.getUserLocale(userId);
+    ContentLearningLevel contentLevel = contentLearningLevel(userId);
     List<WritingExpression> expressions =
         writingExpressionRepository.findScenarioExpressions(
             scenarioId,
             userLocale.targetLocale(),
             userLocale.baseLocale(),
-            maximumExpressionDifficulty(userId),
+            contentLevel.minimumExpressionDifficulty(),
+            contentLevel.maximumExpressionDifficulty(),
             ActiveStatus.ACTIVE);
     Set<Long> completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId).values();
@@ -329,16 +333,16 @@ public class ExpressionQueryService {
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
     if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
-        && expression.getDifficultyLevel() > maximumExpressionDifficulty(userId)) {
+        && !contentLearningLevel(userId)
+            .includesExpressionDifficulty(expression.getDifficultyLevel())) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     return expression;
   }
 
-  /** 사용자 학습 레벨에서 조회 가능한 최대 표현 난이도를 계산한다. */
-  private int maximumExpressionDifficulty(Long userId) {
-    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel())
-        .maximumExpressionDifficulty();
+  /** 사용자 학습 레벨을 콘텐츠 레벨 그룹으로 변환한다. */
+  private ContentLearningLevel contentLearningLevel(Long userId) {
+    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
   }
 
   /**

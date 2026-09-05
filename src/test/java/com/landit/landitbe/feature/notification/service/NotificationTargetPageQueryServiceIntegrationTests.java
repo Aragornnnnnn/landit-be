@@ -113,6 +113,24 @@ class NotificationTargetPageQueryServiceIntegrationTests {
         .containsExactly(advancedExpressionId);
   }
 
+  @Test
+  void learningLevelTwoIncludesOnlyLevelTwoToThreeExpressions() {
+    seedUser();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", USER_ID);
+    seedCategory();
+    seedScenario(DAILY_SCENARIO_ID, 1);
+    insertExpression(DAILY_SCENARIO_ID, 1, 1);
+    long levelTwoExpressionId = insertExpression(DAILY_SCENARIO_ID, 2, 2);
+    long levelThreeExpressionId = insertExpression(DAILY_SCENARIO_ID, 3, 3);
+    insertExpression(DAILY_SCENARIO_ID, 4, 4);
+
+    NotificationTargetPage page = queryService.loadPage(USER_ID - 1, 1, SCHEDULED_DATE);
+
+    assertThat(page.inputs().get(USER_ID).expressions())
+        .extracting(ExpressionNotificationCandidate::expressionId)
+        .containsExactly(levelTwoExpressionId, levelThreeExpressionId);
+  }
+
   /** 오늘 완료 이력이 없으면 기존 접근 상태에서 첫 미완료 시나리오를 오늘 배정으로 계산한다. */
   @Test
   void loadsFirstUnclearedScenarioAsTodaysAssignment() {
@@ -229,7 +247,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     jdbcTemplate.update(
         """
         INSERT INTO category (id, display_order, status, created_at, updated_at)
-        VALUES (?, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 9950001, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         CATEGORY_ID);
     jdbcTemplate.update(

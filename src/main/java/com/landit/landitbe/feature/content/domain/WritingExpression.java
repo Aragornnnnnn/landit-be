@@ -44,9 +44,8 @@ public class WritingExpression extends BaseTimeEntity {
   @Column(name = "usage_frequency_level", nullable = false, length = 20)
   private ExpressionUsageFrequencyLevel usageFrequencyLevel;
 
-  // difficulty_level은 표현의 난이도이자 노출 하한선이다. 수준이 1-3인 유저에게는
-  // difficulty_level 1-3인 표현들만 보여주고, 수준이 4-5인 유저에게는
-  // difficulty_level 1-5인 표현 전부를 보여준다.
+  // 시나리오 표현은 사용자 레벨 그룹과 일치하는 난이도 범위로 노출한다.
+  // 프리톡 표현은 별도 정책의 최대 난이도 이하로 추천한다.
   @Column(name = "difficulty_level", nullable = false)
   private int difficultyLevel;
 

@@ -4,7 +4,7 @@
 
 **Goal:** 사용자 학습 레벨에 맞는 시나리오 질문과 Writing 표현을 노출하고, 진행 중 세션의 질문 그룹을 시작 시점에 고정한다.
 
-**Architecture:** `ContentLearningLevel` 하나가 프로필 레벨을 질문 그룹과 표현 최대 난이도로 해석한다. 질문과 시나리오 세션에는 그룹을 저장하고, 표현은 기존 `difficulty_level`을 그대로 필터에 사용한다.
+**Architecture:** `ContentLearningLevel` 하나가 프로필 레벨을 질문 그룹과 표현 난이도 범위로 해석한다. 질문과 시나리오 세션에는 그룹을 저장하고, 표현은 기존 `difficulty_level`을 그대로 필터에 사용한다.
 
 **Tech Stack:** Java 21, Spring Boot 4, Spring Data JPA, Flyway, PostgreSQL, H2, JUnit 5.
 
@@ -13,8 +13,8 @@
 ## 범위
 
 - 질문 그룹은 `LEVEL_1`, `LEVEL_2_TO_3`, `LEVEL_4_TO_5`다.
-- `learning_level = null`은 `LEVEL_4_TO_5`와 표현 최대 난이도 5로 처리한다.
-- 레벨 1~3은 `difficulty_level <= 3`, 레벨 4~5는 `<= 5` 표현을 사용한다.
+- `learning_level = null`은 `LEVEL_4_TO_5`와 표현 난이도 4~5로 처리한다.
+- 레벨 1은 난이도 1, 레벨 2~3은 난이도 2~3, 레벨 4~5는 난이도 4~5 표현을 사용한다.
 - 기존 질문과 시나리오 세션은 `LEVEL_4_TO_5`로 백필한다.
 - 신규 질문 240개와 음원은 별도 데이터 PR 범위다.
 - 공개 API 응답 필드는 변경하지 않는다.
@@ -29,8 +29,8 @@
 - Modify: `src/main/java/com/landit/landitbe/feature/session/domain/ScenarioSession.java`
 - Test: `src/test/java/com/landit/landitbe/feature/content/domain/ContentLearningLevelTest.java`
 
-- [x] `ContentLearningLevel.from(Integer)`와 `maximumExpressionDifficulty()` 테스트를 먼저 실패시킨다.
-- [x] 세 질문 그룹과 표현 최대 난이도 3·5 매핑을 구현한다.
+- [x] `ContentLearningLevel.from(Integer)`와 표현 난이도 범위 테스트를 먼저 실패시킨다.
+- [x] 세 질문 그룹과 표현 난이도 범위 매핑을 구현한다.
 - [x] 질문과 시나리오 세션 엔티티에 `question_level_group` 필드를 추가한다.
 - [x] `./gradlew test --tests '*ContentLearningLevelTest'`를 통과시킨다.
 - [x] `867eb344 feat: 콘텐츠 학습 레벨 매핑을 추가한다`로 커밋한다.
@@ -82,13 +82,13 @@
 - Test: `src/test/java/com/landit/landitbe/feature/content/service/ExpressionLearningCompletionServiceTest.java`
 - Test: `src/test/java/com/landit/landitbe/feature/notification/service/NotificationTargetPageQueryServiceIntegrationTests.java`
 
-- [x] 시나리오 표현 목록 조회에 `difficultyLevel <= maximumDifficulty` 조건을 추가한다.
-- [x] 목록과 진행도는 현재 사용자 레벨의 최대 난이도를 같은 repository 메서드에 전달한다.
-- [x] 상세·추가 연습은 시나리오 표현의 난이도가 사용자 한도를 넘으면 `RESOURCE_NOT_FOUND`로 처리한다.
+- [x] 시나리오 표현 목록 조회에 난이도 범위 조건을 추가한다.
+- [x] 목록과 진행도는 현재 사용자 레벨의 최소·최대 난이도를 같은 repository 메서드에 전달한다.
+- [x] 상세·추가 연습은 시나리오 표현의 난이도가 사용자 범위를 벗어나면 `RESOURCE_NOT_FOUND`로 처리한다.
 - [x] 완료 처리는 같은 난이도 검증과 필터된 학습 순서를 사용한다.
 - [x] FreeTalk 표현 조회·완료에는 시나리오 난이도 필터를 적용하지 않는다.
-- [x] 알림 집계 SQL에 `coalesce(up.learning_level, 5)` 기준 최대 난이도 조건을 한 줄 추가한다.
-- [x] 난이도 2·3·4 fixture로 레벨 1~3과 4~5·`null`의 목록·진행도·완료 차이를 검증한다.
+- [x] 알림 집계 SQL에 `coalesce(up.learning_level, 5)` 기준 난이도 범위 조건을 추가한다.
+- [x] 난이도 1~5 fixture로 세 레벨 그룹과 `null`의 목록·진행도·완료 차이를 검증한다.
 - [x] 다음 검증을 통과시킨다.
 
 ```bash

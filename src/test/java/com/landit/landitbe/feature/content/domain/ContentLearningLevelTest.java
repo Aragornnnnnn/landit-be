@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 class ContentLearningLevelTest {
 
   @Test
-  void mapsNullAndLevelsToQuestionGroupsAndExpressionMaximums() {
+  void mapsNullAndLevelsToQuestionGroupsAndExpressionDifficultyRanges() {
     assertAll(
         () -> assertEquals(LEVEL_1, ContentLearningLevel.from(1)),
         () -> assertEquals(LEVEL_2_TO_3, ContentLearningLevel.from(2)),
@@ -22,8 +22,11 @@ class ContentLearningLevelTest {
         () -> assertEquals(LEVEL_4_TO_5, ContentLearningLevel.from(4)),
         () -> assertEquals(LEVEL_4_TO_5, ContentLearningLevel.from(5)),
         () -> assertEquals(LEVEL_4_TO_5, ContentLearningLevel.from(null)),
-        () -> assertEquals(3, ContentLearningLevel.from(1).maximumExpressionDifficulty()),
+        () -> assertEquals(1, ContentLearningLevel.from(1).minimumExpressionDifficulty()),
+        () -> assertEquals(1, ContentLearningLevel.from(1).maximumExpressionDifficulty()),
+        () -> assertEquals(2, ContentLearningLevel.from(3).minimumExpressionDifficulty()),
         () -> assertEquals(3, ContentLearningLevel.from(3).maximumExpressionDifficulty()),
+        () -> assertEquals(4, ContentLearningLevel.from(4).minimumExpressionDifficulty()),
         () -> assertEquals(5, ContentLearningLevel.from(4).maximumExpressionDifficulty()));
   }
 

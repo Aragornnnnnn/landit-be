@@ -214,7 +214,7 @@ class ExpressionQueryServiceTest {
         .isInstanceOf(ApiException.class);
 
     verify(writingExpressionRepository, never())
-        .findScenarioExpressions(any(), any(), any(), anyInt(), any());
+        .findScenarioExpressions(any(), any(), any(), anyInt(), anyInt(), any());
   }
 
   /** 표현 목록은 사용자 프로필의 locale(target/base) 기준으로 조회되는지 검증한다. (LAN-59 리뷰 반영) */
@@ -227,7 +227,7 @@ class ExpressionQueryServiceTest {
 
     // 사용자 locale(en/ko)이 repository 조회 조건으로 그대로 전달된다
     verify(writingExpressionRepository)
-        .findScenarioExpressions(SCENARIO_ID, Locale.EN, Locale.KR, 3, ActiveStatus.ACTIVE);
+        .findScenarioExpressions(SCENARIO_ID, Locale.EN, Locale.KR, 2, 3, ActiveStatus.ACTIVE);
   }
 
   @Test
@@ -235,6 +235,22 @@ class ExpressionQueryServiceTest {
     WritingExpression expression = mock(WritingExpression.class);
     when(expression.getExpressionSource()).thenReturn(WritingExpressionSource.SCENARIO);
     when(expression.getDifficultyLevel()).thenReturn(4);
+    when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
+        .thenReturn(Optional.of(expression));
+    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+
+    assertThatThrownBy(
+            () -> expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+  }
+
+  @Test
+  void shouldRejectScenarioExpressionBelowUserDifficultyGroup() {
+    WritingExpression expression = mock(WritingExpression.class);
+    when(expression.getExpressionSource()).thenReturn(WritingExpressionSource.SCENARIO);
+    when(expression.getDifficultyLevel()).thenReturn(1);
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
     when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
@@ -338,7 +354,7 @@ class ExpressionQueryServiceTest {
         .thenReturn(new UserLocale(Locale.EN, Locale.KR));
     when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
     when(writingExpressionRepository.findScenarioExpressions(
-            eq(SCENARIO_ID), eq(Locale.EN), eq(Locale.KR), eq(3), eq(ActiveStatus.ACTIVE)))
+            eq(SCENARIO_ID), eq(Locale.EN), eq(Locale.KR), eq(2), eq(3), eq(ActiveStatus.ACTIVE)))
         .thenReturn(List.of(expressions));
   }
 

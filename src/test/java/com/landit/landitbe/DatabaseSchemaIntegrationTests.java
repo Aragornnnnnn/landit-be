@@ -305,6 +305,20 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("scenario_session", "chk_scenario_session_level_group");
   }
 
+  @DisplayName("V76 migration은 기존 시나리오 표현을 레벨 4~5용 난이도로 옮긴다.")
+  @Test
+  void v76MovesExistingScenarioExpressionsToAdvancedDifficulty() throws Exception {
+    String migrationSql =
+        readMigrationSql("db/migration/V76__add_scenario_question_level_group.sql");
+
+    assertThat(migrationSql)
+        .contains(
+            "UPDATE writing_expression",
+            "SET difficulty_level = 4",
+            "WHERE expression_source = 'SCENARIO'",
+            "AND difficulty_level < 4");
+  }
+
   @DisplayName("V18 migration은 첫 질문 속마음을 질문 Variant로 옮긴다.")
   @Test
   void v18MovesOpeningInnerThoughtToQuestionLanguageVariant() {

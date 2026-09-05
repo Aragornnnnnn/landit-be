@@ -84,9 +84,9 @@ public class ExpressionLearningCompletionService {
     if (scenarioId == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
-    int maximumDifficulty = maximumExpressionDifficulty(userId);
+    ContentLearningLevel contentLevel = contentLearningLevel(userId);
     if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
-        && expression.getDifficultyLevel() > maximumDifficulty) {
+        && !contentLevel.includesExpressionDifficulty(expression.getDifficultyLevel())) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     writingExpressionRepository
@@ -104,7 +104,7 @@ public class ExpressionLearningCompletionService {
 
     // 시나리오 학습 순서에 따라 잠금 여부를 검증한다.
     if (!isUnlockedExpression(
-        userId, scenarioId, expressionId, maximumDifficulty, completedExpressionIds.values())) {
+        userId, scenarioId, expressionId, contentLevel, completedExpressionIds.values())) {
       log.warn(LOCKED_EXPRESSION_LOG, userId, expressionId);
       throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
     }
@@ -156,7 +156,7 @@ public class ExpressionLearningCompletionService {
       Long userId,
       Long scenarioId,
       Long expressionId,
-      int maximumDifficulty,
+      ContentLearningLevel contentLevel,
       Set<Long> completedExpressionIds) {
     // 사용자의 학습 언어와 기준 언어를 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
@@ -167,7 +167,8 @@ public class ExpressionLearningCompletionService {
             scenarioId,
             userLocale.targetLocale(),
             userLocale.baseLocale(),
-            maximumDifficulty,
+            contentLevel.minimumExpressionDifficulty(),
+            contentLevel.maximumExpressionDifficulty(),
             ActiveStatus.ACTIVE);
 
     // 가장 앞선 미완료 표현의 ID를 찾는다.
@@ -181,9 +182,8 @@ public class ExpressionLearningCompletionService {
         && firstIncompleteExpressionId.get().equals(expressionId);
   }
 
-  /** 사용자 학습 레벨에서 조회 가능한 최대 표현 난이도를 계산한다. */
-  private int maximumExpressionDifficulty(Long userId) {
-    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel())
-        .maximumExpressionDifficulty();
+  /** 사용자 학습 레벨을 콘텐츠 레벨 그룹으로 변환한다. */
+  private ContentLearningLevel contentLearningLevel(Long userId) {
+    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
   }
 }

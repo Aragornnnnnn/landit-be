@@ -228,7 +228,7 @@ class ExpressionLearningFinishApiIntegrationTests {
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "practice_examples_payload, status, "
             + "created_at, updated_at) "
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, 'EN', 'KR', ?, ?, ?, 'usage summary', "
+            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 4, 'EN', 'KR', ?, ?, ?, 'usage summary', "
             + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], "
             + "ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
         scenarioId,

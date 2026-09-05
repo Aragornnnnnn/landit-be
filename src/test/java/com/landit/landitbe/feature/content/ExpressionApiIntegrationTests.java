@@ -111,6 +111,10 @@ class ExpressionApiIntegrationTests {
     Long scenarioId = seedScenarioWithExpressions();
     Long advancedExpressionId = findExpressionIdByDisplayOrder(scenarioId, 5);
     jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 3 "
+            + "WHERE scenario_id = ? AND display_order < 5",
+        scenarioId);
+    jdbcTemplate.update(
         "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", advancedExpressionId);
     String accessToken =
         login("google-expr-level", "expr-level@example.com", "Expr Level", "expr-level-nonce");
@@ -128,6 +132,34 @@ class ExpressionApiIntegrationTests {
                 .value(
                     org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.hasItem(advancedExpressionId.intValue()))));
+  }
+
+  @Test
+  void getExpressionsReturnsOnlyLevelTwoToThreeDifficultyGroup() throws Exception {
+    Long scenarioId = seedScenarioWithExpressions();
+    for (int displayOrder = 1; displayOrder <= 5; displayOrder++) {
+      jdbcTemplate.update(
+          "UPDATE writing_expression SET difficulty_level = ? WHERE id = ?",
+          displayOrder,
+          findExpressionIdByDisplayOrder(scenarioId, displayOrder));
+    }
+    String accessToken =
+        login(
+            "google-expr-level-group",
+            "expr-level-group@example.com",
+            "Expr Level Group",
+            "expr-level-group-nonce");
+    Long userProfileId = findUserProfileIdByEmail("expr-level-group@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{scenarioId}", scenarioId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].displayOrder").value(2))
+        .andExpect(jsonPath("$.data[1].displayOrder").value(3));
   }
 
   /** 모든 표현을 완료한 사용자는 전부 completed=true, locked=false로 받는지 검증한다. (해금 대상이 없는 엣지 케이스) */
@@ -325,7 +357,7 @@ class ExpressionApiIntegrationTests {
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "practice_examples_payload, status, "
             + "created_at, updated_at) "
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 3, ?, ?, ?, ?, ?, 'usage summary', "
+            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 4, ?, ?, ?, ?, ?, 'usage summary', "
             + "'usage description', 'sample sentence', '샘플 문장', ARRAY['sample'], "
             + "ARRAY['sample','choice'], CAST(? AS jsonb), 'ACTIVE', ?, ?)",
         scenarioId,
