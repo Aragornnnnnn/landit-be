@@ -104,10 +104,15 @@ class SessionFeedbackContextService {
               question == null
                   ? defaultDemand(scenarioContext.questionLevelGroup())
                   : question.responseDemand(),
-              List.of(
-                  question == null
+              (question == null
+                          || question.requiredResponseElement() == null
+                          || question.requiredResponseElement().isBlank()
                       ? evaluationContext.content()
-                      : question.requiredResponseElement())));
+                      : question.requiredResponseElement())
+                  .lines()
+                  .map(String::strip)
+                  .filter(element -> !element.isEmpty())
+                  .toList()));
     }
     if (userMessages.isEmpty()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);

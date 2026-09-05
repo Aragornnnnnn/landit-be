@@ -1309,7 +1309,8 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update(
         """
         UPDATE scenario_question_language_variant
-        SET required_response_element = 'name a food'
+        SET required_response_element = 'name a food
+        explain a preference'
         WHERE scenario_question_id = (SELECT id FROM scenario_question WHERE scenario_id = 2120)
         """);
 
@@ -1320,7 +1321,8 @@ class ScenarioSessionApiIntegrationTests {
     AiSessionFeedbackRequest.AssessmentMessage assessmentMessage =
         fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages().getFirst();
     assertThat(assessmentMessage.responseDemand()).isEqualTo(ResponseDemand.LOW);
-    assertThat(assessmentMessage.requiredElements()).containsExactly("name a food");
+    assertThat(assessmentMessage.requiredElements())
+        .containsExactly("name a food", "explain a preference");
   }
 
   @Test
