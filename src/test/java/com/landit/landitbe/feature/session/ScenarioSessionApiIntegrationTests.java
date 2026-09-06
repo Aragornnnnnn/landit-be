@@ -113,6 +113,7 @@ class ScenarioSessionApiIntegrationTests {
   void setUp() {
     mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
+    awaitPendingLevelAssessments();
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
@@ -133,6 +134,25 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario");
     jdbcTemplate.update("DELETE FROM category_language_variant");
     jdbcTemplate.update("DELETE FROM category");
+  }
+
+  // 완료 직후 비동기 수준 평가가 이전 테스트 데이터를 더 이상 쓰지 않게 정리한다.
+  private void awaitPendingLevelAssessments() {
+    for (int attempt = 0; attempt < 50; attempt++) {
+      Integer preparingCount =
+          jdbcTemplate.queryForObject(
+              "SELECT COUNT(*) FROM learning_session WHERE level_assessment_processing_status = 'PREPARING'",
+              Integer.class);
+      if (preparingCount == null || preparingCount == 0) {
+        return;
+      }
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
   }
 
   @ParameterizedTest
