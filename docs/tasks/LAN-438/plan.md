@@ -127,7 +127,7 @@
 
 ## 비동기 수준 평가·JSON 호환 처리 수정 계획
 
-상태: **2026-09-07 구현 완료.** 위 baseline 실행 기록은 당시 구조를 설명하며, 아래 계약을 AI·BE 코드와 통합 테스트에 반영했다.
+상태: **2026-09-07 KST 구현 완료.** 이 문서의 날짜는 Asia/Seoul 기준이다(UTC 2026-09-06 늦은 오후는 KST 다음 날). 위 baseline 실행 기록은 당시 구조를 설명하며, 아래 계약을 AI·BE 코드와 통합 테스트에 반영했다.
 
 ### 1. 목표와 변경 경계
 
@@ -196,6 +196,12 @@
 
 ### 5. 비동기 실행과 대기 상한
 
+- 배포 설정 계약: AI `SESSION_LEVEL_ASSESSMENT_BUDGET_SECONDS`(기본 100초) < BE `LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT`(기본 120초), AI 예산 < PREPARING 만료 120초. BE timeout을 낮추면 AI 예산도 함께 낮추고 전송·저장 여유를 둔다.
+- 예약 시각은 세션 완료 시각을 재사용하며, 만료 판정도 동일한 주입 Clock을 사용한다.
+- 수동 수준 변경과 평가 수준 반영 시각도 같은 Clock에서 생성하여 전달한다. 서버 기본 시간대와 무관하게 늦은 평가가 수동 변경을 덮어쓰지 않게 한다.
+- 미배포 V88의 상태 CHECK는 `NOT VALID`로 추가하여 기존 행 검사 중 쓰기 차단을 피한다. 신규·수정 행에는 즉시 적용된다. 후속 저트래픽 운영 작업에서 별도 신규 migration으로 `ALTER TABLE learning_session VALIDATE CONSTRAINT chk_learning_session_level_assessment_processing_status;`를 실행한다. 이번 배포에서 즉시 검증하지 않는다.
+- V88은 기존 vendor migration 방식으로 PostgreSQL/H2를 분리했다. H2는 `NOT VALID`를 지원하지 않아 일반 CHECK를 사용한다.
+
 - 완료 트랜잭션에 PREPARING을 기록하고 커밋 뒤 dispatch한다. 중도 종료·미완료 세션과 과거 히스토리 조회는 진단 트리거가 아니다.
 - **사용자 확정: V1은 속마음과 같은 서버 내부 비동기 방식으로 기존 `applicationTaskExecutor`를 재사용한다.** SQS, 별도 Worker, 새 실행기·범용 작업 프레임워크를 추가하지 않는다. LAN-438 V1에 한정한 아키텍처 원칙의 예외이며 실행기 선택을 다시 승인받지 않는다.
 - 서버 재시작 후 작업 재실행은 보장하지 않는다. DB의 PREPARING을 보존하고 만료 후 조회 시 결정적 fallback으로 종료한다. FE가 이탈한 경우 다음 조회에서 만료를 정리하며, 별도 복구 스케줄러·무제한 자동 재시작·새 작업 큐는 추가하지 않는다.
@@ -225,6 +231,12 @@ strict json_schema
 - 모드, 전환 사유 코드, Core 재요청 횟수, 최종 source, 지연·토큰·비용을 기록한다. API key, raw prompt, 사용자 답변 전문은 운영 로그에 남기지 않는다.
 
 ### 7. FE 인계
+
+FE 구현은 이 PR의 범위 밖이며 아래 항목을 후속 호환성 작업으로 추적한다. 완료 전에는 수준 결과 표시·결제 흐름까지 구현됐다고 판단하지 않는다.
+
+- [ ] 기존 피드백 DTO는 유지하고 신규 수준 평가 GET DTO와 폴링을 연결한다.
+- [ ] 5개 영역 게이지·설명, FALLBACK 안내, FAILED 재조회 화면을 연결한다.
+- [ ] 결과 확정 후 프로필·표현 캐시를 갱신하고 결제 전환 E2E를 검증한다.
 
 - 마지막 발화의 기존 세션 완료 정보를 기준으로 피드백 POST와 수준 평가 GET을 병행한다. 피드백 응답에서 평가 상태·결과를 읽지 않는다. 신규 GET이 PREPARING이면 약 2초 간격으로 조회하며 요청이 겹치지 않게 한다.
 - 피드백을 읽는 도중 완료돼도 화면을 강제로 전환하지 않는다. 피드백 마지막 단계에서 준비된 평가를 표시한다.
@@ -259,3 +271,6 @@ strict json_schema
 - 분리 전후 평가 유효율·일치도·미관찰율·반복성을 비교한다. 기준표나 임계값을 테스트 결과에 맞춰 수정하지 않는다.
 - 비용은 턴 피드백·요약·수준 평가·미지원 요청·Core 재요청을 구분한다. **호출 분리 후 비용은 다시 측정**하며 결합 호출의 기존 증분 비용을 그대로 약속하지 않는다.
 - 2026-09-07 리뷰 4건 보완 완료. 완료 트랜잭션의 예약 저장, 컨텍스트 로드 실패 이후 만료 복구, 무관한 프로필 변경과 수동 수준 변경 구분을 회귀 검증했다. `./gradlew spotlessApply check --no-parallel` 통과. 독립 코드 검수에서 추가 결함 없음. 운영 DB·배포·실제 LLM 재측정은 실행하지 않았다.
+
+- 2026-09-07 KST PR 리뷰 보완: 예약·만료·수동 및 자동 수준 변경을 동일 Clock으로 맞추고, 테스트 대기 실패를 명시했다. V88은 PostgreSQL/H2별로 분리했으며 공개 Javadoc과 FE 후속 작업을 보완했다.
+- 검증: 기본 테스트 힙에서 Java heap space가 발생해 로컬 init script로 Test.maxHeapSize=1536m를 설정한 `./gradlew check --no-parallel -I /tmp/lan438-review-tests.gradle`을 실행했다. 916개 테스트, 실패·오류 0이며 Spotless·Checkstyle도 통과했다. 독립 재검수에서 추가 결함 없음. 운영 PostgreSQL 및 실제 LLM은 실행하지 않았다.
