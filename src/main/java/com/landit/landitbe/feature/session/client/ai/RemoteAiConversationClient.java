@@ -34,6 +34,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
   private static final String CLOSING_MESSAGE_PATH = "/api/v1/conversation/closing-message";
   private static final String MESSAGE_FEEDBACK_PATH = "/api/v1/conversation/message-feedback";
   private static final String SESSION_FEEDBACK_PATH = "/api/v1/conversation/session-feedback";
+  private static final String SESSION_LEVEL_ASSESSMENT_PATH =
+      "/api/v1/conversation/session-level-assessment";
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -98,6 +100,18 @@ public class RemoteAiConversationClient implements AiConversationClient {
             sessionFeedbackUri(),
             request,
             RemoteSessionFeedbackResponse.class,
+            ErrorCode.FEEDBACK_GENERATION_FAILED,
+            properties.sessionFeedbackRequestTimeout())
+        .toResult();
+  }
+
+  /** AI 서버에 세션 텍스트 수준 평가를 요청한다. */
+  @Override
+  public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
+    return post(
+            sessionLevelAssessmentUri(),
+            request,
+            RemoteSessionLevelAssessmentResponse.class,
             ErrorCode.FEEDBACK_GENERATION_FAILED,
             properties.sessionFeedbackRequestTimeout())
         .toResult();
@@ -192,6 +206,10 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   private URI sessionFeedbackUri() {
     return aiBaseUri(ErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_FEEDBACK_PATH);
+  }
+
+  private URI sessionLevelAssessmentUri() {
+    return aiBaseUri(ErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_LEVEL_ASSESSMENT_PATH);
   }
 
   private URI aiBaseUri(ErrorCode defaultErrorCode) {
@@ -293,6 +311,18 @@ public class RemoteAiConversationClient implements AiConversationClient {
           messageFeedbacks,
           levelAssessment,
           false);
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteSessionLevelAssessmentResponse(
+      Long sessionId, AiSessionLevelAssessment levelAssessment) {
+
+    private AiSessionLevelAssessment toResult() {
+      if (sessionId == null) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return levelAssessment;
     }
   }
 

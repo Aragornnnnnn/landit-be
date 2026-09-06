@@ -6,11 +6,13 @@ import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.docs.SessionControllerDocs;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.feature.session.service.SessionFeedbackService;
 import com.landit.landitbe.feature.session.service.SessionInnerThoughtQueryService;
+import com.landit.landitbe.feature.session.service.SessionLevelAssessmentGenerationService;
 import com.landit.landitbe.feature.session.service.SessionMessageSubmitService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class SessionController implements SessionControllerDocs {
   private final SessionFeedbackService sessionFeedbackService;
   private final SessionMessageSubmitService sessionMessageSubmitService;
   private final SessionInnerThoughtQueryService sessionInnerThoughtQueryService;
+  private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
 
   /** {@inheritDoc} */
   @Override
@@ -65,6 +68,15 @@ public class SessionController implements SessionControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
     return ApiResponse.success(
         HttpStatus.OK, sessionFeedbackService.getOrCreate(principal.userId(), sessionId));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/sessions/{sessionId}/level-assessment")
+  public ResponseEntity<ApiResponse<SessionLevelAssessmentResponse>> getLevelAssessment(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
+    return ApiResponse.success(
+        HttpStatus.OK, levelAssessmentGenerationService.get(principal.userId(), sessionId));
   }
 
   /** {@inheritDoc} */

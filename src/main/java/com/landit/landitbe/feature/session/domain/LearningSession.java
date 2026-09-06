@@ -65,6 +65,13 @@ public class LearningSession extends BaseTimeEntity {
   @Column(name = "ended_at")
   private LocalDateTime endedAt;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "level_assessment_processing_status", length = 20)
+  private ProcessingStatus levelAssessmentProcessingStatus;
+
+  @Column(name = "level_assessment_requested_at")
+  private LocalDateTime levelAssessmentRequestedAt;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected LearningSession() {}
 
@@ -175,5 +182,21 @@ public class LearningSession extends BaseTimeEntity {
   /** 세션이 진행 중인지 반환한다. */
   public boolean isInProgress() {
     return status == LearningSessionStatus.IN_PROGRESS;
+  }
+
+  /** 수준 평가 비동기 작업을 시작할 수 있도록 상태와 예약 시각을 기록한다. */
+  public void prepareLevelAssessment(LocalDateTime requestedAt) {
+    this.levelAssessmentProcessingStatus = ProcessingStatus.PREPARING;
+    this.levelAssessmentRequestedAt = requestedAt;
+  }
+
+  /** 수준 평가 저장이 완료됐음을 기록한다. */
+  public void completeLevelAssessment() {
+    this.levelAssessmentProcessingStatus = ProcessingStatus.COMPLETED;
+  }
+
+  /** 수준 평가 저장에 실패했음을 기록한다. */
+  public void failLevelAssessment() {
+    this.levelAssessmentProcessingStatus = ProcessingStatus.FAILED;
   }
 }

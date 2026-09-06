@@ -80,4 +80,10 @@ public class LocalAiConversationClient implements AiConversationClient {
                         "Your message clearly communicates the main idea."))
             .toList());
   }
+
+  /** 로컬 환경에서는 수준 평가를 생략하고 BE fallback 경로를 사용한다. */
+  @Override
+  public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
+    return null;
+  }
 }

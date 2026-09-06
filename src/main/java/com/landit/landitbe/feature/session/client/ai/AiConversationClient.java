@@ -19,4 +19,10 @@ public interface AiConversationClient {
 
   /** 세션 최종 피드백을 생성한다. */
   AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request);
+
+  /** 세션 최종 피드백과 독립적으로 텍스트 수준 평가를 생성한다. */
+  default AiSessionLevelAssessment generateSessionLevelAssessment(
+      AiSessionFeedbackRequest request) {
+    return null;
+  }
 }

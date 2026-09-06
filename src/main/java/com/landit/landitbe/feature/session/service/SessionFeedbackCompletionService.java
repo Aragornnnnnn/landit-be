@@ -30,7 +30,6 @@ class SessionFeedbackCompletionService {
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final SessionMessageService sessionMessageService;
   private final LearningProgressService learningProgressService;
-  private final SessionLevelAssessmentService sessionLevelAssessmentService;
 
   /** 유효한 AI 최종 피드백을 저장하고 세션 결과를 최초 한 번 확정한다. */
   @Transactional
@@ -46,7 +45,6 @@ class SessionFeedbackCompletionService {
       return ExistingSummaryFeedbackContext.from(existing).summaryFeedbackId();
     }
 
-    sessionLevelAssessmentService.assessApplyAndSave(userId, context, result.levelAssessment());
     SessionHistorySummaryFeedback summaryFeedback =
         saveSummaryFeedback(context, result, starRating);
     saveMessageFeedbacks(context, result, summaryFeedback.getId());
@@ -58,18 +56,6 @@ class SessionFeedbackCompletionService {
         context.sessionId(),
         summaryFeedback.getId());
     return summaryFeedback.getId();
-  }
-
-  /** 수준 평가 도입 전 저장된 세션 요약에 결정적 fallback 결과를 보완한다. */
-  @Transactional
-  void attachLegacyFallback(long userId, LoadedSessionFeedbackContext context) {
-    learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
-    sessionFeedbackDataService.requireSummary(
-        context.existingSummary().orElseThrow().summaryFeedbackId());
-    if (sessionLevelAssessmentService.findBySessionId(context.sessionId()) != null) {
-      return;
-    }
-    sessionLevelAssessmentService.assessApplyAndSave(userId, context, null);
   }
 
   /** AI 응답의 세션 식별자, 점수, 필수 요약 필드가 계약을 만족하는지 검증한다. */

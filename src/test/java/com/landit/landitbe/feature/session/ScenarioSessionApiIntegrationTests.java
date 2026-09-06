@@ -226,6 +226,7 @@ class ScenarioSessionApiIntegrationTests {
             post("/api/v1/sessions/%d/feedback".formatted(sessionId))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
         .andExpect(status().isOk());
+    awaitLevelAssessment(sessionId, token);
     var assessment = fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages();
     assertThat(assessment).hasSize(4);
     assertThat(assessment.get(3).requiredElements())
@@ -1314,7 +1315,7 @@ class ScenarioSessionApiIntegrationTests {
       throws Exception {
     StartedSession startedSession =
         startCompletedAiFirstSession("session-feedback-api@example.com");
-    long userId = startedSession.userId();
+    final long userId = startedSession.userId();
     String accessToken = startedSession.accessToken();
     long sessionId = startedSession.sessionId();
 
@@ -1326,14 +1327,6 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessionId").value(sessionId))
         .andExpect(jsonPath("$.data.nativeScore").value(90))
         .andExpect(jsonPath("$.data.starRating").value(3.0))
-        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
-        .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
-        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3))
-        .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(false))
-        .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(nullValue()))
-        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
-        .andExpect(jsonPath("$.data.levelAssessment.changeType").value("NOT_APPLIED"))
-        .andExpect(jsonPath("$.data.levelAssessment.grammar.confidence").value(0.0))
         .andExpect(jsonPath("$.data.messageFeedbacks[0].messageId").isNumber())
         .andExpect(jsonPath("$.data.messageFeedbacks[0].messageFeedbackId").isNumber())
         .andExpect(
@@ -1342,6 +1335,17 @@ class ScenarioSessionApiIntegrationTests {
             jsonPath("$.data.messageFeedbacks[0].evaluationContext.content")
                 .value("What food do you like?"))
         .andExpect(jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
+
+    awaitLevelAssessment(sessionId, accessToken);
+    mockMvc
+        .perform(
+            get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
+        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3));
 
     assertThat(
             jdbcTemplate.queryForObject(
@@ -1381,8 +1385,7 @@ class ScenarioSessionApiIntegrationTests {
             post("/api/v1/sessions/%d/feedback".formatted(sessionId))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.nativeScore").value(90))
-        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
+        .andExpect(jsonPath("$.data.nativeScore").value(90));
 
     assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(1);
     assertThat(
@@ -1398,7 +1401,7 @@ class ScenarioSessionApiIntegrationTests {
                 "SELECT COUNT(*) FROM user_level_assessment WHERE learning_session_id = ?",
                 Integer.class,
                 sessionId))
-        .isEqualTo(1);
+        .isEqualTo(0);
     assertThat(
             jdbcTemplate.queryForMap(
                 """
@@ -1448,9 +1451,12 @@ class ScenarioSessionApiIntegrationTests {
         WHERE scenario_question_id = (SELECT id FROM scenario_question WHERE scenario_id = 2120)
         """);
 
-    mockMvc.perform(
-        post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()));
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+        .andExpect(status().isOk());
+    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
 
     AiSessionFeedbackRequest.AssessmentMessage assessmentMessage =
         fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages().getFirst();
@@ -1470,9 +1476,16 @@ class ScenarioSessionApiIntegrationTests {
             post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
-        .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
         .andExpect(jsonPath("$.data.messageFeedbacks.length()").value(0));
+
+    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
+    mockMvc
+        .perform(
+            get("/api/v1/sessions/%d/level-assessment".formatted(startedSession.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
 
     assertThat(
             jdbcTemplate.queryForObject(
@@ -1498,6 +1511,7 @@ class ScenarioSessionApiIntegrationTests {
             post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
         .andExpect(status().isOk());
+    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
 
     Map<String, Object> statuses = messageFeedbackProcessingStatuses(messageId);
     assertThat(statuses.get("DETAILED_FEEDBACK_STATUS")).isEqualTo("COMPLETED");
@@ -1517,6 +1531,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.nativeScore").value(90))
         .andExpect(jsonPath("$.data.starRating").value(2.5));
+    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
 
     assertThat(
             jdbcTemplate.queryForObject(
@@ -1534,7 +1549,15 @@ class ScenarioSessionApiIntegrationTests {
         .perform(
             post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
+        .andExpect(status().isOk());
+
+    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
+    mockMvc
+        .perform(
+            get("/api/v1/sessions/%d/level-assessment".formatted(startedSession.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
 
     assertThat(
@@ -1593,7 +1616,15 @@ class ScenarioSessionApiIntegrationTests {
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.type").value("AI_MESSAGE"))
         .andExpect(
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.content")
-                .value("Oh, you like spicy pizza. Would you like anything else?"))
+                .value("Oh, you like spicy pizza. Would you like anything else?"));
+
+    awaitLevelAssessment(sessionId, accessToken);
+    mockMvc
+        .perform(
+            get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
         .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(5.0))
         .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(true))
@@ -1668,7 +1699,14 @@ class ScenarioSessionApiIntegrationTests {
           .perform(
               post("/api/v1/sessions/%d/feedback".formatted(sessionId))
                   .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk());
+      awaitLevelAssessment(sessionId, accessToken);
+      mockMvc
+          .perform(
+              get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
           .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
           .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
           .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(5.0))
           .andExpect(
@@ -2690,6 +2728,29 @@ class ScenarioSessionApiIntegrationTests {
     return false;
   }
 
+  private void awaitLevelAssessment(long sessionId, String accessToken) throws Exception {
+    for (int attempt = 0; attempt < 50; attempt++) {
+      MvcResult result =
+          mockMvc
+              .perform(
+                  get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                      .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+              .andExpect(status().isOk())
+              .andReturn();
+      String processingStatus =
+          objectMapper
+              .readTree(result.getResponse().getContentAsByteArray())
+              .path("data")
+              .path("processingStatus")
+              .asText();
+      if (!"PREPARING".equals(processingStatus)) {
+        return;
+      }
+      Thread.sleep(100L);
+    }
+    throw new AssertionError("수준 평가가 제한 시간 안에 완료되지 않았습니다.");
+  }
+
   private boolean awaitInnerThoughtStatus(long messageId, String expectedStatus)
       throws InterruptedException {
     for (int attempt = 0; attempt < 50; attempt++) {
@@ -3258,6 +3319,7 @@ class ScenarioSessionApiIntegrationTests {
     private boolean failSessionFeedbackGeneration;
 
     private int sessionFeedbackCallCount;
+    private int sessionLevelAssessmentCallCount;
     private boolean unobservedPragmatics;
 
     private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
@@ -3372,19 +3434,27 @@ class ScenarioSessionApiIntegrationTests {
                           null,
                           "Your message clearly communicates the main idea."))
               .toList(),
-          request.assessmentMessages().size() < 2
-              ? null
-              : new AiSessionLevelAssessment(
-                  new AiSessionLevelAssessment.Core(
-                      request.assessmentMessages().stream()
-                          .map(
-                              message ->
-                                  new AiSessionLevelAssessment.Message(
-                                      message.messageId(),
-                                      AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
-                                      observedDomains(message.userMessage())))
-                          .toList()),
-                  new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요.")));
+          null);
+    }
+
+    @Override
+    public AiSessionLevelAssessment generateSessionLevelAssessment(
+        AiSessionFeedbackRequest request) {
+      sessionLevelAssessmentCallCount++;
+      if (request.assessmentMessages().size() < 2) {
+        return null;
+      }
+      return new AiSessionLevelAssessment(
+          new AiSessionLevelAssessment.Core(
+              request.assessmentMessages().stream()
+                  .map(
+                      message ->
+                          new AiSessionLevelAssessment.Message(
+                              message.messageId(),
+                              AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
+                              observedDomains(message.userMessage())))
+                  .toList()),
+          new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요."));
     }
 
     private void failSessionFeedbackGeneration() {
@@ -3425,6 +3495,7 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackStarRating = new BigDecimal("3.0");
       failSessionFeedbackGeneration = false;
       sessionFeedbackCallCount = 0;
+      sessionLevelAssessmentCallCount = 0;
       unobservedPragmatics = false;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;

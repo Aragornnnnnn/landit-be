@@ -7,8 +7,6 @@ import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.session.domain.SessionHistorySummaryFeedback;
-import com.landit.landitbe.feature.session.domain.SessionLevelAssessment;
-import com.landit.landitbe.feature.session.domain.UserLevelAssessment;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse.EvaluationContextResponse;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse.MessageFeedbackResponse;
@@ -31,7 +29,7 @@ public class SessionFeedbackService {
   private final SessionFeedbackContextService contextService;
   private final SessionFeedbackCompletionService completionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
-  private final SessionLevelAssessmentService sessionLevelAssessmentService;
+  private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
   private final AiConversationClient aiConversationClient;
 
   /**
@@ -44,31 +42,15 @@ public class SessionFeedbackService {
    */
   public SessionFeedbackResponse getOrCreate(long userId, long sessionId) {
     LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
+    levelAssessmentGenerationService.startIfNeeded(userId, context);
     ExistingSummaryFeedbackContext existingSummary = context.existingSummary().orElse(null);
     if (existingSummary != null) {
-      if (sessionLevelAssessmentService.findBySessionId(sessionId) == null) {
-        completionService.attachLegacyFallback(userId, context);
-      }
       // 이미 확정된 결과는 AI를 다시 호출하지 않고 그대로 반환한다.
       return responseFor(context, existingSummary.summaryFeedbackId());
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
-    AiSessionFeedbackRequest request =
-        new AiSessionFeedbackRequest(
-            context.sessionId(),
-            context.scenario(),
-            context.userMessages().stream().map(UserMessageContext::messageId).toList(),
-            context.userMessages().stream()
-                .map(
-                    message ->
-                        new AiSessionFeedbackRequest.AssessmentMessage(
-                            message.messageId(),
-                            message.evaluationContext().content(),
-                            message.content(),
-                            message.responseDemand(),
-                            message.requiredElements()))
-                .toList());
+    AiSessionFeedbackRequest request = toAiRequest(context);
     AiSessionFeedbackResult result = generateOrFallback(request);
     Long summaryFeedbackId = recordOrFallback(userId, context, result);
     return responseFor(context, summaryFeedbackId);
@@ -112,15 +94,7 @@ public class SessionFeedbackService {
         sessionFeedbackDataService.findMessageFeedbacks(summaryFeedbackId);
     SessionHistorySummaryFeedback summary =
         sessionFeedbackDataService.requireSummary(summaryFeedbackId);
-    UserLevelAssessment storedAssessment =
-        sessionLevelAssessmentService.findBySessionId(context.sessionId());
-    if (storedAssessment == null) {
-      throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
-    }
-    SessionLevelAssessment levelAssessment = storedAssessment.toAssessment();
-    boolean generationFallback =
-        feedbacks.isEmpty() && levelAssessment.source() == SessionLevelAssessment.Source.FALLBACK;
-    if (!generationFallback && feedbacks.size() != context.userMessages().size()) {
+    if (!feedbacks.isEmpty() && feedbacks.size() != context.userMessages().size()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     Map<Long, SessionHistoryMessageFeedback> feedbackByMessageId =
@@ -132,15 +106,14 @@ public class SessionFeedbackService {
     return SessionFeedbackResponse.from(
         context.sessionId(),
         summary,
-        generationFallback
+        feedbacks.isEmpty()
             ? List.of()
             : context.userMessages().stream()
                 .map(
                     userMessage ->
                         messageFeedbackResponse(
                             feedbackByMessageId.get(userMessage.messageId()), userMessage))
-                .toList(),
-        levelAssessment);
+                .toList());
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
@@ -157,5 +130,23 @@ public class SessionFeedbackService {
             userMessage.evaluationContext().type(),
             userMessage.evaluationContext().content(),
             userMessage.evaluationContext().translatedContent()));
+  }
+
+  /** 완료 세션 컨텍스트를 AI 수준 평가와 최종 피드백 공통 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList(),
+        context.userMessages().stream()
+            .map(
+                message ->
+                    new AiSessionFeedbackRequest.AssessmentMessage(
+                        message.messageId(),
+                        message.evaluationContext().content(),
+                        message.content(),
+                        message.responseDemand(),
+                        message.requiredElements()))
+            .toList());
   }
 }
