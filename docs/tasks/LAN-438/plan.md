@@ -127,7 +127,7 @@
 
 ## 비동기 수준 평가·JSON 호환 처리 수정 계획
 
-상태: **2026-09-07 구현 전 계획.** 이 절은 다음 실행 모델의 인수인계 기준이다. 위 baseline 실행 기록은 당시 구조를 설명하며, 아래 항목은 아직 구현되지 않았다.
+상태: **2026-09-07 구현 완료.** 위 baseline 실행 기록은 당시 구조를 설명하며, 아래 계약을 AI·BE 코드와 통합 테스트에 반영했다.
 
 ### 1. 목표와 변경 경계
 
@@ -163,7 +163,7 @@
 
 | 계약 | 계획 |
 | --- | --- |
-| AI 신규 `POST /api/v1/conversation/level-assessment` | `sessionId`, `scenario`, `expectedMessageIds`, `assessmentMessages`를 입력받고 `sessionId`, `levelAssessment`를 반환한다. Core 복구 소진 시 평가는 null이다. |
+| AI 신규 `POST /api/v1/conversation/session-level-assessment` | `sessionId`, `scenario`, `expectedMessageIds`, `assessmentMessages`를 입력받고 `sessionId`, `levelAssessment`를 반환한다. Core 복구 소진 시 평가는 null이다. |
 | AI 기존 `POST /api/v1/conversation/session-feedback` | 새 BE 흐름에서는 assessmentMessages를 보내지 않는다. 기존 결합 요청 계약은 전환 기간 동안 유지한다. |
 | BE 신규 `GET /api/v1/sessions/{sessionId}/level-assessment` | `sessionId`, `processingStatus`, `levelAssessment`를 반환한다. 소유권 확인 후 저장된 상태를 조회한다. LLM 호출을 시작하거나 재생성하지 않는다. |
 | BE 기존 `POST /api/v1/sessions/{sessionId}/feedback` | 수준 평가 도입 전 구조인 `sessionId`, `nativeScore`, `starRating`, `highlightMessage`, `summaryMessage`, `messageFeedbacks`만 반환한다. LAN-438의 `levelAssessment` 필드를 제거하고 평가 상태 필드도 추가하지 않는다. |
@@ -185,7 +185,7 @@
 | COMPLETED | source=MODEL 또는 FALLBACK | 평가 결과 저장이 끝났다. 유효 Core라도 근거 부족이면 MODEL·NOT_APPLIED일 수 있다. |
 | FAILED | null | 결과 저장 등 인프라 실패로 정상적인 결과 확정이 불가능하다. LLM 오류의 일반 종착점으로 쓰지 않는다. |
 
-- 작업 상태는 `learning_session`에 nullable `level_assessment_status`, `level_assessment_requested_at`을 추가한다. null은 API의 NOT_REQUESTED로 매핑한다. 완료 평가가 이미 있으면 COMPLETED로 응답한다.
+- 작업 상태는 `learning_session`에 nullable `level_assessment_processing_status`, `level_assessment_requested_at`을 추가한다. null은 API의 NOT_REQUESTED로 매핑한다. 완료 평가가 이미 있으면 COMPLETED로 응답한다.
 - `user_level_assessment`는 기존처럼 **확정된 결과만** 저장한다. Core/Details JSON과 영역별 점수 저장 구조를 대기 상태를 위해 완화하지 않는다. 새 평가/작업 테이블은 만들지 않는다.
 - 평가 결과·프로필의 적용 수준/streak·처리 완료 상태를 한 트랜잭션에서 저장한다. 기존 세션별 평가 unique 제약과 행 잠금을 유지한다.
 - 같은 세션의 예약을 원자적으로 한 번만 허용한다. 외부 호출은 트랜잭션 밖에서 수행하며, 저장 시 PREPARING인지 재확인한다. 요약 저장도 별도로 기존 멱등성을 유지한다.
@@ -199,7 +199,7 @@
 - 완료 트랜잭션에 PREPARING을 기록하고 커밋 뒤 dispatch한다. 중도 종료·미완료 세션과 과거 히스토리 조회는 진단 트리거가 아니다.
 - **사용자 확정: V1은 속마음과 같은 서버 내부 비동기 방식으로 기존 `applicationTaskExecutor`를 재사용한다.** SQS, 별도 Worker, 새 실행기·범용 작업 프레임워크를 추가하지 않는다. LAN-438 V1에 한정한 아키텍처 원칙의 예외이며 실행기 선택을 다시 승인받지 않는다.
 - 서버 재시작 후 작업 재실행은 보장하지 않는다. DB의 PREPARING을 보존하고 만료 후 조회 시 결정적 fallback으로 종료한다. FE가 이탈한 경우 다음 조회에서 만료를 정리하며, 별도 복구 스케줄러·무제한 자동 재시작·새 작업 큐는 추가하지 않는다.
-- 초기 시간 예산 제안: AI 논리 평가 전체 90초, BE 해당 AI HTTP 요청 100초, PREPARING 만료 120초. 예약 시각부터 측정하며 실행 대기와 DB 저장 여유를 포함한다. 기존 다른 endpoint의 timeout은 바꾸지 않는다.
+- V1은 기존 `sessionFeedbackRequestTimeout`을 수준 평가 AI 호출에도 재사용하고, `PREPARING` 만료는 120초로 둔다. 기존 다른 endpoint의 timeout은 바꾸지 않는다.
 - SDK 기본 재시도로 시간·호출 예산이 늘지 않도록 해당 호출의 자동 재시도를 명시적으로 제어한다. 매 요청에 남은 시간을 전달하고, 총 deadline을 별도로 검사한다. BE timeout이 외부 모델 실행·과금 취소를 보장하지는 않는다.
 - dispatch 거절·LLM 실패·기한 초과는 가능한 경우 `COMPLETED + FALLBACK + NOT_APPLIED`로 확정한다. 현재 속마음 조회처럼 만료 정리는 GET에서 조건부 수행할 수 있지만 **LLM 생성은 하지 않는다.** 따라서 DB까지 완전한 read-only GET이라고 문서화하지 않는다.
 - 비동기 작업 완료와 만료 정리는 같은 잠금·상태 조건·유일성 규칙을 사용한다. GET이 여러 번 실행되거나 늦은 결과가 돌아와도 승급·fallback 저장은 한 번이다.
