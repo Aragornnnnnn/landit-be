@@ -13,6 +13,23 @@ import org.junit.jupiter.api.Test;
 class TextLevelAssessmentPolicyTest {
 
   @Test
+  void diagnosticQuestionsCanAssessTheFullLevelRange() {
+    for (int level = 1; level <= 5; level++) {
+      var score =
+          TextLevelAssessmentPolicy.calculate(
+                  List.of(
+                      observation(ResponseDemand.MEDIUM, level),
+                      observation(ResponseDemand.MEDIUM, level),
+                      observation(ResponseDemand.HIGH, level),
+                      observation(ResponseDemand.HIGH, level)),
+                  ContentLearningLevel.DIAGNOSTIC)
+              .orElseThrow();
+      assertThat(score.assessedLevel()).isEqualTo(level);
+      assertThat(score.sufficientEvidence()).isTrue();
+    }
+  }
+
+  @Test
   void calculatesDemandWeightedDomainsAndCapsOnlyOverallScore() {
     TextLevelAssessmentPolicy.Score score =
         TextLevelAssessmentPolicy.calculate(

@@ -6,7 +6,8 @@ package com.landit.landitbe.feature.content.domain;
 public enum ContentLearningLevel {
   LEVEL_1(1, 1),
   LEVEL_2_TO_3(2, 3),
-  LEVEL_4_TO_5(4, 5);
+  LEVEL_4_TO_5(4, 5),
+  DIAGNOSTIC(1, 5);
 
   private final int minimumExpressionDifficulty;
   private final int maximumExpressionDifficulty;

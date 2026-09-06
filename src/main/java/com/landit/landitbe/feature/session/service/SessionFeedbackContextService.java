@@ -144,7 +144,7 @@ class SessionFeedbackContextService {
       com.landit.landitbe.feature.content.domain.ContentLearningLevel group) {
     return switch (group) {
       case LEVEL_1 -> ResponseDemand.LOW;
-      case LEVEL_2_TO_3 -> ResponseDemand.MEDIUM;
+      case LEVEL_2_TO_3, DIAGNOSTIC -> ResponseDemand.MEDIUM;
       case LEVEL_4_TO_5 -> ResponseDemand.HIGH;
     };
   }

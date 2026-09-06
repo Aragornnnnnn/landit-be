@@ -133,7 +133,7 @@ public final class TextLevelAssessmentPolicy {
     return switch (group) {
       case LEVEL_1 -> new BigDecimal("2.00");
       case LEVEL_2_TO_3 -> new BigDecimal("4.00");
-      case LEVEL_4_TO_5 -> new BigDecimal("5.00");
+      case LEVEL_4_TO_5, DIAGNOSTIC -> new BigDecimal("5.00");
     };
   }
 }
