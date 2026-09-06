@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.client.ai.AiSessionLevelAssessment;
@@ -27,6 +28,7 @@ public class SessionLevelAssessmentGenerationService {
   private static final Duration PREPARING_TIMEOUT = Duration.ofSeconds(120);
 
   private final LearningSessionService learningSessionService;
+  private final UserProfileService userProfileService;
   private final SessionFeedbackContextService contextService;
   private final SessionLevelAssessmentService assessmentService;
   private final UserLevelAssessmentRepository assessmentRepository;
@@ -36,6 +38,7 @@ public class SessionLevelAssessmentGenerationService {
 
   SessionLevelAssessmentGenerationService(
       LearningSessionService learningSessionService,
+      UserProfileService userProfileService,
       SessionFeedbackContextService contextService,
       SessionLevelAssessmentService assessmentService,
       UserLevelAssessmentRepository assessmentRepository,
@@ -43,6 +46,7 @@ public class SessionLevelAssessmentGenerationService {
       PlatformTransactionManager transactionManager,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
     this.learningSessionService = learningSessionService;
+    this.userProfileService = userProfileService;
     this.contextService = contextService;
     this.assessmentService = assessmentService;
     this.assessmentRepository = assessmentRepository;
@@ -51,14 +55,8 @@ public class SessionLevelAssessmentGenerationService {
     this.taskExecutor = taskExecutor;
   }
 
-  /** 평가 작업을 한 번만 예약하고 서버 내부 실행기로 시작한다. */
-  public void startIfNeeded(long userId, LoadedSessionFeedbackContext context) {
-    Boolean reserved =
-        transactionTemplate.execute(
-            status -> reserve(userId, context.sessionId(), LocalDateTime.now()));
-    if (!Boolean.TRUE.equals(reserved)) {
-      return;
-    }
+  /** 완료 트랜잭션에서 예약한 평가를 서버 내부 실행기로 시작한다. */
+  private void dispatch(long userId, LoadedSessionFeedbackContext context) {
     try {
       taskExecutor.execute(() -> generateAndPersist(userId, context));
     } catch (RuntimeException exception) {
@@ -71,7 +69,7 @@ public class SessionLevelAssessmentGenerationService {
   public void startIfNeeded(long userId, long sessionId) {
     try {
       LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
-      startIfNeeded(userId, context);
+      dispatch(userId, context);
     } catch (RuntimeException exception) {
       log.warn("수준 평가 시작에 필요한 세션 조회에 실패했습니다. sessionId={}", sessionId, exception);
     }
@@ -92,16 +90,6 @@ public class SessionLevelAssessmentGenerationService {
         session, assessment == null ? null : assessment.toAssessment());
   }
 
-  private boolean reserve(long userId, long sessionId, LocalDateTime requestedAt) {
-    LearningSession session = learningSessionService.findOwnedCompletedForUpdate(userId, sessionId);
-    if (assessmentRepository.findByLearningSessionId(sessionId).isPresent()
-        || session.getLevelAssessmentProcessingStatus() != null) {
-      return false;
-    }
-    session.prepareLevelAssessment(requestedAt);
-    return true;
-  }
-
   private void generateAndPersist(long userId, LoadedSessionFeedbackContext context) {
     AiSessionLevelAssessment aiAssessment = null;
     try {
@@ -118,6 +106,7 @@ public class SessionLevelAssessmentGenerationService {
     try {
       transactionTemplate.executeWithoutResult(
           status -> {
+            userProfileService.requireActiveForUpdate(userId);
             LearningSession session =
                 learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
             if (session.getLevelAssessmentProcessingStatus() != ProcessingStatus.PREPARING

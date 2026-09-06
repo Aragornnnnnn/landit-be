@@ -230,7 +230,7 @@ public class UserProfileService {
    */
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
-    requireActive(userId).updateLearningLevel(learningLevel);
+    requireActiveForUpdate(userId).updateLearningLevel(learningLevel);
   }
 
   /**

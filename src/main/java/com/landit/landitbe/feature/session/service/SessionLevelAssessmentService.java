@@ -43,7 +43,10 @@ class SessionLevelAssessmentService {
             .findActiveByIdForUpdate(userId)
             .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
     Integer previousLevel = profile.getLearningLevel();
-    applyToProfile = applyToProfile && !profile.getUpdatedAt().isAfter(requestedAt);
+    applyToProfile =
+        applyToProfile
+            && (profile.getLearningLevelUpdatedAt() == null
+                || !profile.getLearningLevelUpdatedAt().isAfter(requestedAt));
     TextLevelAssessmentPolicy.Score modelScore = modelScore(context, aiAssessment);
     boolean modelResult = modelScore != null;
     TextLevelAssessmentPolicy.Score score = modelResult ? modelScore : fallbackScore();

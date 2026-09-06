@@ -3270,8 +3270,8 @@ class ScenarioSessionApiIntegrationTests {
 
     @Bean
     @Primary
-    FakeAiConversationClient fakeAiConversationClient() {
-      return new FakeAiConversationClient();
+    FakeAiConversationClient fakeAiConversationClient(JdbcTemplate jdbcTemplate) {
+      return new FakeAiConversationClient(jdbcTemplate);
     }
 
     @Bean
@@ -3310,6 +3310,12 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private static class FakeAiConversationClient implements AiConversationClient {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    private FakeAiConversationClient(JdbcTemplate jdbcTemplate) {
+      this.jdbcTemplate = jdbcTemplate;
+    }
 
     private AiNextMessageRequest lastNextMessageRequest;
 
@@ -3466,6 +3472,13 @@ class ScenarioSessionApiIntegrationTests {
     @Override
     public AiSessionLevelAssessment generateSessionLevelAssessment(
         AiSessionFeedbackRequest request) {
+      assertThat(
+              jdbcTemplate.queryForMap(
+                  "SELECT status, level_assessment_processing_status FROM learning_session "
+                      + "WHERE id = ?",
+                  request.sessionId()))
+          .containsEntry("STATUS", "COMPLETED")
+          .containsEntry("LEVEL_ASSESSMENT_PROCESSING_STATUS", "PREPARING");
       lastSessionLevelAssessmentRequest = request;
       sessionLevelAssessmentCallCount++;
       if (request.assessmentMessages().size() < 2) {
