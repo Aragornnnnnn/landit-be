@@ -107,6 +107,15 @@ public class LearningSessionService {
     return learningSession;
   }
 
+  /** 평가 대상 세션이 사용자의 최신 완료 시나리오인지 확인한다. */
+  public boolean isLatestCompletedScenario(LearningSession session) {
+    return learningSessionRepository
+        .findTopByUserProfileIdAndSessionTypeAndStatusOrderByEndedAtDescIdDesc(
+            session.getUserProfileId(), SessionType.SCENARIO, LearningSessionStatus.COMPLETED)
+        .map(latest -> latest.getId().equals(session.getId()))
+        .orElse(false);
+  }
+
   /** 최종 피드백을 생성할 수 있는 완료 시나리오 세션인지 검증한다. */
   private void validateCompletedScenarioSession(LearningSession learningSession) {
     if (learningSession.getStatus() != LearningSessionStatus.COMPLETED) {

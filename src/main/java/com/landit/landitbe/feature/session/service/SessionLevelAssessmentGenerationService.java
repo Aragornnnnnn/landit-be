@@ -67,6 +67,16 @@ public class SessionLevelAssessmentGenerationService {
     }
   }
 
+  /** 완료 커밋 이후 세션 컨텍스트를 조회해 수준 평가를 시작한다. */
+  public void startIfNeeded(long userId, long sessionId) {
+    try {
+      LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
+      startIfNeeded(userId, context);
+    } catch (RuntimeException exception) {
+      log.warn("수준 평가 시작에 필요한 세션 조회에 실패했습니다. sessionId={}", sessionId, exception);
+    }
+  }
+
   /** 수준 평가 상태와 저장된 결과를 조회하고 만료된 작업은 fallback으로 종료한다. */
   public SessionLevelAssessmentResponse get(long userId, long sessionId) {
     LearningSession session = learningSessionService.findOwned(userId, sessionId);
@@ -95,7 +105,7 @@ public class SessionLevelAssessmentGenerationService {
   private void generateAndPersist(long userId, LoadedSessionFeedbackContext context) {
     AiSessionLevelAssessment aiAssessment = null;
     try {
-      AiSessionFeedbackRequest request = SessionFeedbackService.toAiRequest(context);
+      AiSessionFeedbackRequest request = SessionFeedbackService.toAiLevelAssessmentRequest(context);
       aiAssessment = aiConversationClient.generateSessionLevelAssessment(request);
     } catch (RuntimeException exception) {
       log.warn("수준 평가 AI 호출에 실패해 fallback을 사용합니다. sessionId={}", context.sessionId(), exception);
@@ -114,7 +124,12 @@ public class SessionLevelAssessmentGenerationService {
                 || assessmentRepository.findByLearningSessionId(context.sessionId()).isPresent()) {
               return;
             }
-            assessmentService.assessApplyAndSave(userId, context, aiAssessment);
+            assessmentService.assessApplyAndSave(
+                userId,
+                context,
+                aiAssessment,
+                learningSessionService.isLatestCompletedScenario(session),
+                session.getLevelAssessmentRequestedAt());
             session.completeLevelAssessment();
           });
     } catch (RuntimeException exception) {

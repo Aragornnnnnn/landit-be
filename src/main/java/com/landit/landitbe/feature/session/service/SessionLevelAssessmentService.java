@@ -33,23 +33,33 @@ class SessionLevelAssessmentService {
   private final UserLevelAssessmentRepository userLevelAssessmentRepository;
 
   UserLevelAssessment assessApplyAndSave(
-      long userId, LoadedSessionFeedbackContext context, AiSessionLevelAssessment aiAssessment) {
+      long userId,
+      LoadedSessionFeedbackContext context,
+      AiSessionLevelAssessment aiAssessment,
+      boolean applyToProfile,
+      java.time.LocalDateTime requestedAt) {
     UserProfile profile =
         userProfileRepository
             .findActiveByIdForUpdate(userId)
             .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
     Integer previousLevel = profile.getLearningLevel();
+    applyToProfile = applyToProfile && !profile.getUpdatedAt().isAfter(requestedAt);
     TextLevelAssessmentPolicy.Score modelScore = modelScore(context, aiAssessment);
     boolean modelResult = modelScore != null;
     TextLevelAssessmentPolicy.Score score = modelResult ? modelScore : fallbackScore();
     LearningLevelPolicy.Decision decision =
-        LearningLevelPolicy.apply(
-            previousLevel,
-            profile.getPromotionStreak(),
-            score.overallScore(),
-            score.overallConfidence(),
-            score.sufficientEvidence());
-    if (score.sufficientEvidence()) {
+        applyToProfile
+            ? LearningLevelPolicy.apply(
+                previousLevel,
+                profile.getPromotionStreak(),
+                score.overallScore(),
+                score.overallConfidence(),
+                score.sufficientEvidence())
+            : new LearningLevelPolicy.Decision(
+                previousLevel,
+                profile.getPromotionStreak(),
+                LearningLevelPolicy.ChangeType.NOT_APPLIED);
+    if (applyToProfile && score.sufficientEvidence()) {
       profile.applyAssessedLearningLevel(decision.level(), decision.promotionStreak());
     }
 

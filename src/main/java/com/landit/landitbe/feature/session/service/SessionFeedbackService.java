@@ -29,7 +29,6 @@ public class SessionFeedbackService {
   private final SessionFeedbackContextService contextService;
   private final SessionFeedbackCompletionService completionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
-  private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
   private final AiConversationClient aiConversationClient;
 
   /**
@@ -42,7 +41,6 @@ public class SessionFeedbackService {
    */
   public SessionFeedbackResponse getOrCreate(long userId, long sessionId) {
     LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
-    levelAssessmentGenerationService.startIfNeeded(userId, context);
     ExistingSummaryFeedbackContext existingSummary = context.existingSummary().orElse(null);
     if (existingSummary != null) {
       // 이미 확정된 결과는 AI를 다시 호출하지 않고 그대로 반환한다.
@@ -50,7 +48,7 @@ public class SessionFeedbackService {
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
-    AiSessionFeedbackRequest request = toAiRequest(context);
+    AiSessionFeedbackRequest request = toAiFeedbackRequest(context);
     AiSessionFeedbackResult result = generateOrFallback(request);
     Long summaryFeedbackId = recordOrFallback(userId, context, result);
     return responseFor(context, summaryFeedbackId);
@@ -132,8 +130,16 @@ public class SessionFeedbackService {
             userMessage.evaluationContext().translatedContent()));
   }
 
-  /** 완료 세션 컨텍스트를 AI 수준 평가와 최종 피드백 공통 요청으로 변환한다. */
-  static AiSessionFeedbackRequest toAiRequest(LoadedSessionFeedbackContext context) {
+  /** 완료 세션 컨텍스트를 기존 AI 최종 피드백 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiFeedbackRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList());
+  }
+
+  /** 완료 세션 컨텍스트를 AI 수준 평가 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiLevelAssessmentRequest(LoadedSessionFeedbackContext context) {
     return new AiSessionFeedbackRequest(
         context.sessionId(),
         context.scenario(),

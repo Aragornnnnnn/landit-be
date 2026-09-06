@@ -227,7 +227,8 @@ class ScenarioSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
         .andExpect(status().isOk());
     awaitLevelAssessment(sessionId, token);
-    var assessment = fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages();
+    var assessment =
+        fakeAiConversationClient.lastSessionLevelAssessmentRequest().assessmentMessages();
     assertThat(assessment).hasSize(4);
     assertThat(assessment.get(3).requiredElements())
         .containsExactly(questions.get(3).get("requiredElements").get(0).asText());
@@ -1459,10 +1460,12 @@ class ScenarioSessionApiIntegrationTests {
     awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
 
     AiSessionFeedbackRequest.AssessmentMessage assessmentMessage =
-        fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages().getFirst();
-    assertThat(assessmentMessage.responseDemand()).isEqualTo(ResponseDemand.LOW);
-    assertThat(assessmentMessage.requiredElements())
-        .containsExactly("name a food", "explain a preference");
+        fakeAiConversationClient
+            .lastSessionLevelAssessmentRequest()
+            .assessmentMessages()
+            .getFirst();
+    assertThat(assessmentMessage.responseDemand()).isEqualTo(ResponseDemand.HIGH);
+    assertThat(assessmentMessage.requiredElements()).containsExactly("What food do you like?");
   }
 
   @Test
@@ -1690,9 +1693,9 @@ class ScenarioSessionApiIntegrationTests {
         "ACTIVE");
     seedScenarioQuestion(4121, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?");
     long sessionId = startScenario(accessToken, 2121);
+    fakeAiConversationClient.unobservedPragmatics = true;
     submitMessage(accessToken, sessionId, "Can I get an iced americano?");
     submitMessage(accessToken, sessionId, "That is all, thank you.");
-    fakeAiConversationClient.unobservedPragmatics = true;
 
     for (int attempt = 0; attempt < 2; attempt++) {
       mockMvc
@@ -3297,6 +3300,8 @@ class ScenarioSessionApiIntegrationTests {
 
     private AiSessionFeedbackRequest lastSessionFeedbackRequest;
 
+    private AiSessionFeedbackRequest lastSessionLevelAssessmentRequest;
+
     private final List<Boolean> nextMessageTransactionActive = new ArrayList<>();
 
     private final List<Boolean> closingMessageTransactionActive = new ArrayList<>();
@@ -3440,6 +3445,7 @@ class ScenarioSessionApiIntegrationTests {
     @Override
     public AiSessionLevelAssessment generateSessionLevelAssessment(
         AiSessionFeedbackRequest request) {
+      lastSessionLevelAssessmentRequest = request;
       sessionLevelAssessmentCallCount++;
       if (request.assessmentMessages().size() < 2) {
         return null;
@@ -3483,6 +3489,7 @@ class ScenarioSessionApiIntegrationTests {
       lastClosingMessageRequest = null;
       lastMessageFeedbackRequest = null;
       lastSessionFeedbackRequest = null;
+      lastSessionLevelAssessmentRequest = null;
       nextMessageTransactionActive.clear();
       closingMessageTransactionActive.clear();
       messageFeedbackTransactionActive.clear();
@@ -3589,6 +3596,10 @@ class ScenarioSessionApiIntegrationTests {
 
     private AiSessionFeedbackRequest lastSessionFeedbackRequest() {
       return lastSessionFeedbackRequest;
+    }
+
+    private AiSessionFeedbackRequest lastSessionLevelAssessmentRequest() {
+      return lastSessionLevelAssessmentRequest;
     }
 
     private List<Boolean> sessionFeedbackTransactionActive() {
