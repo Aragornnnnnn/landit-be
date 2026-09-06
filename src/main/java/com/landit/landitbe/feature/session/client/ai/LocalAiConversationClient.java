@@ -81,7 +81,12 @@ public class LocalAiConversationClient implements AiConversationClient {
             .toList());
   }
 
-  /** 로컬 환경에서는 수준 평가를 생략하고 BE fallback 경로를 사용한다. */
+  /**
+   * 로컬 환경에서는 수준 평가를 생략하고 BE fallback 경로를 사용한다.
+   *
+   * @param request 세션 수준 평가 입력
+   * @return fallback 처리를 위한 null
+   */
   @Override
   public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
     return null;

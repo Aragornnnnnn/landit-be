@@ -50,7 +50,7 @@ class GeneratedMessageService {
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
       learningSession.completeBySystem(generation.completionReason(), completedAt);
-      learningSession.prepareLevelAssessment(LocalDateTime.now());
+      learningSession.prepareLevelAssessment(completedAt);
       grantScenarioAccess(learningSession, submittedContext, completedAt);
       streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
     }

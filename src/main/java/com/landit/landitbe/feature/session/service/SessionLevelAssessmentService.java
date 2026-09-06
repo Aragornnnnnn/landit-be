@@ -31,6 +31,7 @@ class SessionLevelAssessmentService {
 
   private final UserProfileRepository userProfileRepository;
   private final UserLevelAssessmentRepository userLevelAssessmentRepository;
+  private final java.time.Clock clock;
 
   UserLevelAssessment assessApplyAndSave(
       long userId,
@@ -63,7 +64,8 @@ class SessionLevelAssessmentService {
                 profile.getPromotionStreak(),
                 LearningLevelPolicy.ChangeType.NOT_APPLIED);
     if (applyToProfile && score.sufficientEvidence()) {
-      profile.applyAssessedLearningLevel(decision.level(), decision.promotionStreak());
+      profile.applyAssessedLearningLevel(
+          decision.level(), decision.promotionStreak(), java.time.LocalDateTime.now(clock));
     }
 
     AiSessionLevelAssessment.Details details = modelResult ? aiAssessment.details() : null;

@@ -107,7 +107,12 @@ public class LearningSessionService {
     return learningSession;
   }
 
-  /** 평가 대상 세션이 사용자의 최신 완료 시나리오인지 확인한다. */
+  /**
+   * 평가 대상 세션이 사용자의 최신 완료 시나리오인지 확인한다.
+   *
+   * @param session 평가할 소유 세션
+   * @return 최신 완료 시나리오와 ID가 같으면 true
+   */
   public boolean isLatestCompletedScenario(LearningSession session) {
     return learningSessionRepository
         .findTopByUserProfileIdAndSessionTypeAndStatusOrderByEndedAtDescIdDesc(

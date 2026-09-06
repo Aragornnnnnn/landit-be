@@ -1,4 +1,4 @@
--- 세션 수준 평가의 비동기 처리 상태와 예약 시각을 저장한다.
+-- H2에서 세션 수준 평가의 상태와 예약 시각을 저장하고 허용 상태를 검증한다.
 ALTER TABLE learning_session
     ADD COLUMN level_assessment_processing_status VARCHAR(20);
 

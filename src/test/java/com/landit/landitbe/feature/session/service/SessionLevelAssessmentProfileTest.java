@@ -15,28 +15,35 @@ import com.landit.landitbe.feature.session.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.domain.LearningLevelPolicy.ChangeType;
 import com.landit.landitbe.feature.session.repository.UserLevelAssessmentRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class SessionLevelAssessmentProfileTest {
+  private static final Clock CLOCK =
+      Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+
   @Test
   void unrelatedProfileChangeStillInitializesLevel() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
-    LocalDateTime requestedAt = LocalDateTime.now().minusSeconds(10);
+    LocalDateTime requestedAt = LocalDateTime.now(CLOCK).minusSeconds(10);
     profile.updateAccentLocale(AccentLocale.EN_US);
     ReflectionTestUtils.setField(profile, "updatedAt", LocalDateTime.now());
     assertThat(assess(profile, requestedAt)).isEqualTo(ChangeType.INITIALIZED);
     assertThat(profile.getLearningLevel()).isEqualTo(4);
+    assertThat(profile.getLearningLevelUpdatedAt()).isEqualTo(LocalDateTime.now(CLOCK));
   }
 
   @Test
   void manualLevelChangeRejectsEarlierAssessment() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
-    LocalDateTime requestedAt = LocalDateTime.now().minusSeconds(10);
-    profile.updateLearningLevel(1);
+    LocalDateTime requestedAt = LocalDateTime.now(CLOCK).minusSeconds(10);
+    profile.updateLearningLevel(1, LocalDateTime.now(CLOCK));
     assertThat(assess(profile, requestedAt)).isEqualTo(ChangeType.NOT_APPLIED);
     assertThat(profile.getLearningLevel()).isEqualTo(1);
     assertThat(profile.getPromotionStreak()).isZero();
@@ -66,7 +73,7 @@ class SessionLevelAssessmentProfileTest {
                             AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
                             domains))
                 .toList());
-    return new SessionLevelAssessmentService(profiles, assessments)
+    return new SessionLevelAssessmentService(profiles, assessments, CLOCK)
         .assessApplyAndSave(
             1L, context, new AiSessionLevelAssessment(core, null), true, requestedAt)
         .getChangeType();

@@ -113,9 +113,14 @@ public class UserProfile extends BaseTimeEntity {
     }
   }
 
-  /** 온보딩에서 선택한 학습 수준으로 갱신한다. */
-  public void updateLearningLevel(int learningLevel) {
-    this.learningLevelUpdatedAt = LocalDateTime.now();
+  /**
+   * 온보딩에서 선택한 학습 수준으로 갱신한다.
+   *
+   * @param learningLevel 사용자가 설정한 학습 수준
+   * @param changedAt 서비스 Clock으로 생성한 수준 변경 시각
+   */
+  public void updateLearningLevel(int learningLevel, LocalDateTime changedAt) {
+    this.learningLevelUpdatedAt = changedAt;
     this.learningLevel = learningLevel;
     this.promotionStreak = 0;
   }
@@ -125,9 +130,11 @@ public class UserProfile extends BaseTimeEntity {
    *
    * @param learningLevel 새로 적용할 학습 수준
    * @param promotionStreak 평가 후 유지할 연속 승급 신호 횟수
+   * @param changedAt 서비스 Clock으로 생성한 수준 변경 시각
    */
-  public void applyAssessedLearningLevel(int learningLevel, int promotionStreak) {
-    this.learningLevelUpdatedAt = LocalDateTime.now();
+  public void applyAssessedLearningLevel(
+      int learningLevel, int promotionStreak, LocalDateTime changedAt) {
+    this.learningLevelUpdatedAt = changedAt;
     this.learningLevel = learningLevel;
     this.promotionStreak = promotionStreak;
   }

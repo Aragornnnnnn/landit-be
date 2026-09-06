@@ -111,9 +111,9 @@ class ScenarioSessionApiIntegrationTests {
 
   @BeforeEach
   void setUp() {
+    awaitPendingLevelAssessments();
     mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
-    awaitPendingLevelAssessments();
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
@@ -151,9 +151,10 @@ class ScenarioSessionApiIntegrationTests {
         Thread.sleep(20);
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
-        return;
+        throw new AssertionError("수준 평가 완료 대기가 중단됐습니다.", exception);
       }
     }
+    throw new AssertionError("이전 테스트의 수준 평가가 제한 시간 내 완료되지 않았습니다.");
   }
 
   @ParameterizedTest

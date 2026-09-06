@@ -17,7 +17,10 @@ import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.repository.UserLevelAssessmentRepository;
 import com.landit.landitbe.shared.domain.Locale;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -34,8 +37,10 @@ class SessionLevelAssessmentRecoveryTest {
     final var ai = mock(AiConversationClient.class);
     var transactions = mock(PlatformTransactionManager.class);
     when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-    var session = LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now());
-    session.prepareLevelAssessment(LocalDateTime.now().minusMinutes(3));
+    var clock = Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneOffset.UTC);
+    var session =
+        LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
+    session.prepareLevelAssessment(LocalDateTime.now(clock).minusMinutes(3));
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
     when(contexts.load(1L, 10L))
@@ -46,7 +51,15 @@ class SessionLevelAssessmentRecoveryTest {
     when(repository.findByLearningSessionId(10L)).thenReturn(Optional.empty());
     var service =
         new SessionLevelAssessmentGenerationService(
-            sessions, profiles, contexts, evaluator, repository, ai, transactions, Runnable::run);
+            sessions,
+            profiles,
+            contexts,
+            evaluator,
+            repository,
+            ai,
+            transactions,
+            Runnable::run,
+            clock);
 
     service.startIfNeeded(1L, 10L);
     assertThat(session.getLevelAssessmentProcessingStatus()).isEqualTo(ProcessingStatus.PREPARING);

@@ -184,7 +184,11 @@ public class LearningSession extends BaseTimeEntity {
     return status == LearningSessionStatus.IN_PROGRESS;
   }
 
-  /** 수준 평가 비동기 작업을 시작할 수 있도록 상태와 예약 시각을 기록한다. */
+  /**
+   * 수준 평가 비동기 작업을 시작할 수 있도록 상태와 예약 시각을 기록한다.
+   *
+   * @param requestedAt 세션 완료와 동일한 시계로 생성한 평가 예약 시각
+   */
   public void prepareLevelAssessment(LocalDateTime requestedAt) {
     this.levelAssessmentProcessingStatus = ProcessingStatus.PREPARING;
     this.levelAssessmentRequestedAt = requestedAt;

@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.UserLevelAssessment;
 import com.landit.landitbe.feature.session.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.session.repository.UserLevelAssessmentRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class SessionLevelAssessmentGenerationService {
   private final AiConversationClient aiConversationClient;
   private final TransactionTemplate transactionTemplate;
   private final TaskExecutor taskExecutor;
+  private final Clock clock;
 
   SessionLevelAssessmentGenerationService(
       LearningSessionService learningSessionService,
@@ -44,7 +46,8 @@ public class SessionLevelAssessmentGenerationService {
       UserLevelAssessmentRepository assessmentRepository,
       AiConversationClient aiConversationClient,
       PlatformTransactionManager transactionManager,
-      @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
+      @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
+      Clock clock) {
     this.learningSessionService = learningSessionService;
     this.userProfileService = userProfileService;
     this.contextService = contextService;
@@ -53,6 +56,7 @@ public class SessionLevelAssessmentGenerationService {
     this.aiConversationClient = aiConversationClient;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.taskExecutor = taskExecutor;
+    this.clock = clock;
   }
 
   /** 완료 트랜잭션에서 예약한 평가를 서버 내부 실행기로 시작한다. */
@@ -65,7 +69,12 @@ public class SessionLevelAssessmentGenerationService {
     }
   }
 
-  /** 완료 커밋 이후 세션 컨텍스트를 조회해 수준 평가를 시작한다. */
+  /**
+   * 완료 커밋 이후 세션 컨텍스트를 조회해 수준 평가를 시작한다.
+   *
+   * @param userId 세션 소유 사용자 ID
+   * @param sessionId 완료 트랜잭션에서 평가가 예약된 세션 ID
+   */
   public void startIfNeeded(long userId, long sessionId) {
     try {
       LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
@@ -75,7 +84,13 @@ public class SessionLevelAssessmentGenerationService {
     }
   }
 
-  /** 수준 평가 상태와 저장된 결과를 조회하고 만료된 작업은 fallback으로 종료한다. */
+  /**
+   * 수준 평가 상태와 저장된 결과를 조회하고 만료된 작업은 fallback으로 종료한다.
+   *
+   * @param userId 세션 소유 사용자 ID
+   * @param sessionId 조회할 세션 ID
+   * @return 처리 상태와 저장된 평가 결과
+   */
   public SessionLevelAssessmentResponse get(long userId, long sessionId) {
     LearningSession session = learningSessionService.findOwned(userId, sessionId);
     UserLevelAssessment assessment =
@@ -153,6 +168,6 @@ public class SessionLevelAssessmentGenerationService {
         && !session
             .getLevelAssessmentRequestedAt()
             .plus(PREPARING_TIMEOUT)
-            .isAfter(LocalDateTime.now());
+            .isAfter(LocalDateTime.now(clock));
   }
 }

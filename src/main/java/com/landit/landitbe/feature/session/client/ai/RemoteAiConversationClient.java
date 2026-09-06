@@ -105,7 +105,12 @@ public class RemoteAiConversationClient implements AiConversationClient {
         .toResult();
   }
 
-  /** AI 서버에 세션 텍스트 수준 평가를 요청한다. */
+  /**
+   * AI 서버에 세션 텍스트 수준 평가를 요청한다.
+   *
+   * @param request 세션 질문과 사용자 답변을 포함한 평가 입력
+   * @return 검증된 평가 결과. 복구 불가능한 평가 응답은 null
+   */
   @Override
   public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
     return post(
