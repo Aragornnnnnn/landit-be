@@ -23,19 +23,20 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
-      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
+      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough",
+      "landit.subscription.revenuecat.webhook-authorization="
     })
 class RevenueCatWebhookSecretMissingIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
 
-  /** 설정값이 비어 있으면 어떤 Authorization 헤더로도 웹훅을 받지 않는다. */
+  /** 설정값이 비어 있으면 값이 있는 Authorization 헤더로도 웹훅을 받지 않는다. 빈 헤더는 불일치 분기로도 거절되므로 값을 채워 보낸다. */
   @Test
   void rejectsEveryWebhookWhenSecretIsNotConfigured() throws Exception {
     mockMvc
         .perform(
             post("/webhooks/revenuecat")
-                .header(HttpHeaders.AUTHORIZATION, "")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer unexpected")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """

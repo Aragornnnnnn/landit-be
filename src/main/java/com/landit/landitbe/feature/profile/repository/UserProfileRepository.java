@@ -39,6 +39,18 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
       """)
   Optional<UserProfile> findActiveByIdForUpdate(@Param("id") Long id);
 
+  /**
+   * 상태와 무관하게 사용자 프로필을 PK로 조회하면서 구독 상태 변경을 직렬화한다.
+   *
+   * <p>결제 제공자 웹훅은 탈퇴한 사용자의 환불·만료 이벤트도 반영해야 하므로 활성 조건을 두지 않는다.
+   *
+   * @param id 사용자 프로필 ID
+   * @return 쓰기 잠금으로 조회한 사용자 프로필. 없으면 빈 값
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select userProfile from UserProfile userProfile where userProfile.id = :id")
+  Optional<UserProfile> findByIdForUpdate(@Param("id") Long id);
+
   /** 특정 상태의 사용자 프로필 존재 여부를 PK로 확인한다. */
   boolean existsByIdAndStatus(Long id, UserProfileStatus status);
 

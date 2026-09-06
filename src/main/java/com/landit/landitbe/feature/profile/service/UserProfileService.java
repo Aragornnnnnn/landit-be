@@ -70,7 +70,8 @@ public class UserProfileService {
   /**
    * 결제 제공자 이벤트로 사용자 구독 상태를 갱신한다.
    *
-   * <p>탈퇴한 사용자도 대상에 포함해 환불·만료 이벤트가 유실되지 않게 한다. 이미 반영한 이벤트보다 오래된 이벤트는 무시한다.
+   * <p>탈퇴한 사용자도 대상에 포함해 환불·만료 이벤트가 유실되지 않게 한다. 이미 반영한 이벤트보다 오래된 이벤트는 무시한다. 같은 사용자의 웹훅이 동시에 들어와도 오래된
+   * 이벤트가 최신 상태를 덮어쓰지 않도록 쓰기 잠금으로 조회한다.
    *
    * @param userId 갱신할 사용자 ID
    * @param command 갱신할 구독 정보
@@ -79,7 +80,7 @@ public class UserProfileService {
   @Transactional
   public SubscriptionUpdateResult updateSubscription(
       Long userId, SubscriptionUpdateCommand command) {
-    Optional<UserProfile> found = userProfileRepository.findById(userId);
+    Optional<UserProfile> found = userProfileRepository.findByIdForUpdate(userId);
     if (found.isEmpty()) {
       return SubscriptionUpdateResult.USER_NOT_FOUND;
     }
