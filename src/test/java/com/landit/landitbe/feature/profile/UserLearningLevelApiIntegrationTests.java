@@ -1,8 +1,9 @@
-// 사용자 학습 수준 API의 인증과 저장 계약을 검증한다.
+// 사용자 학습 수준 API의 인증과 조회 및 저장 동작을 검증한다.
 
 package com.landit.landitbe.feature.profile;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -25,7 +26,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** 사용자 학습 수준 API의 인증과 저장 계약을 검증한다. */
+/** 사용자 학습 수준 API의 인증과 조회 및 저장 동작을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -93,6 +94,41 @@ class UserLearningLevelApiIntegrationTests {
     assertThat(learningLevel(otherKey)).isEqualTo(4);
   }
 
+  /** 인증된 사용자의 현재 학습 수준을 조회한다. */
+  @Test
+  void getsAuthenticatedUsersLearningLevel() throws Exception {
+    String accessToken = login("learning-level-get");
+    updateLearningLevel(accessToken, 4);
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/learning-level")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.learningLevel").value(4));
+  }
+
+  /** 학습 수준을 설정하지 않은 사용자는 null 수준을 조회한다. */
+  @Test
+  void returnsNullWhenLearningLevelIsNotSet() throws Exception {
+    String accessToken = login("learning-level-get-null");
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/learning-level")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.learningLevel").value(nullValue()));
+  }
+
+  /** 인증되지 않은 사용자는 학습 수준을 조회할 수 없다. */
+  @Test
+  void rejectsUnauthenticatedLearningLevelQuery() throws Exception {
+    mockMvc.perform(get("/api/v1/me/learning-level")).andExpect(status().isUnauthorized());
+  }
+
   /** 학습 수준이 없거나 1부터 5까지의 범위를 벗어나면 요청을 거절한다. */
   @Test
   void rejectsMissingOrOutOfRangeLearningLevel() throws Exception {
@@ -130,6 +166,26 @@ class UserLearningLevelApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/me/learning-level'].put.responses['200']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/learning-level'].put.responses['400']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/learning-level'].put.responses['401']").exists());
+  }
+
+  /** OpenAPI 문서에 학습 수준 조회의 성공과 인증 실패 응답을 공개한다. */
+  @Test
+  void openApiDocsDescribeLearningLevelQuery() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/me/learning-level'].get.responses['200']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/me/learning-level'].get.responses['401']").exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.UserLearningLevelResponse.required"
+                        + "[?(@ == 'learningLevel')]")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.UserLearningLevelResponse.properties."
+                        + "learningLevel.type[1]")
+                .value("null"));
   }
 
   /** 사용자 학습 수준 변경 요청을 보내고 성공 응답을 검증한다. */

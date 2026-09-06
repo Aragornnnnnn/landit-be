@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -31,13 +32,18 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   private static final String OPENING_PATH = "/api/v1/free-talk/opening";
   private static final String TURN_PATH = "/api/v1/free-talk/turn";
+  private static final String MEMORY_QUERY_EMBEDDING_PATH =
+      "/api/v1/free-talk/memory-query-embedding";
   private static final String INNER_THOUGHT_PATH = "/api/v1/free-talk/inner-thought";
   private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
   private static final String EXPRESSION_RECOMMENDATIONS_PATH =
       "/api/v1/free-talk/expression-recommendations";
   private static final String CONVERSATION_EMBEDDINGS_PATH =
       "/api/v1/free-talk/conversation-embeddings";
+  private static final String MEMORY_CANDIDATES_PATH = "/api/v1/free-talk/memory-candidates";
+  private static final String MEMORY_RESOLUTION_PATH = "/api/v1/free-talk/memory-resolution";
   private static final int MAX_CONVERSATION_EXCERPTS = 4;
+  private static final Duration MEMORY_QUERY_TIMEOUT = Duration.ofSeconds(2);
   private static final String AI_CALL_ELAPSED_LOG = "AI 호출 소요 시간. path={}, elapsedMs={}";
 
   private final HttpClient httpClient;
@@ -59,13 +65,25 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
-    return post(OPENING_PATH, request, RemoteOpeningResponse.class).toResult();
+    return post(OPENING_PATH, request, RemoteOpeningResponse.class)
+        .toResult(request.memoryContext());
   }
 
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
-    return post(TURN_PATH, request, RemoteTurnResponse.class).toResult();
+    return post(TURN_PATH, request, RemoteTurnResponse.class).toResult(request.memoryContext());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
+    return post(
+            MEMORY_QUERY_EMBEDDING_PATH,
+            request,
+            RemoteMemoryQueryEmbeddingResponse.class,
+            MEMORY_QUERY_TIMEOUT)
+        .toResult();
   }
 
   /** {@inheritDoc} */
@@ -109,7 +127,23 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         .toResult();
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+    return post(MEMORY_CANDIDATES_PATH, request, AiMemoryCandidatesResult.class);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+    return post(MEMORY_RESOLUTION_PATH, request, AiMemoryResolutionResult.class);
+  }
+
   private <T> T post(String path, Object payload, Class<T> responseType) {
+    return post(path, payload, responseType, properties.requestTimeout());
+  }
+
+  private <T> T post(String path, Object payload, Class<T> responseType, Duration requestTimeout) {
     long startNanos = System.nanoTime();
     try {
       HttpRequest request =
@@ -117,7 +151,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
-              .timeout(properties.requestTimeout())
+              .timeout(requestTimeout)
               .POST(
                   HttpRequest.BodyPublishers.ofString(
                       jsonMapper.writeValueAsString(payload), StandardCharsets.UTF_8))
@@ -182,14 +216,18 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteOpeningResponse(
-      String aiMessage, String translatedMessage, CharacterEmotion emotion) {
+      String aiMessage,
+      String translatedMessage,
+      CharacterEmotion emotion,
+      List<Long> usedMemoryIds) {
 
-    // 원격 첫 발화 응답을 검증해 애플리케이션 결과로 변환한다.
-    private AiFreeTalkOpeningResult toResult() {
+    /** 원격 첫 발화와 memory 사용 ID를 검증해 애플리케이션 결과로 변환한다. */
+    private AiFreeTalkOpeningResult toResult(List<AiFreeTalkMemoryContext> memoryContext) {
       if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiFreeTalkOpeningResult(aiMessage, translatedMessage, emotion);
+      return new AiFreeTalkOpeningResult(
+          aiMessage, translatedMessage, emotion, validUsedMemoryIds(usedMemoryIds, memoryContext));
     }
   }
 
@@ -199,10 +237,11 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String inferredTitle,
       String aiMessage,
       String translatedMessage,
-      CharacterEmotion emotion) {
+      CharacterEmotion emotion,
+      List<Long> usedMemoryIds) {
 
-    // 원격 후속 발화 응답을 검증해 애플리케이션 결과로 변환한다.
-    private AiFreeTalkTurnResult toResult() {
+    /** 원격 후속 발화의 종료·생성 필드와 memory 사용 ID를 함께 검증한다. */
+    private AiFreeTalkTurnResult toResult(List<AiFreeTalkMemoryContext> memoryContext) {
       if (userExitIntentDetected == null
           || (!userExitIntentDetected && hasMissingGeneratedField())) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -212,7 +251,12 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiFreeTalkTurnResult(
-          userExitIntentDetected, inferredTitle, aiMessage, translatedMessage, emotion);
+          userExitIntentDetected,
+          inferredTitle,
+          aiMessage,
+          translatedMessage,
+          emotion,
+          validUsedMemoryIds(usedMemoryIds, memoryContext));
     }
 
     private boolean hasMissingGeneratedField() {
@@ -222,6 +266,45 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     private boolean hasGeneratedField() {
       return aiMessage != null || translatedMessage != null || emotion != null;
     }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteMemoryQueryEmbeddingResponse(String embeddingModel, List<Float> embedding) {
+
+    /** 원격 query embedding이 차원·유한값 계약을 지키는지 검증한다. */
+    private AiMemoryQueryEmbeddingResult toResult() {
+      if (blank(embeddingModel)
+          || embedding == null
+          || embedding.size() != 1536
+          || embedding.stream().anyMatch(value -> value == null || !Float.isFinite(value))) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiMemoryQueryEmbeddingResult(embeddingModel, embedding);
+    }
+  }
+
+  /** AI가 반환한 장기기억 식별자가 제공된 문맥의 유효한 부분집합인지 확인한다. */
+  private static List<Long> validUsedMemoryIds(
+      List<Long> usedMemoryIds, List<AiFreeTalkMemoryContext> memoryContext) {
+    List<Long> normalized = usedMemoryIds == null ? List.of() : usedMemoryIds;
+    if (hasInvalidUsedMemoryIds(normalized) || !isMemorySubset(normalized, memoryContext)) {
+      return List.of();
+    }
+    return List.copyOf(normalized);
+  }
+
+  private static boolean hasInvalidUsedMemoryIds(List<Long> usedMemoryIds) {
+    return usedMemoryIds.stream().anyMatch(id -> id == null || id <= 0)
+        || usedMemoryIds.size() != usedMemoryIds.stream().distinct().count();
+  }
+
+  private static boolean isMemorySubset(
+      List<Long> usedMemoryIds, List<AiFreeTalkMemoryContext> memoryContext) {
+    return memoryContext != null
+        && memoryContext.stream()
+            .map(AiFreeTalkMemoryContext::memoryId)
+            .collect(java.util.stream.Collectors.toSet())
+            .containsAll(usedMemoryIds);
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

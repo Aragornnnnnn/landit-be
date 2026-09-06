@@ -55,8 +55,11 @@ class SessionMessageAiGenerator {
     assertNextMessageResult(nextMessageResult);
 
     return new Generation(
-        nextMessageResult.aiMessage(),
-        nextMessageResult.translatedMessage(),
+        combine(nextMessageResult.acknowledgement(), nextQuestion.questionText()),
+        combine(nextMessageResult.translatedAcknowledgement(), nextQuestion.questionTranslation()),
+        nextMessageResult.acknowledgement(),
+        nextQuestion.questionText(),
+        nextQuestion.questionAudioUrl(),
         null,
         null,
         nextMessageResult.goalCompletionStatus(),
@@ -94,6 +97,9 @@ class SessionMessageAiGenerator {
     return new Generation(
         closingMessageResult.aiMessage(),
         closingMessageResult.translatedMessage(),
+        closingMessageResult.aiMessage(),
+        null,
+        null,
         closingMessageResult.innerThought(),
         closingMessageResult.innerThoughtType(),
         goalCompletionStatus,
@@ -111,8 +117,8 @@ class SessionMessageAiGenerator {
 
   private void assertNextMessageResult(AiNextMessageResult result) {
     if (result == null
-        || blank(result.aiMessage())
-        || blank(result.translatedMessage())
+        || blank(result.acknowledgement())
+        || blank(result.translatedAcknowledgement())
         || result.goalCompletionStatus() == null) {
       throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
@@ -132,6 +138,10 @@ class SessionMessageAiGenerator {
     return value == null || value.isBlank();
   }
 
+  private String combine(String acknowledgement, String question) {
+    return "%s %s".formatted(acknowledgement, question);
+  }
+
   record Request(
       Long learningSessionId,
       Long submittedMessageId,
@@ -143,6 +153,9 @@ class SessionMessageAiGenerator {
   record Generation(
       String aiMessage,
       String translatedMessage,
+      String ttsText,
+      String fixedQuestionText,
+      String questionAudioUrl,
       String innerThought,
       InnerThoughtType innerThoughtType,
       GoalCompletionStatus goalCompletionStatus,

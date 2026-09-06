@@ -44,6 +44,9 @@ public class FreeTalkTopicService {
     FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.usage(userId);
     return FreeTalkMainResponse.of(
-        getActiveTopics(), dailyUsage.usedSpeakingDurationMs(), dailyUsage.remainingMs());
+        getActiveTopics(),
+        dailySpeakingUsageService.speakingTimeLimitMs(),
+        dailyUsage.usedSpeakingDurationMs(),
+        dailyUsage.remainingMs());
   }
 }

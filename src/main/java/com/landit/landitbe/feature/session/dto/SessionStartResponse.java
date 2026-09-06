@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.dto;
 
+import com.landit.landitbe.feature.content.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
@@ -15,11 +16,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
  *
  * @param sessionId 생성된 학습 세션 ID
  * @param scenarioId 시나리오 ID
- * @param characterId 시나리오 캐릭터 식별자
+ * @param character 시나리오 캐릭터 정보
  * @param sessionType 세션 타입
  * @param firstSpeaker 첫 발화자
  * @param userOpeningInstruction USER first 시 사용자 시작 안내
- * @param ttsVoice 활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null
  * @param currentMessage AI first 시 생성된 현재 메시지
  * @param progress 세션 진행도
  */
@@ -27,11 +27,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record SessionStartResponse(
     @Schema(description = "생성된 학습 세션 ID") Long sessionId,
     @Schema(description = "시나리오 ID") Long scenarioId,
-    @Schema(description = "시나리오 캐릭터 식별자", example = "chloe") String characterId,
+    @Schema(description = "시나리오 캐릭터 정보") ConversationCharacterResponse character,
     @Schema(description = "세션 타입") String sessionType,
     @Schema(description = "첫 발화자") String firstSpeaker,
     @Schema(description = "USER first 시 사용자 시작 안내") String userOpeningInstruction,
-    @Schema(description = "활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null") TtsVoiceResponse ttsVoice,
     @Schema(description = "AI first 시 생성된 현재 메시지") CurrentMessageResponse currentMessage,
     @Schema(description = "세션 진행도") SessionProgressResponse progress) {
 
@@ -54,15 +53,16 @@ public record SessionStartResponse(
     return new SessionStartResponse(
         learningSession.getId(),
         startProjection.scenarioId(),
-        startProjection.characterId(),
+        new ConversationCharacterResponse(
+            startProjection.characterId(),
+            TtsVoiceResponse.from(
+                startProjection.ttsVoiceProvider(),
+                startProjection.ttsVoiceModel(),
+                startProjection.providerVoiceId(),
+                startProjection.ttsVoiceGender())),
         SessionType.SCENARIO.name(),
         startProjection.firstSpeaker().name(),
         userOpeningInstruction,
-        TtsVoiceResponse.from(
-            startProjection.ttsVoiceProvider(),
-            startProjection.ttsVoiceModel(),
-            startProjection.providerVoiceId(),
-            startProjection.ttsVoiceGender()),
         currentMessage,
         SessionProgressResponse.from(startProjection));
   }
@@ -76,6 +76,7 @@ public record SessionStartResponse(
    * @param role 발화 주체
    * @param content 메시지 본문
    * @param translatedContent 기준 locale 번역
+   * @param questionAudioUrl 첫 고정 질문 음원 URL
    * @param innerThought 첫 화면에 보여줄 상대 역할의 속마음
    * @param innerThoughtType 속마음 유형
    */
@@ -87,6 +88,7 @@ public record SessionStartResponse(
       @Schema(description = "발화 주체") String role,
       @Schema(description = "메시지 본문") String content,
       @Schema(description = "기준 locale 번역") String translatedContent,
+      @Schema(description = "첫 고정 질문 음원 URL") String questionAudioUrl,
       @Schema(description = "첫 화면에 보여줄 상대 역할의 속마음") String innerThought,
       @Schema(description = "속마음 유형") String innerThoughtType) {
 
@@ -94,9 +96,11 @@ public record SessionStartResponse(
      * 저장된 AI 시작 메시지를 현재 메시지 응답으로 변환한다.
      *
      * @param message 저장된 AI 시작 메시지
+     * @param questionAudioUrl 첫 고정 질문 음원 URL
      * @return 현재 메시지 응답
      */
-    public static CurrentMessageResponse from(SessionHistoryMessage message) {
+    public static CurrentMessageResponse from(
+        SessionHistoryMessage message, String questionAudioUrl) {
       return new CurrentMessageResponse(
           message.getId(),
           message.getTurnNumber(),
@@ -104,6 +108,7 @@ public record SessionStartResponse(
           message.getRole().name(),
           message.getContent(),
           message.getTranslatedContent(),
+          questionAudioUrl,
           message.getInnerThought(),
           message.getInnerThoughtType() == null ? null : message.getInnerThoughtType().name());
     }

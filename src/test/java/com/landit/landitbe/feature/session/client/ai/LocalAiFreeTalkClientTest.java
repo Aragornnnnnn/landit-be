@@ -42,7 +42,8 @@ class LocalAiFreeTalkClientTest {
         null,
         List.of(
             new AiConversationHistoryMessage(
-                3002L, 1, "USER", "I'm going hiking with friends.", null)));
+                3002L, 1, "USER", "I'm going hiking with friends.", null)),
+        List.of());
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest() {

@@ -97,7 +97,7 @@ class ScenarioListApiIntegrationTests {
       throws Exception {
     JsonNode loginResponseBody = login();
     final long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
-    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
     seedScenarioListData(userId);
 
     mockMvc
@@ -300,8 +300,9 @@ class ScenarioListApiIntegrationTests {
   void scenariosReturnOrderedAccessStatusAndOpeningPreview() throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
-    String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
     seedScenarioListData(userId);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
     insertScenarioAccess(userId, 202);
 
     mockMvc
@@ -336,30 +337,35 @@ class ScenarioListApiIntegrationTests {
             jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessage")
-                .value("What is your favorite food?"))
+                .value("What food do you like?"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessageTranslation")
-                .value("가장 좋아하는 음식이 뭐예요?"))
+                .value("어떤 음식을 좋아해요?"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.userOpeningInstruction")
                 .value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThought")
-                .value("질문 1번의 속마음"))
+                .value("쉬운 질문의 속마음"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.innerThoughtType")
                 .value("GOOD"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.provider")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.characterId")
+                .value("chloe"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.provider")
                 .value("OPENROUTER"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.model")
-                .value("microsoft/mai-voice-2"))
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.model")
+                .value("deepgram/aura-2"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.providerVoiceId")
-                .value("en-US-Harper:MAI-Voice-2"))
+            jsonPath(
+                    "$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice"
+                        + ".providerVoiceId")
+                .value("aura-2-luna-en"))
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice.gender")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.gender")
                 .value("FEMALE"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
@@ -436,10 +442,10 @@ class ScenarioListApiIntegrationTests {
                     "Bearer " + loginResponseBody.get("data").get("accessToken").asText()))
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.data.categories[0].scenarios[0].openingPreview.ttsVoice")
+            jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice")
                 .value(nullValue()))
         .andExpect(
-            jsonPath("$.data.categories[1].scenarios[0].openingPreview.ttsVoice")
+            jsonPath("$.data.categories[1].scenarios[0].openingPreview.character.ttsVoice")
                 .value(nullValue()));
   }
 
@@ -465,7 +471,7 @@ class ScenarioListApiIntegrationTests {
   }
 
   private void seedScenarioListData(Long clearedUserId) {
-    final long harperVoiceId = ttsVoiceId("en-US-Harper:MAI-Voice-2");
+    final long harperVoiceId = ttsVoiceId("aura-2-luna-en");
     final long marcoVoiceId = ttsVoiceId("aura-2-hyperion-en");
     insertCategory(100, 2, "ACTIVE", "두 번째 카테고리");
     insertCategory(101, 1, "ACTIVE", "첫 번째 카테고리");
@@ -486,6 +492,8 @@ class ScenarioListApiIntegrationTests {
         202, "AI 먼저 말하기", "AI가 먼저 질문합니다.", "좋아하는 음식을 설명한다.", null, harperVoiceId, "ACTIVE");
     insertScenarioQuestion(
         9202, 202, 1, "What is your favorite food?", "가장 좋아하는 음식이 뭐예요?", "질문 1번의 속마음", "GOOD");
+    insertScenarioQuestion(
+        9203, 202, 1, "What food do you like?", "어떤 음식을 좋아해요?", "쉬운 질문의 속마음", "GOOD", "LEVEL_1");
 
     insertScenario(203, 100, 3, "AI", "HARD", "INACTIVE", null);
     insertScenarioVariant(203, "잠긴 시나리오", "비활성 시나리오입니다.", "잠긴 시나리오를 확인한다.", null, null, "ACTIVE");
@@ -547,21 +555,43 @@ class ScenarioListApiIntegrationTests {
       String questionTranslation,
       String innerThought,
       String innerThoughtType) {
+    insertScenarioQuestion(
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        innerThought,
+        innerThoughtType,
+        "LEVEL_4_TO_5");
+  }
+
+  private void insertScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      String questionText,
+      String questionTranslation,
+      String innerThought,
+      String innerThoughtType,
+      String questionLevelGroup) {
     jdbcTemplate.update(
         """
                         INSERT INTO scenario_question (
                             id,
                             scenario_id,
                             display_order,
+                            question_level_group,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId,
-        displayOrder);
+        displayOrder,
+        questionLevelGroup);
     jdbcTemplate.update(
         """
                         INSERT INTO scenario_question_language_variant (
@@ -570,17 +600,19 @@ class ScenarioListApiIntegrationTests {
                             base_locale,
                             question_text,
                             question_translation,
+                            audio_url,
                             inner_thought,
                             inner_thought_type,
                             status,
                             created_at,
                             updated_at
                         )
-                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         questionText,
         questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId),
         innerThought,
         innerThoughtType);
   }

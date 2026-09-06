@@ -22,6 +22,7 @@ class PgVectorExpressionEmbeddingSearchRepositoryTests {
         .contains("embedding <=> CAST(? AS extensions.vector)")
         .contains("expression_source = 'FREE_TALK'")
         .contains("status = 'ACTIVE'")
+        .contains("difficulty_level <= ?")
         .contains("embedding IS NOT NULL")
         .contains("NOT EXISTS")
         .contains("user_writing_expression_completion")
@@ -29,5 +30,20 @@ class PgVectorExpressionEmbeddingSearchRepositoryTests {
 
     // 벡터 인덱스 활용을 위해 ORDER BY에도 별칭이 아닌 연산식을 유지한다.
     assertThat(sql).contains("ORDER BY we.embedding <=> CAST(? AS extensions.vector)");
+  }
+
+  /** 위치 인자로 바인딩하므로 플레이스홀더의 개수와 순서가 곧 계약이다. 조건을 끼워 넣으면서 인자 순서를 함께 고치지 않으면 예외 없이 잘못된 값으로 검색된다. */
+  @Test
+  void searchSqlKeepsPlaceholderCountAndOrder() {
+    String sql = PgVectorExpressionEmbeddingSearchRepository.SEARCH_SQL;
+
+    // 순서대로 임베딩, 학습 언어, 기준 언어, 난이도 상한, 사용자 ID, 임베딩, 후보 수를 바인딩한다.
+    assertThat(sql.chars().filter(character -> character == '?').count()).isEqualTo(7);
+    assertThat(sql.indexOf("target_locale = ?")).isLessThan(sql.indexOf("base_locale = ?"));
+    assertThat(sql.indexOf("base_locale = ?")).isLessThan(sql.indexOf("difficulty_level <= ?"));
+    assertThat(sql.indexOf("difficulty_level <= ?"))
+        .isLessThan(sql.indexOf("c.user_profile_id = ?"));
+    assertThat(sql.indexOf("c.user_profile_id = ?")).isLessThan(sql.indexOf("ORDER BY"));
+    assertThat(sql.indexOf("ORDER BY")).isLessThan(sql.indexOf("LIMIT ?"));
   }
 }

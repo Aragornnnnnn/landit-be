@@ -43,6 +43,9 @@ public class ScenarioQuestionLanguageVariant extends BaseTimeEntity {
   @Column(name = "question_translation", nullable = false, length = 500)
   private String questionTranslation;
 
+  @Column(name = "audio_url", nullable = false, length = 1000)
+  private String audioUrl;
+
   @Column(name = "inner_thought", columnDefinition = "text")
   private String innerThought;
 

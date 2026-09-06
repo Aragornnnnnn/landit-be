@@ -23,6 +23,7 @@ class UserScenarioProgressTest {
     assertThat(progress.getStatus()).isEqualTo(UserScenarioProgressStatus.CLEARED);
     assertThat(progress.getCompletedCount()).isEqualTo(1);
     assertThat(progress.getFirstClearedAt()).isEqualTo(endedAt);
+    assertThat(progress.getLastClearedAt()).isEqualTo(endedAt);
     assertThat(progress.getLastPlayedAt()).isEqualTo(endedAt);
     assertThat(progress.getBestNativeScore()).isEqualTo(75);
     assertThat(progress.getBestStarRating()).isEqualByComparingTo("2.5");
@@ -40,6 +41,7 @@ class UserScenarioProgressTest {
 
     assertThat(progress.getCompletedCount()).isEqualTo(2);
     assertThat(progress.getFirstClearedAt()).isEqualTo(firstEndedAt);
+    assertThat(progress.getLastClearedAt()).isEqualTo(secondEndedAt);
     assertThat(progress.getLastPlayedAt()).isEqualTo(secondEndedAt);
     assertThat(progress.getBestNativeScore()).isEqualTo(90);
     assertThat(progress.getBestStarRating()).isEqualByComparingTo("3.0");

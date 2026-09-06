@@ -1,0 +1,17 @@
+[
+  {
+    "expressionId": 990304,
+    "accentLocale": "EN_US",
+    "sentenceText": "I'm busy studying now.",
+    "words": [
+      {"order": 1, "word": "I'm", "syllables": ["I'm"], "stressIndex": -1,
+       "pronunciationDisplay": "aim"},
+      {"order": 2, "word": "busy", "syllables": ["bi", "zy"], "stressIndex": 0,
+       "pronunciationDisplay": "bi·zee"},
+      {"order": 3, "word": "studying", "syllables": ["stud", "y", "ing"], "stressIndex": 0,
+       "pronunciationDisplay": "stuh·dee·ing"},
+      {"order": 4, "word": "now", "syllables": ["now"], "stressIndex": 0,
+       "pronunciationDisplay": "nau"}
+    ]
+  }
+]

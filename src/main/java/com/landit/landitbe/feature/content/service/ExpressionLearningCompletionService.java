@@ -2,7 +2,9 @@
 
 package com.landit.landitbe.feature.content.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
+import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -82,6 +84,11 @@ public class ExpressionLearningCompletionService {
     if (scenarioId == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
+    ContentLearningLevel contentLevel = contentLearningLevel(userId);
+    if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
+        && !contentLevel.includesExpressionDifficulty(expression.getDifficultyLevel())) {
+      throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
     writingExpressionRepository
         .findByIdAndStatusForUpdate(expressionId, ActiveStatus.ACTIVE)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -96,7 +103,8 @@ public class ExpressionLearningCompletionService {
     }
 
     // 시나리오 학습 순서에 따라 잠금 여부를 검증한다.
-    if (!isUnlockedExpression(userId, scenarioId, expressionId, completedExpressionIds.values())) {
+    if (!isUnlockedExpression(
+        userId, scenarioId, expressionId, contentLevel, completedExpressionIds.values())) {
       log.warn(LOCKED_EXPRESSION_LOG, userId, expressionId);
       throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
     }
@@ -145,18 +153,23 @@ public class ExpressionLearningCompletionService {
 
   /** 사용자 로케일과 학습 순서로 표현의 잠금 해제 여부를 판단한다. */
   private boolean isUnlockedExpression(
-      Long userId, Long scenarioId, Long expressionId, Set<Long> completedExpressionIds) {
+      Long userId,
+      Long scenarioId,
+      Long expressionId,
+      ContentLearningLevel contentLevel,
+      Set<Long> completedExpressionIds) {
     // 사용자의 학습 언어와 기준 언어를 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
 
     // 사용자 로케일에 맞는 활성 표현을 노출 순서대로 조회한다.
     List<WritingExpression> expressions =
-        writingExpressionRepository
-            .findByScenarioIdAndTargetLocaleAndBaseLocaleAndStatusOrderByDisplayOrderAsc(
-                scenarioId,
-                userLocale.targetLocale(),
-                userLocale.baseLocale(),
-                ActiveStatus.ACTIVE);
+        writingExpressionRepository.findScenarioExpressions(
+            scenarioId,
+            userLocale.targetLocale(),
+            userLocale.baseLocale(),
+            contentLevel.minimumExpressionDifficulty(),
+            contentLevel.maximumExpressionDifficulty(),
+            ActiveStatus.ACTIVE);
 
     // 가장 앞선 미완료 표현의 ID를 찾는다.
     Optional<Long> firstIncompleteExpressionId =
@@ -167,5 +180,10 @@ public class ExpressionLearningCompletionService {
 
     return firstIncompleteExpressionId.isPresent()
         && firstIncompleteExpressionId.get().equals(expressionId);
+  }
+
+  /** 사용자 학습 레벨을 콘텐츠 레벨 그룹으로 변환한다. */
+  private ContentLearningLevel contentLearningLevel(Long userId) {
+    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
   }
 }

@@ -22,7 +22,10 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
     return new AiFreeTalkOpeningResult(
-        "What would you like to talk about today?", "오늘은 무슨 이야기를 하고 싶어?", CharacterEmotion.HAPPY);
+        "What would you like to talk about today?",
+        "오늘은 무슨 이야기를 하고 싶어?",
+        CharacterEmotion.HAPPY,
+        List.of());
   }
 
   /** {@inheritDoc} */
@@ -33,7 +36,14 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
         null,
         "That sounds interesting. Tell me more.",
         "흥미롭다. 조금 더 이야기해줘.",
-        CharacterEmotion.HAPPY);
+        CharacterEmotion.HAPPY,
+        List.of());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
+    return new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", firstAxisEmbedding());
   }
 
   /** {@inheritDoc} */
@@ -72,6 +82,24 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
       AiConversationEmbeddingsRequest request) {
     return new AiConversationEmbeddingsResult(
         List.of(new AiConversationExcerpt("That sounds interesting.", firstAxisEmbedding())));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
+    return new AiMemoryCandidatesResult("memory-candidate-v1", List.of());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
+    return new AiMemoryResolutionResult(
+        request.candidates().stream()
+            .map(
+                candidate ->
+                    new AiMemoryResolutionResult.Resolution(
+                        candidate.candidateIndex(), AiMemoryOperation.ADD, List.of()))
+            .toList());
   }
 
   // 테스트에서 예측할 수 있도록 첫 성분만 1인 고정 임베딩을 만든다.

@@ -1,0 +1,11 @@
+[
+  {
+    "expressionId": 999999,
+    "accentLocale": "EN_US",
+    "sentenceText": "Whatever.",
+    "words": [
+      {"order": 1, "word": "Whatever", "syllables": ["what", "ev", "er"], "stressIndex": 1,
+       "pronunciationDisplay": "wat·e·ver"}
+    ]
+  }
+]

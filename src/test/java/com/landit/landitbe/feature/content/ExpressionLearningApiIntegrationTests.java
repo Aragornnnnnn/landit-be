@@ -108,7 +108,161 @@ class ExpressionLearningApiIntegrationTests {
                         "mind")))
         .andExpect(
             jsonPath("$.data.representativeImageUrl")
-                .value("https://cdn.example.com/images/101.png"));
+                .value("https://cdn.example.com/images/101.png"))
+        // 아직 학습을 마치지 않았으므로 완료 여부는 false다.
+        .andExpect(jsonPath("$.data.completed").value(false));
+  }
+
+  @Test
+  void learningStartRejectsExpressionAboveLearningLevel() throws Exception {
+    Long expressionId = seedExpression();
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET difficulty_level = 4 WHERE id = ?", expressionId);
+    String accessToken =
+        login("google-learn-level", "learn-level@example.com", "Learn Level", "learn-level-nonce");
+    Long userProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM user_profile WHERE email = ?", Long.class, "learn-level@example.com");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userProfileId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+  }
+
+  /** 학습을 완료한 표현은 다시 조회했을 때 완료 여부가 true로 내려가는지 검증한다. */
+  @Test
+  void learningStartReturnsCompletedAfterFinishingLearning() throws Exception {
+    // given: 표현을 심고 로그인한 뒤, 학습 완료 API로 해당 표현을 완료한 상태
+    Long expressionId = seedExpression();
+    String accessToken = login("google-learn-done", "done@example.com", "Done User", "done-nonce");
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk());
+
+    // when: 같은 표현의 학습 시작 API를 다시 호출하면
+    // then: 완료 여부가 true로 내려간다
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.completed").value(true));
+  }
+
+  /** 완료 여부는 사용자별로 갈린다 — 남이 완료해도 내 응답은 false여야 한다. */
+  @Test
+  void learningStartReturnsNotCompletedForAnotherUser() throws Exception {
+    // given: 한 사용자가 표현 학습을 완료한 상태
+    Long expressionId = seedExpression();
+    String ownerToken =
+        login("google-learn-owner", "owner@example.com", "Owner User", "owner-nonce");
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/{expressionId}/learning-finish", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken))
+        .andExpect(status().isOk());
+
+    // when: 같은 표현을 아직 학습하지 않은 다른 사용자가 조회하면
+    String otherToken =
+        login("google-learn-other", "other@example.com", "Other User", "other-nonce");
+
+    // then: 완료 여부는 false다
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.completed").value(false));
+  }
+
+  /** 발음 자산(TTS 완성)이 있으면 사용자 억양에 맞는 대표 예문 음성 URL이 내려가는지 검증한다. */
+  @Test
+  void learningStartReturnsSentenceAudioUrlWhenPronunciationAssetIsReady() throws Exception {
+    // given: 표현 + EN_US 발음 자산(TTS 완성)이 있고, 사용자의 튜터가 EN_US 억양인 상태
+    Long expressionId = seedExpression();
+    String accessToken =
+        login("google-learn-audio", "learn-audio@example.com", "Audio User", "audio-nonce");
+    assignUsTutor("learn-audio@example.com");
+    jdbcTemplate.update(
+        "INSERT INTO expression_pronunciation_asset (writing_expression_id, accent_locale,"
+            + " expression_audio_url, sentence_audio_url, words, created_at, updated_at) VALUES (?,"
+            + " 'EN_US', 'https://cdn.example.com/expression.mp3',"
+            + " 'https://cdn.example.com/sentence.mp3', CAST('[{\"order\":1,\"word\":\"w\"}]' AS"
+            + " jsonb), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        expressionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data.representativeSentenceAudioUrl")
+                .value("https://cdn.example.com/sentence.mp3"))
+        .andExpect(
+            jsonPath("$.data.targetExpressionAudioUrl")
+                .value("https://cdn.example.com/expression.mp3"));
+  }
+
+  /** 패턴형 표현(발화 불가)은 표현 음성만 null이고 대표 예문 음성은 정상 응답되는지 검증한다. */
+  @Test
+  void learningStartReturnsNullExpressionAudioUrlForTemplatedExpression() throws Exception {
+    // given: 표현 음성 없이(TTS 배치가 패턴형에는 표현 음성을 만들지 않음) 문장 TTS만 완성된 자산
+    Long expressionId = seedExpression();
+    String accessToken =
+        login("google-learn-pattern", "learn-pattern@example.com", "Pattern User", "pattern-nonce");
+    assignUsTutor("learn-pattern@example.com");
+    jdbcTemplate.update(
+        "INSERT INTO expression_pronunciation_asset (writing_expression_id, accent_locale,"
+            + " expression_audio_url, sentence_audio_url, words, created_at, updated_at) VALUES (?,"
+            + " 'EN_US', NULL, 'https://cdn.example.com/sentence.mp3',"
+            + " CAST('[{\"order\":1,\"word\":\"w\"}]' AS jsonb), CURRENT_TIMESTAMP,"
+            + " CURRENT_TIMESTAMP)",
+        expressionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data.representativeSentenceAudioUrl")
+                .value("https://cdn.example.com/sentence.mp3"))
+        .andExpect(jsonPath("$.data.targetExpressionAudioUrl").isEmpty());
+  }
+
+  /** 발음 자산이 아직 없으면 음성 URL이 null이고 나머지 응답은 정상인지 검증한다 (단계적 자산 구축 대응). */
+  @Test
+  void learningStartReturnsNullAudioUrlWhenAssetIsMissing() throws Exception {
+    Long expressionId = seedExpression();
+    String accessToken =
+        login("google-learn-noaudio", "learn-noaudio@example.com", "NoAudio User", "noaudio-nonce");
+    assignUsTutor("learn-noaudio@example.com");
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/{expressionId}/learning-start", expressionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetExpressionText").value("blow my mind"))
+        .andExpect(jsonPath("$.data.representativeSentenceAudioUrl").isEmpty())
+        .andExpect(jsonPath("$.data.targetExpressionAudioUrl").isEmpty());
+  }
+
+  /** 사용자의 튜터를 EN_US 억양 튜터로 고정한다 (발음 자산 시드가 EN_US라서). */
+  private void assignUsTutor(String email) {
+    Long usTutorId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM ai_tutor WHERE accent_locale = 'EN_US' ORDER BY id LIMIT 1",
+            Long.class);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET ai_tutor_id = ? WHERE email = ?", usTutorId, email);
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
@@ -188,7 +342,8 @@ class ExpressionLearningApiIntegrationTests {
     //    테스트가 검증할 값들(blow my mind 등)을 여기서 심는다.
     return insertAndGetId(
         "INSERT INTO writing_expression "
-            + "(scenario_id, expression_type, usage_frequency_level, target_locale, base_locale, "
+            + "(scenario_id, expression_type, usage_frequency_level, difficulty_level, "
+            + "target_locale, base_locale, "
             + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
             + "usage_description, representative_question_text, "
             + "representative_question_translation, "
@@ -196,7 +351,7 @@ class ExpressionLearningApiIntegrationTests {
             + "representative_sentence_words, representative_sentence_word_choices, "
             + "representative_image_url, "
             + "practice_examples_payload, status, created_at, updated_at) "
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
+            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 4, 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
             + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
             + "'What should I definitely see in Korea?', '한국에서 뭘 꼭 봐야 해?', "
             + "'Gyeongbokgung Palace will blow your mind.', '경복궁은 널 완전 놀라게 할 거야.', "

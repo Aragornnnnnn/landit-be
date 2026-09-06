@@ -137,7 +137,7 @@ class ScenarioSessionApiIntegrationTests {
         "기존 시작 메시지",
         "음식 이야기는 처음 대화를 열기 좋다.",
         "GOOD",
-        ttsVoiceId("en-US-Harper:MAI-Voice-2"),
+        ttsVoiceId("aura-2-luna-en"),
         "ACTIVE");
     MvcResult result =
         mockMvc
@@ -149,15 +149,15 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.error").value(nullValue()))
             .andExpect(jsonPath("$.data.sessionId").value(notNullValue()))
             .andExpect(jsonPath("$.data.scenarioId").value(2001))
-            .andExpect(jsonPath("$.data.characterId").value("chloe"))
+            .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.sessionType").value("SCENARIO"))
             .andExpect(jsonPath("$.data.firstSpeaker").value("AI"))
             .andExpect(jsonPath("$.data.userOpeningInstruction").value(nullValue()))
-            .andExpect(jsonPath("$.data.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(jsonPath("$.data.ttsVoice.model").value("microsoft/mai-voice-2"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.model").value("deepgram/aura-2"))
             .andExpect(
-                jsonPath("$.data.ttsVoice.providerVoiceId").value("en-US-Harper:MAI-Voice-2"))
-            .andExpect(jsonPath("$.data.ttsVoice.gender").value("FEMALE"))
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.gender").value("FEMALE"))
             .andExpect(jsonPath("$.data.currentMessage.messageId").value(notNullValue()))
             .andExpect(jsonPath("$.data.currentMessage.turnNumber").value(1))
             .andExpect(jsonPath("$.data.currentMessage.messageSequence").value(1))
@@ -167,6 +167,9 @@ class ScenarioSessionApiIntegrationTests {
                     .value("What food do you like? Why do you like it?"))
             .andExpect(
                 jsonPath("$.data.currentMessage.translatedContent").value("좋아하는 음식이 있어? 왜 좋아해?"))
+            .andExpect(
+                jsonPath("$.data.currentMessage.questionAudioUrl")
+                    .value("https://cdn.example.com/questions/4001.mp3"))
             .andExpect(jsonPath("$.data.currentMessage.innerThought").value("질문 1번의 속마음"))
             .andExpect(jsonPath("$.data.currentMessage.innerThoughtType").value("GOOD"))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
@@ -214,6 +217,18 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionEndPath + ".responses['403'].description").value("권한 없음"))
         .andExpect(jsonPath(sessionEndPath + ".responses['404'].description").value("세션 없음"))
         .andExpect(jsonPath(sessionEndPath + ".responses['409'].description").value("이미 완료됨"));
+  }
+
+  @Test
+  void openApiDocumentsFixedQuestionTextAsNullable() throws Exception {
+    String fixedQuestionTextSchema =
+        "$.components.schemas.NextMessageResponse.properties.fixedQuestionText";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(fixedQuestionTextSchema + ".type[0]").value("string"))
+        .andExpect(jsonPath(fixedQuestionTextSchema + ".type[1]").value("null"));
   }
 
   @Test
@@ -308,6 +323,13 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(
                 jsonPath("$.data.nextMessage.translatedContent")
                     .value("아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?"))
+            .andExpect(jsonPath("$.data.nextMessage.ttsText").value("Oh, you like spicy pizza."))
+            .andExpect(
+                jsonPath("$.data.nextMessage.fixedQuestionText")
+                    .value("What food did you eat recently?"))
+            .andExpect(
+                jsonPath("$.data.nextMessage.questionAudioUrl")
+                    .value("https://cdn.example.com/questions/4102.mp3"))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
             .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
             .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(2))
@@ -465,7 +487,11 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(
                 jsonPath("$.data.nextMessage.content")
-                    .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                    .value("Oh, you like spicy pizza. What would you like?"))
+            .andExpect(jsonPath("$.data.nextMessage.ttsText").value("Oh, you like spicy pizza."))
+            .andExpect(
+                jsonPath("$.data.nextMessage.questionAudioUrl")
+                    .value("https://cdn.example.com/questions/4203.mp3"))
             .andReturn();
     long messageId =
         objectMapper
@@ -796,7 +822,7 @@ class ScenarioSessionApiIntegrationTests {
             fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().type().name())
         .isEqualTo("AI_MESSAGE");
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().evaluationContext().content())
-        .isEqualTo("Oh, you like spicy pizza. What food did you eat recently?");
+        .isEqualTo("Oh, you like spicy pizza. What size would you like?");
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
         .isEqualTo("A medium size, please.");
   }
@@ -841,6 +867,51 @@ class ScenarioSessionApiIntegrationTests {
     submitMessage(accessToken, sessionId, "No, thank you.");
     assertThat(fakeAiConversationClient.lastClosingMessageRequest()).isNotNull();
     assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
+  }
+
+  @Test
+  void scenarioSessionKeepsQuestionLevelGroupFromStart() throws Exception {
+    JsonNode loginBody = login("question-level-snapshot@example.com");
+    long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
+    seedCategory(1131, 1, "ACTIVE", "카페");
+    seedScenario(2131, 1131, 1, "USER", "ACTIVE", 2);
+    seedScenarioVariant(
+        3131,
+        2131,
+        "카페 주문",
+        "카페에서 음료를 주문합니다.",
+        "원하는 음료를 주문합니다.",
+        "주문하고 싶은 음료를 말해보세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(4133, 2131, 1, "What do you want?", "무엇을 원해요?", "LEVEL_1");
+    seedScenarioQuestion(
+        4134,
+        2131,
+        1,
+        "Could you describe your preferred beverage?",
+        "선호하는 음료를 설명해 주시겠어요?",
+        "LEVEL_4_TO_5");
+
+    long sessionId = startScenario(accessToken, 2131);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 5 WHERE id = ?", userId);
+
+    submitMessage(accessToken, sessionId, "I want coffee.");
+
+    assertThat(fakeAiConversationClient.lastNextMessageRequest().nextQuestion().questionId())
+        .isEqualTo(4133L);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT question_level_group FROM scenario_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("LEVEL_1");
   }
 
   @Test
@@ -1024,6 +1095,11 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(
             jsonPath("$.data.nextMessage.content")
                 .value("Thanks for sharing. That was a good conversation."))
+        .andExpect(
+            jsonPath("$.data.nextMessage.ttsText")
+                .value("Thanks for sharing. That was a good conversation."))
+        .andExpect(jsonPath("$.data.nextMessage.fixedQuestionText").value(nullValue()))
+        .andExpect(jsonPath("$.data.nextMessage.questionAudioUrl").value(nullValue()))
         .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(2))
         .andExpect(jsonPath("$.data.progress.currentMessageSequenceNumber").value(2))
         .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(1))
@@ -1294,7 +1370,7 @@ class ScenarioSessionApiIntegrationTests {
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.type").value("AI_MESSAGE"))
         .andExpect(
             jsonPath("$.data.messageFeedbacks[1].evaluationContext.content")
-                .value("Oh, you like spicy pizza. What food did you eat recently?"));
+                .value("Oh, you like spicy pizza. Would you like anything else?"));
 
     assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().expectedMessageIds())
         .containsExactlyElementsOf(userMessageIds(sessionId));
@@ -1389,7 +1465,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.submittedMessage.innerThought").value(nullValue()))
         .andExpect(
             jsonPath("$.data.nextMessage.content")
-                .value("Oh, you like spicy pizza. What food did you eat recently?"))
+                .value("Oh, you like spicy pizza. Do you want me to stop now?"))
         .andExpect(jsonPath("$.data.progress.completed").value(false));
 
     assertThat(fakeAiConversationClient.lastNextMessageRequest()).isNotNull();
@@ -1413,7 +1489,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsExactly(
             "What do you want me to do?",
             "Could you keep it down at night?",
-            "Oh, you like spicy pizza. What food did you eat recently?");
+            "Oh, you like spicy pizza. Do you want me to stop now?");
   }
 
   @Test
@@ -1841,9 +1917,11 @@ class ScenarioSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.firstSpeaker").value("USER"))
             .andExpect(
                 jsonPath("$.data.userOpeningInstruction").value("점원에게 먼저 주문하고 싶은 음료를 말해보세요."))
-            .andExpect(jsonPath("$.data.ttsVoice.model").value("deepgram/aura-2"))
-            .andExpect(jsonPath("$.data.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
-            .andExpect(jsonPath("$.data.ttsVoice.gender").value("MALE"))
+            .andExpect(jsonPath("$.data.character.characterId").value("marco"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.model").value("deepgram/aura-2"))
+            .andExpect(
+                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-hyperion-en"))
+            .andExpect(jsonPath("$.data.character.ttsVoice.gender").value("MALE"))
             .andExpect(jsonPath("$.data.currentMessage").value(nullValue()))
             .andExpect(jsonPath("$.data.progress.currentTurnNumber").value(1))
             .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(3))
@@ -1897,7 +1975,8 @@ class ScenarioSessionApiIntegrationTests {
             post("/api/v1/scenarios/2011/sessions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.data.ttsVoice").value(nullValue()));
+        .andExpect(jsonPath("$.data.character.characterId").value("test-990201"))
+        .andExpect(jsonPath("$.data.character.ttsVoice").value(nullValue()));
   }
 
   @Test
@@ -2436,7 +2515,32 @@ class ScenarioSessionApiIntegrationTests {
       String questionText,
       String questionTranslation) {
     seedScenarioQuestion(
-        questionId, scenarioId, displayOrder, questionText, questionTranslation, null, null);
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        null,
+        null,
+        "LEVEL_4_TO_5");
+  }
+
+  private void seedScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      String questionText,
+      String questionTranslation,
+      String questionLevelGroup) {
+    seedScenarioQuestion(
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        null,
+        null,
+        questionLevelGroup);
   }
 
   private void seedScenarioQuestion(
@@ -2447,21 +2551,43 @@ class ScenarioSessionApiIntegrationTests {
       String questionTranslation,
       String innerThought,
       String innerThoughtType) {
+    seedScenarioQuestion(
+        questionId,
+        scenarioId,
+        displayOrder,
+        questionText,
+        questionTranslation,
+        innerThought,
+        innerThoughtType,
+        "LEVEL_4_TO_5");
+  }
+
+  private void seedScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      int displayOrder,
+      String questionText,
+      String questionTranslation,
+      String innerThought,
+      String innerThoughtType,
+      String questionLevelGroup) {
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question (
             id,
             scenario_id,
             display_order,
+            question_level_group,
             status,
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         scenarioId,
-        displayOrder);
+        displayOrder,
+        questionLevelGroup);
     jdbcTemplate.update(
         """
         INSERT INTO scenario_question_language_variant (
@@ -2470,17 +2596,19 @@ class ScenarioSessionApiIntegrationTests {
             base_locale,
             question_text,
             question_translation,
+            audio_url,
             inner_thought,
             inner_thought_type,
             status,
             created_at,
             updated_at
         )
-        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'EN', 'KR', ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         questionId,
         questionText,
         questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId),
         innerThought,
         innerThoughtType);
   }
@@ -2840,9 +2968,7 @@ class ScenarioSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       return new AiNextMessageResult(
-          "Oh, you like spicy pizza. What food did you eat recently?",
-          "아, 매콤한 피자를 좋아하는구나. 최근에는 어떤 음식을 먹었어?",
-          nextGoalCompletionStatus);
+          "Oh, you like spicy pizza.", "아, 매콤한 피자를 좋아하는구나.", nextGoalCompletionStatus);
     }
 
     @Override

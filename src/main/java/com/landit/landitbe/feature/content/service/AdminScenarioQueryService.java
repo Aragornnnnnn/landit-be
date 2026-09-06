@@ -2,8 +2,10 @@
 
 package com.landit.landitbe.feature.content.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.dto.AdminScenarioListResponse;
 import com.landit.landitbe.feature.content.repository.AdminScenarioListQueryRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminScenarioQueryService {
 
   private final AdminScenarioListQueryRepository adminScenarioListQueryRepository;
+  private final UserProfileService userProfileService;
 
   /**
    * 활성 콘텐츠만 관리자 테스트 목록으로 조회한다.
@@ -24,6 +27,9 @@ public class AdminScenarioQueryService {
   @Transactional(readOnly = true)
   public AdminScenarioListResponse getAdminScenarioList(long userId) {
     return AdminScenarioListResponse.from(
-        adminScenarioListQueryRepository.findActiveScenarioList(userId));
+        adminScenarioListQueryRepository.findActiveScenarioList(
+            userId,
+            ContentLearningLevel.from(
+                userProfileService.getLearningLevel(userId).learningLevel())));
   }
 }

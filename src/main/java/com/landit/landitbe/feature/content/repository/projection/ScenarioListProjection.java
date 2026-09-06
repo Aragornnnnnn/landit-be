@@ -32,6 +32,7 @@ import java.math.BigDecimal;
  * @param userOpeningInstruction 사용자 첫 발화 안내
  * @param innerThought AI 속마음
  * @param innerThoughtType AI 속마음 유형
+ * @param characterId 시나리오 캐릭터 식별자
  * @param ttsVoiceProvider TTS 제공자
  * @param ttsVoiceModel TTS 음성 모델
  * @param providerVoiceId TTS 제공자 음성 ID
@@ -58,6 +59,7 @@ public record ScenarioListProjection(
     String userOpeningInstruction,
     String innerThought,
     InnerThoughtType innerThoughtType,
+    String characterId,
     TtsVoiceProvider ttsVoiceProvider,
     String ttsVoiceModel,
     String providerVoiceId,

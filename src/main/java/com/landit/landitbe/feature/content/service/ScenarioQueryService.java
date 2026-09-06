@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.domain.ScenarioAvailabilityStatus;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse;
@@ -53,12 +54,14 @@ public class ScenarioQueryService {
     // 접근 권한과 오늘 시나리오를 동일한 기준 시각으로 계산한다.
     Instant evaluatedAt = clock.instant();
     UserLocale userLocale = userProfileService.getUserLocale(userId);
+    ContentLearningLevel questionLevelGroup =
+        ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
 
     Set<Long> accessibleScenarioIds =
         Set.copyOf(
             scenarioAccessService.findAccessibleScenarioIds(userId, userLocale.targetLocale()));
     List<ScenarioListProjection> scenarioRows =
-        scenarioListQueryRepository.findScenarioList(userId);
+        scenarioListQueryRepository.findScenarioList(userId, questionLevelGroup);
 
     ScenarioProgressionService.CurrentScenario currentScenario =
         scenarioProgressionService

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.config.session.FreeTalkProperties;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
@@ -18,11 +19,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkDailySpeakingUsageService {
 
-  private static final long DAILY_SPEAKING_LIMIT_MS = 60_000L;
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
   private final FreeTalkDailySpeakingUsageRepository repository;
   private final UserProfileService userProfileService;
+  private final FreeTalkProperties properties;
+
+  /**
+   * 현재 환경의 일일 사용자 발화 제한시간을 반환한다.
+   *
+   * @return 일일 사용자 발화 제한시간 밀리초
+   */
+  public long speakingTimeLimitMs() {
+    return properties.speakingTimeLimitMs();
+  }
 
   /**
    * KST 당일의 남은 발화 시간을 조회한다.
@@ -50,7 +60,7 @@ public class FreeTalkDailySpeakingUsageService {
             usage ->
                 new DailySpeakingUsage(
                     usageDate, usage.getUsedSpeakingDurationMs(), remainingForUsage(usage)))
-        .orElse(new DailySpeakingUsage(usageDate, 0L, DAILY_SPEAKING_LIMIT_MS));
+        .orElse(new DailySpeakingUsage(usageDate, 0L, speakingTimeLimitMs()));
   }
 
   /**
@@ -115,7 +125,7 @@ public class FreeTalkDailySpeakingUsageService {
   }
 
   private long remainingForUsedDurationMs(long usedSpeakingDurationMs) {
-    return Math.max(0L, DAILY_SPEAKING_LIMIT_MS - usedSpeakingDurationMs);
+    return Math.max(0L, speakingTimeLimitMs() - usedSpeakingDurationMs);
   }
 
   /**

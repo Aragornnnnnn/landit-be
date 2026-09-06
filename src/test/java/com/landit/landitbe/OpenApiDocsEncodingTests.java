@@ -74,4 +74,25 @@ class OpenApiDocsEncodingTests {
             jsonPath("$.components.schemas.FreeTalkNextMessageResponse.properties.emotion")
                 .exists());
   }
+
+  @Test
+  void conversationCharacterSchemaDocumentsSharedNullableTtsVoiceContract() throws Exception {
+    String schemas = "$.components.schemas.";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(schemas + "SessionStartResponse.properties.character.$ref")
+                .value("#/components/schemas/ConversationCharacterResponse"))
+        .andExpect(
+            jsonPath(schemas + "FreeTalkSessionStartResponse.properties.character.$ref")
+                .value("#/components/schemas/ConversationCharacterResponse"))
+        .andExpect(
+            jsonPath(schemas + "ConversationCharacterResponse.properties.ttsVoice.type[0]")
+                .value("object"))
+        .andExpect(
+            jsonPath(schemas + "ConversationCharacterResponse.properties.ttsVoice.type[1]")
+                .value("null"));
+  }
 }

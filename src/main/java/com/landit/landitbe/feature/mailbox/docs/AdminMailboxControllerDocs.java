@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
+import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterListResponse;
@@ -15,6 +16,7 @@ import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyRequest;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -91,6 +93,16 @@ public interface AdminMailboxControllerDocs {
       int page,
       int size,
       FeedbackSort sort);
+
+  /**
+   * 피드백 상세와 최신 답장을 조회한다.
+   *
+   * @param feedbackId 피드백 ID
+   * @return 피드백 상세
+   * @throws ApiException 피드백을 찾을 수 없을 때
+   */
+  @Operation(summary = "피드백 상세 조회", security = @SecurityRequirement(name = "bearerAuth"))
+  ApiResponse<AdminMailboxFeedbackDetailResponse> getFeedback(Long feedbackId);
 
   /**
    * 여러 사용자에게 같은 답장을 보낸다.

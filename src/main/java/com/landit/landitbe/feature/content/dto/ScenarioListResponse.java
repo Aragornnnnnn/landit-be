@@ -151,7 +151,7 @@ public record ScenarioListResponse(
    * @param userOpeningInstruction USER first 시 사용자 시작 안내
    * @param innerThought 첫 화면에 보여줄 상대 역할의 속마음
    * @param innerThoughtType 속마음 유형
-   * @param ttsVoice 활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null
+   * @param character 시나리오 캐릭터 정보
    */
   @Schema(description = "시작 메시지 미리보기 응답")
   public record OpeningPreviewResponse(
@@ -160,7 +160,7 @@ public record ScenarioListResponse(
       @Schema(description = "USER first 시 사용자 시작 안내") String userOpeningInstruction,
       @Schema(description = "첫 화면에 보여줄 상대 역할의 속마음") String innerThought,
       @Schema(description = "속마음 유형") String innerThoughtType,
-      @Schema(description = "활성 시나리오 TTS 음성. 미설정 또는 비활성 음성이면 null") TtsVoiceResponse ttsVoice) {
+      @Schema(description = "시나리오 캐릭터 정보") ConversationCharacterResponse character) {
 
     /**
      * AI가 먼저 발화하는 시나리오의 미리보기를 생성한다.
@@ -175,11 +175,13 @@ public record ScenarioListResponse(
           null,
           projection.innerThought(),
           projection.innerThoughtType() == null ? null : projection.innerThoughtType().name(),
-          TtsVoiceResponse.from(
-              projection.ttsVoiceProvider(),
-              projection.ttsVoiceModel(),
-              projection.providerVoiceId(),
-              projection.ttsVoiceGender()));
+          new ConversationCharacterResponse(
+              projection.characterId(),
+              TtsVoiceResponse.from(
+                  projection.ttsVoiceProvider(),
+                  projection.ttsVoiceModel(),
+                  projection.providerVoiceId(),
+                  projection.ttsVoiceGender())));
     }
 
     /**
@@ -195,11 +197,13 @@ public record ScenarioListResponse(
           projection.userOpeningInstruction(),
           null,
           null,
-          TtsVoiceResponse.from(
-              projection.ttsVoiceProvider(),
-              projection.ttsVoiceModel(),
-              projection.providerVoiceId(),
-              projection.ttsVoiceGender()));
+          new ConversationCharacterResponse(
+              projection.characterId(),
+              TtsVoiceResponse.from(
+                  projection.ttsVoiceProvider(),
+                  projection.ttsVoiceModel(),
+                  projection.providerVoiceId(),
+                  projection.ttsVoiceGender())));
     }
   }
 }

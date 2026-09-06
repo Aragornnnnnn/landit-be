@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
+import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterCreateRequest;
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -57,6 +59,7 @@ public class AdminMailboxService {
   private final AdminMailboxLetterRecipientRepository recipientRepository;
   private final AdminAuditService adminAuditService;
   private final EntityManager entityManager;
+  private final ApplicationEventPublisher applicationEventPublisher;
 
   /**
    * 편지함 어드민 저장소와 감사 Service를 주입받는다.
@@ -66,18 +69,21 @@ public class AdminMailboxService {
    * @param recipientRepository 편지 수신자 저장소
    * @param adminAuditService 관리자 감사 Service
    * @param entityManager 영속 상태를 DB 저장 값과 동기화할 EntityManager
+   * @param applicationEventPublisher 답장 커밋 후 알림 이벤트를 전달할 Publisher
    */
   public AdminMailboxService(
       AdminMailboxLetterRepository letterRepository,
       AdminMailboxFeedbackRepository feedbackRepository,
       AdminMailboxLetterRecipientRepository recipientRepository,
       AdminAuditService adminAuditService,
-      EntityManager entityManager) {
+      EntityManager entityManager,
+      ApplicationEventPublisher applicationEventPublisher) {
     this.letterRepository = letterRepository;
     this.feedbackRepository = feedbackRepository;
     this.recipientRepository = recipientRepository;
     this.adminAuditService = adminAuditService;
     this.entityManager = entityManager;
+    this.applicationEventPublisher = applicationEventPublisher;
   }
 
   /**
@@ -222,6 +228,47 @@ public class AdminMailboxService {
         feedbacks.getTotalPages());
   }
 
+  /**
+   * 피드백 상세와 대표 피드백에 연결된 최신 답장을 조회한다.
+   *
+   * @param feedbackId 피드백 ID
+   * @return 피드백 상세 응답
+   * @throws ApiException 피드백이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public AdminMailboxFeedbackDetailResponse getFeedback(Long feedbackId) {
+    AdminMailboxFeedbackSummary feedback =
+        feedbackRepository
+            .findSummaryByFeedbackId(feedbackId)
+            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+    Long representativeFeedbackId =
+        feedback.getResolvedByFeedbackId() == null
+            ? feedbackId
+            : feedback.getResolvedByFeedbackId();
+    Set<Long> replyFeedbackIds = new LinkedHashSet<>();
+    replyFeedbackIds.add(representativeFeedbackId);
+    replyFeedbackIds.add(feedbackId);
+    MailboxLetter reply =
+        letterRepository
+            .findRepliesByFeedbackIds(
+                feedback.getUserProfileId(), replyFeedbackIds, PageRequest.of(0, 1))
+            .stream()
+            .findFirst()
+            .orElse(null);
+    return new AdminMailboxFeedbackDetailResponse(
+        feedback.getFeedbackId(),
+        feedback.getUserProfileId(),
+        feedback.getEmail(),
+        feedback.getNickname(),
+        feedback.getType(),
+        feedback.getContent(),
+        feedback.getStatus(),
+        feedback.getResolvedByFeedbackId(),
+        feedback.getCreatedAt(),
+        feedback.getUpdatedAt(),
+        toFeedbackReply(reply));
+  }
+
   private Page<AdminMailboxFeedbackSummary> findFeedbacks(
       String keyword,
       UserFeedbackType type,
@@ -270,6 +317,11 @@ public class AdminMailboxService {
         null,
         "recipientCount=%d,completedFeedbackCount=%d,representativeFeedbackIds=%s"
             .formatted(recipients.size(), completedFeedbackCount, representativeFeedbackIds));
+    applicationEventPublisher.publishEvent(
+        new MailboxReplyCreatedEvent(
+            reply.getId(),
+            recipients.stream().map(MailboxLetterRecipient::getUserProfileId).toList(),
+            reply.getTitle()));
     return new AdminMailboxReplyResponse(
         reply.getId(), recipients.size(), completedFeedbackCount, representativeFeedbackIds);
   }
@@ -483,6 +535,14 @@ public class AdminMailboxService {
         feedback.getResolvedByFeedbackId(),
         feedback.getCreatedAt(),
         feedback.getUpdatedAt());
+  }
+
+  private AdminMailboxFeedbackDetailResponse.Reply toFeedbackReply(MailboxLetter letter) {
+    if (letter == null) {
+      return null;
+    }
+    return new AdminMailboxFeedbackDetailResponse.Reply(
+        letter.getId(), letter.getTitle(), letter.getBodyText(), letter.getPublishedAt());
   }
 
   private String letterSummary(MailboxLetter letter) {

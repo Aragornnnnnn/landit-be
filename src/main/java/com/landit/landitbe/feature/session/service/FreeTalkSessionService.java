@@ -91,6 +91,7 @@ public class FreeTalkSessionService {
     return new StartedFreeTalkSession(
         learningSession.getId(),
         sessionHistory.getId(),
+        freeTalkSession.getId(),
         request.startMode(),
         character.id(),
         topic == null ? null : topic.getId(),
@@ -186,6 +187,7 @@ public class FreeTalkSessionService {
    *
    * @param learningSessionId 생성된 학습 세션 ID
    * @param sessionHistoryId 생성된 세션 히스토리 ID
+   * @param freeTalkSessionId 생성된 프리톡 세션 ID
    * @param startMode 첫 발화 주체
    * @param characterId 선택한 프리톡 캐릭터 식별자
    * @param topicId 선택한 주제 ID
@@ -198,6 +200,7 @@ public class FreeTalkSessionService {
   public record StartedFreeTalkSession(
       Long learningSessionId,
       Long sessionHistoryId,
+      Long freeTalkSessionId,
       FreeTalkStartMode startMode,
       String characterId,
       Long topicId,

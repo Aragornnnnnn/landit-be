@@ -6,5 +6,18 @@ package com.landit.landitbe.shared.domain;
 public enum AccentLocale {
   EN_US,
   EN_AU,
-  EN_GB
+  EN_GB;
+
+  /**
+   * 억양 locale에 대응하는 나라 이름을 반환한다.
+   *
+   * @return 나라 이름
+   */
+  public String countryName() {
+    return switch (this) {
+      case EN_US -> "미국";
+      case EN_GB -> "영국";
+      case EN_AU -> "호주";
+    };
+  }
 }

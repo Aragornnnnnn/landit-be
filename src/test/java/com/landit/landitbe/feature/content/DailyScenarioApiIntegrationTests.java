@@ -107,9 +107,11 @@ class DailyScenarioApiIntegrationTests {
       throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 2 WHERE id = ?", userId);
     seedDailyScenarios();
     long firstExpressionId = insertWritingExpression(100, 1);
     insertWritingExpression(100, 2);
+    insertWritingExpression(100, 3, 4);
     markExpressionCompleted(userId, 100, firstExpressionId);
     String accessToken = loginResponseBody.get("data").get("accessToken").asText();
 
@@ -127,22 +129,27 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completedAt").value(nullValue()))
         .andExpect(jsonPath("$.data.scenario.expressionCount").value(2))
         .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1))
-        .andExpect(jsonPath("$.data.scenario.openingPreview.characterId").value("chloe"))
+        .andExpect(jsonPath("$.data.scenario.openingPreview.character.characterId").value("chloe"))
+        .andExpect(jsonPath("$.data.scenario.openingPreview.questionAudioUrl").value(nullValue()))
         .andExpect(
-            jsonPath("$.data.scenario.openingPreview.ttsVoice.providerVoiceId")
-                .value("en-US-Harper:MAI-Voice-2"));
+            jsonPath("$.data.scenario.openingPreview.character.ttsVoice.providerVoiceId")
+                .value("aura-2-luna-en"));
   }
 
   @Test
   void dailyScenarioPrefersDisplayOrderOverIdWhenOrdersDiverge() throws Exception {
     JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
     insertCategory(10, 1);
     // ID 오름차순과 노출 순서가 어긋나도 노출 순서가 우선한다.
     insertScenario(100, 10, 2, "USER", "EASY");
     insertScenarioVariant(100, "첫 번째 시나리오", "첫 번째 시나리오 설명", "첫 번째 목표", "먼저 말해보세요.");
     insertScenario(101, 10, 1, "AI", "NORMAL");
     insertScenarioVariant(101, "두 번째 시나리오", "두 번째 시나리오 설명", "두 번째 목표", null);
+    insertScenarioQuestion(1001, 101, "How was your day?", "오늘 하루 어땠어?");
+    insertScenarioQuestion(1002, 101, "Are you happy?", "기분이 좋아?", "LEVEL_1");
 
     mockMvc
         .perform(
@@ -152,7 +159,10 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.playable").value(true))
         .andExpect(jsonPath("$.data.scenario.scenarioId").value(101))
-        .andExpect(jsonPath("$.data.scenario.dailyScenarioType").value("NEW"));
+        .andExpect(jsonPath("$.data.scenario.dailyScenarioType").value("NEW"))
+        .andExpect(
+            jsonPath("$.data.scenario.openingPreview.questionAudioUrl")
+                .value("https://cdn.example.com/questions/1002.mp3"));
   }
 
   @Test
@@ -406,22 +416,63 @@ class DailyScenarioApiIntegrationTests {
         conversationGoal);
   }
 
+  private void insertScenarioQuestion(
+      long questionId, long scenarioId, String questionText, String questionTranslation) {
+    insertScenarioQuestion(
+        questionId, scenarioId, questionText, questionTranslation, "LEVEL_4_TO_5");
+  }
+
+  private void insertScenarioQuestion(
+      long questionId,
+      long scenarioId,
+      String questionText,
+      String questionTranslation,
+      String questionLevelGroup) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_question (
+            id, scenario_id, display_order, question_level_group, status, created_at, updated_at
+        )
+        VALUES (?, ?, 1, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        questionId,
+        scenarioId,
+        questionLevelGroup);
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_question_language_variant (
+            scenario_question_id, target_locale, base_locale, question_text,
+            question_translation, audio_url, status, created_at, updated_at
+        )
+        VALUES (?, 'EN', 'KR', ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        questionId,
+        questionText,
+        questionTranslation,
+        "https://cdn.example.com/questions/%d.mp3".formatted(questionId));
+  }
+
   private long insertWritingExpression(long scenarioId, int displayOrder) {
+    return insertWritingExpression(scenarioId, displayOrder, 3);
+  }
+
+  private long insertWritingExpression(long scenarioId, int displayOrder, int difficultyLevel) {
     jdbcTemplate.update(
         """
         INSERT INTO writing_expression (
-            scenario_id, expression_type, usage_frequency_level, target_locale, base_locale,
+            scenario_id, expression_type, usage_frequency_level, difficulty_level, target_locale, base_locale,
             display_order, target_expression_text, base_expression_meaning_text, usage_summary,
             usage_description, representative_sentence_text, representative_sentence_translation,
             representative_sentence_words, representative_sentence_word_choices,
             practice_examples_payload, status, created_at, updated_at
         )
-        VALUES (?, 'DAILY_ROUTINE', 'BASIC', 'EN', 'KR', ?, 'expression', '표현',
+        VALUES (?, 'DAILY_ROUTINE', 'BASIC', ?, 'EN', 'KR', ?, 'expression', '표현',
                 'usage summary', 'usage description', 'sample sentence', '샘플 문장',
                 ARRAY['sample'], ARRAY['sample', 'choice'], CAST('[]' AS jsonb), 'ACTIVE',
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
+        difficultyLevel,
         displayOrder);
     return jdbcTemplate.queryForObject(
         "SELECT id FROM writing_expression WHERE scenario_id = ? AND display_order = ?",

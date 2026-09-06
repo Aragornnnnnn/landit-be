@@ -142,6 +142,7 @@ class SubmittedMessageService {
     return scenarioContentService.findActiveQuestion(
         scenarioContext.scenarioId(),
         nextQuestionOrder,
+        scenarioContext.questionLevelGroup(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale());
   }

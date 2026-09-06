@@ -60,6 +60,13 @@ public class FreeTalkSession extends BaseTimeEntity {
   @Column(name = "expression_generation_started_at")
   private LocalDateTime expressionGenerationStartedAt;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "memory_generation_status", length = 20)
+  private MemoryGenerationStatus memoryGenerationStatus;
+
+  @Column(name = "memory_generation_started_at")
+  private LocalDateTime memoryGenerationStartedAt;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkSession() {}
 
@@ -240,6 +247,55 @@ public class FreeTalkSession extends BaseTimeEntity {
     expressionGenerationStatus = ExpressionGenerationStatus.PREPARING;
   }
 
+  /** 완료된 세션의 장기기억 생성을 등록한다. */
+  public void prepareMemoryGeneration() {
+    if (conversationStatus == FreeTalkConversationStatus.COMPLETED
+        && memoryGenerationStatus == null) {
+      memoryGenerationStatus = MemoryGenerationStatus.PREPARING;
+    }
+  }
+
+  /**
+   * 지정한 시각으로 준비된 장기기억 생성 작업을 실행 중으로 선점한다.
+   *
+   * @param startedAt 작업을 선점한 시각
+   * @throws IllegalStateException 완료된 프리톡의 준비 상태가 아니거나 이미 시작된 작업일 때
+   */
+  public void startMemoryGeneration(LocalDateTime startedAt) {
+    if (conversationStatus != FreeTalkConversationStatus.COMPLETED
+        || memoryGenerationStatus != MemoryGenerationStatus.PREPARING
+        || memoryGenerationStartedAt != null
+        || startedAt == null) {
+      throw new IllegalStateException("장기기억 생성 작업을 시작할 수 없는 상태입니다.");
+    }
+    memoryGenerationStartedAt = startedAt;
+  }
+
+  /**
+   * 실행 중인 장기기억 생성 작업을 완료 상태로 전환한다.
+   *
+   * @throws IllegalStateException 실행 중인 준비 작업이 아닐 때
+   */
+  public void completeMemoryGeneration() {
+    requireStartedMemoryGeneration();
+    memoryGenerationStatus = MemoryGenerationStatus.READY;
+    memoryGenerationStartedAt = null;
+  }
+
+  /**
+   * 준비된 장기기억 생성 작업을 실패 상태로 전환한다.
+   *
+   * @throws IllegalStateException 완료된 프리톡의 준비 상태가 아닐 때
+   */
+  public void failMemoryGeneration() {
+    if (conversationStatus != FreeTalkConversationStatus.COMPLETED
+        || memoryGenerationStatus != MemoryGenerationStatus.PREPARING) {
+      throw new IllegalStateException("준비된 장기기억 생성 작업이 아닙니다.");
+    }
+    memoryGenerationStatus = MemoryGenerationStatus.FAILED;
+    memoryGenerationStartedAt = null;
+  }
+
   /**
    * 사용자 발화 시간을 누적한다.
    *
@@ -257,6 +313,14 @@ public class FreeTalkSession extends BaseTimeEntity {
   private void requireInProgress() {
     if (conversationStatus != FreeTalkConversationStatus.IN_PROGRESS) {
       throw new IllegalStateException("진행 중인 프리톡 세션이 아닙니다.");
+    }
+  }
+
+  private void requireStartedMemoryGeneration() {
+    if (conversationStatus != FreeTalkConversationStatus.COMPLETED
+        || memoryGenerationStatus != MemoryGenerationStatus.PREPARING
+        || memoryGenerationStartedAt == null) {
+      throw new IllegalStateException("실행 중인 장기기억 생성 작업이 아닙니다.");
     }
   }
 }

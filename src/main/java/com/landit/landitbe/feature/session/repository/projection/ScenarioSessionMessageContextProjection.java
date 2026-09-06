@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.repository.projection;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.domain.Locale;
 
@@ -18,6 +19,7 @@ import com.landit.landitbe.shared.domain.Locale;
  * @param totalQuestionCount 전체 질문 수
  * @param targetLocale 학습 대상 언어
  * @param baseLocale 사용자 기준 언어
+ * @param questionLevelGroup 세션 시작 시점의 질문 레벨 그룹
  */
 public record ScenarioSessionMessageContextProjection(
     Long scenarioId,
@@ -29,4 +31,5 @@ public record ScenarioSessionMessageContextProjection(
     String userOpeningInstruction,
     int totalQuestionCount,
     Locale targetLocale,
-    Locale baseLocale) {}
+    Locale baseLocale,
+    ContentLearningLevel questionLevelGroup) {}

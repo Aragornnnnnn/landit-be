@@ -22,6 +22,7 @@ import java.math.BigDecimal;
  * @param firstSpeaker 첫 발화자
  * @param aiOpeningMessage AI 첫 메시지
  * @param aiOpeningMessageTranslation AI 첫 메시지 번역
+ * @param openingQuestionAudioUrl 첫 고정 질문 음원 URL
  * @param userOpeningInstruction 사용자 첫 발화 안내
  * @param innerThought AI 속마음
  * @param innerThoughtType AI 속마음 유형
@@ -42,6 +43,7 @@ public record DailyScenarioProjection(
     ConversationSpeaker firstSpeaker,
     String aiOpeningMessage,
     String aiOpeningMessageTranslation,
+    String openingQuestionAudioUrl,
     String userOpeningInstruction,
     String innerThought,
     InnerThoughtType innerThoughtType,

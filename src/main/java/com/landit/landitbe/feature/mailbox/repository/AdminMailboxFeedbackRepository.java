@@ -9,6 +9,7 @@ import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,31 @@ import org.springframework.data.repository.query.Param;
 
 /** 편지함 어드민 피드백 검색과 일괄 처리를 지원한다. */
 public interface AdminMailboxFeedbackRepository extends JpaRepository<MailboxFeedback, Long> {
+
+  /**
+   * 사용자 정보와 함께 어드민 피드백 상세를 조회한다.
+   *
+   * @param feedbackId 피드백 ID
+   * @return 피드백 상세 projection
+   */
+  @Query(
+      """
+      select feedback.id as feedbackId,
+             feedback.userProfileId as userProfileId,
+             profile.email as email,
+             profile.nickname as nickname,
+             feedback.feedbackType as type,
+             feedback.contentText as content,
+             feedback.processingStatus as status,
+             feedback.resolvedByFeedbackId as resolvedByFeedbackId,
+             feedback.createdAt as createdAt,
+             feedback.updatedAt as updatedAt
+      from MailboxFeedback feedback, UserProfile profile
+      where profile.id = feedback.userProfileId
+        and feedback.id = :feedbackId
+      """)
+  Optional<AdminMailboxFeedbackSummary> findSummaryByFeedbackId(
+      @Param("feedbackId") Long feedbackId);
 
   /**
    * 사용자 정보와 함께 어드민 피드백을 검색한다.

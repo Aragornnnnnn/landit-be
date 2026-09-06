@@ -35,10 +35,11 @@ class FreeTalkTopicServiceTest {
         .thenReturn(
             new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
                 java.time.LocalDate.now(), 42_000L, 18_000L));
+    when(dailySpeakingUsageService.speakingTimeLimitMs()).thenReturn(9_999_999L);
 
     FreeTalkMainResponse response = service.getMain(1L);
 
-    assertThat(response.dailySpeakingTimeLimitMs()).isEqualTo(60_000L);
+    assertThat(response.dailySpeakingTimeLimitMs()).isEqualTo(9_999_999L);
     assertThat(response.usedSpeakingTimeMs()).isEqualTo(42_000L);
     assertThat(response.remainingSpeakingTimeMs()).isEqualTo(18_000L);
     assertThat(response.canStart()).isTrue();

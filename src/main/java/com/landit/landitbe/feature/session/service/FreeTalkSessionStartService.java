@@ -2,7 +2,10 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
+import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;
@@ -23,6 +26,7 @@ public class FreeTalkSessionStartService {
   private final FreeTalkSessionService freeTalkSessionService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
+  private final FreeTalkMemoryRetrievalService memoryRetrievalService;
 
   /**
    * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.
@@ -41,11 +45,26 @@ public class FreeTalkSessionStartService {
     if (startedSession.startMode() == FreeTalkStartMode.USER_FIRST) {
       return response(startedSession, null);
     }
+    return startAiFirstSession(userId, startedSession);
+  }
+
+  /** AI-first 세션은 검색 문맥을 먼저 만들고 실패하면 시작 작업을 정리한다. */
+  private FreeTalkSessionStartResponse startAiFirstSession(
+      long userId, StartedFreeTalkSession startedSession) {
+    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+        memoryRetrievalService.retrieve(
+            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+                startedSession.freeTalkSessionId(),
+                userId,
+                startedSession.characterId(),
+                MemoryRetrievalStage.OPENING,
+                memoryQuery(startedSession)));
     try {
-      AiFreeTalkOpeningResult openingResult =
-          aiFreeTalkClient.generateOpening(openingRequest(startedSession));
+      AiFreeTalkOpeningResult openingResult = generateOpening(startedSession, memoryResult);
       CurrentMessageResponse currentMessage =
           freeTalkSessionService.saveOpening(startedSession, openingResult);
+      memoryRetrievalService.recordUsage(
+          memoryResult, openingResult.usedMemoryIds(), currentMessage.messageId());
       return response(startedSession, currentMessage);
     } catch (RuntimeException exception) {
       freeTalkSessionService.deleteStart(startedSession.learningSessionId());
@@ -53,7 +72,16 @@ public class FreeTalkSessionStartService {
     }
   }
 
-  private AiFreeTalkOpeningRequest openingRequest(StartedFreeTalkSession startedSession) {
+  private AiFreeTalkOpeningResult generateOpening(
+      StartedFreeTalkSession startedSession,
+      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
+    return aiFreeTalkClient.generateOpening(
+        openingRequest(startedSession, memoryResult.contexts()));
+  }
+
+  private AiFreeTalkOpeningRequest openingRequest(
+      StartedFreeTalkSession startedSession,
+      java.util.List<AiFreeTalkMemoryContext> memoryContext) {
     return new AiFreeTalkOpeningRequest(
         startedSession.learningSessionId(),
         startedSession.characterId(),
@@ -62,7 +90,21 @@ public class FreeTalkSessionStartService {
         new AiFreeTalkTopic(
             startedSession.topicId(),
             startedSession.title(),
-            startedSession.topicPromptDescription()));
+            startedSession.topicPromptDescription()),
+        memoryContext);
+  }
+
+  /** 시작 시 AI가 참고할 수 있도록 주제와 캐릭터의 짧은 검색 문맥을 만든다. */
+  private String memoryQuery(StartedFreeTalkSession startedSession) {
+    return String.join(
+        " ",
+        java.util.List.of(
+                startedSession.title(),
+                startedSession.topicPromptDescription(),
+                startedSession.characterId())
+            .stream()
+            .filter(value -> value != null && !value.isBlank())
+            .toList());
   }
 
   private FreeTalkSessionStartResponse response(
@@ -73,6 +115,7 @@ public class FreeTalkSessionStartService {
         startedSession.characterId(),
         startedSession.title(),
         startedSession.ttsVoice(),
+        dailySpeakingUsageService.speakingTimeLimitMs(),
         currentMessage);
   }
 }

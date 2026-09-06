@@ -52,6 +52,9 @@ public class UserScenarioProgress extends BaseTimeEntity {
   @Column(name = "first_cleared_at")
   private LocalDateTime firstClearedAt;
 
+  @Column(name = "last_cleared_at")
+  private LocalDateTime lastClearedAt;
+
   @Column(name = "last_played_at")
   private LocalDateTime lastPlayedAt;
 
@@ -100,6 +103,7 @@ public class UserScenarioProgress extends BaseTimeEntity {
     if (firstClearedAt == null) {
       firstClearedAt = endedAt;
     }
+    lastClearedAt = endedAt;
     lastPlayedAt = endedAt;
     if (bestNativeScore == null || nativeScore > bestNativeScore) {
       bestNativeScore = nativeScore;

@@ -31,6 +31,10 @@ public class ScenarioQuestion extends BaseTimeEntity {
   private int displayOrder;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "question_level_group", nullable = false, length = 30)
+  private ContentLearningLevel questionLevelGroup;
+
+  @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 

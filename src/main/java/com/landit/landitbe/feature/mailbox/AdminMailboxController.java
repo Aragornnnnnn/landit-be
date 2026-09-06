@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
+import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterListResponse;
@@ -98,6 +99,14 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
     return ApiResponse.success(
         adminMailboxService.getFeedbacks(
             keyword, type, status, createdFrom, createdTo, page, size, sort));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/admin/mailbox/feedbacks/{feedbackId}")
+  public ApiResponse<AdminMailboxFeedbackDetailResponse> getFeedback(
+      @PathVariable Long feedbackId) {
+    return ApiResponse.success(adminMailboxService.getFeedback(feedbackId));
   }
 
   /** {@inheritDoc} */

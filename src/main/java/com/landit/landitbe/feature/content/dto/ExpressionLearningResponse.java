@@ -20,6 +20,9 @@ import java.util.List;
  * @param representativeSentenceWords 정답 예문을 단어 단위로 나눈 배열(정답 순서 유지)
  * @param representativeSentenceWordChoices 정답 단어와 오답 단어를 섞은 선택지 배열(저장된 섞인 순서 그대로)
  * @param representativeImageUrl 대표 예문 이미지 URL
+ * @param representativeSentenceAudioUrl 대표 예문 원어민 TTS URL. 발음 자산이 없으면 null
+ * @param targetExpressionAudioUrl 타겟 표현만 읽은 원어민 TTS URL. 자산 미준비이거나 패턴형 표현이면 null
+ * @param completed 학습 완료 여부. 시나리오·프리톡 어느 경로의 표현이든 완료 이력이 있으면 true
  */
 @Schema(description = "원어민 표현 학습 시작 응답")
 public record ExpressionLearningResponse(
@@ -49,15 +52,38 @@ public record ExpressionLearningResponse(
                     + "\"have\", \"get\", \"your\", \"mind\"]")
         List<String> representativeSentenceWordChoices,
     @Schema(description = "대표 예문 이미지 URL", example = "https://cdn.example.com/images/101.png")
-        String representativeImageUrl) {
+        String representativeImageUrl,
+    @Schema(
+            description =
+                "대표 예문 원어민 TTS URL. 발음 페이지의 '원어민 발음 듣기' 재생용."
+                    + " 사용자의 AI 튜터 억양 기준이며, 발음 자산이 아직 준비되지 않은 표현은 null"
+                    + " (앱은 null이면 발음 듣기·발화 파트를 숨긴다)",
+            example = "https://cdn.landit.com/content/expression-pronunciation-audio/101/abc.mp3")
+        String representativeSentenceAudioUrl,
+    @Schema(
+            description =
+                "타겟 표현만 읽은 원어민 TTS URL. 표현 듣기 재생용."
+                    + " 사용자의 AI 튜터 억양 기준이며, 발음 자산이 아직 준비되지 않았거나"
+                    + " 패턴형 표현(발화 불가)이면 null (앱은 null이면 표현 듣기 버튼을 숨긴다)",
+            example = "https://cdn.landit.com/content/expression-pronunciation-audio/101/expr.mp3")
+        String targetExpressionAudioUrl,
+    @Schema(description = "이 표현의 학습 완료 여부. 시나리오·프리톡 어느 경로의 표현이든 완료 이력이 있으면 true", example = "true")
+        boolean completed) {
 
   /**
-   * 표현 엔티티를 학습 시작 응답으로 변환한다.
+   * 표현 엔티티와 원어민 TTS URL들을 학습 시작 응답으로 변환한다.
    *
    * @param expression 변환할 표현 엔티티
+   * @param representativeSentenceAudioUrl 대표 예문 원어민 TTS URL. 발음 자산이 없으면 null
+   * @param targetExpressionAudioUrl 타겟 표현만 읽은 원어민 TTS URL. 자산 미준비이거나 패턴형 표현이면 null
+   * @param completed 학습 완료 여부. 시나리오·프리톡 어느 경로의 표현이든 완료 이력이 있으면 true
    * @return 표현 학습 시작 응답
    */
-  public static ExpressionLearningResponse from(WritingExpression expression) {
+  public static ExpressionLearningResponse from(
+      WritingExpression expression,
+      String representativeSentenceAudioUrl,
+      String targetExpressionAudioUrl,
+      boolean completed) {
     return new ExpressionLearningResponse(
         expression.getId(),
         expression.getTargetExpressionText(),
@@ -69,6 +95,9 @@ public record ExpressionLearningResponse(
         expression.getRepresentativeSentenceTranslation(),
         expression.getRepresentativeSentenceWords(),
         expression.getRepresentativeSentenceWordChoices(),
-        expression.getRepresentativeImageUrl());
+        expression.getRepresentativeImageUrl(),
+        representativeSentenceAudioUrl,
+        targetExpressionAudioUrl,
+        completed);
   }
 }

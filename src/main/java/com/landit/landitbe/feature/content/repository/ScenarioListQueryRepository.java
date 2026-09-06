@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.repository;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.Scenario;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioSummaryProjection;
@@ -20,6 +21,7 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
    * 사용자 기본 언어 조합에 해당하는 목록 데이터를 조회한다. Entity 연관관계가 없는 FK는 명시적으로 join한다.
    *
    * @param userId 사용자 ID
+   * @param questionLevelGroup 질문 레벨 그룹
    * @return 사용자 언어 조합에 맞는 시나리오 목록 데이터
    */
   @Query(
@@ -44,6 +46,7 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
                 slv.userOpeningInstruction,
                 openingQuestionVariant.innerThought,
                 openingQuestionVariant.innerThoughtType,
+                s.characterId,
                 tv.provider,
                 tv.model,
                 tv.providerVoiceId,
@@ -64,6 +67,7 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
             LEFT JOIN ScenarioQuestion openingQuestion
               ON openingQuestion.scenarioId = s.id
              AND openingQuestion.displayOrder = 1
+             AND openingQuestion.questionLevelGroup = :questionLevelGroup
              AND openingQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN ScenarioQuestionLanguageVariant openingQuestionVariant
               ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id
@@ -83,7 +87,9 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
             WHERE up.id = :userId
             ORDER BY c.displayOrder ASC, s.displayOrder ASC
       """)
-  List<ScenarioListProjection> findScenarioList(@Param("userId") long userId);
+  List<ScenarioListProjection> findScenarioList(
+      @Param("userId") long userId,
+      @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup);
 
   /**
    * 사용자 언어 설정에 맞는 특정 시나리오의 기본 정보를 조회한다.

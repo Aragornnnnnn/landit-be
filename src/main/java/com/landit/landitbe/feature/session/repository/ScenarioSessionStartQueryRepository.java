@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.repository;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.Scenario;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import java.util.Optional;
@@ -17,6 +18,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
    *
    * @param userId 사용자 ID
    * @param scenarioId 시나리오 ID
+   * @param questionLevelGroup 질문 레벨 그룹
    * @return 사용자 언어 설정에 맞는 시나리오 시작 정보
    */
   @Query(
@@ -34,6 +36,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
                 slv.userOpeningInstruction,
                 openingQuestionVariant.questionText,
                 openingQuestionVariant.questionTranslation,
+                openingQuestionVariant.audioUrl,
                 openingQuestionVariant.innerThought,
                 openingQuestionVariant.innerThoughtType,
                 tv.provider,
@@ -53,6 +56,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
             LEFT JOIN ScenarioQuestion openingQuestion
               ON openingQuestion.scenarioId = s.id
              AND openingQuestion.displayOrder = 1
+             AND openingQuestion.questionLevelGroup = :questionLevelGroup
              AND openingQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN ScenarioQuestionLanguageVariant openingQuestionVariant
               ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id
@@ -68,5 +72,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
             WHERE up.id = :userId
       """)
   Optional<ScenarioSessionStartProjection> findStartRow(
-      @Param("userId") long userId, @Param("scenarioId") long scenarioId);
+      @Param("userId") long userId,
+      @Param("scenarioId") long scenarioId,
+      @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup);
 }

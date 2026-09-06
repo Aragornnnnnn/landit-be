@@ -1,0 +1,19 @@
+[
+  {
+    "expressionId": 990301,
+    "accentLocale": "EN_US",
+    "sentenceText": "There's nothing like hiking.",
+    "words": [
+      {"order": 1, "word": "There's", "syllables": ["There's"], "stressIndex": 0,
+       "pronunciationDisplay": "thairz"},
+      {"order": 2, "word": "nothing", "syllables": ["nuh", "thing"], "stressIndex": 0,
+       "pronunciationDisplay": "nuh·thing",
+       "accentContrast": {"expected": "sounds like 「nuh·thing」",
+                          "other": "sounds like 「nah·ssing」", "errorType": "PHONEME"}},
+      {"order": 3, "word": "like", "syllables": ["like"], "stressIndex": 0,
+       "pronunciationDisplay": "laik"},
+      {"order": 4, "word": "hiking", "syllables": ["hik", "ing"], "stressIndex": 0,
+       "pronunciationDisplay": "hai·king"}
+    ]
+  }
+]

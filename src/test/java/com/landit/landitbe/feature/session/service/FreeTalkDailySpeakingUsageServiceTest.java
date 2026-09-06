@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.session.FreeTalkProperties;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
@@ -28,8 +29,12 @@ class FreeTalkDailySpeakingUsageServiceTest {
   private final FreeTalkDailySpeakingUsageRepository repository =
       mock(FreeTalkDailySpeakingUsageRepository.class);
   private final UserProfileService userProfileService = mock(UserProfileService.class);
-  private final FreeTalkDailySpeakingUsageService service =
-      new FreeTalkDailySpeakingUsageService(repository, userProfileService);
+  private final FreeTalkDailySpeakingUsageService service = serviceWithLimit(60_000L);
+
+  private FreeTalkDailySpeakingUsageService serviceWithLimit(long speakingTimeLimitMs) {
+    return new FreeTalkDailySpeakingUsageService(
+        repository, userProfileService, new FreeTalkProperties(speakingTimeLimitMs));
+  }
 
   /** 59초 사용 뒤 3초 발화는 전체를 예약하고 남은 시간을 0으로 제한한다. */
   @Test
@@ -119,5 +124,16 @@ class FreeTalkDailySpeakingUsageServiceTest {
         .thenReturn(Optional.empty());
 
     assertThat(service.remainingMs(1L)).isEqualTo(60_000L);
+  }
+
+  /** 환경 설정의 제한시간을 사용량 계산과 공개 응답에 함께 사용한다. */
+  @Test
+  void usesConfiguredSpeakingTimeLimit() {
+    when(repository.findByIdUserProfileIdAndIdUsageDate(eq(1L), any(LocalDate.class)))
+        .thenReturn(Optional.empty());
+    FreeTalkDailySpeakingUsageService configuredService = serviceWithLimit(9_999_999L);
+
+    assertThat(configuredService.remainingMs(1L)).isEqualTo(9_999_999L);
+    assertThat(configuredService.speakingTimeLimitMs()).isEqualTo(9_999_999L);
   }
 }

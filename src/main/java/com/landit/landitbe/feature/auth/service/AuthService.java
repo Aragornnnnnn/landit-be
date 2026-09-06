@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.service.AiTutorService;
+import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
@@ -44,6 +45,7 @@ public class AuthService {
   private final OauthIdentityRepository oauthIdentityRepository;
   private final RefreshTokenRepository refreshTokenRepository;
   private final OidcTokenVerifier oidcTokenVerifier;
+  private final ConversationMemoryDeletionService conversationMemoryDeletionService;
   private final LanditTokenService tokenService;
   private final TokenProperties tokenProperties;
 
@@ -55,6 +57,7 @@ public class AuthService {
    * @param oauthIdentityRepository OAuth 연결 Repository
    * @param refreshTokenRepository Refresh token Repository
    * @param oidcTokenVerifier OIDC ID Token 검증기
+   * @param conversationMemoryDeletionService 탈퇴 사용자의 장기기억 삭제 Service
    * @param tokenService 자체 토큰 Service
    * @param tokenProperties 자체 토큰 설정
    */
@@ -64,6 +67,7 @@ public class AuthService {
       OauthIdentityRepository oauthIdentityRepository,
       RefreshTokenRepository refreshTokenRepository,
       OidcTokenVerifier oidcTokenVerifier,
+      ConversationMemoryDeletionService conversationMemoryDeletionService,
       LanditTokenService tokenService,
       TokenProperties tokenProperties) {
     this.userProfileService = userProfileService;
@@ -71,6 +75,7 @@ public class AuthService {
     this.oauthIdentityRepository = oauthIdentityRepository;
     this.refreshTokenRepository = refreshTokenRepository;
     this.oidcTokenVerifier = oidcTokenVerifier;
+    this.conversationMemoryDeletionService = conversationMemoryDeletionService;
     this.tokenService = tokenService;
     this.tokenProperties = tokenProperties;
   }
@@ -169,6 +174,7 @@ public class AuthService {
     if (!userProfileService.withdrawIfActiveForUpdate(userId)) {
       throw new ApiException(ErrorCode.INVALID_TOKEN);
     }
+    conversationMemoryDeletionService.deleteAllByUserProfileId(userId);
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
     oauthIdentityRepository
         .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.ACTIVE)

@@ -58,6 +58,9 @@ class GeneratedMessageService {
         submittedMessage,
         feedbackProcessingStatus,
         nextMessage,
+        generation.ttsText(),
+        generation.fixedQuestionText(),
+        generation.questionAudioUrl(),
         submittedContext.scenarioContext().totalQuestionCount(),
         generation.completed());
   }
