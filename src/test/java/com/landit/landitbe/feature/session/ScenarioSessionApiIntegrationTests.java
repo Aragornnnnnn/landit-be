@@ -141,7 +141,8 @@ class ScenarioSessionApiIntegrationTests {
     for (int attempt = 0; attempt < 50; attempt++) {
       Integer preparingCount =
           jdbcTemplate.queryForObject(
-              "SELECT COUNT(*) FROM learning_session WHERE level_assessment_processing_status = 'PREPARING'",
+              "SELECT COUNT(*) FROM learning_session "
+                  + "WHERE level_assessment_processing_status = 'PREPARING'",
               Integer.class);
       if (preparingCount == null || preparingCount == 0) {
         return;
