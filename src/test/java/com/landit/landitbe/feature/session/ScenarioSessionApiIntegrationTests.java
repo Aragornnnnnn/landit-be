@@ -13,7 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.repository.AdminScenarioListQueryRepository;
+import com.landit.landitbe.feature.content.repository.DailyScenarioQueryRepository;
+import com.landit.landitbe.feature.content.repository.ScenarioListQueryRepository;
 import com.landit.landitbe.feature.session.client.ai.AiClosingMessageRequest;
 import com.landit.landitbe.feature.session.client.ai.AiClosingMessageResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
@@ -30,10 +34,13 @@ import com.landit.landitbe.feature.session.client.ai.AiSessionMessageFeedbackRes
 import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,15 +57,21 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -81,6 +94,14 @@ class ScenarioSessionApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private ScenarioSessionMessageQueryRepository scenarioContextRepository;
+
+  @Autowired private ScenarioListQueryRepository scenarioListRepository;
+
+  @Autowired private DailyScenarioQueryRepository dailyScenarioRepository;
+
+  @Autowired private AdminScenarioListQueryRepository adminScenarioRepository;
 
   @Autowired private FakeAiConversationClient fakeAiConversationClient;
 
@@ -112,6 +133,119 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario");
     jdbcTemplate.update("DELETE FROM category_language_variant");
     jdbcTemplate.update("DELETE FROM category");
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(ints = {1, 2, 3, 4, 5})
+  void diagnosticScenarioUsesFourCommonQuestionsAtEveryLearningLevel(Integer level)
+      throws Exception {
+    JsonNode loginBody = login("diagnostic-" + level + "@example.com");
+    long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String token = loginBody.get("data").get("accessToken").asText();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = ? WHERE id = ?", level, userId);
+    final JsonNode questions =
+        objectMapper
+            .readTree(Files.readString(Path.of("docs/tasks/LAN-438/onboarding-questions.json")))
+            .get("questions");
+    seedCategory(1001, 1, "ACTIVE", "일상");
+    seedScenario(1, 1001, 1, "AI", "ACTIVE", 3);
+    seedScenarioVariant(
+        3001,
+        1,
+        "첫 만남",
+        "교환학생과 이야기합니다.",
+        "자신의 생각을 이야기합니다.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(4201, 1, 1, "Old beginner question", "이전 초급 질문", "LEVEL_1");
+    seedScenarioQuestion(4301, 1, 1, "Old intermediate question", "이전 중급 질문", "LEVEL_2_TO_3");
+    seedScenarioQuestion(4401, 1, 1, "Old advanced question", "이전 고급 질문", "LEVEL_4_TO_5");
+    jdbcTemplate.execute(
+        (ConnectionCallback<Void>)
+            connection -> {
+              ScriptUtils.executeSqlScript(
+                  connection,
+                  new ClassPathResource(
+                      "db/migration/V87__insert_common_diagnostic_questions.sql"));
+              return null;
+            });
+    assertThat(
+            jdbcTemplate.queryForList(
+                "SELECT question_text FROM scenario_question_language_variant "
+                    + "WHERE scenario_question_id IN (4201, 4301, 4401) "
+                    + "ORDER BY scenario_question_id",
+                String.class))
+        .containsExactly(
+            "Old beginner question", "Old intermediate question", "Old advanced question");
+    var requestedGroup = ContentLearningLevel.from(level);
+    String opening = questions.get(0).get("questionText").asText();
+    assertThat(scenarioListRepository.findScenarioList(userId, requestedGroup))
+        .singleElement()
+        .extracting(row -> row.aiOpeningMessage())
+        .isEqualTo(opening);
+    assertThat(adminScenarioRepository.findActiveScenarioList(userId, requestedGroup))
+        .singleElement()
+        .extracting(row -> row.aiOpeningMessage())
+        .isEqualTo(opening);
+    assertThat(dailyScenarioRepository.findDailyScenario(userId, 1L, requestedGroup))
+        .get()
+        .extracting(row -> row.aiOpeningMessage())
+        .isEqualTo(opening);
+    long sessionId = startScenario(token, 1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT question_level_group FROM scenario_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("DIAGNOSTIC");
+    for (int turn = 1; turn <= 4; turn++) {
+      var result =
+          mockMvc
+              .perform(
+                  post("/api/v1/sessions/%d/messages".formatted(sessionId))
+                      .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content("{\"content\":\"I enjoy meeting people.\",\"inputType\":\"VOICE\"}"))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(4))
+              .andExpect(jsonPath("$.data.progress.completed").value(turn == 4));
+      if (turn < 4) {
+        result.andExpect(
+            jsonPath("$.data.nextMessage.fixedQuestionText")
+                .value(questions.get(turn).get("questionText").asText()));
+      }
+    }
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+    var assessment = fakeAiConversationClient.lastSessionFeedbackRequest().assessmentMessages();
+    assertThat(assessment).hasSize(4);
+    assertThat(assessment.get(3).requiredElements())
+        .containsExactly(questions.get(3).get("requiredElements").get(0).asText());
+    assertThat(
+            scenarioContextRepository
+                .findContextByLearningSessionId(sessionId)
+                .orElseThrow()
+                .totalQuestionCount())
+        .isEqualTo(4);
+    jdbcTemplate.update(
+        "UPDATE scenario_session SET question_level_group = 'LEVEL_1' "
+            + "WHERE learning_session_id = ?",
+        sessionId);
+    assertThat(
+            scenarioContextRepository
+                .findContextByLearningSessionId(sessionId)
+                .orElseThrow()
+                .totalQuestionCount())
+        .isEqualTo(3);
   }
 
   @Test

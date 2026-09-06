@@ -24,7 +24,9 @@ public interface ScenarioSessionMessageQueryRepository
                 scenario.aiRole,
                 scenario.firstSpeaker,
                 scenarioSession.userOpeningInstructionSnapshot,
-                scenario.totalQuestionCount,
+                CASE WHEN scenario.id = 1 AND scenarioSession.questionLevelGroup <>
+                     com.landit.landitbe.feature.content.domain.ContentLearningLevel.DIAGNOSTIC
+                     THEN 3 ELSE scenario.totalQuestionCount END,
                 scenarioVariant.targetLocale,
                 scenarioVariant.baseLocale,
                 scenarioSession.questionLevelGroup

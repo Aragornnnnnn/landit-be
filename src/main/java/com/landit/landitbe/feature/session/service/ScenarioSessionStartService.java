@@ -65,8 +65,11 @@ public class ScenarioSessionStartService {
       long userId, long scenarioId, boolean enforceProgression) {
     Instant startedInstant = clock.instant();
     UserProfile userProfile = findActiveUser(userId);
+    // 신규 진단은 공통 질문을 사용하고 과거 세션은 시작 당시 질문 그룹을 유지한다.
     ContentLearningLevel questionLevelGroup =
-        ContentLearningLevel.from(userProfile.getLearningLevel());
+        scenarioId == 1L
+            ? ContentLearningLevel.DIAGNOSTIC
+            : ContentLearningLevel.from(userProfile.getLearningLevel());
     ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId, questionLevelGroup);
 
     assertContentActive(startRow);
