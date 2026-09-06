@@ -132,6 +132,7 @@
 ### 1. 목표와 변경 경계
 
 - 시나리오 완료 직후 수준 평가를 시작하고, FE는 피드백을 보여주는 동안 상태를 폴링한다.
+- 사용자 확정: 기존 BE 피드백 API는 수준 평가 도입 전 응답 구조를 유지한다. 수준 평가 결과와 처리 상태는 신규 수준 평가 GET API에서만 반환한다.
 - 평가 기준은 유지한다: 질문별 5영역 평가 → 요구도 가중 평균 → 영역 가중치 → 상한 보정, 충분성, 최초 초기화, 2회 승급, 자동 강등 없음.
 - 제품 평가 모델·루브릭·가중치·임계값을 실행 모델의 판단으로 바꾸지 않는다. 호출 분리에 필요한 입출력 지시문만 조정하고 변경점을 기록한다.
 - JSON 출력 방식 전환은 **별도 JSON_schema 이슈의 공통 구현**을 재사용한다. LAN-438에서 다른 API까지 중복 구현하지 않는다.
@@ -145,7 +146,8 @@
 | AI는 피드백 반환 후 메시지 캐시를 삭제하며, 평가가 이 캐시의 원문과 비교한다. | 새 수준 평가 API는 BE에 저장된 질문·답변·메타데이터를 받는다. 캐시 유무나 요약 호출 순서에 의존하지 않는다. |
 | BE `SessionFeedbackService.getOrCreate`는 AI 결과를 기다린다. | 기존 피드백 API는 요약·턴 피드백만 기다린다. 수준 평가 완료는 기다리지 않는다. |
 | `SessionFeedbackCompletionService.record`가 요약·평가·진행도를 함께 저장한다. | 요약·진행도 저장과 평가·사용자 수준 저장을 분리한다. 각 흐름의 멱등성을 유지한다. |
-| 요약만 있고 평가가 없으면 `attachLegacyFallback`이 평가를 확정한다. | 비동기 대기와 레거시 평가 부재를 구분한다. PREPARING을 fallback으로 확정하지 않는다. |
+| 요약만 있고 평가가 없으면 `attachLegacyFallback`이 평가를 확정한다. | 피드백 조회 경로에서 평가 보완을 제거한다. 평가 예약·이력이 없는 과거 세션은 신규 GET에서 NOT_REQUESTED로 반환하고, PREPARING을 임의 fallback으로 확정하지 않는다. |
+| `responseFor`가 평가 존재와 source에 의존해 피드백 응답을 조립한다. | 평가 조회·필수 존재 조건을 제거한다. 메시지 피드백 정합성 검증은 평가 source가 아닌 요약·피드백 자체의 생성 결과를 기준으로 유지한다. |
 | `SessionMessageSubmitService`의 완료 저장 이후에도 예외 보상 코드가 실행될 수 있다. | 평가 dispatch 실패를 기존 발화 삭제 보상 경로에 흘리지 않는다. 완료 커밋 뒤 별도 처리한다. |
 
 이 분리로 피드백 조회가 즉시 반환된다는 뜻은 아니다. 기존 요약 생성과 턴 피드백 준비 시간은 남지만 **수준 평가 지연이 피드백 화면을 막지는 않는다.**
@@ -164,13 +166,14 @@
 | AI 신규 `POST /api/v1/conversation/level-assessment` | `sessionId`, `scenario`, `expectedMessageIds`, `assessmentMessages`를 입력받고 `sessionId`, `levelAssessment`를 반환한다. Core 복구 소진 시 평가는 null이다. |
 | AI 기존 `POST /api/v1/conversation/session-feedback` | 새 BE 흐름에서는 assessmentMessages를 보내지 않는다. 기존 결합 요청 계약은 전환 기간 동안 유지한다. |
 | BE 신규 `GET /api/v1/sessions/{sessionId}/level-assessment` | `sessionId`, `processingStatus`, `levelAssessment`를 반환한다. 소유권 확인 후 저장된 상태를 조회한다. LLM 호출을 시작하거나 재생성하지 않는다. |
-| BE 기존 피드백 POST | 기존 요약·턴 피드백 필드는 유지하고 `levelAssessmentProcessingStatus`를 추가한다. 대기 중 `levelAssessment=null`, 완료 후 저장된 평가를 반환한다. |
-| BE 마지막 발화 응답 | 수준 평가를 기다리지 않고 세션 완료를 응답한다. 상태를 함께 전달해 FE가 폴링을 시작할 수 있게 한다. |
+| BE 기존 `POST /api/v1/sessions/{sessionId}/feedback` | 수준 평가 도입 전 구조인 `sessionId`, `nativeScore`, `starRating`, `highlightMessage`, `summaryMessage`, `messageFeedbacks`만 반환한다. LAN-438의 `levelAssessment` 필드를 제거하고 평가 상태 필드도 추가하지 않는다. |
+| BE 마지막 발화 응답 | 수준 평가를 기다리지 않고 기존 세션 완료 정보를 응답한다. 별도 평가 상태 필드를 추가하지 않으며, FE는 세션 완료를 기준으로 신규 GET을 시작한다. |
 
 - 새 AI 요청 DTO는 기존 `SessionAssessmentMessage`와 Core/Details 타입을 재사용한다. 빈 입력, 중복·누락·순서 불일치 ID를 거부한다.
 - BE가 저장된 소유 세션의 실제 원문과 질문 스냅샷으로 입력을 구성한다. FE가 보낸 임의 평가 입력은 신뢰하지 않는다.
 - AI는 요청 원문에서 근거의 연속 부분 문자열 여부를 검사하고, BE는 저장 원문에 대해 다시 검증한다. 기존 캐시 비교를 없애는 대신 검증 근거를 DB 스냅샷으로 옮긴다.
-- 피드백 POST에서 평가가 반드시 존재한다는 현재 가정은 변경된다. AI만 먼저 배포하고 BE와 FE는 nullable/상태 계약을 맞춘 뒤 전환한다. 구 FE와의 동시 지원이 필요하면 구현 전에 전환 정책을 확정한다.
+- 피드백 POST는 평가 상태와 관계없이 같은 응답 구조를 유지한다. 신규 GET만 `processingStatus`와 nullable `levelAssessment`를 사용한다. 기존에 저장한 평가는 삭제하지 않고 신규 GET으로 조회한다.
+- 전환 순서는 AI의 신규 API 제공 → BE 분리 계약 제공 → FE 폴링 연결이다. 배포 실행 승인은 별도다. 구현 전에 LAN-438의 실제 배포 여부와 FE가 피드백 내 `levelAssessment`에 의존하는지 확인하고 해당 소비부를 신규 GET으로 옮긴다. 이미 배포된 소비부가 있으면 호환 전환 순서를 먼저 맞춘다.
 - 기존 결합 경로와 신규 독립 경로가 같은 세션을 각각 평가하지 않도록 요청별 평가 소유 경로를 하나로 고정한다.
 
 ### 4. 상태·저장·실패 계약
@@ -223,7 +226,7 @@ strict json_schema
 
 ### 7. FE 인계
 
-- 마지막 발화 완료 후 기존 피드백 POST와 수준 평가 GET을 병행한다. PREPARING이면 약 2초 간격으로 조회하며 요청이 겹치지 않게 한다.
+- 마지막 발화의 기존 세션 완료 정보를 기준으로 피드백 POST와 수준 평가 GET을 병행한다. 피드백 응답에서 평가 상태·결과를 읽지 않는다. 신규 GET이 PREPARING이면 약 2초 간격으로 조회하며 요청이 겹치지 않게 한다.
 - 피드백을 읽는 도중 완료돼도 화면을 강제로 전환하지 않는다. 피드백 마지막 단계에서 준비된 평가를 표시한다.
 - 마지막 단계까지 PREPARING이면 분석 중 화면을 사용한다. 임의 타이머 만료를 평가 실패나 Level 3 판정으로 처리하지 않는다.
 - COMPLETED/FAILED 또는 화면 이탈 시 폴링을 멈춘다. 복귀 시 GET으로 재개하며, 새 평가 생성 요청을 보내지 않는다. 네트워크 오류는 제한된 재조회·안내로 처리한다.
@@ -235,7 +238,7 @@ strict json_schema
 1. 실제 AI·BE HEAD, dirty diff, 열린 PR 및 별도 JSON_schema 이슈의 공통 함수 계약을 다시 확인한다. 실행기 예외와 FE 전환 범위를 확인한다. 과거 작업 기록을 현재 반영 상태로 간주하지 않는다.
 2. AI에 캐시 독립 평가 DTO/API를 추가하고 기존 루브릭·검증을 재사용한다. 공통 출력 모드 helper와 Core 재요청을 연결하며 기존 결합 endpoint의 호환 테스트를 남긴다.
 3. BE에 상태 컬럼용 새 Flyway migration, 예약·실행·확정·조회 흐름을 추가한다. 이미 작성된 과거 migration을 수정하지 않는다. 기존 평가 계산기를 재사용한다.
-4. 요약 저장에서 평가 저장을 분리하고 신규 폴링 API·피드백 응답·OpenAPI를 갱신한다. 레거시 fallback과 PREPARING을 구분한다.
+4. 요약 저장에서 평가 저장을 분리하고 신규 폴링 API·OpenAPI를 추가한다. 기존 피드백 응답에서 LAN-438 평가 필드를 제거해 도입 전 구조로 복원하고, 조회 시 평가 보완·평가 존재 의존성을 제거한다. 기존 평가 이력은 보존한다.
 5. FE 계약에 맞춘 통합 테스트를 완료하고 AI `.venv/bin/python -m unittest discover -s tests`, BE `./gradlew check`를 실행한다. 두 BE Gradle 검증은 동시에 실행하지 않는다.
 6. 동시성·DB·API 경계 변경은 독립 검수를 받는다. 아래 테스트와 회귀 측정 결과를 기존 baseline 보고서에 후속 run으로 추가한다.
 
@@ -245,6 +248,7 @@ strict json_schema
 | 인증·429·5xx·일반 404·잘못된 스키마 | 미지원으로 오분류해 모드 전환하지 않는다. 요청·시간 상한을 지킨다. |
 | 잘못된 JSON/Core/Details, 근거 불일치 | Core만 최대 1회 복구한다. Details 실패는 Core를 보존하며 최종 fallback은 수준/streak를 바꾸지 않는다. |
 | 캐시 삭제·AI 인스턴스 교체·요약/평가 완료 순서 | 수준 평가는 BE 입력만으로 동작한다. 요약의 기존 캐시 의존 해결까지 완료한 것으로 주장하지 않는다. |
+| 피드백 응답 구조·평가 독립성 | NOT_REQUESTED/PREPARING/COMPLETED/FAILED 모두 기존 피드백 응답 필드가 동일하고 평가 결과·상태 필드가 없다. 피드백 POST는 평가를 생성·보완하지 않는다. 신규 GET에서만 평가 상태·결과를 조회한다. |
 | 느린 평가·중복 제출/피드백 POST/GET·동시 만료 | 피드백이 평가를 기다리지 않으며 예약·평가 행·수준 적용이 중복되지 않는다. |
 | dispatch 실패·재시작·DB 저장 실패·늦은 응답 | PREPARING이 무한 지속되지 않고 이미 확정된 fallback/수준을 덮어쓰지 않는다. |
 | 여러 세션 역순 완료·수동 하향·온보딩·일반 승급 | 오래된 작업은 최신 수준을 덮어쓰지 않는다. 최초 초기화·2회 승급·자동 강등 없음이 유지된다. |
