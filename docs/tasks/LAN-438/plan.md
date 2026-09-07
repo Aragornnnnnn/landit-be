@@ -256,7 +256,8 @@ FE 구현은 이 PR의 범위 밖이며 아래 항목을 후속 호환성 작업
 | 120초 만료 | 대기 중 만료한 작업은 모델 호출을 생략한다. 실행 중 만료한 결과도 저장 직전에 확인해 fallback 처리하고 승급에 반영하지 않는다. |
 
 - 과거에 표현 수준 자체를 저장하지 않았던 세션은 당시 사용자가 실제 본 표현을 완전히 복원할 수 없다. 위 질문 그룹 기반 복원이 V1의 대체 기준이다.
-- 검증: `./gradlew spotlessApply check --no-parallel -I /tmp/lan438-review-tests.gradle` 통과. 테스트 921개, 실패·오류·건너뜀 0개. 임시 init script로 로컬 테스트 힙만 1536m로 지정했고 저장소 빌드 설정은 변경하지 않았다.
+- 최신 검증: `./gradlew spotlessApply check --no-parallel -I /tmp/lan438-review-tests.gradle` 통과. 실행 당시 HEAD는 `4738acb8`이고 기능 보완은 미커밋 상태였다. 검증한 소스·테스트는 이후 `f0f38dfe`와 `f3e82690`으로 확정했다. 테스트 필터 없이 전체 921개를 검증했으며 실패·오류·건너뜀은 0개다. 최종 `check`는 직전 전체 실행 결과를 UP-TO-DATE로 재사용하고 남은 Checkstyle 수정을 확인했다. 임시 init script로 로컬 테스트 힙만 1536m로 지정했고 저장소 빌드 설정은 변경하지 않았다.
+- 이전 916개 기록과의 차이는 실행 범위 축소·확대가 아니라 회귀 테스트 5개 추가다. 과거 표현 API 1개, 콘텐츠 수준 정책 1개, 마지막 피드백 실패 1개, 대기/실행 중 만료 파라미터 사례 2개다. 기존 테스트에 추가한 재플레이 assertion은 개수를 늘리지 않는다.
 - 과거 캘린더의 표현 목록·진행도·학습 시작·완료, 승급 후 재플레이, 마지막 피드백 실패 DB 상태, 대기/실행 중 만료 회귀 테스트를 포함한다. 독립 검수의 실패 상태 저장 지적을 수정하고 재검수를 통과했다.
 - 실제 모델 독립 평가 60회 결과는 AI 저장소 `docs/tasks/LAN-438/blind-baseline.md`에 기록한다. FE 결과 화면·결제 E2E와 운영 PostgreSQL 적용·배포는 검증하지 않았다.
 
@@ -288,4 +289,4 @@ FE 구현은 이 PR의 범위 밖이며 아래 항목을 후속 호환성 작업
 - 2026-09-07 리뷰 4건 보완 완료. 완료 트랜잭션의 예약 저장, 컨텍스트 로드 실패 이후 만료 복구, 무관한 프로필 변경과 수동 수준 변경 구분을 회귀 검증했다. `./gradlew spotlessApply check --no-parallel` 통과. 독립 코드 검수에서 추가 결함 없음. 운영 DB·배포·실제 LLM 재측정은 실행하지 않았다.
 
 - 2026-09-07 KST PR 리뷰 보완: 예약·만료·수동 및 자동 수준 변경을 동일 Clock으로 맞추고, 테스트 대기 실패를 명시했다. V88은 PostgreSQL/H2별로 분리했으며 공개 Javadoc과 FE 후속 작업을 보완했다.
-- 검증: 기본 테스트 힙에서 Java heap space가 발생해 로컬 init script로 Test.maxHeapSize=1536m를 설정한 `./gradlew check --no-parallel -I /tmp/lan438-review-tests.gradle`을 실행했다. 916개 테스트, 실패·오류 0이며 Spotless·Checkstyle도 통과했다. 독립 재검수에서 추가 결함 없음. 운영 PostgreSQL 및 실제 LLM은 실행하지 않았다.
+- 이전 검증 기록(최신 결과 아님): Clock 통일·DB별 제약 분리 변경을 커밋 전에 검증했고, 해당 소스·테스트는 `556c0066`으로 확정했다(`4738acb8`은 문서만 변경). 기본 테스트 힙에서 Java heap space가 발생해 로컬 init script로 Test.maxHeapSize=1536m를 설정한 `./gradlew check --no-parallel -I /tmp/lan438-review-tests.gradle`을 실행했다. 테스트 필터 없이 당시 전체 916개, 실패·오류 0이며 Spotless·Checkstyle도 통과했다. 독립 재검수에서 추가 결함 없음. 이 실행에서는 운영 PostgreSQL 및 실제 LLM을 실행하지 않았다. 현재 검증 기준은 위 '기능 누락 수정 검증'의 921개 결과다.
