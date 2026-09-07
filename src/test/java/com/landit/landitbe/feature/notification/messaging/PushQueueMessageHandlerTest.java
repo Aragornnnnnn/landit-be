@@ -41,24 +41,24 @@ class PushQueueMessageHandlerTest {
   @InjectMocks private PushQueueMessageHandler pushQueueMessageHandler;
 
   @Test
-  void handlesAndValidatesAdminRun() {
+  void handlesAndValidatesAdminCampaign() {
     java.util.UUID id = java.util.UUID.randomUUID();
     PushQueueMessage message =
         new PushQueueMessage(
             1,
             "admin-message",
-            "ADMIN_PUSH_RUN",
+            PushQueueMessage.ADMIN_PUSH_CAMPAIGN,
             Instant.now(),
-            new PushQueuePayload(null, null, null, null, null, id, 2L));
+            new PushQueuePayload(null, null, null, null, null, id, null, null));
     pushQueueMessageHandler.handle(message);
-    verify(adminPushProcessingService).process(id, 2L);
+    verify(adminPushProcessingService).process(id);
     assertThatThrownBy(
             () ->
                 pushQueueMessageHandler.handle(
                     new PushQueueMessage(
                         1,
                         "invalid",
-                        "ADMIN_PUSH_RUN",
+                        PushQueueMessage.ADMIN_PUSH_CAMPAIGN,
                         Instant.now(),
                         new PushQueuePayload(null, null))))
         .isInstanceOf(IllegalArgumentException.class);

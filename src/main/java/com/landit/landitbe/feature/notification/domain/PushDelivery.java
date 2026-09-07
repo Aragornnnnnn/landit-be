@@ -71,108 +71,6 @@ public class PushDelivery extends BaseTimeEntity {
   @Column(name = "receipt_checked_at")
   private LocalDateTime receiptCheckedAt;
 
-  @Column(name = "admin_push_target_id")
-  private Long adminPushTargetId;
-
-  @Column(name = "admin_retry_count", nullable = false)
-  private int adminRetryCount;
-
-  @Column(name = "admin_next_attempt_at")
-  private LocalDateTime adminNextAttemptAt;
-
-  @Column(name = "admin_receipt_attempt", nullable = false)
-  private int adminReceiptAttempt;
-
-  @Column(name = "admin_receipt_next_at")
-  private LocalDateTime adminReceiptNextAt;
-
-  @Column(name = "admin_receipt_lease_until")
-  private LocalDateTime adminReceiptLeaseUntil;
-
-  /**
-   * 새 이력을 확정된 관리자 발송 대상에 연결한다.
-   *
-   * @param targetId 대상 ID
-   */
-  public void attachAdminTarget(long targetId) {
-    adminPushTargetId = targetId;
-  }
-
-  /**
-   * 관리자 발송의 결과 불명을 기록하고 자동 재제출을 차단한다.
-   *
-   * @param code 토큰 원문 없는 사유
-   */
-  public void adminUnknown(String code) {
-    if (adminPushTargetId != null
-        && (status == PushDeliveryStatus.REQUESTED
-            || status == PushDeliveryStatus.TICKET_ACCEPTED)) {
-      status = PushDeliveryStatus.UNKNOWN;
-      errorCode = code;
-      adminNextAttemptAt = null;
-      adminReceiptNextAt = null;
-    }
-  }
-
-  /**
-   * 명시적으로 거부된 429 요청의 재시도를 제한한다.
-   *
-   * @param now 현재 시각
-   */
-  public void adminRateLimited(LocalDateTime now) {
-    if (status != PushDeliveryStatus.REQUESTED || adminPushTargetId == null) {
-      return;
-    }
-    if (adminRetryCount >= 3) {
-      fail("RATE_LIMIT_RETRIES_EXHAUSTED", now);
-      return;
-    }
-    int[] delays = {5, 30, 120};
-    adminNextAttemptAt = now.plusSeconds(delays[adminRetryCount++]);
-    errorCode = "ADMIN_RATE_LIMITED";
-  }
-
-  /**
-   * DB에 저장한 관리자 Receipt 확인 회차를 선점한다.
-   *
-   * @param now 현재 시각
-   * @return 선점한 경우 true
-   */
-  public boolean claimAdminReceipt(LocalDateTime now) {
-    if (adminPushTargetId == null
-        || status != PushDeliveryStatus.TICKET_ACCEPTED
-        || adminReceiptNextAt == null
-        || adminReceiptNextAt.isAfter(now)
-        || (adminReceiptLeaseUntil != null && adminReceiptLeaseUntil.isAfter(now))) {
-      return false;
-    }
-    if (adminReceiptAttempt >= 3) {
-      adminUnknown("ReceiptNotAvailable");
-      return false;
-    }
-    adminReceiptAttempt++;
-    adminReceiptLeaseUntil = now.plusMinutes(5);
-    return true;
-  }
-
-  /**
-   * 미준비 또는 통신 실패 Receipt의 다음 회차를 예약한다.
-   *
-   * @param attempt 선점한 확인 회차
-   * @param now 현재 시각
-   */
-  public void deferAdminReceipt(int attempt, LocalDateTime now) {
-    if (adminReceiptAttempt != attempt || status != PushDeliveryStatus.TICKET_ACCEPTED) {
-      return;
-    }
-    adminReceiptLeaseUntil = null;
-    if (adminReceiptAttempt >= 3) {
-      adminUnknown("ReceiptNotAvailable");
-    } else {
-      adminReceiptNextAt = now.plusMinutes(15);
-    }
-  }
-
   /** JPA에서 사용하는 기본 생성자다. */
   protected PushDelivery() {}
 
@@ -274,14 +172,10 @@ public class PushDelivery extends BaseTimeEntity {
     if (ticketId == null || ticketId.isBlank()) {
       throw new IllegalArgumentException("Expo Ticket ID는 비어 있을 수 없습니다.");
     }
-    if (status != PushDeliveryStatus.REQUESTED
-        && !(adminPushTargetId != null && status == PushDeliveryStatus.UNKNOWN)) {
+    if (status != PushDeliveryStatus.REQUESTED) {
       return false;
     }
     expoTicketId = ticketId;
-    if (adminPushTargetId != null) {
-      adminReceiptNextAt = LocalDateTime.now().plusMinutes(15);
-    }
     status = PushDeliveryStatus.TICKET_ACCEPTED;
     errorCode = null;
     return true;
@@ -300,12 +194,7 @@ public class PushDelivery extends BaseTimeEntity {
    * @return 재시도 표식이 남아 있으면 {@code true}
    */
   public boolean isRetryable() {
-    return status == PushDeliveryStatus.REQUESTED
-        && (RETRYABLE_ERROR_CODE.equals(errorCode)
-            || (adminPushTargetId != null
-                && "ADMIN_RATE_LIMITED".equals(errorCode)
-                && adminNextAttemptAt != null
-                && !adminNextAttemptAt.isAfter(LocalDateTime.now())));
+    return status == PushDeliveryStatus.REQUESTED && RETRYABLE_ERROR_CODE.equals(errorCode);
   }
 
   /**
@@ -318,10 +207,6 @@ public class PushDelivery extends BaseTimeEntity {
       return false;
     }
     errorCode = null;
-    if (adminPushTargetId != null) {
-      adminNextAttemptAt = null;
-      requestedAt = LocalDateTime.now();
-    }
     return true;
   }
 
@@ -347,10 +232,7 @@ public class PushDelivery extends BaseTimeEntity {
    * @return 배달 완료 상태로 전환했으면 {@code true}
    */
   public boolean delivered(LocalDateTime checkedAt) {
-    if (status != PushDeliveryStatus.TICKET_ACCEPTED
-        && !(adminPushTargetId != null
-            && status == PushDeliveryStatus.UNKNOWN
-            && expoTicketId != null)) {
+    if (status != PushDeliveryStatus.TICKET_ACCEPTED) {
       return false;
     }
     status = PushDeliveryStatus.DELIVERED;
@@ -367,10 +249,7 @@ public class PushDelivery extends BaseTimeEntity {
    * @return Receipt 실패 상태로 전환했으면 {@code true}
    */
   public boolean failReceipt(String failureCode, LocalDateTime checkedAt) {
-    if (status != PushDeliveryStatus.TICKET_ACCEPTED
-        && !(adminPushTargetId != null
-            && status == PushDeliveryStatus.UNKNOWN
-            && expoTicketId != null)) {
+    if (status != PushDeliveryStatus.TICKET_ACCEPTED) {
       return false;
     }
     fail(failureCode, checkedAt);

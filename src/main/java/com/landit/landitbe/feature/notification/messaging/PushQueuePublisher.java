@@ -5,14 +5,20 @@ package com.landit.landitbe.feature.notification.messaging;
 /** 편지함 답장과 Expo Receipt 확인 메시지를 Push 전용 Queue에 발행하는 Port다. */
 public interface PushQueuePublisher {
   /**
-   * 관리자 실행의 한 작업을 발행한다.
+   * 관리자 캠페인의 다음 Token 페이지 작업을 발행한다.
    *
-   * @param runId 실행 ID
-   * @param version 작업 버전
+   * @param campaignId 캠페인 ID
    */
-  default void publishAdminRun(java.util.UUID runId, long version) {
-    throw new UnsupportedOperationException("관리자 실행 발행이 구성되지 않았습니다.");
-  }
+  void publishAdminCampaign(java.util.UUID campaignId);
+
+  /**
+   * 관리자 본인 테스트 작업을 발행한다.
+   *
+   * @param campaignId 캠페인 ID
+   * @param adminId 관리자 ID
+   * @param key 테스트 멱등성 키
+   */
+  void publishAdminTest(java.util.UUID campaignId, long adminId, String key);
 
   /**
    * 편지함 답장 수신자 일괄 알림을 즉시 발행한다.

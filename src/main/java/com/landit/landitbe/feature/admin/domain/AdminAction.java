@@ -10,8 +10,6 @@ public enum AdminAction {
   PUSH_CAMPAIGN_TESTED,
   /** 전체 푸시 발송 요청이다. */
   PUSH_CAMPAIGN_SENT,
-  /** 중단된 푸시 실행 복구다. */
-  PUSH_CAMPAIGN_RESUMED,
   /** 앱 버전 정책 수정 작업이다. */
   APP_VERSION_UPDATED,
 

@@ -1,13 +1,21 @@
-// 관리자 SQS 작업을 짧은 트랜잭션과 외부 제출 단계로 나누어 실행한다.
+// SQS 관리자 푸시 작업에서 Token 페이지와 테스트 알림을 처리한다.
 
 package com.landit.landitbe.feature.notification.service;
 
+import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
+import com.landit.landitbe.feature.notification.domain.NotificationType;
+import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
+import com.landit.landitbe.feature.notification.repository.AdminPushRepository;
+import com.landit.landitbe.feature.notification.repository.AdminPushRepository.Campaign;
+import com.landit.landitbe.feature.notification.repository.AdminPushRepository.Target;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-/** 저장된 실행의 한 페이지 또는 Receipt 하나를 처리한다. */
+/** 관리자 캠페인의 다음 Token 페이지 또는 관리자 테스트를 처리한다. */
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
@@ -15,34 +23,86 @@ import org.springframework.stereotype.Service;
     name = "consumer-enabled",
     havingValue = "true")
 public class AdminPushProcessingService {
-  private final AdminPushCampaignService campaigns;
+
+  private static final int BATCH_SIZE = 100;
+
+  private final AdminPushRepository repository;
+  private final PushDeliveryService deliveries;
   private final NotificationDispatchService dispatch;
-  private final PushReceiptService receipts;
+  private final PushQueuePublisher publisher;
 
   /**
-   * 중복 메시지를 걸러내고 하나의 지속성 작업을 수행한다.
+   * 캠페인의 다음 Token 페이지를 처리한다.
    *
-   * @param runId 실행 ID
-   * @param version 메시지 버전
+   * @param campaignId 캠페인 ID
    */
-  public void process(UUID runId, long version) {
-    campaigns
-        .claim(runId, version)
-        .ifPresent(
-            work -> {
-              try {
-                AdminPushCampaignService.Batch batch = campaigns.prepare(work);
-                if (!batch.deliveries().isEmpty() && campaigns.maySubmit(work)) {
-                  dispatch.sendAdminPrepared(batch.deliveries());
-                }
-                if (!batch.receiptIds().isEmpty()) {
-                  receipts.checkAdmin(batch.receiptIds());
-                }
-                campaigns.finish(work);
-              } catch (RuntimeException exception) {
-                campaigns.failed(work);
-                throw exception;
-              }
-            });
+  public void process(UUID campaignId) {
+    Campaign campaign = campaign(campaignId);
+    if (campaign.status().equals("DRAFT")) {
+      return;
+    }
+    if (campaign.status().equals("COMPLETED")) {
+      return;
+    }
+    List<Target> targets = repository.targets(campaign);
+    List<PreparedPushDelivery> prepared = new ArrayList<>();
+    for (Target target : targets) {
+      deliveries
+          .prepare(
+              new PreparePushDeliveryCommand(
+                  target.userId(),
+                  target.tokenId(),
+                  NotificationType.ADMIN_BROADCAST,
+                  "push:admin-broadcast:"
+                      + campaignId
+                      + ":"
+                      + target.userId()
+                      + ":"
+                      + target.tokenId(),
+                  campaign.content().title(),
+                  campaign.content().body(),
+                  campaign.content().deepLink()))
+          .ifPresent(prepared::add);
+    }
+    if (!prepared.isEmpty()) {
+      dispatch.sendAdminPrepared(prepared);
+    }
+    String eventId = "admin-broadcast:" + campaignId;
+    List<Long> tokenIds = targets.stream().map(Target::tokenId).toList();
+    if (deliveries.hasRequestedDeliveries("push:" + eventId + ":", tokenIds)) {
+      throw new RetryablePushNotificationException("같은 관리자 푸시 페이지가 처리 중입니다.");
+    }
+    dispatch.scheduleAcceptedDeliveryReceipts(eventId, tokenIds);
+    boolean completed = targets.size() < BATCH_SIZE;
+    long lastTargetId = completed ? campaign.maxTargetId() : targets.getLast().id();
+    repository.advance(campaignId, lastTargetId, completed);
+    if (!completed) {
+      publisher.publishAdminCampaign(campaignId);
+    }
+  }
+
+  /**
+   * 관리자 본인의 활성 Token에 테스트 알림을 보낸다.
+   *
+   * @param campaignId 캠페인 ID
+   * @param adminId 관리자 ID
+   * @param key 테스트 멱등성 키
+   */
+  public void test(UUID campaignId, long adminId, String key) {
+    Campaign campaign = campaign(campaignId);
+    dispatch.send(
+        new SendPushNotificationCommand(
+            "admin-broadcast-test:" + campaignId + ":" + key,
+            adminId,
+            NotificationType.ADMIN_BROADCAST_TEST,
+            campaign.content().title(),
+            campaign.content().body(),
+            campaign.content().deepLink()));
+  }
+
+  private Campaign campaign(UUID id) {
+    return repository.find(id).stream()
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("관리자 캠페인이 존재하지 않습니다."));
   }
 }

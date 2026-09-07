@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.notification.messaging;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Push Queue 메시지 유형별 선택 payload를 정의한다.
@@ -12,8 +13,9 @@ import java.util.List;
  * @param mailboxLetterId 답장 편지 ID
  * @param userProfileIds 답장 수신 사용자 ID 목록
  * @param replyTitle 답장 제목
- * @param runId 관리자 실행 ID
- * @param workVersion 관리자 작업 버전
+ * @param campaignId 관리자 푸시 캠페인 ID
+ * @param adminId 테스트 대상 관리자 ID
+ * @param requestKey 테스트 멱등성 키
  */
 public record PushQueuePayload(
     Long pushDeliveryId,
@@ -21,23 +23,44 @@ public record PushQueuePayload(
     Long mailboxLetterId,
     List<Long> userProfileIds,
     String replyTitle,
-    java.util.UUID runId,
-    Long workVersion) {
+    UUID campaignId,
+    Long adminId,
+    String requestKey) {
 
-  /** 기존 편지함 메시지 생성 계약을 유지한다. */
+  /**
+   * 관리자 캠페인 ID가 없는 기존 메시지를 생성한다.
+   *
+   * @param pushDeliveryId Receipt 대상 ID
+   * @param receiptAttempt Receipt 확인 횟수
+   * @param mailboxLetterId 답장 편지 ID
+   * @param userProfileIds 답장 수신자 ID
+   * @param replyTitle 답장 제목
+   */
   public PushQueuePayload(
-      Long deliveryId, Integer attempt, Long letterId, List<Long> userIds, String title) {
-    this(deliveryId, attempt, letterId, userIds, title, null, null);
+      Long pushDeliveryId,
+      Integer receiptAttempt,
+      Long mailboxLetterId,
+      List<Long> userProfileIds,
+      String replyTitle) {
+    this(
+        pushDeliveryId,
+        receiptAttempt,
+        mailboxLetterId,
+        userProfileIds,
+        replyTitle,
+        null,
+        null,
+        null);
   }
 
   /**
-   * 기존 Scheduler의 빈 payload 역직렬화와 테스트 생성을 지원한다.
+   * 기존 Queue payload 생성 계약을 유지한다.
    *
    * @param pushDeliveryId Receipt를 확인할 Push Delivery ID
    * @param receiptAttempt Receipt 확인 시도 횟수
    */
   public PushQueuePayload(Long pushDeliveryId, Integer receiptAttempt) {
-    this(pushDeliveryId, receiptAttempt, null, null, null);
+    this(pushDeliveryId, receiptAttempt, null, null, null, null, null, null);
   }
 
   /**
@@ -48,7 +71,14 @@ public record PushQueuePayload(
    */
   public static PushQueuePayload mailboxReply(MailboxReplyNotificationRequest request) {
     return new PushQueuePayload(
-        null, null, request.letterId(), request.userProfileIds(), request.replyTitle());
+        null,
+        null,
+        request.letterId(),
+        request.userProfileIds(),
+        request.replyTitle(),
+        null,
+        null,
+        null);
   }
 
   /**
@@ -59,6 +89,6 @@ public record PushQueuePayload(
    * @return Receipt 확인 payload
    */
   public static PushQueuePayload receipt(Long pushDeliveryId, int receiptAttempt) {
-    return new PushQueuePayload(pushDeliveryId, receiptAttempt, null, null, null);
+    return new PushQueuePayload(pushDeliveryId, receiptAttempt, null, null, null, null, null, null);
   }
 }

@@ -20,7 +20,6 @@ public enum ErrorCode {
   SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션을 찾을 수 없습니다."),
   IDEMPOTENCY_KEY_CONFLICT(HttpStatus.CONFLICT, "같은 요청 키에 다른 입력을 사용할 수 없습니다."),
   PUSH_PAYLOAD_TOO_LARGE(HttpStatus.BAD_REQUEST, "푸시 메시지가 허용 크기를 초과했습니다."),
-  TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 요청해 주세요."),
   CONFLICT(HttpStatus.CONFLICT, "요청이 현재 상태와 충돌합니다."),
   SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 세션입니다."),
   SESSION_NOT_COMPLETED(HttpStatus.CONFLICT, "완료되지 않은 세션입니다."),

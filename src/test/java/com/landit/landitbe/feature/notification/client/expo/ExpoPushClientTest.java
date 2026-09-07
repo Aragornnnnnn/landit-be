@@ -50,38 +50,6 @@ class ExpoPushClientTest {
     }
   }
 
-  @Test
-  void batchesReceiptsInInputOrderWithMissingAndFailedResults() throws Exception {
-    AtomicReference<String> request = new AtomicReference<>();
-    AtomicInteger calls = new AtomicInteger();
-    server.createContext(
-        RECEIPT_PATH,
-        exchange -> {
-          calls.incrementAndGet();
-          request.set(readBody(exchange));
-          respond(
-              exchange,
-              200,
-              "{\"data\":{\"b\":{\"status\":\"error\",\"details\":"
-                  + "{\"error\":\"DeviceNotRegistered\"}},\"a\":{\"status\":\"ok\"}}}");
-        });
-    var results = expoPushClient(null).getReceipts(List.of("a", "b", "missing"));
-    assertThat(results)
-        .extracting(r -> r.status())
-        .containsExactly(
-            PushReceiptStatus.DELIVERED, PushReceiptStatus.FAILED, PushReceiptStatus.NOT_READY);
-    assertThat(jsonMapper.readTree(request.get()).get("ids")).hasSize(3);
-    assertThat(calls.get()).isEqualTo(1);
-  }
-
-  @Test
-  void distinguishesExplicitRateLimitFromUncertainServerError() {
-    server.createContext(SEND_PATH, exchange -> respond(exchange, 429, "{}"));
-    assertThatThrownBy(() -> send(expoPushClient(null)))
-        .isInstanceOf(
-            com.landit.landitbe.feature.notification.client.PushRateLimitedException.class);
-  }
-
   /** 정해진 여섯 필드와 선택 Access Token으로 알림을 보내고 Ticket ID를 반환한다. */
   @Test
   void sendsPushMessageAndMapsAcceptedTicket() throws Exception {

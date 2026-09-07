@@ -71,19 +71,6 @@ public class GlobalExceptionHandler {
     return error(ErrorCode.VALIDATION_FAILED);
   }
 
-  /**
-   * 제공하지 않는 HTTP 메서드를 405로 반환한다.
-   *
-   * @param exception 지원하지 않는 메서드 예외
-   * @return 메서드 거부 응답
-   */
-  @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
-  public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
-      org.springframework.web.HttpRequestMethodNotSupportedException exception) {
-    return ResponseEntity.status(org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED)
-        .body(ApiResponse.error(ErrorCode.INVALID_REQUEST));
-  }
-
   /** Spring Security 접근 거부를 공통 권한 오류로 변환한다. */
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException exception) {

@@ -1,23 +1,27 @@
-// 관리자 푸시 캠페인의 불변 원문과 전체 및 테스트 실행을 전달한다.
+// 관리자 푸시 캠페인의 원문과 발송 집계를 전달한다.
 
 package com.landit.landitbe.feature.notification.dto;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 /**
- * 캠페인 원문과 실행 요약이다. 전체 실행이 없으면 DRAFT이며 원문은 수정할 수 없다.
+ * 관리자 푸시 캠페인의 원문과 토큰 기준 발송 집계다.
  *
  * @param id 캠페인 ID
  * @param title 알림 제목
  * @param body 알림 본문
  * @param deepLink 알림 이동 경로
  * @param createdBy 생성 관리자 ID
+ * @param status 캠페인 상태
+ * @param targetUserCount 발송 시작 시점의 대상 사용자 수
+ * @param targetTokenCount 발송 시작 시점의 대상 Token 수
+ * @param pendingCount Ticket 또는 Receipt 처리 중인 수
+ * @param succeededCount Receipt 성공 수
+ * @param failedCount 명시적인 실패 수
+ * @param excludedCount 발송 전에 비활성화되어 제외된 수
  * @param createdAt 생성 시각
- * @param status 전체 실행으로부터 계산한 캠페인 상태
- * @param broadcast 전체 발송 실행, 없으면 null
- * @param tests 관리자 테스트 실행 목록
+ * @param completedAt 전체 대상 제출 완료 시각
  */
 public record AdminPushCampaignView(
     UUID id,
@@ -25,7 +29,12 @@ public record AdminPushCampaignView(
     String body,
     String deepLink,
     long createdBy,
-    LocalDateTime createdAt,
     String status,
-    AdminPushRunView broadcast,
-    List<AdminPushRunView> tests) {}
+    long targetUserCount,
+    long targetTokenCount,
+    long pendingCount,
+    long succeededCount,
+    long failedCount,
+    long excludedCount,
+    LocalDateTime createdAt,
+    LocalDateTime completedAt) {}

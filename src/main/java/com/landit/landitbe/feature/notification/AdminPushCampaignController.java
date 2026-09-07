@@ -1,4 +1,4 @@
-// 관리자 푸시 캠페인의 생성, 테스트와 비동기 전체 발송 요청을 처리한다.
+// 관리자 푸시 캠페인의 생성, 테스트와 전체 발송 요청을 처리한다.
 
 package com.landit.landitbe.feature.notification;
 
@@ -7,10 +7,7 @@ import com.landit.landitbe.feature.notification.docs.AdminPushCampaignController
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
-import com.landit.landitbe.feature.notification.dto.AdminPushRunView;
 import com.landit.landitbe.feature.notification.service.AdminPushCampaignService;
-import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -28,13 +25,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 관리자 푸시 캠페인 API를 기존 관리자 권한 필터 아래에서 제공한다. */
+/** 관리자 권한 필터 아래에서 일괄 푸시 API를 제공한다. */
 @RestController
 @RequestMapping("/api/v1/admin/push-campaigns")
 @RequiredArgsConstructor
 public class AdminPushCampaignController implements AdminPushCampaignControllerDocs {
 
-  private final AdminPushCampaignService campaignService;
+  private final AdminPushCampaignService campaigns;
 
   /** {@inheritDoc} */
   @Override
@@ -44,7 +41,7 @@ public class AdminPushCampaignController implements AdminPushCampaignControllerD
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @RequestHeader("Idempotency-Key") String key,
       @Valid @RequestBody AdminPushCampaignRequest request) {
-    return ApiResponse.success(campaignService.create(principal.userId(), key, request));
+    return ApiResponse.success(campaigns.create(principal.userId(), key, request));
   }
 
   /** {@inheritDoc} */
@@ -52,64 +49,42 @@ public class AdminPushCampaignController implements AdminPushCampaignControllerD
   @GetMapping
   public ApiResponse<List<AdminPushCampaignView>> list(
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-    if (page < 0 || size < 1 || size > 50) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST);
-    }
-    return ApiResponse.success(campaignService.list(page, size));
+    return ApiResponse.success(campaigns.list(page, size));
   }
 
   /** {@inheritDoc} */
   @Override
   @GetMapping("/{campaignId}")
   public ApiResponse<AdminPushCampaignView> detail(@PathVariable UUID campaignId) {
-    return ApiResponse.success(campaignService.detail(campaignId));
+    return ApiResponse.success(campaigns.detail(campaignId));
   }
 
   /** {@inheritDoc} */
   @Override
   @GetMapping("/{campaignId}/audience-preview")
   public ApiResponse<AdminPushAudiencePreview> preview(@PathVariable UUID campaignId) {
-    return ApiResponse.success(campaignService.preview(campaignId));
+    return ApiResponse.success(campaigns.preview(campaignId));
   }
 
   /** {@inheritDoc} */
   @Override
-  @PostMapping("/{campaignId}/test-runs")
+  @PostMapping("/{campaignId}/test")
   @ResponseStatus(HttpStatus.ACCEPTED)
-  public ApiResponse<AdminPushRunView> test(
+  public ApiResponse<AdminPushCampaignView> test(
       @PathVariable UUID campaignId,
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @RequestHeader("Idempotency-Key") String key) {
-    return ApiResponse.success(campaignService.start(campaignId, principal.userId(), key, true));
+    return ApiResponse.success(campaigns.test(campaignId, principal.userId(), key));
   }
 
   /** {@inheritDoc} */
   @Override
   @PostMapping("/{campaignId}/send")
   @ResponseStatus(HttpStatus.ACCEPTED)
-  public ApiResponse<AdminPushRunView> send(
+  public ApiResponse<AdminPushCampaignView> send(
       @PathVariable UUID campaignId,
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @RequestHeader("Idempotency-Key") String key) {
-    return ApiResponse.success(campaignService.start(campaignId, principal.userId(), key, false));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  @GetMapping("/{campaignId}/runs/{runId}")
-  public ApiResponse<AdminPushRunView> run(
-      @PathVariable UUID campaignId, @PathVariable UUID runId) {
-    return ApiResponse.success(campaignService.run(campaignId, runId));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  @PostMapping("/{campaignId}/runs/{runId}/resume")
-  @ResponseStatus(HttpStatus.ACCEPTED)
-  public ApiResponse<AdminPushRunView> resume(
-      @PathVariable UUID campaignId,
-      @PathVariable UUID runId,
-      @AuthenticationPrincipal AuthUserPrincipal principal) {
-    return ApiResponse.success(campaignService.resume(campaignId, runId, principal.userId()));
+    return ApiResponse.success(campaigns.send(campaignId, principal.userId(), key));
   }
 }
