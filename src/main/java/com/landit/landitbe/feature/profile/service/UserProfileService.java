@@ -15,7 +15,7 @@ import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionResponse;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -285,15 +285,15 @@ public class UserProfileService {
   }
 
   /**
-   * 활성 사용자의 서버 기준 구독 상태를 반환한다.
+   * 활성 사용자의 서버 기준 구독 상태를 다른 기능이 쓸 스냅샷으로 반환한다.
    *
    * @param userId 조회할 사용자 ID
-   * @return 사용자 구독 상태
+   * @return 사용자 구독 상태 스냅샷
    * @throws UserProfileException 활성 프로필이 없을 때
    */
   @Transactional(readOnly = true)
-  public UserSubscriptionResponse getSubscription(Long userId) {
-    return UserSubscriptionResponse.from(requireActive(userId));
+  public UserSubscriptionSnapshot getSubscription(Long userId) {
+    return UserSubscriptionSnapshot.from(requireActive(userId));
   }
 
   /**

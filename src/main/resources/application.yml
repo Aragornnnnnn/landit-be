@@ -77,6 +77,7 @@ landit:
   pronunciation-asset:
     manifest-mode: ${LANDIT_PRONUNCIATION_MANIFEST_MODE:s3}
   subscription:
+    launched-at: ${LANDIT_SUBSCRIPTION_LAUNCHED_AT:}
     revenuecat:
       webhook-authorization: ${LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION:}
   notification:

@@ -1,20 +1,21 @@
-// 사용자의 서버 기준 구독 상태를 API 응답으로 제공한다.
+// 사용자의 서버 기준 구독 상태와 페이월 판단 근거를 API 응답으로 제공한다.
 
-package com.landit.landitbe.feature.profile.dto;
+package com.landit.landitbe.feature.subscription.dto;
 
 import com.landit.landitbe.feature.profile.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
-import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
 /**
- * 사용자의 서버 기준 구독 상태를 API 응답으로 제공한다.
+ * 사용자의 서버 기준 구독 상태와 페이월 판단 근거를 API 응답으로 제공한다.
  *
  * @param subscriptionStatus 구독 상태
  * @param premium 프리미엄 혜택 적용 여부
  * @param periodType 현재 결제 기간 종류. 무료 체험 중이면 TRIAL. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
+ * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
  */
 @Schema(description = "사용자 구독 상태")
 public record UserSubscriptionResponse(
@@ -32,19 +33,29 @@ public record UserSubscriptionResponse(
             example = "TRIAL")
         SubscriptionPeriodType periodType,
     @Schema(description = "구독 만료 시각. 프리미엄이 꺼져 있으면 null", example = "2026-10-04T12:00:00")
-        LocalDateTime expiresAt) {
+        LocalDateTime expiresAt,
+    @Schema(
+            description =
+                "유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있으면 true. 신규 가입자는 시나리오 1 완료,"
+                    + " 도입 전 가입자는 도입 후 오늘의 시나리오 완료가 기준이다. 도입 시점이 설정되기 전에는 항상 false."
+                    + " 앱은 conversationCompletedSinceLaunch && !premium 이면 페이월을 보여준다.",
+            example = "false")
+        boolean conversationCompletedSinceLaunch) {
 
   /**
-   * 사용자 프로필의 구독 정보를 응답으로 변환한다.
+   * 프로필의 구독 스냅샷과 대화 완료 여부를 응답으로 합친다.
    *
-   * @param userProfile 변환할 사용자 프로필
+   * @param snapshot 프로필 기능이 제공한 구독 상태 스냅샷
+   * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화 완료 여부
    * @return 사용자 구독 상태 응답
    */
-  public static UserSubscriptionResponse from(UserProfile userProfile) {
+  public static UserSubscriptionResponse of(
+      UserSubscriptionSnapshot snapshot, boolean conversationCompletedSinceLaunch) {
     return new UserSubscriptionResponse(
-        userProfile.getSubscriptionStatus(),
-        userProfile.isPremium(),
-        userProfile.getSubscriptionPeriodType(),
-        userProfile.getSubscriptionExpiresAt());
+        snapshot.subscriptionStatus(),
+        snapshot.premium(),
+        snapshot.periodType(),
+        snapshot.expiresAt(),
+        conversationCompletedSinceLaunch);
   }
 }
