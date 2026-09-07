@@ -108,6 +108,14 @@ public class SessionLevelAssessmentGenerationService {
   private void generateAndPersist(long userId, LoadedSessionFeedbackContext context) {
     AiSessionLevelAssessment aiAssessment = null;
     try {
+      LearningSession session = learningSessionService.findOwned(userId, context.sessionId());
+      if (session.getLevelAssessmentProcessingStatus() != ProcessingStatus.PREPARING) {
+        return;
+      }
+      if (isExpired(session, null)) {
+        completeFallback(userId, context);
+        return;
+      }
       AiSessionFeedbackRequest request = SessionFeedbackService.toAiLevelAssessmentRequest(context);
       aiAssessment = aiConversationClient.generateSessionLevelAssessment(request);
     } catch (RuntimeException exception) {
@@ -131,7 +139,7 @@ public class SessionLevelAssessmentGenerationService {
             assessmentService.assessApplyAndSave(
                 userId,
                 context,
-                aiAssessment,
+                isExpired(session, null) ? null : aiAssessment,
                 learningSessionService.isLatestCompletedScenario(session),
                 session.getLevelAssessmentRequestedAt());
             session.completeLevelAssessment();
