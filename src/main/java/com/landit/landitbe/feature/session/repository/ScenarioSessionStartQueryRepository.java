@@ -32,7 +32,9 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
                 slv.id,
                 slv.status,
                 s.firstSpeaker,
-                s.totalQuestionCount,
+                CASE WHEN s.id = 1
+                       AND :questionLevelGroup <> com.landit.landitbe.feature.content.domain.ContentLearningLevel.DIAGNOSTIC
+                     THEN 3 ELSE s.totalQuestionCount END,
                 slv.userOpeningInstruction,
                 openingQuestionVariant.questionText,
                 openingQuestionVariant.questionTranslation,
@@ -56,9 +58,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
             LEFT JOIN ScenarioQuestion openingQuestion
               ON openingQuestion.scenarioId = s.id
              AND openingQuestion.displayOrder = 1
-             AND ((s.id = 1 AND openingQuestion.questionLevelGroup =
-                   com.landit.landitbe.feature.content.domain.ContentLearningLevel.DIAGNOSTIC)
-               OR (s.id <> 1 AND openingQuestion.questionLevelGroup = :questionLevelGroup))
+             AND openingQuestion.questionLevelGroup = :questionLevelGroup
              AND openingQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN ScenarioQuestionLanguageVariant openingQuestionVariant
               ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id

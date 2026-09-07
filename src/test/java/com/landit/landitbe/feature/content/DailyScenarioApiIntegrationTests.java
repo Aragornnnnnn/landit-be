@@ -103,6 +103,62 @@ class DailyScenarioApiIntegrationTests {
   }
 
   @Test
+  void pastExpressionsAndProgressRemainAccessibleAfterPromotion() throws Exception {
+    JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    final String token = loginResponseBody.get("data").get("accessToken").asText();
+    seedDailyScenarios();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
+    long expressionId = insertWritingExpression(100, 1, 1);
+    insertWritingExpression(100, 2, 4);
+    markExpressionCompleted(userId, 100, expressionId);
+    MvcResult start =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/100/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(start.getResponse().getContentAsByteArray())
+            .path("data")
+            .path("sessionId")
+            .asLong();
+    jdbcTemplate.update(
+        "UPDATE learning_session SET status = 'COMPLETED', ended_by = 'SYSTEM', "
+            + "completion_reason = 'MAX_TURNS_REACHED', ended_at = "
+            + "TIMESTAMP '2026-07-27 10:00:00' WHERE id = ?",
+        sessionId);
+    insertScenarioAccess(userId, 100, "2026-07-27 10:00:00");
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 5 WHERE id = ?", userId);
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios/daily")
+                .queryParam("date", "2026-07-27")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.scenario.expressionCount").value(1))
+        .andExpect(jsonPath("$.data.scenario.completedExpressionCount").value(1));
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/100").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].expressionId").value(expressionId));
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/%d/learning-start".formatted(expressionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            post("/api/v1/expressions/%d/learning-finish".formatted(expressionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void dailyScenarioReturnsLowestDisplayOrderCurrentScenarioAndExpressionProgress()
       throws Exception {
     JsonNode loginResponseBody = login();

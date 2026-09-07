@@ -153,7 +153,12 @@ public class SessionMessageSubmitService {
     if (!generation.completed()) {
       return ProcessingStatus.PREPARING;
     }
-    return requestMessageFeedback(submittedContext);
+    try {
+      return requestMessageFeedback(submittedContext);
+    } catch (RuntimeException exception) {
+      // 마지막 발화의 피드백 장애가 세션 완료와 독립 수준 평가를 막지 않게 한다.
+      return ProcessingStatus.FAILED;
+    }
   }
 
   private void recordInnerThoughtAfterMessageGeneration(

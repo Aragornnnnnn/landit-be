@@ -56,9 +56,7 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
             LEFT JOIN ScenarioQuestion openingQuestion
               ON openingQuestion.scenarioId = s.id
              AND openingQuestion.displayOrder = 1
-             AND ((s.id = 1 AND openingQuestion.questionLevelGroup =
-                   com.landit.landitbe.feature.content.domain.ContentLearningLevel.DIAGNOSTIC)
-               OR (s.id <> 1 AND openingQuestion.questionLevelGroup = :questionLevelGroup))
+             AND openingQuestion.questionLevelGroup = :questionLevelGroup
              AND openingQuestion.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             LEFT JOIN ScenarioQuestionLanguageVariant openingQuestionVariant
               ON openingQuestionVariant.scenarioQuestionId = openingQuestion.id

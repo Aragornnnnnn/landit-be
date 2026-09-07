@@ -215,7 +215,8 @@ class ScenarioSessionApiIntegrationTests {
         .singleElement()
         .extracting(row -> row.aiOpeningMessage())
         .isEqualTo(opening);
-    assertThat(dailyScenarioRepository.findDailyScenario(userId, 1L, requestedGroup))
+    assertThat(
+            dailyScenarioRepository.findDailyScenario(userId, 1L, ContentLearningLevel.DIAGNOSTIC))
         .get()
         .extracting(row -> row.aiOpeningMessage())
         .isEqualTo(opening);
@@ -270,6 +271,12 @@ class ScenarioSessionApiIntegrationTests {
                 .orElseThrow()
                 .totalQuestionCount())
         .isEqualTo(3);
+    mockMvc
+        .perform(
+            post("/api/v1/scenarios/1/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(3));
   }
 
   @Test
@@ -1073,6 +1080,42 @@ class ScenarioSessionApiIntegrationTests {
                 String.class,
                 sessionId))
         .isEqualTo("LEVEL_1");
+    submitMessage(accessToken, sessionId, "Coffee, please.");
+    awaitPendingLevelAssessments();
+    long replayId = startScenario(accessToken, 2131);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT question_level_group FROM scenario_session WHERE learning_session_id = ?",
+                String.class,
+                replayId))
+        .isEqualTo("LEVEL_1");
+  }
+
+  @Test
+  void lastTurnFeedbackFailureStillCompletesAndAssessesSession() throws Exception {
+    fakeAiConversationClient.failMessageFeedbackRequest();
+    var session = startCompletedAiFirstSession("last-feedback-failure@example.com");
+    awaitPendingLevelAssessments();
+    assertLearningSession(
+        session.sessionId(), session.userId(), "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForList(
+                """
+                SELECT m.feedback_processing_status FROM session_history_message m
+                JOIN session_history h ON h.id = m.session_history_id
+                WHERE h.learning_session_id = ? AND m.role = 'USER'
+                """,
+                String.class,
+                session.sessionId()))
+        .containsExactly("FAILED");
+    mockMvc
+        .perform(
+            get("/api/v1/sessions/%d/level-assessment".formatted(session.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
   }
 
   @Test

@@ -99,6 +99,7 @@ public class ExpressionQueryService {
   private final UserAccentLocaleResolver accentLocaleResolver;
   private final ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
   private final LearningProgressService learningProgressService;
+  private final ScenarioLearningLevelService scenarioLearningLevelService;
 
   /**
    * 사용자 locale에 맞는 시나리오 표현을 학습 순서대로 조회하고 완료 여부를 반영한다.
@@ -114,7 +115,8 @@ public class ExpressionQueryService {
 
     // 사용자 로케일에 맞는 표현을 로케일별 노출 순서로 조회한다.
     UserLocale userLocale = userProfileService.getUserLocale(userId);
-    ContentLearningLevel contentLevel = contentLearningLevel(userId);
+    ContentLearningLevel contentLevel =
+        scenarioLearningLevelService.expressionLevel(userId, scenarioId);
     List<WritingExpression> expressions =
         writingExpressionRepository.findScenarioExpressions(
             scenarioId,
@@ -149,7 +151,8 @@ public class ExpressionQueryService {
   @Transactional(readOnly = true)
   public ExpressionProgress getExpressionProgress(Long userId, Long scenarioId) {
     UserLocale userLocale = userProfileService.getUserLocale(userId);
-    ContentLearningLevel contentLevel = contentLearningLevel(userId);
+    ContentLearningLevel contentLevel =
+        scenarioLearningLevelService.expressionLevel(userId, scenarioId);
     List<WritingExpression> expressions =
         writingExpressionRepository.findScenarioExpressions(
             scenarioId,
@@ -359,16 +362,12 @@ public class ExpressionQueryService {
                   return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
                 });
     if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
-        && !contentLearningLevel(userId)
+        && !scenarioLearningLevelService
+            .expressionLevel(userId, expression.getScenarioId())
             .includesExpressionDifficulty(expression.getDifficultyLevel())) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     return expression;
-  }
-
-  /** 사용자 학습 레벨을 콘텐츠 레벨 그룹으로 변환한다. */
-  private ContentLearningLevel contentLearningLevel(Long userId) {
-    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
   }
 
   /**
