@@ -62,12 +62,26 @@ public class GlobalExceptionHandler {
   /** 잘못된 요청 본문이나 필수 파라미터 누락을 공통 검증 오류로 변환한다. */
   @ExceptionHandler({
     MissingServletRequestParameterException.class,
+    org.springframework.web.bind.MissingRequestHeaderException.class,
     HttpMessageNotReadableException.class,
     MethodArgumentTypeMismatchException.class,
     MultipartException.class
   })
   public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
     return error(ErrorCode.VALIDATION_FAILED);
+  }
+
+  /**
+   * 제공하지 않는 HTTP 메서드를 405로 반환한다.
+   *
+   * @param exception 지원하지 않는 메서드 예외
+   * @return 메서드 거부 응답
+   */
+  @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+      org.springframework.web.HttpRequestMethodNotSupportedException exception) {
+    return ResponseEntity.status(org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED)
+        .body(ApiResponse.error(ErrorCode.INVALID_REQUEST));
   }
 
   /** Spring Security 접근 거부를 공통 권한 오류로 변환한다. */

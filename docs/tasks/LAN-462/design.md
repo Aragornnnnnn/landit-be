@@ -3,10 +3,10 @@
 ## 문서 상태와 목적
 
 - 작성일: 2026-09-07.
-- 상태: 구현 전 검토안. 사용자 요청에 따라 재설계한 문서이며 구현·배포·운영 발송 승인을 의미하지 않는다.
+- 상태: 2026-09-07 사용자 구현 승인에 따라 BE 구현을 반영했다. FE 기기 검증·운영 배포·운영 발송은 별도 확인 대상이다.
 - 대상 독자: BE 구현자, 어드민·앱 FE 담당자, 리뷰어.
 - 상세 구현 계약의 기준은 이 문서다. [issue.md](issue.md)는 이슈 등록용 범위와 완료 기준을 요약한다.
-- 코드 확인 기준: `88ee78c2f3491c7be1fcb8c00223f206b89fe1a0`. 아래 신규 API·테이블·상태는 구현 제안이며 현재 존재하는 기능이 아니다.
+- 기존 코드 대조 기준: `88ee78c2f3491c7be1fcb8c00223f206b89fe1a0`. 신규 API·테이블·상태는 LAN-462 구현에 반영했다. 검증 결과는 [plan.md](plan.md)를 참고한다.
 
 ## 목표와 범위
 
@@ -120,16 +120,16 @@ API 멱등성 키는 `Idempotency-Key` 헤더로 받는다. 1~128자의 ASCII �
 
 ## 데이터 모델
 
-Flyway 신규 마이그레이션으로 세 테이블과 `push_delivery`의 nullable 연결 컬럼을 추가한다. 실제 마이그레이션 번호는 구현 시 최신 이력을 확인해 정한다.
+Flyway `V82__add_admin_push_campaign.sql`로 캠페인·실행·대상 세 테이블, 공용 선점 게이트 한 테이블과 `push_delivery`의 연결·복구 컬럼을 추가한다.
 
 | 테이블 | 핵심 필드·제약 | 역할 |
 | --- | --- | --- |
 | `admin_push_campaign` | UUID PK, title/body/deep_link, created_by, create_request_key, request_hash, created_at. `(created_by, create_request_key)` 유일. | 변경되지 않는 원문과 생성 멱등성. |
-| `admin_push_run` | UUID PK, campaign_id FK, mode, requested_by, request_key, status, audience_captured_at, target_user_count, target_token_count, next_attempt_at, lease_owner, lease_until, work_version, published_at, failure_count, last_error_code, completed_at, created_at/updated_at. | 전체 또는 테스트 실행, 진행 상태, DB에 저장한 SQS 발행·복구 작업. |
+| `admin_push_run` | UUID PK, campaign_id FK, mode, requested_by, request_key, status, audience_captured_at, target_user_count, target_token_count, next_attempt_at, lease_owner, lease_until, work_version, last_target_id, published_at, failure_count, last_error_code, completed_at, created_at/updated_at. | 전체 또는 테스트 실행, 진행 상태, DB에 저장한 SQS 발행·복구 작업. |
 | `admin_push_target` | ID PK, run_id FK, user_push_token_id, user_profile_id, expo_push_token_snapshot, excluded_reason, created_at. `(run_id, user_push_token_id)` 유일. | 확정 대상과 선점 전 제외 사유. |
 | 기존 `push_delivery` | nullable `admin_push_target_id` FK와 유일 제약. | 대상당 하나의 발송 이력. 기존 일반 푸시는 null이다. |
 
-`admin_push_run`은 `mode = BROADCAST`인 `campaign_id`에 부분 유일 인덱스를 둔다. 테스트 실행은 `(campaign_id, requested_by, request_key, mode)`를 유일하게 만든다. PostgreSQL 부분 인덱스 계약은 PostgreSQL에서 검증한다.
+`admin_push_run.broadcast_campaign_id`는 전체 실행에서만 campaign_id를 저장하고 UNIQUE와 CHECK 제약을 적용한다. 테스트는 null을 저장한다. 이는 캠페인당 전체 실행 하나를 PostgreSQL과 H2에서 동일한 DDL로 보장한다. 테스트 실행은 `(campaign_id, requested_by, request_key, mode)`를 유일하게 만든다. `admin_push_gate`의 단일 행은 인스턴스 공용 제출 lease·cooldown과 짧은 API 멱등성 직렬화에 사용한다.
 
 주요 조회 인덱스는 실행의 `(status, next_attempt_at)`, 대상의 `(run_id, id)`, 캠페인의 `(created_at, id)`다. 집계 쿼리 계획에 따라 필요한 연결 인덱스를 확인한다.
 
@@ -174,7 +174,8 @@ Repository는 각 소유 Service 안에서만 접근한다. 캠페인 실행 서
 - SQS 전송 응답을 잃으면 같은 실행·작업 버전을 다시 발행할 수 있다. 발행 성공 표시와 DB 커밋을 외부 SQS와 원자적으로 묶으려 하지 않는다.
 - 소비자는 실행 상태·작업 버전을 검사하고 처리 lease를 원자적으로 선점한다. 처리 중 중복 메시지와 이전 버전 메시지는 무해하게 종료한다.
 - 유효한 새 버전만 처리한다. 현재보다 미래 버전·알 수 없는 실행·잘못된 payload는 계약 오류로 처리한다.
-- 한 메시지에서는 준비 작업 하나 또는 최대 100개 대상의 Expo 요청 하나를 수행하고 다음 작업을 DB에 남긴 뒤 ACK한다. 페이지 진행과 `work_version` 변경은 같은 트랜잭션이다.
+- 한 메시지에서는 준비 작업 하나, 최대 100개 대상의 Expo 제출 하나 또는 최대 100개 Receipt 조회 하나를 수행하고 다음 작업을 DB에 남긴 뒤 ACK한다. 페이지 진행과 `work_version` 변경은 같은 트랜잭션이다.
+- `last_target_id`는 대상 선점과 같은 트랜잭션에서 전진한다. 최초 대상은 `id > last_target_id`로 조회하고 만기 429 재시도는 별도 조회한다. 토큰 잠금은 ID 순으로 획득한다.
 - 다음 메시지 발행은 DB 발행기가 담당한다. 다음 SQS 발행 실패 때문에 완료한 페이지를 다시 제출하지 않는다.
 - 현재 발행됐지만 5분 동안 처리 시작이 없는 작업과 만료된 처리 lease를 복구 스캔한다. 현재 설정의 HTTP 타임아웃 10초보다 충분히 긴 처리 lease 5분을 기본으로 사용한다. 설정 변경 시 이 관계를 검증한다.
 - lease 소유자·작업 버전을 조건으로 진행 상태를 갱신해 오래된 소비자가 새 작업 상태를 덮어쓰지 못하게 한다. 각 토큰의 외부 제출 가능 여부는 별도로 `push_delivery`에서 선점한다.
@@ -186,11 +187,11 @@ DB/SQS 작업 실패는 5초부터 지수적으로 최대 5분 간격으로 재�
 
 ### Receipt 복구
 
-기존 15분 지연 Receipt 확인과 최대 3회 확인 흐름을 재사용한다. 공지의 Ticket 저장 후 Receipt SQS 발행에 실패한 경우를 위해 캠페인 복구 작업이 `TICKET_ACCEPTED` 이력을 다시 찾을 수 있어야 한다.
+기존의 15분 지연·최대 3회 확인 정책과 Receipt 결과 변환·토큰 무효화 로직을 재사용한다. 공지는 `PUSH_RECEIPT_CHECK` 메시지를 별도 발행하는 대신 DB의 다음 확인 시각을 `ADMIN_PUSH_RUN` 작업으로 처리한다. 따라서 Ticket 저장 후 별도 Receipt 메시지 발행이 유실되는 구간을 만들지 않는다. 기존 예약·편지함의 `PUSH_RECEIPT_CHECK`는 유지한다.
 
-Receipt 확인 시도·다음 확인 시각은 공지 이력에 지속성 있게 기록한다. 중복 SQS 메시지마다 횟수를 증가시키거나 첫 시도로 초기화하지 않는다. 기존 예약 메시지와 공지 복구 스캔은 같은 확인 회차를 선점한다. 최종 미확인은 `UNKNOWN`이다. 원본 Expo 발송은 다시 하지 않는다.
+`push_delivery`에 확인 회차·다음 시각·lease 만료를 저장한다. 한 작업에서 만기 Receipt 최대 100개를 선점하고 Expo에 한 HTTP 요청으로 조회한다. NOT_READY·통신 오류의 다음 회차 예약은 선점 회차가 현재 회차와 일치할 때만 적용한다. 이전 소비자의 늦은 응답은 새 lease를 해제하지 못한다. 최종 미확인은 `UNKNOWN`이며 원본 푸시는 다시 보내지 않는다.
 
-필요한 공지용 확인 회차·다음 시각·lease 필드는 `push_delivery`에 nullable로 추가한다. 기존 알림의 Receipt 계약은 유지한다.
+완료 실행에 늦은 Ticket이 기록되면 DB 발행기의 reconciliation이 이를 `AWAITING_RECEIPTS`로 되돌리고 새 작업 버전을 발행한다. 기록된 Ticket에 대한 유효한 늦은 Receipt도 `UNKNOWN`을 보정할 수 있다. 대기 시각은 다음 재시도·Receipt 시각·만료된 선점의 복구 시각으로 계산하여 미확정 결과를 매초 재조회하지 않는다.
 
 ## 예약 알림과 처리량
 
@@ -201,7 +202,7 @@ Receipt 확인 시도·다음 확인 시각은 공지 이력에 지속성 있게
 - 공지 발송 결과로 유효하지 않은 토큰이 발견되면 기존 정책대로 비활성화한다. 이후 예약 알림에서 그 토큰이 빠지는 것은 정상적인 토큰 관리다.
 - 기존 SQS·Expo 자원을 공유하므로 20시 알림의 지연이 전혀 없다는 보장은 하지 않는다.
 
-v1 공지 작업은 모든 인스턴스를 합쳐 최대 한 개의 외부 제출 배치를 수행하고 최대 초당 100토큰으로 제한한다. DB에서 공지 발송 공용 선점을 관리하며 테스트와 429 재시도도 이 제한에 포함한다. 한 실행이 전체 루프를 점유하지 않고 최대 100건마다 큐에 실행 기회를 돌려준다. 캠페인 간 처리는 만기 시각 순으로 분배한다.
+v1 공지 작업은 모든 인스턴스를 합쳐 최대 한 개의 외부 제출 배치를 수행하고 최대 초당 100토큰으로 제한한다. DB에서 공지 발송 공용 선점을 관리하며 테스트와 429 재시도도 이 제한에 포함한다. 공용 선점 해제 시점부터 최소 1초 뒤에 다음 제출을 허용하므로 DB 준비가 오래 걸려도 제출이 몰리지 않는다. 한 실행이 전체 루프를 점유하지 않고 최대 100건마다 큐에 실행 기회를 돌려준다. 캠페인 간 처리는 만기 시각 순으로 분배한다.
 
 공용 선점은 실행별 lease와 별개의 범위다. HTTP 제출 직전에 공용 선점과 실행 lease의 소유권·유효성을 다시 확인하며 상실한 소비자는 새 HTTP 호출을 시작하지 않는다. 프로세스 정지 후 늦게 재개되는 경계까지 외부 제공자의 동시 요청 수를 절대 보장하는 것은 아니므로, 초당 제한은 운영 부하 검증과 함께 확인한다. 토큰별 이미 선점한 요청을 다른 소비자가 다시 제출하지 않는 규칙은 유지한다.
 
@@ -239,7 +240,7 @@ FE가 지원하지 않는 경로·외부 URL 처리는 BE URI 검증만으로 �
 | --- | --- | --- |
 | `POST /` | `Idempotency-Key`, title/body/deepLink. | `201`, campaignId와 불변 원문. 동일 요청은 기존 ID를 반환한다. |
 | `GET /` | 기존 프로젝트 방식의 페이지 파라미터. | 캠페인 목록과 전체 실행 상태. |
-| `GET /{campaignId}` | 없음. | 원문, 생성자·시각, 전체 실행 상태·집계, 테스트 실행 요약. |
+| `GET /{campaignId}` | 없음. | 원문, 생성자·시각, 전체 실행 상태·집계, 테스트 실행 요약. `id`가 캠페인 ID다. |
 | `GET /{campaignId}/audience-preview` | 없음. | estimatedUserCount/estimatedTokenCount/estimatedAt. |
 | `POST /{campaignId}/test-runs` | `Idempotency-Key`. | `202`, 인증 관리자 대상 runId. 전체 발송 시작 후 새 테스트는 `409`. |
 | `POST /{campaignId}/send` | `Idempotency-Key`. | `202`, 유일한 전체 runId. 중복 요청은 같은 runId를 반환한다. |
@@ -252,7 +253,7 @@ FE가 지원하지 않는 경로·외부 URL 처리는 BE URI 검증만으로 �
 
 ## 집계와 감사 로그
 
-집계는 대상 목록과 연결된 `push_delivery`를 읽어 계산한다. 재처리 때마다 카운터를 더하지 않는다. v1에서 별도 통계 캐시·집계 테이블을 만들지 않는다. 한 응답의 합계는 단일 집계 쿼리의 일관된 스냅샷에서 계산한다.
+집계는 대상 목록과 연결된 `push_delivery`를 읽어 계산한다. `reasonCounts`는 사유별 제외·오류·429 대기 건수의 참고 내역이며 합산 카운터와 별도 조회 시점일 수 있다. 재처리 때마다 카운터를 더하지 않는다. v1에서 별도 통계 캐시·집계 테이블을 만들지 않는다. 한 응답의 합계는 단일 집계 쿼리의 일관된 스냅샷에서 계산한다.
 
 ```text
 targetTokenCount = pendingCount + succeededCount + failedCount + excludedCount + unknownCount
@@ -314,4 +315,32 @@ targetTokenCount = pendingCount + succeededCount + failedCount + excludedCount +
 - [Expo 발송·Ticket·Receipt·payload 제한](https://docs.expo.dev/push-notifications/sending-notifications/): Receipt 의미, 100건 발송 배치와 payload 제한.
 - [SQS at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html): 재전달을 고려한 소비자 멱등성 필요.
 
-현재 검증은 소스 대조, 문서 구조·로컬 링크 검사, 문서 수준의 독립 설계 리뷰까지다. 독립 리뷰에서 차단 결함은 발견되지 않았으며 공용 lease 상실 후 제출 금지 조건을 보완했다. 신규 API·테이블·복구 동작·성능·FE·운영 런타임은 아직 구현 또는 검증하지 않았다. 이 문서만 변경한 단계에서는 애플리케이션 테스트를 실행하지 않는다.
+BE 구현과 로컬 자동 검증은 [plan.md](plan.md)에 기록한다. 독립 코드 리뷰의 차단 사항을 수정했고 재리뷰에서 남은 차단 결함은 발견되지 않았다. 실제 FE 딥 링크·기기 도착, 운영 런타임·DB 적용·공유 큐 지연은 아직 검증하지 않았다.
+
+## 구현된 핸드오프와 운영 확인 절차
+
+어드민은 생성과 테스트에 작업별로 보존한 `Idempotency-Key`를 재사용하고, `send` 응답의 실행 `id`를 상세 조회에 사용한다. 생성 후 편집 UI를 제공하지 않는다. 본 발송 상태와 `tests`를 구분하고, `UNKNOWN`은 실패로 단정하지 않는다. `BLOCKED` 복구는 같은 실행의 `/resume`를 사용한다.
+
+앱 FE가 확인할 예시는 `/home`, `/mailbox/received/123`, `https://example.com/notice`다. 금지 예시는 `//example.com`, `/%2fexample.com`, `javascript:alert(1)`, `https://user:pass@example.com`, `http://example.com`이다. 앱 실행·백그라운드·종료 상태에서 내부 라우팅과 시스템 브라우저 열기를 검증한다. BE의 URL 허용 테스트는 이 실제 기기 검증을 대신하지 않는다.
+
+`LANDIT_NOTIFICATION_CONSUMER_ENABLED=true`인 기존 BE 런타임에서 SQS 소비자와 DB 발행기가 함께 활성화된다. DB polling 기본 간격은 1초, 최초 대기는 10초다. 변경 속성은 `landit.notification.admin-poll-delay-ms`, `landit.notification.admin-poll-initial-delay-ms`다. 공지용 별도 큐를 추가하지 않는다. 배포 환경에서는 HTTP timeout이 작업 lease 5분보다 충분히 짧은지 확인한다.
+
+운영자는 아래 읽기 전용 조회와 기존 SQS/DLQ 지표로 정체를 확인할 수 있다. 조회 결과에 토큰 원문은 포함하지 않는다.
+
+```sql
+SELECT id, status, failure_count, last_error_code, updated_at, next_attempt_at
+FROM admin_push_run
+WHERE status = 'BLOCKED'
+   OR (status <> 'COMPLETED' AND updated_at < CURRENT_TIMESTAMP - INTERVAL '10 minutes')
+ORDER BY updated_at;
+```
+
+`AWAITING_RECEIPTS`는 정상적으로 15분 간격으로 진행하므로 위 결과만으로 장애로 판단하지 않는다. SQS 접근 장애를 복구한 뒤 `BLOCKED` 실행을 재개한다. 새 캠페인으로 대체하면 이미 수신한 사용자에게 다시 보낼 수 있다. 공지 제출 메트릭 `landit.notification.admin.submission`은 accepted/failed/unknown/rate_limited를 구분하며 Ticket 기준이다. 기기 도착 성공률로 사용하지 않는다.
+
+PostgreSQL 계약 테스트는 `127.0.0.1:55462/postgres`에 준비한 폐기 가능한 로컬 PostgreSQL에서만 실행한다. 테스트는 임의 스키마를 생성·삭제하며 운영 접속 정보를 사용하지 않는다.
+
+```bash
+LANDIT_ADMIN_PUSH_PG_TEST=true ./gradlew test --tests '*AdminPushPostgresIntegrationTests'
+```
+
+이 테스트는 신규 마이그레이션과 필요한 기존 발송 스키마를 최소 fixture에 적용한다. 전체 운영 데이터 마이그레이션 리허설이나 운영 부하 시험은 아니다.

@@ -41,6 +41,43 @@ public class PushReceiptService {
         .ifPresent(target -> checkReceipt(target, attempt));
   }
 
+  /**
+   * DB에 저장한 관리자 Receipt 회차를 선점해 최대 100건씩 조회한다.
+   *
+   * @param deliveryIds 발송 이력 ID 목록
+   */
+  public void checkAdmin(java.util.List<Long> deliveryIds) {
+    var targets =
+        deliveryIds.stream()
+            .map(pushDeliveryService::claimAdminReceipt)
+            .flatMap(java.util.Optional::stream)
+            .toList();
+    if (targets.isEmpty()) {
+      return;
+    }
+    java.util.List<PushReceiptResult> results;
+    try {
+      results =
+          notificationSender.getReceipts(
+              targets.stream().map(PushDeliveryService.AdminReceiptTarget::ticketId).toList());
+    } catch (com.landit.landitbe.feature.notification.client.PushNotificationException exception) {
+      targets.forEach(t -> pushDeliveryService.deferAdminReceipt(t.pushDeliveryId(), t.attempt()));
+      return;
+    }
+    if (results.size() != targets.size()) {
+      targets.forEach(t -> pushDeliveryService.deferAdminReceipt(t.pushDeliveryId(), t.attempt()));
+      return;
+    }
+    for (int i = 0; i < targets.size(); i++) {
+      var target = targets.get(i);
+      if (results.get(i).status() == PushReceiptStatus.NOT_READY) {
+        pushDeliveryService.deferAdminReceipt(target.pushDeliveryId(), target.attempt());
+      } else {
+        pushDeliveryService.recordReceiptResult(target.pushDeliveryId(), results.get(i));
+      }
+    }
+  }
+
   /** Expo Receipt 결과에 따라 완료 기록 또는 다음 확인 예약을 처리한다. */
   private void checkReceipt(PushReceiptTarget target, int attempt) {
     PushReceiptResult result = notificationSender.getReceipt(target.ticketId());

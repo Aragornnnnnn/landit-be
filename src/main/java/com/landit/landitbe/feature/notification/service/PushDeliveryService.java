@@ -66,6 +66,70 @@ public class PushDeliveryService {
     return Optional.of(prepared(delivery));
   }
 
+  /**
+   * 확정된 관리자 대상에 기존 발송 이력을 연결해 선점한다.
+   *
+   * @param command 발송 정보
+   * @param targetId 확정 대상 ID
+   * @return 신규 또는 429 재시도 선점
+   */
+  @Transactional
+  public Optional<PreparedPushDelivery> prepareAdmin(
+      PreparePushDeliveryCommand command, long targetId) {
+    Optional<PreparedPushDelivery> prepared = prepare(command);
+    prepared.ifPresent(
+        value -> requireForUpdate(value.pushDeliveryId()).attachAdminTarget(targetId));
+    return prepared;
+  }
+
+  /**
+   * 관리자 발송의 결과 불명을 기록한다.
+   *
+   * @param id 발송 이력 ID
+   * @param code 실패 사유
+   */
+  @Transactional
+  public void adminUnknown(long id, String code) {
+    requireForUpdate(id).adminUnknown(code);
+  }
+
+  /**
+   * 명시적 HTTP 429 거부만 재시도 가능하게 기록한다.
+   *
+   * @param id 발송 이력 ID
+   */
+  @Transactional
+  public void adminRateLimited(long id) {
+    requireForUpdate(id).adminRateLimited(LocalDateTime.now());
+  }
+
+  /**
+   * 관리자 Receipt 회차를 DB 잠금으로 선점한다.
+   *
+   * @param id 발송 이력 ID
+   * @return 이번 회차 조회 대상
+   */
+  @Transactional
+  public Optional<AdminReceiptTarget> claimAdminReceipt(long id) {
+    PushDelivery delivery = requireForUpdate(id);
+    return delivery.claimAdminReceipt(LocalDateTime.now())
+        ? Optional.of(
+            new AdminReceiptTarget(
+                id, delivery.getExpoTicketId(), delivery.getAdminReceiptAttempt()))
+        : Optional.empty();
+  }
+
+  /**
+   * 관리자 Receipt 다음 회차를 DB에 남긴다.
+   *
+   * @param id 발송 이력 ID
+   * @param attempt 선점한 확인 회차
+   */
+  @Transactional
+  public void deferAdminReceipt(long id, int attempt) {
+    requireForUpdate(id).deferAdminReceipt(attempt, LocalDateTime.now());
+  }
+
   /** 잠긴 기존 이력의 Token과 현재 발송 대상을 확인하고 재시도 표식을 소비한다. */
   private Optional<PreparedPushDelivery> claimRetry(
       PushDelivery delivery, PreparePushDeliveryCommand command) {
@@ -146,7 +210,10 @@ public class PushDeliveryService {
       throw new IllegalArgumentException("준비되지 않은 Receipt는 최종 결과로 기록할 수 없습니다.");
     }
     PushDelivery delivery = requireForUpdate(pushDeliveryId);
-    if (delivery.getStatus() != PushDeliveryStatus.TICKET_ACCEPTED) {
+    if (delivery.getStatus() != PushDeliveryStatus.TICKET_ACCEPTED
+        && !(delivery.getAdminPushTargetId() != null
+            && delivery.getStatus() == PushDeliveryStatus.UNKNOWN
+            && delivery.getExpoTicketId() != null)) {
       return;
     }
     if (result.status() == PushReceiptStatus.DELIVERED) {
@@ -190,4 +257,13 @@ public class PushDeliveryService {
     }
     userPushTokenDeliveryService.revokeCurrentTokenOwner(delivery.getSentExpoPushToken());
   }
+
+  /**
+   * 결과 저장의 선점 회차를 포함한 Receipt 대상이다.
+   *
+   * @param pushDeliveryId 발송 이력 ID
+   * @param ticketId Expo Ticket
+   * @param attempt 선점 회차
+   */
+  public record AdminReceiptTarget(long pushDeliveryId, String ticketId, int attempt) {}
 }

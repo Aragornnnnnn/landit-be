@@ -29,6 +29,9 @@ public class PushQueueMessageHandler {
   private final ScheduledNotificationService scheduledNotificationService;
   private final NotificationDispatchService notificationDispatchService;
 
+  private final com.landit.landitbe.feature.notification.service.AdminPushProcessingService
+      adminPushProcessingService;
+
   /**
    * 메시지 공통 계약과 유형별 payload를 검증한 뒤 알림 흐름을 실행한다.
    *
@@ -47,6 +50,16 @@ public class PushQueueMessageHandler {
   public void handle(PushQueueMessage message, Runnable visibilityExtender) {
     validateCommon(message);
     switch (message.messageType()) {
+      case "ADMIN_PUSH_RUN" -> {
+        if (message.payload().runId() == null
+            || message.payload().workVersion() == null
+            || message.payload().workVersion() < 1) {
+          throw new IllegalArgumentException("관리자 실행 payload가 올바르지 않습니다.");
+        }
+        visibilityExtender.run();
+        adminPushProcessingService.process(
+            message.payload().runId(), message.payload().workVersion());
+      }
       case PushQueueMessage.MAILBOX_REPLY_NOTIFICATION_BATCH ->
           handleMailboxReplyNotificationBatch(message, visibilityExtender);
       case PushQueueMessage.PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());

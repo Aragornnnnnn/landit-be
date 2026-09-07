@@ -12,13 +12,23 @@ import java.util.List;
  * @param mailboxLetterId 답장 편지 ID
  * @param userProfileIds 답장 수신 사용자 ID 목록
  * @param replyTitle 답장 제목
+ * @param runId 관리자 실행 ID
+ * @param workVersion 관리자 작업 버전
  */
 public record PushQueuePayload(
     Long pushDeliveryId,
     Integer receiptAttempt,
     Long mailboxLetterId,
     List<Long> userProfileIds,
-    String replyTitle) {
+    String replyTitle,
+    java.util.UUID runId,
+    Long workVersion) {
+
+  /** 기존 편지함 메시지 생성 계약을 유지한다. */
+  public PushQueuePayload(
+      Long deliveryId, Integer attempt, Long letterId, List<Long> userIds, String title) {
+    this(deliveryId, attempt, letterId, userIds, title, null, null);
+  }
 
   /**
    * 기존 Scheduler의 빈 payload 역직렬화와 테스트 생성을 지원한다.

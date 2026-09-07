@@ -34,6 +34,21 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   /** {@inheritDoc} */
   @Override
+  public void publishAdminRun(UUID runId, long version) {
+    validateConfiguration();
+    send(
+        new PushQueueMessage(
+            1,
+            "admin-push:" + runId + ":" + version,
+            "ADMIN_PUSH_RUN",
+            Instant.now(),
+            new PushQueuePayload(null, null, null, null, null, runId, version)),
+        0,
+        "관리자 실행 발행에 실패했습니다.");
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public void publishMailboxReply(MailboxReplyNotificationRequest request) {
     validateConfiguration();
     PushQueueMessage message =

@@ -59,6 +59,9 @@ public class ExpoPushClient implements NotificationSender {
 
     List<ExpoPushRequest> request = messages.stream().map(this::request).toList();
     HttpResponse<String> response = post(SEND_PATH, request);
+    if (response.statusCode() == 429) {
+      throw new com.landit.landitbe.feature.notification.client.PushRateLimitedException();
+    }
     if (isTemporaryFailure(response.statusCode())) {
       throw new RetryablePushNotificationException("Expo Push 발송 요청이 일시적으로 실패했습니다.");
     }
@@ -80,6 +83,22 @@ public class ExpoPushClient implements NotificationSender {
       return PushReceiptResult.failed(readRequestErrorCode(response.body()));
     }
     return readReceipt(response.body(), ticketId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<PushReceiptResult> getReceipts(List<String> ticketIds) {
+    if (ticketIds.isEmpty()) {
+      return List.of();
+    }
+    if (ticketIds.size() > 100) {
+      throw new IllegalArgumentException("Receipt 배치는 최대 100건입니다.");
+    }
+    HttpResponse<String> response = post(RECEIPT_PATH, new ExpoReceiptRequest(ticketIds));
+    if (!isSuccess(response.statusCode())) {
+      throw new RetryablePushNotificationException("Expo Receipt 배치 조회에 실패했습니다.");
+    }
+    return ticketIds.stream().map(id -> readReceipt(response.body(), id)).toList();
   }
 
   /** Expo API에 JSON POST 요청을 보내고 HTTP 응답을 반환한다. */

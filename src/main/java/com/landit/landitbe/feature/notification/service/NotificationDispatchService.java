@@ -98,6 +98,57 @@ public class NotificationDispatchService {
         preparedDeliveries, expoRequestCount, ticketAccepted, ticketFailed);
   }
 
+  /**
+   * DB에서 선점한 확정 토큰만 공지 전용 실패 정책으로 제출한다.
+   *
+   * @param deliveries 최대 100개 선점된 발송
+   */
+  public void sendAdminPrepared(List<PreparedPushDelivery> deliveries) {
+    if (deliveries.isEmpty()) {
+      return;
+    }
+    if (deliveries.size() > EXPO_BATCH_SIZE) {
+      throw new IllegalArgumentException("최대 100건입니다.");
+    }
+    long startedAt = System.nanoTime();
+    List<PushTicketResult> results;
+    try {
+      results =
+          notificationSender.send(
+              deliveries.stream().map(PreparedPushDelivery::toPushMessage).toList());
+    } catch (com.landit.landitbe.feature.notification.client.PushRateLimitedException exception) {
+      recordExpoRequestDuration(startedAt, "admin_rate_limited");
+      meterRegistry
+          .counter("landit.notification.admin.submission", "outcome", "rate_limited")
+          .increment(deliveries.size());
+      deliveries.forEach(d -> pushDeliveryService.adminRateLimited(d.pushDeliveryId()));
+      return;
+    } catch (PushNotificationException exception) {
+      recordExpoRequestDuration(startedAt, "admin_unknown");
+      meterRegistry
+          .counter("landit.notification.admin.submission", "outcome", "unknown")
+          .increment(deliveries.size());
+      deliveries.forEach(
+          d -> pushDeliveryService.adminUnknown(d.pushDeliveryId(), EXPO_REQUEST_UNCONFIRMED));
+      return;
+    }
+    if (results.size() != deliveries.size()) {
+      deliveries.forEach(
+          d -> pushDeliveryService.adminUnknown(d.pushDeliveryId(), EXPO_TICKET_RESULT_MISMATCH));
+      return;
+    }
+    recordExpoRequestDuration(startedAt, "admin_response");
+    for (int i = 0; i < deliveries.size(); i++) {
+      meterRegistry
+          .counter(
+              "landit.notification.admin.submission",
+              "outcome",
+              results.get(i).accepted() ? "accepted" : "failed")
+          .increment();
+      pushDeliveryService.recordTicketResult(deliveries.get(i).pushDeliveryId(), results.get(i));
+    }
+  }
+
   /** 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다. */
   private void scheduleAcceptedDeliveryReceipts(String eventId) {
     pushDeliveryService

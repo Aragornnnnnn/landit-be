@@ -22,4 +22,14 @@ public interface NotificationSender {
    * @return Receipt 조회 결과
    */
   PushReceiptResult getReceipt(String ticketId);
+
+  /**
+   * 여러 Ticket의 Receipt를 입력 순서대로 조회한다.
+   *
+   * @param ticketIds 최대 100개 Ticket ID
+   * @return 입력 순서의 확인 결과
+   */
+  default java.util.List<PushReceiptResult> getReceipts(java.util.List<String> ticketIds) {
+    return ticketIds.stream().map(this::getReceipt).toList();
+  }
 }
