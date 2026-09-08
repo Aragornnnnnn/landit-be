@@ -21,8 +21,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -290,7 +290,7 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public AdminUserProfilePage getAdminUserProfiles(
       int page, int size, Boolean active, Boolean pushConsent) {
-    Slice<UserProfile> profiles =
+    Page<UserProfile> profiles =
         userProfileRepository.findAdminUsers(active, pushConsent, PageRequest.of(page, size));
 
     return AdminUserProfilePage.from(profiles, page, size);

@@ -28,7 +28,8 @@ public interface AdminUserControllerDocs {
       summary = "관리자 사용자 목록 조회",
       description =
           "사용자 기본 정보를 가입일 최신순으로 페이지 조회한다. 두 필터는 AND 조건이며 생략하면 전체를 조회한다. "
-              + "푸시 동의는 서버 저장값으로, 실시간 기기 권한이나 활성 Token 보유 여부를 의미하지 않는다.",
+              + "푸시 동의는 서버 저장값으로, 실시간 기기 권한이나 활성 Token 보유 여부를 의미하지 않는다. "
+              + "totalCount와 totalPages는 필터 적용 결과 기준이다. page는 0부터 시작하며 결과가 없으면 totalPages는 0이다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

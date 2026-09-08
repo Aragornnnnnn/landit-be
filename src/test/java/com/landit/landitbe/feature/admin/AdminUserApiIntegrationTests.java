@@ -162,6 +162,40 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.data.hasNext").value(true));
   }
 
+  @Test
+  @Transactional
+  @DisplayName("필터 결과의 전체 건수와 페이지 수를 마지막·범위 밖·빈 페이지에도 반환한다.")
+  void returnsFilteredPageTotals() throws Exception {
+    String accessToken = loginAdmin();
+    // 이 테스트의 트랜잭션 안에서 기존 사용자를 필터 밖으로 옮겨 대상 수를 고정한다.
+    jdbcTemplate.update(
+        "UPDATE user_profile SET status='ACTIVE', push_permission_status='GRANTED'");
+    seedFilterUsers();
+    int[] itemCounts = {3, 1, 0};
+    for (int page = 0; page < itemCounts.length; page++) {
+      mockMvc
+          .perform(
+              filteredUsersRequest(accessToken, false, false)
+                  .param("page", String.valueOf(page))
+                  .param("size", "3"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.page").value(page))
+          .andExpect(jsonPath("$.data.size").value(3))
+          .andExpect(jsonPath("$.data.items.length()").value(itemCounts[page]))
+          .andExpect(jsonPath("$.data.totalCount").value(4))
+          .andExpect(jsonPath("$.data.totalPages").value(2))
+          .andExpect(jsonPath("$.data.hasNext").value(page == 0));
+    }
+    jdbcTemplate.update("UPDATE user_profile SET push_permission_status='GRANTED'");
+    mockMvc
+        .perform(filteredUsersRequest(accessToken, false, false))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0))
+        .andExpect(jsonPath("$.data.totalCount").value(0))
+        .andExpect(jsonPath("$.data.totalPages").value(0))
+        .andExpect(jsonPath("$.data.hasNext").value(false));
+  }
+
   private List<FilterUser> seedFilterUsers() throws Exception {
     List<FilterUser> users = new ArrayList<>();
     for (UserProfileStatus profileStatus : UserProfileStatus.values()) {
@@ -341,6 +375,10 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'page')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'size')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'hasNext')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'totalCount')]").exists())
+        .andExpect(
+            jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'totalPages')]").exists())
         .andExpect(
             jsonPath(schemas + "AdminUserListItem.required[?(@ == 'userProfileId')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'email')]").exists())

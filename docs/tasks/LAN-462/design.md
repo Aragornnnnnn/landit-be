@@ -26,6 +26,8 @@
 - 목록에 `userProfileId`, 기존 기본 정보와 `pushPermissionStatus`를 반환한다.
 - 푸시 동의 필터는 서버 저장값이다. 실제 기기 권한이나 활성 Token 보유 여부를 의미하지 않는다.
 - 예: `/api/v1/admin/users?active=true&pushConsent=true&page=0&size=20`.
+- 응답의 `totalCount`, `totalPages`는 필터 적용 결과 기준이다. 결과가 없으면 둘 다 0이며, 범위 밖 페이지는 빈 목록과 실제 전체 수를 반환한다.
+- API의 `page`는 0부터 시작한다. 화면은 `page + 1`로 표시하며 마지막 페이지 요청 값은 `totalPages - 1`이다. 기존 `hasNext`도 유지한다.
 
 ### 캠페인 입력
 
