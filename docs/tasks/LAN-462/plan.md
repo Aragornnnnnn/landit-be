@@ -67,3 +67,14 @@
 - develop SSM 기본 배포 문서 version 10에 읽기 DB와 Scheduler 환경변수 연결을 반영했다. 다음 BE 배포 때 API에 들어가며 API가 Push 소비도 수행한다. 개발 전체 Terraform plan은 No changes다.
 - production ECS API의 환경변수·SSM 경로는 IaC에 준비했으나 service 배포는 수행하지 않았다. 운영 배포 단계에서 새 task definition과 service 갱신을 함께 적용해야 한다. 현재 BE workflow의 force-new-deployment만으로는 새 설정이 추가되지 않는다.
 - Terraform 검증·런타임 회귀 테스트·독립 리뷰 및 실제 IAM 권한 시뮬레이션을 통과했다. DB 연결·마이그레이션·예약 시간 도래·기기 알림 검증은 배포 후 수행한다.
+
+## PR #170 리뷰 보완 (2026-09-09)
+
+- 공개 API의 파라미터·반환·호출자 예외 Javadoc을 보완했다.
+- 읽기 DB 연결을 client Adapter로 분리하고 원격 verify-full·JVM 신뢰 저장소를 강제한다. URL 옵션의 보안·계정·타임아웃 우회를 막고 loopback에서만 로컬 테스트 예외를 허용한다.
+- 캠페인 목록의 선택·제외 ID와 집계를 페이지 단위로 묶고 정확한 발송 멱등성 키로 이력을 조인한다. 1개/50개 조회 모두 4회 쿼리이며 기존 상세 응답 및 집계 계약을 유지한다.
+- 제외 ID만 있는 SELECTED 요청을 거부한다. 선택 후 전원 제외된 유효한 0명 캠페인은 원본 입력으로 해시를 계산해 동일 요청 재시도와 함께 유지한다.
+- PostgreSQL 테스트는 매 실행마다 고유 DB·역할을 만들고 종료 시 자신이 만든 객체만 정리한다. 같은 로컬 PostgreSQL 15 주소로 연속 2회(각 4건) 실행해 통과했다.
+- Scheduler Target에 기존 Push DLQ ARN을 요구하고 중복 등록 시에도 일치 여부를 확인한다. landit-iac 후속 브랜치 feat/LAN-462-review에서 DLQ SendMessage 및 dev/prod 환경변수·운영 복구 절차를 보완했다.
+- 최종 `./gradlew spotlessApply check` 통과: 961건 중 957건 성공, 실패·오류 0, PostgreSQL 조건부 4건은 위 별도 실행으로 확인했다. 데이터/API와 보안/예약 독립 리뷰에 남은 차단 결함 없음.
+- IaC fmt/validate/EC2 계약·runtime/Push 계약과 양 환경 plan을 검증했다. AWS apply·앱 배포·Supabase 실제 TLS 연결·DLQ 전달은 수행하지 않았다. 후속 IaC 적용 후 BE를 배포해야 한다.

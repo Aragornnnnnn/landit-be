@@ -24,6 +24,7 @@ public class EventBridgeAdminPushScheduler implements AdminPushScheduler {
   private final String group;
   private final String queueArn;
   private final String roleArn;
+  private final String dlqArn;
 
   /**
    * 예약 클라이언트와 실행 대상 설정을 받는다.
@@ -33,18 +34,21 @@ public class EventBridgeAdminPushScheduler implements AdminPushScheduler {
    * @param group 환경별 예약 그룹
    * @param queueArn 기존 Push SQS ARN
    * @param roleArn SQS 전송을 허용한 Scheduler 실행 역할 ARN
+   * @param dlqArn 재시도를 소진한 전달 실패를 보관하는 Push DLQ ARN
    */
   public EventBridgeAdminPushScheduler(
       SchedulerClient client,
       JsonMapper mapper,
       @Value("${landit.notification.scheduler.group:default}") String group,
       @Value("${landit.notification.scheduler.queue-arn:}") String queueArn,
-      @Value("${landit.notification.scheduler.role-arn:}") String roleArn) {
+      @Value("${landit.notification.scheduler.role-arn:}") String roleArn,
+      @Value("${landit.notification.scheduler.dlq-arn:}") String dlqArn) {
     this.client = client;
     this.mapper = mapper;
     this.group = group;
     this.queueArn = queueArn;
     this.roleArn = roleArn;
+    this.dlqArn = dlqArn;
   }
 
   /** {@inheritDoc} */
@@ -65,7 +69,13 @@ public class EventBridgeAdminPushScheduler implements AdminPushScheduler {
                 PushQueueMessage.ADMIN_PUSH_CAMPAIGN,
                 time,
                 new PushQueuePayload(null, null, null, null, null, campaignId, null, null)));
-    Target target = Target.builder().arn(queueArn).roleArn(roleArn).input(input).build();
+    Target target =
+        Target.builder()
+            .arn(queueArn)
+            .roleArn(roleArn)
+            .input(input)
+            .deadLetterConfig(dlq -> dlq.arn(dlqArn))
+            .build();
     try {
       client.createSchedule(
           builder ->
@@ -84,7 +94,9 @@ public class EventBridgeAdminPushScheduler implements AdminPushScheduler {
           || !"Asia/Seoul".equals(existing.scheduleExpressionTimezone())
           || !queueArn.equals(existing.target().arn())
           || !roleArn.equals(existing.target().roleArn())
-          || !input.equals(existing.target().input())) {
+          || !input.equals(existing.target().input())
+          || existing.target().deadLetterConfig() == null
+          || !dlqArn.equals(existing.target().deadLetterConfig().arn())) {
         throw new ApiException(ErrorCode.CONFLICT);
       }
     }
@@ -107,7 +119,7 @@ public class EventBridgeAdminPushScheduler implements AdminPushScheduler {
   }
 
   private void validateConfiguration() {
-    if (queueArn.isBlank() || roleArn.isBlank() || group.isBlank()) {
+    if (queueArn.isBlank() || roleArn.isBlank() || group.isBlank() || dlqArn.isBlank()) {
       throw new ApiException(ErrorCode.SERVICE_UNAVAILABLE);
     }
   }

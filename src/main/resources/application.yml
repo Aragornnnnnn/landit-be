@@ -94,6 +94,7 @@ landit:
       group: ${LANDIT_PUSH_SCHEDULER_GROUP:default}
       queue-arn: ${LANDIT_PUSH_SCHEDULER_QUEUE_ARN:}
       role-arn: ${LANDIT_PUSH_SCHEDULER_ROLE_ARN:}
+      dlq-arn: ${LANDIT_PUSH_SCHEDULER_DLQ_ARN:}
 
 sentry:
   dsn: ${SENTRY_DSN:}

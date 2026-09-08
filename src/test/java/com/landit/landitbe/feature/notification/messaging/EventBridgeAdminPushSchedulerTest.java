@@ -37,7 +37,8 @@ class EventBridgeAdminPushSchedulerTest {
           mapper,
           "test",
           "arn:aws:sqs:ap-northeast-2:123456789012:push",
-          "arn:aws:iam::123456789012:role/scheduler");
+          "arn:aws:iam::123456789012:role/scheduler",
+          "arn:aws:sqs:ap-northeast-2:123456789012:push-dlq");
 
   @org.junit.jupiter.api.BeforeEach
   void stubSdkOperationsWhileKeepingConsumerBuilders() {
@@ -64,6 +65,8 @@ class EventBridgeAdminPushSchedulerTest {
     assertThat(request.scheduleExpressionTimezone()).isEqualTo("Asia/Seoul");
     assertThat(request.actionAfterCompletionAsString()).isEqualTo("DELETE");
     assertThat(request.flexibleTimeWindow().modeAsString()).isEqualTo("OFF");
+    assertThat(request.target().deadLetterConfig().arn())
+        .isEqualTo("arn:aws:sqs:ap-northeast-2:123456789012:push-dlq");
     PushQueueMessage message = mapper.readValue(request.target().input(), PushQueueMessage.class);
     assertThat(message.payload().campaignId()).isEqualTo(id);
     assertThat(message.messageType()).isEqualTo(PushQueueMessage.ADMIN_PUSH_CAMPAIGN);
@@ -89,6 +92,17 @@ class EventBridgeAdminPushSchedulerTest {
             .build();
     doReturn(existing).when(client).getSchedule(any(GetScheduleRequest.class));
     assertThatCode(() -> scheduler.schedule(id, time)).doesNotThrowAnyException();
+    doReturn(
+            existing.toBuilder()
+                .target(
+                    request.target().toBuilder()
+                        .deadLetterConfig(dlq -> dlq.arn("different-dlq"))
+                        .build())
+                .build())
+        .when(client)
+        .getSchedule(any(GetScheduleRequest.class));
+    assertThatThrownBy(() -> scheduler.schedule(id, time)).isInstanceOf(ApiException.class);
+
     doReturn(
             existing.toBuilder()
                 .target(request.target().toBuilder().arn("different").build())

@@ -41,7 +41,7 @@
 - 캠페인 생성과 테스트는 `Idempotency-Key`를 사용한다.
 - `audienceType`: `ALL`(생략 시 기본값) 또는 `SELECTED`.
 - `ALL`은 `userProfileIds`를 생략하거나 빈 목록으로 보낸다. ID가 포함되면 오류다.
-- `SELECTED`는 `userProfileIds` 또는 `audienceSql`을 받는다. 캠페인 1,000명 제한은 없으며 DB 조회·저장은 내부에서 1,000개씩 처리한다.
+- `SELECTED`는 `userProfileIds` 또는 `audienceSql`을 받는다. 제외 ID만 있는 생성 요청은 거부하며, 유효한 선택에서 제외를 적용한 결과가 0명인 경우는 허용한다. 캠페인 1,000명 제한은 없으며 DB 조회·저장은 내부에서 1,000개씩 처리한다.
 - 대상은 `(SQL 결과 ∪ userProfileIds) − excludedUserProfileIds`다. 제외가 우선한다. 수동 입력 ID는 양수·실재 여부를 검증하고 중복 제거·정렬한다. SQL 결과에 없는 사용자나 비활성 사용자는 실제 대상에서 제외된다.
 - 개별 클릭과 쉼표·공백·줄바꿈으로 붙여넣은 ID는 어드민 UI에서 같은 `userProfileIds` 배열로 보낸다. 이 저장소는 BE API만 제공한다.
 - SQL 결과를 고정하려면 미리보기 ID를 `userProfileIds`에 넣고 SQL을 생략한다. 발송 시 재조회하려면 `audienceSql`을 저장한다.
@@ -107,6 +107,7 @@ WHERE u.status = 'ACTIVE'
 
 - `SELECT` 또는 읽기 `WITH`만 지원한다. 결과는 `user_profile_id` 하나의 SMALLINT/INTEGER/BIGINT 컬럼이어야 한다. 데이터 수신 전에 JDBC Describe로 검사한다.
 - 세미콜론, SQL 주석, 역슬래시·달러 문자열, 따옴표 식별자, 쓰기 CTE, 임의 함수·UNION은 거부한다. 함수는 `count/min/max/sum/avg/coalesce/nullif/lower/upper/length`만 지원하며 최종 결과는 정수 타입이어야 한다. 일반 JOIN, NOT EXISTS, IN, 조건 비교를 지원한다.
+- 별도 JDBC client Adapter가 원격 DB의 TLS `verify-full`과 JVM 신뢰 저장소(DefaultJavaSSLFactory)를 강제한다. URL의 약한 SSL 옵션과 계정·타임아웃 옵션은 정책을 덮을 수 없다. 정확한 localhost/127.0.0.1/[::1]만 로컬 테스트용 비암호화 연결을 허용한다. 배포 환경의 JVM이 서버 인증서 체인을 신뢰해야 하며 실패 시 약한 TLS로 대체하지 않는다.
 - 별도 읽기 계정의 `READ ONLY` 트랜잭션에서 실행하고 항상 롤백한다. 애플리케이션 DB 연결로 대체하지 않는다. 관리자 권한·문법 검사만으로 쓰기 차단을 보장한다고 가정하지 않는다.
 - DB statement timeout 10초, lock timeout 1초, 연결 제한 5초, socket timeout 15초다. 서버 커서를 사용하지 않아 SELECT 실행 전체에 statement timeout을 적용한다.
 - 기본 결과 상한 100,000행은 SQL 자원 보호용이며 초과하면 조회 전체가 실패한다. 일부 결과로 캠페인을 진행하지 않는다. 중복 제거 전 행 수에 적용하며 환경 설정으로 조정한다. 수동 SELECTED 캠페인의 1,000명 제한과는 별개다.
@@ -124,6 +125,7 @@ WHERE u.status = 'ACTIVE'
 - `status`는 `scheduled`와 AND로 적용되며 생략하면 모든 상태다. `DRAFT`, `PENDING`, `SCHEDULE_PENDING`, `SCHEDULED`, `QUEUED`, `SENDING`, `COMPLETED`, `CANCELLED`를 지원한다. `SCHEDULE_PENDING`은 AWS 등록 확인이 필요한 상태이며 `SCHEDULED`와 구별한다.
 - 모든 목록의 정렬은 생성 시각·ID 내림차순이다. `page`는 0부터, `size`는 기본 20·최대 50이다. 응답은 `{items, page, size, hasNext, totalCount, totalPages}`이며 전체 수는 같은 예약 여부·상태 필터 기준이다. 빈 결과는 전체 수·페이지 수 모두 0이고, 범위 밖 페이지는 빈 목록과 실제 전체 수를 반환한다.
 - 배열이었던 기존 목록의 `data`는 `{items, page, size, hasNext, totalCount, totalPages}` 객체로 변경한다. FE는 `data.items`를 사용한다. 별도 `/schedules` 경로는 제거한다.
+- 목록은 페이지 크기와 무관하게 전체 수·캠페인·선택/제외 ID·발송 집계 총 4회 쿼리로 조회한다. 집계는 스냅샷 대상의 정확한 멱등성 키로 이력을 조인한다.
 - 각 항목은 캠페인 상세와 같은 원문·`scheduledAt`·상태·대상/발송 집계를 제공한다. 표시 시각은 한국 시간으로, 페이지 번호는 `page + 1`로 변환한다.
 
 - 입력은 초 단위 `+09:00` 오프셋이며 최초 요청은 현재보다 1분 이후여야 한다. DB에는 TIMESTAMPTZ로 저장하고 어드민은 `Asia/Seoul`로 표시한다.
@@ -132,7 +134,8 @@ WHERE u.status = 'ACTIVE'
 - 등록 성공 후 `SCHEDULED`로 변경한다. 등록 실패·응답 유실은 같은 캠페인·같은 시각의 schedule API로 재시도한다. 그때 이미 예약 시각이 지났다면 SQS에 즉시 발행한다. 시각 변경은 409이며 취소 후 새 캠페인을 만든다.
 - 발송 대상은 예약 당시가 아니라 실제 시작 시 고정한다. 그전에 설문을 응답한 사용자는 재조회 결과에서 빠진다. 수동 추가 ID는 SQL과 별도의 명시적 포함이므로 계속 포함된다.
 - 취소와 대상 고정은 같은 DB 행의 조건부 갱신으로 경쟁한다. 대상 고정이 먼저 성공하면 취소는 409다. 취소가 먼저면 남은 Scheduler/SQS 작업도 발송하지 않는다. DB 취소 후 AWS 삭제가 실패하면 취소 API를 재호출한다.
-- `LANDIT_PUSH_SCHEDULER_GROUP`, `LANDIT_PUSH_SCHEDULER_QUEUE_ARN`, `LANDIT_PUSH_SCHEDULER_ROLE_ARN` 설정이 필요하다. API 역할에는 지정 그룹의 Create/Get/DeleteSchedule과 지정 실행 역할의 PassRole, Scheduler 실행 역할에는 기존 Push SQS의 SendMessage가 필요하다. 환경별 그룹을 사용한다.
+- `LANDIT_PUSH_SCHEDULER_GROUP`, `LANDIT_PUSH_SCHEDULER_QUEUE_ARN`, `LANDIT_PUSH_SCHEDULER_ROLE_ARN`, `LANDIT_PUSH_SCHEDULER_DLQ_ARN` 설정이 필요하다. API 역할에는 지정 그룹의 Create/Get/DeleteSchedule과 지정 실행 역할의 PassRole, Scheduler 실행 역할에는 기존 Push SQS와 같은 환경 Push DLQ의 SendMessage가 필요하다. 환경별 그룹을 사용한다.
+- Scheduler가 SQS 전달 재시도를 소진하면 기존 Push DLQ에 실패를 보관한다. Scheduler 오류 속성·원본 Target Input과 캠페인 상태를 확인해 수동 복구하며 일반 소비 실패 메시지와 섞어 일괄 redrive하지 않는다. 새 DLQ ARN과 IAM 권한을 IaC로 적용한 뒤 BE를 배포한다.
 - Worker SQL/설정 오류는 SQS 재시도와 기존 DLQ로 처리한다. 상태가 PENDING/예약 대기에 남으면 DLQ·설정을 확인하고 기존 메시지를 재처리한다. 새로운 자동 복구/폴링 시스템은 추가하지 않는다.
 
 ## 독립성 및 한계
