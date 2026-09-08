@@ -7,12 +7,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.notification.client.AdminPushAudienceJdbcClient;
 import com.landit.landitbe.shared.exception.ApiException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -46,13 +49,17 @@ class AdminPushAudiencePostgresTest {
       roleCreated = true;
     }
     Properties source = Driver.parseURL(URL, null);
+    source.setProperty("PGDBNAME", DATABASE);
     fixtureUrl =
-        "jdbc:postgresql://"
-            + source.getProperty("PGHOST")
-            + ":"
-            + source.getProperty("PGPORT")
-            + "/"
-            + DATABASE;
+        "jdbc:postgresql://?"
+            + source.stringPropertyNames().stream()
+                .sorted()
+                .map(
+                    key ->
+                        URLEncoder.encode(key, StandardCharsets.UTF_8)
+                            + "="
+                            + URLEncoder.encode(source.getProperty(key), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
     try (Connection connection = fixtureConnection();
         var statement = connection.createStatement()) {
       statement.execute("create table user_profile(id bigint primary key,status text)");
