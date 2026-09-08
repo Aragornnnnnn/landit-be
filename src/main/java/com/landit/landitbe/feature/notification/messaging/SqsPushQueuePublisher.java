@@ -5,6 +5,10 @@ package com.landit.landitbe.feature.notification.messaging;
 import com.landit.landitbe.config.notification.NotificationProperties;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -12,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchResponse;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,6 +38,59 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
   private final SqsAsyncClient sqsAsyncClient;
   private final JsonMapper jsonMapper;
   private final NotificationProperties properties;
+
+  /** {@inheritDoc} */
+  @Override
+  public void scheduleReceiptChecks(List<Long> pushDeliveryIds, int attempt) {
+    if (pushDeliveryIds.isEmpty()) {
+      return;
+    }
+    validateConfiguration();
+    List<Long> ids = pushDeliveryIds.stream().distinct().toList();
+    for (int offset = 0; offset < ids.size(); offset += 10) {
+      sendReceiptBatch(ids.subList(offset, Math.min(offset + 10, ids.size())), attempt);
+    }
+  }
+
+  private void sendReceiptBatch(List<Long> ids, int attempt) {
+    try {
+      List<SendMessageBatchRequestEntry> entries = new ArrayList<>();
+      for (int i = 0; i < ids.size(); i++) {
+        PushQueueMessage message =
+            new PushQueueMessage(
+                MESSAGE_VERSION,
+                UUID.randomUUID().toString(),
+                PushQueueMessage.PUSH_RECEIPT_CHECK,
+                Instant.now(),
+                PushQueuePayload.receipt(ids.get(i), attempt));
+        entries.add(
+            SendMessageBatchRequestEntry.builder()
+                .id(Integer.toString(i))
+                .delaySeconds(properties.receiptDelaySeconds())
+                .messageBody(jsonMapper.writeValueAsString(message))
+                .build());
+      }
+      SendMessageBatchResponse response =
+          sqsAsyncClient
+              .sendMessageBatch(
+                  SendMessageBatchRequest.builder()
+                      .queueUrl(properties.queueUrl())
+                      .entries(entries)
+                      .build())
+              .orTimeout(properties.requestTimeout().toMillis(), TimeUnit.MILLISECONDS)
+              .join();
+      Set<String> expected =
+          new HashSet<>(entries.stream().map(SendMessageBatchRequestEntry::id).toList());
+      List<String> succeeded = response.successful().stream().map(result -> result.id()).toList();
+      if (!response.failed().isEmpty()
+          || succeeded.size() != expected.size()
+          || !new HashSet<>(succeeded).equals(expected)) {
+        throw new PushNotificationException("Push Receipt 묶음에 실패하거나 누락된 항목이 있습니다.");
+      }
+    } catch (JacksonException | CompletionException exception) {
+      throw new PushNotificationException("Push Receipt 묶음 발행에 실패했습니다.", exception);
+    }
+  }
 
   /** {@inheritDoc} */
   @Override

@@ -11,7 +11,9 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.config.notification.NotificationProperties;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
+import software.amazon.awssdk.services.sqs.model.BatchResultErrorEntry;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchResponse;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchResultEntry;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 import tools.jackson.databind.JsonNode;
@@ -119,5 +125,83 @@ class SqsPushQueuePublisherTest {
         .thenReturn(
             CompletableFuture.completedFuture(
                 SendMessageResponse.builder().messageId("sqs-message-id").build()));
+  }
+
+  /** 21개 예약은 10·10·1로 분리하고 각 항목의 지연·payload를 유지한다. */
+  @Test
+  void batchesReceiptsWithEntryDelayAndPayload() {
+    when(sqsAsyncClient.sendMessageBatch(any(SendMessageBatchRequest.class)))
+        .thenAnswer(
+            call -> {
+              SendMessageBatchRequest request = call.getArgument(0);
+              return CompletableFuture.completedFuture(
+                  SendMessageBatchResponse.builder()
+                      .successful(
+                          request.entries().stream()
+                              .map(
+                                  e ->
+                                      SendMessageBatchResultEntry.builder()
+                                          .id(e.id())
+                                          .messageId("sqs-" + e.id())
+                                          .build())
+                              .toList())
+                      .build());
+            });
+    publisher.scheduleReceiptChecks(LongStream.rangeClosed(1, 21).boxed().toList(), 2);
+    ArgumentCaptor<SendMessageBatchRequest> captor =
+        ArgumentCaptor.forClass(SendMessageBatchRequest.class);
+    org.mockito.Mockito.verify(sqsAsyncClient, org.mockito.Mockito.times(3))
+        .sendMessageBatch(captor.capture());
+    assertThat(captor.getAllValues())
+        .extracting(r -> r.entries().size())
+        .containsExactly(10, 10, 1);
+    assertThat(captor.getAllValues().stream().flatMap(r -> r.entries().stream()).toList())
+        .allSatisfy(
+            e -> {
+              assertThat(e.delaySeconds()).isEqualTo(900);
+              JsonNode body = jsonMapper.readTree(e.messageBody());
+              assertThat(body.get("payload").get("receiptAttempt").asInt()).isEqualTo(2);
+            });
+    assertThat(
+            captor.getAllValues().stream()
+                .flatMap(r -> r.entries().stream())
+                .map(
+                    e ->
+                        jsonMapper
+                            .readTree(e.messageBody())
+                            .get("payload")
+                            .get("pushDeliveryId")
+                            .asLong())
+                .toList())
+        .containsExactlyElementsOf(LongStream.rangeClosed(1, 21).boxed().toList());
+  }
+
+  /** HTTP 성공 응답의 개별 실패도 예외로 처리해 접수 이력 기반 재예약을 유도한다. */
+  @Test
+  void rejectsPartialFailure() {
+    when(sqsAsyncClient.sendMessageBatch(any(SendMessageBatchRequest.class)))
+        .thenReturn(
+            CompletableFuture.completedFuture(
+                SendMessageBatchResponse.builder()
+                    .successful(
+                        SendMessageBatchResultEntry.builder().id("0").messageId("ok").build())
+                    .failed(
+                        BatchResultErrorEntry.builder()
+                            .id("1")
+                            .code("InternalError")
+                            .senderFault(false)
+                            .build())
+                    .build()));
+    assertThatThrownBy(() -> publisher.scheduleReceiptChecks(List.of(1L, 2L), 1))
+        .isInstanceOf(PushNotificationException.class);
+  }
+
+  /** 성공 목록에서 누락된 항목을 성공으로 간주하지 않는다. */
+  @Test
+  void rejectsMissingBatchResult() {
+    when(sqsAsyncClient.sendMessageBatch(any(SendMessageBatchRequest.class)))
+        .thenReturn(CompletableFuture.completedFuture(SendMessageBatchResponse.builder().build()));
+    assertThatThrownBy(() -> publisher.scheduleReceiptChecks(List.of(1L), 1))
+        .isInstanceOf(PushNotificationException.class);
   }
 }
