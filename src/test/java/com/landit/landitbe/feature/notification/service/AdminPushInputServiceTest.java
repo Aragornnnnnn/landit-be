@@ -42,6 +42,19 @@ class AdminPushInputServiceTest {
   }
 
   @Test
+  void rejectsExclusionsWithoutAnAudienceButAllowsAllSelectedUsersToBeExcluded() {
+    var excludedOnly =
+        new AdminPushCampaignRequest(
+            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of(), null, List.of(1L));
+    assertThatThrownBy(() -> service.validate(excludedOnly)).isInstanceOf(ApiException.class);
+    var allExcluded =
+        new AdminPushCampaignRequest(
+            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of(1L), null, List.of(1L));
+    assertThat(service.validate(allExcluded).userProfileIds()).isEmpty();
+    assertThat(service.fingerprint(allExcluded)).isNotBlank();
+  }
+
+  @Test
   void rejectsOversizedPayloadAndInvalidKey() {
     assertThatThrownBy(
             () -> service.validate(new AdminPushCampaignRequest("공지", "가".repeat(1000), "/")))

@@ -64,8 +64,7 @@ public class AdminPushInputService {
                 || !request.excludedUserProfileIds().isEmpty()))
         || (request.audienceType() == AdminPushAudienceType.SELECTED
             && request.userProfileIds().isEmpty()
-            && request.audienceSql() == null
-            && request.excludedUserProfileIds().isEmpty())) {
+            && request.audienceSql() == null)) {
       throw invalid();
     }
     if (request.audienceSql() != null) {

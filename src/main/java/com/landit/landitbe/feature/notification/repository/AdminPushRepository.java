@@ -11,8 +11,11 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -75,14 +78,48 @@ public class AdminPushRepository {
    * @param size 페이지 크기
    * @return 캠페인 목록
    */
-  public List<Campaign> list(Boolean scheduled, String status, int page, int size) {
-    return jdbc.query(
-        "select *" + campaignFrom(scheduled) + " order by created_at desc,id desc limit ? offset ?",
-        this::map,
-        status,
-        status,
-        size,
-        (long) page * size);
+  public List<AdminPushCampaignView> list(Boolean scheduled, String status, int page, int size) {
+    List<Campaign> campaigns =
+        jdbc.query(
+            "select *"
+                + campaignFrom(scheduled)
+                + " order by created_at desc,id desc limit ? offset ?",
+            (result, row) -> map(result, List.of(), List.of()),
+            status,
+            status,
+            size,
+            (long) page * size);
+    if (campaigns.isEmpty()) {
+      return List.of();
+    }
+    Object[] ids = campaigns.stream().map(Campaign::id).toArray();
+    String placeholders = String.join(",", Collections.nCopies(ids.length, "?"));
+    Map<UUID, List<Long>> selected = new HashMap<>();
+    Map<UUID, List<Long>> excluded = new HashMap<>();
+    jdbc.query(
+        "select campaign_id,user_profile_id,excluded from admin_push_campaign_user "
+            + "where campaign_id in ("
+            + placeholders
+            + ") order by user_profile_id",
+        (org.springframework.jdbc.core.RowCallbackHandler)
+            result -> {
+              var users = result.getBoolean("excluded") ? excluded : selected;
+              users
+                  .computeIfAbsent(
+                      result.getObject("campaign_id", UUID.class), key -> new ArrayList<>())
+                  .add(result.getLong("user_profile_id"));
+            },
+        ids);
+    Map<UUID, Counts> counts = counts(placeholders, ids);
+    return campaigns.stream()
+        .map(
+            campaign ->
+                toView(
+                    campaign,
+                    counts.getOrDefault(campaign.id(), new Counts(0, 0, 0, 0, 0)),
+                    selected.getOrDefault(campaign.id(), List.of()),
+                    excluded.getOrDefault(campaign.id(), List.of())))
+        .toList();
   }
 
   /**
@@ -414,35 +451,49 @@ public class AdminPushRepository {
    * @return 관리자 조회 응답
    */
   public AdminPushCampaignView view(Campaign campaign) {
-    Counts counts =
-        jdbc.queryForObject(
-            """
-            select count(*) total,
-              (select count(*) from admin_push_target where campaign_id=? and id<=?) processed,
-              (select count(*) from push_delivery processed_delivery
-                join admin_push_target processed_target
-                  on processed_target.user_push_token_id=processed_delivery.user_push_token_id
-                where processed_target.campaign_id=? and processed_target.id<=?
-                  and processed_delivery.deduplication_key like ?) processed_deliveries,
-              coalesce(sum(case when status in ('REQUESTED','TICKET_ACCEPTED') then 1 else 0 end),0) pending,
-              coalesce(sum(case when status='DELIVERED' then 1 else 0 end),0) succeeded,
-              coalesce(sum(case when status='FAILED' then 1 else 0 end),0) failed
-            from push_delivery where deduplication_key like ?
-            """,
-            (result, row) ->
-                new Counts(
-                    result.getLong("total"),
-                    result.getLong("processed"),
-                    result.getLong("processed_deliveries"),
-                    result.getLong("pending"),
-                    result.getLong("succeeded"),
-                    result.getLong("failed")),
-            campaign.id(),
-            campaign.lastTargetId(),
-            campaign.id(),
-            campaign.lastTargetId(),
-            "push:admin-broadcast:" + campaign.id() + ":%",
-            "push:admin-broadcast:" + campaign.id() + ":%");
+    return toView(
+        campaign,
+        counts("?", new Object[] {campaign.id()})
+            .getOrDefault(campaign.id(), new Counts(0, 0, 0, 0, 0)),
+        campaign.content().userProfileIds(),
+        campaign.content().excludedUserProfileIds());
+  }
+
+  private Map<UUID, Counts> counts(String placeholders, Object[] ids) {
+    Map<UUID, Counts> counts = new HashMap<>();
+    // 고정 대상에서 멱등성 키의 유일 인덱스로 이력을 찾는다. 테스트 발송은 집계에 포함하지 않는다.
+    jdbc.query(
+        """
+        select t.campaign_id,
+          sum(case when t.id<=c.last_target_id then 1 else 0 end) processed,
+          sum(case when t.id<=c.last_target_id and d.id is not null then 1 else 0 end) processed_deliveries,
+          sum(case when d.status in ('REQUESTED','TICKET_ACCEPTED') then 1 else 0 end) pending,
+          sum(case when d.status='DELIVERED' then 1 else 0 end) succeeded,
+          sum(case when d.status='FAILED' then 1 else 0 end) failed
+        from admin_push_target t join admin_push_campaign c on c.id=t.campaign_id
+        left join push_delivery d on d.deduplication_key=concat('push:admin-broadcast:',
+          cast(t.campaign_id as varchar),':',cast(t.user_profile_id as varchar),':',
+          cast(t.user_push_token_id as varchar))
+        where t.campaign_id in (
+        """
+            + placeholders
+            + ") group by t.campaign_id",
+        (org.springframework.jdbc.core.RowCallbackHandler)
+            result ->
+                counts.put(
+                    result.getObject("campaign_id", UUID.class),
+                    new Counts(
+                        result.getLong("processed"),
+                        result.getLong("processed_deliveries"),
+                        result.getLong("pending"),
+                        result.getLong("succeeded"),
+                        result.getLong("failed"))),
+        ids);
+    return counts;
+  }
+
+  private AdminPushCampaignView toView(
+      Campaign campaign, Counts counts, List<Long> selectedUsers, List<Long> excludedUsers) {
     long excluded = Math.max(0, counts.processed() - counts.processedDeliveries());
     return new AdminPushCampaignView(
         campaign.id(),
@@ -460,9 +511,9 @@ public class AdminPushRepository {
         campaign.createdAt(),
         campaign.completedAt(),
         campaign.content().audienceType(),
-        campaign.content().userProfileIds(),
+        selectedUsers,
         campaign.content().audienceSql(),
-        campaign.content().excludedUserProfileIds(),
+        excludedUsers,
         campaign.scheduledAt());
   }
 
@@ -478,6 +529,20 @@ public class AdminPushRepository {
                     + "where campaign_id=? and not excluded order by user_profile_id",
                 Long.class,
                 id);
+    List<Long> excludedUsers =
+        jdbc.queryForList(
+            "select user_profile_id from admin_push_campaign_user "
+                + "where campaign_id=? and excluded order by user_profile_id",
+            Long.class,
+            id);
+    return map(result, selectedUsers, excludedUsers);
+  }
+
+  private Campaign map(ResultSet result, List<Long> selectedUsers, List<Long> excludedUsers)
+      throws SQLException {
+    UUID id = result.getObject("id", UUID.class);
+    AdminPushAudienceType audience =
+        AdminPushAudienceType.valueOf(result.getString("audience_type"));
     return new Campaign(
         id,
         new AdminPushCampaignRequest(
@@ -487,11 +552,7 @@ public class AdminPushRepository {
             audience,
             selectedUsers,
             result.getString("audience_sql"),
-            jdbc.queryForList(
-                "select user_profile_id from admin_push_campaign_user "
-                    + "where campaign_id=? and excluded order by user_profile_id",
-                Long.class,
-                id)),
+            excludedUsers),
         result.getLong("created_by"),
         result.getString("request_hash"),
         result.getString("status"),
@@ -591,10 +652,5 @@ public class AdminPushRepository {
   public record Target(long id, long tokenId, long userId) {}
 
   private record Counts(
-      long total,
-      long processed,
-      long processedDeliveries,
-      long pending,
-      long succeeded,
-      long failed) {}
+      long processed, long processedDeliveries, long pending, long succeeded, long failed) {}
 }

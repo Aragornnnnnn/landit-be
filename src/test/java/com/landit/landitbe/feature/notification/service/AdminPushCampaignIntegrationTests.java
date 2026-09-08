@@ -95,6 +95,68 @@ class AdminPushCampaignIntegrationTests {
   }
 
   @Test
+  void listsFiftyCampaignsWithFourQueriesAndPreservesDetails() throws Exception {
+    token(USER, "batch-list");
+    UUID sent = campaigns.create(ADMIN, "batch-sent", selected(List.of(USER))).id();
+    campaigns.test(sent, ADMIN, "test");
+    campaigns.send(sent, ADMIN, "send");
+    processor.process(sent);
+    jdbc.update(
+        "update push_delivery set status='DELIVERED' where notification_type='ADMIN_BROADCAST'");
+    for (int index = 0; index < 49; index++) {
+      campaigns.create(
+          ADMIN,
+          "batch-draft-" + index,
+          new AdminPushCampaignRequest(
+              "공지",
+              "내용",
+              "/home",
+              AdminPushAudienceType.SELECTED,
+              List.of(USER),
+              null,
+              List.of(ADMIN)));
+    }
+    var source = org.mockito.Mockito.spy(jdbc.getDataSource());
+    var listing =
+        new AdminPushCampaignService(
+            new AdminPushRepository(new JdbcTemplate(source)), input, audit, queue, sql, scheduler);
+    var page = listing.list(null, null, 0, 50);
+    assertThat(page.items()).hasSize(50);
+    var sentItem =
+        page.items().stream().filter(item -> item.id().equals(sent)).findFirst().orElseThrow();
+    assertThat(sentItem.succeededCount()).isEqualTo(1);
+    assertThat(sentItem.pendingCount()).isZero();
+    assertThat(sentItem.failedCount()).isZero();
+    assertThat(sentItem.excludedCount()).isZero();
+    verify(source, times(4)).getConnection();
+    for (var item : page.items()) {
+      assertThat(item).isEqualTo(campaigns.detail(item.id()));
+    }
+    org.mockito.Mockito.clearInvocations(source);
+    assertThat(listing.list(null, null, 0, 1).items()).hasSize(1);
+    verify(source, times(4)).getConnection();
+  }
+
+  @Test
+  void preservesZeroAudienceWhenEverySelectedUserIsExcluded() {
+    var request =
+        new AdminPushCampaignRequest(
+            "공지",
+            "내용",
+            "/home",
+            AdminPushAudienceType.SELECTED,
+            List.of(USER),
+            null,
+            List.of(USER));
+    UUID id = campaigns.create(ADMIN, "all-excluded", request).id();
+    assertThat(campaigns.create(ADMIN, "all-excluded", request).id()).isEqualTo(id);
+    assertThat(campaigns.preview(id).estimatedTokenCount()).isZero();
+    campaigns.send(id, ADMIN, "send");
+    processor.process(id);
+    assertThat(campaigns.detail(id).targetTokenCount()).isZero();
+  }
+
+  @Test
   void supportsMoreThanOneThousandSelectedUsersInOneCampaign() {
     var ids = java.util.stream.LongStream.rangeClosed(996000, 997000).boxed().toList();
     ids.forEach(this::profile);

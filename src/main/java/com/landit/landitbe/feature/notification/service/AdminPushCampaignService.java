@@ -52,7 +52,7 @@ public class AdminPushCampaignService {
         || !repository.usersExist(content.excludedUserProfileIds())) {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
-    String hash = input.fingerprint(content);
+    String hash = input.fingerprint(request);
     Campaign campaign =
         new Campaign(
             UUID.randomUUID(),
@@ -115,8 +115,7 @@ public class AdminPushCampaignService {
     String filter = status == null ? "" : status;
     long totalCount = repository.count(scheduled, filter);
     long totalPages = totalCount / size + (totalCount % size == 0 ? 0 : 1);
-    List<AdminPushCampaignView> items =
-        repository.list(scheduled, filter, page, size).stream().map(repository::view).toList();
+    List<AdminPushCampaignView> items = repository.list(scheduled, filter, page, size);
     return new AdminPushCampaignPage(
         items, page, size, (long) page + 1 < totalPages, totalCount, totalPages);
   }
