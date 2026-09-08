@@ -5,9 +5,9 @@ package com.landit.landitbe.feature.notification.docs;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudienceQueryRequest;
+import com.landit.landitbe.feature.notification.dto.AdminPushCampaignPage;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
-import com.landit.landitbe.feature.notification.dto.AdminPushSchedulePage;
 import com.landit.landitbe.feature.notification.dto.AdminPushScheduleRequest;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,30 +63,29 @@ public interface AdminPushCampaignControllerDocs {
       @Parameter(description = "1~128자 ASCII 영숫자, 대시, 밑줄") String key,
       @Valid AdminPushCampaignRequest request);
 
-  /** 관리자 푸시 캠페인을 최신순으로 조회한다. */
-  @Operation(summary = "푸시 캠페인 목록 조회")
-  ApiResponse<List<AdminPushCampaignView>> list(int page, int size);
-
   /**
-   * 예약 캠페인 목록과 페이지 정보를 조회한다.
+   * 캠페인 목록과 페이지 정보를 조회한다.
    *
-   * @param status 상태 필터. 생략하면 전체 예약 이력
+   * @param scheduled true이면 예약, false이면 예약 없는 캠페인. 생략하면 전체
+   * @param status 상태 필터. 생략하면 모든 상태
    * @param page 0부터 시작하는 페이지 번호
    * @param size 페이지 크기. 기본 20, 최대 50
-   * @return 상태와 예약 시각을 포함한 캠페인 페이지
+   * @return 필터가 적용된 캠페인 페이지
    */
   @Operation(
-      summary = "예약 푸시 목록 조회",
+      summary = "푸시 캠페인 목록 조회",
       description =
-          "예약 시각이 있는 캠페인만 예약 시각·ID 내림차순으로 "
-              + "조회한다. 상태 생략 시 등록 대기·발송 중·완료·취소를 모두 포함한다. scheduledAt은 UTC이며 "
-              + "화면에서는 Asia/Seoul로 변환하고 페이지 번호는 page + 1로 표시한다. AWS 실시간 조회는 하지 않는다.")
-  ApiResponse<AdminPushSchedulePage> schedules(
+          "예약 여부와 상태를 AND 조건으로 필터링하고 "
+              + "생성 시각·ID 내림차순으로 조회한다. 응답은 items와 페이지 정보다. "
+              + "scheduledAt은 UTC이며 화면에서는 Asia/Seoul로 변환하고 페이지는 page + 1로 표시한다.")
+  ApiResponse<AdminPushCampaignPage> list(
+      @Parameter(description = "예약 시각 보유 여부. false에는 초안도 포함") Boolean scheduled,
       @Parameter(
-              description = "예약 상태",
               schema =
                   @io.swagger.v3.oas.annotations.media.Schema(
                       allowableValues = {
+                        "DRAFT",
+                        "PENDING",
                         "SCHEDULE_PENDING",
                         "SCHEDULED",
                         "QUEUED",

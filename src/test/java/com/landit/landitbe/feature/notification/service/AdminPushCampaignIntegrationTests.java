@@ -109,7 +109,7 @@ class AdminPushCampaignIntegrationTests {
   }
 
   @Test
-  void listsOnlyScheduledCampaignsWithStatusFiltersAndPageTotals() {
+  void filtersCampaignsByReservationAndStatusWithPageTotals() {
     List<String> statuses =
         List.of("SCHEDULE_PENDING", "SCHEDULED", "QUEUED", "SENDING", "COMPLETED", "CANCELLED");
     var ids = new java.util.ArrayList<UUID>();
@@ -117,28 +117,50 @@ class AdminPushCampaignIntegrationTests {
       UUID id = create("list-" + index);
       ids.add(id);
       jdbc.update(
-          "update admin_push_campaign set status=?,scheduled_at=? where id=?",
+          "update admin_push_campaign set status=?,scheduled_at=?,created_at=? where id=?",
           statuses.get(index),
           java.sql.Timestamp.from(
-              java.time.Instant.parse("2026-09-10T10:00:00Z").plusSeconds(index)),
+              java.time.Instant.parse("2026-09-10T10:00:00Z").minusSeconds(index)),
+          java.time.LocalDateTime.of(2026, 9, 8, 10, 0).plusSeconds(index),
           id);
     }
-    create("not-scheduled");
+    final UUID draft = create("not-scheduled");
+    UUID pending = create("immediate-pending");
+    jdbc.update("update admin_push_campaign set status='PENDING' where id=?", pending);
     UUID immediate = create("immediate-completed");
     jdbc.update("update admin_push_campaign set status='COMPLETED' where id=?", immediate);
 
-    var first = campaigns.schedules(null, 0, 2);
+    var all = campaigns.list(null, null, 0, 20);
+    assertThat(all.totalCount()).isEqualTo(9);
+    assertThat(all.items()).hasSize(9);
+    var unreserved = campaigns.list(false, null, 0, 20);
+    assertThat(unreserved.totalCount()).isEqualTo(3);
+    assertThat(unreserved.items())
+        .extracting(item -> item.id())
+        .containsExactlyInAnyOrder(draft, pending, immediate);
+    assertThat(campaigns.list(null, "COMPLETED", 0, 20).totalCount()).isEqualTo(2);
+    assertThat(campaigns.list(false, "COMPLETED", 0, 20).items())
+        .extracting(item -> item.id())
+        .containsExactly(immediate);
+    assertThat(campaigns.list(false, "SCHEDULED", 0, 20).totalCount()).isZero();
+    assertThat(campaigns.list(null, "DRAFT", 0, 20).items())
+        .extracting(item -> item.id())
+        .containsExactly(draft);
+    assertThat(campaigns.list(null, "PENDING", 0, 20).items())
+        .extracting(item -> item.id())
+        .containsExactly(pending);
+    var first = campaigns.list(true, null, 0, 2);
     assertThat(first.items()).extracting(item -> item.id()).containsExactly(ids.get(5), ids.get(4));
     assertThat(first.totalCount()).isEqualTo(6);
     assertThat(first.totalPages()).isEqualTo(3);
     assertThat(first.hasNext()).isTrue();
-    assertThat(campaigns.schedules(null, 2, 2).hasNext()).isFalse();
-    var beyond = campaigns.schedules(null, 3, 2);
+    assertThat(campaigns.list(true, null, 2, 2).hasNext()).isFalse();
+    var beyond = campaigns.list(true, null, 3, 2);
     assertThat(beyond.items()).isEmpty();
     assertThat(beyond.totalCount()).isEqualTo(6);
     assertThat(beyond.totalPages()).isEqualTo(3);
     for (int index = 0; index < statuses.size(); index++) {
-      var filtered = campaigns.schedules(statuses.get(index), 0, 20);
+      var filtered = campaigns.list(true, statuses.get(index), 0, 20);
       assertThat(filtered.items()).extracting(item -> item.id()).containsExactly(ids.get(index));
       assertThat(filtered.totalCount()).isEqualTo(1);
       assertThat(filtered.totalPages()).isEqualTo(1);
@@ -146,17 +168,18 @@ class AdminPushCampaignIntegrationTests {
   }
 
   @Test
-  void handlesEmptyScheduleListAndRejectsInvalidFilters() {
-    var page = campaigns.schedules(null, 0, 20);
+  void handlesEmptyCampaignListAndRejectsInvalidFilters() {
+    var page = campaigns.list(true, null, 0, 20);
     assertThat(page.items()).isEmpty();
     assertThat(page.totalCount()).isZero();
     assertThat(page.totalPages()).isZero();
     assertThat(page.hasNext()).isFalse();
-    assertThatThrownBy(() -> campaigns.schedules("DRAFT", 0, 20)).isInstanceOf(ApiException.class);
-    assertThatThrownBy(() -> campaigns.schedules("", 0, 20)).isInstanceOf(ApiException.class);
-    assertThatThrownBy(() -> campaigns.schedules(null, -1, 20)).isInstanceOf(ApiException.class);
-    assertThatThrownBy(() -> campaigns.schedules(null, 0, 0)).isInstanceOf(ApiException.class);
-    assertThatThrownBy(() -> campaigns.schedules(null, 0, 51)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.list(true, "UNKNOWN", 0, 20))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.list(true, "", 0, 20)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.list(true, null, -1, 20)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.list(true, null, 0, 0)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.list(true, null, 0, 51)).isInstanceOf(ApiException.class);
   }
 
   @Test

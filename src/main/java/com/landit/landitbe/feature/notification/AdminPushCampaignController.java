@@ -6,9 +6,9 @@ import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.notification.docs.AdminPushCampaignControllerDocs;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudienceQueryRequest;
+import com.landit.landitbe.feature.notification.dto.AdminPushCampaignPage;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
-import com.landit.landitbe.feature.notification.dto.AdminPushSchedulePage;
 import com.landit.landitbe.feature.notification.dto.AdminPushScheduleRequest;
 import com.landit.landitbe.feature.notification.service.AdminPushCampaignService;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -80,9 +80,12 @@ public class AdminPushCampaignController implements AdminPushCampaignControllerD
   /** {@inheritDoc} */
   @Override
   @GetMapping
-  public ApiResponse<List<AdminPushCampaignView>> list(
-      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-    return ApiResponse.success(campaigns.list(page, size));
+  public ApiResponse<AdminPushCampaignPage> list(
+      @RequestParam(required = false) Boolean scheduled,
+      @RequestParam(required = false) String status,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
+    return ApiResponse.success(campaigns.list(scheduled, status, page, size));
   }
 
   /** {@inheritDoc} */
@@ -90,16 +93,6 @@ public class AdminPushCampaignController implements AdminPushCampaignControllerD
   @GetMapping("/{campaignId}")
   public ApiResponse<AdminPushCampaignView> detail(@PathVariable UUID campaignId) {
     return ApiResponse.success(campaigns.detail(campaignId));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  @GetMapping("/schedules")
-  public ApiResponse<AdminPushSchedulePage> schedules(
-      @RequestParam(required = false) String status,
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
-    return ApiResponse.success(campaigns.schedules(status, page, size));
   }
 
   /** {@inheritDoc} */

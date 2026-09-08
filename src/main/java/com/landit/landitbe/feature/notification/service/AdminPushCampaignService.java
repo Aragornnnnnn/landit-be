@@ -5,9 +5,9 @@ package com.landit.landitbe.feature.notification.service;
 import com.landit.landitbe.feature.admin.domain.AdminAction;
 import com.landit.landitbe.feature.admin.service.AdminAuditService;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
+import com.landit.landitbe.feature.notification.dto.AdminPushCampaignPage;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
-import com.landit.landitbe.feature.notification.dto.AdminPushSchedulePage;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import com.landit.landitbe.feature.notification.repository.AdminPushRepository;
 import com.landit.landitbe.feature.notification.repository.AdminPushRepository.Campaign;
@@ -86,44 +86,38 @@ public class AdminPushCampaignService {
   }
 
   /**
-   * 캠페인을 최신순으로 조회한다.
+   * 예약 여부와 상태로 캠페인 목록과 전체 페이지 수를 조회한다.
    *
-   * @param page 페이지 번호
-   * @param size 페이지 크기
-   * @return 캠페인 목록
-   */
-  public List<AdminPushCampaignView> list(int page, int size) {
-    if (page < 0 || size < 1 || size > 50) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST);
-    }
-    return repository.list(page, size).stream().map(repository::view).toList();
-  }
-
-  /**
-   * 예약 이력과 전체 페이지 수를 상태별로 조회한다.
-   *
-   * @param status 예약 상태. null이면 취소·완료를 포함한 모든 예약
+   * @param scheduled true이면 예약, false이면 예약 없는 캠페인. null이면 전체
+   * @param status 상태 필터. null이면 모든 상태
    * @param page 0부터 시작하는 페이지 번호
    * @param size 페이지 크기. 1부터 50까지
-   * @return 예약 목록 페이지
+   * @return 캠페인 목록 페이지
    * @throws ApiException 지원하지 않는 상태 또는 페이지 입력일 때 발생
    */
-  public AdminPushSchedulePage schedules(String status, int page, int size) {
+  public AdminPushCampaignPage list(Boolean scheduled, String status, int page, int size) {
     if (page < 0
         || size < 1
         || size > 50
         || (status != null
             && !Set.of(
-                    "SCHEDULE_PENDING", "SCHEDULED", "QUEUED", "SENDING", "COMPLETED", "CANCELLED")
+                    "DRAFT",
+                    "PENDING",
+                    "SCHEDULE_PENDING",
+                    "SCHEDULED",
+                    "QUEUED",
+                    "SENDING",
+                    "COMPLETED",
+                    "CANCELLED")
                 .contains(status))) {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
     String filter = status == null ? "" : status;
-    long totalCount = repository.countSchedules(filter);
+    long totalCount = repository.count(scheduled, filter);
     long totalPages = totalCount / size + (totalCount % size == 0 ? 0 : 1);
     List<AdminPushCampaignView> items =
-        repository.schedules(filter, page, size).stream().map(repository::view).toList();
-    return new AdminPushSchedulePage(
+        repository.list(scheduled, filter, page, size).stream().map(repository::view).toList();
+    return new AdminPushCampaignPage(
         items, page, size, (long) page + 1 < totalPages, totalCount, totalPages);
   }
 

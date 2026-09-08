@@ -27,7 +27,7 @@ class AdminPushCampaignApiIntegrationTests {
 
   @Test
   @org.springframework.transaction.annotation.Transactional
-  void exposesSchedulePageToAdminsAndValidatesQueryParameters() throws Exception {
+  void exposesFilteredCampaignPageToAdminsAndValidatesQueryParameters() throws Exception {
     final long adminId = 99462071L;
     jdbc.update(
         """
@@ -38,9 +38,7 @@ class AdminPushCampaignApiIntegrationTests {
         """,
         adminId);
     mockMvc
-        .perform(
-            get("/api/v1/admin/push-campaigns/schedules")
-                .with(user(new AuthUserPrincipal(adminId))))
+        .perform(get("/api/v1/admin/push-campaigns").with(user(new AuthUserPrincipal(adminId))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items").isArray())
         .andExpect(jsonPath("$.data.page").value(0))
@@ -50,28 +48,41 @@ class AdminPushCampaignApiIntegrationTests {
         .andExpect(jsonPath("$.data.hasNext").isBoolean());
     mockMvc
         .perform(
-            get("/api/v1/admin/push-campaigns/schedules")
-                .param("status", "DRAFT")
+            get("/api/v1/admin/push-campaigns")
+                .param("scheduled", "true")
+                .param("status", "SCHEDULED")
+                .with(user(new AuthUserPrincipal(adminId))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items").isArray());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/push-campaigns")
+                .param("scheduled", "maybe")
                 .with(user(new AuthUserPrincipal(adminId))))
         .andExpect(status().isBadRequest());
     mockMvc
         .perform(
-            get("/api/v1/admin/push-campaigns/schedules")
+            get("/api/v1/admin/push-campaigns")
+                .param("status", "UNKNOWN")
+                .with(user(new AuthUserPrincipal(adminId))))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/push-campaigns")
                 .param("page", "-1")
                 .with(user(new AuthUserPrincipal(adminId))))
         .andExpect(status().isBadRequest());
     mockMvc
         .perform(get("/api/v1/admin/push-campaigns").with(user(new AuthUserPrincipal(adminId))))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").isArray());
+        .andExpect(jsonPath("$.data.items").isArray());
   }
 
   @Test
   void rejectsAuthenticatedNonAdminForQueryAndSchedule() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/admin/push-campaigns/schedules")
-                .with(user(new AuthUserPrincipal(Long.MAX_VALUE))))
+            get("/api/v1/admin/push-campaigns").with(user(new AuthUserPrincipal(Long.MAX_VALUE))))
         .andExpect(status().isForbidden());
     for (String path :
         java.util.List.of(
@@ -88,9 +99,7 @@ class AdminPushCampaignApiIntegrationTests {
 
   @Test
   void requiresAuthenticationAndPublishesOpenApiContract() throws Exception {
-    mockMvc
-        .perform(get("/api/v1/admin/push-campaigns/schedules"))
-        .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/admin/push-campaigns")).andExpect(status().isUnauthorized());
     for (String path :
         java.util.List.of(
             "/audience-query",
@@ -105,8 +114,10 @@ class AdminPushCampaignApiIntegrationTests {
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/admin/push-campaigns'].post.summary").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/push-campaigns/schedules']").doesNotExist())
         .andExpect(
-            jsonPath("$.paths['/api/v1/admin/push-campaigns/schedules'].get.summary").exists())
+            jsonPath("$.paths['/api/v1/admin/push-campaigns'].get.parameters[*].name")
+                .value(org.hamcrest.Matchers.hasItems("scheduled", "status", "page", "size")))
         .andExpect(
             jsonPath("$.components.schemas.AdminPushCampaignRequest.properties.audienceType.enum")
                 .value(org.hamcrest.Matchers.contains("ALL", "SELECTED")))
