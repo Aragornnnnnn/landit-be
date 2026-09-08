@@ -4,6 +4,18 @@ package com.landit.landitbe.feature.admin.domain;
 
 /** 관리자 쓰기 작업의 감사 로그 유형을 정의한다. */
 public enum AdminAction {
+  /** 관리자 푸시 캠페인 생성이다. */
+  PUSH_CAMPAIGN_CREATED,
+  /** 관리자 본인 테스트 요청이다. */
+  PUSH_CAMPAIGN_TESTED,
+  /** 전체 푸시 발송 요청이다. */
+  PUSH_CAMPAIGN_SENT,
+  /** 대상 SQL 조회다. */
+  PUSH_AUDIENCE_QUERIED,
+  /** 캠페인 예약 요청이다. */
+  PUSH_CAMPAIGN_SCHEDULED,
+  /** 예약 취소다. */
+  PUSH_CAMPAIGN_CANCELLED,
   /** 앱 버전 정책 수정 작업이다. */
   APP_VERSION_UPDATED,
 
