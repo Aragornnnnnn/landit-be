@@ -17,6 +17,18 @@
 
 ## 입력 계약
 
+### 어드민 사용자 선택용 목록
+
+기존 `GET /api/v1/admin/users`에 선택 필터를 추가한다. 두 필터는 AND 조건이며, 생략하면 해당 조건을 제한하지 않는다. 필터 적용 후 가입일·ID 내림차순으로 기존 `page`, `size` 페이지를 조회한다.
+
+- `active=true`: 활성 사용자(`ACTIVE`). `false`: 탈퇴·차단 사용자(`WITHDRAWN`, `BANNED`).
+- `pushConsent=true`: 저장된 푸시 권한이 `GRANTED`. `false`: `DENIED` 또는 `NOT_DETERMINED`.
+- 목록에 `userProfileId`, 기존 기본 정보와 `pushPermissionStatus`를 반환한다.
+- 푸시 동의 필터는 서버 저장값이다. 실제 기기 권한이나 활성 Token 보유 여부를 의미하지 않는다.
+- 예: `/api/v1/admin/users?active=true&pushConsent=true&page=0&size=20`.
+
+### 캠페인 입력
+
 - 제목, 내용, 딥 링크는 필수이며 최대 길이는 각각 255자, 500자, 1,000자다.
 - 실제 Expo 표시 payload는 UTF-8 기준 3,000바이트 이하여야 한다.
 - 딥 링크는 `/`로 시작하는 앱 내부 경로 또는 사용자 정보가 없는 `https` URL만 허용한다.

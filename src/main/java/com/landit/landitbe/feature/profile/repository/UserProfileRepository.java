@@ -18,12 +18,28 @@ import org.springframework.data.repository.query.Param;
 public interface UserProfileRepository extends JpaRepository<UserProfile, Long> {
 
   /**
-   * 가입일 최신순으로 사용자 프로필을 페이지 조회한다.
+   * 활성 여부와 저장된 푸시 동의 여부로 사용자 프로필을 페이지 조회한다.
    *
+   * @param active 활성 여부. 생략하면 모든 상태
+   * @param pushConsent 저장된 푸시 동의 여부. 생략하면 모든 권한 상태
    * @param pageable 페이지 요청
    * @return 가입일 최신순 사용자 프로필 목록
    */
-  Slice<UserProfile> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
+  @Query(
+      """
+      select profile from UserProfile profile
+      where (:active is null
+        or (:active = true and profile.status = com.landit.landitbe.feature.profile.domain.UserProfileStatus.ACTIVE)
+        or (:active = false and profile.status <> com.landit.landitbe.feature.profile.domain.UserProfileStatus.ACTIVE))
+        and (:pushConsent is null
+          or (:pushConsent = true and profile.pushPermissionStatus = com.landit.landitbe.feature.profile.domain.PushPermissionStatus.GRANTED)
+          or (:pushConsent = false and profile.pushPermissionStatus <> com.landit.landitbe.feature.profile.domain.PushPermissionStatus.GRANTED))
+      order by profile.createdAt desc, profile.id desc
+      """)
+  Slice<UserProfile> findAdminUsers(
+      @Param("active") Boolean active,
+      @Param("pushConsent") Boolean pushConsent,
+      Pageable pageable);
 
   /** 특정 상태의 사용자 프로필을 PK로 조회한다. */
   Optional<UserProfile> findByIdAndStatus(Long id, UserProfileStatus status);
