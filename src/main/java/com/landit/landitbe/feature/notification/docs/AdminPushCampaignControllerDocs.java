@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.notification.dto.AdminPushCampaignPage;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
 import com.landit.landitbe.feature.notification.dto.AdminPushScheduleRequest;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,7 +24,14 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public interface AdminPushCampaignControllerDocs {
 
-  /** SQL 결과의 ID를 조회한다. 서버는 별도 읽기 전용 DB 연결을 사용한다. */
+  /**
+   * SQL 결과의 ID를 조회한다. 서버는 별도 읽기 전용 DB 연결을 사용한다.
+   *
+   * @param principal 인증 관리자
+   * @param request 대상 조회 SQL
+   * @return 중복을 제거한 사용자 ID
+   * @throws ApiException 설정 누락, SQL 실행 실패 또는 잘못된 결과일 때 발생
+   */
   @Operation(
       summary = "대상 SQL 미리보기",
       description =
@@ -33,7 +41,16 @@ public interface AdminPushCampaignControllerDocs {
       @Parameter(hidden = true) AuthUserPrincipal principal,
       @Valid AdminPushAudienceQueryRequest request);
 
-  /** 발송 시 SQL을 다시 조회하는 한국 시간 일회성 예약이다. */
+  /**
+   * 발송 시 SQL을 다시 조회하는 한국 시간 일회성 예약이다.
+   *
+   * @param campaignId 캠페인 ID
+   * @param principal 인증 관리자
+   * @param key 요청 멱등성 키
+   * @param request 한국 시간 예약 시각
+   * @return 예약 상태와 캠페인 정보
+   * @throws ApiException 잘못된 시각, 없는 캠페인 또는 상태 충돌 시 발생
+   */
   @Operation(
       summary = "캠페인 예약",
       description =
@@ -45,12 +62,27 @@ public interface AdminPushCampaignControllerDocs {
       String key,
       @Valid AdminPushScheduleRequest request);
 
-  /** 시작 전 예약을 취소한다. 발송이 시작되었으면 409를 반환한다. */
+  /**
+   * 시작 전 예약을 취소한다. 발송이 시작되었으면 409를 반환한다.
+   *
+   * @param campaignId 캠페인 ID
+   * @param principal 인증 관리자
+   * @return 취소된 캠페인 정보
+   * @throws ApiException 캠페인이 없거나 발송이 시작된 경우 발생
+   */
   @Operation(summary = "캠페인 예약 취소")
   ApiResponse<AdminPushCampaignView> cancelSchedule(
       UUID campaignId, @Parameter(hidden = true) AuthUserPrincipal principal);
 
-  /** 관리자 푸시 캠페인을 생성한다. */
+  /**
+   * 관리자 푸시 캠페인을 생성한다.
+   *
+   * @param principal 인증 관리자
+   * @param key 생성 요청 멱등성 키
+   * @param request 캠페인 내용과 대상 조건
+   * @return 생성되었거나 같은 요청으로 이미 생성된 캠페인
+   * @throws ApiException 입력이 잘못되었거나 같은 키에 다른 내용을 요청한 경우 발생
+   */
   @Operation(
       summary = "푸시 캠페인 생성",
       description =
@@ -97,20 +129,48 @@ public interface AdminPushCampaignControllerDocs {
       int page,
       int size);
 
-  /** 캠페인의 원문, 상태와 Token 기준 집계를 조회한다. */
+  /**
+   * 캠페인의 원문, 상태와 Token 기준 집계를 조회한다.
+   *
+   * @param campaignId 캠페인 ID
+   * @return 내용, 상태와 토큰 단위 집계
+   * @throws ApiException 캠페인이 없는 경우 발생
+   */
   @Operation(summary = "푸시 캠페인 상세 조회")
   ApiResponse<AdminPushCampaignView> detail(UUID campaignId);
 
-  /** 캠페인 대상 조건에 맞는 현재 활성 사용자와 Token 수를 조회한다. */
+  /**
+   * 캠페인 대상 조건에 맞는 현재 활성 사용자와 Token 수를 조회한다.
+   *
+   * @param campaignId 캠페인 ID
+   * @return 조회 시점의 예상 사용자 수와 토큰 수
+   * @throws ApiException 캠페인이 없거나 SQL 대상 조회가 실패한 경우 발생
+   */
   @Operation(summary = "캠페인 예상 대상 조회")
   ApiResponse<AdminPushAudiencePreview> preview(UUID campaignId);
 
-  /** 인증 관리자의 활성 Token에 테스트 알림을 보낸다. */
+  /**
+   * 인증 관리자의 활성 Token에 테스트 알림을 보낸다.
+   *
+   * @param campaignId 캠페인 ID
+   * @param principal 인증 관리자
+   * @param key 테스트 요청 멱등성 키
+   * @return 테스트를 요청한 캠페인 정보
+   * @throws ApiException 잘못된 키, 없는 캠페인 또는 DRAFT가 아닌 상태일 때 발생
+   */
   @Operation(summary = "관리자 본인 테스트 발송")
   ApiResponse<AdminPushCampaignView> test(
       UUID campaignId, @Parameter(hidden = true) AuthUserPrincipal principal, String key);
 
-  /** 캠페인의 대상 조건에 맞는 발송을 SQS에 요청한다. */
+  /**
+   * 캠페인의 대상 조건에 맞는 발송을 SQS에 요청한다.
+   *
+   * @param campaignId 캠페인 ID
+   * @param principal 인증 관리자
+   * @param key 발송 요청 멱등성 키
+   * @return 발송을 요청한 캠페인 정보
+   * @throws ApiException 잘못된 키, 없는 캠페인 또는 상태 충돌 시 발생
+   */
   @Operation(summary = "캠페인 발송", description = "저장된 ALL 또는 SELECTED 범위 중 활성 사용자·활성 Token에 발송한다.")
   ApiResponse<AdminPushCampaignView> send(
       UUID campaignId, @Parameter(hidden = true) AuthUserPrincipal principal, String key);
