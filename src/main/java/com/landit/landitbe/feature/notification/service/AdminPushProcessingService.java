@@ -30,6 +30,7 @@ public class AdminPushProcessingService {
   private final PushDeliveryService deliveries;
   private final NotificationDispatchService dispatch;
   private final PushQueuePublisher publisher;
+  private final AdminPushCampaignService campaigns;
 
   /**
    * 캠페인의 다음 Token 페이지를 처리한다.
@@ -37,11 +38,12 @@ public class AdminPushProcessingService {
    * @param campaignId 캠페인 ID
    */
   public void process(UUID campaignId) {
+    campaigns.prepareForProcessing(campaignId);
     Campaign campaign = campaign(campaignId);
-    if (campaign.status().equals("DRAFT")) {
-      return;
+    if (campaign.status().equals("SCHEDULED") || campaign.status().equals("SCHEDULE_PENDING")) {
+      throw new RetryablePushNotificationException("예약 대상 고정을 재시도합니다.");
     }
-    if (campaign.status().equals("COMPLETED")) {
+    if (!campaign.status().equals("QUEUED") && !campaign.status().equals("SENDING")) {
       return;
     }
     List<Target> targets = repository.targets(campaign);

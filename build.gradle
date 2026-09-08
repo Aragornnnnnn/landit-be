@@ -40,6 +40,7 @@ checkstyle {
 dependencies {
 	implementation platform('software.amazon.awssdk:bom:2.48.2')
 	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:scheduler'
 	implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.0.2')
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

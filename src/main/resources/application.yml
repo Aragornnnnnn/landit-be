@@ -85,6 +85,15 @@ landit:
     test-api-enabled: ${LANDIT_NOTIFICATION_TEST_API_ENABLED:false}
     queue-url: ${SQS_PUSH_NOTIFICATIONS_QUEUE_URL:}
     receipt-delay-seconds: ${LANDIT_NOTIFICATION_RECEIPT_DELAY_SECONDS:900}
+    audience-query:
+      url: ${LANDIT_PUSH_AUDIENCE_DB_URL:}
+      username: ${LANDIT_PUSH_AUDIENCE_DB_USERNAME:}
+      password: ${LANDIT_PUSH_AUDIENCE_DB_PASSWORD:}
+      max-rows: ${LANDIT_PUSH_AUDIENCE_MAX_ROWS:100000}
+    scheduler:
+      group: ${LANDIT_PUSH_SCHEDULER_GROUP:default}
+      queue-arn: ${LANDIT_PUSH_SCHEDULER_QUEUE_ARN:}
+      role-arn: ${LANDIT_PUSH_SCHEDULER_ROLE_ARN:}
 
 sentry:
   dsn: ${SENTRY_DSN:}

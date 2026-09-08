@@ -56,20 +56,34 @@ public class AdminPushInputService {
     if (payload(request).length > MAX_PAYLOAD_BYTES) {
       throw new ApiException(ErrorCode.PUSH_PAYLOAD_TOO_LARGE);
     }
-    if (request.userProfileIds().size() > 1000
-        || request.userProfileIds().stream().anyMatch(id -> id == null || id <= 0)
+    if (request.userProfileIds().stream().anyMatch(id -> id == null || id <= 0)
+        || request.excludedUserProfileIds().stream().anyMatch(id -> id == null || id <= 0)
         || (request.audienceType() == AdminPushAudienceType.ALL
-            && !request.userProfileIds().isEmpty())
+            && (!request.userProfileIds().isEmpty()
+                || request.audienceSql() != null
+                || !request.excludedUserProfileIds().isEmpty()))
         || (request.audienceType() == AdminPushAudienceType.SELECTED
-            && request.userProfileIds().isEmpty())) {
+            && request.userProfileIds().isEmpty()
+            && request.audienceSql() == null
+            && request.excludedUserProfileIds().isEmpty())) {
       throw invalid();
     }
+    if (request.audienceSql() != null) {
+      AdminPushAudienceSqlService.validateSql(request.audienceSql());
+    }
+    var excluded = new java.util.HashSet<>(request.excludedUserProfileIds());
     return new AdminPushCampaignRequest(
         request.title(),
         request.body(),
         request.deepLink(),
         request.audienceType(),
-        request.userProfileIds().stream().distinct().sorted().toList());
+        request.userProfileIds().stream()
+            .filter(id -> !excluded.contains(id))
+            .distinct()
+            .sorted()
+            .toList(),
+        request.audienceSql(),
+        request.excludedUserProfileIds().stream().distinct().sorted().toList());
   }
 
   /**
@@ -100,6 +114,14 @@ public class AdminPushInputService {
             jsonMapper
                 .writeValueAsString(validated.userProfileIds())
                 .getBytes(StandardCharsets.UTF_8));
+        if (validated.audienceSql() != null || !validated.excludedUserProfileIds().isEmpty()) {
+          digest.update(
+              jsonMapper
+                  .writeValueAsString(
+                      java.util.Arrays.asList(
+                          validated.audienceSql(), validated.excludedUserProfileIds()))
+                  .getBytes(StandardCharsets.UTF_8));
+        }
       }
       return HexFormat.of().formatHex(digest.digest());
     } catch (NoSuchAlgorithmException exception) {

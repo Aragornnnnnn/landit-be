@@ -26,6 +26,9 @@ import java.util.UUID;
  * @param completedAt 전체 대상 제출 완료 시각
  * @param audienceType 발송 대상 유형
  * @param userProfileIds 생성 시 고정한 선택 사용자 목록. ALL이면 빈 목록
+ * @param audienceSql 발송 시 다시 실행하는 SQL
+ * @param excludedUserProfileIds 제외 사용자 ID
+ * @param scheduledAt UTC 예약 시각. 화면에서는 Asia/Seoul로 변환
  */
 public record AdminPushCampaignView(
     UUID id,
@@ -43,4 +46,7 @@ public record AdminPushCampaignView(
     LocalDateTime createdAt,
     LocalDateTime completedAt,
     AdminPushAudienceType audienceType,
-    List<Long> userProfileIds) {}
+    List<Long> userProfileIds,
+    String audienceSql,
+    List<Long> excludedUserProfileIds,
+    java.time.Instant scheduledAt) {}

@@ -5,8 +5,10 @@ package com.landit.landitbe.feature.notification;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.notification.docs.AdminPushCampaignControllerDocs;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
+import com.landit.landitbe.feature.notification.dto.AdminPushAudienceQueryRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
+import com.landit.landitbe.feature.notification.dto.AdminPushScheduleRequest;
 import com.landit.landitbe.feature.notification.service.AdminPushCampaignService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -32,6 +34,36 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPushCampaignController implements AdminPushCampaignControllerDocs {
 
   private final AdminPushCampaignService campaigns;
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/audience-query")
+  public ApiResponse<List<Long>> queryAudience(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @Valid @RequestBody AdminPushAudienceQueryRequest request) {
+    return ApiResponse.success(campaigns.queryAudience(principal.userId(), request.sql()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/{campaignId}/schedule")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  public ApiResponse<AdminPushCampaignView> schedule(
+      @PathVariable UUID campaignId,
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @RequestHeader("Idempotency-Key") String key,
+      @Valid @RequestBody AdminPushScheduleRequest request) {
+    return ApiResponse.success(
+        campaigns.schedule(campaignId, principal.userId(), key, request.scheduledAt()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/{campaignId}/cancel-schedule")
+  public ApiResponse<AdminPushCampaignView> cancelSchedule(
+      @PathVariable UUID campaignId, @AuthenticationPrincipal AuthUserPrincipal principal) {
+    return ApiResponse.success(campaigns.cancelSchedule(campaignId, principal.userId()));
+  }
 
   /** {@inheritDoc} */
   @Override

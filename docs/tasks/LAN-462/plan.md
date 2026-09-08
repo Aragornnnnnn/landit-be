@@ -27,3 +27,15 @@
 - 예상 대상과 스냅샷 생성에 같은 SQL 조건을 적용한다. 기존 배치 소비 및 Receipt 흐름은 재사용한다.
 - 선택 대상 제한, 정규화·멱등성 충돌, 관리자 테스트 독립성, 선택 목록 저장 실패 롤백, 입력·OpenAPI 테스트 통과.
 - `./gradlew spotlessApply check` 통과. 독립 리뷰에서 결함 없음. 실제 PostgreSQL 적용·기기·어드민 UI 연동은 미검증이다.
+
+## SQL 대상·대규모 선택·한국 시간 예약 (2026-09-08)
+
+- SELECTED 1,000명 상한을 제거하고 존재 검증·선택 저장을 1,000개씩 처리한다. 1,001명 단일 캠페인과 10,001개 입력 검증을 통과했다.
+- 선택적 `audienceSql`과 `excludedUserProfileIds`를 추가했다. SQL 미리보기, 직접 선택·ID 배열의 합집합과 제외, 발송 시 SQL 재조회, 빈 결과의 0명 발송을 검증했다.
+- 별도 읽기 PostgreSQL 계정만 사용하고 실행 전에 단일 정수 ID 컬럼을 검사한다. 기본 10만 행 상한 초과는 전체 실패다.
+- 한국 시간 일회성 EventBridge 예약·취소와 실패 후 재시도를 구현했다. 스케줄러는 기존 Push SQS 계약을 사용하며 AWS SDK 요청 테스트를 통과했다.
+- 예약 등록 실패/재시도, 예약 전 메시지, 취소와 SQL 대상 고정 경합, 중복 처리, 최신 설문 응답 결과 반영을 검증했다.
+- 독립 리뷰의 SQL E 문자열 우회, 서버 커서의 timeout 범위, JVM/DB 시계 차이로 인한 예약 메시지 ACK 지적을 수정했다. 재리뷰에서 남은 차단 결함 없음.
+- 별도 로컬 PostgreSQL 15에서 SQL 테스트 4건 통과: 설문 미응답자, 결과 타입·상한, 쓰기 권한 및 SECURITY DEFINER가 있어도 READ ONLY 차단, 10초 statement timeout. V82~V84도 최소 참조 테이블을 갖춘 별도 임시 PostgreSQL DB에 적용했다. 검증 서버는 종료했다.
+- 최종 `./gradlew spotlessApply check` 통과. 945건 중 941건 성공, 조건부 PostgreSQL 4건은 기본 실행에서 건너뛰며 위 별도 실행으로 검증했다.
+- 실제 운영 DB 계정·GRANT·Flyway, AWS Scheduler IAM·그룹·실제 예약, 어드민 UI와 기기 알림은 미적용·미검증이다. 설문 테이블은 변경하지 않았다. API/FE 계약 및 설정은 기존 `design.md`에 통합했다.

@@ -10,6 +10,12 @@ public enum AdminAction {
   PUSH_CAMPAIGN_TESTED,
   /** 전체 푸시 발송 요청이다. */
   PUSH_CAMPAIGN_SENT,
+  /** 대상 SQL 조회다. */
+  PUSH_AUDIENCE_QUERIED,
+  /** 캠페인 예약 요청이다. */
+  PUSH_CAMPAIGN_SCHEDULED,
+  /** 예약 취소다. */
+  PUSH_CAMPAIGN_CANCELLED,
   /** 앱 버전 정책 수정 작업이다. */
   APP_VERSION_UPDATED,
 

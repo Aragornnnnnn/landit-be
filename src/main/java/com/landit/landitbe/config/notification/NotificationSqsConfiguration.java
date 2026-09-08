@@ -14,6 +14,26 @@ import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 public class NotificationSqsConfiguration {
 
   /**
+   * 관리자 일회성 예약 클라이언트를 구성한다.
+   *
+   * @param region AWS 리전
+   * @return 제한 시간이 설정된 Scheduler 클라이언트
+   */
+  @Bean(destroyMethod = "close")
+  @ConditionalOnMissingBean
+  public software.amazon.awssdk.services.scheduler.SchedulerClient notificationSchedulerClient(
+      @Value("${AWS_REGION:ap-northeast-2}") String region) {
+    return software.amazon.awssdk.services.scheduler.SchedulerClient.builder()
+        .region(Region.of(region))
+        .overrideConfiguration(
+            configuration ->
+                configuration
+                    .apiCallTimeout(java.time.Duration.ofSeconds(10))
+                    .apiCallAttemptTimeout(java.time.Duration.ofSeconds(5)))
+        .build();
+  }
+
+  /**
    * 애플리케이션 AWS 리전에 연결할 비동기 SQS Client를 생성한다.
    *
    * @param region AWS 리전

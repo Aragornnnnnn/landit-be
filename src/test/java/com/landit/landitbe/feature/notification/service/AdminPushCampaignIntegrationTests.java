@@ -58,6 +58,8 @@ class AdminPushCampaignIntegrationTests {
   private PushQueuePublisher queue;
   private AdminPushCampaignService campaigns;
   private AdminPushProcessingService processor;
+  private AdminPushAudienceSqlService sql;
+  private com.landit.landitbe.feature.notification.messaging.AdminPushScheduler scheduler;
 
   @BeforeEach
   void setup() {
@@ -83,11 +85,182 @@ class AdminPushCampaignIntegrationTests {
                 invocation.<List<PushMessage>>getArgument(0).stream()
                     .map(message -> PushTicketResult.accepted(UUID.randomUUID().toString()))
                     .toList());
-    NotificationDispatchService dispatch =
+    final NotificationDispatchService dispatch =
         new NotificationDispatchService(
             tokens, deliveries, sender, queue, new SimpleMeterRegistry());
-    campaigns = new AdminPushCampaignService(repository, input, audit, queue);
-    processor = new AdminPushProcessingService(repository, deliveries, dispatch, queue);
+    sql = mock(AdminPushAudienceSqlService.class);
+    scheduler = mock(com.landit.landitbe.feature.notification.messaging.AdminPushScheduler.class);
+    campaigns = new AdminPushCampaignService(repository, input, audit, queue, sql, scheduler);
+    processor = new AdminPushProcessingService(repository, deliveries, dispatch, queue, campaigns);
+  }
+
+  @Test
+  void supportsMoreThanOneThousandSelectedUsersInOneCampaign() {
+    var ids = java.util.stream.LongStream.rangeClosed(996000, 997000).boxed().toList();
+    ids.forEach(this::profile);
+    token(ids.getFirst(), "first");
+    token(ids.getLast(), "last");
+    UUID id = campaigns.create(ADMIN, "large", selected(ids)).id();
+    assertThat(campaigns.detail(id).userProfileIds()).hasSize(1001);
+    assertThat(campaigns.preview(id).estimatedTokenCount()).isEqualTo(2);
+    campaigns.send(id, ADMIN, "send");
+    processor.process(id);
+    assertThat(campaigns.detail(id).targetTokenCount()).isEqualTo(2);
+  }
+
+  @Test
+  void resolvesSqlAtDispatchAndCombinesManualSelectionAndExclusions() {
+    token(USER, "sql");
+    token(ADMIN, "excluded");
+    profile(USER + 1);
+    token(USER + 1, "manual");
+    String query = "select id as user_profile_id from user_profile";
+    when(sql.query(query)).thenReturn(List.of(USER, ADMIN));
+    UUID id =
+        campaigns
+            .create(
+                ADMIN,
+                "query",
+                new AdminPushCampaignRequest(
+                    "공지",
+                    "내용",
+                    "/home",
+                    AdminPushAudienceType.SELECTED,
+                    List.of(USER + 1, ADMIN),
+                    query,
+                    List.of(ADMIN)))
+            .id();
+    assertThat(campaigns.preview(id).estimatedTokenCount()).isEqualTo(2);
+    campaigns.send(id, ADMIN, "send");
+    assertThat(campaigns.detail(id).status()).isEqualTo("PENDING");
+    // 예약/미리보기 후 응답한 사용자는 SQL 결과에서 사라진다.
+    when(sql.query(query)).thenReturn(List.of(ADMIN));
+    processor.process(id);
+    processor.process(id);
+    assertThat(campaigns.detail(id).targetTokenCount()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("select user_profile_id from push_delivery", Long.class))
+        .isEqualTo(USER + 1);
+    verify(sql, times(2)).query(query);
+  }
+
+  @Test
+  void retriesScheduleRegistrationAndRejectsEarlyDeliveryAndChangedTime() {
+    token(USER, "scheduled");
+    UUID id = create("schedule");
+    var time =
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.ofHours(9)).plusHours(1).withNano(0);
+    doThrow(new IllegalStateException("temporary scheduler failure"))
+        .doNothing()
+        .when(scheduler)
+        .schedule(id, time.toInstant());
+    assertThatThrownBy(() -> campaigns.schedule(id, ADMIN, "schedule", time))
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(campaigns.detail(id).status()).isEqualTo("SCHEDULE_PENDING");
+    campaigns.schedule(id, ADMIN, "schedule", time);
+    campaigns.schedule(id, ADMIN, "schedule", time);
+    verify(scheduler, times(2)).schedule(id, time.toInstant());
+    assertThatThrownBy(() -> campaigns.schedule(id, ADMIN, "schedule", time.plusHours(1)))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.send(id, ADMIN, "send")).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> processor.process(id))
+        .isInstanceOf(RetryablePushNotificationException.class);
+    assertThat(campaigns.detail(id).targetTokenCount()).isZero();
+    jdbc.update(
+        "update admin_push_campaign set scheduled_at=? where id=?",
+        java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),
+        id);
+    processor.process(id);
+    processor.process(id);
+    assertThat(campaigns.detail(id).targetTokenCount()).isEqualTo(1);
+    assertThatThrownBy(() -> campaigns.cancelSchedule(id, ADMIN)).isInstanceOf(ApiException.class);
+  }
+
+  @Test
+  void ignoresCancelledScheduleEvenWhenQueuedMessageArrives() {
+    token(USER, "cancelled");
+    UUID id = create("cancel");
+    var time =
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.ofHours(9)).plusHours(1).withNano(0);
+    campaigns.schedule(id, ADMIN, "schedule", time);
+    campaigns.cancelSchedule(id, ADMIN);
+    campaigns.cancelSchedule(id, ADMIN);
+    processor.process(id);
+    assertThat(campaigns.detail(id).status()).isEqualTo("CANCELLED");
+    org.mockito.Mockito.verifyNoInteractions(sender);
+  }
+
+  @Test
+  void scheduledSqlUsesLatestResultsAndNeverFallsBackToAllWhenEmpty() {
+    token(USER, "answered-later");
+    String query = "select id as user_profile_id from user_profile";
+    when(sql.query(query)).thenReturn(List.of(USER));
+    UUID id =
+        campaigns
+            .create(
+                ADMIN,
+                "survey-schedule",
+                new AdminPushCampaignRequest(
+                    "공지",
+                    "내용",
+                    "/home",
+                    AdminPushAudienceType.SELECTED,
+                    List.of(),
+                    query,
+                    List.of()))
+            .id();
+    assertThat(campaigns.preview(id).estimatedUserCount()).isEqualTo(1);
+    campaigns.schedule(
+        id,
+        ADMIN,
+        "schedule",
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.ofHours(9)).plusHours(1).withNano(0));
+    when(sql.query(query)).thenReturn(List.of());
+    jdbc.update(
+        "update admin_push_campaign set scheduled_at=? where id=?",
+        java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),
+        id);
+    processor.process(id);
+    assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
+    assertThat(campaigns.detail(id).targetTokenCount()).isZero();
+    org.mockito.Mockito.verifyNoInteractions(sender);
+  }
+
+  @Test
+  void cancellationWinsAgainstSqlResolutionBeforeSnapshot() {
+    token(USER, "cancel-race");
+    String query = "select id as user_profile_id from user_profile";
+    UUID id =
+        campaigns
+            .create(
+                ADMIN,
+                "race",
+                new AdminPushCampaignRequest(
+                    "공지",
+                    "내용",
+                    "/home",
+                    AdminPushAudienceType.SELECTED,
+                    List.of(),
+                    query,
+                    List.of()))
+            .id();
+    campaigns.schedule(
+        id,
+        ADMIN,
+        "schedule",
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.ofHours(9)).plusHours(1).withNano(0));
+    jdbc.update(
+        "update admin_push_campaign set scheduled_at=? where id=?",
+        java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),
+        id);
+    when(sql.query(query))
+        .thenAnswer(
+            invocation -> {
+              campaigns.cancelSchedule(id, ADMIN);
+              return List.of(USER);
+            });
+    processor.process(id);
+    assertThat(campaigns.detail(id).targetTokenCount()).isZero();
+    org.mockito.Mockito.verifyNoInteractions(sender);
   }
 
   @Test

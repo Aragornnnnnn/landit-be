@@ -8,6 +8,8 @@ import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminPushRepository {
 
   private static final int BATCH_SIZE = 100;
+  private static final int USER_BATCH_SIZE = 1000;
 
   private static final String AUDIENCE_FROM =
       """
@@ -31,7 +34,9 @@ public class AdminPushRepository {
       where t.status='ACTIVE' and p.status='ACTIVE'
         and (c.audience_type='ALL' or exists (
           select 1 from admin_push_campaign_user selected
-          where selected.campaign_id=c.id and selected.user_profile_id=p.id))
+          where selected.campaign_id=c.id and selected.user_profile_id=p.id and not selected.excluded))
+        and not exists (select 1 from admin_push_campaign_user excluded
+          where excluded.campaign_id=c.id and excluded.user_profile_id=p.id and excluded.excluded)
       """;
 
   private final JdbcTemplate jdbc;
@@ -87,8 +92,8 @@ public class AdminPushRepository {
     jdbc.update(
         """
         insert into admin_push_campaign (
-          id,title,body,deep_link,created_by,create_request_key,request_hash,created_at,updated_at,audience_type
-        ) values (?,?,?,?,?,?,?,?,?,?)
+          id,title,body,deep_link,created_by,create_request_key,request_hash,created_at,updated_at,audience_type,audience_sql
+        ) values (?,?,?,?,?,?,?,?,?,?,?)
         """,
         campaign.id(),
         campaign.content().title(),
@@ -99,14 +104,27 @@ public class AdminPushRepository {
         campaign.hash(),
         campaign.createdAt(),
         campaign.createdAt(),
-        campaign.content().audienceType().name());
+        campaign.content().audienceType().name(),
+        campaign.content().audienceSql());
     if (!campaign.content().userProfileIds().isEmpty()) {
       jdbc.batchUpdate(
           "insert into admin_push_campaign_user(campaign_id,user_profile_id) values (?,?)",
-          campaign.content().userProfileIds().stream()
-              .map(userId -> new Object[] {campaign.id(), userId})
-              .toList());
+          campaign.content().userProfileIds(),
+          USER_BATCH_SIZE,
+          (statement, userId) -> {
+            statement.setObject(1, campaign.id());
+            statement.setLong(2, userId);
+          });
     }
+    jdbc.batchUpdate(
+        "insert into admin_push_campaign_user(campaign_id,user_profile_id,excluded) "
+            + "values (?,?,true)",
+        campaign.content().excludedUserProfileIds(),
+        USER_BATCH_SIZE,
+        (statement, userId) -> {
+          statement.setObject(1, campaign.id());
+          statement.setLong(2, userId);
+        });
   }
 
   /**
@@ -119,12 +137,19 @@ public class AdminPushRepository {
     if (userIds.isEmpty()) {
       return true;
     }
-    String placeholders = String.join(",", Collections.nCopies(userIds.size(), "?"));
-    return jdbc.queryForObject(
-            "select count(*) from user_profile where id in (" + placeholders + ")",
-            Long.class,
-            userIds.toArray())
-        == userIds.size();
+    for (int offset = 0; offset < userIds.size(); offset += USER_BATCH_SIZE) {
+      List<Long> batch =
+          userIds.subList(offset, Math.min(offset + USER_BATCH_SIZE, userIds.size()));
+      String placeholders = String.join(",", Collections.nCopies(batch.size(), "?"));
+      if (jdbc.queryForObject(
+              "select count(*) from user_profile where id in (" + placeholders + ")",
+              Long.class,
+              batch.toArray())
+          != batch.size()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -143,6 +168,36 @@ public class AdminPushRepository {
   }
 
   /**
+   * SQL과 수동 목록을 합친 사용자들의 현재 활성 Token 수를 조회한다.
+   *
+   * @param userIds 중복 없는 대상 ID
+   * @return 예상 발송 수
+   */
+  public AdminPushAudiencePreview previewUsers(List<Long> userIds) {
+    long users = 0;
+    long tokens = 0;
+    for (int offset = 0; offset < userIds.size(); offset += USER_BATCH_SIZE) {
+      List<Long> batch =
+          userIds.subList(offset, Math.min(offset + USER_BATCH_SIZE, userIds.size()));
+      String placeholders = String.join(",", Collections.nCopies(batch.size(), "?"));
+      AdminPushAudiencePreview count =
+          jdbc.queryForObject(
+              "select count(distinct p.id) users,count(*) tokens from user_profile p "
+                  + "join user_push_token t on t.user_profile_id=p.id "
+                  + "where p.status='ACTIVE' and t.status='ACTIVE' and p.id in ("
+                  + placeholders
+                  + ")",
+              (result, row) ->
+                  new AdminPushAudiencePreview(
+                      result.getLong("users"), result.getLong("tokens"), LocalDateTime.now()),
+              batch.toArray());
+      users += count.estimatedUserCount();
+      tokens += count.estimatedTokenCount();
+    }
+    return new AdminPushAudiencePreview(users, tokens, LocalDateTime.now());
+  }
+
+  /**
    * 최초 전체 발송 요청 시 대상 범위와 수를 고정한다.
    *
    * @param id 캠페인 ID
@@ -150,26 +205,43 @@ public class AdminPushRepository {
    */
   @Transactional
   public boolean queueAndCaptureTargets(UUID id) {
+    return queueAndCaptureTargets(id, null);
+  }
+
+  /**
+   * 조회된 SQL 사용자 목록 또는 저장된 대상 조건으로 발송 대상을 한 번 고정한다.
+   *
+   * @param id 캠페인 ID
+   * @param resolvedUsers SQL과 수동 선택의 최종 ID. null이면 저장된 조건 사용
+   * @return 최초 고정 여부
+   */
+  @Transactional
+  public boolean queueAndCaptureTargets(UUID id, List<Long> resolvedUsers) {
     int updated =
         jdbc.update(
             """
             update admin_push_campaign set
               status='QUEUED',
               updated_at=?
-            where id=? and status='DRAFT'
+            where id=? and (status in ('DRAFT','PENDING') or
+              (status in ('SCHEDULE_PENDING','SCHEDULED') and scheduled_at<=CURRENT_TIMESTAMP))
             """,
             LocalDateTime.now(),
             id);
     if (updated == 0) {
       return false;
     }
-    jdbc.update(
-        """
-        insert into admin_push_target(campaign_id,user_push_token_id,user_profile_id)
-        select c.id,t.id,t.user_profile_id
-        """
-            + AUDIENCE_FROM,
-        id);
+    if (resolvedUsers == null) {
+      jdbc.update(
+          """
+          insert into admin_push_target(campaign_id,user_push_token_id,user_profile_id)
+          select c.id,t.id,t.user_profile_id
+          """
+              + AUDIENCE_FROM,
+          id);
+    } else {
+      captureUsers(id, resolvedUsers);
+    }
     jdbc.update(
         """
         update admin_push_campaign set
@@ -184,6 +256,85 @@ public class AdminPushRepository {
         LocalDateTime.now(),
         id);
     return true;
+  }
+
+  private void captureUsers(UUID id, List<Long> userIds) {
+    for (int offset = 0; offset < userIds.size(); offset += USER_BATCH_SIZE) {
+      List<Long> batch =
+          userIds.subList(offset, Math.min(offset + USER_BATCH_SIZE, userIds.size()));
+      String placeholders = String.join(",", Collections.nCopies(batch.size(), "?"));
+      var args = new java.util.ArrayList<Object>();
+      args.add(id);
+      args.addAll(batch);
+      jdbc.update(
+          "insert into admin_push_target(campaign_id,user_push_token_id,user_profile_id) "
+              + "select ?,t.id,p.id from user_push_token t "
+              + "join user_profile p on p.id=t.user_profile_id "
+              + "where t.status='ACTIVE' and p.status='ACTIVE' and p.id in ("
+              + placeholders
+              + ")",
+          args.toArray());
+    }
+  }
+
+  /**
+   * SQL 대상 준비를 Worker에 넘기기 위해 발송 의도를 고정한다.
+   *
+   * @param id 캠페인 ID
+   * @return 최초 요청 여부
+   */
+  public boolean requestSend(UUID id) {
+    return jdbc.update(
+            "update admin_push_campaign set status='PENDING',updated_at=? "
+                + "where id=? and status='DRAFT'",
+            LocalDateTime.now(),
+            id)
+        == 1;
+  }
+
+  /**
+   * 예약 생성 전 재시도 가능한 예약 의도를 저장한다.
+   *
+   * @param id 캠페인 ID
+   * @param time UTC 예약 시각
+   * @return 최초 요청 여부
+   */
+  public boolean requestSchedule(UUID id, Instant time) {
+    return jdbc.update(
+            "update admin_push_campaign set status='SCHEDULE_PENDING',scheduled_at=?,updated_at=? "
+                + "where id=? and status='DRAFT'",
+            Timestamp.from(time),
+            LocalDateTime.now(),
+            id)
+        == 1;
+  }
+
+  /**
+   * AWS 예약 등록 성공을 기록한다. 이미 취소되거나 발송 중이면 변경하지 않는다.
+   *
+   * @param id 캠페인 ID
+   */
+  public void scheduled(UUID id) {
+    jdbc.update(
+        "update admin_push_campaign set status='SCHEDULED',updated_at=? "
+            + "where id=? and status='SCHEDULE_PENDING'",
+        LocalDateTime.now(),
+        id);
+  }
+
+  /**
+   * 아직 대상을 고정하지 않은 예약을 취소한다.
+   *
+   * @param id 캠페인 ID
+   * @return 최초 취소 여부
+   */
+  public boolean cancelSchedule(UUID id) {
+    return jdbc.update(
+            "update admin_push_campaign set status='CANCELLED',updated_at=? "
+                + "where id=? and status in ('SCHEDULE_PENDING','SCHEDULED')",
+            LocalDateTime.now(),
+            id)
+        == 1;
   }
 
   /**
@@ -285,7 +436,10 @@ public class AdminPushRepository {
         campaign.createdAt(),
         campaign.completedAt(),
         campaign.content().audienceType(),
-        campaign.content().userProfileIds());
+        campaign.content().userProfileIds(),
+        campaign.content().audienceSql(),
+        campaign.content().excludedUserProfileIds(),
+        campaign.scheduledAt());
   }
 
   private Campaign map(ResultSet result, int row) throws SQLException {
@@ -297,7 +451,7 @@ public class AdminPushRepository {
             ? List.of()
             : jdbc.queryForList(
                 "select user_profile_id from admin_push_campaign_user "
-                    + "where campaign_id=? order by user_profile_id",
+                    + "where campaign_id=? and not excluded order by user_profile_id",
                 Long.class,
                 id);
     return new Campaign(
@@ -307,7 +461,13 @@ public class AdminPushRepository {
             result.getString("body"),
             result.getString("deep_link"),
             audience,
-            selectedUsers),
+            selectedUsers,
+            result.getString("audience_sql"),
+            jdbc.queryForList(
+                "select user_profile_id from admin_push_campaign_user "
+                    + "where campaign_id=? and excluded order by user_profile_id",
+                Long.class,
+                id)),
         result.getLong("created_by"),
         result.getString("request_hash"),
         result.getString("status"),
@@ -318,7 +478,10 @@ public class AdminPushRepository {
         result.getTimestamp("created_at").toLocalDateTime(),
         result.getTimestamp("completed_at") == null
             ? null
-            : result.getTimestamp("completed_at").toLocalDateTime());
+            : result.getTimestamp("completed_at").toLocalDateTime(),
+        result.getTimestamp("scheduled_at") == null
+            ? null
+            : result.getTimestamp("scheduled_at").toInstant());
   }
 
   /**
@@ -335,6 +498,7 @@ public class AdminPushRepository {
    * @param lastTargetId 처리한 마지막 대상 ID
    * @param createdAt 생성 시각
    * @param completedAt 제출 완료 시각
+   * @param scheduledAt UTC 예약 시각
    */
   public record Campaign(
       UUID id,
@@ -347,7 +511,51 @@ public class AdminPushRepository {
       long maxTargetId,
       long lastTargetId,
       LocalDateTime createdAt,
-      LocalDateTime completedAt) {}
+      LocalDateTime completedAt,
+      Instant scheduledAt) {
+
+    /**
+     * 예약하지 않은 캠페인을 생성한다.
+     *
+     * @param id 캠페인 ID
+     * @param content 내용
+     * @param adminId 관리자 ID
+     * @param hash 원문 해시
+     * @param status 상태
+     * @param targetUserCount 사용자 수
+     * @param targetTokenCount Token 수
+     * @param maxTargetId 마지막 대상 ID
+     * @param lastTargetId 처리한 ID
+     * @param createdAt 생성 시각
+     * @param completedAt 완료 시각
+     */
+    public Campaign(
+        UUID id,
+        AdminPushCampaignRequest content,
+        long adminId,
+        String hash,
+        String status,
+        long targetUserCount,
+        long targetTokenCount,
+        long maxTargetId,
+        long lastTargetId,
+        LocalDateTime createdAt,
+        LocalDateTime completedAt) {
+      this(
+          id,
+          content,
+          adminId,
+          hash,
+          status,
+          targetUserCount,
+          targetTokenCount,
+          maxTargetId,
+          lastTargetId,
+          createdAt,
+          completedAt,
+          null);
+    }
+  }
 
   /**
    * 한 Token 발송 대상이다.

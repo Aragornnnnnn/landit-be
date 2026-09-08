@@ -68,7 +68,7 @@ class AdminPushInputServiceTest {
             "내용",
             "/home",
             AdminPushAudienceType.SELECTED,
-            LongStream.rangeClosed(1, 1000).boxed().toList());
+            LongStream.rangeClosed(1, 10001).boxed().toList());
     assertThatCode(() -> service.validate(large)).doesNotThrowAnyException();
     assertThat(
             service
@@ -95,13 +95,7 @@ class AdminPushInputServiceTest {
         new AdminPushCampaignRequest(
             "공지", "내용", "/home", AdminPushAudienceType.SELECTED, Arrays.asList(1L, null)),
         new AdminPushCampaignRequest(
-            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of(0L)),
-        new AdminPushCampaignRequest(
-            "공지",
-            "내용",
-            "/home",
-            AdminPushAudienceType.SELECTED,
-            LongStream.rangeClosed(1, 1001).boxed().toList()));
+            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of(0L)));
   }
 
   private static Stream<String> validLinks() {
