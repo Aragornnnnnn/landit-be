@@ -59,3 +59,11 @@
 - 컬럼 UPDATE, 제한 SELECT 정책, 같은 이름의 다른 정책, 전역 PUBLIC 쓰기 기본 권한, 스키마별 reader 쓰기 기본 권한 각각을 넣어 실행 거부와 전체 롤백을 확인했다. 충돌 제거 후 재실행도 성공했다.
 - 독립 리뷰에서 발견한 컬럼 쓰기·기존 쓰기 기본 권한 검사 누락을 수정했고 재리뷰에서 남은 차단 결함 없음. Java 변경 없이 SQL 실행과 문서 diff를 검증했다.
 - 현재 환경에는 Supabase 연결 정보가 없어 운영 권한은 적용하지 않았다. 기존 계정 비밀번호와 운영 데이터는 변경하지 않았다.
+
+## 예약 인프라 적용 (2026-09-08)
+
+- 사용자 요청으로 prod/develop의 LANDIT_PUSH_AUDIENCE_DB_URL/USERNAME/PASSWORD 총 6개를 SSM SecureString으로 저장하고 비밀값 출력 없이 일치 여부를 확인했다. 기존 DB_*는 변경하지 않았다.
+- landit-iac feat/LAN-462에서 환경별 admin-push Scheduler 그룹·전용 실행 역할·기존 Push SQS SendMessage·API Create/Get/DeleteSchedule 및 PassRole 제한을 구성하고 AWS에 적용했다. 기존 20시 Scheduler와 ECS 서비스 상태는 변경되지 않았다.
+- develop SSM 기본 배포 문서 version 10에 읽기 DB와 Scheduler 환경변수 연결을 반영했다. 다음 BE 배포 때 API에 들어가며 API가 Push 소비도 수행한다. 개발 전체 Terraform plan은 No changes다.
+- production ECS API의 환경변수·SSM 경로는 IaC에 준비했으나 service 배포는 수행하지 않았다. 운영 배포 단계에서 새 task definition과 service 갱신을 함께 적용해야 한다. 현재 BE workflow의 force-new-deployment만으로는 새 설정이 추가되지 않는다.
+- Terraform 검증·런타임 회귀 테스트·독립 리뷰 및 실제 IAM 권한 시뮬레이션을 통과했다. DB 연결·마이그레이션·예약 시간 도래·기기 알림 검증은 배포 후 수행한다.
