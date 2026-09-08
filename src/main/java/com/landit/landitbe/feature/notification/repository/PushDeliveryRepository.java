@@ -16,6 +16,35 @@ import org.springframework.data.repository.query.Param;
 public interface PushDeliveryRepository extends JpaRepository<PushDelivery, Long> {
 
   /**
+   * 묶음의 기존 이력을 ID 순서로 잠가 다른 발송·Receipt 처리와 잠금 순서를 맞춘다.
+   *
+   * @param keys 중복 방지 키 목록
+   * @return 잠긴 기존 이력
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select d from PushDelivery d where d.deduplicationKey in :keys order by d.id")
+  List<PushDelivery> findAllByKeysForUpdate(@Param("keys") List<String> keys);
+
+  /**
+   * Token 잠금을 얻은 후 다른 요청이 생성한 키를 다시 확인한다.
+   *
+   * @param keys 중복 방지 키 목록
+   * @return 이미 존재하는 키 목록
+   */
+  @Query("select d.deduplicationKey from PushDelivery d where d.deduplicationKey in :keys")
+  List<String> findExistingKeys(@Param("keys") List<String> keys);
+
+  /**
+   * 결과를 기록할 이력을 ID 순서로 잠근다.
+   *
+   * @param ids 발송 이력 ID 목록
+   * @return 잠긴 발송 이력
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select d from PushDelivery d where d.id in :ids order by d.id")
+  List<PushDelivery> findAllByIdsForUpdate(@Param("ids") List<Long> ids);
+
+  /**
    * 중복 방지 키로 기존 발송 이력을 조회한다.
    *
    * @param deduplicationKey 발송 중복 방지 키
