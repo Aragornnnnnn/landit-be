@@ -7,7 +7,8 @@
 ## API
 
 - `POST /api/v1/admin/push-campaigns`: 캠페인 생성.
-- `GET /api/v1/admin/push-campaigns`: 목록 조회.
+- `GET /api/v1/admin/push-campaigns`: 기존 전체 캠페인 목록 조회(배열 응답).
+- `GET /api/v1/admin/push-campaigns/schedules?status=SCHEDULED&page=0&size=20`: 예약 목록과 페이지 정보 조회.
 - `GET /api/v1/admin/push-campaigns/{campaignId}`: 원문, 상태, 집계 조회.
 - `GET /api/v1/admin/push-campaigns/{campaignId}/audience-preview`: 현재 예상 사용자·Token 수 조회.
 - `POST /api/v1/admin/push-campaigns/{campaignId}/test`: 관리자 본인 테스트를 SQS에 발행.
@@ -114,6 +115,11 @@ WHERE u.status = 'ACTIVE'
 - 초기 허용 테이블은 `public.user_profile`, `public.survey_responses`다. 추가 SQL 대상 테이블은 읽기 역할의 GRANT로 명시적으로 확장한다. 운영 계정·GRANT 생성은 별도 인프라 적용 작업이다.
 
 ## 한국 시간 예약
+
+- 예약 목록은 DB에서 `scheduled_at`이 있는 캠페인만 조회한다. AWS 목록 조회나 SQL 대상 재조회는 수행하지 않는다.
+- `status` 생략 시 등록 대기·예약 완료·발송 중·완료·취소 이력을 모두 포함한다. 정확한 상태 필터는 `SCHEDULE_PENDING`, `SCHEDULED`, `QUEUED`, `SENDING`, `COMPLETED`, `CANCELLED`를 지원한다. `SCHEDULE_PENDING`은 AWS 등록 확인이 필요한 상태이며 `SCHEDULED`와 구별한다.
+- 정렬은 예약 시각·ID 내림차순이다. `page`는 0부터, `size`는 기본 20·최대 50이다. 응답은 `{items, page, size, hasNext, totalCount, totalPages}`이며 전체 수는 같은 상태 필터 기준이다. 빈 결과는 전체 수·페이지 수 모두 0이고, 범위 밖 페이지는 빈 목록과 실제 전체 수를 반환한다.
+- 각 항목은 기존 캠페인 상세와 같은 원문·`scheduledAt`·상태·대상/발송 집계를 제공한다. 표시 시각은 한국 시간으로, 페이지 번호는 `page + 1`로 변환한다.
 
 - 입력은 초 단위 `+09:00` 오프셋이며 최초 요청은 현재보다 1분 이후여야 한다. DB에는 TIMESTAMPTZ로 저장하고 어드민은 `Asia/Seoul`로 표시한다.
 - DB에 `SCHEDULE_PENDING`과 불변 예약 시각을 먼저 저장한 뒤 EventBridge Scheduler의 일회성 `at(...)` 예약을 만든다. 예약 이름은 `admin-push-{campaignId}`로 고정한다.

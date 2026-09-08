@@ -26,6 +26,8 @@ public class AdminPushRepository {
 
   private static final int BATCH_SIZE = 100;
   private static final int USER_BATCH_SIZE = 1000;
+  private static final String SCHEDULE_FROM =
+      " from admin_push_campaign where scheduled_at is not null and (?='' or status=?)";
 
   private static final String AUDIENCE_FROM =
       """
@@ -79,6 +81,34 @@ public class AdminPushRepository {
         this::map,
         size,
         (long) page * size);
+  }
+
+  /**
+   * 예약 캠페인을 예약 시각과 ID 내림차순으로 조회한다.
+   *
+   * @param status 상태 필터. 빈 문자열이면 모든 예약 상태
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 페이지 크기
+   * @return 예약 캠페인 목록
+   */
+  public List<Campaign> schedules(String status, int page, int size) {
+    return jdbc.query(
+        "select *" + SCHEDULE_FROM + " order by scheduled_at desc,id desc limit ? offset ?",
+        this::map,
+        status,
+        status,
+        size,
+        (long) page * size);
+  }
+
+  /**
+   * 같은 상태 조건의 전체 예약 수를 조회한다.
+   *
+   * @param status 상태 필터. 빈 문자열이면 모든 예약 상태
+   * @return 전체 예약 수
+   */
+  public long countSchedules(String status) {
+    return jdbc.queryForObject("select count(*)" + SCHEDULE_FROM, Long.class, status, status);
   }
 
   /**

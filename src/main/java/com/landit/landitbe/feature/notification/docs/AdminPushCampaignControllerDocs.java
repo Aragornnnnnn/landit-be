@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudienceQueryRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
+import com.landit.landitbe.feature.notification.dto.AdminPushSchedulePage;
 import com.landit.landitbe.feature.notification.dto.AdminPushScheduleRequest;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,6 +66,37 @@ public interface AdminPushCampaignControllerDocs {
   /** 관리자 푸시 캠페인을 최신순으로 조회한다. */
   @Operation(summary = "푸시 캠페인 목록 조회")
   ApiResponse<List<AdminPushCampaignView>> list(int page, int size);
+
+  /**
+   * 예약 캠페인 목록과 페이지 정보를 조회한다.
+   *
+   * @param status 상태 필터. 생략하면 전체 예약 이력
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 페이지 크기. 기본 20, 최대 50
+   * @return 상태와 예약 시각을 포함한 캠페인 페이지
+   */
+  @Operation(
+      summary = "예약 푸시 목록 조회",
+      description =
+          "예약 시각이 있는 캠페인만 예약 시각·ID 내림차순으로 "
+              + "조회한다. 상태 생략 시 등록 대기·발송 중·완료·취소를 모두 포함한다. scheduledAt은 UTC이며 "
+              + "화면에서는 Asia/Seoul로 변환하고 페이지 번호는 page + 1로 표시한다. AWS 실시간 조회는 하지 않는다.")
+  ApiResponse<AdminPushSchedulePage> schedules(
+      @Parameter(
+              description = "예약 상태",
+              schema =
+                  @io.swagger.v3.oas.annotations.media.Schema(
+                      allowableValues = {
+                        "SCHEDULE_PENDING",
+                        "SCHEDULED",
+                        "QUEUED",
+                        "SENDING",
+                        "COMPLETED",
+                        "CANCELLED"
+                      }))
+          String status,
+      int page,
+      int size);
 
   /** 캠페인의 원문, 상태와 Token 기준 집계를 조회한다. */
   @Operation(summary = "푸시 캠페인 상세 조회")

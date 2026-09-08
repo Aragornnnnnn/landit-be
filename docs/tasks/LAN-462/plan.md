@@ -39,3 +39,9 @@
 - 별도 로컬 PostgreSQL 15에서 SQL 테스트 4건 통과: 설문 미응답자, 결과 타입·상한, 쓰기 권한 및 SECURITY DEFINER가 있어도 READ ONLY 차단, 10초 statement timeout. V82~V84도 최소 참조 테이블을 갖춘 별도 임시 PostgreSQL DB에 적용했다. 검증 서버는 종료했다.
 - 최종 `./gradlew spotlessApply check` 통과. 945건 중 941건 성공, 조건부 PostgreSQL 4건은 기본 실행에서 건너뛰며 위 별도 실행으로 검증했다.
 - 실제 운영 DB 계정·GRANT·Flyway, AWS Scheduler IAM·그룹·실제 예약, 어드민 UI와 기기 알림은 미적용·미검증이다. 설문 테이블은 변경하지 않았다. API/FE 계약 및 설정은 기존 `design.md`에 통합했다.
+
+## 예약 목록 조회 (2026-09-08)
+
+- `GET /api/v1/admin/push-campaigns/schedules`를 추가했다. 예약 시각이 있는 캠페인만 상태별로 조회하고 페이지 번호·전체 수·전체 페이지 수를 반환한다. 기존 전체 목록 배열 응답은 유지한다.
+- 등록 대기/예약 완료/발송 중/완료/취소 상태, 즉시 발송 제외, 정렬과 필터별 전체 수, 빈·마지막·범위 밖 페이지를 검증했다. API의 관리자 권한, 입력 오류, 정적 경로 매핑과 기존 목록 호환성도 검증했다.
+- `./gradlew check` 통과. 독립 리뷰에서 결함 없음. AWS 호출이나 DB 스키마 변경은 없다. 어드민 UI 연결과 운영 배포는 수행하지 않았다.

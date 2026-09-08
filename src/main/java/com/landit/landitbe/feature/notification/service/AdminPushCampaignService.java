@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.admin.service.AdminAuditService;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
+import com.landit.landitbe.feature.notification.dto.AdminPushSchedulePage;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import com.landit.landitbe.feature.notification.repository.AdminPushRepository;
 import com.landit.landitbe.feature.notification.repository.AdminPushRepository.Campaign;
@@ -96,6 +97,34 @@ public class AdminPushCampaignService {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
     return repository.list(page, size).stream().map(repository::view).toList();
+  }
+
+  /**
+   * 예약 이력과 전체 페이지 수를 상태별로 조회한다.
+   *
+   * @param status 예약 상태. null이면 취소·완료를 포함한 모든 예약
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 페이지 크기. 1부터 50까지
+   * @return 예약 목록 페이지
+   * @throws ApiException 지원하지 않는 상태 또는 페이지 입력일 때 발생
+   */
+  public AdminPushSchedulePage schedules(String status, int page, int size) {
+    if (page < 0
+        || size < 1
+        || size > 50
+        || (status != null
+            && !Set.of(
+                    "SCHEDULE_PENDING", "SCHEDULED", "QUEUED", "SENDING", "COMPLETED", "CANCELLED")
+                .contains(status))) {
+      throw new ApiException(ErrorCode.INVALID_REQUEST);
+    }
+    String filter = status == null ? "" : status;
+    long totalCount = repository.countSchedules(filter);
+    long totalPages = totalCount / size + (totalCount % size == 0 ? 0 : 1);
+    List<AdminPushCampaignView> items =
+        repository.schedules(filter, page, size).stream().map(repository::view).toList();
+    return new AdminPushSchedulePage(
+        items, page, size, (long) page + 1 < totalPages, totalCount, totalPages);
   }
 
   /**

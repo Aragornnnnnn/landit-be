@@ -23,9 +23,56 @@ import org.springframework.test.web.servlet.MockMvc;
 class AdminPushCampaignApiIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void exposesSchedulePageToAdminsAndValidatesQueryParameters() throws Exception {
+    final long adminId = 99462071L;
+    jdbc.update(
+        """
+        insert into user_profile(id,nickname,target_locale,base_locale,current_level,
+          push_permission_status,status,role,created_at,updated_at)
+        values (?,'schedule-list','EN','KR',1,'NOT_DETERMINED','ACTIVE','ADMIN',
+          CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+        """,
+        adminId);
+    mockMvc
+        .perform(
+            get("/api/v1/admin/push-campaigns/schedules")
+                .with(user(new AuthUserPrincipal(adminId))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items").isArray())
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.totalCount").isNumber())
+        .andExpect(jsonPath("$.data.totalPages").isNumber())
+        .andExpect(jsonPath("$.data.hasNext").isBoolean());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/push-campaigns/schedules")
+                .param("status", "DRAFT")
+                .with(user(new AuthUserPrincipal(adminId))))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/push-campaigns/schedules")
+                .param("page", "-1")
+                .with(user(new AuthUserPrincipal(adminId))))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/v1/admin/push-campaigns").with(user(new AuthUserPrincipal(adminId))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isArray());
+  }
 
   @Test
   void rejectsAuthenticatedNonAdminForQueryAndSchedule() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/admin/push-campaigns/schedules")
+                .with(user(new AuthUserPrincipal(Long.MAX_VALUE))))
+        .andExpect(status().isForbidden());
     for (String path :
         java.util.List.of(
             "/audience-query",
@@ -41,6 +88,9 @@ class AdminPushCampaignApiIntegrationTests {
 
   @Test
   void requiresAuthenticationAndPublishesOpenApiContract() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/admin/push-campaigns/schedules"))
+        .andExpect(status().isUnauthorized());
     for (String path :
         java.util.List.of(
             "/audience-query",
@@ -55,6 +105,8 @@ class AdminPushCampaignApiIntegrationTests {
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/admin/push-campaigns'].post.summary").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/push-campaigns/schedules'].get.summary").exists())
         .andExpect(
             jsonPath("$.components.schemas.AdminPushCampaignRequest.properties.audienceType.enum")
                 .value(org.hamcrest.Matchers.contains("ALL", "SELECTED")))

@@ -109,6 +109,57 @@ class AdminPushCampaignIntegrationTests {
   }
 
   @Test
+  void listsOnlyScheduledCampaignsWithStatusFiltersAndPageTotals() {
+    List<String> statuses =
+        List.of("SCHEDULE_PENDING", "SCHEDULED", "QUEUED", "SENDING", "COMPLETED", "CANCELLED");
+    var ids = new java.util.ArrayList<UUID>();
+    for (int index = 0; index < statuses.size(); index++) {
+      UUID id = create("list-" + index);
+      ids.add(id);
+      jdbc.update(
+          "update admin_push_campaign set status=?,scheduled_at=? where id=?",
+          statuses.get(index),
+          java.sql.Timestamp.from(
+              java.time.Instant.parse("2026-09-10T10:00:00Z").plusSeconds(index)),
+          id);
+    }
+    create("not-scheduled");
+    UUID immediate = create("immediate-completed");
+    jdbc.update("update admin_push_campaign set status='COMPLETED' where id=?", immediate);
+
+    var first = campaigns.schedules(null, 0, 2);
+    assertThat(first.items()).extracting(item -> item.id()).containsExactly(ids.get(5), ids.get(4));
+    assertThat(first.totalCount()).isEqualTo(6);
+    assertThat(first.totalPages()).isEqualTo(3);
+    assertThat(first.hasNext()).isTrue();
+    assertThat(campaigns.schedules(null, 2, 2).hasNext()).isFalse();
+    var beyond = campaigns.schedules(null, 3, 2);
+    assertThat(beyond.items()).isEmpty();
+    assertThat(beyond.totalCount()).isEqualTo(6);
+    assertThat(beyond.totalPages()).isEqualTo(3);
+    for (int index = 0; index < statuses.size(); index++) {
+      var filtered = campaigns.schedules(statuses.get(index), 0, 20);
+      assertThat(filtered.items()).extracting(item -> item.id()).containsExactly(ids.get(index));
+      assertThat(filtered.totalCount()).isEqualTo(1);
+      assertThat(filtered.totalPages()).isEqualTo(1);
+    }
+  }
+
+  @Test
+  void handlesEmptyScheduleListAndRejectsInvalidFilters() {
+    var page = campaigns.schedules(null, 0, 20);
+    assertThat(page.items()).isEmpty();
+    assertThat(page.totalCount()).isZero();
+    assertThat(page.totalPages()).isZero();
+    assertThat(page.hasNext()).isFalse();
+    assertThatThrownBy(() -> campaigns.schedules("DRAFT", 0, 20)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.schedules("", 0, 20)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.schedules(null, -1, 20)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.schedules(null, 0, 0)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.schedules(null, 0, 51)).isInstanceOf(ApiException.class);
+  }
+
+  @Test
   void resolvesSqlAtDispatchAndCombinesManualSelectionAndExclusions() {
     token(USER, "sql");
     token(ADMIN, "excluded");
