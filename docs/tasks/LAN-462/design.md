@@ -110,8 +110,13 @@ WHERE u.status = 'ACTIVE'
 - 별도 읽기 계정의 `READ ONLY` 트랜잭션에서 실행하고 항상 롤백한다. 애플리케이션 DB 연결로 대체하지 않는다. 관리자 권한·문법 검사만으로 쓰기 차단을 보장한다고 가정하지 않는다.
 - DB statement timeout 10초, lock timeout 1초, 연결 제한 5초, socket timeout 15초다. 서버 커서를 사용하지 않아 SELECT 실행 전체에 statement timeout을 적용한다.
 - 기본 결과 상한 100,000행은 SQL 자원 보호용이며 초과하면 조회 전체가 실패한다. 일부 결과로 캠페인을 진행하지 않는다. 중복 제거 전 행 수에 적용하며 환경 설정으로 조정한다. 수동 SELECTED 캠페인의 1,000명 제한과는 별개다.
-- `LANDIT_PUSH_AUDIENCE_DB_URL/USERNAME/PASSWORD`를 API와 소비 환경 모두 설정한다. 같은 BE DB에 별도 로그인 역할을 만들고 필요한 기본 테이블에만 SELECT를 부여한다. superuser/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS 역할은 서버에서 거부한다. 역할 상속, 쓰기 권한, SECURITY DEFINER 함수·뷰 및 넓은 스키마 권한은 부여하지 않는다.
-- 초기 허용 테이블은 `public.user_profile`, `public.survey_responses`다. 추가 SQL 대상 테이블은 읽기 역할의 GRANT로 명시적으로 확장한다. 운영 계정·GRANT 생성은 별도 인프라 적용 작업이다.
+- `LANDIT_PUSH_AUDIENCE_DB_URL/USERNAME/PASSWORD`를 API와 소비 환경 모두 설정한다. 같은 BE DB의 별도 로그인 역할 `landit_push_reader`에 `public` 업무 테이블 전체의 SELECT를 부여한다. superuser/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS 역할은 서버에서 거부한다. 역할 상속·쓰기·스키마 생성·추가 함수 실행 권한은 부여하지 않는다. 서버의 읽기 트랜잭션과 SQL 검증은 유지한다.
+- 사용자 승인에 따라 두 테이블 제한을 없애고 `public` 전체로 확장한다. [grant-push-reader.sql](grant-push-reader.sql)을 Supabase SQL Editor에서 테이블 소유자 권한으로 실행한다. 기존 계정·비밀번호·데이터는 변경하지 않는다. `auth`, `storage` 스키마에 새 권한을 부여하지 않는다.
+- `GRANT ... ON ALL TABLES`와 기본 권한의 PostgreSQL 범위에는 뷰·외부 테이블도 포함된다. 특히 `public`의 소유자 권한으로 실행하는 뷰가 다른 스키마를 노출하지 않는지 적용 환경에서 확인한다. 일반 함수에 대한 새로운 EXECUTE 권한은 부여하지 않는다.
+- 스크립트는 일반·파티션 테이블마다 계정 전용 `FOR SELECT ... USING (true)` 정책을 추가하며 RLS 활성화 여부와 다른 역할의 정책은 유지한다. 같은 이름의 다른 정책, 이 역할에 적용되는 제한 SELECT 정책, 기존 테이블·컬럼 쓰기 권한 또는 생성 역할의 전역·public 쓰기 기본 권한이 있으면 전체 트랜잭션을 중단한다. 스크립트 재실행은 같은 정책을 중복 생성하지 않는다.
+- 앞으로의 SELECT 자동 부여는 현재 `public` 객체 소유자들과 실행 역할이 만드는 테이블에 적용한다. 다른 역할을 새로 테이블 생성자로 쓰면 그 역할의 `ALTER DEFAULT PRIVILEGES`도 설정해야 한다. 실행자가 해당 역할의 기본 권한을 바꿀 수 없으면 전체 스크립트가 실패하므로 소유자 권한으로 실행한다.
+- **기본 권한은 RLS 정책을 자동 생성하지 않는다.** 새 테이블을 만드는 마이그레이션에서 RLS 정책도 함께 추가하거나, 노출 전에 위 스크립트를 재실행한다. 별도의 DDL 이벤트 트리거는 추가하지 않는다. RLS 때문에 SQL 결과가 일부만 보이는 상태를 허용하지 않도록 운영 연결 검증에서 관리자와 읽기 계정의 행 수를 비교한다.
+- 스크립트 마지막 표는 테이블별 `can_read=true`, `can_write=false`를 확인하는 용도다. 실제 읽기 계정의 연결과 행 가시성 검증은 별도로 수행한다. 권한 확장 스크립트는 로컬 검증 대상이며 운영 적용 완료를 의미하지 않는다.
 
 ## 한국 시간 예약
 
@@ -148,3 +153,5 @@ WHERE u.status = 'ACTIVE'
 - `./gradlew check`와 인증·동시성·마이그레이션 독립 리뷰.
 
 예약 동작의 외부 계약은 [AWS Scheduler 공식 문서](https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html)를 기준으로 한다.
+
+계정 권한의 외부 계약: [PostgreSQL 기본 권한](https://www.postgresql.org/docs/current/sql-alterdefaultprivileges.html), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).

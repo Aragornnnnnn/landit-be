@@ -51,3 +51,11 @@
 - 사용자 요청에 따라 별도 `/schedules` GET을 제거하고 기존 `/api/v1/admin/push-campaigns`에 `scheduled`, `status` 필터를 통합했다. true/false/생략은 예약/미예약/전체이며 상태와 AND로 적용한다. 미예약에는 초안도 포함한다.
 - 응답은 `AdminPushCampaignPage`의 `items`와 페이지 정보로 통일하고 생성 시각·ID 내림차순으로 정렬한다. 이전 배열 응답 소비자는 `data.items`로 변경해야 한다. 단일 기준 `design.md`와 OpenAPI를 갱신했다.
 - 필터 조합, 전체 수·페이지 수, 예약 시각과 별개인 생성 순 정렬, 기존 관리자 권한과 제거한 API의 OpenAPI 미노출을 검증했다. `./gradlew check` 통과. 독립 리뷰에서 차단 결함 없음. 운영 배포는 수행하지 않았다.
+
+## public 전체 읽기 권한 확장 (2026-09-08)
+
+- 기존 `landit_push_reader` 계정의 권한 확장용 `grant-push-reader.sql`을 추가했다. 적용 범위와 미래 테이블의 RLS 정책 관리 계약은 `design.md`에 기록했다. 자동 Flyway 적용 대상은 아니다.
+- 별도 임시 PostgreSQL 15에서 반복 실행, RLS가 켜진 기존 테이블의 전체 행 조회, 다른 생성 역할의 새 테이블 SELECT 자동 부여, 쓰기 및 auth/storage 직접 조회 권한 미부여, 다른 역할의 정책 보존을 확인했다.
+- 컬럼 UPDATE, 제한 SELECT 정책, 같은 이름의 다른 정책, 전역 PUBLIC 쓰기 기본 권한, 스키마별 reader 쓰기 기본 권한 각각을 넣어 실행 거부와 전체 롤백을 확인했다. 충돌 제거 후 재실행도 성공했다.
+- 독립 리뷰에서 발견한 컬럼 쓰기·기존 쓰기 기본 권한 검사 누락을 수정했고 재리뷰에서 남은 차단 결함 없음. Java 변경 없이 SQL 실행과 문서 diff를 검증했다.
+- 현재 환경에는 Supabase 연결 정보가 없어 운영 권한은 적용하지 않았다. 기존 계정 비밀번호와 운영 데이터는 변경하지 않았다.
