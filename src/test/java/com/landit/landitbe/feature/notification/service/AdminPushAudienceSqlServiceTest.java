@@ -55,7 +55,10 @@ class AdminPushAudienceSqlServiceTest {
 
   @Test
   void neverFallsBackToApplicationDatabase() {
-    var service = new AdminPushAudienceSqlService("", "", "", 100000);
+    var service =
+        new AdminPushAudienceSqlService(
+            new com.landit.landitbe.feature.notification.client.AdminPushAudienceJdbcClient(
+                "", "", "", 100000));
     assertThatThrownBy(() -> service.query("select 1 as user_profile_id"))
         .isInstanceOf(ApiException.class);
   }

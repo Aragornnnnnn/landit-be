@@ -5,28 +5,56 @@ package com.landit.landitbe.feature.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.notification.client.AdminPushAudienceJdbcClient;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Properties;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.postgresql.Driver;
 
 /** 전용 임시 DB URL이 주어진 경우에만 실제 PostgreSQL 계약을 확인한다. */
 @EnabledIfEnvironmentVariable(named = "LAN462_TEST_POSTGRES_URL", matches = ".+")
 class AdminPushAudiencePostgresTest {
   private static final String URL = System.getenv("LAN462_TEST_POSTGRES_URL");
 
+  private static final String DATABASE = "lan462_" + UUID.randomUUID().toString().replace("-", "");
+  private static final String READER = DATABASE + "_reader";
+  private static boolean databaseCreated;
+  private static boolean roleCreated;
+  private static String fixtureUrl;
+
+  private static Connection fixtureConnection() throws Exception {
+    Properties properties = Driver.parseURL(URL, null);
+    properties.setProperty("PGDBNAME", DATABASE);
+    return DriverManager.getConnection("jdbc:postgresql://", properties);
+  }
+
   @BeforeAll
   static void setup() throws Exception {
     try (Connection connection = DriverManager.getConnection(URL);
         var statement = connection.createStatement()) {
-      statement.execute(
-          "do $$ begin if not exists (select 1 from pg_roles where rolname='lan462_reader') "
-              + "then create role lan462_reader login password "
-              + "'local-fixture-only'; end if; end $$");
+      statement.execute("create database " + DATABASE);
+      databaseCreated = true;
+      statement.execute("create role " + READER + " login password 'local-fixture-only'");
+      roleCreated = true;
+    }
+    Properties source = Driver.parseURL(URL, null);
+    fixtureUrl =
+        "jdbc:postgresql://"
+            + source.getProperty("PGHOST")
+            + ":"
+            + source.getProperty("PGPORT")
+            + "/"
+            + DATABASE;
+    try (Connection connection = fixtureConnection();
+        var statement = connection.createStatement()) {
       statement.execute("create table user_profile(id bigint primary key,status text)");
       statement.execute(
           "create table survey_responses(user_id bigint primary "
@@ -41,9 +69,22 @@ class AdminPushAudiencePostgresTest {
               + "values (99,'ACTIVE') returning id $$");
       statement.execute(
           "create view mutation_view as select " + "attempt_write() as user_profile_id");
-      statement.execute("grant select on all tables in schema public to lan462_reader");
+      statement.execute("grant select on all tables in schema public to " + READER);
       // 테스트에서만 쓰기 권한을 부여해 트랜잭션 READ ONLY 자체의 차단을 분리한다.
-      statement.execute("grant insert on user_profile to lan462_reader");
+      statement.execute("grant insert on user_profile to " + READER);
+    }
+  }
+
+  @AfterAll
+  static void cleanup() throws Exception {
+    try (Connection connection = DriverManager.getConnection(URL);
+        var statement = connection.createStatement()) {
+      if (databaseCreated) {
+        statement.execute("drop database " + DATABASE + " with (force)");
+      }
+      if (roleCreated) {
+        statement.execute("drop role " + READER);
+      }
     }
   }
 
@@ -74,7 +115,7 @@ class AdminPushAudiencePostgresTest {
   void readOnlyTransactionBlocksWritesHiddenBehindView() throws Exception {
     assertThatThrownBy(() -> service(10).query("select user_profile_id from mutation_view"))
         .isInstanceOf(ApiException.class);
-    try (Connection connection = DriverManager.getConnection(URL);
+    try (Connection connection = fixtureConnection();
         var statement = connection.createStatement();
         var result = statement.executeQuery("select count(*) from user_profile where id=99")) {
       result.next();
@@ -96,6 +137,7 @@ class AdminPushAudiencePostgresTest {
   }
 
   private AdminPushAudienceSqlService service(int limit) {
-    return new AdminPushAudienceSqlService(URL, "lan462_reader", "local-fixture-only", limit);
+    return new AdminPushAudienceSqlService(
+        new AdminPushAudienceJdbcClient(fixtureUrl, READER, "local-fixture-only", limit));
   }
 }

@@ -2,18 +2,16 @@
 
 package com.landit.landitbe.feature.notification.service;
 
+import com.landit.landitbe.feature.notification.client.AdminPushAudienceJdbcClient;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
-import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /** 애플리케이션 쓰기 계정으로 대체하지 않는 관리자 대상 조회 서비스다. */
@@ -42,28 +40,15 @@ public class AdminPushAudienceSqlService {
           "\\b(insert|update|delete|merge|into|copy|call|do|set|reset|alter|drop|"
               + "create|grant|revoke|"
               + "execute|prepare|vacuum|analyze|lock|for|union)\\b");
-  private final String url;
-  private final String username;
-  private final String password;
-  private final int maxRows;
+  private final AdminPushAudienceJdbcClient client;
 
   /**
-   * 별도 읽기 계정의 연결 설정을 받는다.
+   * 읽기 전용 연결 Adapter를 받는다.
    *
-   * @param url 읽기 계정용 BE PostgreSQL JDBC URL
-   * @param username 읽기 전용 사용자
-   * @param password 읽기 계정 비밀번호
-   * @param maxRows 조회 결과 상한. 초과 시 전체 조회를 거부
+   * @param client 제한된 읽기 연결과 결과 상한을 제공하는 Adapter
    */
-  public AdminPushAudienceSqlService(
-      @Value("${landit.notification.audience-query.url:}") String url,
-      @Value("${landit.notification.audience-query.username:}") String username,
-      @Value("${landit.notification.audience-query.password:}") String password,
-      @Value("${landit.notification.audience-query.max-rows:100000}") int maxRows) {
-    this.url = url;
-    this.username = username;
-    this.password = password;
-    this.maxRows = maxRows;
+  public AdminPushAudienceSqlService(AdminPushAudienceJdbcClient client) {
+    this.client = client;
   }
 
   /**
@@ -112,20 +97,7 @@ public class AdminPushAudienceSqlService {
    */
   public List<Long> query(String sql) {
     validateSql(sql);
-    if (!url.startsWith("jdbc:postgresql:")
-        || username.isBlank()
-        || password.isBlank()
-        || maxRows < 1
-        || maxRows == Integer.MAX_VALUE) {
-      throw new ApiException(ErrorCode.SERVICE_UNAVAILABLE);
-    }
-    Properties credentials = new Properties();
-    credentials.setProperty("user", username);
-    credentials.setProperty("password", password);
-    credentials.setProperty("connectTimeout", "5");
-    credentials.setProperty("socketTimeout", "15");
-    credentials.setProperty("readOnlyMode", "transaction");
-    try (Connection connection = DriverManager.getConnection(url, credentials)) {
+    try (Connection connection = client.open()) {
       connection.setReadOnly(true);
       connection.setAutoCommit(false);
       try {
@@ -161,7 +133,7 @@ public class AdminPushAudienceSqlService {
     try (var statement =
         connection.prepareStatement("select * from (\n" + sql + "\n) audience_result")) {
       statement.setQueryTimeout(10);
-      statement.setMaxRows(maxRows + 1);
+      statement.setMaxRows(client.maxRows() + 1);
       // 데이터 전송 전에 형식을 확인해 JSON·TEXT 대량 결과를 메모리에 받지 않는다.
       var metadata = statement.getMetaData();
       if (metadata == null
@@ -180,7 +152,7 @@ public class AdminPushAudienceSqlService {
         int rows = 0;
         while (result.next()) {
           var value = result.getBigDecimal(1);
-          if (++rows > maxRows || value == null || value.signum() <= 0) {
+          if (++rows > client.maxRows() || value == null || value.signum() <= 0) {
             throw new ApiException(ErrorCode.INVALID_REQUEST);
           }
           ids.add(value.longValueExact());
