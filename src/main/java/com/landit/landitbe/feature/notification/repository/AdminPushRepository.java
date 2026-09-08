@@ -2,12 +2,14 @@
 
 package com.landit.landitbe.feature.notification.repository;
 
+import com.landit.landitbe.feature.notification.domain.AdminPushAudienceType;
 import com.landit.landitbe.feature.notification.dto.AdminPushAudiencePreview;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignView;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminPushRepository {
 
   private static final int BATCH_SIZE = 100;
+
+  private static final String AUDIENCE_FROM =
+      """
+      from user_push_token t join user_profile p on p.id=t.user_profile_id
+      join admin_push_campaign c on c.id=?
+      where t.status='ACTIVE' and p.status='ACTIVE'
+        and (c.audience_type='ALL' or exists (
+          select 1 from admin_push_campaign_user selected
+          where selected.campaign_id=c.id and selected.user_profile_id=p.id))
+      """;
 
   private final JdbcTemplate jdbc;
 
@@ -70,12 +82,13 @@ public class AdminPushRepository {
    * @param campaign 저장할 캠페인
    * @param key 생성 요청 키
    */
+  @Transactional
   public void insert(Campaign campaign, String key) {
     jdbc.update(
         """
         insert into admin_push_campaign (
-          id,title,body,deep_link,created_by,create_request_key,request_hash,created_at,updated_at
-        ) values (?,?,?,?,?,?,?,?,?)
+          id,title,body,deep_link,created_by,create_request_key,request_hash,created_at,updated_at,audience_type
+        ) values (?,?,?,?,?,?,?,?,?,?)
         """,
         campaign.id(),
         campaign.content().title(),
@@ -85,24 +98,48 @@ public class AdminPushRepository {
         key,
         campaign.hash(),
         campaign.createdAt(),
-        campaign.createdAt());
+        campaign.createdAt(),
+        campaign.content().audienceType().name());
+    if (!campaign.content().userProfileIds().isEmpty()) {
+      jdbc.batchUpdate(
+          "insert into admin_push_campaign_user(campaign_id,user_profile_id) values (?,?)",
+          campaign.content().userProfileIds().stream()
+              .map(userId -> new Object[] {campaign.id(), userId})
+              .toList());
+    }
+  }
+
+  /**
+   * 선택 목록의 모든 사용자 ID가 존재하는지 확인한다.
+   *
+   * @param userIds 중복을 제거한 사용자 ID 목록
+   * @return 모두 존재하거나 목록이 비어 있으면 true
+   */
+  public boolean usersExist(List<Long> userIds) {
+    if (userIds.isEmpty()) {
+      return true;
+    }
+    String placeholders = String.join(",", Collections.nCopies(userIds.size(), "?"));
+    return jdbc.queryForObject(
+            "select count(*) from user_profile where id in (" + placeholders + ")",
+            Long.class,
+            userIds.toArray())
+        == userIds.size();
   }
 
   /**
    * 현재 활성 사용자와 Token 수를 반환한다.
    *
+   * @param id 대상 조건을 적용할 캠페인 ID
    * @return 예상 대상 수
    */
-  public AdminPushAudiencePreview preview() {
+  public AdminPushAudiencePreview preview(UUID id) {
     return jdbc.queryForObject(
-        """
-        select count(distinct t.user_profile_id) users,count(*) tokens
-        from user_push_token t join user_profile p on p.id=t.user_profile_id
-        where t.status='ACTIVE' and p.status='ACTIVE'
-        """,
+        "select count(distinct t.user_profile_id) users,count(*) tokens " + AUDIENCE_FROM,
         (result, row) ->
             new AdminPushAudiencePreview(
-                result.getLong("users"), result.getLong("tokens"), LocalDateTime.now()));
+                result.getLong("users"), result.getLong("tokens"), LocalDateTime.now()),
+        id);
   }
 
   /**
@@ -129,10 +166,9 @@ public class AdminPushRepository {
     jdbc.update(
         """
         insert into admin_push_target(campaign_id,user_push_token_id,user_profile_id)
-        select ?,t.id,t.user_profile_id
-        from user_push_token t join user_profile p on p.id=t.user_profile_id
-        where t.status='ACTIVE' and p.status='ACTIVE'
-        """,
+        select c.id,t.id,t.user_profile_id
+        """
+            + AUDIENCE_FROM,
         id);
     jdbc.update(
         """
@@ -247,14 +283,31 @@ public class AdminPushRepository {
         counts.failed(),
         excluded,
         campaign.createdAt(),
-        campaign.completedAt());
+        campaign.completedAt(),
+        campaign.content().audienceType(),
+        campaign.content().userProfileIds());
   }
 
   private Campaign map(ResultSet result, int row) throws SQLException {
+    UUID id = result.getObject("id", UUID.class);
+    AdminPushAudienceType audience =
+        AdminPushAudienceType.valueOf(result.getString("audience_type"));
+    List<Long> selectedUsers =
+        audience == AdminPushAudienceType.ALL
+            ? List.of()
+            : jdbc.queryForList(
+                "select user_profile_id from admin_push_campaign_user "
+                    + "where campaign_id=? order by user_profile_id",
+                Long.class,
+                id);
     return new Campaign(
-        result.getObject("id", UUID.class),
+        id,
         new AdminPushCampaignRequest(
-            result.getString("title"), result.getString("body"), result.getString("deep_link")),
+            result.getString("title"),
+            result.getString("body"),
+            result.getString("deep_link"),
+            audience,
+            selectedUsers),
         result.getLong("created_by"),
         result.getString("request_hash"),
         result.getString("status"),

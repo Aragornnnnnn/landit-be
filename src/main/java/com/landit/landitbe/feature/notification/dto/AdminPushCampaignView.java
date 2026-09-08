@@ -2,7 +2,9 @@
 
 package com.landit.landitbe.feature.notification.dto;
 
+import com.landit.landitbe.feature.notification.domain.AdminPushAudienceType;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -22,6 +24,8 @@ import java.util.UUID;
  * @param excludedCount 발송 전에 비활성화되어 제외된 수
  * @param createdAt 생성 시각
  * @param completedAt 전체 대상 제출 완료 시각
+ * @param audienceType 발송 대상 유형
+ * @param userProfileIds 생성 시 고정한 선택 사용자 목록. ALL이면 빈 목록
  */
 public record AdminPushCampaignView(
     UUID id,
@@ -37,4 +41,6 @@ public record AdminPushCampaignView(
     long failedCount,
     long excludedCount,
     LocalDateTime createdAt,
-    LocalDateTime completedAt) {}
+    LocalDateTime completedAt,
+    AdminPushAudienceType audienceType,
+    List<Long> userProfileIds) {}

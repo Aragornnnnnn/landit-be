@@ -19,10 +19,12 @@ import com.landit.landitbe.feature.notification.client.NotificationSender;
 import com.landit.landitbe.feature.notification.client.PushMessage;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
+import com.landit.landitbe.feature.notification.domain.AdminPushAudienceType;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.messaging.PushQueuePublisher;
 import com.landit.landitbe.feature.notification.repository.AdminPushRepository;
+import com.landit.landitbe.shared.exception.ApiException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;
@@ -61,6 +63,7 @@ class AdminPushCampaignIntegrationTests {
   void setup() {
     jdbc.update("delete from push_delivery");
     jdbc.update("delete from admin_push_target");
+    jdbc.update("delete from admin_push_campaign_user");
     jdbc.update("delete from admin_push_campaign");
     jdbc.update("delete from user_push_token");
     profile(ADMIN);
@@ -85,6 +88,90 @@ class AdminPushCampaignIntegrationTests {
             tokens, deliveries, sender, queue, new SimpleMeterRegistry());
     campaigns = new AdminPushCampaignService(repository, input, audit, queue);
     processor = new AdminPushProcessingService(repository, deliveries, dispatch, queue);
+  }
+
+  @Test
+  void sendsOnlySelectedActiveUsersAndKeepsAdminTestIndependent() {
+    final long selectedToken = token(USER, "selected-1");
+    final long revokedToken = token(USER, "selected-2");
+    token(ADMIN, "not-selected-admin");
+    profile(USER + 1);
+    profile(USER + 2);
+    token(USER + 1, "inactive");
+    jdbc.update("update user_profile set status='BANNED' where id=?", USER + 1);
+    UUID id =
+        campaigns.create(ADMIN, "selected", selected(List.of(USER + 2, USER, USER + 1, USER))).id();
+
+    assertThat(campaigns.detail(id).audienceType()).isEqualTo(AdminPushAudienceType.SELECTED);
+    assertThat(campaigns.detail(id).userProfileIds()).containsExactly(USER, USER + 1, USER + 2);
+    assertThat(campaigns.preview(id).estimatedUserCount()).isEqualTo(1);
+    assertThat(campaigns.preview(id).estimatedTokenCount()).isEqualTo(2);
+    campaigns.test(id, ADMIN, "test");
+    processor.test(id, ADMIN, "test");
+    campaigns.send(id, ADMIN, "send");
+    campaigns.send(id, ADMIN, "send");
+    jdbc.update("update user_push_token set status='REVOKED' where id=?", revokedToken);
+    processor.process(id);
+    processor.process(id);
+
+    assertThat(campaigns.detail(id).targetTokenCount()).isEqualTo(2);
+    assertThat(campaigns.detail(id).excludedCount()).isEqualTo(1);
+    assertThat(
+            jdbc.queryForList(
+                "select user_push_token_id from push_delivery "
+                    + "where notification_type='ADMIN_BROADCAST'",
+                Long.class))
+        .containsExactly(selectedToken);
+    verify(sender, times(2)).send(anyList());
+  }
+
+  @Test
+  void deduplicatesSelectedCreationAndRejectsChangedAudienceOrMissingUsers() {
+    UUID id = campaigns.create(ADMIN, "selection-key", selected(List.of(USER, ADMIN))).id();
+    assertThat(campaigns.create(ADMIN, "selection-key", selected(List.of(ADMIN, USER, USER))).id())
+        .isEqualTo(id);
+    assertThatThrownBy(() -> campaigns.create(ADMIN, "selection-key", selected(List.of(USER))))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(
+            () ->
+                campaigns.create(
+                    ADMIN, "selection-key", new AdminPushCampaignRequest("공지", "내용", "/home")))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> campaigns.create(ADMIN, "missing", selected(List.of(Long.MAX_VALUE))))
+        .isInstanceOf(ApiException.class);
+    assertThat(repository.byKey(ADMIN, "missing")).isEmpty();
+    assertThat(campaigns.detail(id).userProfileIds()).containsExactly(ADMIN, USER);
+  }
+
+  private AdminPushCampaignRequest selected(List<Long> ids) {
+    return new AdminPushCampaignRequest("공지", "내용", "/home", AdminPushAudienceType.SELECTED, ids);
+  }
+
+  @Test
+  void rollsBackCampaignAndUsersWhenSelectionInsertFails() {
+    UUID id = UUID.randomUUID();
+    AdminPushRepository.Campaign campaign =
+        new AdminPushRepository.Campaign(
+            id,
+            selected(List.of(USER, Long.MAX_VALUE)),
+            ADMIN,
+            "hash",
+            "DRAFT",
+            0,
+            0,
+            0,
+            0,
+            java.time.LocalDateTime.now(),
+            null);
+    assertThatThrownBy(() -> repository.insert(campaign, "rollback"))
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    assertThat(repository.find(id)).isEmpty();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from admin_push_campaign_user where campaign_id=?",
+                Long.class,
+                id))
+        .isZero();
   }
 
   @Test

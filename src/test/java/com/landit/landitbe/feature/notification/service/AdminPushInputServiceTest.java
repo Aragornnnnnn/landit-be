@@ -2,11 +2,16 @@
 
 package com.landit.landitbe.feature.notification.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.notification.domain.AdminPushAudienceType;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.shared.exception.ApiException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +51,57 @@ class AdminPushInputServiceTest {
 
   private AdminPushCampaignRequest request(String link) {
     return new AdminPushCampaignRequest("공지", "내용", link);
+  }
+
+  @Test
+  void acceptsLegacyAllAndNormalizesSelectedIdsWithoutCountingThemInPushPayload() {
+    AdminPushCampaignRequest legacy =
+        JsonMapper.builder()
+            .build()
+            .readValue(
+                "{\"title\":\"공지\",\"body\":\"내용\",\"deepLink\":\"/home\"}",
+                AdminPushCampaignRequest.class);
+    assertThat(service.validate(legacy).audienceType()).isEqualTo(AdminPushAudienceType.ALL);
+    AdminPushCampaignRequest large =
+        new AdminPushCampaignRequest(
+            "공지",
+            "내용",
+            "/home",
+            AdminPushAudienceType.SELECTED,
+            LongStream.rangeClosed(1, 1000).boxed().toList());
+    assertThatCode(() -> service.validate(large)).doesNotThrowAnyException();
+    assertThat(
+            service
+                .validate(
+                    new AdminPushCampaignRequest(
+                        "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of(2L, 1L, 2L)))
+                .userProfileIds())
+        .containsExactly(1L, 2L);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidAudiences")
+  void rejectsInvalidAudienceSelections(AdminPushCampaignRequest request) {
+    assertThatThrownBy(() -> service.validate(request)).isInstanceOf(ApiException.class);
+  }
+
+  private static Stream<AdminPushCampaignRequest> invalidAudiences() {
+    return Stream.of(
+        new AdminPushCampaignRequest("공지", "내용", "/home", AdminPushAudienceType.ALL, List.of(1L)),
+        new AdminPushCampaignRequest("공지", "내용", "/home", null, List.of(1L)),
+        new AdminPushCampaignRequest("공지", "내용", "/home", AdminPushAudienceType.SELECTED, null),
+        new AdminPushCampaignRequest(
+            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of()),
+        new AdminPushCampaignRequest(
+            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, Arrays.asList(1L, null)),
+        new AdminPushCampaignRequest(
+            "공지", "내용", "/home", AdminPushAudienceType.SELECTED, List.of(0L)),
+        new AdminPushCampaignRequest(
+            "공지",
+            "내용",
+            "/home",
+            AdminPushAudienceType.SELECTED,
+            LongStream.rangeClosed(1, 1001).boxed().toList()));
   }
 
   private static Stream<String> validLinks() {

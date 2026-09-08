@@ -21,7 +21,11 @@ import java.util.UUID;
 public interface AdminPushCampaignControllerDocs {
 
   /** 관리자 푸시 캠페인을 생성한다. */
-  @Operation(summary = "푸시 캠페인 생성")
+  @Operation(
+      summary = "푸시 캠페인 생성",
+      description =
+          "audienceType은 ALL(기본값) 또는 SELECTED다. SELECTED는 사용자 ID 목록 1~1000개가 필요하며 "
+              + "중복 ID는 제거한다. ALL에 ID를 보내거나 존재하지 않는 ID를 보내면 거부한다. 대상 조건은 생성 후 수정할 수 없다.")
   ApiResponse<AdminPushCampaignView> create(
       @Parameter(hidden = true) AuthUserPrincipal principal,
       @Parameter(description = "1~128자 ASCII 영숫자, 대시, 밑줄") String key,
@@ -35,8 +39,8 @@ public interface AdminPushCampaignControllerDocs {
   @Operation(summary = "푸시 캠페인 상세 조회")
   ApiResponse<AdminPushCampaignView> detail(UUID campaignId);
 
-  /** 현재 활성 사용자와 Token 수를 조회한다. */
-  @Operation(summary = "전체 발송 예상 대상 조회")
+  /** 캠페인 대상 조건에 맞는 현재 활성 사용자와 Token 수를 조회한다. */
+  @Operation(summary = "캠페인 예상 대상 조회")
   ApiResponse<AdminPushAudiencePreview> preview(UUID campaignId);
 
   /** 인증 관리자의 활성 Token에 테스트 알림을 보낸다. */
@@ -44,8 +48,8 @@ public interface AdminPushCampaignControllerDocs {
   ApiResponse<AdminPushCampaignView> test(
       UUID campaignId, @Parameter(hidden = true) AuthUserPrincipal principal, String key);
 
-  /** 캠페인의 전체 발송을 SQS에 요청한다. */
-  @Operation(summary = "캠페인 전체 발송")
+  /** 캠페인의 대상 조건에 맞는 발송을 SQS에 요청한다. */
+  @Operation(summary = "캠페인 발송", description = "저장된 ALL 또는 SELECTED 범위 중 활성 사용자·활성 Token에 발송한다.")
   ApiResponse<AdminPushCampaignView> send(
       UUID campaignId, @Parameter(hidden = true) AuthUserPrincipal principal, String key);
 }

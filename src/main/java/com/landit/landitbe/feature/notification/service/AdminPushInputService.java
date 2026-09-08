@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.notification.service;
 
+import com.landit.landitbe.feature.notification.domain.AdminPushAudienceType;
 import com.landit.landitbe.feature.notification.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -55,7 +56,20 @@ public class AdminPushInputService {
     if (payload(request).length > MAX_PAYLOAD_BYTES) {
       throw new ApiException(ErrorCode.PUSH_PAYLOAD_TOO_LARGE);
     }
-    return request;
+    if (request.userProfileIds().size() > 1000
+        || request.userProfileIds().stream().anyMatch(id -> id == null || id <= 0)
+        || (request.audienceType() == AdminPushAudienceType.ALL
+            && !request.userProfileIds().isEmpty())
+        || (request.audienceType() == AdminPushAudienceType.SELECTED
+            && request.userProfileIds().isEmpty())) {
+      throw invalid();
+    }
+    return new AdminPushCampaignRequest(
+        request.title(),
+        request.body(),
+        request.deepLink(),
+        request.audienceType(),
+        request.userProfileIds().stream().distinct().sorted().toList());
   }
 
   /**
@@ -77,8 +91,17 @@ public class AdminPushInputService {
    */
   public String fingerprint(AdminPushCampaignRequest request) {
     try {
-      return HexFormat.of()
-          .formatHex(MessageDigest.getInstance("SHA-256").digest(payload(validate(request))));
+      AdminPushCampaignRequest validated = validate(request);
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update(payload(validated));
+      // 기존 ALL 캠페인의 해시는 유지하고 SELECTED의 정규화된 ID 목록만 추가한다.
+      if (validated.audienceType() == AdminPushAudienceType.SELECTED) {
+        digest.update(
+            jsonMapper
+                .writeValueAsString(validated.userProfileIds())
+                .getBytes(StandardCharsets.UTF_8));
+      }
+      return HexFormat.of().formatHex(digest.digest());
     } catch (NoSuchAlgorithmException exception) {
       throw new IllegalStateException("SHA-256 해시를 생성할 수 없습니다.", exception);
     }

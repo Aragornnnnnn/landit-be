@@ -1,8 +1,8 @@
-# LAN-462 어드민 전체 푸시 캠페인 설계
+# LAN-462 어드민 푸시 캠페인 설계
 
 ## 목표
 
-관리자가 제목, 내용, 딥 링크를 가진 캠페인을 만들고 본인 테스트 후 전체 활성 Expo Push Token에 비동기로 발송한다. 캠페인 생성 후 원문은 수정하지 않는다.
+관리자가 제목, 내용, 딥 링크를 가진 캠페인을 만들고 본인 테스트 후 전체 또는 선택 사용자의 활성 Expo Push Token에 비동기로 발송한다. 캠페인 생성 후 원문과 대상 조건은 수정하지 않는다.
 
 ## API
 
@@ -11,7 +11,7 @@
 - `GET /api/v1/admin/push-campaigns/{campaignId}`: 원문, 상태, 집계 조회.
 - `GET /api/v1/admin/push-campaigns/{campaignId}/audience-preview`: 현재 예상 사용자·Token 수 조회.
 - `POST /api/v1/admin/push-campaigns/{campaignId}/test`: 관리자 본인 테스트를 SQS에 발행.
-- `POST /api/v1/admin/push-campaigns/{campaignId}/send`: 전체 발송을 SQS에 발행.
+- `POST /api/v1/admin/push-campaigns/{campaignId}/send`: 저장된 대상 조건의 발송을 SQS에 발행.
 
 모든 API는 기존 `/api/v1/admin/**` 권한 검사를 사용한다. 생성·테스트·전체 발송은 기존 관리자 감사 로그에 기록한다.
 
@@ -35,12 +35,22 @@
 - 실제 Expo 표시 payload는 UTF-8 기준 3,000바이트 이하여야 한다.
 - 딥 링크는 `/`로 시작하는 앱 내부 경로 또는 사용자 정보가 없는 `https` URL만 허용한다.
 - 캠페인 생성과 테스트는 `Idempotency-Key`를 사용한다.
+- `audienceType`: `ALL`(생략 시 기본값) 또는 `SELECTED`.
+- `ALL`은 `userProfileIds`를 생략하거나 빈 목록으로 보낸다. ID가 포함되면 오류다.
+- `SELECTED`는 양수 사용자 ID 1~1,000개가 필수다. 중복 제거·정렬 후 저장하며 존재하지 않는 ID는 거부한다.
+- 같은 생성 요청 키에서 대상 유형이나 사용자 집합이 달라지면 충돌이다. 순서·중복만 달라진 목록은 같은 요청으로 처리한다.
+- 선택 사용자가 비활성이거나 활성 Token이 없으면 실제 대상에 포함하지 않는다. 대상 수는 입력 ID 수가 아닌 발송 가능한 사용자·Token 수다.
+- 생성·목록·상세 응답에 `audienceType`, 정규화된 `userProfileIds`를 반환한다. 본인 테스트는 이 목록과 관계없이 인증 관리자에게 발송한다.
+
+```json
+{"title":"공지","body":"내용","deepLink":"/home","audienceType":"SELECTED","userProfileIds":[123,456]}
+```
 
 ## 발송 흐름
 
-1. 전체 발송 요청 시 활성 사용자와 Token ID를 캠페인 대상 테이블에 고정한다.
+1. 발송 요청 시 저장된 ALL/SELECTED 조건에 맞는 활성 사용자와 Token ID를 캠페인 대상 테이블에 고정한다. 예상 대상 조회도 같은 SQL 조건을 사용한다.
 2. SQS에는 캠페인 ID만 발행한다.
-3. 소비자는 고정된 대상 중 현재도 같은 활성 사용자가 소유한 활성 Token을 최대 100개 조회한다.
+3. 소비자는 고정된 대상을 최대 100개 조회한다. 실제 발송 적격성은 다음 단계에서 확인한다.
 4. 기존 `PushDeliveryService`가 Token을 다시 확인하고 `push_delivery`를 선점한다.
 5. 기존 Expo 배치 발송과 `PUSH_RECEIPT_CHECK` 흐름으로 Ticket과 Receipt를 기록한다.
 6. 마지막 대상 ID를 캠페인 커서에 저장하고 다음 페이지를 SQS에 발행한다.
@@ -63,10 +73,12 @@ push:admin-broadcast-test:{campaignId}:{idempotencyKey}:{userPushTokenId}
 
 `admin_push_campaign`에는 불변 원문, 생성 멱등성 키, `DRAFT/QUEUED/SENDING/COMPLETED` 상태, 대상 수와 처리 커서를 저장한다. `admin_push_target`에는 발송 요청 시점의 사용자와 Token ID만 저장한다. 결과 수는 기존 `push_delivery`에서 캠페인 키 접두어로 집계한다.
 
+V83에서 `audience_type`과 `admin_push_campaign_user(campaign_id, user_profile_id)`를 추가한다. 캠페인과 선택 목록은 한 트랜잭션에 저장한다. 기존 캠페인은 ALL로 유지하며 기존 생성 요청 해시도 호환된다.
+
 - 성공: Receipt가 `DELIVERED`인 Token 수.
 - 실패: Ticket 또는 Receipt가 `FAILED`인 Token 수.
 - 대기: `REQUESTED` 또는 `TICKET_ACCEPTED`인 Token 수.
-- 제외: 최초 대상 Token 수에서 생성된 전체 발송 이력 수를 뺀 값.
+- 제외: 처리 완료 커서 이하의 대상 수에서 같은 범위의 발송 이력 수를 뺀 값.
 
 `COMPLETED`는 대상 페이지 제출 완료를 뜻하며 실제 기기 표시나 전원 성공을 뜻하지 않는다.
 

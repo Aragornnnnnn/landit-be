@@ -29,6 +29,19 @@ class AdminPushCampaignApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/admin/push-campaigns'].post.summary").exists())
         .andExpect(
+            jsonPath("$.components.schemas.AdminPushCampaignRequest.properties.audienceType.enum")
+                .value(org.hamcrest.Matchers.contains("ALL", "SELECTED")))
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.AdminPushCampaignRequest.properties"
+                        + ".userProfileIds.maxItems")
+                .value(1000))
+        .andExpect(
+            jsonPath("$.components.schemas.AdminPushCampaignView.properties.audienceType").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.AdminPushCampaignView.properties.userProfileIds")
+                .exists())
+        .andExpect(
             jsonPath("$.paths['/api/v1/admin/push-campaigns/{campaignId}/test'].post.summary")
                 .exists())
         .andExpect(

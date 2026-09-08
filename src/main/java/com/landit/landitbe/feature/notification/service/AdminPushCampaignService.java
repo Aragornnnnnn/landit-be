@@ -40,6 +40,9 @@ public class AdminPushCampaignService {
   public AdminPushCampaignView create(long adminId, String key, AdminPushCampaignRequest request) {
     input.validateKey(key);
     AdminPushCampaignRequest content = input.validate(request);
+    if (!repository.usersExist(content.userProfileIds())) {
+      throw new ApiException(ErrorCode.INVALID_REQUEST);
+    }
     String hash = input.fingerprint(content);
     Campaign campaign =
         new Campaign(
@@ -105,7 +108,7 @@ public class AdminPushCampaignService {
    */
   public AdminPushAudiencePreview preview(UUID id) {
     requireCampaign(id);
-    return repository.preview();
+    return repository.preview(id);
   }
 
   /**
