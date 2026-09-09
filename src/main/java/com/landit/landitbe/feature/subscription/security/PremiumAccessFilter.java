@@ -16,15 +16,17 @@ import java.util.List;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * 유료 기능 API 요청을 구독 상태와 무료 대화 완료 여부로 제한한다.
  *
- * <p>인증 필터 뒤에서 동작하며, 아래 두 목록에 해당하는 요청만 검사한다. 허용 규칙은 {@link PremiumAccess}가 정한다. 인증되지 않은 요청은 건드리지 않고
- * 넘겨 시큐리티 설정이 401을 돌려주게 한다.
+ * <p>인증 필터 뒤에서 동작하며, 아래 두 목록에 해당하는 요청만 검사한다. 경로 비교는 시큐리티 설정의 {@code requestMatchers}와 같은 {@link
+ * PathPatternRequestMatcher}를 써서, 컨트롤러 매핑과 동일하게 디코딩된 경로로 판단한다(인코딩·매트릭스 변수로 우회할 수 없다). 허용 규칙은 {@link
+ * PremiumAccess}가 정한다. 인증되지 않은 요청은 건드리지 않고 넘겨 시큐리티 설정이 401을 돌려주게 한다.
  *
  * <ul>
  *   <li>프리미엄 전용: 프리톡 시작과 진행 중 동작(메시지·종료 결정·표현 재생성), 표현 학습 시작·추가 예문·완료, 발음 평가
@@ -37,21 +39,23 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class PremiumAccessFilter extends OncePerRequestFilter {
 
-  private static final List<GatedPath> PREMIUM_ONLY_PATHS =
+  private static final List<RequestMatcher> PREMIUM_ONLY_PATHS =
       List.of(
-          new GatedPath(HttpMethod.POST, "/api/v1/free-talk/sessions"),
-          new GatedPath(HttpMethod.POST, "/api/v1/free-talk/sessions/*/**"),
-          new GatedPath(HttpMethod.GET, "/api/v1/expressions/*/learning-start"),
-          new GatedPath(HttpMethod.GET, "/api/v1/expressions/*/practice"),
-          new GatedPath(HttpMethod.POST, "/api/v1/expressions/*/learning-finish"),
-          new GatedPath(HttpMethod.POST, "/api/v1/expressions/*/pronunciation/**"));
+          PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/free-talk/sessions"),
+          PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/free-talk/sessions/*/**"),
+          PathPatternRequestMatcher.pathPattern(
+              HttpMethod.GET, "/api/v1/expressions/*/learning-start"),
+          PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/v1/expressions/*/practice"),
+          PathPatternRequestMatcher.pathPattern(
+              HttpMethod.POST, "/api/v1/expressions/*/learning-finish"),
+          PathPatternRequestMatcher.pathPattern(
+              HttpMethod.POST, "/api/v1/expressions/*/pronunciation/**"));
 
-  private static final List<GatedPath> SCENARIO_CONVERSATION_PATHS =
+  private static final List<RequestMatcher> SCENARIO_CONVERSATION_PATHS =
       List.of(
-          new GatedPath(HttpMethod.POST, "/api/v1/scenarios/*/sessions"),
-          new GatedPath(HttpMethod.POST, "/api/v1/sessions/*/messages"));
+          PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/scenarios/*/sessions"),
+          PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/sessions/*/messages"));
 
-  private final AntPathMatcher pathMatcher = new AntPathMatcher(); // URL 경로 패턴 비교기
   private final UserSubscriptionService userSubscriptionService;
   private final AuthFailureResponseWriter failureResponseWriter;
 
@@ -114,23 +118,7 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
     return access.allowsScenarioConversation();
   }
 
-  private boolean matchesAny(List<GatedPath> gatedPaths, HttpServletRequest request) {
-    return gatedPaths.stream().anyMatch(gatedPath -> gatedPath.matches(request, pathMatcher));
-  }
-
-  /**
-   * "잠글 API 하나"를 표현하는 작은 데이터 묶음이다.
-   *
-   * <p>제한 대상 경로 하나를 HTTP 메서드와 Ant 패턴으로 표현한다.
-   *
-   * @param method 제한할 HTTP 메서드. null이면 모든 메서드
-   * @param pattern 요청 URI에 대한 Ant 패턴
-   */
-  private record GatedPath(HttpMethod method, String pattern) {
-
-    private boolean matches(HttpServletRequest request, AntPathMatcher pathMatcher) {
-      boolean methodMatches = method == null || method.matches(request.getMethod());
-      return methodMatches && pathMatcher.match(pattern, request.getRequestURI());
-    }
+  private static boolean matchesAny(List<RequestMatcher> matchers, HttpServletRequest request) {
+    return matchers.stream().anyMatch(matcher -> matcher.matches(request));
   }
 }

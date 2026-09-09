@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -114,6 +115,24 @@ class PremiumAccessIntegrationTests {
         }) {
       mockMvc
           .perform(request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+    }
+  }
+
+  /** 경로를 퍼센트 인코딩해도 컨트롤러 매핑과 같은 디코딩 기준으로 게이트에 걸린다. 매트릭스 변수(;)는 Spring Security 방화벽이 400으로 거절한다. */
+  @Test
+  void blocksEncodedAndMatrixVariantsOfGatedPaths() throws Exception {
+    String accessToken = login("premium-gate-encoded");
+
+    for (String rawPath :
+        new String[] {
+          "/api/v1/expressions/" + MISSING_ID + "/learning%2Dstart",
+          "/api/v1/expressions/" + MISSING_ID + "/learning%2dstart",
+        }) {
+      mockMvc
+          .perform(
+              get(URI.create(rawPath)).header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
     }
