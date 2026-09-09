@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 
 /** 구독 기능에서 예상 가능한 오류 코드와 HTTP 상태를 정의한다. */
 public enum SubscriptionErrorCode {
-  WEBHOOK_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "웹훅 인증에 실패했습니다.");
+  WEBHOOK_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "웹훅 인증에 실패했습니다."),
+  PREMIUM_REQUIRED(HttpStatus.FORBIDDEN, "프리미엄 구독이 필요합니다.");
 
   private final HttpStatus status;
   private final String message;

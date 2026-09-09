@@ -61,6 +61,21 @@ class UserSubscriptionLaunchUnsetIntegrationTests {
         .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(false));
   }
 
+  /** 도입 시점이 비어 있으면 유료 기능 게이트도 꺼져 비프리미엄 사용자의 표현 학습 요청이 403을 받지 않는다. */
+  @Test
+  void doesNotGatePremiumFeaturesWhenLaunchedAtIsNotConfigured() throws Exception {
+    String accessToken = login("subscription-launch-unset-gate");
+
+    mockMvc
+        .perform(
+            get("/api/v1/expressions/987654321/learning-start")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(
+            result ->
+                org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
+                    .isNotEqualTo(403));
+  }
+
   private void seedClearedScenario(String userKey) {
     jdbcTemplate.update("DELETE FROM user_scenario_progress WHERE scenario_id = ?", SCENARIO_ID);
     jdbcTemplate.update("DELETE FROM scenario WHERE id = ?", SCENARIO_ID);

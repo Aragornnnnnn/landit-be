@@ -8,6 +8,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +34,17 @@ public interface ExpressionPronunciationControllerDocs {
       description =
           "대표 예문을 읽은 녹음을 분석해 점수와 단어별 발음·강세 판정, 코칭 문구를 반환한다." + " 판정 기준은 사용자의 AI 튜터 억양을 따른다.",
       security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "분석 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)")
+  })
   ApiResponse<PronunciationAnalysisResponse> analyzeSentence(
       AuthUserPrincipal principal,
       @Parameter(description = "Writing 표현 ID", example = "101") Long expressionId,

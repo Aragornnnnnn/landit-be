@@ -6,6 +6,7 @@ import com.landit.landitbe.config.web.CorsProperties;
 import com.landit.landitbe.feature.admin.security.AdminAuthorizationFilter;
 import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
 import com.landit.landitbe.feature.auth.security.AuthTokenFilter;
+import com.landit.landitbe.feature.subscription.security.PremiumAccessFilter;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
@@ -35,6 +36,7 @@ public class AuthSecurityConfig {
 
   private final AuthTokenFilter authTokenFilter;
   private final AdminAuthorizationFilter adminAuthorizationFilter;
+  private final PremiumAccessFilter premiumAccessFilter;
   private final AuthFailureResponseWriter failureResponseWriter;
 
   /**
@@ -42,14 +44,17 @@ public class AuthSecurityConfig {
    *
    * @param authTokenFilter Bearer 토큰 인증 필터
    * @param adminAuthorizationFilter 관리자 API 권한 필터
+   * @param premiumAccessFilter 유료 기능 접근 제한 필터
    * @param failureResponseWriter 인증 실패 응답 작성기
    */
   public AuthSecurityConfig(
       AuthTokenFilter authTokenFilter,
       AdminAuthorizationFilter adminAuthorizationFilter,
+      PremiumAccessFilter premiumAccessFilter,
       AuthFailureResponseWriter failureResponseWriter) {
     this.authTokenFilter = authTokenFilter;
     this.adminAuthorizationFilter = adminAuthorizationFilter;
+    this.premiumAccessFilter = premiumAccessFilter;
     this.failureResponseWriter = failureResponseWriter;
   }
 
@@ -135,6 +140,7 @@ public class AuthSecurityConfig {
                     .permitAll())
         .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(adminAuthorizationFilter, AuthTokenFilter.class)
+        .addFilterAfter(premiumAccessFilter, AdminAuthorizationFilter.class)
         .build();
   }
 

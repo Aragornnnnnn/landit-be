@@ -66,6 +66,9 @@ public interface FreeTalkControllerDocs {
         responseCode = "401",
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "주제 없음"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -99,7 +102,7 @@ public interface FreeTalkControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "세션 소유자 아님"),
+        description = "세션 소유자 아님 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
@@ -134,7 +137,7 @@ public interface FreeTalkControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "세션 소유자 아님"),
+        description = "세션 소유자 아님 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
@@ -222,7 +225,7 @@ public interface FreeTalkControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "세션 소유자 아님"),
+        description = "세션 소유자 아님 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
