@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.admin;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,13 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
-import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,8 +30,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.transaction.annotation.Transactional;
 
 /** 관리자 사용자 목록과 상세 조회 API를 검증한다. */
 @ActiveProfiles("test")
@@ -116,119 +109,6 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.data.page").value(0))
         .andExpect(jsonPath("$.data.size").value(2));
   }
-
-  @Test
-  @Transactional
-  @DisplayName("활성 및 푸시 동의 필터를 단독·조합 적용하고 필터 후 페이지를 나눈다.")
-  void filtersUsersBeforePagination() throws Exception {
-    final String accessToken = loginAdmin();
-    List<FilterUser> users = seedFilterUsers();
-    Boolean[] filters = {null, true, false};
-    for (Boolean active : filters) {
-      for (Boolean pushConsent : filters) {
-        List<Long> expected =
-            users.stream()
-                .filter(
-                    user -> active == null || active == (user.status() == UserProfileStatus.ACTIVE))
-                .filter(
-                    user ->
-                        pushConsent == null
-                            || pushConsent == (user.permission() == PushPermissionStatus.GRANTED))
-                .map(FilterUser::id)
-                .toList();
-        MvcResult result =
-            mockMvc
-                .perform(
-                    filteredUsersRequest(accessToken, active, pushConsent)
-                        .param("size", String.valueOf(expected.size())))
-                .andExpect(status().isOk())
-                .andReturn();
-        JsonNode items =
-            objectMapper
-                .readTree(result.getResponse().getContentAsByteArray())
-                .path("data")
-                .path("items");
-        List<Long> actual = new ArrayList<>();
-        items.forEach(item -> actual.add(item.path("userProfileId").asLong()));
-        assertThat(actual).containsExactlyElementsOf(expected);
-      }
-    }
-    mockMvc
-        .perform(
-            filteredUsersRequest(accessToken, false, false).param("size", "1").param("page", "1"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].userProfileId").value(users.get(5).id()))
-        .andExpect(jsonPath("$.data.items[0].pushPermissionStatus").value("NOT_DETERMINED"))
-        .andExpect(jsonPath("$.data.hasNext").value(true));
-  }
-
-  @Test
-  @Transactional
-  @DisplayName("필터 결과의 전체 건수와 페이지 수를 마지막·범위 밖·빈 페이지에도 반환한다.")
-  void returnsFilteredPageTotals() throws Exception {
-    String accessToken = loginAdmin();
-    // 이 테스트의 트랜잭션 안에서 기존 사용자를 필터 밖으로 옮겨 대상 수를 고정한다.
-    jdbcTemplate.update(
-        "UPDATE user_profile SET status='ACTIVE', push_permission_status='GRANTED'");
-    seedFilterUsers();
-    int[] itemCounts = {3, 1, 0};
-    for (int page = 0; page < itemCounts.length; page++) {
-      mockMvc
-          .perform(
-              filteredUsersRequest(accessToken, false, false)
-                  .param("page", String.valueOf(page))
-                  .param("size", "3"))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.page").value(page))
-          .andExpect(jsonPath("$.data.size").value(3))
-          .andExpect(jsonPath("$.data.items.length()").value(itemCounts[page]))
-          .andExpect(jsonPath("$.data.totalCount").value(4))
-          .andExpect(jsonPath("$.data.totalPages").value(2))
-          .andExpect(jsonPath("$.data.hasNext").value(page == 0));
-    }
-    jdbcTemplate.update("UPDATE user_profile SET push_permission_status='GRANTED'");
-    mockMvc
-        .perform(filteredUsersRequest(accessToken, false, false))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items.length()").value(0))
-        .andExpect(jsonPath("$.data.totalCount").value(0))
-        .andExpect(jsonPath("$.data.totalPages").value(0))
-        .andExpect(jsonPath("$.data.hasNext").value(false));
-  }
-
-  private List<FilterUser> seedFilterUsers() throws Exception {
-    List<FilterUser> users = new ArrayList<>();
-    for (UserProfileStatus profileStatus : UserProfileStatus.values()) {
-      for (PushPermissionStatus permission : PushPermissionStatus.values()) {
-        String key = "admin-filter-" + UUID.randomUUID();
-        login(key, "필터 사용자");
-        long id = userProfileId(key);
-        jdbcTemplate.update(
-            "UPDATE user_profile SET status=?, push_permission_status=?, created_at=? WHERE id=?",
-            profileStatus.name(),
-            permission.name(),
-            java.time.LocalDateTime.of(2999, 1, 1, 0, 0).minusSeconds(users.size()),
-            id);
-        users.add(new FilterUser(id, profileStatus, permission));
-      }
-    }
-    return users;
-  }
-
-  private MockHttpServletRequestBuilder filteredUsersRequest(
-      String accessToken, Boolean active, Boolean pushConsent) {
-    MockHttpServletRequestBuilder request =
-        get("/api/v1/admin/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
-    if (active != null) {
-      request.param("active", active.toString());
-    }
-    if (pushConsent != null) {
-      request.param("pushConsent", pushConsent.toString());
-    }
-    return request;
-  }
-
-  private record FilterUser(long id, UserProfileStatus status, PushPermissionStatus permission) {}
 
   @DisplayName("사용자 상세에서 프로필과 학습 요약을 조회한다.")
   @Test
@@ -318,14 +198,6 @@ class AdminUserApiIntegrationTests {
             get("/api/v1/admin/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isForbidden());
     String adminAccessToken = loginAdmin();
-    for (String filter : List.of("active", "pushConsent")) {
-      mockMvc
-          .perform(
-              get("/api/v1/admin/users")
-                  .param(filter, "invalid")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
-          .andExpect(status().isBadRequest());
-    }
     mockMvc
         .perform(
             get("/api/v1/admin/users")
@@ -341,21 +213,6 @@ class AdminUserApiIntegrationTests {
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/admin/users'].get.summary").exists())
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/v1/admin/users'].get.parameters"
-                        + "[?(@.name == 'active')].schema.type")
-                .value("boolean"))
-        .andExpect(
-            jsonPath(
-                    "$.paths['/api/v1/admin/users'].get.parameters"
-                        + "[?(@.name == 'pushConsent')].schema.type")
-                .value("boolean"))
-        .andExpect(
-            jsonPath(
-                    "$.components.schemas.AdminUserListItem.required"
-                        + "[?(@ == 'pushPermissionStatus')]")
-                .exists())
         .andExpect(jsonPath("$.paths['/api/v1/admin/users/{userProfileId}'].get.summary").exists());
   }
 
@@ -375,10 +232,6 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'page')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'size')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'hasNext')]").exists())
-        .andExpect(
-            jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'totalCount')]").exists())
-        .andExpect(
-            jsonPath(schemas + "AdminUserListResponse.required[?(@ == 'totalPages')]").exists())
         .andExpect(
             jsonPath(schemas + "AdminUserListItem.required[?(@ == 'userProfileId')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'email')]").exists())

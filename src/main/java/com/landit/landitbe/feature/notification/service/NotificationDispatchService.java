@@ -98,59 +98,10 @@ public class NotificationDispatchService {
         preparedDeliveries, expoRequestCount, ticketAccepted, ticketFailed);
   }
 
-  /**
-   * DB에서 선점한 확정 토큰만 공지 전용 실패 정책으로 제출한다.
-   *
-   * @param deliveries 최대 100개 선점된 발송
-   */
-  public void sendAdminPrepared(List<PreparedPushDelivery> deliveries) {
-    if (deliveries.isEmpty()) {
-      return;
-    }
-    if (deliveries.size() > EXPO_BATCH_SIZE) {
-      throw new IllegalArgumentException("최대 100건입니다.");
-    }
-    List<PushTicketResult> results;
-    try {
-      results =
-          notificationSender.send(
-              deliveries.stream().map(PreparedPushDelivery::toPushMessage).toList());
-    } catch (PushNotificationException exception) {
-      markDeliveriesFailed(deliveries, EXPO_REQUEST_UNCONFIRMED);
-      return;
-    }
-    if (results.size() != deliveries.size()) {
-      markDeliveriesFailed(deliveries, EXPO_TICKET_RESULT_MISMATCH);
-      return;
-    }
-    for (int i = 0; i < deliveries.size(); i++) {
-      pushDeliveryService.recordTicketResult(deliveries.get(i).pushDeliveryId(), results.get(i));
-    }
-  }
-
-  /**
-   * 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다.
-   *
-   * @param eventId 다시 예약할 발송 이벤트 ID
-   */
-  public void scheduleAcceptedDeliveryReceipts(String eventId) {
+  /** 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다. */
+  private void scheduleAcceptedDeliveryReceipts(String eventId) {
     pushDeliveryService
         .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId))
-        .forEach(pushDeliveryId -> pushQueuePublisher.scheduleReceiptCheck(pushDeliveryId, 1));
-  }
-
-  /**
-   * 지정한 Token의 접수된 Ticket만 Receipt 확인 대상으로 다시 예약한다.
-   *
-   * @param eventId 다시 예약할 발송 이벤트 ID
-   * @param userPushTokenIds 현재 발송 페이지의 Token ID
-   */
-  public void scheduleAcceptedDeliveryReceipts(String eventId, List<Long> userPushTokenIds) {
-    if (userPushTokenIds.isEmpty()) {
-      return;
-    }
-    pushDeliveryService
-        .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId), userPushTokenIds)
         .forEach(pushDeliveryId -> pushQueuePublisher.scheduleReceiptCheck(pushDeliveryId, 1));
   }
 

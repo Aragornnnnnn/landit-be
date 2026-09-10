@@ -21,8 +21,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -283,15 +283,12 @@ public class UserProfileService {
    *
    * @param page 페이지 번호
    * @param size 페이지 크기
-   * @param active 활성 여부. 생략하면 모든 상태
-   * @param pushConsent 저장된 푸시 동의 여부. 생략하면 모든 권한 상태
    * @return 관리자 사용자 프로필 목록 페이지
    */
   @Transactional(readOnly = true)
-  public AdminUserProfilePage getAdminUserProfiles(
-      int page, int size, Boolean active, Boolean pushConsent) {
-    Page<UserProfile> profiles =
-        userProfileRepository.findAdminUsers(active, pushConsent, PageRequest.of(page, size));
+  public AdminUserProfilePage getAdminUserProfiles(int page, int size) {
+    Slice<UserProfile> profiles =
+        userProfileRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(page, size));
 
     return AdminUserProfilePage.from(profiles, page, size);
   }

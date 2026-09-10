@@ -34,14 +34,11 @@ public class AdminUserQueryService {
    *
    * @param page 페이지 번호
    * @param size 페이지 크기
-   * @param active 활성 여부. 생략하면 모든 상태
-   * @param pushConsent 저장된 푸시 동의 여부. 생략하면 모든 권한 상태
    * @return 관리자 사용자 목록 응답
    */
   @Transactional(readOnly = true)
-  public AdminUserListResponse getUsers(int page, int size, Boolean active, Boolean pushConsent) {
-    return AdminUserListResponse.from(
-        userProfileService.getAdminUserProfiles(page, size, active, pushConsent));
+  public AdminUserListResponse getUsers(int page, int size) {
+    return AdminUserListResponse.from(userProfileService.getAdminUserProfiles(page, size));
   }
 
   /**
