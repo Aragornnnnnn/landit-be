@@ -452,14 +452,27 @@ class RevenueCatWebhookApiIntegrationTests {
     assertThat(subscriptionStatus(userId)).isEqualTo("NONE");
   }
 
-  /** 이벤트 객체나 type이 없는 본문은 400으로 거절한다. */
+  /** 이벤트 객체, type, id가 없는 본문은 400으로 거절해 이력 없이 상태만 바뀌는 일을 막는다. */
   @Test
   void rejectsMalformedBody() throws Exception {
+    Long userId = createUser("rc-malformed");
+
     postWebhook(WEBHOOK_SECRET, "{\"api_version\":\"1.0\"}")
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     postWebhook(WEBHOOK_SECRET, "{\"event\":{\"app_user_id\":\"1\"}}")
         .andExpect(status().isBadRequest());
+    postWebhook(
+            WEBHOOK_SECRET,
+            """
+            {"event":{"type":"INITIAL_PURCHASE","app_user_id":"%d","event_timestamp_ms":%d}}
+            """
+                .formatted(userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("NONE");
+    assertThat(subscriptionEvents(userId)).isEmpty();
   }
 
   /** OpenAPI 문서에는 웹훅 경로를 공개하지 않는다. */

@@ -68,7 +68,7 @@ public class RevenueCatWebhookService {
     if (userId.isEmpty()) {
       return;
     }
-    if (event.id() != null && subscriptionEventRepository.existsByEventId(event.id())) {
+    if (subscriptionEventRepository.existsByEventId(event.id())) {
       log.info(
           "RevenueCat 웹훅 무시: 이미 저장한 이벤트의 재전송. eventId={}, type={}, userId={}",
           event.id(),
@@ -143,16 +143,8 @@ public class RevenueCatWebhookService {
     return userId;
   }
 
-  /** 이벤트를 결제 이력으로 저장한다. 이벤트 ID가 없으면 중복을 막을 수 없으므로 경고만 남기고 저장하지 않는다. */
+  /** 이벤트를 결제 이력으로 저장한다. 발생 시각은 결제 시각을 우선하고, 없으면 이벤트 생성 시각을 쓴다. */
   private void saveEvent(RevenueCatWebhookEvent event, SubscriptionEventType type, Long userId) {
-    if (event.id() == null) {
-      log.warn(
-          "RevenueCat 웹훅 이력 저장 생략: 이벤트 ID가 없다. type={}, userId={}, eventTimestampMs={}",
-          event.type(),
-          userId,
-          event.eventTimestampMs());
-      return;
-    }
     LocalDateTime occurredAt =
         toLocalDateTime(event.purchasedAtMs())
             .or(() -> toLocalDateTime(event.eventTimestampMs()))
