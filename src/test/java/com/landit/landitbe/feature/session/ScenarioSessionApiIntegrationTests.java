@@ -194,7 +194,7 @@ class ScenarioSessionApiIntegrationTests {
               ScriptUtils.executeSqlScript(
                   connection,
                   new ClassPathResource(
-                      "db/migration/V87__insert_common_diagnostic_questions.sql"));
+                      "db/migration/V90__insert_common_diagnostic_questions.sql"));
               return null;
             });
     assertThat(
