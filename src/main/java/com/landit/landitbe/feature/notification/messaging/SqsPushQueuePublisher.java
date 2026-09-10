@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
@@ -18,6 +19,10 @@ import tools.jackson.databind.json.JsonMapper;
 /** 편지함 답장과 Expo Receipt 확인 메시지를 Push 전용 SQS에 발행한다. */
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+    prefix = "landit.notification",
+    name = "consumer-enabled",
+    havingValue = "true")
 public class SqsPushQueuePublisher implements PushQueuePublisher {
 
   private static final int MESSAGE_VERSION = 1;
@@ -26,36 +31,6 @@ public class SqsPushQueuePublisher implements PushQueuePublisher {
   private final SqsAsyncClient sqsAsyncClient;
   private final JsonMapper jsonMapper;
   private final NotificationProperties properties;
-
-  /** {@inheritDoc} */
-  @Override
-  public void publishAdminCampaign(UUID campaignId) {
-    validateConfiguration();
-    send(
-        new PushQueueMessage(
-            MESSAGE_VERSION,
-            UUID.randomUUID().toString(),
-            PushQueueMessage.ADMIN_PUSH_CAMPAIGN,
-            Instant.now(),
-            new PushQueuePayload(null, null, null, null, null, campaignId, null, null)),
-        0,
-        "관리자 캠페인 발행에 실패했습니다.");
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public void publishAdminTest(UUID campaignId, long adminId, String key) {
-    validateConfiguration();
-    send(
-        new PushQueueMessage(
-            MESSAGE_VERSION,
-            UUID.randomUUID().toString(),
-            PushQueueMessage.ADMIN_PUSH_TEST,
-            Instant.now(),
-            new PushQueuePayload(null, null, null, null, null, campaignId, adminId, key)),
-        0,
-        "관리자 테스트 발행에 실패했습니다.");
-  }
 
   /** {@inheritDoc} */
   @Override

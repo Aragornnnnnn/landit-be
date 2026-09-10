@@ -62,7 +62,6 @@ public class GlobalExceptionHandler {
   /** 잘못된 요청 본문이나 필수 파라미터 누락을 공통 검증 오류로 변환한다. */
   @ExceptionHandler({
     MissingServletRequestParameterException.class,
-    org.springframework.web.bind.MissingRequestHeaderException.class,
     HttpMessageNotReadableException.class,
     MethodArgumentTypeMismatchException.class,
     MultipartException.class
