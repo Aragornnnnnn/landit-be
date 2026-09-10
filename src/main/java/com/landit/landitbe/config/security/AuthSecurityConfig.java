@@ -90,6 +90,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/expo-push-token")
                     .authenticated()
+                    .requestMatchers("/api/v1/me/alarm")
+                    .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/learning-level")
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/learning-level")

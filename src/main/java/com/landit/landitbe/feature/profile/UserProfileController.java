@@ -7,8 +7,11 @@ import com.landit.landitbe.feature.profile.docs.UserProfileControllerDocs;
 import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleUpdateRequest;
+import com.landit.landitbe.feature.profile.dto.UserAlarmResponse;
+import com.landit.landitbe.feature.profile.dto.UserAlarmUpdateRequest;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelUpdateRequest;
+import com.landit.landitbe.feature.profile.service.UserAlarmService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -26,6 +29,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserProfileController implements UserProfileControllerDocs {
 
   private final UserProfileService userProfileService;
+  private final UserAlarmService userAlarmService;
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/me/alarm")
+  public ApiResponse<UserAlarmResponse> getAlarm(
+      @AuthenticationPrincipal AuthUserPrincipal principal) {
+    return ApiResponse.success(userAlarmService.getAlarm(principal.userId()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PutMapping("/api/v1/me/alarm")
+  public ApiResponse<UserAlarmResponse> updateAlarm(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @Valid @RequestBody UserAlarmUpdateRequest request) {
+    return ApiResponse.success(userAlarmService.updateAlarm(principal.userId(), request));
+  }
 
   /** {@inheritDoc} */
   @Override
