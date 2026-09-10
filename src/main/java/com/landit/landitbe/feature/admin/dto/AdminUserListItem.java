@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.admin.dto;
 
+import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
  * @param nickname 사용자 닉네임
  * @param role 사용자 역할
  * @param status 사용자 프로필 상태
+ * @param pushPermissionStatus 서버에 저장된 푸시 권한 상태
  * @param createdAt 가입 시각
  */
 public record AdminUserListItem(
@@ -28,6 +30,7 @@ public record AdminUserListItem(
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String nickname,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UserRole role,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UserProfileStatus status,
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PushPermissionStatus pushPermissionStatus,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt) {
 
   /**
@@ -43,6 +46,7 @@ public record AdminUserListItem(
         profile.nickname(),
         profile.role(),
         profile.status(),
+        profile.pushPermissionStatus(),
         profile.createdAt());
   }
 }

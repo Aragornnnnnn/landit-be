@@ -26,10 +26,13 @@ public class AdminUserController implements AdminUserControllerDocs {
   @Override
   @GetMapping("/api/v1/admin/users")
   public ApiResponse<AdminUserListResponse> list(
-      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size,
+      @RequestParam(required = false) Boolean active,
+      @RequestParam(required = false) Boolean pushConsent) {
     validatePage(page, size);
 
-    return ApiResponse.success(adminUserQueryService.getUsers(page, size));
+    return ApiResponse.success(adminUserQueryService.getUsers(page, size, active, pushConsent));
   }
 
   /** {@inheritDoc} */
