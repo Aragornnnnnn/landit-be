@@ -1,4 +1,11 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 50s
+  task:
+    execution:
+      shutdown:
+        await-termination: true
+        await-termination-period: 50s
   application:
     name: landit-be
   cloud:
@@ -56,6 +63,7 @@ landit:
       access-expires-in-seconds: ${LANDIT_AUTH_TOKEN_ACCESS_EXPIRES_IN_SECONDS:1800}
       refresh-expires-in-seconds: ${LANDIT_AUTH_TOKEN_REFRESH_EXPIRES_IN_SECONDS:1209600}
   ai:
+    internal-token: ${LANDIT_AI_INTERNAL_TOKEN:}
     client-mode: ${LANDIT_AI_CLIENT_MODE:local}
     base-url: ${LANDIT_AI_BASE_URL:}
     service-audience: ${LANDIT_AI_SERVICE_AUDIENCE:KOREAN_LEARNER}
@@ -81,6 +89,7 @@ landit:
   subscription:
     launched-at: ${LANDIT_SUBSCRIPTION_LAUNCHED_AT:}
     revenuecat:
+      apply-sandbox-events: ${LANDIT_REVENUECAT_APPLY_SANDBOX_EVENTS:true}
       webhook-authorization: ${LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION:}
   notification:
     expo-base-url: ${LANDIT_NOTIFICATION_EXPO_BASE_URL:https://exp.host}
@@ -107,6 +116,7 @@ sentry:
   environment: ${SENTRY_ENVIRONMENT:local}
 
 server:
+  shutdown: graceful
   tomcat:
     mbeanregistry:
       enabled: true

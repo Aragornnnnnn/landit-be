@@ -80,7 +80,7 @@ public class SessionLevelAssessmentGenerationService {
    * @param sessionId 완료 트랜잭션에서 평가가 예약된 세션 ID
    */
   public void startIfNeeded(long userId, long sessionId) {
-    if (!launchService.isEnabled()) {
+    if (!launchService.isEnabledFor(userId)) {
       return;
     }
     try {
@@ -104,8 +104,9 @@ public class SessionLevelAssessmentGenerationService {
    */
   public @Nullable SessionLevelAssessmentResponse get(long userId, long sessionId) {
     LearningSession session = learningSessionService.findOwned(userId, sessionId);
-    if (!launchService.isEnabled()
-        || (session.getEndedAt() != null && !launchService.includes(session.getEndedAt()))) {
+    if (!launchService.isEnabledFor(userId)
+        || (session.getEndedAt() != null
+            && !launchService.includes(session.getUserProfileId(), session.getEndedAt()))) {
       return null;
     }
     UserLevelAssessment assessment =
@@ -195,7 +196,7 @@ public class SessionLevelAssessmentGenerationService {
   }
 
   private boolean canProcess(LearningSession session) {
-    return launchService.includes(session.getEndedAt())
+    return launchService.includes(session.getUserProfileId(), session.getEndedAt())
         && session.getLevelAssessmentProcessingStatus() == ProcessingStatus.PREPARING;
   }
 }

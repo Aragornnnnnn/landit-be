@@ -18,9 +18,17 @@ class SessionLevelAssessmentLaunchServiceTest {
 
   @Test
   void blankSettingDisablesAssessmentRegardlessOfCompletionDate() {
-    var launch = new SessionLevelAssessmentLaunchService(new SubscriptionProperties("  "), clock);
+    var launch =
+        new SessionLevelAssessmentLaunchService(
+            new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
+                org.mockito.Mockito.mock(
+                    com.landit.landitbe.feature.subscription.repository
+                        .SubscriptionLaunchPolicyRepository.class),
+                new SubscriptionProperties("  "),
+                clock),
+            clock);
     assertThat(launch.isEnabled()).isFalse();
-    assertThat(launch.includes(LocalDateTime.now(clock))).isFalse();
+    assertThat(launch.includes(1L, LocalDateTime.now(clock))).isFalse();
     assertThatThrownBy(launch::requireLaunchedAt).isInstanceOf(IllegalStateException.class);
   }
 
@@ -28,13 +36,19 @@ class SessionLevelAssessmentLaunchServiceTest {
   void usesServiceTimeZoneAndIncludesExactLaunchInstant() {
     var launch =
         new SessionLevelAssessmentLaunchService(
-            new SubscriptionProperties("2026-07-01T00:00:00Z"), clock);
+            new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
+                org.mockito.Mockito.mock(
+                    com.landit.landitbe.feature.subscription.repository
+                        .SubscriptionLaunchPolicyRepository.class),
+                new SubscriptionProperties("2026-07-01T00:00:00Z"),
+                clock),
+            clock);
     var boundary = LocalDateTime.parse("2026-07-01T09:00:00");
     assertThat(launch.isEnabled()).isTrue();
     assertThat(launch.requireLaunchedAt()).isEqualTo(boundary);
-    assertThat(launch.includes(null)).isFalse();
-    assertThat(launch.includes(boundary.minusNanos(1))).isFalse();
-    assertThat(launch.includes(boundary)).isTrue();
-    assertThat(launch.includes(boundary.plusNanos(1))).isTrue();
+    assertThat(launch.includes(1L, null)).isFalse();
+    assertThat(launch.includes(1L, boundary.minusNanos(1))).isFalse();
+    assertThat(launch.includes(1L, boundary)).isTrue();
+    assertThat(launch.includes(1L, boundary.plusNanos(1))).isTrue();
   }
 }

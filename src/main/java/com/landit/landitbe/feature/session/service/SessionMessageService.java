@@ -167,4 +167,11 @@ public class SessionMessageService {
     return sessionHistoryMessageRepository.markFeedbackCompletedIfPreparing(
         messageIds, ProcessingStatus.COMPLETED, ProcessingStatus.PREPARING);
   }
+
+  /** 재시도에서 복구된 평가만 실패 상태에서 되돌린다. */
+  @Transactional
+  public void retryFeedback(long messageId) {
+    sessionHistoryMessageRepository.retryFeedback(
+        messageId, ProcessingStatus.PREPARING, ProcessingStatus.FAILED);
+  }
 }

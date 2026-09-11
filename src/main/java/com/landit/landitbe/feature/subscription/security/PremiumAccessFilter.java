@@ -58,6 +58,18 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
 
   private final UserSubscriptionService userSubscriptionService;
   private final AuthFailureResponseWriter failureResponseWriter;
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService grants;
+  private static final RequestMatcher SCENARIO_MESSAGE =
+      PathPatternRequestMatcher.pathPattern(
+          HttpMethod.POST, "/api/v1/sessions/{sessionId}/messages");
+  private static final RequestMatcher FREE_TALK_ACTION =
+      PathPatternRequestMatcher.pathPattern(
+          HttpMethod.POST, "/api/v1/free-talk/sessions/{sessionId}/{action}");
+  private static final RequestMatcher FREE_TALK_RESULT_RETRY =
+      PathPatternRequestMatcher.pathPattern(
+          HttpMethod.POST, "/api/v1/free-talk/sessions/{sessionId}/expressions/retry");
+  private static final RequestMatcher EXPRESSION_ACTION =
+      PathPatternRequestMatcher.pathPattern("/api/v1/expressions/{expressionId}/{*action}");
 
   /**
    * 구독 상태 평가 Service와 접근 거부 응답 작성기를 주입받는다.
@@ -67,9 +79,11 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
    */
   public PremiumAccessFilter(
       UserSubscriptionService userSubscriptionService,
-      AuthFailureResponseWriter failureResponseWriter) {
+      AuthFailureResponseWriter failureResponseWriter,
+      com.landit.landitbe.feature.subscription.service.LearningAccessGrantService grants) {
     this.userSubscriptionService = userSubscriptionService;
     this.failureResponseWriter = failureResponseWriter;
+    this.grants = grants;
   }
 
   /**
@@ -101,7 +115,10 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
 
     if (authentication != null
         && authentication.getPrincipal() instanceof AuthUserPrincipal principal
-        && !isAllowed(request, userSubscriptionService.evaluateAccess(principal.userId()))) {
+        && !isAllowed(
+            request,
+            principal.userId(),
+            userSubscriptionService.evaluateAccess(principal.userId()))) {
       SubscriptionErrorCode errorCode = SubscriptionErrorCode.PREMIUM_REQUIRED;
       failureResponseWriter.write(
           response, errorCode.getStatus(), errorCode.name(), errorCode.getMessage());
@@ -111,11 +128,48 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private boolean isAllowed(HttpServletRequest request, PremiumAccess access) {
-    if (matchesAny(PREMIUM_ONLY_PATHS, request)) {
-      return access.allowsPremiumOnlyFeature();
+  private boolean isAllowed(HttpServletRequest request, long userId, PremiumAccess access) {
+    // 첫 무료 예약은 컨트롤러 이후 사용자 잠금 안에서 원자적으로 검사한다.
+    if (matchesAny(SCENARIO_CONVERSATION_PATHS, request)) {
+      if (access.allowsScenarioConversation()) {
+        return true;
+      }
+      var message = SCENARIO_MESSAGE.matcher(request);
+      return message.isMatch()
+          && grants.ownsScenario(userId, targetId(message.getVariables().get("sessionId")));
     }
-    return access.allowsScenarioConversation();
+    if (access.allowsPremiumOnlyFeature()) {
+      return true;
+    }
+    var resultRetry = FREE_TALK_RESULT_RETRY.matcher(request);
+    if (resultRetry.isMatch()) {
+      return grants.ownsCompletedFreeTalk(
+          userId, targetId(resultRetry.getVariables().get("sessionId")));
+    }
+    var freeTalk = FREE_TALK_ACTION.matcher(request);
+    if (freeTalk.isMatch()) {
+      return grants.allowsExisting(
+          userId, "FREE_TALK", targetId(freeTalk.getVariables().get("sessionId")), null, false);
+    }
+    var expression = EXPRESSION_ACTION.matcher(request);
+    if (expression.isMatch()) {
+      String action = expression.getVariables().get("action");
+      return grants.allowsExisting(
+          userId,
+          "EXPRESSION",
+          targetId(expression.getVariables().get("expressionId")),
+          request.getHeader("X-Learning-Attempt-Id"),
+          action.endsWith("/learning-finish"));
+    }
+    return false;
+  }
+
+  private long targetId(String value) {
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException exception) {
+      return -1;
+    }
   }
 
   private static boolean matchesAny(List<RequestMatcher> matchers, HttpServletRequest request) {

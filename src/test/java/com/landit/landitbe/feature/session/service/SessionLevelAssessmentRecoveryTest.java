@@ -67,7 +67,14 @@ class SessionLevelAssessmentRecoveryTest {
             queued::set,
             clock,
             new SessionLevelAssessmentLaunchService(
-                new SubscriptionProperties("2026-06-01T00:00:00Z"), clock));
+                new com.landit.landitbe.feature.subscription.service
+                    .SubscriptionLaunchPolicyService(
+                    org.mockito.Mockito.mock(
+                        com.landit.landitbe.feature.subscription.repository
+                            .SubscriptionLaunchPolicyRepository.class),
+                    new SubscriptionProperties("2026-06-01T00:00:00Z"),
+                    clock),
+                clock));
     service.startIfNeeded(1L, 10L);
     if (expiresInQueue) {
       when(clock.instant()).thenReturn(start.plusSeconds(121));
@@ -125,7 +132,14 @@ class SessionLevelAssessmentRecoveryTest {
             Runnable::run,
             clock,
             new SessionLevelAssessmentLaunchService(
-                new SubscriptionProperties("2026-06-01T00:00:00Z"), clock));
+                new com.landit.landitbe.feature.subscription.service
+                    .SubscriptionLaunchPolicyService(
+                    org.mockito.Mockito.mock(
+                        com.landit.landitbe.feature.subscription.repository
+                            .SubscriptionLaunchPolicyRepository.class),
+                    new SubscriptionProperties("2026-06-01T00:00:00Z"),
+                    clock),
+                clock));
 
     service.startIfNeeded(1L, 10L);
     assertThat(session.getLevelAssessmentProcessingStatus()).isEqualTo(ProcessingStatus.PREPARING);

@@ -111,6 +111,12 @@ class ScenarioSessionApiIntegrationTests {
 
   @Autowired private MutableClock mutableClock;
 
+  @Autowired
+  private com.landit.landitbe.feature.session.repository.MessageFeedbackWorkRepository
+      feedbackWorks;
+
+  @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
   @Autowired private UserLevelAssessmentRepository levelAssessmentRepository;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -138,9 +144,12 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM session_history_summary_feedback");
     jdbcTemplate.update("DELETE FROM user_level_assessment");
     jdbcTemplate.update("DELETE FROM session_history_artifact");
+    jdbcTemplate.update("DELETE FROM message_feedback_work");
     jdbcTemplate.update("DELETE FROM session_history_message");
     jdbcTemplate.update("DELETE FROM scenario_session");
     jdbcTemplate.update("DELETE FROM session_history");
+    jdbcTemplate.update("DELETE FROM free_scenario_reservation");
+    jdbcTemplate.update("DELETE FROM learning_access_grant");
     jdbcTemplate.update("DELETE FROM learning_session");
     jdbcTemplate.update("DELETE FROM user_scenario_access");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
@@ -1553,38 +1562,99 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(assessmentMessage.requiredElements()).containsExactly("What food do you like?");
   }
 
+  /** 임대 교체 뒤 늦게 도착한 이전 응답이 최신 평가를 덮어쓰지 못한다. */
   @Test
-  void getSessionFeedbackReturnsLevelFallbackWhenFinalAiGenerationFails() throws Exception {
+  void lan474ClaimsExpiredFeedbackAndRejectsTheOldAttempt() throws Exception {
+    var session = startCompletedAiFirstSession("feedback-lease@example.com");
+    long messageId = userMessageIds(session.sessionId()).getFirst();
+    var now = java.time.LocalDateTime.now(mutableClock);
+    jdbcTemplate.update(
+        """
+        UPDATE message_feedback_work SET legacy_completed=false, attempts=0,
+          available_at=?, lease_until=null WHERE message_id=?
+        """,
+        now,
+        messageId);
+    var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+    assertThat(
+            tx.<Integer>execute(
+                status -> feedbackWorks.claim(messageId, "first", now, now.plusSeconds(30))))
+        .isEqualTo(1);
+    assertThat(
+            tx.<Integer>execute(
+                status -> feedbackWorks.claim(messageId, "other", now, now.plusSeconds(30))))
+        .isZero();
+    assertThat(
+            tx.<Integer>execute(
+                status ->
+                    feedbackWorks.claim(
+                        messageId, "second", now.plusSeconds(31), now.plusSeconds(60))))
+        .isEqualTo(1);
+    assertThat(
+            tx.<Integer>execute(
+                status -> feedbackWorks.finish(messageId, "first", "old", false, false, now)))
+        .isZero();
+    assertThat(
+            tx.<Integer>execute(
+                status -> feedbackWorks.finish(messageId, "second", "new", false, false, now)))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT result_payload FROM message_feedback_work WHERE message_id=?",
+                String.class,
+                messageId))
+        .isEqualTo("new");
+  }
+
+  /** AI 엔드포인트가 반환한 실제 계약을 저장하고 캐시 없이 최종 요청에 재사용한다. */
+  @Test
+  void lan474PersistsCompletedFeedbackAndSuppliesTheFinalRequest() throws Exception {
+    fakeAiConversationClient.durableMessageFeedback = true;
+    var session = startCompletedAiFirstSession("durable-feedback@example.com");
+    long messageId = userMessageIds(session.sessionId()).getFirst();
+    String payload =
+        jdbcTemplate.queryForObject(
+            "SELECT result_payload FROM message_feedback_work WHERE message_id=?",
+            String.class,
+            messageId);
+    assertThat(payload).isNotBlank();
+    fakeAiConversationClient.reset();
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/%d/feedback".formatted(session.sessionId()))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken()))
+        .andExpect(status().isOk());
+    var snapshots = fakeAiConversationClient.lastSessionFeedbackRequest().completedFeedbacks();
+    assertThat(snapshots).hasSize(1);
+    assertThat(snapshots.getFirst().path("feedback").path("messageId").asLong())
+        .isEqualTo(messageId);
+    assertThat(snapshots.getFirst().toString()).isEqualTo(payload);
+  }
+
+  @Test
+  void getSessionFeedbackRetriesFinalAiFailureWithoutPersistingEmptyResult() throws Exception {
     StartedSession startedSession =
         startCompletedAiFirstSession("session-feedback-fallback@example.com");
     fakeAiConversationClient.failSessionFeedbackGeneration();
-
     mockMvc
         .perform(
             post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.messageFeedbacks.length()").value(0));
-
-    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
+        .andExpect(status().isServiceUnavailable());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_summary_feedback", Integer.class))
+        .isZero();
+    fakeAiConversationClient.reset();
     mockMvc
         .perform(
-            get("/api/v1/sessions/%d/level-assessment".formatted(startedSession.sessionId()))
+            post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
-        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
-
+        .andExpect(status().isOk());
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_summary_feedback", Integer.class))
         .isEqualTo(1);
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT source FROM user_level_assessment WHERE learning_session_id = ?",
-                String.class,
-                startedSession.sessionId()))
-        .isEqualTo("FALLBACK");
   }
 
   @Test
@@ -2217,7 +2287,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
-  void submitMessageRollsBackUserMessageWhenAiGenerationFails() throws Exception {
+  void submitMessagePreservesUserMessageWhenAiGenerationFails() throws Exception {
     fakeAiConversationClient.blockInnerThoughtGeneration();
     fakeAiConversationClient.failNextMessageGenerationAfterInnerThoughtStarts();
     JsonNode loginBody = login("message-ai-fail@example.com");
@@ -2269,7 +2339,7 @@ class ScenarioSessionApiIntegrationTests {
             """,
             Integer.class,
             sessionId);
-    assertThat(messageCount).isEqualTo(1);
+    assertThat(messageCount).isEqualTo(2);
   }
 
   @Test
@@ -2860,6 +2930,106 @@ class ScenarioSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.error.code").value("SESSION_ALREADY_COMPLETED"));
+  }
+
+  /** 두 기기의 동시 시작과 중도 종료에도 무료 기회는 같은 대화에 고정된다. */
+  @Test
+  void lan474ReservesOneFreeSessionAndResumesInterruptedWithin24Hours() throws Exception {
+    var seed = startUserFirstSession("free-reservation@example.com", 1291, 2291, 3291);
+    seedScenarioQuestion(4291, 2291, 1, "What would you like?", "무엇을 원하세요?");
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_status='NONE',"
+            + " subscription_expires_at=null WHERE id=?",
+        seed.userId());
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var first = pool.submit(() -> startScenario(seed.accessToken(), 2291));
+      var second = pool.submit(() -> startScenario(seed.accessToken(), 2291));
+      long sessionId = first.get(10, TimeUnit.SECONDS);
+      assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(sessionId);
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT COUNT(*) FROM free_scenario_reservation WHERE user_id=?",
+                  Integer.class,
+                  seed.userId()))
+          .isEqualTo(1);
+      mockMvc
+          .perform(
+              patch("/api/v1/sessions/{id}/end", sessionId)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + seed.accessToken()))
+          .andExpect(status().isOk());
+      assertThat(startScenario(seed.accessToken(), 2291)).isEqualTo(sessionId);
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT status FROM learning_session WHERE id=?", String.class, sessionId))
+          .isEqualTo("IN_PROGRESS");
+      mutableClock.setInstant(DEFAULT_TEST_INSTANT.plusSeconds(24 * 3600));
+      mockMvc
+          .perform(
+              post("/api/v1/sessions/{id}/messages", sessionId)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + seed.accessToken())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"content\":\"Hello\",\"inputType\":\"TEXT\"}"))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+    }
+  }
+
+  /** 접수 후 실패한 같은 발화는 재시도하고, 완료 응답은 유예 만료 후에도 재전송한다. */
+  @Test
+  void lan474RetriesAcceptedMessageAndReplaysStoredResponse() throws Exception {
+    var session = startUserFirstSession("durable-turn@example.com", 1292, 2292, 3292);
+    seedScenarioQuestion(4292, 2292, 1, "What would you like?", "무엇을 원하세요?");
+    String clientId = UUID.randomUUID().toString();
+    String body =
+        "{\"content\":\"An americano please.\",\"inputType\":\"TEXT\",\"clientMessageId\":\""
+            + clientId
+            + "\"}";
+    fakeAiConversationClient.failNextMessageGenerationAfterInnerThoughtStarts();
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isServiceUnavailable());
+    assertThat(userMessageIds(session.sessionId())).hasSize(1);
+    long acceptedId = userMessageIds(session.sessionId()).getFirst();
+    fakeAiConversationClient.reset();
+    var result =
+        mockMvc
+            .perform(
+                post("/api/v1/sessions/{id}/messages", session.sessionId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.submittedMessage.messageId").value(acceptedId))
+            .andReturn();
+    var expected = objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_status='NONE',"
+            + " subscription_expires_at=null WHERE id=?",
+        session.userId());
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT.plusSeconds(25 * 3600));
+    var replay =
+        mockMvc
+            .perform(
+                post("/api/v1/sessions/{id}/messages", session.sessionId())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andExpect(status().isOk())
+            .andReturn();
+    assertThat(objectMapper.readTree(replay.getResponse().getContentAsByteArray()).path("data"))
+        .isEqualTo(expected);
+    assertThat(userMessageIds(session.sessionId())).containsExactly(acceptedId);
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.replace("An americano please.", "Different content")))
+        .andExpect(status().isConflict());
   }
 
   private StartedSession startUserFirstSession(
@@ -3556,6 +3726,7 @@ class ScenarioSessionApiIntegrationTests {
     private AiClosingMessageRequest lastClosingMessageRequest;
 
     private AiMessageFeedbackRequest lastMessageFeedbackRequest;
+    private boolean durableMessageFeedback;
 
     private AiSessionFeedbackRequest lastSessionFeedbackRequest;
 
@@ -3668,7 +3839,22 @@ class ScenarioSessionApiIntegrationTests {
           messageFeedbackResponseMessageId == null
               ? request.messageId()
               : messageFeedbackResponseMessageId,
-          messageFeedbackStatus);
+          messageFeedbackStatus,
+          durableMessageFeedback ? completedFeedback(request) : null);
+    }
+
+    private tools.jackson.databind.JsonNode completedFeedback(AiMessageFeedbackRequest request) {
+      var mapper = new tools.jackson.databind.json.JsonMapper();
+      var value =
+          (tools.jackson.databind.node.ObjectNode)
+              mapper.readTree(
+                  ScenarioSessionApiIntegrationTests.class.getResourceAsStream(
+                      "/fixtures/completed-message-feedback-v1.json"));
+      value.put("sessionId", request.sessionId());
+      value.put("userMessage", request.userMessage());
+      ((tools.jackson.databind.node.ObjectNode) value.get("feedback"))
+          .put("messageId", request.messageId());
+      return value;
     }
 
     @Override
@@ -3766,6 +3952,7 @@ class ScenarioSessionApiIntegrationTests {
       failInnerThoughtGeneration = false;
       innerThoughtResponseMessageId = null;
       failMessageFeedbackRequest = false;
+      durableMessageFeedback = false;
       sessionFeedbackStarRating = new BigDecimal("3.0");
       failSessionFeedbackGeneration = false;
       sessionFeedbackCallCount = 0;

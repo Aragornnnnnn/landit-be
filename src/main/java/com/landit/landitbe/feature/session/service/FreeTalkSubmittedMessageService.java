@@ -59,6 +59,8 @@ public class FreeTalkSubmittedMessageService {
   private final StreakService streakService;
   private final MemoryProperties memoryProperties;
   private final Clock clock;
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
 
   /**
    * 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다.
@@ -272,6 +274,7 @@ public class FreeTalkSubmittedMessageService {
                     && message.getFreeTalkTurnStatus() == null)) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+    accessGrants.requireSessionContinuation(userId, "FREE_TALK", learningSession.getId());
     int userTurnNumber = nextUserTurnNumber(messages);
     FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.reserve(userId, request.utteranceDurationMs());

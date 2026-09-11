@@ -42,7 +42,7 @@ class UserSubscriptionApiIntegrationTests {
   static final String WEBHOOK_SECRET = "test-revenuecat-webhook-secret";
   static final String LAUNCHED_AT = "2026-09-01T00:00:00+09:00";
 
-  private static final long EVENT_TIMESTAMP_MS = 1_756_000_000_000L;
+  private static final long EVENT_TIMESTAMP_MS = 4_000_000_000_000L;
   private static final long EXPIRATION_MS = EVENT_TIMESTAMP_MS + 30L * 24 * 60 * 60 * 1000;
   private static final long CATEGORY_ID = 7_001L;
   private static final long SCENARIO_ID = 7_101L;

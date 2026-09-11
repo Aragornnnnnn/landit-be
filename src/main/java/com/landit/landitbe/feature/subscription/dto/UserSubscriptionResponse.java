@@ -53,7 +53,13 @@ public record UserSubscriptionResponse(
                 "결제한 스토어. APP_STORE, PLAY_STORE 등 RevenueCat store 값. 웹은 이 값으로 구독 관리 링크를 고른다."
                     + " 프리미엄이 꺼져 있으면 null",
             example = "APP_STORE")
-        SubscriptionStore store) {
+        SubscriptionStore store,
+    @Schema(description = "현재 계정에 페이월 표시와 서버 유료 제한을 적용하는지") boolean paymentEnabled,
+    @Schema(description = "공개 정책 버전") long paymentPolicyVersion,
+    @Schema(description = "배포 전환으로 새 학습 시작만 일시 중지됐는지") boolean newStartsPaused,
+    @Schema(description = "새 시나리오 대화를 시작할 수 있는지") boolean canStartScenario,
+    @Schema(description = "소모한 첫 무료 기회에 연결된 세션. 재개 가능 여부는 세션 조회로 확인한다")
+        Long freeScenarioSessionId) {
 
   /**
    * 프로필의 구독 스냅샷과 대화 완료 여부를 응답으로 합친다.
@@ -71,6 +77,34 @@ public record UserSubscriptionResponse(
         snapshot.expiresAt(),
         conversationCompletedSinceLaunch,
         snapshot.productId(),
-        snapshot.store());
+        snapshot.store(),
+        false,
+        0,
+        false,
+        true,
+        null);
+  }
+
+  /** 기존 구독 상태와 서버의 새 시작 정책을 함께 전달한다. */
+  public UserSubscriptionResponse withAccess(
+      boolean effectivePremium,
+      boolean paymentEnabled,
+      long paymentPolicyVersion,
+      boolean newStartsPaused,
+      boolean canStartScenario,
+      Long freeScenarioSessionId) {
+    return new UserSubscriptionResponse(
+        !effectivePremium && premium ? SubscriptionStatus.EXPIRED : subscriptionStatus,
+        effectivePremium,
+        effectivePremium ? periodType : null,
+        effectivePremium ? expiresAt : null,
+        conversationCompletedSinceLaunch,
+        effectivePremium ? productId : null,
+        effectivePremium ? store : null,
+        paymentEnabled,
+        paymentPolicyVersion,
+        newStartsPaused,
+        canStartScenario,
+        freeScenarioSessionId);
   }
 }

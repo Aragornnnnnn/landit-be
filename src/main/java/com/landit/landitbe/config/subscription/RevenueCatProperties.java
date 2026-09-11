@@ -10,10 +10,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param webhookAuthorization RevenueCat 대시보드에 등록한 Authorization 헤더 값. 비어 있으면 모든 웹훅을 거절한다.
  */
 @ConfigurationProperties(prefix = "landit.subscription.revenuecat")
-public record RevenueCatProperties(String webhookAuthorization) {
+public record RevenueCatProperties(String webhookAuthorization, Boolean applySandboxEvents) {
+
+  /** 구버전 설정은 기존과 같이 샌드박스 이벤트를 반영한다. */
+  public RevenueCatProperties(String webhookAuthorization) {
+    this(webhookAuthorization, true);
+  }
 
   /** Authorization 헤더 값의 앞뒤 공백을 제거하고 null을 빈 문자열로 정규화한다. */
+  @org.springframework.boot.context.properties.bind.ConstructorBinding
   public RevenueCatProperties {
+    applySandboxEvents = applySandboxEvents == null || applySandboxEvents;
     webhookAuthorization = webhookAuthorization == null ? "" : webhookAuthorization.trim();
   }
 

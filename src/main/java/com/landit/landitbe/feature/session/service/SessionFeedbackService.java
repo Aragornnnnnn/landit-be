@@ -30,6 +30,7 @@ public class SessionFeedbackService {
   private final SessionFeedbackCompletionService completionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final AiConversationClient aiConversationClient;
+  private final MessageFeedbackWorkService feedbackWorkService;
 
   /**
    * 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다.
@@ -48,8 +49,23 @@ public class SessionFeedbackService {
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
-    AiSessionFeedbackRequest request = toAiFeedbackRequest(context);
-    AiSessionFeedbackResult result = generateOrFallback(request);
+    AiSessionFeedbackRequest legacy = toAiFeedbackRequest(context);
+    AiSessionFeedbackRequest request =
+        new AiSessionFeedbackRequest(
+            legacy.sessionId(),
+            legacy.scenario(),
+            legacy.expectedMessageIds(),
+            legacy.assessmentMessages(),
+            feedbackWorkService.completedResults(context.sessionId(), legacy.expectedMessageIds()));
+    AiSessionFeedbackResult result;
+    try {
+      result = aiConversationClient.generateSessionFeedback(request);
+    } catch (ApiException exception) {
+      if (exception.getErrorCode() == ErrorCode.FEEDBACK_NOT_READY) {
+        feedbackWorkService.recoverMissing(userId, context);
+      }
+      throw exception;
+    }
     Long summaryFeedbackId = recordOrFallback(userId, context, result);
     return responseFor(context, summaryFeedbackId);
   }
@@ -65,23 +81,6 @@ public class SessionFeedbackService {
       log.warn("invalid session feedback fallback: sessionId={}", context.sessionId());
       return completionService.record(
           userId, context, AiSessionFeedbackResult.fallback(context.sessionId()));
-    }
-  }
-
-  private AiSessionFeedbackResult generateOrFallback(AiSessionFeedbackRequest request) {
-    try {
-      return aiConversationClient.generateSessionFeedback(request);
-    } catch (ApiException exception) {
-      if (exception.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID
-          && exception.getErrorCode() != ErrorCode.AI_GENERATION_FAILED
-          && exception.getErrorCode() != ErrorCode.FEEDBACK_GENERATION_FAILED) {
-        throw exception;
-      }
-      log.warn(
-          "session feedback fallback: sessionId={}, errorCode={}",
-          request.sessionId(),
-          exception.getErrorCode());
-      return AiSessionFeedbackResult.fallback(request.sessionId());
     }
   }
 

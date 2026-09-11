@@ -97,6 +97,7 @@ public interface ExpressionControllerDocs {
    * @param principal 인증된 사용자
    * @param expressionId 완료할 표현 ID
    * @param request 프리톡 학습 맥락. 시나리오 학습이면 null
+   * @param attemptId learning-start에서 받은 학습 시도 ID. 구버전 요청은 null
    * @return 빈 객체를 담은 성공 응답
    */
   @Operation(
@@ -115,5 +116,8 @@ public interface ExpressionControllerDocs {
         description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)")
   })
   ApiResponse<Map<String, Object>> finishLearning(
-      AuthUserPrincipal principal, Long expressionId, ExpressionLearningFinishRequest request);
+      AuthUserPrincipal principal,
+      Long expressionId,
+      ExpressionLearningFinishRequest request,
+      String attemptId);
 }

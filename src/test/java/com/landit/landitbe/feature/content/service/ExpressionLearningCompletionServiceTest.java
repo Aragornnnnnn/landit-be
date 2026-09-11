@@ -64,6 +64,9 @@ class ExpressionLearningCompletionServiceTest {
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
 
+  @Mock
+  private com.landit.landitbe.feature.subscription.service.LearningAccessGrantService accessGrants;
+
   @Mock private UserProfileService userProfileService;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 

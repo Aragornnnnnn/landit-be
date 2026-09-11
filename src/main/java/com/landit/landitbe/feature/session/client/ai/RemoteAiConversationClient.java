@@ -134,7 +134,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
       Duration requestTimeout) {
     try {
       HttpRequest request =
-          HttpRequest.newBuilder(uri)
+          properties
+              .authorize(HttpRequest.newBuilder(uri))
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
@@ -277,13 +278,13 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteMessageFeedbackResponse(
-      Long sessionId, Long messageId, ProcessingStatus feedbackStatus) {
+      Long sessionId, Long messageId, ProcessingStatus feedbackStatus, JsonNode completedFeedback) {
 
     private AiMessageFeedbackResult toResult() {
       if (sessionId == null || messageId == null || feedbackStatus == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus);
+      return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus, completedFeedback);
     }
   }
 

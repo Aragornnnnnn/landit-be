@@ -24,6 +24,11 @@ import org.springframework.stereotype.Component;
 @Component
 class SubmittedMessageService {
 
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
+  private final com.landit.landitbe.config.ai.AiClientProperties aiProperties;
+  private final java.time.Clock clock;
+  private final tools.jackson.databind.json.JsonMapper mapper;
   private final LearningSessionService learningSessionService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionHistoryService sessionHistoryService;
@@ -32,7 +37,11 @@ class SubmittedMessageService {
 
   /** 사용자 메시지를 저장하고 AI 요청에 필요한 세션 컨텍스트를 반환한다. */
   SubmittedMessageContext record(
-      long userId, long sessionId, String content, SessionMessageInputType inputType) {
+      long userId,
+      long sessionId,
+      String content,
+      SessionMessageInputType inputType,
+      String clientMessageId) {
     LearningSession learningSession =
         learningSessionService.findOwnedInProgressForUpdate(userId, sessionId);
     ScenarioSessionMessageContextProjection scenarioContext = findScenarioContext(sessionId);
@@ -40,9 +49,29 @@ class SubmittedMessageService {
     SessionHistory sessionHistory = sessionHistoryLookup.sessionHistory();
     List<SessionHistoryMessage> previousMessages = findPreviousMessages(sessionHistory);
 
-    int submittedTurnNumber = submittedTurnNumber(previousMessages);
+    SessionHistoryMessage pending = previousMessages.isEmpty() ? null : previousMessages.getLast();
+    if (pending != null && pending.getRole() == ConversationSpeaker.USER) {
+      requireSameInput(pending, content, inputType, clientMessageId);
+      if (pending.getScenarioLeaseUntil() != null
+          && java.time.LocalDateTime.now(clock).isBefore(pending.getScenarioLeaseUntil())) {
+        throw new ApiException(ErrorCode.CONFLICT, "같은 발화의 다음 질문을 생성하고 있습니다.");
+      }
+      previousMessages = new ArrayList<>(previousMessages.subList(0, previousMessages.size() - 1));
+    } else {
+      pending = null;
+      accessGrants.requireSessionContinuation(userId, "SCENARIO", sessionId);
+    }
+    int submittedTurnNumber =
+        pending == null ? submittedTurnNumber(previousMessages) : pending.getTurnNumber();
     SessionHistoryMessage submittedMessage =
-        saveUserMessage(sessionHistory, previousMessages, submittedTurnNumber, content, inputType);
+        pending == null
+            ? saveUserMessage(
+                sessionHistory, previousMessages, submittedTurnNumber, content, inputType)
+            : pending;
+    String attempt =
+        submittedMessage.claimScenarioGeneration(
+            clientMessageId,
+            java.time.LocalDateTime.now(clock).plus(aiProperties.requestTimeout()).plusSeconds(30));
     List<AiConversationHistoryMessage> conversationHistory =
         toConversationHistory(previousMessages, submittedMessage);
 
@@ -62,14 +91,57 @@ class SubmittedMessageService {
         scenarioContext,
         conversationHistory,
         nextQuestion,
-        sessionHistoryLookup.created());
+        sessionHistoryLookup.created(),
+        attempt);
   }
 
-  /** AI 생성 실패 시 먼저 저장한 사용자 메시지를 제거한다. */
+  /** AI 실패 뒤 접수한 발화는 보존하고 같은 시도만 다시 실행할 수 있게 한다. */
   void remove(SubmittedMessageContext submittedContext) {
-    sessionMessageService.deleteIfExists(submittedContext.submittedMessageId());
-    if (submittedContext.createdSessionHistory()) {
-      sessionHistoryService.deleteIfExists(submittedContext.sessionHistoryId());
+    sessionMessageService
+        .require(submittedContext.submittedMessageId())
+        .releaseScenarioAttempt(submittedContext.attemptToken());
+  }
+
+  /** 완료된 같은 발화는 구독 변경과 관계없이 저장한 응답을 그대로 반환한다. */
+  com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse replay(
+      long userId,
+      long sessionId,
+      String content,
+      SessionMessageInputType inputType,
+      String clientMessageId) {
+    learningSessionService.findOwnedForUpdate(userId, sessionId);
+    if (clientMessageId == null) {
+      return null;
+    }
+    var history = sessionHistoryService.findByLearningSessionId(sessionId);
+    if (history.isEmpty()) {
+      return null;
+    }
+    var stored =
+        sessionMessageService.findAll(history.get().getId()).stream()
+            .filter(message -> clientMessageId.equals(message.getClientMessageId()))
+            .findFirst()
+            .orElse(null);
+    if (stored == null) {
+      return null;
+    }
+    requireSameInput(stored, content, inputType, clientMessageId);
+    return stored.getScenarioResponsePayload() == null
+        ? null
+        : mapper.readValue(
+            stored.getScenarioResponsePayload(),
+            com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse.class);
+  }
+
+  private void requireSameInput(
+      SessionHistoryMessage stored,
+      String content,
+      SessionMessageInputType inputType,
+      String clientMessageId) {
+    if (!stored.getContent().equals(content)
+        || stored.getInputType() != inputType
+        || !java.util.Objects.equals(stored.getClientMessageId(), clientMessageId)) {
+      throw new ApiException(ErrorCode.CONFLICT, "같은 메시지 ID의 내용이나 입력 방식이 다릅니다.");
     }
   }
 

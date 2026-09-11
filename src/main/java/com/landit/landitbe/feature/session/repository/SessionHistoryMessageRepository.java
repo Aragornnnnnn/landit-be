@@ -103,4 +103,13 @@ public interface SessionHistoryMessageRepository
       @Param("messageIds") List<Long> messageIds,
       @Param("completedStatus") ProcessingStatus completedStatus,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
+
+  /** 실패한 메시지의 평가가 복구되면 최종 피드백 대기 상태로 되돌린다. */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      update SessionHistoryMessage m set m.feedbackProcessingStatus = :preparing
+      where m.id = :messageId and m.feedbackProcessingStatus = :failed
+      """)
+  int retryFeedback(long messageId, ProcessingStatus preparing, ProcessingStatus failed);
 }

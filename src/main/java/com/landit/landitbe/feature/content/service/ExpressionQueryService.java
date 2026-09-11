@@ -90,6 +90,8 @@ public class ExpressionQueryService {
   private static final String INVALID_PRACTICE_SENTENCE_EXCLUDED_LOG =
       "추가 예문 파싱 제외: 필수 값이 누락된 예문입니다. expressionId={}, index={}";
 
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
   private final Random random = new Random();
 
   private final ScenarioService scenarioService;
@@ -182,16 +184,18 @@ public class ExpressionQueryService {
    * @return 학습 화면에 필요한 표현 상세 정보와 완료 여부
    * @throws ApiException 표현이 없거나 비활성 상태일 때, 다른 사용자의 전용 표현일 때
    */
-  @Transactional(readOnly = true)
+  @Transactional
   public ExpressionLearningResponse getExpressionForLearning(Long userId, Long expressionId) {
     WritingExpression expression = requireAccessibleExpression(userId, expressionId);
+    var attempt = accessGrants.startExpression(userId, expressionId);
     // 자산을 한 번만 조회해 대표 예문 TTS와 표현 TTS를 함께 꺼낸다.
     Optional<ExpressionPronunciationAsset> asset = findReadyAsset(userId, expressionId);
     return ExpressionLearningResponse.from(
-        expression,
-        asset.map(ExpressionPronunciationAsset::getSentenceAudioUrl).orElse(null),
-        asset.map(ExpressionPronunciationAsset::getExpressionAudioUrl).orElse(null),
-        learningProgressService.hasCompletedExpression(userId, expressionId));
+            expression,
+            asset.map(ExpressionPronunciationAsset::getSentenceAudioUrl).orElse(null),
+            asset.map(ExpressionPronunciationAsset::getExpressionAudioUrl).orElse(null),
+            learningProgressService.hasCompletedExpression(userId, expressionId))
+        .withAttempt(attempt.getId(), attempt.getExpiresAt());
   }
 
   /**

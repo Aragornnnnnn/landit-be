@@ -60,6 +60,9 @@ public class FreeTalkSession extends BaseTimeEntity {
   @Column(name = "expression_generation_started_at")
   private LocalDateTime expressionGenerationStartedAt;
 
+  @Column(name = "expression_generation_attempt", nullable = false)
+  private int expressionGenerationAttempt;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "memory_generation_status", length = 20)
   private MemoryGenerationStatus memoryGenerationStatus;
@@ -220,6 +223,7 @@ public class FreeTalkSession extends BaseTimeEntity {
       throw new IllegalStateException("표현 생성 작업을 시작할 수 없는 상태입니다.");
     }
     expressionGenerationStartedAt = LocalDateTime.now();
+    expressionGenerationAttempt++;
   }
 
   /** 표현 생성 결과가 준비됐음을 기록하고 실행 시작 시각을 비운다. */

@@ -51,7 +51,7 @@ class PremiumAccessIntegrationTests {
   private static final long SCENARIO_ID = 7_103L;
   private static final long MISSING_ID = 987_654_321L;
   private static final LocalDateTime AFTER_LAUNCH = LocalDateTime.of(2026, 9, 1, 0, 0, 0);
-  private static final long EVENT_TIMESTAMP_MS = 1_756_000_000_000L;
+  private static final long EVENT_TIMESTAMP_MS = 4_000_000_000_000L;
 
   @Autowired private MockMvc mockMvc;
 

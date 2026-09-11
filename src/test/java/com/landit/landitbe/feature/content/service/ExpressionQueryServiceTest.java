@@ -63,6 +63,9 @@ class ExpressionQueryServiceTest {
 
   @Mock private ScenarioService scenarioService;
 
+  @Mock
+  private com.landit.landitbe.feature.subscription.service.LearningAccessGrantService accessGrants;
+
   @Mock private UserProfileService userProfileService;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
@@ -78,6 +81,23 @@ class ExpressionQueryServiceTest {
   @Mock private UserAccentLocaleResolver accentLocaleResolver;
 
   @InjectMocks private ExpressionQueryService expressionQueryService;
+
+  @org.junit.jupiter.api.BeforeEach
+  void allowLearningStart() {
+    org.mockito.Mockito.lenient()
+        .when(
+            accessGrants.startExpression(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenAnswer(
+            call ->
+                new com.landit.landitbe.feature.subscription.domain.LearningAccessGrant(
+                    call.getArgument(0),
+                    "EXPRESSION",
+                    call.getArgument(1),
+                    1,
+                    "PREMIUM",
+                    java.time.LocalDateTime.of(2026, 9, 11, 12, 0)));
+  }
 
   @Test
   void returnsCandidatesByIdsPreservingInputOrder() {

@@ -147,7 +147,8 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     long startNanos = System.nanoTime();
     try {
       HttpRequest request =
-          HttpRequest.newBuilder(aiUri(path))
+          properties
+              .authorize(HttpRequest.newBuilder(aiUri(path)))
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
