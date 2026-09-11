@@ -112,10 +112,9 @@ class ScenarioSessionApiIntegrationTests {
 
   @BeforeEach
   void setUp() {
-    awaitPendingLevelAssessments();
+    clearLearningData();
     mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
-    clearLearningData();
   }
 
   /** 테스트가 만든 캐릭터·음성 행이 다른 테스트 클래스의 스키마 검증에 남지 않도록 정리한다. */
@@ -127,6 +126,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private void clearLearningData() {
+    awaitPendingLevelAssessments();
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
