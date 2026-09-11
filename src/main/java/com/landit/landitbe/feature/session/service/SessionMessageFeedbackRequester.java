@@ -2,13 +2,11 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackResult;
 import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
@@ -24,19 +22,23 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionMessageFeedbackRequester {
 
-  private final AiConversationClient aiConversationClient;
-  private final AiConversationSettings aiConversationSettings;
+  private final MessageFeedbackWorkService feedbackWorkService;
   private final SessionMessageService sessionMessageService;
+  private final AiConversationSettings aiConversationSettings;
 
   /** 사용자 메시지의 평가 기준을 구성해 피드백 생성을 요청한다. */
   ProcessingStatus request(SubmittedMessageContext submittedContext) {
-    AiMessageFeedbackRequest request = toRequest(submittedContext);
-    AiMessageFeedbackResult result = aiConversationClient.requestMessageFeedback(request);
-    validateResult(result, request);
-    if (result.feedbackStatus() == ProcessingStatus.FAILED) {
+    return feedbackWorkService.generate(submittedContext.submittedMessageId());
+  }
+
+  /** 사용자 발화와 함께 평가 입력을 저장해 프로세스 종료 뒤에도 재실행한다. */
+  void prepare(SubmittedMessageContext submittedContext) {
+    try {
+      feedbackWorkService.prepare(toRequest(submittedContext));
+    } catch (ApiException exception) {
+      // 평가 기준이 빠져도 대화의 다음 질문 생성은 계속한다.
       sessionMessageService.failFeedback(submittedContext.submittedMessageId());
     }
-    return result.feedbackStatus();
   }
 
   /** AI First와 USER First 시작 발화에 맞는 평가 기준을 요청 본문으로 조립한다. */
@@ -102,15 +104,5 @@ class SessionMessageFeedbackRequester {
         AiMessageFeedbackEvaluationContextType.AI_MESSAGE,
         precedingMessage.content(),
         precedingMessage.translatedContent());
-  }
-
-  private void validateResult(AiMessageFeedbackResult result, AiMessageFeedbackRequest request) {
-    if (result == null
-        || !request.sessionId().equals(result.sessionId())
-        || !request.messageId().equals(result.messageId())
-        || (result.feedbackStatus() != ProcessingStatus.PREPARING
-            && result.feedbackStatus() != ProcessingStatus.FAILED)) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-    }
   }
 }

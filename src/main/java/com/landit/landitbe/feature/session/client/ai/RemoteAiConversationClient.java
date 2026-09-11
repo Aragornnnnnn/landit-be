@@ -94,12 +94,18 @@ public class RemoteAiConversationClient implements AiConversationClient {
   /** AI 서버에 세션 단위 최종 피드백 생성을 요청하고 FE 저장용 결과로 변환한다. */
   @Override
   public AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request) {
+    return generateSessionFeedback(request, properties.sessionFeedbackRequestTimeout());
+  }
+
+  @Override
+  public AiSessionFeedbackResult generateSessionFeedback(
+      AiSessionFeedbackRequest request, Duration timeout) {
     return post(
             sessionFeedbackUri(),
             request,
             RemoteSessionFeedbackResponse.class,
             ErrorCode.FEEDBACK_GENERATION_FAILED,
-            properties.sessionFeedbackRequestTimeout())
+            timeout)
         .toResult();
   }
 
@@ -254,13 +260,13 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteMessageFeedbackResponse(
-      Long sessionId, Long messageId, ProcessingStatus feedbackStatus) {
+      Long sessionId, Long messageId, ProcessingStatus feedbackStatus, JsonNode completedFeedback) {
 
     private AiMessageFeedbackResult toResult() {
       if (sessionId == null || messageId == null || feedbackStatus == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus);
+      return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus, completedFeedback);
     }
   }
 

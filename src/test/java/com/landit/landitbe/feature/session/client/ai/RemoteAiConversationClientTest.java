@@ -492,6 +492,55 @@ class RemoteAiConversationClientTest {
   }
 
   @Test
+  void hotfixForwardsCompletedFeedbacksWithoutChangingLegacyFields() throws Exception {
+    AtomicReference<String> body = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-feedback",
+        exchange -> {
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeSessionFeedbackSuccessResponse(exchange);
+        });
+    AiSessionFeedbackRequest legacy = aiSessionFeedbackRequest();
+    JsonNode snapshot = jsonMapper.readTree("{\"schemaVersion\":1,\"sessionId\":100}");
+    remoteClient()
+        .generateSessionFeedback(
+            new AiSessionFeedbackRequest(
+                legacy.sessionId(),
+                legacy.scenario(),
+                legacy.expectedMessageIds(),
+                List.of(snapshot)));
+    JsonNode sent = jsonMapper.readTree(body.get());
+    assertThat(sent.get("completedFeedbacks").get(0)).isEqualTo(snapshot);
+    assertThat(sent.get("expectedMessageIds")).hasSize(legacy.expectedMessageIds().size());
+    assertThat(sent.has("assessmentMessages")).isFalse();
+  }
+
+  @Test
+  void hotfixUsesRemainingTimeoutForFinalFeedbackRetry() {
+    server.createContext(
+        "/api/v1/conversation/session-feedback",
+        exchange -> {
+          try {
+            Thread.sleep(200);
+            writeSessionFeedbackSuccessResponse(exchange);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          } finally {
+            exchange.close();
+          }
+        });
+    assertThatThrownBy(
+            () ->
+                remoteClient()
+                    .generateSessionFeedback(aiSessionFeedbackRequest(), Duration.ofMillis(30)))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
+  }
+
+  @Test
   void generateSessionFeedbackUsesLongerDedicatedRequestTimeout() {
     server.createContext(
         "/api/v1/conversation/session-feedback",

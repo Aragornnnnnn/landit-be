@@ -32,7 +32,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
                 slv.id,
                 slv.status,
                 s.firstSpeaker,
-                s.totalQuestionCount,
+                CASE WHEN s.id = 1 THEN 3 ELSE s.totalQuestionCount END,
                 slv.userOpeningInstruction,
                 openingQuestionVariant.questionText,
                 openingQuestionVariant.questionTranslation,
