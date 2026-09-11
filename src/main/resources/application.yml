@@ -41,7 +41,7 @@ management:
 
 landit:
   free-talk:
-    speaking-time-limit-ms: ${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:7200000}
+    speaking-time-limit-ms: ${LANDIT_FREE_TALK_DAILY_SPEAKING_TIME_LIMIT_MS:${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:7200000}}
     daily-request-limit: ${LANDIT_FREE_TALK_DAILY_REQUEST_LIMIT:1000}
     requests-per-minute-limit: ${LANDIT_FREE_TALK_REQUESTS_PER_MINUTE_LIMIT:20}
   cors:
