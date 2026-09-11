@@ -8,8 +8,11 @@ import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +27,7 @@ public class FreeTalkDailySpeakingUsageService {
   private final FreeTalkDailySpeakingUsageRepository repository;
   private final UserProfileService userProfileService;
   private final FreeTalkProperties properties;
+  private final Clock clock;
 
   /**
    * 현재 환경의 일일 사용자 발화 제한시간을 반환한다.
@@ -53,7 +57,7 @@ public class FreeTalkDailySpeakingUsageService {
    */
   @Transactional(readOnly = true)
   public DailySpeakingUsage usage(long userId) {
-    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate usageDate = LocalDate.now(clock.withZone(KOREA_ZONE_ID));
     return repository
         .findByIdUserProfileIdAndIdUsageDate(userId, usageDate)
         .map(
@@ -82,24 +86,55 @@ public class FreeTalkDailySpeakingUsageService {
    * @param userId 사용자 ID
    * @param utteranceDurationMs 예약할 사용자 발화 시간 밀리초
    * @return 예약 후 당일 사용 시간과 남은 시간 요약
-   * @throws SessionException 당일 발화 한도를 이미 모두 사용했을 때
+   * @throws SessionException 당일 발화 한도 또는 일일·분당 요청 한도에 도달했을 때
    * @throws IllegalArgumentException 발화 시간이 음수이거나 누적값이 long 범위를 넘을 때
    */
   @Transactional
   public DailySpeakingUsage reserve(long userId, long utteranceDurationMs) {
-    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
     userProfileService.requireActiveForUpdate(userId);
-    FreeTalkDailySpeakingUsage usage =
-        repository
-            .findByUserProfileIdAndUsageDateForUpdate(userId, usageDate)
-            .orElseGet(
-                () -> repository.save(FreeTalkDailySpeakingUsage.create(userId, usageDate, 0L)));
+    LocalDateTime now = LocalDateTime.now(clock.withZone(KOREA_ZONE_ID));
+    LocalDate usageDate = now.toLocalDate();
+    FreeTalkDailySpeakingUsage usage = findOrCreateUsage(userId, usageDate);
     if (remainingForUsedDurationMs(usage.getUsedSpeakingDurationMs()) == 0) {
       throw new SessionException(SessionErrorCode.FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED);
     }
+    recordRequestWithinLimits(usage, now);
     usage.reserve(utteranceDurationMs);
     return new DailySpeakingUsage(
         usageDate, usage.getUsedSpeakingDurationMs(), remainingForUsage(usage));
+  }
+
+  /**
+   * 발화 시간이 없는 세션 시작·종료 결정·표현 재시도의 생성 요청을 기록한다.
+   *
+   * <p>호출자의 예약 트랜잭션에서 기록하고 외부 AI 호출 전에 커밋한다. AI 실패 후에도 요청 횟수는 유지한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @throws SessionException 일일 또는 분당 요청 한도에 도달했을 때
+   */
+  @Transactional
+  public void reserveRequest(long userId) {
+    userProfileService.requireActiveForUpdate(userId);
+    LocalDateTime now = LocalDateTime.now(clock.withZone(KOREA_ZONE_ID));
+    recordRequestWithinLimits(findOrCreateUsage(userId, now.toLocalDate()), now);
+  }
+
+  private FreeTalkDailySpeakingUsage findOrCreateUsage(long userId, LocalDate usageDate) {
+    return repository
+        .findByUserProfileIdAndUsageDateForUpdate(userId, usageDate)
+        .orElseGet(() -> repository.save(FreeTalkDailySpeakingUsage.create(userId, usageDate, 0L)));
+  }
+
+  private void recordRequestWithinLimits(FreeTalkDailySpeakingUsage usage, LocalDateTime now) {
+    if (usage.getRequestCount() >= properties.dailyRequestLimit()) {
+      throw new SessionException(SessionErrorCode.FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED);
+    }
+    LocalDateTime minute = now.truncatedTo(ChronoUnit.MINUTES);
+    if (minute.equals(usage.getRequestMinute())
+        && usage.getMinuteRequestCount() >= properties.requestsPerMinuteLimit()) {
+      throw new SessionException(SessionErrorCode.FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED);
+    }
+    usage.recordRequest(minute);
   }
 
   /**
