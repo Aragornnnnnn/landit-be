@@ -6,9 +6,11 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +18,11 @@ import org.springframework.data.repository.query.Param;
 /** 세션 히스토리 메시지 엔티티의 저장을 담당한다. */
 public interface SessionHistoryMessageRepository
     extends JpaRepository<SessionHistoryMessage, Long> {
+
+  /** 피드백 작업보다 부모 메시지를 먼저 잠가 삭제와 잠금 순서를 맞춘다. */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select m from SessionHistoryMessage m where m.id = :messageId")
+  Optional<SessionHistoryMessage> findByIdForFeedbackUpdate(long messageId);
 
   /** 세션 히스토리의 메시지를 메시지 순서대로 조회한다. */
   List<SessionHistoryMessage> findBySessionHistoryIdOrderByMessageSequenceAsc(
@@ -103,4 +110,13 @@ public interface SessionHistoryMessageRepository
       @Param("messageIds") List<Long> messageIds,
       @Param("completedStatus") ProcessingStatus completedStatus,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
+
+  /** 실패한 메시지의 평가가 복구되면 최종 피드백 대기 상태로 되돌린다. */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+      update SessionHistoryMessage m set m.feedbackProcessingStatus = :preparing
+      where m.id = :messageId and m.feedbackProcessingStatus = :failed
+      """)
+  int retryFeedback(long messageId, ProcessingStatus preparing, ProcessingStatus failed);
 }

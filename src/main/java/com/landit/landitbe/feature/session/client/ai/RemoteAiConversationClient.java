@@ -17,7 +17,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -96,12 +98,23 @@ public class RemoteAiConversationClient implements AiConversationClient {
   /** AI 서버에 세션 단위 최종 피드백 생성을 요청하고 FE 저장용 결과로 변환한다. */
   @Override
   public AiSessionFeedbackResult generateSessionFeedback(AiSessionFeedbackRequest request) {
+    return generateSessionFeedback(request, properties.sessionFeedbackRequestTimeout());
+  }
+
+  @Override
+  public AiSessionFeedbackResult generateSessionFeedback(
+      AiSessionFeedbackRequest request, Duration timeout) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("sessionId", request.sessionId());
+    payload.put("scenario", request.scenario());
+    payload.put("expectedMessageIds", request.expectedMessageIds());
+    payload.put("completedFeedbacks", request.completedFeedbacks());
     return post(
             sessionFeedbackUri(),
-            request,
+            payload,
             RemoteSessionFeedbackResponse.class,
             ErrorCode.FEEDBACK_GENERATION_FAILED,
-            properties.sessionFeedbackRequestTimeout())
+            timeout)
         .toResult();
   }
 
@@ -115,7 +128,11 @@ public class RemoteAiConversationClient implements AiConversationClient {
   public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
     return post(
             sessionLevelAssessmentUri(),
-            request,
+            Map.of(
+                "sessionId", request.sessionId(),
+                "scenario", request.scenario(),
+                "expectedMessageIds", request.expectedMessageIds(),
+                "assessmentMessages", request.assessmentMessages()),
             RemoteSessionLevelAssessmentResponse.class,
             ErrorCode.FEEDBACK_GENERATION_FAILED,
             properties.sessionFeedbackRequestTimeout())
@@ -277,13 +294,13 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteMessageFeedbackResponse(
-      Long sessionId, Long messageId, ProcessingStatus feedbackStatus) {
+      Long sessionId, Long messageId, ProcessingStatus feedbackStatus, JsonNode completedFeedback) {
 
     private AiMessageFeedbackResult toResult() {
       if (sessionId == null || messageId == null || feedbackStatus == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus);
+      return new AiMessageFeedbackResult(sessionId, messageId, feedbackStatus, completedFeedback);
     }
   }
 

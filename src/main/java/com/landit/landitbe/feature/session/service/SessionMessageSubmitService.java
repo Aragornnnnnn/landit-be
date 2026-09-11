@@ -76,7 +76,12 @@ public class SessionMessageSubmitService {
     // AI 요청에 사용자 메시지 ID가 필요하므로 짧은 트랜잭션으로 먼저 저장한다.
     SubmittedMessageContext submittedContext =
         executeInTransaction(
-            () -> submittedMessageService.record(userId, sessionId, content, inputType));
+            () -> {
+              SubmittedMessageContext context =
+                  submittedMessageService.record(userId, sessionId, content, inputType);
+              sessionMessageFeedbackRequester.prepare(context);
+              return context;
+            });
     AsyncGenerationRequests asyncGenerationRequests = AsyncGenerationRequests.none();
     try {
       asyncGenerationRequests = startAsyncGeneration(submittedContext);
