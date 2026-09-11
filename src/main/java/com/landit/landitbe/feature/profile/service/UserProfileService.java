@@ -90,8 +90,26 @@ public class UserProfileService {
       return SubscriptionUpdateResult.STALE_EVENT;
     }
     userProfile.updateSubscription(
-        command.status(), command.periodType(), command.expiresAt(), command.eventAt());
+        command.status(),
+        command.periodType(),
+        command.expiresAt(),
+        command.eventAt(),
+        command.productId(),
+        command.store());
     return SubscriptionUpdateResult.APPLIED;
+  }
+
+  /**
+   * 후보 ID 가운데 실제로 존재하는 첫 사용자 프로필 ID를 찾는다.
+   *
+   * <p>결제 제공자 웹훅이 이력을 저장하기 전에 사용자를 확정하는 용도라, 탈퇴한 사용자도 포함한다.
+   *
+   * @param candidateUserIds 확인할 사용자 ID 후보. 앞선 후보를 우선한다
+   * @return 존재하는 첫 사용자 프로필 ID. 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<Long> findExistingUserId(List<Long> candidateUserIds) {
+    return candidateUserIds.stream().filter(userProfileRepository::existsById).findFirst();
   }
 
   /**

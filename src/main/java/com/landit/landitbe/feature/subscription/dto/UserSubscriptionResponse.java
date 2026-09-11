@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.subscription.dto;
 
 import com.landit.landitbe.feature.profile.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.domain.SubscriptionStore;
 import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -16,6 +17,8 @@ import java.time.LocalDateTime;
  * @param periodType 현재 결제 기간 종류. 무료 체험 중이면 TRIAL. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
+ * @param productId 구독 상품 ID. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
+ * @param store 결제한 스토어. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  */
 @Schema(description = "사용자 구독 상태")
 public record UserSubscriptionResponse(
@@ -40,7 +43,17 @@ public record UserSubscriptionResponse(
                     + " 도입 전 가입자는 도입 후 오늘의 시나리오 완료가 기준이다. 도입 시점이 설정되기 전에는 항상 false."
                     + " 앱은 conversationCompletedSinceLaunch && !premium 이면 페이월을 보여준다.",
             example = "false")
-        boolean conversationCompletedSinceLaunch) {
+        boolean conversationCompletedSinceLaunch,
+    @Schema(
+            description = "구독 상품 ID. 웹은 이 값으로 월간·연간 이름을 붙인다. 프리미엄이 꺼져 있으면 null",
+            example = "com.saynow.app.premium.yearly")
+        String productId,
+    @Schema(
+            description =
+                "결제한 스토어. APP_STORE, PLAY_STORE 등 RevenueCat store 값. 웹은 이 값으로 구독 관리 링크를 고른다."
+                    + " 프리미엄이 꺼져 있으면 null",
+            example = "APP_STORE")
+        SubscriptionStore store) {
 
   /**
    * 프로필의 구독 스냅샷과 대화 완료 여부를 응답으로 합친다.
@@ -56,6 +69,8 @@ public record UserSubscriptionResponse(
         snapshot.premium(),
         snapshot.periodType(),
         snapshot.expiresAt(),
-        conversationCompletedSinceLaunch);
+        conversationCompletedSinceLaunch,
+        snapshot.productId(),
+        snapshot.store());
   }
 }

@@ -1,4 +1,4 @@
-// RevenueCat 웹훅 수신 API의 인증과 이벤트별 구독 상태 갱신을 검증한다.
+// RevenueCat 웹훅 수신 API의 인증, 이벤트별 구독 상태 갱신, 결제 이력 저장을 검증한다.
 
 package com.landit.landitbe.feature.subscription;
 
@@ -9,7 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -25,7 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** RevenueCat 웹훅 수신 API의 인증과 이벤트별 구독 상태 갱신을 검증한다. */
+/** RevenueCat 웹훅 수신 API의 인증, 이벤트별 구독 상태 갱신, 결제 이력 저장을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -200,7 +202,7 @@ class RevenueCatWebhookApiIntegrationTests {
     assertThat(subscriptionPeriodType(userId)).isNull();
   }
 
-  /** 이미 반영한 이벤트보다 오래된 이벤트가 뒤늦게 도착하면 무시한다. */
+  /** 이미 반영한 이벤트보다 오래된 이벤트가 뒤늦게 도착하면 상태는 무시하되 이력에는 남긴다. */
   @Test
   void ignoresStaleEvent() throws Exception {
     Long userId = createUser("rc-stale");
@@ -211,6 +213,9 @@ class RevenueCatWebhookApiIntegrationTests {
         .andExpect(status().isOk());
 
     assertThat(subscriptionStatus(userId)).isEqualTo("EXPIRED");
+    assertThat(subscriptionEvents(userId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("RENEWAL", "EXPIRATION");
   }
 
   /** 익명 App User ID로 온 이벤트도 aliases에 Landit 사용자 ID가 있으면 반영한다. */
@@ -250,6 +255,186 @@ class RevenueCatWebhookApiIntegrationTests {
         .andExpect(status().isOk());
 
     assertThat(subscriptionStatus(userId)).isEqualTo("NONE");
+    assertThat(subscriptionEvents(userId)).isEmpty();
+    assertThat(subscriptionEvents(987_654_321L)).isEmpty();
+  }
+
+  /** 구매 이벤트는 상품 ID와 스토어를 프로필에 저장하고, 프리미엄이 꺼지면 둘 다 비운다. */
+  @Test
+  void storesProductAndStoreWhilePremiumAndClearsWhenOff() throws Exception {
+    Long userId = createUser("rc-product");
+
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    assertThat(subscriptionProductId(userId)).isEqualTo("landit_premium_monthly");
+    assertThat(subscriptionStore(userId)).isEqualTo("APP_STORE");
+
+    postWebhook(WEBHOOK_SECRET, event("CANCELLATION", userId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+    assertThat(subscriptionProductId(userId)).isEqualTo("landit_premium_monthly");
+    assertThat(subscriptionStore(userId)).isEqualTo("APP_STORE");
+
+    postWebhook(WEBHOOK_SECRET, event("EXPIRATION", userId, BASE_EVENT_TIMESTAMP_MS + 2_000))
+        .andExpect(status().isOk());
+    assertThat(subscriptionProductId(userId)).isNull();
+    assertThat(subscriptionStore(userId)).isNull();
+  }
+
+  /** 알 수 없는 store 값은 스토어만 비우고 상태 갱신은 그대로 진행한다. */
+  @Test
+  void storesNullStoreForUnknownValue() throws Exception {
+    Long userId = createUser("rc-store-unknown");
+    String body =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "INITIAL_PURCHASE",
+            "app_user_id": "%d",
+            "store": "SOMETHING_NEW",
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """
+            .formatted(UUID.randomUUID(), userId, BASE_EVENT_TIMESTAMP_MS, EXPIRATION_MS);
+
+    postWebhook(WEBHOOK_SECRET, body).andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionStore(userId)).isNull();
+    assertThat(subscriptionEvents(userId))
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.get("store")).isNull();
+              assertThat(row.get("price")).isNull();
+              assertThat(row.get("currency")).isNull();
+            });
+  }
+
+  /** 결제 이력은 결제 통화 기준 금액, 스토어, 환경, 결제 시각, 만료 시각, 해지 사유를 웹훅 그대로 저장한다. */
+  @Test
+  void recordsEventHistoryFromWebhookFields() throws Exception {
+    Long userId = createUser("rc-history");
+
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "CANCELLATION",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 1_000,
+                Map.of("cancel_reason", "CUSTOMER_SUPPORT")))
+        .andExpect(status().isOk());
+
+    List<Map<String, Object>> events = subscriptionEvents(userId);
+    assertThat(events).hasSize(2);
+    Map<String, Object> purchase = events.get(0);
+    assertThat(purchase.get("event_id")).isNotNull();
+    assertThat(purchase.get("type")).isEqualTo("INITIAL_PURCHASE");
+    assertThat(purchase.get("product_id")).isEqualTo("landit_premium_monthly");
+    assertThat((BigDecimal) purchase.get("price")).isEqualByComparingTo("58500");
+    assertThat(purchase.get("currency")).isEqualTo("KRW");
+    assertThat(purchase.get("store")).isEqualTo("APP_STORE");
+    assertThat(purchase.get("environment")).isEqualTo("SANDBOX");
+    assertThat(purchase.get("cancel_reason")).isNull();
+    assertThat(((Timestamp) purchase.get("occurred_at")).getTime())
+        .isEqualTo(BASE_EVENT_TIMESTAMP_MS);
+    assertThat(((Timestamp) purchase.get("expires_at")).getTime()).isEqualTo(EXPIRATION_MS);
+    Map<String, Object> refund = events.get(1);
+    assertThat(refund.get("type")).isEqualTo("CANCELLATION");
+    assertThat(refund.get("cancel_reason")).isEqualTo("CUSTOMER_SUPPORT");
+  }
+
+  /** 결제 시각이 없으면 이벤트 생성 시각을 발생 시각으로 저장한다. */
+  @Test
+  void fallsBackToEventTimestampWhenPurchasedAtMissing() throws Exception {
+    Long userId = createUser("rc-occurred-fallback");
+    String body =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "EXPIRATION",
+            "app_user_id": "%d",
+            "event_timestamp_ms": %d
+          }
+        }
+        """
+            .formatted(UUID.randomUUID(), userId, BASE_EVENT_TIMESTAMP_MS + 7_000);
+
+    postWebhook(WEBHOOK_SECRET, body).andExpect(status().isOk());
+
+    assertThat(subscriptionEvents(userId))
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(((Timestamp) row.get("occurred_at")).getTime())
+                  .isEqualTo(BASE_EVENT_TIMESTAMP_MS + 7_000);
+              assertThat(row.get("expires_at")).isNull();
+            });
+  }
+
+  /** 같은 이벤트 ID가 다시 오면 이력을 한 번만 남기고 상태도 바꾸지 않는다. */
+  @Test
+  void ignoresDuplicateEventId() throws Exception {
+    Long userId = createUser("rc-duplicate");
+    String eventId = UUID.randomUUID().toString();
+    String template =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "%s",
+            "app_user_id": "%d",
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """;
+    postWebhook(
+            WEBHOOK_SECRET,
+            template.formatted(
+                eventId, "INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS, EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            template.formatted(
+                eventId, "EXPIRATION", userId, BASE_EVENT_TIMESTAMP_MS + 1_000, EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(userId))
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.get("event_id")).isEqualTo(eventId);
+              assertThat(row.get("type")).isEqualTo("INITIAL_PURCHASE");
+            });
+  }
+
+  /** 결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태는 바꾸지 않는다. */
+  @Test
+  void recordsBillingIssueAndProductChangeWithoutStatusChange() throws Exception {
+    Long userId = createUser("rc-history-only");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(WEBHOOK_SECRET, event("BILLING_ISSUE", userId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+    postWebhook(WEBHOOK_SECRET, event("PRODUCT_CHANGE", userId, BASE_EVENT_TIMESTAMP_MS + 2_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(userId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE", "BILLING_ISSUE", "PRODUCT_CHANGE");
   }
 
   /** Authorization 헤더가 없거나 설정값과 다르면 401로 거절하고 상태를 바꾸지 않는다. */
@@ -267,14 +452,27 @@ class RevenueCatWebhookApiIntegrationTests {
     assertThat(subscriptionStatus(userId)).isEqualTo("NONE");
   }
 
-  /** 이벤트 객체나 type이 없는 본문은 400으로 거절한다. */
+  /** 이벤트 객체, type, id가 없는 본문은 400으로 거절해 이력 없이 상태만 바뀌는 일을 막는다. */
   @Test
   void rejectsMalformedBody() throws Exception {
+    Long userId = createUser("rc-malformed");
+
     postWebhook(WEBHOOK_SECRET, "{\"api_version\":\"1.0\"}")
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     postWebhook(WEBHOOK_SECRET, "{\"event\":{\"app_user_id\":\"1\"}}")
         .andExpect(status().isBadRequest());
+    postWebhook(
+            WEBHOOK_SECRET,
+            """
+            {"event":{"type":"INITIAL_PURCHASE","app_user_id":"%d","event_timestamp_ms":%d}}
+            """
+                .formatted(userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("NONE");
+    assertThat(subscriptionEvents(userId)).isEmpty();
   }
 
   /** OpenAPI 문서에는 웹훅 경로를 공개하지 않는다. */
@@ -316,6 +514,11 @@ class RevenueCatWebhookApiIntegrationTests {
             "aliases": ["%d"],
             "product_id": "landit_premium_monthly",
             "environment": "SANDBOX",
+            "store": "APP_STORE",
+            "price": 39.5,
+            "price_in_purchased_currency": 58500,
+            "currency": "KRW",
+            "purchased_at_ms": %d,
             "event_timestamp_ms": %d,
             "expiration_at_ms": %d,
             "unknown_field": {"nested": true}%s
@@ -323,7 +526,15 @@ class RevenueCatWebhookApiIntegrationTests {
         }
         """;
     return template.formatted(
-        UUID.randomUUID(), type, userId, userId, userId, eventTimestampMs, EXPIRATION_MS, extra);
+        UUID.randomUUID(),
+        type,
+        userId,
+        userId,
+        userId,
+        eventTimestampMs,
+        eventTimestampMs,
+        EXPIRATION_MS,
+        extra);
   }
 
   private String subscriptionStatus(Long userId) {
@@ -334,6 +545,23 @@ class RevenueCatWebhookApiIntegrationTests {
   private String subscriptionPeriodType(Long userId) {
     return jdbcTemplate.queryForObject(
         "select subscription_period_type from user_profile where id = ?", String.class, userId);
+  }
+
+  private String subscriptionProductId(Long userId) {
+    return jdbcTemplate.queryForObject(
+        "select subscription_product_id from user_profile where id = ?", String.class, userId);
+  }
+
+  private String subscriptionStore(Long userId) {
+    return jdbcTemplate.queryForObject(
+        "select subscription_store from user_profile where id = ?", String.class, userId);
+  }
+
+  /** 사용자의 결제 이력을 발생 시각 오름차순으로 조회한다. */
+  private List<Map<String, Object>> subscriptionEvents(Long userId) {
+    return jdbcTemplate.queryForList(
+        "select * from subscription_event where user_profile_id = ? order by occurred_at, id",
+        userId);
   }
 
   private Timestamp subscriptionExpiresAt(Long userId) {

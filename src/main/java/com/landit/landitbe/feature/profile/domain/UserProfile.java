@@ -86,6 +86,13 @@ public class UserProfile extends BaseTimeEntity {
   @Column(name = "subscription_event_at")
   private LocalDateTime subscriptionEventAt;
 
+  @Column(name = "subscription_product_id", length = 255)
+  private String subscriptionProductId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "subscription_store", length = 30)
+  private SubscriptionStore subscriptionStore;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private UserProfileStatus status;
@@ -180,16 +187,22 @@ public class UserProfile extends BaseTimeEntity {
    * @param subscriptionPeriodType 현재 결제 기간 종류. 알 수 없으면 null
    * @param expiresAt 구독 만료 시각. 알 수 없으면 null
    * @param eventAt 이벤트 발생 시각
+   * @param subscriptionProductId 구독 상품 ID. 프리미엄이 꺼지거나 알 수 없으면 null
+   * @param subscriptionStore 결제한 스토어. 프리미엄이 꺼지거나 알 수 없으면 null
    */
   public void updateSubscription(
       SubscriptionStatus subscriptionStatus,
       SubscriptionPeriodType subscriptionPeriodType,
       LocalDateTime expiresAt,
-      LocalDateTime eventAt) {
+      LocalDateTime eventAt,
+      String subscriptionProductId,
+      SubscriptionStore subscriptionStore) {
     this.subscriptionStatus = subscriptionStatus;
     this.subscriptionPeriodType = subscriptionPeriodType;
     this.subscriptionExpiresAt = expiresAt;
     this.subscriptionEventAt = eventAt;
+    this.subscriptionProductId = subscriptionProductId;
+    this.subscriptionStore = subscriptionStore;
   }
 
   /**

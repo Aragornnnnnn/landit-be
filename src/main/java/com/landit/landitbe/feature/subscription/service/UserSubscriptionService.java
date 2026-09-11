@@ -1,4 +1,4 @@
-// 프로필의 구독 상태와 학습 진행도를 합쳐 앱이 쓸 구독 조회 응답을 만든다.
+// 프로필의 구독 상태와 학습 진행도를 합쳐 앱이 쓸 구독 조회 응답을 만들고, 결제 이력을 조회한다.
 
 package com.landit.landitbe.feature.subscription.service;
 
@@ -7,21 +7,25 @@ import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
+import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
+import com.landit.landitbe.feature.subscription.repository.SubscriptionEventRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 프로필의 구독 상태와 학습 진행도를 합쳐 앱이 쓸 구독 조회 응답을 만든다. */
+/** 프로필의 구독 상태와 학습 진행도를 합쳐 앱이 쓸 구독 조회 응답을 만들고, 결제 이력을 조회한다. */
 @Slf4j
 @Service
 public class UserSubscriptionService {
 
   private final UserProfileService userProfileService;
   private final LearningProgressService learningProgressService;
+  private final SubscriptionEventRepository subscriptionEventRepository;
   private final Clock clock;
   private final Optional<LocalDateTime> launchedAt;
 
@@ -30,16 +34,19 @@ public class UserSubscriptionService {
    *
    * @param userProfileService 구독 상태 스냅샷을 제공하는 프로필 Service
    * @param learningProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
+   * @param subscriptionEventRepository 결제 이력 Repository
    * @param subscriptionProperties 유료 구독 도입 시점 설정
    * @param clock 서비스 기준 시간대를 제공하는 시계
    */
   public UserSubscriptionService(
       UserProfileService userProfileService,
       LearningProgressService learningProgressService,
+      SubscriptionEventRepository subscriptionEventRepository,
       SubscriptionProperties subscriptionProperties,
       Clock clock) {
     this.userProfileService = userProfileService;
     this.learningProgressService = learningProgressService;
+    this.subscriptionEventRepository = subscriptionEventRepository;
     this.clock = clock;
     this.launchedAt =
         subscriptionProperties
@@ -84,6 +91,23 @@ public class UserSubscriptionService {
     UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
     return PremiumAccess.afterLaunch(
         snapshot.premium(), hasCompletedConversationSinceLaunch(userId));
+  }
+
+  /**
+   * 활성 사용자의 결제 이력을 발생 시각 내림차순으로 최근 50개 조회한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 결제 이력 목록. 이력이 없으면 빈 목록
+   * @throws com.landit.landitbe.feature.profile.exception.UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public List<SubscriptionEventResponse> getEvents(Long userId) {
+    userProfileService.requireActive(userId);
+    return subscriptionEventRepository
+        .findTop50ByUserProfileIdOrderByOccurredAtDescIdDesc(userId)
+        .stream()
+        .map(SubscriptionEventResponse::from)
+        .toList();
   }
 
   private boolean hasCompletedConversationSinceLaunch(Long userId) {

@@ -1,4 +1,4 @@
-// 사용자 구독 상태 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다.
+// 사용자 구독 상태·결제 이력 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다.
 
 package com.landit.landitbe.feature.subscription;
 
@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +25,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** 사용자 구독 상태 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다. */
+/** 사용자 구독 상태·결제 이력 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다. */
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
@@ -103,7 +104,9 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.data.premium").value(false))
         .andExpect(jsonPath("$.data.periodType").isEmpty())
         .andExpect(jsonPath("$.data.expiresAt").isEmpty())
-        .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(false));
+        .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(false))
+        .andExpect(jsonPath("$.data.productId").isEmpty())
+        .andExpect(jsonPath("$.data.store").isEmpty());
   }
 
   /** 웹훅으로 무료 체험 구매가 반영되면 ACTIVE 상태, TRIAL 기간 종류, 만료 시각이 조회된다. */
@@ -121,19 +124,15 @@ class UserSubscriptionApiIntegrationTests {
             "type": "INITIAL_PURCHASE",
             "app_user_id": "%d",
             "period_type": "TRIAL",
+            "product_id": "com.saynow.app.premium.yearly",
+            "store": "PLAY_STORE",
             "event_timestamp_ms": %d,
             "expiration_at_ms": %d
           }
         }
         """
             .formatted(UUID.randomUUID(), userId, EVENT_TIMESTAMP_MS, EXPIRATION_MS);
-    mockMvc
-        .perform(
-            post("/webhooks/revenuecat")
-                .header(HttpHeaders.AUTHORIZATION, WEBHOOK_SECRET)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isOk());
+    postWebhook(body);
 
     mockMvc
         .perform(
@@ -143,7 +142,119 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.data.subscriptionStatus").value("ACTIVE"))
         .andExpect(jsonPath("$.data.premium").value(true))
         .andExpect(jsonPath("$.data.periodType").value("TRIAL"))
-        .andExpect(jsonPath("$.data.expiresAt").isNotEmpty());
+        .andExpect(jsonPath("$.data.expiresAt").isNotEmpty())
+        .andExpect(jsonPath("$.data.productId").value("com.saynow.app.premium.yearly"))
+        .andExpect(jsonPath("$.data.store").value("PLAY_STORE"));
+  }
+
+  /** 결제 이력은 발생 시각 내림차순으로 내려오고, 결제 없는 이벤트의 price는 0이다. */
+  @Test
+  void returnsSubscriptionEventsNewestFirst() throws Exception {
+    String userKey = "subscription-events";
+    final String accessToken = login(userKey);
+    Long userId = userIdOf(userKey);
+    String renewalId = UUID.randomUUID().toString();
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "INITIAL_PURCHASE",
+            userId,
+            EVENT_TIMESTAMP_MS,
+            """
+            "period_type": "TRIAL", "price": 0, "price_in_purchased_currency": 0, "currency": "KRW",
+            "purchased_at_ms": %d,
+            """
+                .formatted(EVENT_TIMESTAMP_MS)));
+    postWebhook(
+        webhookEvent(
+            renewalId,
+            "RENEWAL",
+            userId,
+            EVENT_TIMESTAMP_MS + 2_000,
+            """
+            "period_type": "NORMAL", "price": 39.5, "price_in_purchased_currency": 58500.0,
+            "currency": "KRW", "purchased_at_ms": %d,
+            """
+                .formatted(EVENT_TIMESTAMP_MS + 2_000)));
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "CANCELLATION",
+            userId,
+            EVENT_TIMESTAMP_MS + 1_000,
+            """
+            "cancel_reason": "UNSUBSCRIBE",
+            """));
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/subscription/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.length()").value(3))
+        .andExpect(jsonPath("$.data[0].eventId").value(renewalId))
+        .andExpect(jsonPath("$.data[0].type").value("RENEWAL"))
+        .andExpect(jsonPath("$.data[0].productId").value("com.saynow.app.premium.yearly"))
+        .andExpect(jsonPath("$.data[0].periodType").value("NORMAL"))
+        .andExpect(jsonPath("$.data[0].price").value(58500))
+        .andExpect(jsonPath("$.data[0].currency").value("KRW"))
+        .andExpect(jsonPath("$.data[0].store").value("APP_STORE"))
+        .andExpect(jsonPath("$.data[0].environment").value("PRODUCTION"))
+        .andExpect(jsonPath("$.data[0].cancelReason").isEmpty())
+        .andExpect(jsonPath("$.data[0].occurredAt").isNotEmpty())
+        .andExpect(jsonPath("$.data[0].expiresAt").isNotEmpty())
+        .andExpect(jsonPath("$.data[1].type").value("CANCELLATION"))
+        .andExpect(jsonPath("$.data[1].price").value(0))
+        .andExpect(jsonPath("$.data[1].currency").isEmpty())
+        .andExpect(jsonPath("$.data[1].cancelReason").value("UNSUBSCRIBE"))
+        .andExpect(jsonPath("$.data[2].type").value("INITIAL_PURCHASE"))
+        .andExpect(jsonPath("$.data[2].periodType").value("TRIAL"))
+        .andExpect(jsonPath("$.data[2].price").value(0));
+  }
+
+  /** 결제 이력은 페이지 없이 최근 50개까지만 내려준다. */
+  @Test
+  void limitsSubscriptionEventsToFifty() throws Exception {
+    String userKey = "subscription-events-limit";
+    String accessToken = login(userKey);
+    Long userId = userIdOf(userKey);
+    IntStream.range(0, 55)
+        .forEach(
+            index ->
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO subscription_event (
+                        event_id, user_profile_id, type, occurred_at, created_at
+                    )
+                    VALUES (?, ?, 'RENEWAL', ?, CURRENT_TIMESTAMP)
+                    """,
+                    "limit-" + userId + "-" + index,
+                    userId,
+                    AFTER_LAUNCH.plusDays(index)));
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/subscription/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(50))
+        .andExpect(jsonPath("$.data[0].eventId").value("limit-" + userId + "-54"))
+        .andExpect(jsonPath("$.data[49].eventId").value("limit-" + userId + "-5"));
+  }
+
+  /** 이력이 없는 사용자는 빈 목록을 받는다. */
+  @Test
+  void returnsEmptySubscriptionEventsForNewUser() throws Exception {
+    String accessToken = login("subscription-events-empty");
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/subscription/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").isArray())
+        .andExpect(jsonPath("$.data.length()").value(0));
   }
 
   /** 도입 시점 이후에 시나리오를 끝까지 완료한 사용자는 대화 완료로 조회된다. */
@@ -195,9 +306,10 @@ class UserSubscriptionApiIntegrationTests {
   @Test
   void rejectsUnauthenticatedSubscriptionRequest() throws Exception {
     mockMvc.perform(get("/api/v1/me/subscription")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/me/subscription/events")).andExpect(status().isUnauthorized());
   }
 
-  /** OpenAPI 문서에 구독 상태 조회 API와 대화 완료 필드를 Subscription 태그로 공개한다. */
+  /** OpenAPI 문서에 구독 상태·결제 이력 조회 API와 새 필드를 Subscription 태그로 공개한다. */
   @Test
   void openApiDocsDescribeSubscriptionApi() throws Exception {
     mockMvc
@@ -210,7 +322,51 @@ class UserSubscriptionApiIntegrationTests {
             jsonPath(
                     "$.components.schemas.UserSubscriptionResponse.properties"
                         + ".conversationCompletedSinceLaunch")
+                .exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.productId").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.store").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/me/subscription/events'].get.tags[0]").value("Subscription"))
+        .andExpect(
+            jsonPath("$.paths['/api/v1/me/subscription/events'].get.responses['401']").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.SubscriptionEventResponse.properties.environment")
                 .exists());
+  }
+
+  private void postWebhook(String body) throws Exception {
+    mockMvc
+        .perform(
+            post("/webhooks/revenuecat")
+                .header(HttpHeaders.AUTHORIZATION, WEBHOOK_SECRET)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+  }
+
+  /** 운영 환경 App Store 연간 상품 이벤트 본문을 만든다. extraJson은 뒤에 쉼표를 붙인 JSON 필드 조각이다. */
+  private static String webhookEvent(
+      String eventId, String type, Long userId, long eventTimestampMs, String extraJson) {
+    String template =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "%s",
+            "app_user_id": "%d",
+            "product_id": "com.saynow.app.premium.yearly",
+            "store": "APP_STORE",
+            "environment": "PRODUCTION",
+            %s
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """;
+    return template.formatted(eventId, type, userId, extraJson, eventTimestampMs, EXPIRATION_MS);
   }
 
   private void insertScenarioProgress(Long userId, String status, LocalDateTime lastClearedAt) {

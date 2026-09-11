@@ -104,7 +104,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/accent-locale")
                     .authenticated()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/me/subscription")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/me/subscription", "/api/v1/me/subscription/events")
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/internal/test/push")
                     .authenticated()
