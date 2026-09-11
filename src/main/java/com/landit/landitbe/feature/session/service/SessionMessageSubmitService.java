@@ -73,15 +73,26 @@ public class SessionMessageSubmitService {
       long userId, long sessionId, SessionMessageSubmitRequest request) {
     String content = request.normalizedContent();
     SessionMessageInputType inputType = request.requiredInputType();
-    // AI 요청에 사용자 메시지 ID가 필요하므로 짧은 트랜잭션으로 먼저 저장한다.
-    SubmittedMessageContext submittedContext =
+    String clientMessageId = request.validatedClientMessageId();
+    Reservation reservation =
         executeInTransaction(
             () -> {
+              SessionMessageSubmitResponse replay =
+                  submittedMessageService.replay(
+                      userId, sessionId, content, inputType, clientMessageId);
+              if (replay != null) {
+                return new Reservation(null, replay);
+              }
               SubmittedMessageContext context =
-                  submittedMessageService.record(userId, sessionId, content, inputType);
+                  submittedMessageService.record(
+                      userId, sessionId, content, inputType, clientMessageId);
               sessionMessageFeedbackRequester.prepare(context);
-              return context;
+              return new Reservation(context, null);
             });
+    if (reservation.response() != null) {
+      return reservation.response();
+    }
+    SubmittedMessageContext submittedContext = reservation.context();
     AsyncGenerationRequests asyncGenerationRequests = AsyncGenerationRequests.none();
     try {
       asyncGenerationRequests = startAsyncGeneration(submittedContext);
@@ -113,7 +124,7 @@ public class SessionMessageSubmitService {
           content.length());
       return response;
     } catch (RuntimeException exception) {
-      // AI 생성이나 결과 저장 실패 시 제출 메시지를 제거해 부분 히스토리를 막는다.
+      // 키 있는 발화는 보존하고 구 FE의 키 없는 실패 발화는 다시 입력할 수 있게 한다.
       asyncGenerationRequests.cancel();
       removeSubmittedMessageInTransaction(submittedContext);
       throw exception;
@@ -285,6 +296,9 @@ public class SessionMessageSubmitService {
       }
     }
   }
+
+  private record Reservation(
+      SubmittedMessageContext context, SessionMessageSubmitResponse response) {}
 
   /** CompletableFuture 취소를 실제 실행 작업의 취소로 전달한다. */
   private static class CancellableCompletableFuture<T> extends CompletableFuture<T> {

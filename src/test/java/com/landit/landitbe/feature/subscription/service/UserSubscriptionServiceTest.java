@@ -36,6 +36,8 @@ class UserSubscriptionServiceTest {
   private final LearningProgressService learningProgressService =
       mock(LearningProgressService.class);
 
+  private final LearningAccessGrantService grants = mock(LearningAccessGrantService.class);
+
   /** 미설정 또는 미래 도입 시각이면 구독과 완료 이력을 조회하지 않고 모든 유료 기능 게이트를 연다. */
   @ParameterizedTest
   @ValueSource(strings = {"", LAUNCHED_AT})
@@ -48,7 +50,7 @@ class UserSubscriptionServiceTest {
     assertThat(access.launched()).isFalse();
     assertThat(access.allowsPremiumOnlyFeature()).isTrue();
     assertThat(access.allowsScenarioConversation()).isTrue();
-    verifyNoInteractions(userProfileService, learningProgressService);
+    verifyNoInteractions(userProfileService, learningProgressService, grants);
   }
 
   /** 도입 시각과 같거나 이후이면 시간대 표기와 관계없이 기존 비구독자 제한을 적용한다. */
@@ -73,6 +75,7 @@ class UserSubscriptionServiceTest {
     assertThat(service.getSubscription(USER_ID).conversationCompletedSinceLaunch()).isTrue();
 
     when(userProfileService.getSubscription(USER_ID)).thenReturn(snapshot(true));
+    when(grants.premium(USER_ID)).thenReturn(true);
     assertThat(service.evaluateAccess(USER_ID).allowsPremiumOnlyFeature()).isTrue();
     assertThat(service.evaluateAccess(USER_ID).allowsScenarioConversation()).isTrue();
   }
@@ -97,6 +100,7 @@ class UserSubscriptionServiceTest {
   void preservesSubscriptionAndSkipsCompletionBeforeLaunch(boolean premium) {
     var service = service(LAUNCHED_AT, Clock.fixed(LAUNCH_INSTANT.minusNanos(1), SERVICE_ZONE));
     when(userProfileService.getSubscription(USER_ID)).thenReturn(snapshot(premium));
+    when(grants.premium(USER_ID)).thenReturn(premium);
 
     var response = service.getSubscription(USER_ID);
 
@@ -111,8 +115,8 @@ class UserSubscriptionServiceTest {
         userProfileService,
         learningProgressService,
         mock(SubscriptionEventRepository.class),
-        new SubscriptionProperties(launchedAt),
-        clock);
+        new SubscriptionLaunchPolicyService(new SubscriptionProperties(launchedAt), clock),
+        grants);
   }
 
   private UserSubscriptionSnapshot snapshot(boolean premium) {

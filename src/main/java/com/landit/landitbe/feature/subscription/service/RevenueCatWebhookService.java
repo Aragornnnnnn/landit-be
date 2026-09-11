@@ -61,6 +61,10 @@ public class RevenueCatWebhookService {
   public void handle(String authorization, RevenueCatWebhookRequest request) {
     verifyAuthorization(authorization);
     RevenueCatWebhookEvent event = request.event();
+    if (!revenueCatProperties.applySandboxEvents() && "SANDBOX".equals(event.environment())) {
+      log.info("RevenueCat sandbox event ignored: eventId={}", event.id());
+      return;
+    }
     Optional<SubscriptionEventType> eventType = SubscriptionEventType.fromRevenueCat(event.type());
     if (eventType.filter(SubscriptionEventType.TRANSFER::equals).isPresent()) {
       handleTransfer(event);

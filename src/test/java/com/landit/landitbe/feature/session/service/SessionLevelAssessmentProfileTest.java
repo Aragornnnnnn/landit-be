@@ -118,7 +118,9 @@ class SessionLevelAssessmentProfileTest {
     when(assessments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     var launch =
         new SessionLevelAssessmentLaunchService(
-            new SubscriptionProperties("2026-06-01T00:00:00Z"), CLOCK);
+            new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
+                new SubscriptionProperties("2026-06-01T00:00:00Z"), CLOCK),
+            CLOCK);
     when(assessments.existsInitializedLevelSince(1L, launch.requireLaunchedAt()))
         .thenReturn(levelInitialized);
     var context = mock(LoadedSessionFeedbackContext.class);

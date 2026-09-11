@@ -35,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkSessionService {
 
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
   private final UserProfileService userProfileService;
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
@@ -58,10 +60,12 @@ public class FreeTalkSessionService {
   public StartedFreeTalkSession createStart(long userId, FreeTalkSessionStartRequest request) {
     validateStartRequest(request);
     UserProfile userProfile = userProfileService.requireActiveForUpdate(userId);
+    var startAccess = accessGrants.requirePremiumStart(userId);
     dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
     FreeTalkCharacter character = FreeTalkCharacter.fromId(request.characterId());
-    TtsVoiceResponse ttsVoice = conversationCharacterService.requireActiveTtsVoice(character.id());
+    final TtsVoiceResponse ttsVoice =
+        conversationCharacterService.requireActiveTtsVoice(character.id());
     dailySpeakingUsageService.reserveRequest(userId);
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
@@ -72,6 +76,7 @@ public class FreeTalkSessionService {
                 userProfile.getTargetLocale(),
                 userProfile.getBaseLocale(),
                 startedAt));
+    accessGrants.recordFreeTalk(userId, learningSession.getId(), startedAt, startAccess);
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository.save(
             FreeTalkSession.start(

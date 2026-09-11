@@ -151,7 +151,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
       Duration requestTimeout) {
     try {
       HttpRequest request =
-          HttpRequest.newBuilder(uri)
+          properties
+              .authorize(HttpRequest.newBuilder(uri))
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")

@@ -44,6 +44,40 @@ class RemoteAiConversationClientTest {
   }
 
   @Test
+  void levelAssessmentDoesNotSendFieldsOwnedBySessionFeedback() throws Exception {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-level-assessment",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] response =
+              "{\"success\":true,\"data\":{\"sessionId\":100,\"levelAssessment\":null}}"
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, response.length);
+          exchange.getResponseBody().write(response);
+          exchange.close();
+        });
+    AiSessionFeedbackRequest original = aiSessionFeedbackRequest();
+    for (List<JsonNode> snapshots :
+        java.util.Arrays.<List<JsonNode>>asList(
+            null, List.of(jsonMapper.readTree("{\"schemaVersion\":1}")))) {
+      remoteClient()
+          .generateSessionLevelAssessment(
+              new AiSessionFeedbackRequest(
+                  original.sessionId(),
+                  original.scenario(),
+                  original.expectedMessageIds(),
+                  original.assessmentMessages(),
+                  snapshots));
+      JsonNode body = jsonMapper.readTree(requestBody.get());
+      assertThat(body.has("completedFeedbacks")).isFalse();
+      assertThat(body.get("expectedMessageIds")).hasSize(2);
+      assertThat(body.get("assessmentMessages")).hasSize(2);
+    }
+  }
+
+  @Test
   void generateInnerThoughtPostsConversationContextAndMapsResponse() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
     server.createContext(

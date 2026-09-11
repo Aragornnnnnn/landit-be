@@ -6,6 +6,9 @@ set -euo pipefail
 : "${ECS_SERVICE:?ECS_SERVICE is required}"
 : "${DEPLOYMENT_ID:?DEPLOYMENT_ID is required}"
 : "${DEPLOYMENT_CREATED_AT:?DEPLOYMENT_CREATED_AT is required}"
+: "${TASK_DEFINITION:?TASK_DEFINITION is required}"
+: "${IMAGE_DIGEST:?IMAGE_DIGEST is required}"
+: "${CONTAINER_NAME:?CONTAINER_NAME is required}"
 
 POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-10}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-30}"
@@ -88,12 +91,33 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
     fail_deployment "New stopped task indicates startup failure" "$tasks_json"
   fi
 
+  if [ "$desired_count" -lt 1 ]; then
+    fail_deployment "Production deployment must keep a running application" "$tasks_json"
+  fi
+  if [ "$(jq -r '.services[0].taskDefinition' <<< "$service_json")" != "$TASK_DEFINITION" ] || \
+    [ "$(jq -r '.taskDefinition' <<< "$primary")" != "$TASK_DEFINITION" ]; then
+    fail_deployment "The expected task revision was replaced by another deployment" "$tasks_json"
+  fi
+
   if [ "$deployment_count" -eq 1 ] && [ "$running_count" -eq "$desired_count" ] && [ "$rollout_state" = "COMPLETED" ]; then
+    if ! jq -e --arg task_definition "$TASK_DEFINITION" --arg digest "$IMAGE_DIGEST" \
+      --arg container "$CONTAINER_NAME" --argjson desired "$desired_count" '
+      [.tasks[] | select(.lastStatus == "RUNNING")] | unique_by(.taskArn)
+      | length == $desired and all(.[]; .taskDefinitionArn == $task_definition
+        and ([.containers[] | select(.name == $container)] | length == 1
+          and .[0].imageDigest == $digest))' >/dev/null <<< "$tasks_json"; then
+      fail_deployment "Running task revision or image digest does not match the release" "$tasks_json"
+    fi
     if [ -z "${HEALTH_CHECK_URL:-}" ]; then
       fail_deployment "HEALTH_CHECK_URL is required when desired count is greater than 0" "$tasks_json"
     fi
     curl --fail --silent --show-error --retry 3 --retry-delay 3 --retry-connrefused "$HEALTH_CHECK_URL" >/dev/null
-    echo "ECS service is stable"
+    if [ -n "${RELEASE_RECORD:-}" ]; then
+      jq '.status = "verified" | .verification = "task revision, image digest, and HTTP health"' \
+        "$RELEASE_RECORD" > "${RELEASE_RECORD}.tmp"
+      mv "${RELEASE_RECORD}.tmp" "$RELEASE_RECORD"
+    fi
+    echo "ECS service is stable; task revision, digest, and health verified (not a functional smoke test)"
     exit 0
   fi
 

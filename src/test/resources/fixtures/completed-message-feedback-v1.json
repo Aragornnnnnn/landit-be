@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "sessionId": 100,
+  "feedback": {
+    "baseLocaleAnalogy": "\"피자를 좋아해요. 매워서요\"라고 이유를 바로 붙여 말하는 것과 같아요.",
+    "positiveFeedback": null,
+    "feedbackDetail": "좋아하는 음식과 이유를 because로 자연스럽게 연결했어요.",
+    "correctionExpression": null,
+    "correctionReason": null,
+    "benchmarkMessage": "질문에 맞는 핵심을 자연스럽게 전달했어요.",
+    "messageId": 1001,
+    "feedbackType": "GOOD"
+  },
+  "scoreEvidence": {
+    "contextFit": 2,
+    "clarity": 2,
+    "languageAccuracy": 2
+  },
+  "adjudicationEvidence": {
+    "coverageEvidence": [
+      {
+        "requestExcerpt": "Can I have your phone number?",
+        "answerExcerpt": "why do you wanna know that?",
+        "status": "ANSWERED"
+      }
+    ],
+    "ignoredSpeechArtifacts": [],
+    "actionableIssues": []
+  },
+  "userMessage": "why do you wanna know that?",
+  "candidateWasRepaired": false,
+  "copyWasRepaired": false,
+  "copyWasFallback": false
+}

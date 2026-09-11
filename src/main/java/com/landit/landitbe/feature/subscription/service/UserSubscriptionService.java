@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.subscription.service;
 
-import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -10,53 +9,40 @@ import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
 import com.landit.landitbe.feature.subscription.repository.SubscriptionEventRepository;
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 프로필의 구독 상태와 학습 진행도를 합쳐 앱이 쓸 구독 조회 응답을 만들고, 결제 이력을 조회한다. */
-@Slf4j
 @Service
 public class UserSubscriptionService {
 
   private final UserProfileService userProfileService;
   private final LearningProgressService learningProgressService;
   private final SubscriptionEventRepository subscriptionEventRepository;
-  private final Clock clock;
-  private final Optional<LocalDateTime> launchedAt;
+  private final SubscriptionLaunchPolicyService policies;
+  private final LearningAccessGrantService grants;
 
   /**
-   * 협력 Service와 도입 시점 설정을 주입받고, 도입 시점이 비어 있으면 경고를 남긴다.
+   * 구독 상태와 동일한 실행 정책을 조회할 협력 Service를 주입받는다.
    *
    * @param userProfileService 구독 상태 스냅샷을 제공하는 프로필 Service
    * @param learningProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
    * @param subscriptionEventRepository 결제 이력 Repository
-   * @param subscriptionProperties 유료 구독 도입 시점 설정
-   * @param clock 서비스 기준 시간대를 제공하는 시계
+   * @param policies 서버 실행 정책
+   * @param grants 저장된 학습 권한
    */
   public UserSubscriptionService(
       UserProfileService userProfileService,
       LearningProgressService learningProgressService,
       SubscriptionEventRepository subscriptionEventRepository,
-      SubscriptionProperties subscriptionProperties,
-      Clock clock) {
+      SubscriptionLaunchPolicyService policies,
+      LearningAccessGrantService grants) {
     this.userProfileService = userProfileService;
     this.learningProgressService = learningProgressService;
     this.subscriptionEventRepository = subscriptionEventRepository;
-    this.clock = clock;
-    this.launchedAt =
-        subscriptionProperties
-            .launchedAtOrEmpty()
-            .map(value -> value.atZoneSameInstant(clock.getZone()).toLocalDateTime());
-    if (launchedAt.isEmpty()) {
-      log.warn(
-          "LANDIT_SUBSCRIPTION_LAUNCHED_AT이 설정되지 않아 conversationCompletedSinceLaunch는 항상 false로"
-              + " 응답한다.");
-    }
+    this.policies = policies;
+    this.grants = grants;
   }
 
   /**
@@ -72,8 +58,20 @@ public class UserSubscriptionService {
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
     UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
-    return UserSubscriptionResponse.of(
-        snapshot, isSubscriptionLaunched() && hasCompletedConversationSinceLaunch(userId));
+    var policy = policies.current();
+    boolean enabled = policies.enabledFor(policy, userId);
+    boolean premium = grants.premium(userId);
+    var reservation = grants.freeReservation(userId).orElse(null);
+    boolean completed = hasCompletedConversationSinceLaunch(userId, policy);
+    return UserSubscriptionResponse.of(snapshot, completed)
+        .withAccess(
+            premium,
+            enabled,
+            policy.version(),
+            policy.newStartsPaused(),
+            !policy.newStartsPaused()
+                && (!enabled || premium || (!completed && reservation == null)),
+            reservation == null ? null : reservation.getSessionId());
   }
 
   /**
@@ -88,12 +86,12 @@ public class UserSubscriptionService {
    */
   @Transactional(readOnly = true)
   public PremiumAccess evaluateAccess(Long userId) {
-    if (!isSubscriptionLaunched()) {
+    var policy = policies.current();
+    if (!policies.enabledFor(policy, userId)) {
       return PremiumAccess.beforeLaunch();
     }
-    UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
     return PremiumAccess.afterLaunch(
-        snapshot.premium(), hasCompletedConversationSinceLaunch(userId));
+        grants.premium(userId), hasCompletedConversationSinceLaunch(userId, policy));
   }
 
   /**
@@ -113,13 +111,9 @@ public class UserSubscriptionService {
         .toList();
   }
 
-  private boolean isSubscriptionLaunched() {
-    return launchedAt.map(since -> !LocalDateTime.now(clock).isBefore(since)).orElse(false);
-  }
-
-  private boolean hasCompletedConversationSinceLaunch(Long userId) {
-    return launchedAt
-        .map(since -> learningProgressService.hasClearedScenarioSince(userId, since))
-        .orElse(false);
+  private boolean hasCompletedConversationSinceLaunch(
+      Long userId, SubscriptionLaunchPolicyService.Policy policy) {
+    return policies.enabledFor(policy, userId)
+        && learningProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
   }
 }

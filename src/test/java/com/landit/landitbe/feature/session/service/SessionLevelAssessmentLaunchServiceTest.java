@@ -22,9 +22,13 @@ class SessionLevelAssessmentLaunchServiceTest {
 
   @Test
   void blankSettingDisablesAssessmentRegardlessOfCompletionDate() {
-    var launch = new SessionLevelAssessmentLaunchService(new SubscriptionProperties("  "), clock);
+    var launch =
+        new SessionLevelAssessmentLaunchService(
+            new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
+                new SubscriptionProperties("  "), clock),
+            clock);
     assertThat(launch.isEnabled()).isFalse();
-    assertThat(launch.includes(LocalDateTime.now(clock))).isFalse();
+    assertThat(launch.includes(1L, LocalDateTime.now(clock))).isFalse();
     assertThatThrownBy(launch::requireLaunchedAt).isInstanceOf(IllegalStateException.class);
   }
 
@@ -32,14 +36,17 @@ class SessionLevelAssessmentLaunchServiceTest {
   @ValueSource(strings = {"2026-07-01T00:00:00Z", "2026-07-01T09:00:00+09:00"})
   void usesServiceTimeZoneAndIncludesExactLaunchInstant(String launchedAt) {
     var launch =
-        new SessionLevelAssessmentLaunchService(new SubscriptionProperties(launchedAt), clock);
+        new SessionLevelAssessmentLaunchService(
+            new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
+                new SubscriptionProperties(launchedAt), clock),
+            clock);
     var boundary = LocalDateTime.parse("2026-07-01T09:00:00");
     assertThat(launch.isEnabled()).isTrue();
     assertThat(launch.requireLaunchedAt()).isEqualTo(boundary);
-    assertThat(launch.includes(null)).isFalse();
-    assertThat(launch.includes(boundary.minusNanos(1))).isFalse();
-    assertThat(launch.includes(boundary)).isTrue();
-    assertThat(launch.includes(boundary.plusNanos(1))).isTrue();
+    assertThat(launch.includes(1L, null)).isFalse();
+    assertThat(launch.includes(1L, boundary.minusNanos(1))).isFalse();
+    assertThat(launch.includes(1L, boundary)).isTrue();
+    assertThat(launch.includes(1L, boundary.plusNanos(1))).isTrue();
   }
 
   @Test
@@ -50,20 +57,22 @@ class SessionLevelAssessmentLaunchServiceTest {
     when(movingClock.instant()).thenReturn(launchInstant.minusNanos(1));
     var launch =
         new SessionLevelAssessmentLaunchService(
-            new SubscriptionProperties("2026-07-01T09:00:00+09:00"), movingClock);
+            new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
+                new SubscriptionProperties("2026-07-01T09:00:00+09:00"), movingClock),
+            movingClock);
     LocalDateTime boundary = LocalDateTime.now(clock);
 
     assertThat(launch.isEnabled()).isFalse();
-    assertThat(launch.includes(boundary)).isFalse();
-    assertThat(launch.includes(boundary.plusDays(1))).isFalse();
+    assertThat(launch.includes(1L, boundary)).isFalse();
+    assertThat(launch.includes(1L, boundary.plusDays(1))).isFalse();
 
     when(movingClock.instant()).thenReturn(launchInstant);
     assertThat(launch.isEnabled()).isTrue();
-    assertThat(launch.includes(boundary)).isTrue();
-    assertThat(launch.includes(boundary.minusNanos(1))).isFalse();
+    assertThat(launch.includes(1L, boundary)).isTrue();
+    assertThat(launch.includes(1L, boundary.minusNanos(1))).isFalse();
 
     when(movingClock.instant()).thenReturn(launchInstant.plusSeconds(1));
     assertThat(launch.isEnabled()).isTrue();
-    assertThat(launch.includes(boundary)).isTrue();
+    assertThat(launch.includes(1L, boundary)).isTrue();
   }
 }

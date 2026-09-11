@@ -179,6 +179,16 @@ public class LearningSession extends BaseTimeEntity {
     this.endedAt = endedAt;
   }
 
+  /** 같은 시나리오의 유예 권한을 확인한 뒤 중도 종료 상태만 재개한다. */
+  public void resumeInterruptedScenario() {
+    if (sessionType == SessionType.SCENARIO && status == LearningSessionStatus.INTERRUPTED) {
+      status = LearningSessionStatus.IN_PROGRESS;
+      endedBy = null;
+      completionReason = null;
+      endedAt = null;
+    }
+  }
+
   /** 세션이 진행 중인지 반환한다. */
   public boolean isInProgress() {
     return status == LearningSessionStatus.IN_PROGRESS;

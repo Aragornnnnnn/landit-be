@@ -58,7 +58,10 @@ class SessionLevelAssessmentRecoveryTest {
             executor,
             clock,
             new SessionLevelAssessmentLaunchService(
-                new SubscriptionProperties("2026-07-01T09:00:00+09:00"), clock));
+                new com.landit.landitbe.feature.subscription.service
+                    .SubscriptionLaunchPolicyService(
+                    new SubscriptionProperties("2026-07-01T09:00:00+09:00"), clock),
+                clock));
 
     service.startIfNeeded(1L, 10L);
     verifyNoInteractions(sessions);
@@ -109,7 +112,10 @@ class SessionLevelAssessmentRecoveryTest {
             queued::set,
             clock,
             new SessionLevelAssessmentLaunchService(
-                new SubscriptionProperties("2026-06-01T00:00:00Z"), clock));
+                new com.landit.landitbe.feature.subscription.service
+                    .SubscriptionLaunchPolicyService(
+                    new SubscriptionProperties("2026-06-01T00:00:00Z"), clock),
+                clock));
     service.startIfNeeded(1L, 10L);
     if (expiresInQueue) {
       when(clock.instant()).thenReturn(start.plusSeconds(121));
@@ -167,7 +173,10 @@ class SessionLevelAssessmentRecoveryTest {
             Runnable::run,
             clock,
             new SessionLevelAssessmentLaunchService(
-                new SubscriptionProperties("2026-06-01T00:00:00Z"), clock));
+                new com.landit.landitbe.feature.subscription.service
+                    .SubscriptionLaunchPolicyService(
+                    new SubscriptionProperties("2026-06-01T00:00:00Z"), clock),
+                clock));
 
     service.startIfNeeded(1L, 10L);
     assertThat(session.getLevelAssessmentProcessingStatus()).isEqualTo(ProcessingStatus.PREPARING);
