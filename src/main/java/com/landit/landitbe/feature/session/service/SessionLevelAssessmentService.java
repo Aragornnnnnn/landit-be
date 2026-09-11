@@ -32,6 +32,7 @@ class SessionLevelAssessmentService {
   private final UserProfileRepository userProfileRepository;
   private final UserLevelAssessmentRepository userLevelAssessmentRepository;
   private final java.time.Clock clock;
+  private final SessionLevelAssessmentLaunchService launchService;
 
   UserLevelAssessment assessApplyAndSave(
       long userId,
@@ -59,7 +60,8 @@ class SessionLevelAssessmentService {
                 score.overallScore(),
                 score.overallConfidence(),
                 score.sufficientEvidence(),
-                userLevelAssessmentRepository.existsInitializedLevel(userId))
+                userLevelAssessmentRepository.existsInitializedLevelSince(
+                    userId, launchService.requireLaunchedAt()))
             : new LearningLevelPolicy.Decision(
                 previousLevel,
                 profile.getPromotionStreak(),

@@ -129,6 +129,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/feedback")
                     .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/sessions/*/level-assessment")
+                    .authenticated()
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/sessions/*/end")
                     .authenticated()
                     .requestMatchers("/api/v1/free-talk/**")

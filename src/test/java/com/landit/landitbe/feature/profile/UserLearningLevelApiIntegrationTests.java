@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.profile;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -109,9 +108,9 @@ class UserLearningLevelApiIntegrationTests {
         .andExpect(jsonPath("$.data.learningLevel").value(4));
   }
 
-  /** 학습 수준을 설정하지 않은 사용자는 null 수준을 조회한다. */
+  /** 학습 수준을 선택하지 않은 신규 사용자는 저장된 기본 수준 3을 조회한다. */
   @Test
-  void returnsNullWhenLearningLevelIsNotSet() throws Exception {
+  void returnsDefaultThreeWhenLearningLevelIsNotSelected() throws Exception {
     String accessToken = login("learning-level-get-null");
 
     mockMvc
@@ -120,7 +119,22 @@ class UserLearningLevelApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.learningLevel").value(nullValue()));
+        .andExpect(jsonPath("$.data.learningLevel").value(3));
+    assertThat(learningLevel("learning-level-get-null")).isEqualTo(3);
+  }
+
+  @Test
+  void legacyWriterNullAfterMigrationIsStillReadAsDefaultThree() throws Exception {
+    String accessToken = login("learning-level-legacy-null");
+    jdbcTemplate.update(
+        "UPDATE user_profile SET learning_level=NULL WHERE email=?",
+        "learning-level-legacy-null@example.com");
+    mockMvc
+        .perform(
+            get("/api/v1/me/learning-level")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.learningLevel").value(3));
   }
 
   /** 인증되지 않은 사용자는 학습 수준을 조회할 수 없다. */

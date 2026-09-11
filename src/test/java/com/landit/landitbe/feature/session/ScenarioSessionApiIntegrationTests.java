@@ -87,6 +87,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
+      "landit.subscription.launched-at=2026-07-01T00:00:00+09:00",
       "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
     })
 class ScenarioSessionApiIntegrationTests {
@@ -1430,18 +1431,18 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"))
         .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
-        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3));
+        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(5));
 
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT learning_level FROM user_profile WHERE id = ?", Integer.class, userId))
-        .isNull();
+        .isEqualTo(5);
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT current_level FROM user_level_assessment WHERE learning_session_id = ?",
                 Integer.class,
                 sessionId))
-        .isNull();
+        .isEqualTo(5);
 
     final Map<String, Object> historyBeforeSecondRequest =
         jdbcTemplate.queryForMap(
@@ -1738,7 +1739,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("ASSESSED_SCORE", new BigDecimal("5.00"))
         .containsEntry("ASSESSED_LEVEL", 5)
         .containsEntry("SOURCE", "MODEL")
-        .containsEntry("PREVIOUS_LEVEL", null)
+        .containsEntry("PREVIOUS_LEVEL", 5)
         .containsEntry("CURRENT_LEVEL", 5)
         .containsEntry("PROMOTION_STREAK_AFTER", 0)
         .containsEntry("HAS_CORE", true)
@@ -1832,11 +1833,45 @@ class ScenarioSessionApiIntegrationTests {
         source,
         sufficient,
         firstSessionId);
-    assertThat(levelAssessmentRepository.existsInitializedLevel(userId)).isEqualTo(initialized);
-    assertThat(levelAssessmentRepository.existsInitializedLevel(Long.MAX_VALUE)).isFalse();
+    var launchedAt = java.time.LocalDateTime.parse("2026-07-01T00:00:00");
+    assertThat(levelAssessmentRepository.existsInitializedLevelSince(userId, launchedAt))
+        .isEqualTo(initialized);
+    assertThat(levelAssessmentRepository.existsInitializedLevelSince(Long.MAX_VALUE, launchedAt))
+        .isFalse();
     long nextSessionId = completeLevelAssessmentScenario(accessToken, 1);
     assertSavedLevelDecision(
         nextSessionId, initialized ? 3 : 1, 0, initialized ? "UNCHANGED" : "INITIALIZED");
+  }
+
+  @Test
+  void preLaunchHistoryDoesNotConsumeFirstInitializationOrRestartOldAssessment() throws Exception {
+    JsonNode user = login("pre-launch-assessment@example.com").path("data");
+    String token = user.path("accessToken").asText();
+    long userId = user.path("user").path("userId").asLong();
+    seedLevelAssessmentScenario();
+    long oldSession = completeLevelAssessmentScenario(token, 3);
+    var launch = java.time.LocalDateTime.parse("2026-07-01T00:00:00");
+    jdbcTemplate.update("UPDATE learning_session SET ended_at=? WHERE id=?", launch, oldSession);
+    assertThat(levelAssessmentRepository.existsInitializedLevelSince(userId, launch)).isTrue();
+    jdbcTemplate.update(
+        "UPDATE learning_session SET ended_at=?, "
+            + "level_assessment_processing_status='PREPARING' WHERE id=?",
+        launch.minusNanos(1000),
+        oldSession);
+    assertThat(levelAssessmentRepository.existsInitializedLevelSince(userId, launch)).isFalse();
+    mockMvc
+        .perform(
+            get("/api/v1/sessions/{id}/level-assessment", oldSession)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value(nullValue()));
+    // 도입 전 예약은 복구하지 않고, 다음 유효 결과가 다시 최초 수준을 확정한다.
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(1);
+    jdbcTemplate.update(
+        "UPDATE learning_session SET level_assessment_processing_status='COMPLETED' "
+            + "WHERE id=?",
+        oldSession);
+    assertSavedLevelDecision(completeLevelAssessmentScenario(token, 1), 1, 0, "INITIALIZED");
   }
 
   private void seedLevelAssessmentScenario() {
@@ -1928,8 +1963,8 @@ class ScenarioSessionApiIntegrationTests {
               jsonPath("$.data.levelAssessment.interactionPragmatics.score").value(nullValue()))
           .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
           .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(false))
-          .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3))
-          .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(nullValue()))
+          .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(5))
+          .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(5))
           .andExpect(jsonPath("$.data.levelAssessment.changeType").value("NOT_APPLIED"))
           .andExpect(jsonPath("$.data.levelAssessment.details.strength").isNotEmpty());
     }
@@ -1947,7 +1982,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("INTERACTION_PRAGMATICS_SCORE", null)
         .containsEntry("SUFFICIENT_EVIDENCE", false)
         .containsEntry("HAS_CORE", true)
-        .containsEntry("LEARNING_LEVEL", null)
+        .containsEntry("LEARNING_LEVEL", 5)
         .containsEntry("PROMOTION_STREAK", 0);
   }
 
@@ -2881,7 +2916,13 @@ class ScenarioSessionApiIntegrationTests {
                             .formatted(UUID.randomUUID(), email, nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();
-    return objectMapper.readTree(result.getResponse().getContentAsByteArray());
+    JsonNode body = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+    // 기존 고급 질문 fixture와 반복 플레이를 검증하므로 명시적으로 레벨 5·프리미엄을 설정한다.
+    jdbcTemplate.update(
+        "UPDATE user_profile SET learning_level=5, subscription_status='ACTIVE', "
+            + "subscription_expires_at='2099-01-01 00:00:00' WHERE id=?",
+        body.path("data").path("user").path("userId").asLong());
+    return body;
   }
 
   private long startScenario(String accessToken, long scenarioId) throws Exception {
