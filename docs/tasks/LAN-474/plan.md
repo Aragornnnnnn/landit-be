@@ -54,3 +54,9 @@ FE develop `c62be093` 소스는 수정하지 않았다. FE API·구독/구매 �
 #185 역병합 후 갱신한 develop 기준으로 PR을 생성한다. 24시간 학습 권한·무료 예약·동일 메시지 재시도는 2차 구현을 유지하고, 메시지 피드백의 복구 대기·부모 우선 잠금·최종 응답 계약은 역병합 결과를 사용한다. V100은 반복 초기화가 만든 테이블과 데이터를 유지한다. 기존 FE의 결제 ON 통합과 전체 BE 검사로 조합을 재검증한다.
 
 2026-09-12 PR 준비 검증: #185는 GitHub CI 통과 후 develop 631966fb로 역병합했다. `./gradlew spotlessApply check` 통과(1,177개, 실패 0, 조건부 제외 6). 구·신 실제 AI HTTP 계약 각각 통과, FE 결제 ON 통합 9개도 통과했다(정상 5·지연 재차단 1·기존 FE 오류 재현 3). 배포 revision Python 3개와 ECS shell 검사도 통과했다. V100과 hotfix 반복 초기화 SQL이 동일함을 확인했다. 독립 에이전트는 사용하지 않았고, CodeRabbit은 이용 한도로 역병합 리뷰를 수행하지 않았다.
+
+## PR #186 CI 오류 수정.
+
+CI run 34614206050에서 `submitMessageMarksMessageFeedbackFailedWhenAiReportsFailed`가 실패했다. 메시지 재전송용 응답을 저장하는 JPA 갱신이 다른 트랜잭션의 피드백 상태를 덮어쓰는지 결정적 DB 재현으로 확인하고, 동일 메시지의 독립 필드 갱신을 보존한다. 실패 경로와 전체 check, 수정 커밋의 CI로 검증한다.
+
+원인·수정: 시나리오 응답·시도 저장에서 Hibernate의 전체 열 UPDATE가 다른 트랜잭션에서 확정한 `FAILED` 피드백과 속마음을 과거 값으로 덮어썼다. `SessionHistoryMessage`에 `@DynamicUpdate`를 적용해 변경한 열만 갱신한다. 응답 저장·시도 시작·시도 해제의 독립 트랜잭션 재현 3개는 수정 전 모두 실패했고 수정 후 통과했다. 기존 CI 실패 테스트도 통과했다. `./gradlew spotlessApply check` 성공(1,180개, 실패 0·생략 6), `git diff --check` 통과. 사용자 요청에 따라 직접 검토했으며 독립 에이전트는 사용하지 않았다.

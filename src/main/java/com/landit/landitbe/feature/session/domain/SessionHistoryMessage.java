@@ -15,12 +15,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /** 세션 히스토리에 남길 AI와 사용자 메시지를 저장한다. */
 @Getter
 @Entity
+// 재전송 응답을 저장할 때 병렬 작업이 갱신한 피드백·속마음 필드를 덮어쓰지 않는다.
+@DynamicUpdate
 @Table(name = "session_history_message")
 public class SessionHistoryMessage extends BaseTimeEntity {
 

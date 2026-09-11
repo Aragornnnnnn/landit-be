@@ -104,6 +104,9 @@ class ScenarioSessionApiIntegrationTests {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  @Autowired
+  private com.landit.landitbe.feature.session.service.SessionMessageService sessionMessages;
+
   @Autowired private ScenarioSessionMessageQueryRepository scenarioContextRepository;
 
   @Autowired private ScenarioListQueryRepository scenarioListRepository;
@@ -758,6 +761,64 @@ class ScenarioSessionApiIntegrationTests {
             .asLong();
 
     assertThat(awaitMessageFeedbackStatus(messageId, "FAILED")).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"RESPONSE", "CLAIM", "RELEASE"})
+  void scenarioAttemptUpdatesPreserveConcurrentFeedbackAndInnerThought(String update)
+      throws Exception {
+    var session = startCompletedAiFirstSession("message-update-race@example.com");
+    long messageId = userMessageIds(session.sessionId()).getFirst();
+    jdbcTemplate.update(
+        "UPDATE session_history_message SET feedback_processing_status='PREPARING', "
+            + "inner_thought_processing_status='PREPARING', inner_thought=NULL, "
+            + "inner_thought_type=NULL, scenario_response_payload=NULL, "
+            + "scenario_lease_until=CURRENT_TIMESTAMP WHERE id=?",
+        messageId);
+    var responseTransaction =
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+    var feedbackTransaction =
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+    feedbackTransaction.setPropagationBehavior(
+        org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    responseTransaction.executeWithoutResult(
+        status -> {
+          var staleMessage = sessionMessages.require(messageId);
+          // 응답 저장이 읽은 뒤 피드백 작업이 먼저 커밋하는 순서를 고정한다.
+          feedbackTransaction.executeWithoutResult(
+              feedbackStatus -> {
+                assertThat(sessionMessages.failFeedback(messageId)).isEqualTo(1);
+                assertThat(
+                        sessionMessages.completeInnerThought(
+                            messageId, "The answer is clear.", InnerThoughtType.GOOD))
+                    .isEqualTo(1);
+              });
+          switch (update) {
+            case "RESPONSE" -> staleMessage.recordScenarioResponse("saved-response");
+            case "CLAIM" ->
+                staleMessage.claimScenarioGeneration(
+                    UUID.randomUUID().toString(), LocalDateTime.now(mutableClock).plusSeconds(30));
+            case "RELEASE" ->
+                staleMessage.releaseScenarioAttempt(staleMessage.getScenarioAttemptToken());
+            default -> throw new IllegalArgumentException(update);
+          }
+        });
+    Map<String, Object> saved =
+        jdbcTemplate.queryForMap(
+            "SELECT feedback_processing_status, inner_thought_processing_status, inner_thought, "
+                + "scenario_response_payload, scenario_lease_until "
+                + "FROM session_history_message WHERE id=?",
+            messageId);
+    assertThat(saved.get("FEEDBACK_PROCESSING_STATUS")).isEqualTo("FAILED");
+    assertThat(saved.get("INNER_THOUGHT_PROCESSING_STATUS")).isEqualTo("COMPLETED");
+    assertThat(saved.get("INNER_THOUGHT")).isEqualTo("The answer is clear.");
+    if (update.equals("RESPONSE")) {
+      assertThat(saved.get("SCENARIO_RESPONSE_PAYLOAD")).isEqualTo("saved-response");
+    } else if (update.equals("RELEASE")) {
+      assertThat(saved.get("SCENARIO_LEASE_UNTIL")).isNull();
+    } else {
+      assertThat(saved.get("SCENARIO_LEASE_UNTIL")).isNotNull();
+    }
   }
 
   @Test
