@@ -14,11 +14,15 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -130,6 +134,9 @@ public class MessageFeedbackWorkService {
         repository.findExhausted(LocalDateTime.now(clock), PageRequest.of(0, 10))) {
       transaction.executeWithoutResult(
           status -> {
+            if (!messages.lockForFeedbackResult(exhausted.getMessageId())) {
+              return;
+            }
             if (repository.finish(
                     exhausted.getMessageId(),
                     exhausted.getAttemptToken(),
@@ -175,6 +182,64 @@ public class MessageFeedbackWorkService {
     repository.retryMissing(context.sessionId(), LocalDateTime.now(clock));
   }
 
+  /**
+   * 누락 평가를 즉시 실행하고 완료까지 트랜잭션 없이 제한 시간만 기다린다.
+   *
+   * @param context 완료된 학습의 평가 입력
+   * @param timeout 복구 대기에 허용되는 시간
+   */
+  void awaitRecovery(LoadedSessionFeedbackContext context, Duration timeout) {
+    long deadline = System.nanoTime() + timeout.toNanos();
+    List<Long> ids = context.userMessages().stream().map(UserMessageContext::messageId).toList();
+    List<CompletableFuture<Void>> recovery = new ArrayList<>();
+    try {
+      for (long id : ids) {
+        recovery.add(CompletableFuture.runAsync(() -> recoverOrWarmCache(id), executor));
+      }
+    } catch (TaskRejectedException exception) {
+      throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+    }
+    while (System.nanoTime() < deadline) {
+      if (recovery.stream().anyMatch(CompletableFuture::isCompletedExceptionally)) {
+        break;
+      }
+      List<MessageFeedbackWork> works = repository.findAllById(ids);
+      if (works.size() == ids.size()
+          && recovery.stream().allMatch(CompletableFuture::isDone)
+          && works.stream().allMatch(w -> w.getResultPayload() != null || w.isLegacyCompleted())) {
+        return;
+      }
+      if (works.stream().anyMatch(MessageFeedbackWork::isTerminalFailed)) {
+        break;
+      }
+      try {
+        TimeUnit.NANOSECONDS.sleep(
+            Math.min(
+                TimeUnit.MILLISECONDS.toNanos(100), Math.max(0, deadline - System.nanoTime())));
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+      }
+    }
+    throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+  }
+
+  private void recoverOrWarmCache(long messageId) {
+    MessageFeedbackWork work = repository.findById(messageId).orElseThrow();
+    if (work.getResultPayload() == null) {
+      generate(messageId);
+      return;
+    }
+    // 구 AI는 완성 결과 필드를 무시하므로 기존 DB 결과를 보존한 채 캐시만 재생성한다.
+    AiMessageFeedbackRequest request =
+        mapper.readValue(work.getRequestPayload(), AiMessageFeedbackRequest.class);
+    AiMessageFeedbackResult result = client.requestMessageFeedback(request);
+    validate(result, request);
+    if (result.feedbackStatus() == ProcessingStatus.FAILED) {
+      throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+    }
+  }
+
   private Claim claim(long messageId) {
     return transaction.execute(
         status -> {
@@ -217,6 +282,9 @@ public class MessageFeedbackWorkService {
     boolean exhausted = failed && claim.attempt() >= 3;
     transaction.executeWithoutResult(
         status -> {
+          if (!messages.lockForFeedbackResult(claim.request().messageId())) {
+            return;
+          }
           int updated =
               repository.finish(
                   claim.request().messageId(),
@@ -227,7 +295,7 @@ public class MessageFeedbackWorkService {
                   LocalDateTime.now(clock).plusSeconds(30));
           if (updated > 0 && attemptFailed) {
             messages.failFeedback(claim.request().messageId());
-          } else if (updated > 0 && completed != null) {
+          } else if (updated > 0 && (completed != null || legacyCompleted)) {
             messages.retryFeedback(claim.request().messageId());
           }
         });

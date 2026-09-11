@@ -24,6 +24,17 @@ public class SessionMessageService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
 
   /**
+   * 평가 저장 트랜잭션에서 부모 메시지를 먼저 잠근다.
+   *
+   * @param messageId 평가 대상 메시지 ID
+   * @return 삭제되지 않은 메시지를 잠갔으면 true
+   */
+  @Transactional
+  public boolean lockForFeedbackResult(long messageId) {
+    return sessionHistoryMessageRepository.findByIdForFeedbackUpdate(messageId).isPresent();
+  }
+
+  /**
    * 세션 히스토리의 메시지를 순서대로 조회한다.
    *
    * @param sessionHistoryId 세션 히스토리 ID

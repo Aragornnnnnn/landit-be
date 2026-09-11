@@ -98,6 +98,10 @@ class ScenarioSessionApiIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
 
+  @Autowired
+  private com.landit.landitbe.feature.session.service.MessageFeedbackWorkService
+      feedbackWorkService;
+
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private ScenarioSessionMessageQueryRepository scenarioContextRepository;
@@ -1407,6 +1411,241 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
+  void hotfixReadsDiagnosticSessionWithoutChangingLegacyQuestionCount() throws Exception {
+    StartedSession session = startFirstScenarioForCompatibility();
+    jdbcTemplate.update(
+        "UPDATE scenario_session SET question_level_group='DIAGNOSTIC' WHERE learning_session_id=?",
+        session.sessionId());
+    for (int order = 2; order <= 4; order++) {
+      seedScenarioQuestion(200_000L + order, 1L, order, "Tell me more.", "더 이야기해줘.", "DIAGNOSTIC");
+    }
+    for (int turn = 1; turn <= 4; turn++) {
+      assertCompatibilityTurn(session, turn, 4);
+    }
+  }
+
+  @Test
+  void hotfixKeepsLegacyFirstScenarioAtThreeQuestionsAfterFutureMigration() throws Exception {
+    StartedSession session = startFirstScenarioForCompatibility();
+    jdbcTemplate.update(
+        "UPDATE scenario_session SET question_level_group='LEVEL_4_TO_5' "
+            + "WHERE learning_session_id=?",
+        session.sessionId());
+    for (int order = 2; order <= 3; order++) {
+      seedScenarioQuestion(200_000L + order, 1L, order, "Tell me more.", "더 이야기해줘.");
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT question_level_group FROM scenario_session WHERE learning_session_id=?",
+                String.class,
+                session.sessionId()))
+        .isEqualTo("LEVEL_4_TO_5");
+    for (int turn = 1; turn <= 3; turn++) {
+      assertCompatibilityTurn(session, turn, 3);
+    }
+  }
+
+  @Test
+  void hotfixRecoversLegacyFeedbackInTheSameHttpRequest() throws Exception {
+    StartedSession session = startCompletedAiFirstSession("legacy-recovery@example.com");
+    jdbcTemplate.update("DELETE FROM message_feedback_work");
+    fakeAiConversationClient.feedbackCacheMissing = true;
+    requestCompatibilityFeedback(session);
+    assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(2);
+    assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
+    assertThat(fakeAiConversationClient.sessionFeedbackTransactionActive()).containsOnly(false);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM message_feedback_work WHERE legacy_completed=TRUE",
+                Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void hotfixUsesDurableFeedbackAfterAiCacheIsLost() throws Exception {
+    fakeAiConversationClient.returnCompletedFeedback = true;
+    StartedSession session = startCompletedAiFirstSession("durable-feedback@example.com");
+    fakeAiConversationClient.feedbackCacheMissing = true;
+    requestCompatibilityFeedback(session);
+    assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(1);
+    assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().completedFeedbacks())
+        .hasSize(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM message_feedback_work WHERE result_payload IS NOT NULL",
+                Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void hotfixUpgradesLegacyWorkWhenNewAiRecoversLostFeedback() throws Exception {
+    StartedSession session = startCompletedAiFirstSession("upgrade-feedback@example.com");
+    fakeAiConversationClient.returnCompletedFeedback = true;
+    fakeAiConversationClient.feedbackCacheMissing = true;
+    requestCompatibilityFeedback(session);
+    assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(2);
+    assertThat(fakeAiConversationClient.lastSessionFeedbackRequest().completedFeedbacks())
+        .hasSize(1);
+  }
+
+  @Test
+  void hotfixClaimsConcurrentRecoveryOnlyOnceAndRecoversExpiredLease() throws Exception {
+    StartedSession session = startCompletedAiFirstSession("concurrent-recovery@example.com");
+    long messageId = fakeAiConversationClient.lastMessageFeedbackRequest().messageId();
+    jdbcTemplate.update(
+        "UPDATE message_feedback_work SET legacy_completed=FALSE, attempts=1, "
+            + "available_at='2000-01-01 00:00:00', lease_until='2000-01-01 00:00:00' "
+            + "WHERE message_id=?",
+        messageId);
+    fakeAiConversationClient.messageFeedbackRelease = new CountDownLatch(1);
+    fakeAiConversationClient.prepareMessageFeedbackRequest();
+    try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+      Future<ProcessingStatus> first =
+          executor.submit(() -> feedbackWorkService.generate(messageId));
+      try {
+        assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
+        assertThat(feedbackWorkService.generate(messageId)).isEqualTo(ProcessingStatus.PREPARING);
+        assertThat(
+                jdbcTemplate.queryForObject(
+                    "SELECT attempts FROM message_feedback_work " + "WHERE message_id=?",
+                    Integer.class,
+                    messageId))
+            .isEqualTo(2);
+      } finally {
+        fakeAiConversationClient.messageFeedbackRelease.countDown();
+      }
+      assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(ProcessingStatus.PREPARING);
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT legacy_completed FROM message_feedback_work " + "WHERE message_id=?",
+                Boolean.class,
+                messageId))
+        .isTrue();
+    assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
+  }
+
+  @Test
+  void hotfixLateFeedbackDoesNotDeadlockWithMessageDeletion() throws Exception {
+    startCompletedAiFirstSession("delete-during-feedback@example.com");
+    long messageId = fakeAiConversationClient.lastMessageFeedbackRequest().messageId();
+    jdbcTemplate.update(
+        "UPDATE message_feedback_work SET legacy_completed=FALSE, attempts=0, "
+            + "available_at='2000-01-01 00:00:00' "
+            + "WHERE message_id=?",
+        messageId);
+    fakeAiConversationClient.messageFeedbackRelease = new CountDownLatch(1);
+    fakeAiConversationClient.prepareMessageFeedbackRequest();
+    try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+      Future<ProcessingStatus> generation =
+          executor.submit(() -> feedbackWorkService.generate(messageId));
+      assertThat(fakeAiConversationClient.awaitMessageFeedbackRequest()).isTrue();
+      new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+          .executeWithoutResult(
+              transaction -> {
+                jdbcTemplate.queryForObject(
+                    "SELECT id FROM session_history_message WHERE id=? FOR UPDATE",
+                    Long.class,
+                    messageId);
+                fakeAiConversationClient.messageFeedbackRelease.countDown();
+                try {
+                  Thread.sleep(100);
+                } catch (InterruptedException exception) {
+                  Thread.currentThread().interrupt();
+                  throw new IllegalStateException(exception);
+                }
+                jdbcTemplate.update("DELETE FROM session_history_message WHERE id=?", messageId);
+              });
+      assertThat(generation.get(5, TimeUnit.SECONDS)).isEqualTo(ProcessingStatus.PREPARING);
+    } finally {
+      fakeAiConversationClient.messageFeedbackRelease.countDown();
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM message_feedback_work WHERE message_id=?",
+                Integer.class,
+                messageId))
+        .isZero();
+  }
+
+  @Test
+  void hotfixWarmsLegacyAiWhenItIgnoresSavedSnapshots() throws Exception {
+    fakeAiConversationClient.returnCompletedFeedback = true;
+    final StartedSession session = startCompletedAiFirstSession("snapshot-to-legacy@example.com");
+    final String saved =
+        jdbcTemplate.queryForObject(
+            "SELECT result_payload FROM message_feedback_work", String.class);
+    fakeAiConversationClient.returnCompletedFeedback = false;
+    fakeAiConversationClient.ignoreCompletedFeedback = true;
+    fakeAiConversationClient.feedbackCacheMissing = true;
+    requestCompatibilityFeedback(session);
+    assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT result_payload FROM message_feedback_work", String.class))
+        .isEqualTo(saved);
+  }
+
+  private StartedSession startFirstScenarioForCompatibility() throws Exception {
+    JsonNode body = login("compatibility@example.com").get("data");
+    final String token = body.get("accessToken").asText();
+    seedCategory(1001, 1, "ACTIVE", "첫 대화");
+    seedScenario(1, 1001, 1, "AI", "ACTIVE", 4);
+    seedScenarioVariant(
+        3001,
+        1,
+        "첫 대화",
+        "첫 대화",
+        "첫 대화",
+        null,
+        "What food do you like?",
+        "어떤 음식을 좋아해?",
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(200_001L, 1L, 1, "What food do you like?", "어떤 음식을 좋아해?", "DIAGNOSTIC");
+    var result =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/1/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(4))
+            .andReturn();
+    long id =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .path("data")
+            .path("sessionId")
+            .asLong();
+    return new StartedSession(body.get("user").get("userId").asLong(), token, id);
+  }
+
+  private void assertCompatibilityTurn(StartedSession session, int turn, int total)
+      throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"I like pizza.\",\"inputType\":\"VOICE\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(total))
+        .andExpect(jsonPath("$.data.progress.completed").value(turn == total));
+  }
+
+  private void requestCompatibilityFeedback(StartedSession session) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/feedback", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.nativeScore").value(90))
+        .andExpect(jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
+  }
+
+  @Test
   void getSessionFeedbackCreatesResultAndReturnsExistingResultWithoutRegeneration()
       throws Exception {
     StartedSession startedSession =
@@ -1699,36 +1938,25 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
-  void getSessionFeedbackFallsBackForUnsupportedAiStarRating() throws Exception {
+  void getSessionFeedbackRejectsUnsupportedAiStarRatingWithoutSaving() throws Exception {
     StartedSession startedSession =
         startCompletedAiFirstSession("session-feedback-unsupported-star-rating@example.com");
     fakeAiConversationClient.returnSessionFeedbackStarRating(new BigDecimal("4.0"));
-
     mockMvc
         .perform(
             post("/api/v1/sessions/%d/feedback".formatted(startedSession.sessionId()))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
-        .andExpect(status().isOk());
-
-    awaitLevelAssessment(startedSession.sessionId(), startedSession.accessToken());
-    mockMvc
-        .perform(
-            get("/api/v1/sessions/%d/level-assessment".formatted(startedSession.sessionId()))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + startedSession.accessToken()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
-        .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
-
+        .andExpect(status().isBadGateway());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_summary_feedback", Integer.class))
+        .isZero();
+    fakeAiConversationClient.returnSessionFeedbackStarRating(new BigDecimal("3.0"));
+    requestCompatibilityFeedback(startedSession);
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_summary_feedback", Integer.class))
         .isEqualTo(1);
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT source FROM user_level_assessment WHERE learning_session_id = ?",
-                String.class,
-                startedSession.sessionId()))
-        .isEqualTo("FALLBACK");
   }
 
   @Test
@@ -3819,6 +4047,9 @@ class ScenarioSessionApiIntegrationTests {
     private Long innerThoughtResponseMessageId;
 
     private boolean failMessageFeedbackRequest;
+    private volatile boolean feedbackCacheMissing;
+    private boolean returnCompletedFeedback;
+    private boolean ignoreCompletedFeedback;
 
     private BigDecimal sessionFeedbackStarRating = new BigDecimal("3.0");
     private boolean failSessionFeedbackGeneration;
@@ -3841,6 +4072,7 @@ class ScenarioSessionApiIntegrationTests {
     private CountDownLatch innerThoughtGenerationInterrupted = new CountDownLatch(0);
 
     private CountDownLatch messageFeedbackRequested = new CountDownLatch(1);
+    private CountDownLatch messageFeedbackRelease = new CountDownLatch(0);
 
     @Override
     public AiNextMessageResult generateNextMessage(AiNextMessageRequest request) {
@@ -3897,10 +4129,47 @@ class ScenarioSessionApiIntegrationTests {
     public AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request) {
       lastMessageFeedbackRequest = request;
       messageFeedbackRequested.countDown();
+      try {
+        if (!messageFeedbackRelease.await(5, TimeUnit.SECONDS)) {
+          throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+        }
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+      }
       messageFeedbackTransactionActive.add(
           TransactionSynchronizationManager.isActualTransactionActive());
       if (failMessageFeedbackRequest) {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      }
+      feedbackCacheMissing = false;
+      if (returnCompletedFeedback) {
+        return new AiMessageFeedbackResult(
+            request.sessionId(),
+            request.messageId(),
+            ProcessingStatus.PREPARING,
+            tools.jackson.databind.json.JsonMapper.builder()
+                .build()
+                .valueToTree(
+                    Map.of(
+                        "schemaVersion",
+                        1,
+                        "sessionId",
+                        request.sessionId(),
+                        "feedback",
+                        Map.of("messageId", request.messageId()),
+                        "userMessage",
+                        request.userMessage(),
+                        "adjudicationEvidence",
+                        Map.of(),
+                        "scoreEvidence",
+                        Map.of("contextFit", 2, "clarity", 2, "languageAccuracy", 2),
+                        "candidateWasRepaired",
+                        false,
+                        "copyWasRepaired",
+                        false,
+                        "copyWasFallback",
+                        false)));
       }
       return new AiMessageFeedbackResult(
           messageFeedbackResponseSessionId == null
@@ -3935,6 +4204,10 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackCallCount++;
       if (failSessionFeedbackGeneration) {
         throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+      }
+      if (feedbackCacheMissing
+          && (ignoreCompletedFeedback || request.completedFeedbacks() == null)) {
+        throw new ApiException(ErrorCode.FEEDBACK_NOT_READY);
       }
       return new AiSessionFeedbackResult(
           request.sessionId(),
@@ -4023,6 +4296,9 @@ class ScenarioSessionApiIntegrationTests {
       innerThoughtResponseMessageId = null;
       failMessageFeedbackRequest = false;
       durableMessageFeedback = false;
+      feedbackCacheMissing = false;
+      returnCompletedFeedback = false;
+      ignoreCompletedFeedback = false;
       sessionFeedbackStarRating = new BigDecimal("3.0");
       failSessionFeedbackGeneration = false;
       sessionFeedbackCallCount = 0;
@@ -4036,6 +4312,7 @@ class ScenarioSessionApiIntegrationTests {
       innerThoughtGenerationRelease = new CountDownLatch(0);
       innerThoughtGenerationInterrupted = new CountDownLatch(0);
       messageFeedbackRequested = new CountDownLatch(1);
+      messageFeedbackRelease = new CountDownLatch(0);
     }
 
     private void blockInnerThoughtGeneration() {

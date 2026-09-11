@@ -29,6 +29,51 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class SessionLevelAssessmentRecoveryTest {
+  @Test
+  void futureLaunchReturnsNullForInProgressSessionAndSkipsAssessmentWork() {
+    var sessions = mock(LearningSessionService.class);
+    var profiles = mock(UserProfileService.class);
+    var contexts = mock(SessionFeedbackContextService.class);
+    var evaluator = mock(SessionLevelAssessmentService.class);
+    var repository = mock(UserLevelAssessmentRepository.class);
+    var ai = mock(AiConversationClient.class);
+    var transactions = mock(PlatformTransactionManager.class);
+    var executor = mock(org.springframework.core.task.TaskExecutor.class);
+    var clock = mock(Clock.class);
+    Instant launchInstant = Instant.parse("2026-07-01T00:00:00Z");
+    when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+    when(clock.instant()).thenReturn(launchInstant.minusSeconds(1));
+    var session =
+        LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
+    when(sessions.findOwned(1L, 10L)).thenReturn(session);
+    var service =
+        new SessionLevelAssessmentGenerationService(
+            sessions,
+            profiles,
+            contexts,
+            evaluator,
+            repository,
+            ai,
+            transactions,
+            executor,
+            clock,
+            new SessionLevelAssessmentLaunchService(
+                new com.landit.landitbe.feature.subscription.service
+                    .SubscriptionLaunchPolicyService(
+                    new SubscriptionProperties("2026-07-01T09:00:00+09:00"), clock),
+                clock));
+
+    service.startIfNeeded(1L, 10L);
+    verifyNoInteractions(sessions);
+    assertThat(service.get(1L, 10L)).isNull();
+    verify(sessions).findOwned(1L, 10L);
+    verifyNoInteractions(profiles, contexts, evaluator, repository, ai, transactions, executor);
+
+    when(clock.instant()).thenReturn(launchInstant);
+    assertThat(service.get(1L, 10L)).isNotNull();
+    verifyNoInteractions(profiles, contexts, evaluator, ai, transactions, executor);
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
   void expiryWithoutPollingDiscardsQueuedOrLateModelResult(boolean expiresInQueue) {

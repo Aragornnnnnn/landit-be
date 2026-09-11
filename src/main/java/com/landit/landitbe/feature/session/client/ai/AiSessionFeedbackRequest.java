@@ -12,6 +12,8 @@ import tools.jackson.databind.JsonNode;
  * @param sessionId 학습 세션 ID
  * @param scenario AI 요청용 시나리오 컨텍스트
  * @param expectedMessageIds 피드백을 생성할 메시지 ID 목록
+ * @param assessmentMessages 수준 평가용 사용자 원문과 질문 정보
+ * @param completedFeedbacks 저장된 메시지 평가 결과. 구 AI 결과만 있으면 null
  */
 public record AiSessionFeedbackRequest(
     Long sessionId,
