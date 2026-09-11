@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.client.ai.AiSessionFeedbackResult;
@@ -12,6 +13,7 @@ import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse.Evaluatio
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse.MessageFeedbackResponse;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,6 +30,8 @@ public class SessionFeedbackService {
   private final SessionFeedbackCompletionService completionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final AiConversationClient aiConversationClient;
+  private final MessageFeedbackWorkService feedbackWorkService;
+  private final AiClientProperties properties;
 
   /**
    * 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다.
@@ -46,14 +50,39 @@ public class SessionFeedbackService {
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
-    AiSessionFeedbackResult result =
-        aiConversationClient.generateSessionFeedback(
-            new AiSessionFeedbackRequest(
-                context.sessionId(),
-                context.scenario(),
-                context.userMessages().stream().map(UserMessageContext::messageId).toList()));
+    long deadline = System.nanoTime() + properties.sessionFeedbackRequestTimeout().toNanos();
+    AiSessionFeedbackResult result;
+    try {
+      result =
+          aiConversationClient.generateSessionFeedback(toRequest(context), remaining(deadline));
+    } catch (ApiException exception) {
+      if (exception.getErrorCode() != ErrorCode.FEEDBACK_NOT_READY) {
+        throw exception;
+      }
+      feedbackWorkService.recoverMissing(userId, context);
+      feedbackWorkService.awaitRecovery(context, remaining(deadline).dividedBy(2));
+      result =
+          aiConversationClient.generateSessionFeedback(toRequest(context), remaining(deadline));
+    }
     Long summaryFeedbackId = completionService.record(userId, context, result);
     return responseFor(context, summaryFeedbackId);
+  }
+
+  private AiSessionFeedbackRequest toRequest(LoadedSessionFeedbackContext context) {
+    List<Long> ids = context.userMessages().stream().map(UserMessageContext::messageId).toList();
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        ids,
+        feedbackWorkService.completedResults(context.sessionId(), ids));
+  }
+
+  private Duration remaining(long deadline) {
+    long nanos = deadline - System.nanoTime();
+    if (nanos <= 0) {
+      throw new ApiException(ErrorCode.FEEDBACK_GENERATION_FAILED);
+    }
+    return Duration.ofNanos(nanos);
   }
 
   /** 저장된 최종 피드백과 평가 당시 사용자 메시지 컨텍스트를 API 응답으로 조립한다. */
