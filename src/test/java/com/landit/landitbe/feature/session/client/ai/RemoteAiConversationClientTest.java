@@ -465,11 +465,7 @@ class RemoteAiConversationClientTest {
     assertThat(request.get("expectedMessageIds"))
         .extracting(JsonNode::asLong)
         .containsExactly(200L, 201L);
-    assertThat(request.get("assessmentMessages").get(0).get("responseDemand").asString())
-        .isEqualTo("HIGH");
-    assertThat(request.get("assessmentMessages").get(0).get("requiredElements"))
-        .extracting(JsonNode::asString)
-        .containsExactly("favorite food", "reason");
+    assertThat(request.has("assessmentMessages")).isFalse();
     assertThat(result.sessionId()).isEqualTo(100L);
     assertThat(result.nativeScore()).isEqualTo(75);
     assertThat(result.starRating()).isEqualByComparingTo(new BigDecimal("2.5"));
@@ -498,6 +494,82 @@ class RemoteAiConversationClientTest {
                 "I went to the cafe yesterday.",
                 "Use the past tense for a completed action.",
                 "I went to the cafe yesterday."));
+  }
+
+  @Test
+  void levelAssessmentDoesNotReceiveFinalFeedbackFields() throws Exception {
+    AtomicReference<String> body = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-level-assessment",
+        exchange -> {
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeErrorResponse(exchange, 503, "FEEDBACK_GENERATION_FAILED");
+        });
+    assertThatThrownBy(
+            () -> remoteClient().generateSessionLevelAssessment(aiSessionFeedbackRequest()))
+        .isInstanceOf(ApiException.class);
+    JsonNode sent = jsonMapper.readTree(body.get());
+    assertThat(sent.size()).isEqualTo(4);
+    assertThat(sent.has("sessionId")).isTrue();
+    assertThat(sent.has("scenario")).isTrue();
+    assertThat(sent.has("expectedMessageIds")).isTrue();
+    assertThat(sent.has("assessmentMessages")).isTrue();
+    assertThat(sent.get("assessmentMessages").get(0).get("responseDemand").asString())
+        .isEqualTo("HIGH");
+    assertThat(sent.get("assessmentMessages").get(0).get("requiredElements"))
+        .extracting(JsonNode::asString)
+        .containsExactly("favorite food", "reason");
+    assertThat(sent.has("completedFeedbacks")).isFalse();
+  }
+
+  @Test
+  void hotfixForwardsCompletedFeedbacksWithoutChangingLegacyFields() throws Exception {
+    AtomicReference<String> body = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-feedback",
+        exchange -> {
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeSessionFeedbackSuccessResponse(exchange);
+        });
+    AiSessionFeedbackRequest legacy = aiSessionFeedbackRequest();
+    JsonNode snapshot = jsonMapper.readTree("{\"schemaVersion\":1,\"sessionId\":100}");
+    remoteClient()
+        .generateSessionFeedback(
+            new AiSessionFeedbackRequest(
+                legacy.sessionId(),
+                legacy.scenario(),
+                legacy.expectedMessageIds(),
+                List.of(),
+                List.of(snapshot)));
+    JsonNode sent = jsonMapper.readTree(body.get());
+    assertThat(sent.get("completedFeedbacks").get(0)).isEqualTo(snapshot);
+    assertThat(sent.get("expectedMessageIds")).hasSize(legacy.expectedMessageIds().size());
+    assertThat(sent.has("assessmentMessages")).isFalse();
+  }
+
+  @Test
+  void hotfixUsesRemainingTimeoutForFinalFeedbackRetry() {
+    server.createContext(
+        "/api/v1/conversation/session-feedback",
+        exchange -> {
+          try {
+            Thread.sleep(200);
+            writeSessionFeedbackSuccessResponse(exchange);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          } finally {
+            exchange.close();
+          }
+        });
+    assertThatThrownBy(
+            () ->
+                remoteClient()
+                    .generateSessionFeedback(aiSessionFeedbackRequest(), Duration.ofMillis(30)))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
   @Test

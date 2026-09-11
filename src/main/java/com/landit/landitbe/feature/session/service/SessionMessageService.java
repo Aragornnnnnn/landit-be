@@ -24,6 +24,17 @@ public class SessionMessageService {
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
 
   /**
+   * 평가 저장 트랜잭션에서 부모 메시지를 먼저 잠근다.
+   *
+   * @param messageId 평가 대상 메시지 ID
+   * @return 삭제되지 않은 메시지를 잠갔으면 true
+   */
+  @Transactional
+  public boolean lockForFeedbackResult(long messageId) {
+    return sessionHistoryMessageRepository.findByIdForFeedbackUpdate(messageId).isPresent();
+  }
+
+  /**
    * 세션 히스토리의 메시지를 순서대로 조회한다.
    *
    * @param sessionHistoryId 세션 히스토리 ID
@@ -166,5 +177,12 @@ public class SessionMessageService {
   public int completeFeedback(List<Long> messageIds) {
     return sessionHistoryMessageRepository.markFeedbackCompletedIfPreparing(
         messageIds, ProcessingStatus.COMPLETED, ProcessingStatus.PREPARING);
+  }
+
+  /** 재시도에서 복구된 평가만 실패 상태에서 되돌린다. */
+  @Transactional
+  public void retryFeedback(long messageId) {
+    sessionHistoryMessageRepository.retryFeedback(
+        messageId, ProcessingStatus.PREPARING, ProcessingStatus.FAILED);
   }
 }
