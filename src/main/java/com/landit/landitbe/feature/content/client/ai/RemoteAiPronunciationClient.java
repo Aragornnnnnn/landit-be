@@ -58,7 +58,8 @@ public class RemoteAiPronunciationClient implements AiPronunciationClient {
     URI uri = URI.create(properties.baseUrl()).resolve(ANALYZE_PATH);
     try {
       HttpRequest httpRequest =
-          HttpRequest.newBuilder(uri)
+          properties
+              .authorize(HttpRequest.newBuilder(uri))
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")

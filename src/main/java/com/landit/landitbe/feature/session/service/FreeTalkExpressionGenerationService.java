@@ -98,7 +98,8 @@ public class FreeTalkExpressionGenerationService {
       // 부분 결과를 남기지 않고 재시도할 수 있도록 실패 상태만 기록한다.
       log.warn(
           GENERATION_FAILED_LOG, learningSessionId, elapsedMillis(startNanos), timings, exception);
-      transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
+      transactionTemplate.executeWithoutResult(
+          status -> fail(learningSessionId, context.attempt()));
     }
   }
 
@@ -109,7 +110,7 @@ public class FreeTalkExpressionGenerationService {
    */
   public void markFailed(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-    transactionTemplate.executeWithoutResult(status -> fail(learningSessionId));
+    transactionTemplate.executeWithoutResult(status -> fail(learningSessionId, null));
   }
 
   // 대화 임베딩부터 추천 저장까지를 단계별 소요 시간과 함께 실행한다.
@@ -213,6 +214,7 @@ public class FreeTalkExpressionGenerationService {
     // 트랜잭션 밖 AI 호출에 필요한 값만 불변 컨텍스트로 반환한다.
     return new GenerationContext(
         learningSessionId,
+        freeTalkSession.getExpressionGenerationAttempt(),
         freeTalkSession.getId(),
         learningSession.getUserProfileId(),
         learningSession.getTargetLocale(),
@@ -240,7 +242,8 @@ public class FreeTalkExpressionGenerationService {
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(context.learningSessionId())
             .orElseThrow();
-    if (freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.PREPARING) {
+    if (freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.PREPARING
+        || freeTalkSession.getExpressionGenerationAttempt() != context.attempt()) {
       return;
     }
     sessionExpressionRepository.deleteByFreeTalkSessionId(context.freeTalkSessionId());
@@ -251,12 +254,17 @@ public class FreeTalkExpressionGenerationService {
   }
 
   // 진행 중인 표현 생성 작업을 실패 상태로 전환한다.
-  private void fail(long learningSessionId) {
+  private void fail(long learningSessionId, Integer attempt) {
     freeTalkSessionRepository
         .findByLearningSessionIdForUpdate(learningSessionId)
         .filter(
             session ->
                 session.getExpressionGenerationStatus() == ExpressionGenerationStatus.PREPARING)
+        .filter(
+            session ->
+                attempt == null
+                    ? session.getExpressionGenerationStartedAt() == null
+                    : session.getExpressionGenerationAttempt() == attempt)
         .ifPresent(FreeTalkSession::failExpressionGeneration);
   }
 
@@ -278,6 +286,7 @@ public class FreeTalkExpressionGenerationService {
 
   private record GenerationContext(
       long learningSessionId,
+      int attempt,
       long freeTalkSessionId,
       long userProfileId,
       Locale targetLocale,

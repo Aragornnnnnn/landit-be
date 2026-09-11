@@ -35,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkSessionService {
 
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
   private final UserProfileService userProfileService;
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
@@ -51,16 +53,20 @@ public class FreeTalkSessionService {
    * @param request 시작 방식과 선택 주제
    * @return 외부 AI 호출에 사용할 시작 레코드
    * @throws ApiException 요청, 사용자, 주제 또는 AI 상대 설정이 유효하지 않을 때
-   * @throws com.landit.landitbe.feature.session.exception.SessionException 당일 발화 한도를 모두 사용했을 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 당일 발화 한도 또는 일일·분당 요청 한도에
+   *     도달했을 때
    */
   @Transactional
   public StartedFreeTalkSession createStart(long userId, FreeTalkSessionStartRequest request) {
     validateStartRequest(request);
     UserProfile userProfile = userProfileService.requireActiveForUpdate(userId);
+    var startAccess = accessGrants.requirePremiumStart(userId);
     dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
     FreeTalkCharacter character = FreeTalkCharacter.fromId(request.characterId());
-    TtsVoiceResponse ttsVoice = conversationCharacterService.requireActiveTtsVoice(character.id());
+    final TtsVoiceResponse ttsVoice =
+        conversationCharacterService.requireActiveTtsVoice(character.id());
+    dailySpeakingUsageService.reserveRequest(userId);
     LocalDateTime startedAt = LocalDateTime.now();
     LearningSession learningSession =
         learningSessionRepository.save(
@@ -70,6 +76,7 @@ public class FreeTalkSessionService {
                 userProfile.getTargetLocale(),
                 userProfile.getBaseLocale(),
                 startedAt));
+    accessGrants.recordFreeTalk(userId, learningSession.getId(), startedAt, startAccess);
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository.save(
             FreeTalkSession.start(

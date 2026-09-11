@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.content.domain.ResponseDemand;
 import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
@@ -40,6 +41,40 @@ class RemoteAiConversationClientTest {
   @AfterEach
   void stopServer() {
     server.stop(0);
+  }
+
+  @Test
+  void levelAssessmentDoesNotSendFieldsOwnedBySessionFeedback() throws Exception {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-level-assessment",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] response =
+              "{\"success\":true,\"data\":{\"sessionId\":100,\"levelAssessment\":null}}"
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, response.length);
+          exchange.getResponseBody().write(response);
+          exchange.close();
+        });
+    AiSessionFeedbackRequest original = aiSessionFeedbackRequest();
+    for (List<JsonNode> snapshots :
+        java.util.Arrays.<List<JsonNode>>asList(
+            null, List.of(jsonMapper.readTree("{\"schemaVersion\":1}")))) {
+      remoteClient()
+          .generateSessionLevelAssessment(
+              new AiSessionFeedbackRequest(
+                  original.sessionId(),
+                  original.scenario(),
+                  original.expectedMessageIds(),
+                  original.assessmentMessages(),
+                  snapshots));
+      JsonNode body = jsonMapper.readTree(requestBody.get());
+      assertThat(body.has("completedFeedbacks")).isFalse();
+      assertThat(body.get("expectedMessageIds")).hasSize(2);
+      assertThat(body.get("assessmentMessages")).hasSize(2);
+    }
   }
 
   @Test
@@ -464,11 +499,15 @@ class RemoteAiConversationClientTest {
     assertThat(request.get("expectedMessageIds"))
         .extracting(JsonNode::asLong)
         .containsExactly(200L, 201L);
+    assertThat(request.has("assessmentMessages")).isFalse();
     assertThat(result.sessionId()).isEqualTo(100L);
     assertThat(result.nativeScore()).isEqualTo(75);
     assertThat(result.starRating()).isEqualByComparingTo(new BigDecimal("2.5"));
     assertThat(result.highlightMessage()).isEqualTo("You clearly explained your preference.");
     assertThat(result.summaryMessage()).isEqualTo("Keep connecting your reasons with because.");
+    assertThat(result.levelAssessment().core().messages()).hasSize(2);
+    assertThat(result.levelAssessment().core().messages().getFirst().domains().grammar().level())
+        .isEqualTo(4);
     assertThat(result.messageFeedbacks())
         .containsExactly(
             new AiSessionMessageFeedbackResult(
@@ -492,6 +531,32 @@ class RemoteAiConversationClientTest {
   }
 
   @Test
+  void levelAssessmentDoesNotReceiveFinalFeedbackFields() throws Exception {
+    AtomicReference<String> body = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-level-assessment",
+        exchange -> {
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeErrorResponse(exchange, 503, "FEEDBACK_GENERATION_FAILED");
+        });
+    assertThatThrownBy(
+            () -> remoteClient().generateSessionLevelAssessment(aiSessionFeedbackRequest()))
+        .isInstanceOf(ApiException.class);
+    JsonNode sent = jsonMapper.readTree(body.get());
+    assertThat(sent.size()).isEqualTo(4);
+    assertThat(sent.has("sessionId")).isTrue();
+    assertThat(sent.has("scenario")).isTrue();
+    assertThat(sent.has("expectedMessageIds")).isTrue();
+    assertThat(sent.has("assessmentMessages")).isTrue();
+    assertThat(sent.get("assessmentMessages").get(0).get("responseDemand").asString())
+        .isEqualTo("HIGH");
+    assertThat(sent.get("assessmentMessages").get(0).get("requiredElements"))
+        .extracting(JsonNode::asString)
+        .containsExactly("favorite food", "reason");
+    assertThat(sent.has("completedFeedbacks")).isFalse();
+  }
+
+  @Test
   void hotfixForwardsCompletedFeedbacksWithoutChangingLegacyFields() throws Exception {
     AtomicReference<String> body = new AtomicReference<>();
     server.createContext(
@@ -508,6 +573,7 @@ class RemoteAiConversationClientTest {
                 legacy.sessionId(),
                 legacy.scenario(),
                 legacy.expectedMessageIds(),
+                List.of(),
                 List.of(snapshot)));
     JsonNode sent = jsonMapper.readTree(body.get());
     assertThat(sent.get("completedFeedbacks").get(0)).isEqualTo(snapshot);
@@ -686,7 +752,20 @@ class RemoteAiConversationClientTest {
             "내 취향과 경험을 영어로 설명해봅니다.",
             "friend",
             "KOREAN_LEARNER"),
-        List.of(200L, 201L));
+        List.of(200L, 201L),
+        List.of(
+            new AiSessionFeedbackRequest.AssessmentMessage(
+                200L,
+                "What food do you like and why?",
+                "I like pizza because it is spicy.",
+                ResponseDemand.HIGH,
+                List.of("favorite food", "reason")),
+            new AiSessionFeedbackRequest.AssessmentMessage(
+                201L,
+                "What did you do yesterday?",
+                "I go to the cafe yesterday.",
+                ResponseDemand.HIGH,
+                List.of("past activity"))));
   }
 
   private RemoteAiConversationClient remoteClient() {
@@ -760,7 +839,36 @@ class RemoteAiConversationClientTest {
                         "correctionReason": "Use the past tense for a completed action.",
                         "benchmarkMessage": "I went to the cafe yesterday."
                       }
-                    ]
+                    ],
+                    "levelAssessment": {
+                      "core": {
+                        "messages": [
+                          {
+                            "messageId": 200,
+                            "taskPerformance": "ACHIEVED",
+                            "domains": {
+                              "situationPerformance": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I like pizza"},
+                              "grammar": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "because it is spicy"},
+                              "vocabulary": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "spicy"},
+                              "discourse": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "because"},
+                              "interactionPragmatics": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I like pizza"}
+                            }
+                          },
+                          {
+                            "messageId": 201,
+                            "taskPerformance": "PARTIAL",
+                            "domains": {
+                              "situationPerformance": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "cafe yesterday"},
+                              "grammar": {"level": 2, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I go"},
+                              "vocabulary": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "cafe"},
+                              "discourse": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "yesterday"},
+                              "interactionPragmatics": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I go to the cafe"}
+                            }
+                          }
+                        ]
+                      },
+                      "details": {"strength": "이유를 덧붙였어요.", "improvement": "과거시제를 연습해보세요."}
+                    }
                   },
                   "error": null
                 }

@@ -54,6 +54,7 @@ class AiDeploymentCompatibilityIntegrationTest {
             100L,
             scenario,
             List.of(200L),
+            List.of(),
             supportsSnapshot ? List.of(completed.completedFeedback()) : null);
     if (supportsSnapshot) {
       clearCache(baseUrl);

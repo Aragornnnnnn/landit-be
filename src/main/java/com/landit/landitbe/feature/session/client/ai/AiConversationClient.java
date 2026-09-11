@@ -33,4 +33,15 @@ public interface AiConversationClient {
       AiSessionFeedbackRequest request, Duration timeout) {
     return generateSessionFeedback(request);
   }
+
+  /**
+   * 세션 최종 피드백과 독립적으로 텍스트 수준 평가를 생성한다.
+   *
+   * @param request 세션 질문과 사용자 답변을 포함한 평가 입력
+   * @return 수준 평가 결과. 평가 미지원 또는 복구 실패 시 null
+   */
+  default AiSessionLevelAssessment generateSessionLevelAssessment(
+      AiSessionFeedbackRequest request) {
+    return null;
+  }
 }

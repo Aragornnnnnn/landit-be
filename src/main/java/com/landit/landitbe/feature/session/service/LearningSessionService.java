@@ -66,6 +66,29 @@ public class LearningSessionService {
   }
 
   /**
+   * 상태와 무관하게 소유 세션을 잠가 재개와 중복 요청을 직렬화한다.
+   *
+   * @param userId 소유자 ID
+   * @param sessionId 세션 ID
+   * @return 잠근 소유 세션
+   * @throws SessionException 소유 세션이 없을 때
+   */
+  public LearningSession findOwnedForUpdate(long userId, long sessionId) {
+    return learningSessionRepository
+        .findByIdAndUserProfileIdForUpdate(sessionId, userId)
+        .orElseThrow(
+            () ->
+                learningSessionRepository.existsById(sessionId)
+                    ? new SessionException(SessionErrorCode.FORBIDDEN)
+                    : new SessionException(SessionErrorCode.SESSION_NOT_FOUND));
+  }
+
+  /** 존재하는 소유 세션만 반환해 필터가 다른 계정의 대상에 접근하지 않게 한다. */
+  public java.util.Optional<LearningSession> findOwnedIfPresent(long userId, long sessionId) {
+    return learningSessionRepository.findByIdAndUserProfileId(sessionId, userId);
+  }
+
+  /**
    * 소유한 완료 시나리오 세션을 조회하고 최종 피드백 생성 조건을 검증한다.
    *
    * @param userId 세션 소유자 ID
@@ -105,6 +128,20 @@ public class LearningSessionService {
                         : new SessionException(SessionErrorCode.SESSION_NOT_FOUND));
     validateCompletedScenarioSession(learningSession);
     return learningSession;
+  }
+
+  /**
+   * 평가 대상 세션이 사용자의 최신 완료 시나리오인지 확인한다.
+   *
+   * @param session 평가할 소유 세션
+   * @return 최신 완료 시나리오와 ID가 같으면 true
+   */
+  public boolean isLatestCompletedScenario(LearningSession session) {
+    return learningSessionRepository
+        .findTopByUserProfileIdAndSessionTypeAndStatusOrderByEndedAtDescIdDesc(
+            session.getUserProfileId(), SessionType.SCENARIO, LearningSessionStatus.COMPLETED)
+        .map(latest -> latest.getId().equals(session.getId()))
+        .orElse(false);
   }
 
   /** 최종 피드백을 생성할 수 있는 완료 시나리오 세션인지 검증한다. */

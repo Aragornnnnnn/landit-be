@@ -34,7 +34,35 @@ class PushQueueMessageHandlerTest {
 
   @Mock private NotificationDispatchService notificationDispatchService;
 
+  @Mock
+  private com.landit.landitbe.feature.notification.service.AdminPushProcessingService
+      adminPushProcessingService;
+
   @InjectMocks private PushQueueMessageHandler pushQueueMessageHandler;
+
+  @Test
+  void handlesAndValidatesAdminCampaign() {
+    java.util.UUID id = java.util.UUID.randomUUID();
+    PushQueueMessage message =
+        new PushQueueMessage(
+            1,
+            "admin-message",
+            PushQueueMessage.ADMIN_PUSH_CAMPAIGN,
+            Instant.now(),
+            new PushQueuePayload(null, null, null, null, null, id, null, null));
+    pushQueueMessageHandler.handle(message);
+    verify(adminPushProcessingService).process(id);
+    assertThatThrownBy(
+            () ->
+                pushQueueMessageHandler.handle(
+                    new PushQueueMessage(
+                        1,
+                        "invalid",
+                        PushQueueMessage.ADMIN_PUSH_CAMPAIGN,
+                        Instant.now(),
+                        new PushQueuePayload(null, null))))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 
   /** Receipt 확인 메시지의 발송 이력 ID와 시도 횟수를 Service에 전달한다. */
   @Test

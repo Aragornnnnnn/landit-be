@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.session.client.ai.AiScenarioContext;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.List;
@@ -13,6 +14,7 @@ record LoadedSessionFeedbackContext(
     Long sessionHistoryId,
     Locale targetLocale,
     Locale baseLocale,
+    ContentLearningLevel questionLevelGroup,
     AiScenarioContext scenario,
     List<UserMessageContext> userMessages,
     Optional<ExistingSummaryFeedbackContext> existingSummary) {}

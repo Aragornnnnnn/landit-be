@@ -59,6 +59,10 @@ public class NotificationDispatchService {
         commands.stream().map(SendPushNotificationCommand::userProfileId).distinct().toList();
     Map<Long, List<Long>> userPushTokenIdsByUserProfileId =
         userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(userProfileIds);
+    scheduleReceipts(
+        pushDeliveryService.findAcceptedDeliveryIdsForEvents(
+            commands.stream().map(c -> deduplicationKeyPrefix(c.eventId())).distinct().toList()));
+    List<PreparePushDeliveryCommand> candidates = new ArrayList<>(EXPO_BATCH_SIZE);
     List<PreparedPushDelivery> deliveries = new ArrayList<>(EXPO_BATCH_SIZE);
     RetryablePushNotificationException firstFailure = null;
     int preparedDeliveries = 0;
@@ -66,26 +70,28 @@ public class NotificationDispatchService {
     int ticketAccepted = 0;
     int ticketFailed = 0;
     for (SendPushNotificationCommand command : commands) {
-      scheduleAcceptedDeliveryReceipts(command.eventId());
       for (Long userPushTokenId :
           userPushTokenIdsByUserProfileId.getOrDefault(command.userProfileId(), List.of())) {
-        pushDeliveryService
-            .prepare(prepareCommand(command, userPushTokenId))
-            .ifPresent(deliveries::add);
-        if (deliveries.size() == EXPO_BATCH_SIZE) {
-          DispatchBatchResult result = sendPreparedDeliveries(deliveries);
-          preparedDeliveries += deliveries.size();
+        candidates.add(prepareCommand(command, userPushTokenId));
+        if (candidates.size() == EXPO_BATCH_SIZE) {
+          deliveries.addAll(prepareCandidates(candidates, deliveries));
+          candidates.clear();
+        }
+        if (deliveries.size() >= EXPO_BATCH_SIZE) {
+          DispatchBatchResult result = sendBufferedDeliveries(deliveries);
+          preparedDeliveries += EXPO_BATCH_SIZE;
           expoRequestCount++;
           ticketAccepted += result.ticketAccepted();
           ticketFailed += result.ticketFailed();
           firstFailure = retainFirstFailure(firstFailure, result.retryableFailure());
-          deliveries.clear();
         }
       }
     }
-    if (!deliveries.isEmpty()) {
-      DispatchBatchResult result = sendPreparedDeliveries(deliveries);
-      preparedDeliveries += deliveries.size();
+    deliveries.addAll(prepareCandidates(candidates, deliveries));
+    while (!deliveries.isEmpty()) {
+      int batchSize = Math.min(deliveries.size(), EXPO_BATCH_SIZE);
+      DispatchBatchResult result = sendBufferedDeliveries(deliveries);
+      preparedDeliveries += batchSize;
       expoRequestCount++;
       ticketAccepted += result.ticketAccepted();
       ticketFailed += result.ticketFailed();
@@ -98,10 +104,126 @@ public class NotificationDispatchService {
         preparedDeliveries, expoRequestCount, ticketAccepted, ticketFailed);
   }
 
-  /** 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다. */
-  private void scheduleAcceptedDeliveryReceipts(String eventId) {
+  private List<PreparedPushDelivery> prepareCandidates(
+      List<PreparePushDeliveryCommand> candidates, List<PreparedPushDelivery> pending) {
+    if (candidates.isEmpty()) {
+      return List.of();
+    }
+    try {
+      return measureStage("prepare", () -> pushDeliveryService.prepareAll(List.copyOf(candidates)));
+    } catch (RuntimeException failure) {
+      recoverUnsentDeliveries(pending, failure);
+      throw failure;
+    }
+  }
+
+  /** DB 묶음 경계를 넘은 결과 중 최대 100건만 전송하고 아직 보내지 않은 잔여분을 구분한다. */
+  private DispatchBatchResult sendBufferedDeliveries(List<PreparedPushDelivery> pending) {
+    int batchSize = Math.min(pending.size(), EXPO_BATCH_SIZE);
+    List<PreparedPushDelivery> sending = List.copyOf(pending.subList(0, batchSize));
+    pending.subList(0, batchSize).clear();
+    try {
+      return sendPreparedDeliveries(sending);
+    } catch (RuntimeException failure) {
+      recoverUnsentDeliveries(pending, failure);
+      throw failure;
+    }
+  }
+
+  /** Expo에 전달하지 않은 이력만 복구하고 복구 오류가 원래 실패를 가리지 않도록 한다. */
+  private void recoverUnsentDeliveries(
+      List<PreparedPushDelivery> pending, RuntimeException failure) {
+    for (PreparedPushDelivery delivery : pending) {
+      try {
+        pushDeliveryService.markRetryable(delivery.pushDeliveryId());
+      } catch (RuntimeException recoveryFailure) {
+        if (recoveryFailure != failure) {
+          failure.addSuppressed(recoveryFailure);
+        }
+      }
+    }
+  }
+
+  private void scheduleReceipts(List<Long> ids) {
+    if (!ids.isEmpty()) {
+      measureStage(
+          "receipt_publish",
+          () -> {
+            pushQueuePublisher.scheduleReceiptChecks(ids, 1);
+            return null;
+          });
+    }
+  }
+
+  private <T> T measureStage(String stage, java.util.function.Supplier<T> action) {
+    long start = System.nanoTime();
+    String outcome = "failure";
+    try {
+      T result = action.get();
+      outcome = "success";
+      return result;
+    } finally {
+      Timer.builder("landit.notification.dispatch.stage.duration")
+          .tag("stage", stage)
+          .tag("outcome", outcome)
+          .register(meterRegistry)
+          .record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+    }
+  }
+
+  /**
+   * DB에서 선점한 확정 토큰만 공지 전용 실패 정책으로 제출한다.
+   *
+   * @param deliveries 최대 100개 선점된 발송
+   */
+  public void sendAdminPrepared(List<PreparedPushDelivery> deliveries) {
+    if (deliveries.isEmpty()) {
+      return;
+    }
+    if (deliveries.size() > EXPO_BATCH_SIZE) {
+      throw new IllegalArgumentException("최대 100건입니다.");
+    }
+    List<PushTicketResult> results;
+    try {
+      results =
+          notificationSender.send(
+              deliveries.stream().map(PreparedPushDelivery::toPushMessage).toList());
+    } catch (PushNotificationException exception) {
+      markDeliveriesFailed(deliveries, EXPO_REQUEST_UNCONFIRMED);
+      return;
+    }
+    if (results.size() != deliveries.size()) {
+      markDeliveriesFailed(deliveries, EXPO_TICKET_RESULT_MISMATCH);
+      return;
+    }
+    for (int i = 0; i < deliveries.size(); i++) {
+      pushDeliveryService.recordTicketResult(deliveries.get(i).pushDeliveryId(), results.get(i));
+    }
+  }
+
+  /**
+   * 같은 발송 이벤트에서 이미 Ticket을 접수한 이력의 Receipt 확인을 다시 예약한다.
+   *
+   * @param eventId 다시 예약할 발송 이벤트 ID
+   */
+  public void scheduleAcceptedDeliveryReceipts(String eventId) {
     pushDeliveryService
         .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId))
+        .forEach(pushDeliveryId -> pushQueuePublisher.scheduleReceiptCheck(pushDeliveryId, 1));
+  }
+
+  /**
+   * 지정한 Token의 접수된 Ticket만 Receipt 확인 대상으로 다시 예약한다.
+   *
+   * @param eventId 다시 예약할 발송 이벤트 ID
+   * @param userPushTokenIds 현재 발송 페이지의 Token ID
+   */
+  public void scheduleAcceptedDeliveryReceipts(String eventId, List<Long> userPushTokenIds) {
+    if (userPushTokenIds.isEmpty()) {
+      return;
+    }
+    pushDeliveryService
+        .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId), userPushTokenIds)
         .forEach(pushDeliveryId -> pushQueuePublisher.scheduleReceiptCheck(pushDeliveryId, 1));
   }
 
@@ -130,17 +252,16 @@ public class NotificationDispatchService {
     recordExpoRequestDuration(startedAt, "success");
     int ticketAccepted = (int) results.stream().filter(PushTicketResult::accepted).count();
     int ticketFailed = results.size() - ticketAccepted;
-    for (int index = 0; index < deliveries.size(); index++) {
-      pushDeliveryService.recordTicketResult(
-          deliveries.get(index).pushDeliveryId(), results.get(index));
-    }
+    recordTickets(deliveries, results);
     recordTicketCount("accepted", ticketAccepted);
     recordTicketCount("failed", ticketFailed);
+    List<Long> receiptIds = new ArrayList<>();
     for (int index = 0; index < deliveries.size(); index++) {
       if (results.get(index).accepted()) {
-        pushQueuePublisher.scheduleReceiptCheck(deliveries.get(index).pushDeliveryId(), 1);
+        receiptIds.add(deliveries.get(index).pushDeliveryId());
       }
     }
+    scheduleReceipts(receiptIds);
     return new DispatchBatchResult(ticketAccepted, ticketFailed, null);
   }
 
@@ -164,10 +285,19 @@ public class NotificationDispatchService {
 
   /** 자동 재발송하면 안 되는 Expo 요청 실패를 발송 이력에 종료 상태로 기록한다. */
   private void markDeliveriesFailed(List<PreparedPushDelivery> deliveries, String errorCode) {
-    deliveries.forEach(
-        delivery ->
-            pushDeliveryService.recordTicketResult(
-                delivery.pushDeliveryId(), PushTicketResult.failed(errorCode)));
+    recordTickets(
+        deliveries, deliveries.stream().map(d -> PushTicketResult.failed(errorCode)).toList());
+  }
+
+  private void recordTickets(
+      List<PreparedPushDelivery> deliveries, List<PushTicketResult> results) {
+    measureStage(
+        "ticket_persist",
+        () -> {
+          pushDeliveryService.recordTicketResults(
+              deliveries.stream().map(PreparedPushDelivery::pushDeliveryId).toList(), results);
+          return null;
+        });
   }
 
   /** 먼저 발생한 실패를 유지해 모든 발송 대상 처리 뒤 SQS 재시도를 유도한다. */

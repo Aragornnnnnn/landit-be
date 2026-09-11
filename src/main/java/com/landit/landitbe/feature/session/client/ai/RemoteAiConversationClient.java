@@ -17,7 +17,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -34,6 +36,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
   private static final String CLOSING_MESSAGE_PATH = "/api/v1/conversation/closing-message";
   private static final String MESSAGE_FEEDBACK_PATH = "/api/v1/conversation/message-feedback";
   private static final String SESSION_FEEDBACK_PATH = "/api/v1/conversation/session-feedback";
+  private static final String SESSION_LEVEL_ASSESSMENT_PATH =
+      "/api/v1/conversation/session-level-assessment";
 
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
@@ -100,12 +104,38 @@ public class RemoteAiConversationClient implements AiConversationClient {
   @Override
   public AiSessionFeedbackResult generateSessionFeedback(
       AiSessionFeedbackRequest request, Duration timeout) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("sessionId", request.sessionId());
+    payload.put("scenario", request.scenario());
+    payload.put("expectedMessageIds", request.expectedMessageIds());
+    payload.put("completedFeedbacks", request.completedFeedbacks());
     return post(
             sessionFeedbackUri(),
-            request,
+            payload,
             RemoteSessionFeedbackResponse.class,
             ErrorCode.FEEDBACK_GENERATION_FAILED,
             timeout)
+        .toResult();
+  }
+
+  /**
+   * AI 서버에 세션 텍스트 수준 평가를 요청한다.
+   *
+   * @param request 세션 질문과 사용자 답변을 포함한 평가 입력
+   * @return 검증된 평가 결과. 복구 불가능한 평가 응답은 null
+   */
+  @Override
+  public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
+    return post(
+            sessionLevelAssessmentUri(),
+            Map.of(
+                "sessionId", request.sessionId(),
+                "scenario", request.scenario(),
+                "expectedMessageIds", request.expectedMessageIds(),
+                "assessmentMessages", request.assessmentMessages()),
+            RemoteSessionLevelAssessmentResponse.class,
+            ErrorCode.FEEDBACK_GENERATION_FAILED,
+            properties.sessionFeedbackRequestTimeout())
         .toResult();
   }
 
@@ -121,7 +151,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
       Duration requestTimeout) {
     try {
       HttpRequest request =
-          HttpRequest.newBuilder(uri)
+          properties
+              .authorize(HttpRequest.newBuilder(uri))
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
@@ -198,6 +229,10 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   private URI sessionFeedbackUri() {
     return aiBaseUri(ErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_FEEDBACK_PATH);
+  }
+
+  private URI sessionLevelAssessmentUri() {
+    return aiBaseUri(ErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_LEVEL_ASSESSMENT_PATH);
   }
 
   private URI aiBaseUri(ErrorCode defaultErrorCode) {
@@ -277,7 +312,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
       BigDecimal starRating,
       String highlightMessage,
       String summaryMessage,
-      List<AiSessionMessageFeedbackResult> messageFeedbacks) {
+      List<AiSessionMessageFeedbackResult> messageFeedbacks,
+      AiSessionLevelAssessment levelAssessment) {
 
     /** 응답의 최상위 필수 필드를 확인한 뒤 애플리케이션 포트 결과로 변환한다. */
     private AiSessionFeedbackResult toResult() {
@@ -290,7 +326,26 @@ public class RemoteAiConversationClient implements AiConversationClient {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiSessionFeedbackResult(
-          sessionId, nativeScore, starRating, highlightMessage, summaryMessage, messageFeedbacks);
+          sessionId,
+          nativeScore,
+          starRating,
+          highlightMessage,
+          summaryMessage,
+          messageFeedbacks,
+          levelAssessment,
+          false);
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteSessionLevelAssessmentResponse(
+      Long sessionId, AiSessionLevelAssessment levelAssessment) {
+
+    private AiSessionLevelAssessment toResult() {
+      if (sessionId == null) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return levelAssessment;
     }
   }
 

@@ -467,7 +467,12 @@ class ScenarioListApiIntegrationTests {
                             .formatted(UUID.randomUUID(), nonce, nonce)))
             .andExpect(status().isOk())
             .andReturn();
-    return objectMapper.readTree(loginResult.getResponse().getContentAsByteArray());
+    JsonNode body = objectMapper.readTree(loginResult.getResponse().getContentAsByteArray());
+    // 목록 테스트의 고급 질문 fixture에 맞춰 수준을 명시한다.
+    jdbcTemplate.update(
+        "UPDATE user_profile SET learning_level=5 WHERE id=?",
+        body.path("data").path("user").path("userId").asLong());
+    return body;
   }
 
   private void seedScenarioListData(Long clearedUserId) {

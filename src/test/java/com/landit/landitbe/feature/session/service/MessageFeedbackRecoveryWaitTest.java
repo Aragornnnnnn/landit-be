@@ -38,6 +38,7 @@ class MessageFeedbackRecoveryWaitTest {
           101L,
           Locale.EN,
           Locale.KR,
+          com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_4_TO_5,
           new AiScenarioContext(1L, "test", "test", "test", "friend", "KOREAN_LEARNER"),
           List.of(
               new UserMessageContext(
@@ -45,7 +46,9 @@ class MessageFeedbackRecoveryWaitTest {
                   1,
                   "Hello",
                   new AiMessageFeedbackEvaluationContext(
-                      AiMessageFeedbackEvaluationContextType.AI_MESSAGE, "Hi", "안녕"))),
+                      AiMessageFeedbackEvaluationContextType.AI_MESSAGE, "Hi", "안녕"),
+                  com.landit.landitbe.feature.content.domain.ResponseDemand.HIGH,
+                  List.of())),
           Optional.empty());
 
   @Test

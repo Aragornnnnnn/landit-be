@@ -74,6 +74,7 @@ public class SessionFeedbackService {
         context.sessionId(),
         context.scenario(),
         ids,
+        List.of(),
         feedbackWorkService.completedResults(context.sessionId(), ids));
   }
 
@@ -90,7 +91,9 @@ public class SessionFeedbackService {
       LoadedSessionFeedbackContext context, Long summaryFeedbackId) {
     List<SessionHistoryMessageFeedback> feedbacks =
         sessionFeedbackDataService.findMessageFeedbacks(summaryFeedbackId);
-    if (feedbacks.size() != context.userMessages().size()) {
+    SessionHistorySummaryFeedback summary =
+        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
+    if (!feedbacks.isEmpty() && feedbacks.size() != context.userMessages().size()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     Map<Long, SessionHistoryMessageFeedback> feedbackByMessageId =
@@ -99,18 +102,17 @@ public class SessionFeedbackService {
                 Collectors.toMap(
                     SessionHistoryMessageFeedback::getSessionHistoryMessageId,
                     Function.identity()));
-    SessionHistorySummaryFeedback summary =
-        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
-
     return SessionFeedbackResponse.from(
         context.sessionId(),
         summary,
-        context.userMessages().stream()
-            .map(
-                userMessage ->
-                    messageFeedbackResponse(
-                        feedbackByMessageId.get(userMessage.messageId()), userMessage))
-            .toList());
+        feedbacks.isEmpty()
+            ? List.of()
+            : context.userMessages().stream()
+                .map(
+                    userMessage ->
+                        messageFeedbackResponse(
+                            feedbackByMessageId.get(userMessage.messageId()), userMessage))
+                .toList());
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
@@ -127,5 +129,31 @@ public class SessionFeedbackService {
             userMessage.evaluationContext().type(),
             userMessage.evaluationContext().content(),
             userMessage.evaluationContext().translatedContent()));
+  }
+
+  /** 완료 세션 컨텍스트를 기존 AI 최종 피드백 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiFeedbackRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList());
+  }
+
+  /** 완료 세션 컨텍스트를 AI 수준 평가 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiLevelAssessmentRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList(),
+        context.userMessages().stream()
+            .map(
+                message ->
+                    new AiSessionFeedbackRequest.AssessmentMessage(
+                        message.messageId(),
+                        message.evaluationContext().content(),
+                        message.content(),
+                        message.responseDemand(),
+                        message.requiredElements()))
+            .toList());
   }
 }

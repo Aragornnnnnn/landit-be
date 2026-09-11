@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.content.repository.projection;
 
+import com.landit.landitbe.feature.content.domain.ResponseDemand;
+
 /**
  * 세션 진행에 필요한 고정 질문 조회 결과를 표현한다.
  *
@@ -16,4 +18,6 @@ public record ScenarioQuestionProjection(
     int sequence,
     String questionText,
     String questionTranslation,
-    String questionAudioUrl) {}
+    String questionAudioUrl,
+    ResponseDemand responseDemand,
+    String requiredResponseElement) {}

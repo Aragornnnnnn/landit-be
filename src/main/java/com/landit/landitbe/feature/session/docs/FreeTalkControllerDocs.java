@@ -53,7 +53,11 @@ public interface FreeTalkControllerDocs {
    */
   @Operation(
       summary = "프리톡 세션 시작",
-      description = "AI 선시작 또는 사용자 선시작 프리톡 세션을 생성한다.",
+      description =
+          "AI 선시작 또는 사용자 선시작 프리톡 세션을 생성한다. "
+              + "발화 한도 기본값은 KST 하루 누적 120분이다. "
+              + "세션 시작·발화·종료 결정·표현 재시도는 계정별 요청 한도를 공유한다 "
+              + "(기본 일일 1,000회, 고정 1분 구간당 20회).",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -66,11 +70,22 @@ public interface FreeTalkControllerDocs {
         responseCode = "401",
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "주제 없음"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "일일 발화 한도 초과 (FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED)"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "502",
         description = "AI 응답 오류"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "429",
+        description =
+            "일일 요청 한도 초과 (FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED) 또는 "
+                + "분당 요청 한도 초과 (FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "503",
         description = "AI 생성 실패")
@@ -88,7 +103,10 @@ public interface FreeTalkControllerDocs {
    */
   @Operation(
       summary = "프리톡 발화 제출",
-      description = "사용자 발화를 저장하고 AI 후속 메시지, 종료 확인 또는 시간 제한 종료를 반환한다.",
+      description =
+          "사용자 발화를 저장하고 AI 후속 메시지, 종료 확인 또는 시간 제한 종료를 반환한다. "
+              + "0ms 발화도 요청 한도에 포함하며, 저장된 응답을 반환하는 재전송은 추가 차감하지 않는다. "
+              + "AI 호출 실패 시 발화 시간은 반환하지만 요청 횟수는 유지한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -99,13 +117,18 @@ public interface FreeTalkControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "세션 소유자 아님"),
+        description = "세션 소유자 아님 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "409",
-        description = "중복 또는 처리 중인 발화"),
+        description = "중복·처리 중인 발화 또는 일일 발화 한도 초과 (FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED)"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "429",
+        description =
+            "일일 요청 한도 초과 (FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED) 또는 "
+                + "분당 요청 한도 초과 (FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "503",
         description = "AI 생성 실패")
@@ -134,13 +157,18 @@ public interface FreeTalkControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "세션 소유자 아님"),
+        description = "세션 소유자 아님 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "409",
         description = "종료 확인 상태 불일치"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "429",
+        description =
+            "일일 요청 한도 초과 (FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED) 또는 "
+                + "분당 요청 한도 초과 (FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "503",
         description = "AI 생성 실패")
@@ -222,13 +250,18 @@ public interface FreeTalkControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "세션 소유자 아님"),
+        description = "세션 소유자 아님 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "409",
-        description = "재시도할 수 없는 세션 상태")
+        description = "재시도할 수 없는 세션 상태"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "429",
+        description =
+            "일일 요청 한도 초과 (FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED) 또는 "
+                + "분당 요청 한도 초과 (FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED)")
   })
   ResponseEntity<ApiResponse<FreeTalkExpressionRetryResponse>> retryExpressions(
       AuthUserPrincipal principal, long sessionId);

@@ -6,6 +6,7 @@ import com.landit.landitbe.config.web.CorsProperties;
 import com.landit.landitbe.feature.admin.security.AdminAuthorizationFilter;
 import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
 import com.landit.landitbe.feature.auth.security.AuthTokenFilter;
+import com.landit.landitbe.feature.subscription.security.PremiumAccessFilter;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
@@ -35,6 +36,7 @@ public class AuthSecurityConfig {
 
   private final AuthTokenFilter authTokenFilter;
   private final AdminAuthorizationFilter adminAuthorizationFilter;
+  private final PremiumAccessFilter premiumAccessFilter;
   private final AuthFailureResponseWriter failureResponseWriter;
 
   /**
@@ -42,14 +44,17 @@ public class AuthSecurityConfig {
    *
    * @param authTokenFilter Bearer 토큰 인증 필터
    * @param adminAuthorizationFilter 관리자 API 권한 필터
+   * @param premiumAccessFilter 유료 기능 접근 제한 필터
    * @param failureResponseWriter 인증 실패 응답 작성기
    */
   public AuthSecurityConfig(
       AuthTokenFilter authTokenFilter,
       AdminAuthorizationFilter adminAuthorizationFilter,
+      PremiumAccessFilter premiumAccessFilter,
       AuthFailureResponseWriter failureResponseWriter) {
     this.authTokenFilter = authTokenFilter;
     this.adminAuthorizationFilter = adminAuthorizationFilter;
+    this.premiumAccessFilter = premiumAccessFilter;
     this.failureResponseWriter = failureResponseWriter;
   }
 
@@ -99,8 +104,14 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/accent-locale")
                     .authenticated()
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/me/subscription", "/api/v1/me/subscription/events")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/internal/test/push")
                     .authenticated()
+                    // RevenueCat 웹훅은 Bearer 토큰 대신 공유 비밀값 헤더로 컨트롤러에서 검증한다.
+                    .requestMatchers(HttpMethod.POST, "/webhooks/revenuecat")
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/daily")
@@ -118,6 +129,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/sessions/*/feedback")
                     .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/sessions/*/level-assessment")
+                    .authenticated()
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/sessions/*/end")
                     .authenticated()
                     .requestMatchers("/api/v1/free-talk/**")
@@ -130,6 +143,7 @@ public class AuthSecurityConfig {
                     .permitAll())
         .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(adminAuthorizationFilter, AuthTokenFilter.class)
+        .addFilterAfter(premiumAccessFilter, AdminAuthorizationFilter.class)
         .build();
   }
 

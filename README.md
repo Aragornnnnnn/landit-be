@@ -50,6 +50,16 @@ DB_USERNAME=<db-username>
 DB_PASSWORD=<db-password>
 ```
 
+프리톡 한도는 다음 환경변수로 조정합니다. 기존 SSM 값이 있으면 코드 기본값보다 우선합니다.
+
+| 환경변수 | 기본값 | 의미 |
+| --- | --- | --- |
+| `LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS` | `7200000` | 계정별 KST 일일 사용자 발화 120분 |
+| `LANDIT_FREE_TALK_DAILY_REQUEST_LIMIT` | `1000` | 계정별 KST 일일 생성 요청 수 |
+| `LANDIT_FREE_TALK_REQUESTS_PER_MINUTE_LIMIT` | `20` | 계정별 고정 1분 구간의 생성 요청 수 |
+
+세션 시작·발화 제출·종료 결정·표현 생성 재시도를 합산합니다. AI 호출 전 요청을 기록하고 실패 후에도 횟수를 유지합니다. 저장된 응답 재전송은 차감하지 않습니다. 분당 한도는 매 분 00초에 초기화하며, 구간 경계에서는 두 구간의 요청이 연이어 허용될 수 있습니다. 모든 한도는 양수여야 합니다.
+
 ## Application Metrics
 
 애플리케이션 메트릭은 Micrometer OTLP로 Grafana Cloud에 직접 전송합니다. 기본값은 비활성화이며, 배포 환경에서 다음 환경변수를 주입해야 합니다.

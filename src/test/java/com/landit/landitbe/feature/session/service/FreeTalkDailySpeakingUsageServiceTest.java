@@ -16,8 +16,12 @@ import com.landit.landitbe.feature.session.domain.FreeTalkDailySpeakingUsage;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +30,9 @@ class FreeTalkDailySpeakingUsageServiceTest {
 
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
+  private static final Clock CLOCK =
+      Clock.fixed(Instant.parse("2026-09-11T00:00:00Z"), ZoneOffset.UTC);
+
   private final FreeTalkDailySpeakingUsageRepository repository =
       mock(FreeTalkDailySpeakingUsageRepository.class);
   private final UserProfileService userProfileService = mock(UserProfileService.class);
@@ -33,13 +40,16 @@ class FreeTalkDailySpeakingUsageServiceTest {
 
   private FreeTalkDailySpeakingUsageService serviceWithLimit(long speakingTimeLimitMs) {
     return new FreeTalkDailySpeakingUsageService(
-        repository, userProfileService, new FreeTalkProperties(speakingTimeLimitMs));
+        repository,
+        userProfileService,
+        new FreeTalkProperties(speakingTimeLimitMs, 1000, 20),
+        CLOCK);
   }
 
   /** 59초 사용 뒤 3초 발화는 전체를 예약하고 남은 시간을 0으로 제한한다. */
   @Test
   void reservesEntireUtteranceThatStartsBeforeDailyLimit() {
-    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
     FreeTalkDailySpeakingUsage usage = FreeTalkDailySpeakingUsage.create(1L, usageDate, 59_000L);
     when(repository.findByUserProfileIdAndUsageDateForUpdate(eq(1L), any(LocalDate.class)))
         .thenReturn(Optional.of(usage));
@@ -53,7 +63,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   /** 이미 60초를 사용한 날에는 새 발화를 예약하지 않는다. */
   @Test
   void rejectsUtteranceWhenDailyLimitIsAlreadyUsed() {
-    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
     FreeTalkDailySpeakingUsage usage = FreeTalkDailySpeakingUsage.create(1L, usageDate, 60_000L);
     when(repository.findByUserProfileIdAndUsageDateForUpdate(eq(1L), any(LocalDate.class)))
         .thenReturn(Optional.of(usage));
@@ -68,7 +78,8 @@ class FreeTalkDailySpeakingUsageServiceTest {
   @Test
   void rejectsUtteranceThatOverflowsDailyUsage() {
     FreeTalkDailySpeakingUsage usage =
-        FreeTalkDailySpeakingUsage.create(1L, LocalDate.now(KOREA_ZONE_ID), Long.MAX_VALUE);
+        FreeTalkDailySpeakingUsage.create(
+            1L, LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID)), Long.MAX_VALUE);
 
     assertThatThrownBy(() -> usage.reserve(1L)).isInstanceOf(IllegalArgumentException.class);
     assertThat(usage.getUsedSpeakingDurationMs()).isEqualTo(Long.MAX_VALUE);
@@ -77,7 +88,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   /** 전날 사용량과 분리해 KST 당일 사용량만 예약한다. */
   @Test
   void reservesOnlyCurrentKoreaDateUsage() {
-    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
     FreeTalkDailySpeakingUsage previousUsage =
         FreeTalkDailySpeakingUsage.create(1L, usageDate.minusDays(1), 60_000L);
     FreeTalkDailySpeakingUsage currentUsage = FreeTalkDailySpeakingUsage.create(1L, usageDate, 0L);
@@ -107,7 +118,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   /** AI 호출에 실패하면 같은 날짜에 예약한 발화 시간을 환불한다. */
   @Test
   void releasesReservedUsage() {
-    LocalDate usageDate = LocalDate.now(KOREA_ZONE_ID);
+    LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
     FreeTalkDailySpeakingUsage usage = FreeTalkDailySpeakingUsage.create(1L, usageDate, 3_000L);
     when(repository.findByUserProfileIdAndUsageDateForUpdate(1L, usageDate))
         .thenReturn(Optional.of(usage));
@@ -135,5 +146,91 @@ class FreeTalkDailySpeakingUsageServiceTest {
 
     assertThat(configuredService.remainingMs(1L)).isEqualTo(9_999_999L);
     assertThat(configuredService.speakingTimeLimitMs()).isEqualTo(9_999_999L);
+  }
+
+  @Test
+  void rejectsZeroDurationRequestsAtDailyLimitWithoutMutatingUsage() {
+    FreeTalkDailySpeakingUsage usage = requestUsage();
+    LocalDateTime minute = LocalDateTime.of(2026, 9, 11, 9, 0);
+    for (int index = 0; index < 1000; index++) {
+      usage.recordRequest(minute.minusMinutes(1));
+    }
+
+    assertThatThrownBy(() -> service.reserve(1L, 0L))
+        .isInstanceOf(SessionException.class)
+        .extracting("errorCode")
+        .isEqualTo(SessionErrorCode.FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED);
+    assertThat(usage.getRequestCount()).isEqualTo(1000);
+    assertThat(usage.getUsedSpeakingDurationMs()).isZero();
+  }
+
+  @Test
+  void sharesMinuteLimitBetweenStartsAndZeroDurationMessages() {
+    FreeTalkDailySpeakingUsage usage = requestUsage();
+    for (int index = 0; index < 10; index++) {
+      service.reserveRequest(1L);
+      service.reserve(1L, 0L);
+    }
+
+    assertThatThrownBy(() -> service.reserveRequest(1L))
+        .isInstanceOf(SessionException.class)
+        .extracting("errorCode")
+        .isEqualTo(SessionErrorCode.FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED);
+    assertThat(usage.getRequestCount()).isEqualTo(20);
+    assertThat(usage.getMinuteRequestCount()).isEqualTo(20);
+  }
+
+  @Test
+  void resetsMinuteWindowAtBoundaryWithoutResettingDailyCount() {
+    FreeTalkDailySpeakingUsage usage = requestUsage();
+    for (int index = 0; index < 20; index++) {
+      usage.recordRequest(LocalDateTime.of(2026, 9, 11, 8, 59));
+    }
+
+    service.reserveRequest(1L);
+
+    assertThat(usage.getRequestCount()).isEqualTo(21);
+    assertThat(usage.getMinuteRequestCount()).isEqualTo(1);
+    assertThat(usage.getRequestMinute()).isEqualTo(LocalDateTime.of(2026, 9, 11, 9, 0));
+  }
+
+  @Test
+  void keepsRequestCountsWhenFailedAiUtteranceIsReleased() {
+    FreeTalkDailySpeakingUsage usage = requestUsage();
+    service.reserve(1L, 1000L);
+
+    service.release(1L, usage.getId().getUsageDate(), 1000L);
+
+    assertThat(usage.getUsedSpeakingDurationMs()).isZero();
+    assertThat(usage.getRequestCount()).isEqualTo(1);
+    assertThat(usage.getMinuteRequestCount()).isEqualTo(1);
+  }
+
+  @Test
+  void startsNewDailyRequestBudgetAtKoreaMidnightEvenWithUtcClock() {
+    LocalDate yesterday = LocalDate.of(2026, 9, 11);
+    FreeTalkDailySpeakingUsage previous = FreeTalkDailySpeakingUsage.create(1L, yesterday, 0L);
+    previous.recordRequest(yesterday.atTime(23, 59));
+    when(repository.findByUserProfileIdAndUsageDateForUpdate(1L, yesterday))
+        .thenReturn(Optional.of(previous));
+    when(repository.save(any(FreeTalkDailySpeakingUsage.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    Clock midnight = Clock.fixed(Instant.parse("2026-09-11T15:00:00Z"), ZoneOffset.UTC);
+    FreeTalkDailySpeakingUsageService nextDayService =
+        new FreeTalkDailySpeakingUsageService(
+            repository, userProfileService, new FreeTalkProperties(7200000L, 1, 1), midnight);
+
+    nextDayService.reserveRequest(1L);
+
+    verify(repository).findByUserProfileIdAndUsageDateForUpdate(1L, yesterday.plusDays(1));
+    assertThat(previous.getRequestCount()).isEqualTo(1);
+  }
+
+  private FreeTalkDailySpeakingUsage requestUsage() {
+    LocalDate date = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
+    FreeTalkDailySpeakingUsage usage = FreeTalkDailySpeakingUsage.create(1L, date, 0L);
+    when(repository.findByUserProfileIdAndUsageDateForUpdate(1L, date))
+        .thenReturn(Optional.of(usage));
+    return usage;
   }
 }

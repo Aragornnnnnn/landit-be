@@ -40,6 +40,7 @@ checkstyle {
 dependencies {
 	implementation platform('software.amazon.awssdk:bom:2.48.2')
 	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:scheduler'
 	implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.0.2')
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -53,7 +54,7 @@ dependencies {
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
 	compileOnly 'org.projectlombok:lombok'
-	runtimeOnly 'org.postgresql:postgresql'
+	implementation 'org.postgresql:postgresql'
 	runtimeOnly 'org.springframework.boot:spring-boot-opentelemetry'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
@@ -70,6 +71,8 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 여러 Spring 통합 테스트 컨텍스트를 보관하는 테스트 JVM의 힙 부족을 방지한다.
+	maxHeapSize = '2g'
 	systemProperty 'user.timezone', 'Asia/Seoul'
 }
 

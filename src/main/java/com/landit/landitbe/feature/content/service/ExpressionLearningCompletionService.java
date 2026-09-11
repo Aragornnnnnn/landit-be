@@ -39,8 +39,11 @@ public class ExpressionLearningCompletionService {
   private static final String LOCKED_EXPRESSION_LOG =
       "표현 학습 완료 실패: 아직 잠긴 표현입니다. userId={}, expressionId={}";
 
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
   private final WritingExpressionRepository writingExpressionRepository;
   private final UserProfileService userProfileService;
+  private final ScenarioLearningLevelService scenarioLearningLevelService;
   private final LearningProgressService learningProgressService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final LearningSessionRepository learningSessionRepository;
@@ -68,6 +71,22 @@ public class ExpressionLearningCompletionService {
    */
   @Transactional
   public void completeLearning(Long userId, Long expressionId, Long freeTalkSessionId) {
+    completeLearning(userId, expressionId, freeTalkSessionId, null);
+  }
+
+  /**
+   * 요청한 학습 시도와 완료 저장을 같은 사용자 잠금 아래 확정한다.
+   *
+   * @param userId 학습 사용자 ID
+   * @param expressionId 완료할 표현 ID
+   * @param freeTalkSessionId 연결된 스몰톡 ID 또는 null
+   * @param attemptId 시작 응답에서 받은 시도 ID 또는 구버전의 null
+   * @throws ApiException 대상이나 학습 권한이 유효하지 않을 때
+   */
+  @Transactional
+  public void completeLearning(
+      Long userId, Long expressionId, Long freeTalkSessionId, String attemptId) {
+    accessGrants.completeExpression(userId, expressionId, attemptId);
     WritingExpression expression =
         writingExpressionRepository
             .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
@@ -84,7 +103,8 @@ public class ExpressionLearningCompletionService {
     if (scenarioId == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
-    ContentLearningLevel contentLevel = contentLearningLevel(userId);
+    ContentLearningLevel contentLevel =
+        scenarioLearningLevelService.expressionLevel(userId, scenarioId);
     if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
         && !contentLevel.includesExpressionDifficulty(expression.getDifficultyLevel())) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
@@ -180,10 +200,5 @@ public class ExpressionLearningCompletionService {
 
     return firstIncompleteExpressionId.isPresent()
         && firstIncompleteExpressionId.get().equals(expressionId);
-  }
-
-  /** 사용자 학습 레벨을 콘텐츠 레벨 그룹으로 변환한다. */
-  private ContentLearningLevel contentLearningLevel(Long userId) {
-    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
   }
 }

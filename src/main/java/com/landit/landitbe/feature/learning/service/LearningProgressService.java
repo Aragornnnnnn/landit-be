@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.service;
 
 import com.landit.landitbe.feature.learning.domain.ExpressionLearningSource;
 import com.landit.landitbe.feature.learning.domain.UserScenarioProgress;
+import com.landit.landitbe.feature.learning.domain.UserScenarioProgressStatus;
 import com.landit.landitbe.feature.learning.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.repository.UserScenarioProgressRepository;
@@ -43,6 +44,22 @@ public class LearningProgressService {
   @Transactional(readOnly = true)
   public CompletedExpressionIds findCompletedExpressionIds(Long userId, Long scenarioId) {
     return CompletedExpressionIds.from(findExpressionCompletions(userId, scenarioId));
+  }
+
+  /**
+   * 사용자가 특정 시각 이후에 시나리오를 끝까지 완료한 적이 있는지 확인한다.
+   *
+   * <p>재완료를 포함한 마지막 완료 시각({@code last_cleared_at})을 기준으로 하므로, 그 시각 전에만 완료한 시나리오는 세지 않는다.
+   *
+   * @param userId 사용자 ID
+   * @param since 이 시각 이상으로 완료한 시나리오만 센다
+   * @return 완료 이력이 있으면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean hasClearedScenarioSince(Long userId, LocalDateTime since) {
+    return userScenarioProgressRepository
+        .existsByUserProfileIdAndStatusAndLastClearedAtGreaterThanEqual(
+            userId, UserScenarioProgressStatus.CLEARED, since);
   }
 
   /**

@@ -15,12 +15,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /** 세션 히스토리에 남길 AI와 사용자 메시지를 저장한다. */
 @Getter
 @Entity
+// 재전송 응답을 저장할 때 병렬 작업이 갱신한 피드백·속마음 필드를 덮어쓰지 않는다.
+@DynamicUpdate
 @Table(name = "session_history_message")
 public class SessionHistoryMessage extends BaseTimeEntity {
 
@@ -49,6 +52,15 @@ public class SessionHistoryMessage extends BaseTimeEntity {
 
   @Column(name = "client_message_id", length = 36)
   private String clientMessageId;
+
+  @Column(name = "scenario_attempt_token", length = 36)
+  private String scenarioAttemptToken;
+
+  @Column(name = "scenario_lease_until")
+  private java.time.LocalDateTime scenarioLeaseUntil;
+
+  @Column(name = "scenario_response_payload", columnDefinition = "text")
+  private String scenarioResponsePayload;
 
   @Column(name = "utterance_duration_ms")
   private Long utteranceDurationMs;
@@ -96,6 +108,27 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "reused_expression_payload", columnDefinition = "jsonb")
   private JsonNode reusedExpressionPayload;
+
+  /** 동일한 사용자 발화의 다음 질문 생성을 한 시도만 맡는다. */
+  public String claimScenarioGeneration(String clientMessageId, java.time.LocalDateTime until) {
+    this.clientMessageId = clientMessageId;
+    this.scenarioAttemptToken = java.util.UUID.randomUUID().toString();
+    this.scenarioLeaseUntil = until;
+    return scenarioAttemptToken;
+  }
+
+  /** 다음 질문과 같은 트랜잭션에서 재전송용 응답을 저장한다. */
+  public void recordScenarioResponse(String response) {
+    this.scenarioResponsePayload = response;
+    this.scenarioLeaseUntil = null;
+  }
+
+  /** 실패한 현재 시도만 재시도 가능하게 하며 접수한 사용자 발화는 유지한다. */
+  public void releaseScenarioAttempt(String token) {
+    if (java.util.Objects.equals(token, scenarioAttemptToken) && scenarioResponsePayload == null) {
+      scenarioLeaseUntil = null;
+    }
+  }
 
   /** JPA에서 사용하는 기본 생성자다. */
   protected SessionHistoryMessage() {}
@@ -261,6 +294,13 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   /** 프리톡 사용자 발화의 최초 처리 결과 상태를 기록한다. */
   public void recordFreeTalkTurnStatus(FreeTalkTurnStatus freeTalkTurnStatus) {
     this.freeTalkTurnStatus = freeTalkTurnStatus;
+  }
+
+  /** 요청에 실패한 피드백을 세션 완료 트랜잭션에서 실패 상태로 기록한다. */
+  public void markFeedbackFailed() {
+    if (feedbackProcessingStatus == ProcessingStatus.PREPARING) {
+      feedbackProcessingStatus = ProcessingStatus.FAILED;
+    }
   }
 
   /** 생성에 실패한 속마음의 처리 상태를 기록한다. */

@@ -59,6 +59,8 @@ public class FreeTalkSubmittedMessageService {
   private final StreakService streakService;
   private final MemoryProperties memoryProperties;
   private final Clock clock;
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
 
   /**
    * 같은 클라이언트 메시지 ID의 처리 완료 결과를 다시 구성한다.
@@ -272,6 +274,7 @@ public class FreeTalkSubmittedMessageService {
                     && message.getFreeTalkTurnStatus() == null)) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+    accessGrants.requireSessionContinuation(userId, "FREE_TALK", learningSession.getId());
     int userTurnNumber = nextUserTurnNumber(messages);
     FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.reserve(userId, request.utteranceDurationMs());
@@ -471,6 +474,7 @@ public class FreeTalkSubmittedMessageService {
    * @param decision 사용자가 선택한 종료 확인 결과
    * @return 외부 AI 호출과 후속 확정에 사용할 종료 결정 예약 정보
    * @throws ApiException 세션이 없거나 소유자가 다르거나 종료 확인 상태가 유효하지 않을 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 프리톡 이용 한도에 도달했을 때
    */
   @Transactional
   public DecisionReservation reserveDecision(
@@ -491,6 +495,7 @@ public class FreeTalkSubmittedMessageService {
         || session.getProcessingClientMessageId() != null) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+    dailySpeakingUsageService.reserveRequest(userId);
     session.startProcessing("decision-" + submittedMessageId);
     AiFreeTalkTopic topic = new AiFreeTalkTopic(session.getTopicId(), session.getTitle(), null);
     return new DecisionReservation(

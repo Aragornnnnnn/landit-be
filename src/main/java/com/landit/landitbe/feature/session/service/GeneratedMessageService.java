@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
@@ -23,11 +24,14 @@ import org.springframework.stereotype.Component;
 class GeneratedMessageService {
 
   private final LearningSessionService learningSessionService;
+  private final tools.jackson.databind.json.JsonMapper mapper;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionMessageService sessionMessageService;
   private final ScenarioAccessService scenarioAccessService;
   private final Clock clock;
   private final StreakService streakService;
+  private final SessionLevelAssessmentLaunchService assessmentLaunchService;
+  private final UserProfileService userProfileService;
 
   /** AI 생성 결과를 저장하고 사용자에게 반환할 메시지 제출 응답을 만든다. */
   SessionMessageSubmitResponse record(
@@ -37,9 +41,12 @@ class GeneratedMessageService {
     final LearningSession learningSession =
         learningSessionService.findOwnedInProgressForUpdate(
             submittedContext.userId(), submittedContext.sessionId());
-    ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
+    final ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
     SessionHistoryMessage submittedMessage = findSubmittedMessage(submittedContext);
     assertSubmittedMessageMatches(submittedContext, submittedMessage);
+    if (feedbackProcessingStatus == ProcessingStatus.FAILED) {
+      submittedMessage.markFeedbackFailed();
+    }
 
     if (generation.completed()) {
       submittedMessage.recordInnerThought(generation.innerThought(), generation.innerThoughtType());
@@ -50,19 +57,27 @@ class GeneratedMessageService {
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
       learningSession.completeBySystem(generation.completionReason(), completedAt);
+      scenarioSession.recordCompletedLearningLevel(
+          userProfileService.getLearningLevel(submittedContext.userId()).learningLevel());
+      if (assessmentLaunchService.includes(submittedContext.userId(), completedAt)) {
+        learningSession.prepareLevelAssessment(completedAt);
+      }
       grantScenarioAccess(learningSession, submittedContext, completedAt);
       streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
     }
-    return SessionMessageSubmitResponse.from(
-        submittedContext.sessionId(),
-        submittedMessage,
-        feedbackProcessingStatus,
-        nextMessage,
-        generation.ttsText(),
-        generation.fixedQuestionText(),
-        generation.questionAudioUrl(),
-        submittedContext.scenarioContext().totalQuestionCount(),
-        generation.completed());
+    SessionMessageSubmitResponse response =
+        SessionMessageSubmitResponse.from(
+            submittedContext.sessionId(),
+            submittedMessage,
+            feedbackProcessingStatus,
+            nextMessage,
+            generation.ttsText(),
+            generation.fixedQuestionText(),
+            generation.questionAudioUrl(),
+            submittedContext.scenarioContext().totalQuestionCount(),
+            generation.completed());
+    submittedMessage.recordScenarioResponse(mapper.writeValueAsString(response));
+    return response;
   }
 
   /** 시나리오 세션을 정상 완료하면 해당 시나리오의 복습 권한을 멱등하게 부여한다. */
@@ -87,7 +102,10 @@ class GeneratedMessageService {
 
   private void assertSubmittedMessageMatches(
       SubmittedMessageContext submittedContext, SessionHistoryMessage submittedMessage) {
-    if (submittedMessage.getRole() != ConversationSpeaker.USER
+    if (!java.util.Objects.equals(
+            submittedContext.attemptToken(), submittedMessage.getScenarioAttemptToken())
+        || submittedMessage.getScenarioResponsePayload() != null
+        || submittedMessage.getRole() != ConversationSpeaker.USER
         || submittedMessage.getMessageSequence() != submittedContext.submittedMessageSequence()
         || submittedMessage.getTurnNumber() != submittedContext.submittedTurnNumber()) {
       throw new ApiException(ErrorCode.CONFLICT, "처리 중인 사용자 메시지가 변경되었습니다.");

@@ -1,4 +1,11 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 50s
+  task:
+    execution:
+      shutdown:
+        await-termination: true
+        await-termination-period: 50s
   application:
     name: landit-be
   cloud:
@@ -41,7 +48,9 @@ management:
 
 landit:
   free-talk:
-    speaking-time-limit-ms: ${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:60000}
+    speaking-time-limit-ms: ${LANDIT_FREE_TALK_DAILY_SPEAKING_TIME_LIMIT_MS:${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:7200000}}
+    daily-request-limit: ${LANDIT_FREE_TALK_DAILY_REQUEST_LIMIT:1000}
+    requests-per-minute-limit: ${LANDIT_FREE_TALK_REQUESTS_PER_MINUTE_LIMIT:20}
   cors:
     allowed-origins: ${LANDIT_CORS_ALLOWED_ORIGINS:}
   auth:
@@ -54,6 +63,7 @@ landit:
       access-expires-in-seconds: ${LANDIT_AUTH_TOKEN_ACCESS_EXPIRES_IN_SECONDS:1800}
       refresh-expires-in-seconds: ${LANDIT_AUTH_TOKEN_REFRESH_EXPIRES_IN_SECONDS:1209600}
   ai:
+    internal-token: ${LANDIT_AI_INTERNAL_TOKEN:}
     client-mode: ${LANDIT_AI_CLIENT_MODE:local}
     base-url: ${LANDIT_AI_BASE_URL:}
     service-audience: ${LANDIT_AI_SERVICE_AUDIENCE:KOREAN_LEARNER}
@@ -76,6 +86,11 @@ landit:
     region: ${AWS_REGION:ap-northeast-2}
   pronunciation-asset:
     manifest-mode: ${LANDIT_PRONUNCIATION_MANIFEST_MODE:s3}
+  subscription:
+    launched-at: ${LANDIT_SUBSCRIPTION_LAUNCHED_AT:}
+    revenuecat:
+      apply-sandbox-events: ${LANDIT_REVENUECAT_APPLY_SANDBOX_EVENTS:true}
+      webhook-authorization: ${LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION:}
   notification:
     expo-base-url: ${LANDIT_NOTIFICATION_EXPO_BASE_URL:https://exp.host}
     expo-access-token: ${LANDIT_NOTIFICATION_EXPO_ACCESS_TOKEN:}
@@ -85,12 +100,23 @@ landit:
     test-api-enabled: ${LANDIT_NOTIFICATION_TEST_API_ENABLED:false}
     queue-url: ${SQS_PUSH_NOTIFICATIONS_QUEUE_URL:}
     receipt-delay-seconds: ${LANDIT_NOTIFICATION_RECEIPT_DELAY_SECONDS:900}
+    audience-query:
+      url: ${LANDIT_PUSH_AUDIENCE_DB_URL:}
+      username: ${LANDIT_PUSH_AUDIENCE_DB_USERNAME:}
+      password: ${LANDIT_PUSH_AUDIENCE_DB_PASSWORD:}
+      max-rows: ${LANDIT_PUSH_AUDIENCE_MAX_ROWS:100000}
+    scheduler:
+      group: ${LANDIT_PUSH_SCHEDULER_GROUP:default}
+      queue-arn: ${LANDIT_PUSH_SCHEDULER_QUEUE_ARN:}
+      role-arn: ${LANDIT_PUSH_SCHEDULER_ROLE_ARN:}
+      dlq-arn: ${LANDIT_PUSH_SCHEDULER_DLQ_ARN:}
 
 sentry:
   dsn: ${SENTRY_DSN:}
   environment: ${SENTRY_ENVIRONMENT:local}
 
 server:
+  shutdown: graceful
   tomcat:
     mbeanregistry:
       enabled: true

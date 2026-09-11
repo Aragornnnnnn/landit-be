@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.config.session.FreeTalkProperties;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
@@ -36,9 +38,14 @@ import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
 import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
+import com.landit.landitbe.feature.session.repository.FreeTalkDailySpeakingUsageRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.session.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -71,7 +78,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
-      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
+      "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough",
+      "spring.datasource.url=jdbc:h2:mem:free-talk-api;MODE=PostgreSQL;"
+          + "DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH"
     })
 class FreeTalkSessionApiIntegrationTests {
 
@@ -155,8 +164,8 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.dailySpeakingTimeLimitMs").value(60000))
-        .andExpect(jsonPath("$.data.remainingSpeakingTimeMs").value(60000))
+        .andExpect(jsonPath("$.data.dailySpeakingTimeLimitMs").value(7200000))
+        .andExpect(jsonPath("$.data.remainingSpeakingTimeMs").value(7200000))
         .andExpect(jsonPath("$.data.topics.length()").value(2))
         .andExpect(jsonPath("$.data.topics[0].topicId").value(1001))
         .andExpect(jsonPath("$.data.topics[0].displayName").value("첫 번째"))
@@ -201,7 +210,7 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
             .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
             .andExpect(jsonPath("$.data.title").value("주말 계획"))
-            .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(60000))
+            .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(7200000))
             .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
             .andExpect(
                 jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
@@ -382,7 +391,7 @@ class FreeTalkSessionApiIntegrationTests {
         INSERT INTO free_talk_daily_speaking_usage (
             user_profile_id, usage_date, used_speaking_duration_ms
         )
-        VALUES (?, CURRENT_DATE, 60000)
+        VALUES (?, CURRENT_DATE, 7200000)
         """,
         userId);
 
@@ -452,6 +461,7 @@ class FreeTalkSessionApiIntegrationTests {
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_message", Integer.class))
         .isZero();
+    assertThat(requestCount()).isEqualTo(1);
   }
 
   @Test
@@ -531,7 +541,7 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.nextMessage.role").value("AI"))
             .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(4200))
             .andExpect(jsonPath("$.data.progress.usedSpeakingTimeMs").value(4200))
-            .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(55800))
+            .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(7195800))
             .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"))
             .andReturn();
 
@@ -565,6 +575,7 @@ class FreeTalkSessionApiIntegrationTests {
 
     assertThat(fakeAiFreeTalkClient.turnTransactionActive()).isFalse();
     assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+    assertThat(requestCount()).isEqualTo(2);
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM session_history_message", Integer.class))
@@ -714,7 +725,8 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 60000, false)))
+                    messageRequest(
+                        UUID.randomUUID().toString(), "One last thing.", 7200000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.title").value("주말 계획"))
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
@@ -800,10 +812,10 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 180000, true)))
+                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 7200000, true)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
-        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(180000));
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(7200000));
     assertThat(awaitExpressionGenerationStatus(timeLimitSessionId)).isEqualTo("READY");
     assertCurrentStreak(accessToken, 1, true);
   }
@@ -1153,6 +1165,181 @@ class FreeTalkSessionApiIntegrationTests {
 
     fakeAiFreeTalkClient.releaseTurn();
     assertThat(firstStatus.get(5, TimeUnit.SECONDS)).isEqualTo(200);
+    assertThat(requestCount()).isEqualTo(2);
+  }
+
+  @Test
+  void sharesDailyLimitAcrossSessionsAndReplaysSavedResponseAtLimit() throws Exception {
+    String accessToken = login("request-limit@example.com").at("/data/accessToken").asText();
+    long firstSession = startUserFirstSession(accessToken);
+    final long secondSession = startUserFirstSession(accessToken);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 999");
+    String request = messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false);
+
+    assertThat(performMessageStatus(accessToken, firstSession, request)).isEqualTo(200);
+    assertThat(requestCount()).isEqualTo(1000);
+    mockMvc
+        .perform(
+            post(messagePath(secondSession))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(messageRequest(UUID.randomUUID().toString(), "Again.", 0, false)))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.error.code").value("FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED"));
+    assertThat(performMessageStatus(accessToken, firstSession, request)).isEqualTo(200);
+    assertThat(requestCount()).isEqualTo(1000);
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void rejectsNewAiFirstSessionBeforeOpeningWhenDailyRequestLimitIsUsed() throws Exception {
+    String accessToken =
+        login("opening-request-limit@example.com").at("/data/accessToken").asText();
+    startUserFirstSession(accessToken);
+    seedTopic(1801, "주말", "주말 계획을 묻는다.", 1, "ACTIVE");
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 1000");
+
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1801,\"characterId\":\"chloe\"}"))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.error.code").value("FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED"));
+
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest).isNull();
+    assertThat(requestCount()).isEqualTo(1000);
+    assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM learning_session", Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void serializesConcurrentRequestsFromDifferentSessionsAtLastDailySlot() throws Exception {
+    String accessToken =
+        login("concurrent-request-limit@example.com").at("/data/accessToken").asText();
+    long firstSession = startUserFirstSession(accessToken);
+    long secondSession = startUserFirstSession(accessToken);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 999");
+    CountDownLatch start = new CountDownLatch(1);
+    CompletableFuture<Integer> first = limitedMessage(accessToken, firstSession, start);
+    CompletableFuture<Integer> second = limitedMessage(accessToken, secondSession, start);
+
+    start.countDown();
+
+    assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+        .containsExactlyInAnyOrder(200, 429);
+    assertThat(requestCount()).isEqualTo(1000);
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+  }
+
+  @Test
+  void keepsFailedAiAttemptInDailyRequestBudget() throws Exception {
+    String accessToken = login("failed-request-limit@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 999");
+    String request = messageRequest(UUID.randomUUID().toString(), "Hello.", 1000, false);
+    fakeAiFreeTalkClient.failTurn();
+
+    assertThat(performMessageStatus(accessToken, sessionId, request)).isEqualTo(503);
+    assertThat(requestCount()).isEqualTo(1000);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isZero();
+    assertThat(performMessageStatus(accessToken, sessionId, request)).isEqualTo(429);
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
+  }
+
+  @Test
+  void rejectsMinuteBurstBeforeAiCall() throws Exception {
+    String accessToken = login("minute-limit@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET minute_request_count = 20");
+
+    mockMvc
+        .perform(
+            post(messagePath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false)))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.error.code").value("FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED"));
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isZero();
+    assertThat(requestCount()).isEqualTo(1);
+  }
+
+  @Test
+  void preservesPendingExitDecisionWhenRequestLimitIsExceeded() throws Exception {
+    String accessToken = login("decision-limit@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long messageId = submitForExit(accessToken, sessionId);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 1000");
+
+    mockMvc
+        .perform(
+            post(exitDecisionPath(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(messageId)))
+        .andExpect(status().isTooManyRequests());
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT conversation_status FROM free_talk_session WHERE learning_session_id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("AWAITING_EXIT_DECISION");
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+    assertThat(requestCount()).isEqualTo(1000);
+  }
+
+  @Test
+  void rollsBackExpressionRetryStateWhenRequestLimitIsExceeded() throws Exception {
+    String accessToken = login("expression-limit@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    completeSession(sessionId);
+    jdbcTemplate.update("UPDATE free_talk_session SET expression_generation_status = 'FAILED'");
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 1000");
+
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions/{sessionId}/expressions/retry", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isTooManyRequests());
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                EXPRESSION_GENERATION_STATUS_QUERY, String.class, sessionId))
+        .isEqualTo("FAILED");
+    assertThat(requestCount()).isEqualTo(1000);
+  }
+
+  private CompletableFuture<Integer> limitedMessage(
+      String token, long sessionId, CountDownLatch start) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          try {
+            if (!start.await(5, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("동시 요청 시작 대기 시간 초과");
+            }
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+          }
+          return performMessageStatus(
+              token, sessionId, messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false));
+        });
+  }
+
+  private int requestCount() {
+    return jdbcTemplate.queryForObject(
+        "SELECT request_count FROM free_talk_daily_speaking_usage", Integer.class);
   }
 
   @Test
@@ -1168,7 +1355,7 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    messageRequest(UUID.randomUUID().toString(), "Almost done.", 59000, false)))
+                    messageRequest(UUID.randomUUID().toString(), "Almost done.", 7199000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
 
@@ -1182,7 +1369,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
-        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(62000));
+        .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(7202000));
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT title FROM free_talk_session WHERE learning_session_id = ?",
@@ -1206,7 +1393,7 @@ class FreeTalkSessionApiIntegrationTests {
                 .content(messageRequest(UUID.randomUUID().toString(), "Keep talking.", 1000, true)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
-        .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(59000));
+        .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(7199000));
   }
 
   private long startUserFirstSession(String accessToken) throws Exception {
@@ -1546,6 +1733,20 @@ class FreeTalkSessionApiIntegrationTests {
 
     @Bean
     @Primary
+    FreeTalkDailySpeakingUsageService fixedTimeDailyUsageService(
+        FreeTalkDailySpeakingUsageRepository repository,
+        UserProfileService userProfileService,
+        FreeTalkProperties properties) {
+      // 사용량 집계 시각만 고정해 실제 분 경계에 따른 테스트 흔들림을 방지한다.
+      return new FreeTalkDailySpeakingUsageService(
+          repository,
+          userProfileService,
+          properties,
+          Clock.fixed(Instant.now(), ZoneId.of("Asia/Seoul")));
+    }
+
+    @Bean
+    @Primary
     FakeAiFreeTalkClient fakeAiFreeTalkClient() {
       return new FakeAiFreeTalkClient();
     }
@@ -1560,6 +1761,7 @@ class FreeTalkSessionApiIntegrationTests {
     private volatile boolean failTurn;
     private volatile boolean exitIntentDetected;
     private final AtomicInteger turnCallCount = new AtomicInteger();
+    private final AtomicInteger closingCallCount = new AtomicInteger();
     private volatile CountDownLatch turnStarted = new CountDownLatch(1);
     private volatile CountDownLatch turnRelease = new CountDownLatch(0);
     private volatile boolean omitClosingTitle;
@@ -1619,6 +1821,7 @@ class FreeTalkSessionApiIntegrationTests {
 
     @Override
     public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
+      closingCallCount.incrementAndGet();
       return new AiFreeTalkClosingResult(
           request.titleGenerationRequired() && !omitClosingTitle ? "Weekend Hiking" : null,
           "It was great talking with you!",
@@ -1674,6 +1877,7 @@ class FreeTalkSessionApiIntegrationTests {
       failTurn = false;
       exitIntentDetected = false;
       turnCallCount.set(0);
+      closingCallCount.set(0);
       turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(0);
       omitClosingTitle = false;

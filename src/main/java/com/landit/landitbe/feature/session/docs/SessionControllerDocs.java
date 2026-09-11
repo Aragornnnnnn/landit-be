@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session.docs;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -42,7 +43,7 @@ public interface SessionControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "권한 없음"),
+        description = "권한 없음 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
@@ -120,6 +121,45 @@ public interface SessionControllerDocs {
         description = "최종 피드백 생성 실패")
   })
   ResponseEntity<ApiResponse<SessionFeedbackResponse>> getOrCreateFeedback(
+      AuthUserPrincipal principal, Long sessionId);
+
+  /**
+   * 세션 텍스트 수준 평가의 비동기 상태와 결과를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 수준 평가를 조회할 세션 ID
+   * @return 수준 평가 처리 상태와 결과
+   */
+  @Operation(
+      summary = "세션 텍스트 수준 평가 조회",
+      description =
+          "비동기 수준 평가 상태와 완료된 영역별 평가 결과를 조회한다. "
+              + "LANDIT_SUBSCRIPTION_LAUNCHED_AT 미설정, 현재 시각이 도입 시각 전이거나 도입 전 완료 세션이면 "
+              + "HTTP 200과 success=true, data=null, error=null을 반환한다. FE는 polling을 종료한다. "
+              + "현재 시각이 도입 시각에 도달하면 서버 재시작 없이 수준 평가를 활성화한다. "
+              + "도입 이후 최초 유효 평가만 기존/기본 수준을 대체하고 INITIALIZED를 반환한다. "
+              + "이후 현재 수준보다 0.7 이상 높은 충분한 평가가 2회 연속이면 한 단계 승급하며 자동 강등은 없다. "
+              + "changeType은 INITIALIZED, PROMOTED, UNCHANGED, NOT_APPLIED이며 "
+              + "과거 v1.2 평가 조회에는 DEMOTED가 남아 있을 수 있다. "
+              + "previousLevel과 currentLevel로 변경 전후 수준을 제공한다. "
+              + "Fallback·근거 부족·최신 설정 이후 도착한 오래된 평가는 적용하지 않는다. "
+              + "영역 confidence는 정답 확률이 아닌 가중 관찰 비율이다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "권한 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "세션 없음")
+  })
+  ResponseEntity<ApiResponse<SessionLevelAssessmentResponse>> getLevelAssessment(
       AuthUserPrincipal principal, Long sessionId);
 
   /**

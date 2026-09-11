@@ -70,6 +70,7 @@ public class FreeTalkMessageService {
    * @param request 사용자 발화 요청
    * @return 저장된 사용자 발화와 AI 처리 결과
    * @throws com.landit.landitbe.shared.exception.ApiException 세션 접근, 처리 상태 또는 AI 생성에 실패할 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 프리톡 이용 한도에 도달했을 때
    */
   public FreeTalkMessageSubmitResponse submit(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
@@ -145,6 +146,7 @@ public class FreeTalkMessageService {
    * @param request 종료 또는 계속 대화 결정 요청
    * @return 저장된 사용자 발화와 AI 처리 결과
    * @throws com.landit.landitbe.shared.exception.ApiException 세션 접근, 처리 상태 또는 AI 생성에 실패할 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 프리톡 이용 한도에 도달했을 때
    */
   public FreeTalkMessageSubmitResponse decideExit(
       long userId, long learningSessionId, FreeTalkExitDecisionRequest request) {

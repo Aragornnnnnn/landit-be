@@ -46,6 +46,10 @@ public class ScenarioSessionStartService {
   private final SessionHistoryService sessionHistoryService;
   private final SessionMessageService sessionMessageService;
   private final Clock clock;
+  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
+      accessGrants;
+  private final com.landit.landitbe.feature.content.service.ScenarioLearningLevelService
+      scenarioLearningLevelService;
 
   /**
    * 선택한 시나리오의 접근 조건을 검증하고 학습 세션을 시작한다.
@@ -65,8 +69,18 @@ public class ScenarioSessionStartService {
       long userId, long scenarioId, boolean enforceProgression) {
     Instant startedInstant = clock.instant();
     UserProfile userProfile = findActiveUser(userId);
+    var existing = accessGrants.freeReservation(userId);
+    if (existing.isPresent()
+        && accessGrants.paymentEnabled(userId)
+        && !accessGrants.premium(userId)
+        && existing.get().getScenarioId() == scenarioId
+        && accessGrants.allowsExisting(
+            userId, "SCENARIO", existing.get().getSessionId(), null, false)) {
+      return resume(userId, scenarioId, existing.get().getSessionId());
+    }
+    final var startAccess = accessGrants.requireScenarioStart(userId);
     ContentLearningLevel questionLevelGroup =
-        ContentLearningLevel.from(userProfile.getLearningLevel());
+        scenarioLearningLevelService.questionLevel(userId, scenarioId);
     ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId, questionLevelGroup);
 
     assertContentActive(startRow);
@@ -82,6 +96,7 @@ public class ScenarioSessionStartService {
     ensureProgress(userProfile, startRow, now);
     LearningSession learningSession =
         createLearningSession(userId, userProfile, startRow, questionLevelGroup, now);
+    accessGrants.recordScenario(userId, learningSession.getId(), scenarioId, now, startAccess);
 
     CurrentMessageResponse currentMessage = null;
     if (startRow.firstSpeaker() == ConversationSpeaker.AI) {
@@ -96,6 +111,39 @@ public class ScenarioSessionStartService {
         scenarioId,
         learningSession.getId());
     return response;
+  }
+
+  /** 첫 무료 시작의 응답이 유실되면 같은 세션의 현재 진행도를 반환한다. */
+  private SessionStartResponse resume(long userId, long scenarioId, long sessionId) {
+    LearningSession session = learningSessionService.findOwnedForUpdate(userId, sessionId);
+    session.resumeInterruptedScenario();
+    var context = scenarioSessionService.requireMessageContext(sessionId);
+    var row = findStartRow(userId, scenarioId, context.questionLevelGroup());
+    var history = sessionHistoryService.findByLearningSessionId(sessionId);
+    var messages =
+        history
+            .map(value -> sessionMessageService.findAll(value.getId()))
+            .orElse(java.util.List.of());
+    var current =
+        messages.stream()
+            .filter(message -> message.getRole() == ConversationSpeaker.AI)
+            .reduce((previous, next) -> next)
+            .orElse(null);
+    var response =
+        SessionStartResponse.from(
+            session, row, current == null ? null : CurrentMessageResponse.from(current, null));
+    return new SessionStartResponse(
+        response.sessionId(),
+        response.scenarioId(),
+        response.character(),
+        response.sessionType(),
+        response.firstSpeaker(),
+        response.userOpeningInstruction(),
+        response.currentMessage(),
+        new SessionStartResponse.SessionProgressResponse(
+            current == null ? 1 : current.getTurnNumber(),
+            row.totalQuestionCount(),
+            !session.isInProgress()));
   }
 
   /** 개발 환경 전용 관리자 Service에서 진행 제한 없이 세션을 시작할 때 사용한다. */

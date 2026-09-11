@@ -37,7 +37,7 @@ class SessionFeedbackCompletionService {
     validateResult(context, result);
     BigDecimal starRating = result.starRating();
     // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
-    LearningSession learningSession =
+    final LearningSession learningSession =
         learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
     SessionHistorySummaryFeedback existing =
         sessionFeedbackDataService.findSummaryByHistoryId(context.sessionHistoryId()).orElse(null);
@@ -61,6 +61,11 @@ class SessionFeedbackCompletionService {
   /** AI 응답의 세션 식별자, 점수, 필수 요약 필드가 계약을 만족하는지 검증한다. */
   private void validateResult(
       LoadedSessionFeedbackContext context, AiSessionFeedbackResult result) {
+    if (result != null
+        && result.generationFallback()
+        && context.sessionId().equals(result.sessionId())) {
+      return;
+    }
     if (result == null
         || !context.sessionId().equals(result.sessionId())
         || result.nativeScore() < 0
@@ -140,6 +145,12 @@ class SessionFeedbackCompletionService {
       LoadedSessionFeedbackContext context,
       AiSessionFeedbackResult result,
       Long summaryFeedbackId) {
+    if (result.generationFallback()) {
+      context
+          .userMessages()
+          .forEach(message -> sessionMessageService.failFeedback(message.messageId()));
+      return;
+    }
     List<SessionHistoryMessageFeedback> feedbacks = new java.util.ArrayList<>();
     for (int index = 0; index < context.userMessages().size(); index++) {
       UserMessageContext userMessage = context.userMessages().get(index);

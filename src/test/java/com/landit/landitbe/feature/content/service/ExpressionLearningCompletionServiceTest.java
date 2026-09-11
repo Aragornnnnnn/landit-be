@@ -22,7 +22,6 @@ import com.landit.landitbe.feature.content.repository.WritingExpressionRepositor
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
@@ -65,7 +64,11 @@ class ExpressionLearningCompletionServiceTest {
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
 
+  @Mock
+  private com.landit.landitbe.feature.subscription.service.LearningAccessGrantService accessGrants;
+
   @Mock private UserProfileService userProfileService;
+  @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
   @Mock private LearningProgressService learningProgressService;
 
@@ -82,8 +85,10 @@ class ExpressionLearningCompletionServiceTest {
   @BeforeEach
   void allowAllExistingScenarioExpressions() {
     lenient()
-        .when(userProfileService.getLearningLevel(USER_ID))
-        .thenReturn(new UserLearningLevelResponse(null));
+        .when(
+            scenarioLearningLevelService.expressionLevel(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_4_TO_5);
   }
 
   /** 존재하지 않거나 비활성인 표현은 완료 이력을 저장하지 않는다. */
@@ -195,7 +200,9 @@ class ExpressionLearningCompletionServiceTest {
     when(expression.getDifficultyLevel()).thenReturn(4);
     when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+    when(scenarioLearningLevelService.expressionLevel(
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_2_TO_3);
 
     assertThatThrownBy(
             () ->
@@ -214,7 +221,9 @@ class ExpressionLearningCompletionServiceTest {
     when(expression.getDifficultyLevel()).thenReturn(1);
     when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+    when(scenarioLearningLevelService.expressionLevel(
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_2_TO_3);
 
     assertThatThrownBy(
             () ->

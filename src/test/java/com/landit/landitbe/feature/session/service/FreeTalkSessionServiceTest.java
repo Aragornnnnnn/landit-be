@@ -43,6 +43,8 @@ class FreeTalkSessionServiceTest {
       mock(ConversationCharacterService.class);
   private final FreeTalkSessionService service =
       new FreeTalkSessionService(
+          org.mockito.Mockito.mock(
+              com.landit.landitbe.feature.subscription.service.LearningAccessGrantService.class),
           userProfileService,
           learningSessionRepository,
           freeTalkSessionRepository,
