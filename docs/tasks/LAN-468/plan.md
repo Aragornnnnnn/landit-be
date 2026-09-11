@@ -67,3 +67,11 @@
 - 전체 `./gradlew check`는 기본 테스트 JVM의 메모리 부족과 시나리오 테스트 정리 오류로 실패했다. 저장소 설정 변경 없이 임시 Gradle init script에서 `Test.maxHeapSize = '2g'`로 재실행한 결과 1,066개 중 실패 4개·건너뜀 4개, Spotless·Checkstyle 통과였다.
 - 남은 4개 실패는 모두 `ScenarioSessionApiIntegrationTests.clearLearningData()`의 `user_level_assessment` → `learning_session` 외래 키 오류다. 원본 `d2727246` 임시 작업 디렉터리에서도 시나리오·구독 테스트 79개 중 같은 오류 3개가 재현됐다. 해당 시나리오 코드·테스트는 develop과 동일하며 이번 충돌 해결에서 수정하지 않았다.
 - 충돌 해결 범위의 독립 리뷰에서 추가 결함 없음. 충돌 표식·미해결 인덱스 없음, `git diff --check` 통과.
+
+## 테스트 안정화 · 2026-09-11
+
+- 시나리오 테스트 정리가 비동기 수준 평가의 INSERT와 경합했다. 기존 완료 대기를 `clearLearningData()` 시작으로 옮겨 테스트 시작·종료 양쪽에서 평가 트랜잭션 커밋 이후 데이터를 삭제한다. Clock·Fake 초기화도 대기 이후로 유지한다.
+- `build.gradle`의 테스트 JVM 힙 상한을 2GB로 명시해 전체 Spring 통합 테스트 컨텍스트를 보관할 때 발생한 메모리 부족을 해결했다. 운영 JVM 설정과 테스트 선택 범위는 변경하지 않았다.
+- `./gradlew test --tests '*ScenarioSessionApiIntegrationTests'`: 수정 전 69개 중 외래 키 오류 3개 재현, 수정 후 69개 모두 통과.
+- 추가 실행 옵션 없이 `./gradlew check` 통과: 1,066개 중 성공 1,062개, 실패 0개, 건너뜀 4개. 건너뜀은 전용 PostgreSQL 환경이 필요한 `AdminPushAudiencePostgresTest`이며 기존 조건을 유지했다. Spotless·Checkstyle 통과.
+- 독립 리뷰에서 평가 INSERT·완료 상태의 원자적 커밋, 대기 실패 전파와 테스트 JVM 설정 범위를 확인했고 추가 결함 없음. `git diff --check` 통과.
