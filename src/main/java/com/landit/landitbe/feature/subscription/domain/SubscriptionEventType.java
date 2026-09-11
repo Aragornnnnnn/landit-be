@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * 결제 이력으로 저장하는 RevenueCat 구독 이벤트 타입을 정의한다.
  *
- * <p>RevenueCat 웹훅의 type 값을 그대로 따른다. 여기 없는 타입(TEST, TRANSFER 등)은 이력으로 저장하지 않는다.
+ * <p>RevenueCat 웹훅의 type 값을 그대로 따른다. 여기 없는 타입(TEST 등)은 이력으로 저장하지 않는다.
  */
 public enum SubscriptionEventType {
   /** 첫 결제 또는 무료 체험 시작. */
@@ -23,7 +23,9 @@ public enum SubscriptionEventType {
   /** 결제 실패. */
   BILLING_ISSUE,
   /** 플랜 변경. */
-  PRODUCT_CHANGE;
+  PRODUCT_CHANGE,
+  /** 구독이 다른 앱 계정으로 이전됨. 넘겨받은 계정의 이력에만 남긴다. */
+  TRANSFER;
 
   /**
    * RevenueCat type 문자열을 이벤트 타입으로 변환한다.

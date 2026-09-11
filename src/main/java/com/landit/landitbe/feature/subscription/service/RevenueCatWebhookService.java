@@ -1,4 +1,4 @@
-// RevenueCat 웹훅을 검증하고 결제 이력을 저장한 뒤 이벤트 타입에 따라 사용자 구독 상태를 갱신한다.
+// RevenueCat 웹훅을 검증하고 결제 이력을 저장한 뒤 이벤트 타입에 따라 사용자 구독 상태를 갱신하거나 계정 간에 옮긴다.
 
 package com.landit.landitbe.feature.subscription.service;
 
@@ -6,8 +6,10 @@ import com.landit.landitbe.config.subscription.RevenueCatProperties;
 import com.landit.landitbe.feature.profile.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStore;
+import com.landit.landitbe.feature.profile.dto.SubscriptionTransferResult;
 import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.subscription.domain.SubscriptionEvent;
 import com.landit.landitbe.feature.subscription.domain.SubscriptionEventType;
@@ -30,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** RevenueCat 웹훅을 검증하고 결제 이력을 저장한 뒤 이벤트 타입에 따라 사용자 구독 상태를 갱신한다. */
+/** RevenueCat 웹훅을 검증하고 결제 이력을 저장한 뒤 이벤트 타입에 따라 사용자 구독 상태를 갱신하거나 계정 간에 옮긴다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -48,7 +50,8 @@ public class RevenueCatWebhookService {
    * Authorization 헤더를 검증한 뒤 웹훅 이벤트를 결제 이력으로 저장하고 사용자 구독 상태에 반영한다.
    *
    * <p>이력 저장과 상태 갱신은 한 트랜잭션으로 묶어 한쪽만 반영되지 않게 한다. 이력·상태 모두와 무관한 이벤트 타입, Landit 사용자와 연결할 수 없는 이벤트, 이미
-   * 저장한 이벤트 ID의 재전송은 로그만 남기고 정상 처리로 응답해 RevenueCat이 재시도하지 않게 한다.
+   * 저장한 이벤트 ID의 재전송은 로그만 남기고 정상 처리로 응답해 RevenueCat이 재시도하지 않게 한다. TRANSFER는 app_user_id 대신
+   * transferred_from·transferred_to로 계정을 찾아 구독 상태를 옮긴다.
    *
    * @param authorization 요청의 Authorization 헤더 값. 없으면 null
    * @param request 웹훅 요청 본문
@@ -59,6 +62,10 @@ public class RevenueCatWebhookService {
     verifyAuthorization(authorization);
     RevenueCatWebhookEvent event = request.event();
     Optional<SubscriptionEventType> eventType = SubscriptionEventType.fromRevenueCat(event.type());
+    if (eventType.filter(SubscriptionEventType.TRANSFER::equals).isPresent()) {
+      handleTransfer(event);
+      return;
+    }
     Optional<SubscriptionStatus> targetStatus = resolveTargetStatus(event);
     if (eventType.isEmpty() && targetStatus.isEmpty()) {
       log.info("RevenueCat 웹훅 무시: 구독 상태와 무관한 이벤트. eventId={}, type={}", event.id(), event.type());
@@ -116,8 +123,100 @@ public class RevenueCatWebhookService {
                               ? SubscriptionStatus.EXPIRED
                               : SubscriptionStatus.CANCELED);
                   case EXPIRATION -> Optional.of(SubscriptionStatus.EXPIRED);
-                  case BILLING_ISSUE, PRODUCT_CHANGE -> Optional.empty();
+                  case BILLING_ISSUE, PRODUCT_CHANGE, TRANSFER -> Optional.empty();
                 });
+  }
+
+  /**
+   * 구독 이전 이벤트(Transfer)를 반영한다.
+   *
+   * <p>넘겨준 계정과 넘겨받은 계정을 각각 App User ID 목록에서 찾고, 프로필 기능에 상태 이전을 맡긴다. 이전이 반영되면 넘겨받은 계정의 이력에만
+   * TRANSFER를 남긴다. 어느 한쪽 계정을 찾지 못하면 RevenueCat이 이후 실제 구독 이벤트를 새 계정으로 보내므로 로그만 남기고 끝낸다.
+   */
+  private void handleTransfer(RevenueCatWebhookEvent event) {
+    if (subscriptionEventRepository.existsByEventId(event.id())) {
+      log.info("RevenueCat 웹훅 무시: 이미 저장한 TRANSFER의 재전송. eventId={}", event.id());
+      return;
+    }
+
+    Optional<Long> fromUserId = findExistingUserId(event.transferredFrom());
+    Optional<Long> toUserId = findExistingUserId(event.transferredTo());
+    if (fromUserId.isEmpty() || toUserId.isEmpty()) {
+      logUnresolvedTransfer(event);
+      return;
+    }
+
+    LocalDateTime eventAt =
+        toLocalDateTime(event.eventTimestampMs()).orElseGet(() -> LocalDateTime.now(clock));
+    SubscriptionTransferResult transfer =
+        userProfileService.transferSubscription(fromUserId.get(), toUserId.get(), eventAt);
+
+    if (transfer.moved() != null) {
+      saveTransferEvent(event, toUserId.get(), transfer.moved(), eventAt);
+    }
+    logTransfer(event, fromUserId.get(), toUserId.get(), transfer);
+  }
+
+  private void logUnresolvedTransfer(RevenueCatWebhookEvent event) {
+    log.warn(
+        "RevenueCat 웹훅 무시: TRANSFER 대상 계정을 찾지 못했다. eventId={}, transferredFrom={},"
+            + " transferredTo={}",
+        event.id(),
+        event.transferredFrom(),
+        event.transferredTo());
+  }
+
+  /** 넘겨받은 계정의 이력에 TRANSFER를 남긴다. 구독 상세는 이벤트에 없으므로 넘겨준 계정에서 복사한 값을 쓴다. */
+  private void saveTransferEvent(
+      RevenueCatWebhookEvent event,
+      Long toUserId,
+      UserSubscriptionSnapshot moved,
+      LocalDateTime eventAt) {
+    subscriptionEventRepository.save(
+        SubscriptionEvent.record(
+            event.id(),
+            toUserId,
+            SubscriptionEventType.TRANSFER,
+            moved.productId(),
+            moved.periodType(),
+            null,
+            null,
+            Optional.ofNullable(resolveStore(event)).orElse(moved.store()),
+            event.environment(),
+            null,
+            eventAt,
+            moved.expiresAt()));
+  }
+
+  private void logTransfer(
+      RevenueCatWebhookEvent event,
+      Long fromUserId,
+      Long toUserId,
+      SubscriptionTransferResult transfer) {
+    log.info(
+        "RevenueCat 웹훅 처리: TRANSFER result={}, fromUserId={}, toUserId={}, status={}, eventId={},"
+            + " environment={}",
+        transfer.result(),
+        fromUserId,
+        toUserId,
+        transfer.moved() == null ? null : transfer.moved().subscriptionStatus(),
+        event.id(),
+        event.environment());
+  }
+
+  /** App User ID 목록에서 숫자 형태의 Landit 사용자 ID만 추려 실제로 존재하는 첫 사용자를 찾는다. */
+  private Optional<Long> findExistingUserId(List<String> appUserIds) {
+    if (appUserIds == null) {
+      return Optional.empty();
+    }
+    List<Long> candidateUserIds =
+        appUserIds.stream()
+            .filter(Objects::nonNull)
+            .map(RevenueCatWebhookService::parseUserId)
+            .flatMap(Optional::stream)
+            .distinct()
+            .toList();
+    return userProfileService.findExistingUserId(candidateUserIds);
   }
 
   /** App User ID 후보 가운데 실제로 존재하는 Landit 사용자를 찾는다. 없으면 경고를 남기고 빈 값을 반환한다. */
