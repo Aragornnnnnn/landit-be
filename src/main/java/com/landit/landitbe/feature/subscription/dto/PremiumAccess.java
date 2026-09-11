@@ -13,7 +13,7 @@ package com.landit.landitbe.feature.subscription.dto;
  *       도입 후 첫 시나리오 하나만 끝까지 할 수 있다.
  * </ul>
  *
- * @param launched 유료 구독 도입 시점이 설정돼 제한을 적용하는지
+ * @param launched 유료 구독 도입 시점에 도달해 제한을 적용하는지
  * @param premium 프리미엄 혜택 적용 여부
  * @param conversationCompletedSinceLaunch 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
  */

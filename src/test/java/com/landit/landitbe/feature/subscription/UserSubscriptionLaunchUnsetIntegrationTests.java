@@ -58,6 +58,7 @@ class UserSubscriptionLaunchUnsetIntegrationTests {
             get("/api/v1/me/subscription")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.subscriptionLaunched").value(false))
         .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(false));
   }
 

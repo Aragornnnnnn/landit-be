@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
  *
  * @param subscriptionStatus 구독 상태
  * @param premium 프리미엄 혜택 적용 여부
+ * @param subscriptionLaunched 서버 현재 시각이 유료 구독 도입 시점에 도달했는지. 미설정 또는 도입 전이면 {@code false}
  * @param periodType 현재 결제 기간 종류. 무료 체험 중이면 TRIAL. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
@@ -31,6 +32,12 @@ public record UserSubscriptionResponse(
     @Schema(description = "프리미엄 혜택 적용 여부", example = "true") boolean premium,
     @Schema(
             description =
+                "서버 현재 시각이 유료 구독 도입 시점에 도달했으면 true. 미설정 또는 도입 전이면 false이며 구독에 따른 이용 제한을 적용하지 않는다."
+                    + " 앱은 false일 때 페이월을 표시하지 않는다. premium은 도입 여부와 관계없이 실제 구독 상태를 나타낸다.",
+            example = "true")
+        boolean subscriptionLaunched,
+    @Schema(
+            description =
                 "현재 결제 기간 종류. TRIAL(무료 체험), INTRO(할인 도입가), NORMAL(정가), PROMOTIONAL(프로모션 무료),"
                     + " PREPAID(선결제). 프리미엄이 꺼져 있으면 null",
             example = "TRIAL")
@@ -40,8 +47,8 @@ public record UserSubscriptionResponse(
     @Schema(
             description =
                 "유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있으면 true. 신규 가입자는 시나리오 1 완료,"
-                    + " 도입 전 가입자는 도입 후 오늘의 시나리오 완료가 기준이다. 도입 시점이 설정되기 전에는 항상 false."
-                    + " 앱은 conversationCompletedSinceLaunch && !premium 이면 페이월을 보여준다.",
+                    + " 도입 전 가입자는 도입 후 오늘의 시나리오 완료가 기준이다. 도입 시점 미설정 또는 도입 전에는 항상 false."
+                    + " subscriptionLaunched가 true일 때 비구독자의 무료 시나리오 대화 가능 여부를 판단하는 데 사용한다.",
             example = "false")
         boolean conversationCompletedSinceLaunch,
     @Schema(
@@ -59,14 +66,18 @@ public record UserSubscriptionResponse(
    * 프로필의 구독 스냅샷과 대화 완료 여부를 응답으로 합친다.
    *
    * @param snapshot 프로필 기능이 제공한 구독 상태 스냅샷
+   * @param subscriptionLaunched 서버 현재 시각이 유료 구독 도입 시점에 도달했는지
    * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화 완료 여부
    * @return 사용자 구독 상태 응답
    */
   public static UserSubscriptionResponse of(
-      UserSubscriptionSnapshot snapshot, boolean conversationCompletedSinceLaunch) {
+      UserSubscriptionSnapshot snapshot,
+      boolean subscriptionLaunched,
+      boolean conversationCompletedSinceLaunch) {
     return new UserSubscriptionResponse(
         snapshot.subscriptionStatus(),
         snapshot.premium(),
+        subscriptionLaunched,
         snapshot.periodType(),
         snapshot.expiresAt(),
         conversationCompletedSinceLaunch,
