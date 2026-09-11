@@ -25,8 +25,8 @@ chmod +x "$TMP_DIR/aws" "$TMP_DIR/curl"
 
 service_json() {
   local rollout_state="$1" failed_tasks="$2" running_count="$3" deployment_count="$4"
-  printf '{"services":[{"serviceName":"api","status":"ACTIVE","desiredCount":1,"runningCount":%s,"pendingCount":0,"deployments":[' "$running_count"
-  printf '{"id":"ecs-svc/primary","status":"PRIMARY","createdAt":"2026-07-11T00:00:00Z","rolloutState":"%s","failedTasks":%s,"desiredCount":1,"runningCount":%s,"pendingCount":0}' "$rollout_state" "$failed_tasks" "$running_count"
+  printf '{"services":[{"serviceName":"api","taskDefinition":"arn:task-definition/api:1","status":"ACTIVE","desiredCount":1,"runningCount":%s,"pendingCount":0,"deployments":[' "$running_count"
+  printf '{"id":"ecs-svc/primary","taskDefinition":"arn:task-definition/api:1","status":"PRIMARY","createdAt":"2026-07-11T00:00:00Z","rolloutState":"%s","failedTasks":%s,"desiredCount":1,"runningCount":%s,"pendingCount":0}' "$rollout_state" "$failed_tasks" "$running_count"
   if [ "$deployment_count" = 2 ]; then
     printf ',{"id":"ecs-svc/old","status":"ACTIVE","createdAt":"2026-07-10T00:00:00Z","rolloutState":"COMPLETED","failedTasks":0,"desiredCount":0,"runningCount":0,"pendingCount":0}'
   fi
@@ -39,6 +39,7 @@ run_case() {
   set +e
   local output
   output="$(PATH="$TMP_DIR:$PATH" ECS_CLUSTER=cluster ECS_SERVICE=service HEALTH_CHECK_URL=https://health.example \
+    TASK_DEFINITION=arn:task-definition/api:1 IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa CONTAINER_NAME=api \
     DEPLOYMENT_ID=ecs-svc/primary DEPLOYMENT_CREATED_AT=2026-07-11T00:00:00Z \
     POLL_INTERVAL_SECONDS=0 MAX_ATTEMPTS=1 bash "$SCRIPT" 2>&1)"
   local status=$?
@@ -55,7 +56,13 @@ MOCK_TASKS_JSON='{"tasks":[]}'
 export MOCK_SERVICE_JSON MOCK_TASK_LIST_JSON MOCK_TASKS_JSON
 
 MOCK_SERVICE_JSON="$(service_json COMPLETED null 1 1)"
+MOCK_TASK_LIST_JSON='{"taskArns":["arn:task/new"]}'
+MOCK_TASKS_JSON='{"tasks":[{"taskArn":"arn:task/new","taskDefinitionArn":"arn:task-definition/api:1","lastStatus":"RUNNING","createdAt":"2026-07-11T00:00:01Z","containers":[{"name":"api","imageDigest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}]}'
 run_case stable 0 "ECS service is stable"
+MOCK_TASKS_JSON="${MOCK_TASKS_JSON/sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}"
+run_case wrong_digest 1 "image digest does not match the release"
+MOCK_TASKS_JSON='{"tasks":[]}'
+run_case missing_running_task 1 "image digest does not match the release"
 
 MOCK_SERVICE_JSON="$(service_json IN_PROGRESS 1 0 2)"
 run_case failed_tasks 1 "PRIMARY ECS deployment has failed tasks"
