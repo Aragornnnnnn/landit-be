@@ -60,3 +60,9 @@ FE develop `c62be093` 소스는 수정하지 않았다. FE API·구독/구매 �
 CI run 34614206050에서 `submitMessageMarksMessageFeedbackFailedWhenAiReportsFailed`가 실패했다. 메시지 재전송용 응답을 저장하는 JPA 갱신이 다른 트랜잭션의 피드백 상태를 덮어쓰는지 결정적 DB 재현으로 확인하고, 동일 메시지의 독립 필드 갱신을 보존한다. 실패 경로와 전체 check, 수정 커밋의 CI로 검증한다.
 
 원인·수정: 시나리오 응답·시도 저장에서 Hibernate의 전체 열 UPDATE가 다른 트랜잭션에서 확정한 `FAILED` 피드백과 속마음을 과거 값으로 덮어썼다. `SessionHistoryMessage`에 `@DynamicUpdate`를 적용해 변경한 열만 갱신한다. 응답 저장·시도 시작·시도 해제의 독립 트랜잭션 재현 3개는 수정 전 모두 실패했고 수정 후 통과했다. 기존 CI 실패 테스트도 통과했다. `./gradlew spotlessApply check` 성공(1,180개, 실패 0·생략 6), `git diff --check` 통과. 사용자 요청에 따라 직접 검토했으며 독립 에이전트는 사용하지 않았다.
+
+## 최신 develop 충돌 해결.
+
+#183이 병합된 develop `28d1dd7a`를 반영한다. 구독 오픈 시각의 미설정·미래·정각 판정은 공통 `SubscriptionLaunchPolicyService`로 유지하고, 이번 PR의 학습 권한·무료 예약 응답을 보존한다. #183의 시각 경계·재시작 없는 활성화·도입 전 실제 구독 보존 테스트는 새 서비스 의존성에 맞춰 함께 유지한다.
+
+충돌 해결 후 `./gradlew spotlessApply check` 통과(53초, 1,188개, 실패 0·생략 6). #183의 도입 시각 회귀 8개와 피드백 동시 갱신 재현 3개를 함께 통과했다. `git diff --check`도 통과했다.
