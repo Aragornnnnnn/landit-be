@@ -24,9 +24,10 @@
 - V96까지 적용한 H2 스키마에서 V97 적용 시 기존 발화 시간을 보존하고 새 요청 카운터를 0으로 초기화하는 마이그레이션 테스트를 통과했다. PostgreSQL 실행 검증은 하지 않았다.
 - 독립 리뷰에서 확정 blocker가 없음을 확인했다. 리뷰에서 언급한 분당 응답과 종료 결정·표현 재시도 상태 보존의 통합 테스트도 추가해 통과했다.
 - 테스트 실행 순서에 따른 초기 주제 데이터 간섭을 확인하고 이 작업의 프리톡 통합 테스트 DB를 분리했다. 분당 경계 테스트는 사용량 서비스의 시계만 고정한다.
-- 운영 DB와 운영 SSM은 변경하지 않았다. AI 원가와 사용자 분포는 측정하지 않았다.
-- 2026-09-11 사용자 요청으로 develop의 `/landit/develop/LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS`를 `9999999`(버전 1)에서 `7200000`(버전 2)으로 변경하고 SSM 재조회로 확인했다. 운영에는 같은 파라미터가 없어 LAN-478 배포 후 코드 기본값 `7200000`을 사용한다.
-- 두 환경 모두 일일·분당 요청 한도 SSM 파라미터가 없어 LAN-478 배포 후 공통 기본값인 1,000회·20회를 사용한다. 기존 IaC main(`e932de83`)의 develop 배포 스크립트가 발화 시간 파라미터를 이미 주입하므로 IaC 변경이나 Terraform apply는 필요하지 않았다.
-- 실행 중인 서버는 재시작하지 않았다. 변경한 SSM 값은 다음 develop API 배포에서 런타임 환경 파일을 다시 읽을 때 반영된다. 요청 제한 로직도 LAN-478 코드 배포가 필요하다.
+- 운영 DB는 변경하지 않았다. AI 원가와 사용자 분포는 측정하지 않았다.
+- 2026-09-11 사용자 요청으로 develop의 `/landit/develop/LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS`를 `9999999`(버전 1)에서 `7200000`(버전 2)으로 변경했다. 이후 운영도 SSM으로 통일하기로 승인받아 누락된 다섯 parameter를 `String` 버전 1로 생성했다. 개발·운영의 발화 시간 `7200000`, 일일 요청 `1000`, 분당 요청 `20` 여섯 값 모두 SSM 재조회로 검증했다.
+- IaC `feat/LAN-478`에서 develop runtime env에 요청 한도 두 개, 운영 ECS API secrets에 세 한도를 연결했다. SSM 값은 Terraform 밖에서 관리한다.
+- IaC `terraform fmt -recursive`, 개발·운영 `terraform validate`, `scripts/test-dev-ec2-runtime.sh`, `scripts/test-dev-ec2-contract.sh`와 독립 리뷰를 통과했다. 대상 제한 plan에서 개발은 `aws_ssm_document.ec2_deploy` 1개 수정, 운영은 API task definition 1개 교체를 확인했다. 운영 plan의 세 SSM 경로와 이미지 참조 유지도 확인했다. 전체 plan과 Terraform apply는 실행하지 않았다.
+- 실행 중인 서버는 재시작하지 않았다. 개발은 SSM 배포 문서 반영 후 API 배포, 운영은 새 task definition과 service 반영이 필요하다. 요청 제한 로직도 LAN-478 코드 배포가 필요하다.
 - 작업 중 develop의 V94 중복을 발견했고, 사용자가 `1c382b51`에서 기존 메타데이터 마이그레이션을 V96으로 정리했다. 해당 커밋 위로 리베이스하고 LAN-478은 다음 번호인 V97을 사용한다.
 - 공통·PostgreSQL 위치를 함께 검사하는 버전 중복 검사와 H2 마이그레이션 실행 검증을 모두 통과했다. 최신 base 대비 독립 재검토에서도 V97 구성에 blocker가 없음을 확인했다.
