@@ -49,6 +49,12 @@ public class UserProfile extends BaseTimeEntity {
   @Column(name = "learning_level")
   private Integer learningLevel;
 
+  @Column(name = "learning_level_updated_at")
+  private LocalDateTime learningLevelUpdatedAt;
+
+  @Column(name = "promotion_streak", nullable = false)
+  private int promotionStreak;
+
   @Column(name = "current_level", nullable = false)
   private int currentLevel;
 
@@ -122,9 +128,30 @@ public class UserProfile extends BaseTimeEntity {
     }
   }
 
-  /** 온보딩에서 선택한 학습 수준으로 갱신한다. */
-  public void updateLearningLevel(int learningLevel) {
+  /**
+   * 온보딩에서 선택한 학습 수준으로 갱신한다.
+   *
+   * @param learningLevel 사용자가 설정한 학습 수준
+   * @param changedAt 서비스 Clock으로 생성한 수준 변경 시각
+   */
+  public void updateLearningLevel(int learningLevel, LocalDateTime changedAt) {
+    this.learningLevelUpdatedAt = changedAt;
     this.learningLevel = learningLevel;
+    this.promotionStreak = 0;
+  }
+
+  /**
+   * 세션 평가 정책이 계산한 적용 수준과 승급 연속 횟수를 반영한다.
+   *
+   * @param learningLevel 새로 적용할 학습 수준
+   * @param promotionStreak 평가 후 유지할 연속 승급 신호 횟수
+   * @param changedAt 서비스 Clock으로 생성한 수준 변경 시각
+   */
+  public void applyAssessedLearningLevel(
+      int learningLevel, int promotionStreak, LocalDateTime changedAt) {
+    this.learningLevelUpdatedAt = changedAt;
+    this.learningLevel = learningLevel;
+    this.promotionStreak = promotionStreak;
   }
 
   /**

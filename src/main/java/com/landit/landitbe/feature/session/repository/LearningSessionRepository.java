@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.session.repository;
 
 import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.domain.SessionType;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +17,17 @@ public interface LearningSessionRepository extends JpaRepository<LearningSession
 
   /** 특정 사용자가 소유한 학습 세션을 조회한다. */
   Optional<LearningSession> findByIdAndUserProfileId(Long id, Long userProfileId);
+
+  /**
+   * 사용자의 완료된 시나리오 중 가장 최근 세션을 조회한다.
+   *
+   * @param userProfileId 세션 소유 사용자 ID
+   * @param sessionType 조회할 세션 유형
+   * @param status 조회할 세션 상태
+   * @return 완료 시각과 ID 내림차순의 첫 세션. 일치하는 세션이 없으면 빈 Optional
+   */
+  Optional<LearningSession> findTopByUserProfileIdAndSessionTypeAndStatusOrderByEndedAtDescIdDesc(
+      Long userProfileId, SessionType sessionType, LearningSessionStatus status);
 
   /** 같은 세션에 대한 동시 상태 변경을 직렬화하며 소유 세션을 조회한다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)

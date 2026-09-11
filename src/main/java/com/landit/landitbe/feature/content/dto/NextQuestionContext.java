@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.content.dto;
 
+import com.landit.landitbe.feature.content.domain.ResponseDemand;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
 
 /**
@@ -12,13 +13,17 @@ import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestio
  * @param questionText 질문 본문
  * @param questionTranslation 질문 번역
  * @param questionAudioUrl 질문 음원 URL
+ * @param responseDemand 답변에 요구되는 정보량
+ * @param requiredResponseElement 수준 평가에 필요한 응답 요소
  */
 public record NextQuestionContext(
     Long questionId,
     int sequence,
     String questionText,
     String questionTranslation,
-    String questionAudioUrl) {
+    String questionAudioUrl,
+    ResponseDemand responseDemand,
+    String requiredResponseElement) {
 
   /**
    * 질문 조회 Projection을 기능 간 공개 계약으로 변환한다.
@@ -32,6 +37,10 @@ public record NextQuestionContext(
         projection.sequence(),
         projection.questionText(),
         projection.questionTranslation(),
-        projection.questionAudioUrl());
+        projection.questionAudioUrl(),
+        projection.responseDemand(),
+        projection.requiredResponseElement().isBlank()
+            ? projection.questionText()
+            : projection.requiredResponseElement());
   }
 }

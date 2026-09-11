@@ -38,6 +38,7 @@ public class UserProfileService {
       List.of(AccentLocale.EN_US, AccentLocale.EN_GB, AccentLocale.EN_AU);
 
   private final UserProfileRepository userProfileRepository;
+  private final java.time.Clock clock;
 
   /**
    * 활성 사용자 프로필을 조회한다.
@@ -259,7 +260,8 @@ public class UserProfileService {
    */
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
-    requireActive(userId).updateLearningLevel(learningLevel);
+    requireActiveForUpdate(userId)
+        .updateLearningLevel(learningLevel, java.time.LocalDateTime.now(clock));
   }
 
   /**

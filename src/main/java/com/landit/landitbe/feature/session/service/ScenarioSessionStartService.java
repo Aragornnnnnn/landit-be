@@ -46,6 +46,8 @@ public class ScenarioSessionStartService {
   private final SessionHistoryService sessionHistoryService;
   private final SessionMessageService sessionMessageService;
   private final Clock clock;
+  private final com.landit.landitbe.feature.content.service.ScenarioLearningLevelService
+      scenarioLearningLevelService;
 
   /**
    * 선택한 시나리오의 접근 조건을 검증하고 학습 세션을 시작한다.
@@ -66,7 +68,7 @@ public class ScenarioSessionStartService {
     Instant startedInstant = clock.instant();
     UserProfile userProfile = findActiveUser(userId);
     ContentLearningLevel questionLevelGroup =
-        ContentLearningLevel.from(userProfile.getLearningLevel());
+        scenarioLearningLevelService.questionLevel(userId, scenarioId);
     ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId, questionLevelGroup);
 
     assertContentActive(startRow);

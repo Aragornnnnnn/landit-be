@@ -1,0 +1,49 @@
+{
+  "scenarioId": 1,
+  "firstSpeaker": "AI",
+  "totalQuestionCount": 4,
+  "questions": [
+    {
+      "sequence": 1,
+      "questionText": "Hey! I'm Marco, an exchange student from Spain. Nice to meet you! Can you introduce yourself a little? — What do you do, and what do you like to do in your free time?",
+      "questionTranslation": "안녕! 난 마르코고, 스페인에서 온 교환학생이야. 만나서 반가워! 자기소개를 간단히 해줄래? — 어떤 일을 하고, 여가 시간에는 뭘 즐겨 해?",
+      "responseDemand": "MEDIUM",
+      "requiredElements": [
+        "Describe what you do.",
+        "State what you like to do in your free time."
+      ],
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/95a682253d94b307ed64fad30155f844a5d584990e1e938d8f08d54a99c916b8.mp3"
+    },
+    {
+      "sequence": 2,
+      "questionText": "So, have you done anything fun or memorable lately?",
+      "questionTranslation": "그럼, 최근에 했던 즐겁거나 기억에 남는 일 있어?",
+      "responseDemand": "MEDIUM",
+      "requiredElements": [
+        "Share a recent fun or memorable experience, or state that you have not had one."
+      ],
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/a581134b53756adf5fc5c1b8d767bc958f588eddb6ae44d07935daa1c5d1e562.mp3"
+    },
+    {
+      "sequence": 3,
+      "questionText": "If you could travel anywhere in the world next year, where would you go? And why there?",
+      "questionTranslation": "내년에 세계 어디든 여행할 수 있다면, 어디로 가고 싶어? 그 이유는 뭐야?",
+      "responseDemand": "HIGH",
+      "requiredElements": [
+        "Name a destination you would choose for next year.",
+        "Explain why you would choose that destination."
+      ],
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/364e90ce95079065cb9547fae895b57287fb77a23e28f370a395fbeb6d68ebee.mp3"
+    },
+    {
+      "sequence": 4,
+      "questionText": "Some of my friends say traveling alone is way better than traveling with friends. I'm not so sure though. What do you think?",
+      "questionTranslation": "내 친구들 중엔 혼자 여행하는 게 친구랑 가는 것보다 훨씬 낫다는 애들이 있거든. 난 잘 모르겠던데. 넌 어떻게 생각해?",
+      "responseDemand": "HIGH",
+      "requiredElements": [
+        "Express your view on traveling alone compared with traveling with friends."
+      ],
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/84c1c7d74ccc01888c12fb6ba6fbd2269392ea2ec28cb55e6d49c973635399bb.mp3"
+    }
+  ]
+}

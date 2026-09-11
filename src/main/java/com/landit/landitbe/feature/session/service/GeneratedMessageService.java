@@ -37,9 +37,12 @@ class GeneratedMessageService {
     final LearningSession learningSession =
         learningSessionService.findOwnedInProgressForUpdate(
             submittedContext.userId(), submittedContext.sessionId());
-    ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
+    final ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
     SessionHistoryMessage submittedMessage = findSubmittedMessage(submittedContext);
     assertSubmittedMessageMatches(submittedContext, submittedMessage);
+    if (feedbackProcessingStatus == ProcessingStatus.FAILED) {
+      submittedMessage.markFeedbackFailed();
+    }
 
     if (generation.completed()) {
       submittedMessage.recordInnerThought(generation.innerThought(), generation.innerThoughtType());
@@ -50,6 +53,7 @@ class GeneratedMessageService {
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
       learningSession.completeBySystem(generation.completionReason(), completedAt);
+      learningSession.prepareLevelAssessment(completedAt);
       grantScenarioAccess(learningSession, submittedContext, completedAt);
       streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
     }

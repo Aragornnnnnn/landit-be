@@ -1,0 +1,207 @@
+{
+  "method": "Gemini blind audio transcription; lowercase words and apostrophes normalized; no reference supplied",
+  "acceptance": "exact normalized transcript, intelligible, complete, no technical defects, naturalness >= 4",
+  "notes": "Question 2 regenerated after omitted So; question 4 regenerated after transcript difference then end click. Only passing versions published.",
+  "assets": [
+    {
+      "sequence": 1,
+      "attempt": 1,
+      "sourceText": "Hey! I'm Marco, an exchange student from Spain. Nice to meet you! Can you introduce yourself a little? — What do you do, and what do you like to do in your free time?",
+      "generationFingerprint": "95a682253d94b307ed64fad30155f844a5d584990e1e938d8f08d54a99c916b8",
+      "audioSha256": "4acc0452d4983f571e17cd37baf0c0a2badad4574457b61ebf3a6f314b10152e",
+      "bytes": 68256,
+      "durationSeconds": 11.376,
+      "model": "deepgram/aura-2",
+      "voice": "aura-2-hyperion-en",
+      "reviewModel": "google/gemini-2.5-pro",
+      "reviewRequestId": "gen-1788674483-Ln2D83cBrHLz7dpoghnc",
+      "usage": {
+        "prompt_tokens": 430,
+        "completion_tokens": 668,
+        "total_tokens": 1098,
+        "cost": 0.0072175,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 300,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0072175,
+          "upstream_inference_prompt_cost": 0.0005375,
+          "upstream_inference_completions_cost": 0.00668
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 539,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "review": {
+        "transcript": "Hey, I'm Marco, an exchange student from Spain. Nice to meet you. Can you introduce yourself a little? What do you do and what do you like to do in your free time?",
+        "intelligible": true,
+        "completeUtterance": true,
+        "technicalDefects": [],
+        "naturalness": 5,
+        "voiceDescription": "Adult male with a non-native English accent",
+        "notes": "The speaker has a clear, non-native English accent, but it does not impede intelligibility."
+      },
+      "normalizedTranscriptMatches": true,
+      "passed": true,
+      "s3Key": "content/scenarios/1/diagnostic-questions/95a682253d94b307ed64fad30155f844a5d584990e1e938d8f08d54a99c916b8.mp3",
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/95a682253d94b307ed64fad30155f844a5d584990e1e938d8f08d54a99c916b8.mp3",
+      "remoteVerified": true
+    },
+    {
+      "sequence": 2,
+      "attempt": 2,
+      "sourceText": "So, have you done anything fun or memorable lately?",
+      "generationFingerprint": "a581134b53756adf5fc5c1b8d767bc958f588eddb6ae44d07935daa1c5d1e562",
+      "audioSha256": "b5bc4d085d3ddecb32cc8b23d30ee16c90f45cf006218ed90b7b5f625312e2fd",
+      "bytes": 21024,
+      "durationSeconds": 3.504,
+      "model": "deepgram/aura-2",
+      "voice": "aura-2-hyperion-en",
+      "reviewModel": "google/gemini-2.5-pro",
+      "reviewRequestId": "gen-1788674562-vDLH6J4IXWZP6YhGJAxN",
+      "usage": {
+        "prompt_tokens": 230,
+        "completion_tokens": 583,
+        "total_tokens": 813,
+        "cost": 0.0061175,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 100,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0061175,
+          "upstream_inference_prompt_cost": 0.0002875,
+          "upstream_inference_completions_cost": 0.00583
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 501,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "review": {
+        "transcript": "So, have you done anything fun or memorable lately?",
+        "intelligible": true,
+        "completeUtterance": true,
+        "technicalDefects": [],
+        "naturalness": 5,
+        "voiceDescription": "Adult male with a moderate pitch and a calm, conversational tone.",
+        "notes": ""
+      },
+      "normalizedTranscriptMatches": true,
+      "passed": true,
+      "s3Key": "content/scenarios/1/diagnostic-questions/a581134b53756adf5fc5c1b8d767bc958f588eddb6ae44d07935daa1c5d1e562.mp3",
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/a581134b53756adf5fc5c1b8d767bc958f588eddb6ae44d07935daa1c5d1e562.mp3",
+      "remoteVerified": true
+    },
+    {
+      "sequence": 3,
+      "attempt": 1,
+      "sourceText": "If you could travel anywhere in the world next year, where would you go? And why there?",
+      "generationFingerprint": "364e90ce95079065cb9547fae895b57287fb77a23e28f370a395fbeb6d68ebee",
+      "audioSha256": "22e3ba98464a4d6812f81347a2494450d137e066a1ee3b12a1eb3feb639c9d72",
+      "bytes": 33984,
+      "durationSeconds": 5.664,
+      "model": "deepgram/aura-2",
+      "voice": "aura-2-hyperion-en",
+      "reviewModel": "google/gemini-2.5-pro",
+      "reviewRequestId": "gen-1788674489-IyvGHblW2IdzMjAyQka6",
+      "usage": {
+        "prompt_tokens": 280,
+        "completion_tokens": 766,
+        "total_tokens": 1046,
+        "cost": 0.00801,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 150,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00801,
+          "upstream_inference_prompt_cost": 0.00035,
+          "upstream_inference_completions_cost": 0.00766
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 657,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "review": {
+        "transcript": "If you could travel anywhere in the world next year, where would you go and why there?",
+        "intelligible": true,
+        "completeUtterance": true,
+        "technicalDefects": [],
+        "naturalness": 5,
+        "voiceDescription": "Calm, clear male voice with a medium-low pitch and a non-American English accent.",
+        "notes": "The audio quality is excellent and the speech is very natural."
+      },
+      "normalizedTranscriptMatches": true,
+      "passed": true,
+      "s3Key": "content/scenarios/1/diagnostic-questions/364e90ce95079065cb9547fae895b57287fb77a23e28f370a395fbeb6d68ebee.mp3",
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/364e90ce95079065cb9547fae895b57287fb77a23e28f370a395fbeb6d68ebee.mp3",
+      "remoteVerified": true
+    },
+    {
+      "sequence": 4,
+      "attempt": 3,
+      "sourceText": "Some of my friends say traveling alone is way better than traveling with friends. I'm not so sure though. What do you think?",
+      "generationFingerprint": "84c1c7d74ccc01888c12fb6ba6fbd2269392ea2ec28cb55e6d49c973635399bb",
+      "audioSha256": "68cb58e10f63781e2cdf96689b154c62ec430402d1d1655fc505a6bc12de712d",
+      "bytes": 39168,
+      "durationSeconds": 6.528,
+      "model": "deepgram/aura-2",
+      "voice": "aura-2-hyperion-en",
+      "reviewModel": "google/gemini-2.5-pro",
+      "reviewRequestId": "gen-1788674633-mNP4rRaPbH0ruX0JHfW3",
+      "usage": {
+        "prompt_tokens": 305,
+        "completion_tokens": 591,
+        "total_tokens": 896,
+        "cost": 0.00629125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 175,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00629125,
+          "upstream_inference_prompt_cost": 0.00038125,
+          "upstream_inference_completions_cost": 0.00591
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 481,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "review": {
+        "transcript": "Some of my friends say traveling alone is way better than traveling with friends. I'm not so sure though. What do you think?",
+        "intelligible": true,
+        "completeUtterance": true,
+        "technicalDefects": [],
+        "naturalness": 5,
+        "voiceDescription": "Young adult male with a clear, conversational tone.",
+        "notes": "No issues detected. The audio is clear and the speech is natural."
+      },
+      "normalizedTranscriptMatches": true,
+      "passed": true,
+      "s3Key": "content/scenarios/1/diagnostic-questions/84c1c7d74ccc01888c12fb6ba6fbd2269392ea2ec28cb55e6d49c973635399bb.mp3",
+      "audioUrl": "https://d19azau1un4t7r.cloudfront.net/content/scenarios/1/diagnostic-questions/84c1c7d74ccc01888c12fb6ba6fbd2269392ea2ec28cb55e6d49c973635399bb.mp3",
+      "remoteVerified": true
+    }
+  ]
+}

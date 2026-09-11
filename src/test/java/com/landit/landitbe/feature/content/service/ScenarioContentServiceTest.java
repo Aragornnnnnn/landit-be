@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.domain.ResponseDemand;
 import com.landit.landitbe.feature.content.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
@@ -26,7 +27,13 @@ class ScenarioContentServiceTest {
   void returnsNextQuestionContext() {
     ScenarioQuestionProjection projection =
         new ScenarioQuestionProjection(
-            10L, 2, "question", "translation", "https://cdn.example.com/question.mp3");
+            10L,
+            2,
+            "question",
+            "translation",
+            "https://cdn.example.com/question.mp3",
+            ResponseDemand.MEDIUM,
+            "answer the question");
     when(repository.findActiveQuestion(
             1L, 2, ContentLearningLevel.LEVEL_2_TO_3, Locale.EN, Locale.KR))
         .thenReturn(Optional.of(projection));
@@ -36,6 +43,12 @@ class ScenarioContentServiceTest {
                 1L, 2, ContentLearningLevel.LEVEL_2_TO_3, Locale.EN, Locale.KR))
         .contains(
             new NextQuestionContext(
-                10L, 2, "question", "translation", "https://cdn.example.com/question.mp3"));
+                10L,
+                2,
+                "question",
+                "translation",
+                "https://cdn.example.com/question.mp3",
+                ResponseDemand.MEDIUM,
+                "answer the question"));
   }
 }
