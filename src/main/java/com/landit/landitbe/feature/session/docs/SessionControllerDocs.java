@@ -134,8 +134,12 @@ public interface SessionControllerDocs {
       summary = "세션 텍스트 수준 평가 조회",
       description =
           "비동기 수준 평가 상태와 완료된 영역별 평가 결과를 조회한다. "
-              + "근거가 충분한 최신 평가는 기존 설정 수준을 평가 수준으로 즉시 대체한다. "
-              + "changeType은 INITIALIZED, PROMOTED, DEMOTED, UNCHANGED, NOT_APPLIED이며 "
+              + "LANDIT_SUBSCRIPTION_LAUNCHED_AT 미설정 또는 도입 전 완료 세션이면 "
+              + "HTTP 200과 success=true, data=null, error=null을 반환한다. FE는 polling을 종료한다. "
+              + "도입 이후 최초 유효 평가만 기존/기본 수준을 대체하고 INITIALIZED를 반환한다. "
+              + "이후 현재 수준보다 0.7 이상 높은 충분한 평가가 2회 연속이면 한 단계 승급하며 자동 강등은 없다. "
+              + "changeType은 INITIALIZED, PROMOTED, UNCHANGED, NOT_APPLIED이며 "
+              + "과거 v1.2 평가 조회에는 DEMOTED가 남아 있을 수 있다. "
               + "previousLevel과 currentLevel로 변경 전후 수준을 제공한다. "
               + "Fallback·근거 부족·최신 설정 이후 도착한 오래된 평가는 적용하지 않는다. "
               + "영역 confidence는 정답 확률이 아닌 가중 관찰 비율이다.",

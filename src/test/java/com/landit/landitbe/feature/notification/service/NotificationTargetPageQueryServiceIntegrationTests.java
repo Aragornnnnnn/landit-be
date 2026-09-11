@@ -100,17 +100,19 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   }
 
   @Test
-  void nullLearningLevelIncludesAdvancedExpressions() {
+  void legacyNullLearningLevelUsesDefaultThreeForExpressions() {
     seedUser();
+    jdbcTemplate.update("UPDATE user_profile SET learning_level=NULL WHERE id=?", USER_ID);
     seedCategory();
     seedScenario(DAILY_SCENARIO_ID, 1);
-    long advancedExpressionId = insertExpression(DAILY_SCENARIO_ID, 1, 4);
+    insertExpression(DAILY_SCENARIO_ID, 1, 4);
+    long intermediateExpressionId = insertExpression(DAILY_SCENARIO_ID, 2, 2);
 
     NotificationTargetPage page = queryService.loadPage(USER_ID - 1, 1, SCHEDULED_DATE);
 
     assertThat(page.inputs().get(USER_ID).expressions())
         .extracting(ExpressionNotificationCandidate::expressionId)
-        .containsExactly(advancedExpressionId);
+        .containsExactly(intermediateExpressionId);
   }
 
   @Test

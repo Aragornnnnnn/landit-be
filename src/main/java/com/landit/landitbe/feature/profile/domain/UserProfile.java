@@ -24,6 +24,7 @@ public class UserProfile extends BaseTimeEntity {
 
   private static final Locale DEFAULT_TARGET_LOCALE = Locale.EN;
   private static final Locale DEFAULT_BASE_LOCALE = Locale.KR;
+  private static final int DEFAULT_LEARNING_LEVEL = 3;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -116,6 +117,7 @@ public class UserProfile extends BaseTimeEntity {
     this.nickname = nickname;
     this.targetLocale = DEFAULT_TARGET_LOCALE;
     this.baseLocale = DEFAULT_BASE_LOCALE;
+    this.learningLevel = DEFAULT_LEARNING_LEVEL;
     this.currentLevel = 1;
     this.aiTutorId = aiTutorId;
     this.accentLocale = AccentLocale.EN_US;
@@ -123,6 +125,15 @@ public class UserProfile extends BaseTimeEntity {
     this.subscriptionStatus = SubscriptionStatus.NONE;
     this.status = UserProfileStatus.ACTIVE;
     this.role = UserRole.USER;
+  }
+
+  /**
+   * 현재 적용 수준을 반환하며 배포 전환 중 구버전이 저장한 미설정 값도 기본값으로 해석한다.
+   *
+   * @return 적용 수준. 저장 값이 null이면 기본 수준 3
+   */
+  public Integer getLearningLevel() {
+    return learningLevel == null ? DEFAULT_LEARNING_LEVEL : learningLevel;
   }
 
   /** 소셜 제공자에서 받은 최신 프로필 정보로 갱신한다. */

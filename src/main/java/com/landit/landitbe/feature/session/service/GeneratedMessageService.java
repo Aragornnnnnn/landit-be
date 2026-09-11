@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
@@ -28,6 +29,8 @@ class GeneratedMessageService {
   private final ScenarioAccessService scenarioAccessService;
   private final Clock clock;
   private final StreakService streakService;
+  private final SessionLevelAssessmentLaunchService assessmentLaunchService;
+  private final UserProfileService userProfileService;
 
   /** AI 생성 결과를 저장하고 사용자에게 반환할 메시지 제출 응답을 만든다. */
   SessionMessageSubmitResponse record(
@@ -53,7 +56,11 @@ class GeneratedMessageService {
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
       learningSession.completeBySystem(generation.completionReason(), completedAt);
-      learningSession.prepareLevelAssessment(completedAt);
+      scenarioSession.recordCompletedLearningLevel(
+          userProfileService.getLearningLevel(submittedContext.userId()).learningLevel());
+      if (assessmentLaunchService.includes(completedAt)) {
+        learningSession.prepareLevelAssessment(completedAt);
+      }
       grantScenarioAccess(learningSession, submittedContext, completedAt);
       streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
     }

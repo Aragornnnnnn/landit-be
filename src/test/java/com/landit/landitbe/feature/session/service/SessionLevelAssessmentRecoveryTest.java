@@ -11,8 +11,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationClient;
+import com.landit.landitbe.feature.session.domain.CompletionReason;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.repository.UserLevelAssessmentRepository;
@@ -44,6 +46,7 @@ class SessionLevelAssessmentRecoveryTest {
     when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     var session =
         LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
+    session.completeBySystem(CompletionReason.MAX_TURNS_REACHED, LocalDateTime.now(clock));
     session.prepareLevelAssessment(LocalDateTime.now(clock));
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
@@ -62,7 +65,9 @@ class SessionLevelAssessmentRecoveryTest {
             ai,
             transactions,
             queued::set,
-            clock);
+            clock,
+            new SessionLevelAssessmentLaunchService(
+                new SubscriptionProperties("2026-06-01T00:00:00Z"), clock));
     service.startIfNeeded(1L, 10L);
     if (expiresInQueue) {
       when(clock.instant()).thenReturn(start.plusSeconds(121));
@@ -98,6 +103,7 @@ class SessionLevelAssessmentRecoveryTest {
     var clock = Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneOffset.UTC);
     var session =
         LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
+    session.completeBySystem(CompletionReason.MAX_TURNS_REACHED, LocalDateTime.now(clock));
     session.prepareLevelAssessment(LocalDateTime.now(clock).minusMinutes(3));
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
@@ -117,7 +123,9 @@ class SessionLevelAssessmentRecoveryTest {
             ai,
             transactions,
             Runnable::run,
-            clock);
+            clock,
+            new SessionLevelAssessmentLaunchService(
+                new SubscriptionProperties("2026-06-01T00:00:00Z"), clock));
 
     service.startIfNeeded(1L, 10L);
     assertThat(session.getLevelAssessmentProcessingStatus()).isEqualTo(ProcessingStatus.PREPARING);

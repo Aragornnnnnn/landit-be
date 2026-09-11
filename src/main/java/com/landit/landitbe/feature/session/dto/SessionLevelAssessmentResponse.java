@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session.dto;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionLevelAssessment;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 세션 텍스트 수준 평가의 비동기 상태와 결과 응답을 정의한다.
@@ -13,6 +14,10 @@ import com.landit.landitbe.feature.session.domain.SessionLevelAssessment;
  * @param processingStatus 비동기 평가 처리 상태
  * @param levelAssessment 저장된 평가 결과. 미평가 또는 저장 실패 시 null
  */
+@Schema(
+    description = "수준 평가 상태와 결과. 비활성 또는 도입 전 완료 세션이면 data 자체가 null",
+    nullable = true,
+    types = {"object", "null"})
 public record SessionLevelAssessmentResponse(
     Long sessionId,
     LevelAssessmentProcessingStatus processingStatus,
