@@ -45,6 +45,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -2287,7 +2288,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @Test
-  void submitMessagePreservesUserMessageWhenAiGenerationFails() throws Exception {
+  void submitMessageAllowsLegacyClientToRecordNewInputAfterAiFailure() throws Exception {
     fakeAiConversationClient.blockInnerThoughtGeneration();
     fakeAiConversationClient.failNextMessageGenerationAfterInnerThoughtStarts();
     JsonNode loginBody = login("message-ai-fail@example.com");
@@ -2339,7 +2340,22 @@ class ScenarioSessionApiIntegrationTests {
             """,
             Integer.class,
             sessionId);
-    assertThat(messageCount).isEqualTo(2);
+    assertThat(messageCount).isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM message_feedback_work WHERE session_id=?",
+                Integer.class,
+                sessionId))
+        .isZero();
+    fakeAiConversationClient.reset();
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"A different recording\",\"inputType\":\"VOICE\"}"))
+        .andExpect(status().isOk());
+    assertThat(userMessageIds(sessionId)).hasSize(1);
   }
 
   @Test
@@ -3030,6 +3046,60 @@ class ScenarioSessionApiIntegrationTests {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("An americano please.", "Different content")))
         .andExpect(status().isConflict());
+  }
+
+  /** 서버 종료로 남은 구 FE 발화는 임대 중에는 보존하고 만료 후 새 녹음을 받는다. */
+  @Test
+  void lan474LegacyRecordingCanReplaceOnlyAnExpiredAttempt() throws Exception {
+    var session = startUserFirstSession("legacy-crash@example.com", 1293, 2293, 3293);
+    seedScenarioQuestion(4293, 2293, 1, "What would you like?", "무엇을 원하세요?");
+    String clientId = UUID.randomUUID().toString();
+    fakeAiConversationClient.failNextMessageGenerationAfterInnerThoughtStarts();
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"content\":\"Old recording\",\"inputType\":\"VOICE\",\"clientMessageId\":\""
+                        + clientId
+                        + "\"}"))
+        .andExpect(status().isServiceUnavailable());
+    long oldId = userMessageIds(session.sessionId()).getFirst();
+    // 프로세스 종료로 정리되지 않은 키 없는 발화와 실행 중 임대를 재현한다.
+    jdbcTemplate.update(
+        "UPDATE session_history_message SET client_message_id=null,"
+            + " scenario_lease_until=? WHERE id=?",
+        LocalDateTime.now(mutableClock).plusMinutes(1),
+        oldId);
+    fakeAiConversationClient.reset();
+    String body = "{\"content\":\"A fresh recording\",\"inputType\":\"VOICE\"}";
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isConflict());
+    assertThat(userMessageIds(session.sessionId())).containsExactly(oldId);
+    jdbcTemplate.update(
+        "UPDATE session_history_message SET scenario_lease_until=? WHERE id=?",
+        LocalDateTime.now(mutableClock).minusSeconds(1),
+        oldId);
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/{id}/messages", session.sessionId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    assertThat(userMessageIds(session.sessionId())).hasSize(1).doesNotContain(oldId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM message_feedback_work WHERE message_id=?",
+                Integer.class,
+                oldId))
+        .isZero();
   }
 
   private StartedSession startUserFirstSession(

@@ -51,12 +51,21 @@ class SubmittedMessageService {
 
     SessionHistoryMessage pending = previousMessages.isEmpty() ? null : previousMessages.getLast();
     if (pending != null && pending.getRole() == ConversationSpeaker.USER) {
-      requireSameInput(pending, content, inputType, clientMessageId);
       if (pending.getScenarioLeaseUntil() != null
           && java.time.LocalDateTime.now(clock).isBefore(pending.getScenarioLeaseUntil())) {
         throw new ApiException(ErrorCode.CONFLICT, "같은 발화의 다음 질문을 생성하고 있습니다.");
       }
       previousMessages = new ArrayList<>(previousMessages.subList(0, previousMessages.size() - 1));
+      if (clientMessageId == null
+          && pending.getClientMessageId() == null
+          && (!pending.getContent().equals(content) || pending.getInputType() != inputType)) {
+        // 구 FE의 재녹음은 종료된 시도만 교체한다. 같은 세션 권한과 유예 기한을 다시 확인한다.
+        accessGrants.requireSessionContinuation(userId, "SCENARIO", sessionId);
+        sessionMessageService.deleteIfExists(pending.getId());
+        pending = null;
+      } else {
+        requireSameInput(pending, content, inputType, clientMessageId);
+      }
     } else {
       pending = null;
       accessGrants.requireSessionContinuation(userId, "SCENARIO", sessionId);
@@ -95,11 +104,26 @@ class SubmittedMessageService {
         attempt);
   }
 
-  /** AI 실패 뒤 접수한 발화는 보존하고 같은 시도만 다시 실행할 수 있게 한다. */
+  /** 키 있는 발화는 보존하고 구 FE의 키 없는 실패 발화만 기존 계약대로 정리한다. */
   void remove(SubmittedMessageContext submittedContext) {
-    sessionMessageService
-        .require(submittedContext.submittedMessageId())
-        .releaseScenarioAttempt(submittedContext.attemptToken());
+    learningSessionService.findOwnedForUpdate(
+        submittedContext.userId(), submittedContext.sessionId());
+    var pending =
+        sessionMessageService.findAll(submittedContext.sessionHistoryId()).stream()
+            .filter(message -> message.getId().equals(submittedContext.submittedMessageId()))
+            .findFirst()
+            .orElse(null);
+    if (pending == null
+        || pending.getScenarioResponsePayload() != null
+        || !java.util.Objects.equals(
+            pending.getScenarioAttemptToken(), submittedContext.attemptToken())) {
+      return;
+    }
+    if (pending.getClientMessageId() == null) {
+      sessionMessageService.deleteIfExists(pending.getId());
+    } else {
+      pending.releaseScenarioAttempt(submittedContext.attemptToken());
+    }
   }
 
   /** 완료된 같은 발화는 구독 변경과 관계없이 저장한 응답을 그대로 반환한다. */

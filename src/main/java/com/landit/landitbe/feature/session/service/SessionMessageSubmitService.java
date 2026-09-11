@@ -124,7 +124,7 @@ public class SessionMessageSubmitService {
           content.length());
       return response;
     } catch (RuntimeException exception) {
-      // 접수한 발화는 보존하고 동일 발화의 재전송으로 이어서 처리한다.
+      // 키 있는 발화는 보존하고 구 FE의 키 없는 실패 발화는 다시 입력할 수 있게 한다.
       asyncGenerationRequests.cancel();
       removeSubmittedMessageInTransaction(submittedContext);
       throw exception;
