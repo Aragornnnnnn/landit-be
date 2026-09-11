@@ -43,7 +43,7 @@ class Lan438AssessmentMetadataMigrationTests {
             question);
       }
       var script =
-          new ClassPathResource("db/migration/V94__refine_room_key_assessment_metadata.sql");
+          new ClassPathResource("db/migration/V96__refine_room_key_assessment_metadata.sql");
       for (int attempt = 0; attempt < 2; attempt++) {
         ScriptUtils.executeSqlScript(connection, script);
       }
