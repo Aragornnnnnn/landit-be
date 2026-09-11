@@ -62,7 +62,8 @@ public class UserSubscriptionService {
   /**
    * 활성 사용자의 구독 상태와 도입 이후 대화 완료 여부를 조회한다.
    *
-   * <p>대화 완료 여부는 유료 구독 도입 시점 이후에 시나리오를 끝까지 완료(CLEARED)한 이력이 있는지로 판단한다. 도입 시점이 설정되지 않았으면 항상 false다.
+   * <p>대화 완료 여부는 유료 구독 도입 시점 이후에 시나리오를 끝까지 완료(CLEARED)한 이력이 있는지로 판단한다. 도입 시점이 설정되지 않았거나 아직 도달하지
+   * 않았으면 항상 false다. 실제 구독 상태는 도입 여부와 관계없이 보존한다.
    *
    * @param userId 조회할 사용자 ID
    * @return 사용자 구독 상태 응답
@@ -71,13 +72,15 @@ public class UserSubscriptionService {
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
     UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
-    return UserSubscriptionResponse.of(snapshot, hasCompletedConversationSinceLaunch(userId));
+    return UserSubscriptionResponse.of(
+        snapshot, isSubscriptionLaunched() && hasCompletedConversationSinceLaunch(userId));
   }
 
   /**
    * 유료 기능 접근 제한에 필요한 사용자의 구독·대화 완료 상태를 평가한다.
    *
-   * <p>유료 구독 도입 시점이 설정되지 않았으면 아직 도입 전이므로 모든 기능을 허용한다.
+   * <p>유료 구독 도입 시점이 설정되지 않았거나 아직 도달하지 않았으면 모든 기능을 허용한다. 요청마다 현재 시각을 비교하므로 서버를 재시작하지 않아도 도입 시점부터 기존
+   * 제한을 적용한다.
    *
    * @param userId 평가할 사용자 ID
    * @return 유료 기능 접근 판단 결과
@@ -85,7 +88,7 @@ public class UserSubscriptionService {
    */
   @Transactional(readOnly = true)
   public PremiumAccess evaluateAccess(Long userId) {
-    if (launchedAt.isEmpty()) {
+    if (!isSubscriptionLaunched()) {
       return PremiumAccess.beforeLaunch();
     }
     UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
@@ -108,6 +111,10 @@ public class UserSubscriptionService {
         .stream()
         .map(SubscriptionEventResponse::from)
         .toList();
+  }
+
+  private boolean isSubscriptionLaunched() {
+    return launchedAt.map(since -> !LocalDateTime.now(clock).isBefore(since)).orElse(false);
   }
 
   private boolean hasCompletedConversationSinceLaunch(Long userId) {

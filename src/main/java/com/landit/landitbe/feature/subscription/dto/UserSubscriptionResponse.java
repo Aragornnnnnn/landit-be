@@ -40,8 +40,7 @@ public record UserSubscriptionResponse(
     @Schema(
             description =
                 "유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있으면 true. 신규 가입자는 시나리오 1 완료,"
-                    + " 도입 전 가입자는 도입 후 오늘의 시나리오 완료가 기준이다. 도입 시점이 설정되기 전에는 항상 false."
-                    + " 앱은 conversationCompletedSinceLaunch && !premium 이면 페이월을 보여준다.",
+                    + " 도입 전 가입자는 도입 후 오늘의 시나리오 완료가 기준이다. 도입 시점 미설정 또는 도입 전에는 항상 false.",
             example = "false")
         boolean conversationCompletedSinceLaunch,
     @Schema(

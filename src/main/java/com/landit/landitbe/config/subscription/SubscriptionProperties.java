@@ -17,6 +17,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *   <li>값 예시: {@code 2026-09-15T00:00:00+09:00} (ISO-8601, 시간대 포함)
  *   <li>비어 있으면 아직 도입 전으로 보고 {@link #launchedAtOrEmpty()}가 빈 값을 돌려준다. 이때 완료 여부는 항상 false고 유료 잠금도
  *       꺼진다.
+ *   <li>미래 시각이면 해당 시각까지 유료 잠금을 끄고, 요청 시각이 도입 시점에 도달하면 제한을 적용한다. 서버 시작 후 설정값을 바꾸면 재시작이 필요하다.
  *   <li>형식이 틀리면 서버 시작에 실패한다.
  * </ul>
  *
