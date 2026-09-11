@@ -69,11 +69,7 @@ class SessionLevelAssessmentRecoveryTest {
             new SessionLevelAssessmentLaunchService(
                 new com.landit.landitbe.feature.subscription.service
                     .SubscriptionLaunchPolicyService(
-                    org.mockito.Mockito.mock(
-                        com.landit.landitbe.feature.subscription.repository
-                            .SubscriptionLaunchPolicyRepository.class),
-                    new SubscriptionProperties("2026-06-01T00:00:00Z"),
-                    clock),
+                    new SubscriptionProperties("2026-06-01T00:00:00Z"), clock),
                 clock));
     service.startIfNeeded(1L, 10L);
     if (expiresInQueue) {
@@ -134,11 +130,7 @@ class SessionLevelAssessmentRecoveryTest {
             new SessionLevelAssessmentLaunchService(
                 new com.landit.landitbe.feature.subscription.service
                     .SubscriptionLaunchPolicyService(
-                    org.mockito.Mockito.mock(
-                        com.landit.landitbe.feature.subscription.repository
-                            .SubscriptionLaunchPolicyRepository.class),
-                    new SubscriptionProperties("2026-06-01T00:00:00Z"),
-                    clock),
+                    new SubscriptionProperties("2026-06-01T00:00:00Z"), clock),
                 clock));
 
     service.startIfNeeded(1L, 10L);

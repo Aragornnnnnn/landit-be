@@ -24,7 +24,6 @@ import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionException;
 import com.landit.landitbe.feature.subscription.repository.FreeScenarioReservationRepository;
 import com.landit.landitbe.feature.subscription.repository.LearningAccessGrantRepository;
-import com.landit.landitbe.feature.subscription.repository.SubscriptionLaunchPolicyRepository;
 import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService.StartAccess;
 import java.time.Clock;
 import java.time.Instant;
@@ -55,9 +54,7 @@ class Lan474LearningAccessGrantServiceTest {
   private final Map<Long, FreeScenarioReservation> storedReservations = new HashMap<>();
   private final SubscriptionLaunchPolicyService policies =
       new SubscriptionLaunchPolicyService(
-          mock(SubscriptionLaunchPolicyRepository.class),
-          new SubscriptionProperties("2026-09-11T11:00:00+09:00"),
-          CLOCK);
+          new SubscriptionProperties("2026-09-11T11:00:00+09:00"), CLOCK);
   private final LearningAccessGrantService service =
       new LearningAccessGrantService(
           repository, reservations, policies, profiles, progress, CLOCK, sessions);

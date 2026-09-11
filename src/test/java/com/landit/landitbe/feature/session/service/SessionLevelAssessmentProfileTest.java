@@ -119,11 +119,7 @@ class SessionLevelAssessmentProfileTest {
     var launch =
         new SessionLevelAssessmentLaunchService(
             new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
-                org.mockito.Mockito.mock(
-                    com.landit.landitbe.feature.subscription.repository
-                        .SubscriptionLaunchPolicyRepository.class),
-                new SubscriptionProperties("2026-06-01T00:00:00Z"),
-                CLOCK),
+                new SubscriptionProperties("2026-06-01T00:00:00Z"), CLOCK),
             CLOCK);
     when(assessments.existsInitializedLevelSince(1L, launch.requireLaunchedAt()))
         .thenReturn(levelInitialized);

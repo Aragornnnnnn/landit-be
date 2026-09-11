@@ -21,11 +21,7 @@ class SessionLevelAssessmentLaunchServiceTest {
     var launch =
         new SessionLevelAssessmentLaunchService(
             new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
-                org.mockito.Mockito.mock(
-                    com.landit.landitbe.feature.subscription.repository
-                        .SubscriptionLaunchPolicyRepository.class),
-                new SubscriptionProperties("  "),
-                clock),
+                new SubscriptionProperties("  "), clock),
             clock);
     assertThat(launch.isEnabled()).isFalse();
     assertThat(launch.includes(1L, LocalDateTime.now(clock))).isFalse();
@@ -37,11 +33,7 @@ class SessionLevelAssessmentLaunchServiceTest {
     var launch =
         new SessionLevelAssessmentLaunchService(
             new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
-                org.mockito.Mockito.mock(
-                    com.landit.landitbe.feature.subscription.repository
-                        .SubscriptionLaunchPolicyRepository.class),
-                new SubscriptionProperties("2026-07-01T00:00:00Z"),
-                clock),
+                new SubscriptionProperties("2026-07-01T00:00:00Z"), clock),
             clock);
     var boundary = LocalDateTime.parse("2026-07-01T09:00:00");
     assertThat(launch.isEnabled()).isTrue();
