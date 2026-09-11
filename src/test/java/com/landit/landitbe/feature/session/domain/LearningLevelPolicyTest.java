@@ -1,4 +1,4 @@
-// 텍스트 평가 결과의 최초 수준 확정과 연속 승급 정책을 검증한다.
+// 최신 평가가 기존 수준을 즉시 대체하고 무효 결과는 보존하는지 검증한다.
 
 package com.landit.landitbe.feature.session.domain;
 
@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class LearningLevelPolicyTest {
 
@@ -16,19 +18,18 @@ class LearningLevelPolicyTest {
             new LearningLevelPolicy.Decision(4, 0, LearningLevelPolicy.ChangeType.INITIALIZED));
   }
 
-  @Test
-  void promotesOneLevelAfterTwoConsecutiveHigherAssessments() {
-    LearningLevelPolicy.Decision first =
-        LearningLevelPolicy.apply(3, 0, new BigDecimal("3.70"), BigDecimal.ONE, true);
-    LearningLevelPolicy.Decision second =
-        LearningLevelPolicy.apply(
-            first.level(), first.promotionStreak(), new BigDecimal("4.10"), BigDecimal.ONE, true);
-
-    assertThat(first)
-        .isEqualTo(
-            new LearningLevelPolicy.Decision(3, 1, LearningLevelPolicy.ChangeType.UNCHANGED));
-    assertThat(second)
-        .isEqualTo(new LearningLevelPolicy.Decision(4, 0, LearningLevelPolicy.ChangeType.PROMOTED));
+  @ParameterizedTest
+  @CsvSource({
+    "4, 2.84, 3, DEMOTED",
+    "5, 1.20, 1, DEMOTED",
+    "1, 4.70, 5, PROMOTED",
+    "3, 3.50, 4, PROMOTED",
+    "3, 3.49, 3, UNCHANGED"
+  })
+  void replacesExistingLevelWithoutWaitingForConsecutiveEvidence(
+      int previous, BigDecimal score, int expected, LearningLevelPolicy.ChangeType changeType) {
+    assertThat(LearningLevelPolicy.apply(previous, 1, score, new BigDecimal("0.75"), true))
+        .isEqualTo(new LearningLevelPolicy.Decision(expected, 0, changeType));
   }
 
   @Test

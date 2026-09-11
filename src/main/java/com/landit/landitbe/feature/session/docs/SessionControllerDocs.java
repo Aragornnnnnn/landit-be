@@ -132,7 +132,13 @@ public interface SessionControllerDocs {
    */
   @Operation(
       summary = "세션 텍스트 수준 평가 조회",
-      description = "비동기 수준 평가 상태와 완료된 영역별 평가 결과를 조회한다.",
+      description =
+          "비동기 수준 평가 상태와 완료된 영역별 평가 결과를 조회한다. "
+              + "근거가 충분한 최신 평가는 기존 설정 수준을 평가 수준으로 즉시 대체한다. "
+              + "changeType은 INITIALIZED, PROMOTED, DEMOTED, UNCHANGED, NOT_APPLIED이며 "
+              + "previousLevel과 currentLevel로 변경 전후 수준을 제공한다. "
+              + "Fallback·근거 부족·최신 설정 이후 도착한 오래된 평가는 적용하지 않는다. "
+              + "영역 confidence는 정답 확률이 아닌 가중 관찰 비율이다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

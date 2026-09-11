@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionLevelAssessmentService {
 
-  private static final String ASSESSMENT_VERSION = "text-level-v1.1";
+  private static final String ASSESSMENT_VERSION = "text-level-v1.2";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final UserProfileRepository userProfileRepository;
