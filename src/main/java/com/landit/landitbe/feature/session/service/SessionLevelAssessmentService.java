@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionLevelAssessmentService {
 
-  private static final String ASSESSMENT_VERSION = "text-level-v1.2";
+  private static final String ASSESSMENT_VERSION = "text-level-v1.3";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final UserProfileRepository userProfileRepository;
@@ -58,12 +58,13 @@ class SessionLevelAssessmentService {
                 profile.getPromotionStreak(),
                 score.overallScore(),
                 score.overallConfidence(),
-                score.sufficientEvidence())
+                score.sufficientEvidence(),
+                userLevelAssessmentRepository.existsInitializedLevel(userId))
             : new LearningLevelPolicy.Decision(
                 previousLevel,
                 profile.getPromotionStreak(),
                 LearningLevelPolicy.ChangeType.NOT_APPLIED);
-    if (applyToProfile && score.sufficientEvidence()) {
+    if (decision.changeType() != LearningLevelPolicy.ChangeType.NOT_APPLIED) {
       profile.applyAssessedLearningLevel(
           decision.level(), decision.promotionStreak(), java.time.LocalDateTime.now(clock));
     }

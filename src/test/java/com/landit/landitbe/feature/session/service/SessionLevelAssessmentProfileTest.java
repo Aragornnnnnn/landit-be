@@ -57,11 +57,11 @@ class SessionLevelAssessmentProfileTest {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
     profile.updateLearningLevel(4, LocalDateTime.now(CLOCK).minusMinutes(1));
     var result = assess(profile, LocalDateTime.now(CLOCK).minusSeconds(10), 3, true);
-    assertThat(result.getChangeType()).isEqualTo(ChangeType.DEMOTED);
+    assertThat(result.getChangeType()).isEqualTo(ChangeType.INITIALIZED);
     assertThat(result.getPreviousLevel()).isEqualTo(4);
     assertThat(result.getCurrentLevel()).isEqualTo(3);
     assertThat(result.getAssessedLevel()).isEqualTo(3);
-    assertThat(result.getAssessmentVersion()).isEqualTo("text-level-v1.2");
+    assertThat(result.getAssessmentVersion()).isEqualTo("text-level-v1.3");
     assertThat(profile.getLearningLevel()).isEqualTo(3);
     assertThat(profile.getPromotionStreak()).isZero();
   }
@@ -76,12 +76,46 @@ class SessionLevelAssessmentProfileTest {
     assertThat(profile.getLearningLevel()).isEqualTo(4);
   }
 
+  @Test
+  void initializedLevelDoesNotDecreaseOnLaterAssessment() {
+    UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+    profile.updateLearningLevel(4, LocalDateTime.now(CLOCK).minusMinutes(1));
+    var result = assess(profile, LocalDateTime.now(CLOCK), 2, true, true);
+    assertThat(result.getChangeType()).isEqualTo(ChangeType.UNCHANGED);
+    assertThat(result.getAssessedLevel()).isEqualTo(2);
+    assertThat(profile.getLearningLevel()).isEqualTo(4);
+  }
+
+  @Test
+  void manuallyLoweredInitializedLevelStillRequiresTwoPromotionSignals() {
+    UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+    profile.updateLearningLevel(1, LocalDateTime.now(CLOCK).minusMinutes(1));
+    assertThat(assess(profile, LocalDateTime.now(CLOCK), 5, true, true).getChangeType())
+        .isEqualTo(ChangeType.UNCHANGED);
+    assertThat(profile.getLearningLevel()).isEqualTo(1);
+    assertThat(profile.getPromotionStreak()).isEqualTo(1);
+    assertThat(assess(profile, LocalDateTime.now(CLOCK), 5, true, true).getChangeType())
+        .isEqualTo(ChangeType.PROMOTED);
+    assertThat(profile.getLearningLevel()).isEqualTo(2);
+    assertThat(profile.getPromotionStreak()).isZero();
+  }
+
   private UserLevelAssessment assess(
       UserProfile profile, LocalDateTime requestedAt, int assessedLevel, boolean applyToProfile) {
+    return assess(profile, requestedAt, assessedLevel, applyToProfile, false);
+  }
+
+  private UserLevelAssessment assess(
+      UserProfile profile,
+      LocalDateTime requestedAt,
+      int assessedLevel,
+      boolean applyToProfile,
+      boolean levelInitialized) {
     var profiles = mock(UserProfileRepository.class);
     var assessments = mock(UserLevelAssessmentRepository.class);
     when(profiles.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(profile));
     when(assessments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(assessments.existsInitializedLevel(1L)).thenReturn(levelInitialized);
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
     when(context.questionLevelGroup()).thenReturn(ContentLearningLevel.DIAGNOSTIC);
