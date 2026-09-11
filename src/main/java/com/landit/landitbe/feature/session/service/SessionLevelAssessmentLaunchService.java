@@ -13,8 +13,10 @@ import org.springframework.stereotype.Component;
 class SessionLevelAssessmentLaunchService {
 
   private final @Nullable LocalDateTime launchedAt;
+  private final Clock clock;
 
   SessionLevelAssessmentLaunchService(SubscriptionProperties properties, Clock clock) {
+    this.clock = clock;
     this.launchedAt =
         properties
             .launchedAtOrEmpty()
@@ -23,11 +25,11 @@ class SessionLevelAssessmentLaunchService {
   }
 
   boolean isEnabled() {
-    return launchedAt != null;
+    return launchedAt != null && !LocalDateTime.now(clock).isBefore(launchedAt);
   }
 
   boolean includes(@Nullable LocalDateTime completedAt) {
-    return launchedAt != null && completedAt != null && !completedAt.isBefore(launchedAt);
+    return isEnabled() && completedAt != null && !completedAt.isBefore(launchedAt);
   }
 
   LocalDateTime requireLaunchedAt() {
