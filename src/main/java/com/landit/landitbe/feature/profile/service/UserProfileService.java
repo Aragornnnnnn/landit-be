@@ -9,10 +9,13 @@ import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -62,6 +65,32 @@ public class UserProfileService {
     return userProfileRepository
         .findActiveByIdForUpdate(userId)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN));
+  }
+
+  /**
+   * 결제 제공자 이벤트로 사용자 구독 상태를 갱신한다.
+   *
+   * <p>탈퇴한 사용자도 대상에 포함해 환불·만료 이벤트가 유실되지 않게 한다. 이미 반영한 이벤트보다 오래된 이벤트는 무시한다. 같은 사용자의 웹훅이 동시에 들어와도 오래된
+   * 이벤트가 최신 상태를 덮어쓰지 않도록 쓰기 잠금으로 조회한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param command 갱신할 구독 정보
+   * @return 갱신 처리 결과
+   */
+  @Transactional
+  public SubscriptionUpdateResult updateSubscription(
+      Long userId, SubscriptionUpdateCommand command) {
+    Optional<UserProfile> found = userProfileRepository.findByIdForUpdate(userId);
+    if (found.isEmpty()) {
+      return SubscriptionUpdateResult.USER_NOT_FOUND;
+    }
+    UserProfile userProfile = found.get();
+    if (userProfile.isSubscriptionEventStale(command.eventAt())) {
+      return SubscriptionUpdateResult.STALE_EVENT;
+    }
+    userProfile.updateSubscription(
+        command.status(), command.periodType(), command.expiresAt(), command.eventAt());
+    return SubscriptionUpdateResult.APPLIED;
   }
 
   /**
@@ -253,6 +282,18 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public UserAccentLocaleResponse getAccentLocale(Long userId) {
     return UserAccentLocaleResponse.from(requireActive(userId).getAccentLocale());
+  }
+
+  /**
+   * 활성 사용자의 서버 기준 구독 상태를 다른 기능이 쓸 스냅샷으로 반환한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 사용자 구독 상태 스냅샷
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public UserSubscriptionSnapshot getSubscription(Long userId) {
+    return UserSubscriptionSnapshot.from(requireActive(userId));
   }
 
   /**
