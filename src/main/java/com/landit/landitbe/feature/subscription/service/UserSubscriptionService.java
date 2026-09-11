@@ -72,11 +72,8 @@ public class UserSubscriptionService {
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
     UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
-    boolean subscriptionLaunched = isSubscriptionLaunched();
     return UserSubscriptionResponse.of(
-        snapshot,
-        subscriptionLaunched,
-        subscriptionLaunched && hasCompletedConversationSinceLaunch(userId));
+        snapshot, isSubscriptionLaunched() && hasCompletedConversationSinceLaunch(userId));
   }
 
   /**

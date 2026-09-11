@@ -102,7 +102,6 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.subscriptionStatus").value("NONE"))
         .andExpect(jsonPath("$.data.premium").value(false))
-        .andExpect(jsonPath("$.data.subscriptionLaunched").value(true))
         .andExpect(jsonPath("$.data.periodType").isEmpty())
         .andExpect(jsonPath("$.data.expiresAt").isEmpty())
         .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(false))
@@ -319,11 +318,6 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.tags[0]").value("Subscription"))
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.responses['200']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.responses['401']").exists())
-        .andExpect(
-            jsonPath(
-                    "$.components.schemas.UserSubscriptionResponse.properties"
-                        + ".subscriptionLaunched.type")
-                .value("boolean"))
         .andExpect(
             jsonPath(
                     "$.components.schemas.UserSubscriptionResponse.properties"

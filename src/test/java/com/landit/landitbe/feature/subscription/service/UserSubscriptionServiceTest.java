@@ -70,7 +70,6 @@ class UserSubscriptionServiceTest {
     assertThat(access.allowsScenarioConversation()).isTrue();
     when(learningProgressService.hasClearedScenarioSince(USER_ID, LAUNCH_TIME)).thenReturn(true);
     assertThat(service.evaluateAccess(USER_ID).allowsScenarioConversation()).isFalse();
-    assertThat(service.getSubscription(USER_ID).subscriptionLaunched()).isTrue();
     assertThat(service.getSubscription(USER_ID).conversationCompletedSinceLaunch()).isTrue();
 
     when(userProfileService.getSubscription(USER_ID)).thenReturn(snapshot(true));
@@ -102,7 +101,6 @@ class UserSubscriptionServiceTest {
     var response = service.getSubscription(USER_ID);
 
     assertThat(response.premium()).isEqualTo(premium);
-    assertThat(response.subscriptionLaunched()).isFalse();
     assertThat(response.subscriptionStatus()).isEqualTo(snapshot(premium).subscriptionStatus());
     assertThat(response.conversationCompletedSinceLaunch()).isFalse();
     verifyNoInteractions(learningProgressService);
