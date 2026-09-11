@@ -35,6 +35,7 @@ import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
+import com.landit.landitbe.feature.session.repository.UserLevelAssessmentRepository;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -108,6 +109,8 @@ class ScenarioSessionApiIntegrationTests {
   @Autowired private FakeAiConversationClient fakeAiConversationClient;
 
   @Autowired private MutableClock mutableClock;
+
+  @Autowired private UserLevelAssessmentRepository levelAssessmentRepository;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -1754,27 +1757,12 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   @ParameterizedTest
-  @CsvSource({"1, PROMOTED", "4, DEMOTED", "3, UNCHANGED"})
-  void validAssessmentReplacesSelectedLevelOnceAndReturnsChange(
-      int selectedLevel, String changeType) throws Exception {
+  @ValueSource(ints = {1, 4, 3})
+  void firstAssessmentReplacesSelectedLevelThenUsesConsecutivePromotion(int selectedLevel)
+      throws Exception {
     final String accessToken =
         login("replace-level@example.com").path("data").path("accessToken").asText();
-    seedCategory(1121, 1, "ACTIVE", "카페");
-    seedScenario(2121, 1121, 1, "USER", "ACTIVE", 1);
-    seedScenarioVariant(
-        3121,
-        2121,
-        "카페 주문",
-        "음료를 주문합니다.",
-        "음료 주문",
-        "음료를 주문하세요.",
-        null,
-        null,
-        null,
-        null,
-        null,
-        "ACTIVE");
-    seedScenarioQuestion(4121, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?");
+    seedLevelAssessmentScenario();
     long sessionId = startScenario(accessToken, 2121);
     jdbcTemplate.update(
         "UPDATE user_profile SET learning_level=?, promotion_streak=1 "
@@ -1794,7 +1782,7 @@ class ScenarioSessionApiIntegrationTests {
           .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(3))
           .andExpect(jsonPath("$.data.levelAssessment.previousLevel").value(selectedLevel))
           .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(3))
-          .andExpect(jsonPath("$.data.levelAssessment.changeType").value(changeType));
+          .andExpect(jsonPath("$.data.levelAssessment.changeType").value("INITIALIZED"));
     }
     assertThat(
             jdbcTemplate.queryForObject(
@@ -1810,6 +1798,90 @@ class ScenarioSessionApiIntegrationTests {
                 sessionId))
         .isEqualTo(1);
     assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(1);
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 5), 3, 1, "UNCHANGED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 5), 4, 0, "PROMOTED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 1), 4, 0, "UNCHANGED");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "text-level-v1.1, UNCHANGED, MODEL, true, false",
+    "text-level-v1.1, INITIALIZED, MODEL, false, true",
+    "text-level-v1.1, PROMOTED, MODEL, true, true",
+    "text-level-v1.2, DEMOTED, MODEL, true, true",
+    "text-level-v1.2, UNCHANGED, MODEL, true, true",
+    "text-level-v1.2, UNCHANGED, MODEL, false, false",
+    "text-level-v1.2, NOT_APPLIED, MODEL, true, false",
+    "text-level-v1.3, INITIALIZED, MODEL, true, true",
+    "text-level-v1.3, NOT_APPLIED, MODEL, true, false",
+    "text-level-v1.3, NOT_APPLIED, FALLBACK, false, false"
+  })
+  void storedHistoryDeterminesWhetherNextAssessmentCanInitialize(
+      String version, String changeType, String source, boolean sufficient, boolean initialized)
+      throws Exception {
+    JsonNode loginBody = login("assessment-history@example.com").path("data");
+    final String accessToken = loginBody.path("accessToken").asText();
+    long userId = loginBody.path("user").path("userId").asLong();
+    seedLevelAssessmentScenario();
+    long firstSessionId = completeLevelAssessmentScenario(accessToken, 3);
+    jdbcTemplate.update(
+        "UPDATE user_level_assessment SET assessment_version=?, change_type=?, "
+            + "source=?, sufficient_evidence=? WHERE learning_session_id=?",
+        version,
+        changeType,
+        source,
+        sufficient,
+        firstSessionId);
+    assertThat(levelAssessmentRepository.existsInitializedLevel(userId)).isEqualTo(initialized);
+    assertThat(levelAssessmentRepository.existsInitializedLevel(Long.MAX_VALUE)).isFalse();
+    long nextSessionId = completeLevelAssessmentScenario(accessToken, 1);
+    assertSavedLevelDecision(
+        nextSessionId, initialized ? 3 : 1, 0, initialized ? "UNCHANGED" : "INITIALIZED");
+  }
+
+  private void seedLevelAssessmentScenario() {
+    seedCategory(1121, 1, "ACTIVE", "카페");
+    seedScenario(2121, 1121, 1, "USER", "ACTIVE", 1);
+    seedScenarioVariant(
+        3121,
+        2121,
+        "카페 주문",
+        "음료를 주문합니다.",
+        "음료 주문",
+        "음료를 주문하세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(4121, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?");
+    seedScenarioQuestion(
+        4122, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?", "LEVEL_2_TO_3");
+    seedScenarioQuestion(
+        4123, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?", "LEVEL_1");
+  }
+
+  private long completeLevelAssessmentScenario(String accessToken, int level) throws Exception {
+    fakeAiConversationClient.assessedDomainLevel = level;
+    long sessionId = startScenario(accessToken, 2121);
+    submitMessage(accessToken, sessionId, "Can I get an iced americano?");
+    submitMessage(accessToken, sessionId, "That is all, thank you.");
+    awaitLevelAssessment(sessionId, accessToken);
+    return sessionId;
+  }
+
+  private void assertSavedLevelDecision(long sessionId, int level, int streak, String changeType) {
+    assertThat(
+            jdbcTemplate.queryForMap(
+                "SELECT a.current_level, a.change_type, p.learning_level, p.promotion_streak "
+                    + "FROM user_level_assessment a JOIN user_profile p ON p.id=a.user_profile_id "
+                    + "WHERE a.learning_session_id=?",
+                sessionId))
+        .containsEntry("CURRENT_LEVEL", level)
+        .containsEntry("CHANGE_TYPE", changeType)
+        .containsEntry("LEARNING_LEVEL", level)
+        .containsEntry("PROMOTION_STREAK", streak);
   }
 
   @Test
