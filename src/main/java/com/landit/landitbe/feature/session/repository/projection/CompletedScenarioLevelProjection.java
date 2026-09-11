@@ -16,7 +16,7 @@ public interface CompletedScenarioLevelProjection {
   /**
    * 평가 후 적용 수준을 반환한다.
    *
-   * @return 최초 완료 평가 이후 적용 수준. 평가가 없으면 null
+   * @return 평가 후 적용 수준 또는 완료 당시 수준. 둘 다 없는 과거 기록이면 null
    */
   Integer getCurrentLevel();
 

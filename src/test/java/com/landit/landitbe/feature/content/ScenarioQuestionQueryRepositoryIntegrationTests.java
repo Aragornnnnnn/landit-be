@@ -118,7 +118,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         values (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
-        scenarioId);
+        scenarioId + 991000L);
     jdbcTemplate.update(
         """
                         insert into scenario (

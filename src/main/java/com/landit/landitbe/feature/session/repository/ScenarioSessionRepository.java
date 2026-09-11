@@ -24,7 +24,8 @@ public interface ScenarioSessionRepository extends JpaRepository<ScenarioSession
       value =
           """
           SELECT ss.question_level_group AS questionLevelGroup,
-                 a.current_level AS currentLevel, ls.ended_at AS endedAt
+                 COALESCE(a.current_level, ss.learning_level_at_completion) AS currentLevel,
+                 ls.ended_at AS endedAt
           FROM scenario_session ss
           JOIN learning_session ls ON ls.id = ss.learning_session_id
           JOIN scenario_language_variant v ON v.id = ss.scenario_language_variant_id

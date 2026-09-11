@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class SessionLevelAssessmentGenerationService {
   private final TransactionTemplate transactionTemplate;
   private final TaskExecutor taskExecutor;
   private final Clock clock;
+  private final SessionLevelAssessmentLaunchService launchService;
 
   SessionLevelAssessmentGenerationService(
       LearningSessionService learningSessionService,
@@ -47,7 +49,8 @@ public class SessionLevelAssessmentGenerationService {
       AiConversationClient aiConversationClient,
       PlatformTransactionManager transactionManager,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
-      Clock clock) {
+      Clock clock,
+      SessionLevelAssessmentLaunchService launchService) {
     this.learningSessionService = learningSessionService;
     this.userProfileService = userProfileService;
     this.contextService = contextService;
@@ -57,6 +60,7 @@ public class SessionLevelAssessmentGenerationService {
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.taskExecutor = taskExecutor;
     this.clock = clock;
+    this.launchService = launchService;
   }
 
   /** 완료 트랜잭션에서 예약한 평가를 서버 내부 실행기로 시작한다. */
@@ -76,7 +80,14 @@ public class SessionLevelAssessmentGenerationService {
    * @param sessionId 완료 트랜잭션에서 평가가 예약된 세션 ID
    */
   public void startIfNeeded(long userId, long sessionId) {
+    if (!launchService.isEnabled()) {
+      return;
+    }
     try {
+      LearningSession session = learningSessionService.findOwned(userId, sessionId);
+      if (!canProcess(session)) {
+        return;
+      }
       LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
       dispatch(userId, context);
     } catch (RuntimeException exception) {
@@ -89,10 +100,14 @@ public class SessionLevelAssessmentGenerationService {
    *
    * @param userId 세션 소유 사용자 ID
    * @param sessionId 조회할 세션 ID
-   * @return 처리 상태와 저장된 평가 결과
+   * @return 처리 상태와 저장된 평가 결과. 비활성 또는 도입 전 완료 세션이면 null
    */
-  public SessionLevelAssessmentResponse get(long userId, long sessionId) {
+  public @Nullable SessionLevelAssessmentResponse get(long userId, long sessionId) {
     LearningSession session = learningSessionService.findOwned(userId, sessionId);
+    if (!launchService.isEnabled()
+        || (session.getEndedAt() != null && !launchService.includes(session.getEndedAt()))) {
+      return null;
+    }
     UserLevelAssessment assessment =
         assessmentRepository.findByLearningSessionId(sessionId).orElse(null);
     if (isExpired(session, assessment)) {
@@ -109,7 +124,7 @@ public class SessionLevelAssessmentGenerationService {
     AiSessionLevelAssessment aiAssessment = null;
     try {
       LearningSession session = learningSessionService.findOwned(userId, context.sessionId());
-      if (session.getLevelAssessmentProcessingStatus() != ProcessingStatus.PREPARING) {
+      if (!canProcess(session)) {
         return;
       }
       if (isExpired(session, null)) {
@@ -132,7 +147,7 @@ public class SessionLevelAssessmentGenerationService {
             userProfileService.requireActiveForUpdate(userId);
             LearningSession session =
                 learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
-            if (session.getLevelAssessmentProcessingStatus() != ProcessingStatus.PREPARING
+            if (!canProcess(session)
                 || assessmentRepository.findByLearningSessionId(context.sessionId()).isPresent()) {
               return;
             }
@@ -177,5 +192,10 @@ public class SessionLevelAssessmentGenerationService {
             .getLevelAssessmentRequestedAt()
             .plus(PREPARING_TIMEOUT)
             .isAfter(LocalDateTime.now(clock));
+  }
+
+  private boolean canProcess(LearningSession session) {
+    return launchService.includes(session.getEndedAt())
+        && session.getLevelAssessmentProcessingStatus() == ProcessingStatus.PREPARING;
   }
 }

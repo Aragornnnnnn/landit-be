@@ -32,6 +32,9 @@ public class ScenarioSession extends BaseTimeEntity {
   @Column(name = "question_level_group", nullable = false, length = 30)
   private ContentLearningLevel questionLevelGroup;
 
+  @Column(name = "learning_level_at_completion")
+  private Integer learningLevelAtCompletion;
+
   @Column(name = "user_opening_instruction_snapshot", columnDefinition = "text")
   private String userOpeningInstructionSnapshot;
 
@@ -84,5 +87,14 @@ public class ScenarioSession extends BaseTimeEntity {
    */
   public void updateGoalCompletionStatus(GoalCompletionStatus goalCompletionStatus) {
     this.goalCompletionStatus = goalCompletionStatus;
+  }
+
+  /**
+   * 평가 비활성 기간에도 과거 표현 학습을 복원할 수 있도록 완료 당시 수준을 보존한다.
+   *
+   * @param learningLevel 완료 트랜잭션에서 확인한 현재 적용 수준
+   */
+  public void recordCompletedLearningLevel(int learningLevel) {
+    this.learningLevelAtCompletion = learningLevel;
   }
 }

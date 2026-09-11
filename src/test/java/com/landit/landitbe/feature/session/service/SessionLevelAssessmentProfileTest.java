@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ResponseDemand;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
@@ -115,7 +116,11 @@ class SessionLevelAssessmentProfileTest {
     var assessments = mock(UserLevelAssessmentRepository.class);
     when(profiles.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(profile));
     when(assessments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-    when(assessments.existsInitializedLevel(1L)).thenReturn(levelInitialized);
+    var launch =
+        new SessionLevelAssessmentLaunchService(
+            new SubscriptionProperties("2026-06-01T00:00:00Z"), CLOCK);
+    when(assessments.existsInitializedLevelSince(1L, launch.requireLaunchedAt()))
+        .thenReturn(levelInitialized);
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
     when(context.questionLevelGroup()).thenReturn(ContentLearningLevel.DIAGNOSTIC);
@@ -135,7 +140,7 @@ class SessionLevelAssessmentProfileTest {
                             AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
                             domains))
                 .toList());
-    return new SessionLevelAssessmentService(profiles, assessments, CLOCK)
+    return new SessionLevelAssessmentService(profiles, assessments, CLOCK, launch)
         .assessApplyAndSave(
             1L, context, new AiSessionLevelAssessment(core, null), applyToProfile, requestedAt);
   }
