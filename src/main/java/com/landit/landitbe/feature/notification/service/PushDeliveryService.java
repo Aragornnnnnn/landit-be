@@ -7,10 +7,18 @@ import com.landit.landitbe.feature.notification.client.PushReceiptStatus;
 import com.landit.landitbe.feature.notification.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.domain.PushDelivery;
 import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
+import com.landit.landitbe.feature.notification.repository.PushDeliveryBatchRepository;
 import com.landit.landitbe.feature.notification.repository.PushDeliveryRepository;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +33,153 @@ public class PushDeliveryService {
 
   private final PushDeliveryRepository pushDeliveryRepository;
   private final UserPushTokenDeliveryService userPushTokenDeliveryService;
+  private final PushDeliveryBatchRepository pushDeliveryBatchRepository;
+
+  /**
+   * 최대 100개 후보를 일괄 잠금·검사하고 발송 가능한 이력만 선점한다.
+   *
+   * @param commands 발송 후보 목록
+   * @return 입력 순서의 신규 또는 재시도 선점 결과
+   */
+  @Transactional
+  public List<PreparedPushDelivery> prepareAll(List<PreparePushDeliveryCommand> commands) {
+    requireBatchSize(commands.size());
+    if (commands.isEmpty()) {
+      return List.of();
+    }
+    List<PreparePushDeliveryCommand> unique =
+        commands.stream()
+            .collect(
+                Collectors.toMap(
+                    PreparePushDeliveryCommand::deduplicationKey,
+                    Function.identity(),
+                    (first, ignored) -> first,
+                    LinkedHashMap::new))
+            .values()
+            .stream()
+            .toList();
+    List<String> keys = unique.stream().map(PreparePushDeliveryCommand::deduplicationKey).toList();
+    Map<String, PushDelivery> existing =
+        pushDeliveryRepository.findAllByKeysForUpdate(keys).stream()
+            .collect(Collectors.toMap(PushDelivery::getDeduplicationKey, Function.identity()));
+    Map<Long, Long> owners = new LinkedHashMap<>();
+    unique.forEach(
+        c -> {
+          Long previous = owners.putIfAbsent(c.userPushTokenId(), c.userProfileId());
+          if (previous != null && !previous.equals(c.userProfileId())) {
+            throw new IllegalArgumentException("같은 Token에 서로 다른 사용자를 지정할 수 없습니다.");
+          }
+        });
+    Map<Long, UserPushTokenDeliveryTarget> targets =
+        userPushTokenDeliveryService.findLockedSendableDeliveryTargets(owners);
+    Set<String> presentKeys = new HashSet<>(pushDeliveryRepository.findExistingKeys(keys));
+    Map<String, PreparedPushDelivery> prepared = new LinkedHashMap<>();
+    List<PushDelivery> created = new ArrayList<>();
+    List<PushDelivery> retries = new ArrayList<>();
+    for (PreparePushDeliveryCommand command : unique) {
+      UserPushTokenDeliveryTarget target = targets.get(command.userPushTokenId());
+      if (target == null) {
+        continue;
+      }
+      PushDelivery delivery = existing.get(command.deduplicationKey());
+      if (delivery != null) {
+        if (delivery.getSentExpoPushToken().equals(target.expoPushToken())
+            && delivery.claimRetry()) {
+          retries.add(delivery);
+          prepared.put(command.deduplicationKey(), prepared(delivery));
+        }
+      } else if (!presentKeys.contains(command.deduplicationKey())) {
+        created.add(
+            PushDelivery.requested(
+                command.userProfileId(),
+                command.userPushTokenId(),
+                target.expoPushToken(),
+                command.notificationType(),
+                command.contentVariant(),
+                command.deduplicationKey(),
+                command.title(),
+                command.body(),
+                command.deepLink(),
+                LocalDateTime.now()));
+      }
+    }
+    // 재시도 표식을 먼저 저장해 INSERT 이후 JPA 자동 flush가 건별 갱신하지 않게 한다.
+    pushDeliveryBatchRepository.updateStates(retries);
+    Map<String, Long> inserted = pushDeliveryBatchRepository.insertRequested(created);
+    created.forEach(
+        d ->
+            prepared.put(
+                d.getDeduplicationKey(),
+                new PreparedPushDelivery(
+                    inserted.get(d.getDeduplicationKey()),
+                    d.getSentExpoPushToken(),
+                    d.getTitle(),
+                    d.getBody(),
+                    d.getDeepLink())));
+    return unique.stream()
+        .map(c -> prepared.get(c.deduplicationKey()))
+        .filter(java.util.Objects::nonNull)
+        .toList();
+  }
+
+  /**
+   * 여러 이벤트의 접수 이력을 한 번에 조회한다. 현재 활성 Token이 없어도 복구한다.
+   *
+   * @param prefixes 이벤트별 중복 방지 키 접두어
+   * @return Receipt 확인을 다시 예약할 발송 ID
+   */
+  @Transactional(readOnly = true)
+  public List<Long> findAcceptedDeliveryIdsForEvents(List<String> prefixes) {
+    return pushDeliveryBatchRepository.findAcceptedIds(prefixes);
+  }
+
+  /**
+   * Expo 묶음 응답을 입력 순서의 ID에 연결해 하나의 트랜잭션으로 기록한다.
+   *
+   * @param ids 발송 ID, 최대 100개
+   * @param results ID 순서에 대응하는 Ticket 결과
+   */
+  @Transactional
+  public void recordTicketResults(List<Long> ids, List<PushTicketResult> results) {
+    requireBatchSize(ids.size());
+    if (ids.size() != results.size() || ids.stream().distinct().count() != ids.size()) {
+      throw new IllegalArgumentException("Ticket 결과와 발송 ID 개수가 다르거나 ID가 중복됩니다.");
+    }
+    if (ids.isEmpty()) {
+      return;
+    }
+    List<PushDelivery> deliveries = pushDeliveryRepository.findAllByIdsForUpdate(ids);
+    if (deliveries.size() != ids.size()) {
+      throw new IllegalArgumentException("푸시 발송 이력이 존재하지 않습니다.");
+    }
+    Map<Long, PushTicketResult> byId = new LinkedHashMap<>();
+    for (int i = 0; i < ids.size(); i++) {
+      byId.put(ids.get(i), results.get(i));
+    }
+    List<PushDelivery> changed = new ArrayList<>();
+    List<String> revokedTokens = new ArrayList<>();
+    for (PushDelivery delivery : deliveries) {
+      PushTicketResult result = byId.get(delivery.getId());
+      boolean transitioned =
+          result.accepted()
+              ? delivery.acceptTicket(result.ticketId())
+              : delivery.failTicket(result.errorCode(), LocalDateTime.now());
+      if (transitioned) {
+        changed.add(delivery);
+        if (!result.accepted() && DEVICE_NOT_REGISTERED.equals(result.errorCode())) {
+          revokedTokens.add(delivery.getSentExpoPushToken());
+        }
+      }
+    }
+    pushDeliveryBatchRepository.updateStates(changed);
+    userPushTokenDeliveryService.revokeCurrentTokenOwners(revokedTokens);
+  }
+
+  private void requireBatchSize(int size) {
+    if (size > 100) {
+      throw new IllegalArgumentException("발송 DB 묶음은 최대 100건입니다.");
+    }
+  }
 
   /**
    * User Push Token을 잠근 뒤 중복되지 않은 발송 이력을 Expo 호출 전에 선점한다.

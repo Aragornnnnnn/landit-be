@@ -564,6 +564,29 @@ class AdminPushCampaignIntegrationTests {
     assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
   }
 
+  /** 정기 푸시와 달리 관리자 공지의 일시적 Expo 오류도 종료해 재발송하지 않는다. */
+  @Test
+  void terminatesAdminRequestFailureWithoutResendingAfterBatchIntegration() {
+    token(USER, "request-failure-1");
+    token(USER, "request-failure-2");
+    UUID id = create("request-failure");
+    campaigns.send(id, ADMIN, "send");
+    when(sender.send(anyList())).thenThrow(new RetryablePushNotificationException("Expo timeout"));
+
+    processor.process(id);
+    processor.process(id);
+
+    verify(sender, times(1)).send(anyList());
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from push_delivery "
+                    + "where status='FAILED' and error_code='EXPO_REQUEST_UNCONFIRMED'",
+                Long.class))
+        .isEqualTo(2);
+    assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
+    assertThat(campaigns.detail(id).failedCount()).isEqualTo(2);
+  }
+
   @Test
   void waitsForAnotherConsumerBeforeAdvancingThePage() {
     long tokenId = token(USER, "concurrent");
