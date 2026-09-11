@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.profile.service;
 
+import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
@@ -9,6 +10,7 @@ import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.SubscriptionTransferResult;
 import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
@@ -97,6 +99,49 @@ public class UserProfileService {
         command.productId(),
         command.store());
     return SubscriptionUpdateResult.APPLIED;
+  }
+
+  /**
+   * 결제 제공자가 알린 계정 간 구독 이전을 반영한다.
+   *
+   * <p>넘겨준 계정의 구독 정보를 넘겨받은 계정에 복사하고 넘겨준 계정은 구독 없음으로 비운다. 두 계정을 ID 오름차순으로 쓰기 잠금해 교착을 막고, 어느 한쪽이라도 이미
+   * 반영한 이벤트보다 오래된 이벤트면 아무것도 바꾸지 않는다. 넘겨준 계정에 구독이 없으면 넘겨받은 계정도 건드리지 않는다.
+   *
+   * @param fromUserId 구독을 넘겨준 사용자 ID
+   * @param toUserId 구독을 넘겨받은 사용자 ID
+   * @param eventAt 이벤트 발생 시각
+   * @return 이전 처리 결과와 복사된 구독 정보
+   */
+  @Transactional
+  public SubscriptionTransferResult transferSubscription(
+      Long fromUserId, Long toUserId, LocalDateTime eventAt) {
+    // 두 계정을 항상 작은 ID부터 잠근다. 웹훅 두 개가 동시에 서로 반대 순서로 잠그면 교착이 생기기 때문이다.
+    Long lowerId = Math.min(fromUserId, toUserId);
+    Long higherId = Math.max(fromUserId, toUserId);
+    Optional<UserProfile> lower = userProfileRepository.findByIdForUpdate(lowerId);
+    Optional<UserProfile> higher = userProfileRepository.findByIdForUpdate(higherId);
+    if (lower.isEmpty() || higher.isEmpty()) {
+      return SubscriptionTransferResult.userNotFound();
+    }
+    // 잠근 뒤에는 다시 넘겨준 계정(from)과 넘겨받은 계정(to)으로 나눠 쓴다.
+    UserProfile from = lowerId.equals(fromUserId) ? lower.get() : higher.get();
+    UserProfile to = lowerId.equals(fromUserId) ? higher.get() : lower.get();
+    if (from.isSubscriptionEventStale(eventAt) || to.isSubscriptionEventStale(eventAt)) {
+      return SubscriptionTransferResult.stale();
+    }
+    if (from.getSubscriptionStatus() == SubscriptionStatus.NONE) {
+      return SubscriptionTransferResult.applied(null);
+    }
+    UserSubscriptionSnapshot moved = UserSubscriptionSnapshot.from(from);
+    to.updateSubscription(
+        moved.subscriptionStatus(),
+        moved.periodType(),
+        moved.expiresAt(),
+        eventAt,
+        moved.productId(),
+        moved.store());
+    from.updateSubscription(SubscriptionStatus.NONE, null, null, eventAt, null, null);
+    return SubscriptionTransferResult.applied(moved);
   }
 
   /**

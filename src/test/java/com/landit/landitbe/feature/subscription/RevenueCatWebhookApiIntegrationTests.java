@@ -437,6 +437,121 @@ class RevenueCatWebhookApiIntegrationTests {
         .containsExactly("INITIAL_PURCHASE", "BILLING_ISSUE", "PRODUCT_CHANGE");
   }
 
+  /** 구독 이전 이벤트를 받으면 넘겨준 계정은 구독 없음이 되고 넘겨받은 계정이 같은 구독 정보를 갖는다. */
+  @Test
+  void movesSubscriptionToTransferredAccount() throws Exception {
+    Long fromUserId = createUser("rc-transfer-from");
+    Long toUserId = createUser("rc-transfer-to");
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "INITIAL_PURCHASE",
+                fromUserId,
+                BASE_EVENT_TIMESTAMP_MS,
+                Map.of("period_type", "TRIAL")))
+        .andExpect(status().isOk());
+    Timestamp expiresAt = subscriptionExpiresAt(fromUserId);
+
+    postWebhook(
+            WEBHOOK_SECRET, transferEvent(fromUserId, toUserId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+
+    assertThat(subscriptionStatus(fromUserId)).isEqualTo("NONE");
+    assertThat(subscriptionPeriodType(fromUserId)).isNull();
+    assertThat(subscriptionExpiresAt(fromUserId)).isNull();
+    assertThat(subscriptionProductId(fromUserId)).isNull();
+    assertThat(subscriptionStore(fromUserId)).isNull();
+    assertThat(subscriptionStatus(toUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionPeriodType(toUserId)).isEqualTo("TRIAL");
+    assertThat(subscriptionExpiresAt(toUserId)).isEqualTo(expiresAt);
+    assertThat(subscriptionProductId(toUserId)).isEqualTo("landit_premium_monthly");
+    assertThat(subscriptionStore(toUserId)).isEqualTo("APP_STORE");
+    assertThat(subscriptionEvents(toUserId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("TRANSFER");
+    assertThat(subscriptionEvents(fromUserId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE");
+  }
+
+  /** 이미 반영한 이벤트보다 오래된 구독 이전은 두 계정 모두 바꾸지 않는다. */
+  @Test
+  void ignoresStaleTransfer() throws Exception {
+    Long fromUserId = createUser("rc-transfer-stale-from");
+    Long toUserId = createUser("rc-transfer-stale-to");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", fromUserId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET, transferEvent(fromUserId, toUserId, BASE_EVENT_TIMESTAMP_MS - 1_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(fromUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionStatus(toUserId)).isEqualTo("NONE");
+    assertThat(subscriptionEvents(toUserId)).isEmpty();
+  }
+
+  /** 같은 구독 이전 이벤트가 다시 오면 이력을 추가하거나 상태를 되돌리지 않는다. */
+  @Test
+  void ignoresDuplicateTransfer() throws Exception {
+    Long fromUserId = createUser("rc-transfer-dup-from");
+    Long toUserId = createUser("rc-transfer-dup-to");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", fromUserId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    String transfer = transferEvent(fromUserId, toUserId, BASE_EVENT_TIMESTAMP_MS + 1_000);
+    postWebhook(WEBHOOK_SECRET, transfer).andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET, event("INITIAL_PURCHASE", fromUserId, BASE_EVENT_TIMESTAMP_MS + 2_000))
+        .andExpect(status().isOk());
+
+    postWebhook(WEBHOOK_SECRET, transfer).andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(fromUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionStatus(toUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(toUserId)).hasSize(1);
+  }
+
+  /** 넘겨준 계정에 구독이 없으면 넘겨받은 계정을 건드리지 않고 이력도 남기지 않는다. */
+  @Test
+  void skipsTransferWhenSourceHasNoSubscription() throws Exception {
+    Long fromUserId = createUser("rc-transfer-none-from");
+    Long toUserId = createUser("rc-transfer-none-to");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", toUserId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET, transferEvent(fromUserId, toUserId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(fromUserId)).isEqualTo("NONE");
+    assertThat(subscriptionStatus(toUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(toUserId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE");
+  }
+
+  /** 익명 ID만 담겼거나 한쪽 계정이 없는 구독 이전은 로그만 남기고 200으로 응답한다. */
+  @Test
+  void acknowledgesTransferWithoutResolvableAccounts() throws Exception {
+    Long fromUserId = createUser("rc-transfer-unresolved");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", fromUserId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            transferEvent(
+                "$RCAnonymousID:abc", "$RCAnonymousID:def", BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            transferEvent(String.valueOf(fromUserId), "987654321", BASE_EVENT_TIMESTAMP_MS + 2_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(fromUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(987_654_321L)).isEmpty();
+  }
+
   /** Authorization 헤더가 없거나 설정값과 다르면 401로 거절하고 상태를 바꾸지 않는다. */
   @Test
   void rejectsMissingOrWrongAuthorization() throws Exception {
@@ -492,6 +607,31 @@ class RevenueCatWebhookApiIntegrationTests {
       request.header(HttpHeaders.AUTHORIZATION, authorization);
     }
     return mockMvc.perform(request);
+  }
+
+  private static String transferEvent(Long fromUserId, Long toUserId, long eventTimestampMs) {
+    return transferEvent(String.valueOf(fromUserId), String.valueOf(toUserId), eventTimestampMs);
+  }
+
+  /** RevenueCat 공식 샘플 형태의 TRANSFER 본문. app_user_id와 구독 상세 필드가 없다. */
+  private static String transferEvent(String from, String to, long eventTimestampMs) {
+    String template =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "TRANSFER",
+            "app_id": "1234567890",
+            "store": "APP_STORE",
+            "environment": "SANDBOX",
+            "transferred_from": ["$RCAnonymousID:from", "%s"],
+            "transferred_to": ["%s"],
+            "event_timestamp_ms": %d
+          }
+        }
+        """;
+    return template.formatted(UUID.randomUUID(), from, to, eventTimestampMs);
   }
 
   private static String event(String type, Long userId, long eventTimestampMs) {

@@ -29,6 +29,8 @@ import java.util.List;
  * @param purchasedAtMs 결제 시각(epoch ms)
  * @param expirationAtMs 구독 만료 시각(epoch ms)
  * @param eventTimestampMs 이벤트 생성 시각(epoch ms)
+ * @param transferredFrom TRANSFER 이벤트에서 구독을 넘겨준 App User ID 목록
+ * @param transferredTo TRANSFER 이벤트에서 구독을 넘겨받은 App User ID 목록
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RevenueCatWebhookEvent(
@@ -47,4 +49,6 @@ public record RevenueCatWebhookEvent(
     @JsonProperty("expiration_reason") String expirationReason,
     @JsonProperty("purchased_at_ms") Long purchasedAtMs,
     @JsonProperty("expiration_at_ms") Long expirationAtMs,
-    @JsonProperty("event_timestamp_ms") Long eventTimestampMs) {}
+    @JsonProperty("event_timestamp_ms") Long eventTimestampMs,
+    @JsonProperty("transferred_from") List<String> transferredFrom,
+    @JsonProperty("transferred_to") List<String> transferredTo) {}

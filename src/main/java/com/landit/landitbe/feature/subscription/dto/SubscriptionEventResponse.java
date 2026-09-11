@@ -35,7 +35,7 @@ public record SubscriptionEventResponse(
             description =
                 "이벤트 타입. INITIAL_PURCHASE(첫 결제 또는 체험 시작), RENEWAL(갱신, 체험 끝 첫 결제 포함),"
                     + " CANCELLATION(해지 예약·환불), UNCANCELLATION(해지 취소), EXPIRATION(만료),"
-                    + " BILLING_ISSUE(결제 실패), PRODUCT_CHANGE(플랜 변경)",
+                    + " BILLING_ISSUE(결제 실패), PRODUCT_CHANGE(플랜 변경), TRANSFER(다른 계정에서 구독을 넘겨받음)",
             example = "RENEWAL")
         SubscriptionEventType type,
     @Schema(description = "구독 상품 ID", example = "com.saynow.app.premium.yearly") String productId,
