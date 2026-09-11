@@ -22,6 +22,7 @@ public class FreeTalkExpressionRetryService {
 
   private final LearningSessionRepository learningSessionRepository;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
+  private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
   /**
    * 사용자가 소유한 실패 세션의 표현 생성을 재시도 상태로 전환한다.
@@ -30,6 +31,7 @@ public class FreeTalkExpressionRetryService {
    * @param learningSessionId 재시도할 학습 세션 ID
    * @return 재시도 요청 뒤의 표현 생성 상태
    * @throws ApiException 세션이 없거나 소유하지 않았거나 재시도할 수 없는 상태일 때
+   * @throws com.landit.landitbe.feature.session.exception.SessionException 프리톡 이용 한도에 도달했을 때
    */
   @Transactional
   public FreeTalkExpressionRetryResponse retry(long userId, long learningSessionId) {
@@ -56,6 +58,7 @@ public class FreeTalkExpressionRetryService {
     } catch (IllegalStateException exception) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
+    dailySpeakingUsageService.reserveRequest(userId);
     return new FreeTalkExpressionRetryResponse(
         learningSessionId, freeTalkSession.getExpressionGenerationStatus());
   }
