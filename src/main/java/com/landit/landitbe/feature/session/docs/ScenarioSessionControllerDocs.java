@@ -35,7 +35,7 @@ public interface ScenarioSessionControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "잠금 상태"),
+        description = "잠금 상태 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "시나리오 없음")

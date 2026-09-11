@@ -43,7 +43,7 @@ public interface SessionControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "권한 없음"),
+        description = "권한 없음 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),

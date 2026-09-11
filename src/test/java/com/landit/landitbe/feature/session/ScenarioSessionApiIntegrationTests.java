@@ -55,6 +55,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -114,6 +115,18 @@ class ScenarioSessionApiIntegrationTests {
     awaitPendingLevelAssessments();
     mutableClock.setInstant(DEFAULT_TEST_INSTANT);
     fakeAiConversationClient.reset();
+    clearLearningData();
+  }
+
+  /** 테스트가 만든 캐릭터·음성 행이 다른 테스트 클래스의 스키마 검증에 남지 않도록 정리한다. */
+  @AfterEach
+  void tearDown() {
+    clearLearningData();
+    jdbcTemplate.update("DELETE FROM conversation_character WHERE character_id LIKE 'test-%'");
+    jdbcTemplate.update("DELETE FROM tts_voice WHERE provider_voice_id LIKE 'test-%'");
+  }
+
+  private void clearLearningData() {
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM session_history_message_feedback");
@@ -373,7 +386,9 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(scenarioSessionPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(scenarioSessionPath + ".responses['201'].description").value("시작 성공"))
         .andExpect(jsonPath(scenarioSessionPath + ".responses['401'].description").value("인증 실패"))
-        .andExpect(jsonPath(scenarioSessionPath + ".responses['403'].description").value("잠금 상태"))
+        .andExpect(
+            jsonPath(scenarioSessionPath + ".responses['403'].description")
+                .value("잠금 상태 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"))
         .andExpect(jsonPath(scenarioSessionPath + ".responses['404'].description").value("시나리오 없음"))
         .andExpect(jsonPath(sessionEndPath + ".tags[0]").value("Session"))
         .andExpect(jsonPath(sessionEndPath + ".summary").value("세션 중도 종료"))

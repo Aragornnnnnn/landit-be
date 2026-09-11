@@ -6,6 +6,7 @@ import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -63,10 +64,31 @@ public class UserSubscriptionService {
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
     UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
-    boolean conversationCompletedSinceLaunch =
-        launchedAt
-            .map(since -> learningProgressService.hasClearedScenarioSince(userId, since))
-            .orElse(false);
-    return UserSubscriptionResponse.of(snapshot, conversationCompletedSinceLaunch);
+    return UserSubscriptionResponse.of(snapshot, hasCompletedConversationSinceLaunch(userId));
+  }
+
+  /**
+   * 유료 기능 접근 제한에 필요한 사용자의 구독·대화 완료 상태를 평가한다.
+   *
+   * <p>유료 구독 도입 시점이 설정되지 않았으면 아직 도입 전이므로 모든 기능을 허용한다.
+   *
+   * @param userId 평가할 사용자 ID
+   * @return 유료 기능 접근 판단 결과
+   * @throws com.landit.landitbe.feature.profile.exception.UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public PremiumAccess evaluateAccess(Long userId) {
+    if (launchedAt.isEmpty()) {
+      return PremiumAccess.beforeLaunch();
+    }
+    UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
+    return PremiumAccess.afterLaunch(
+        snapshot.premium(), hasCompletedConversationSinceLaunch(userId));
+  }
+
+  private boolean hasCompletedConversationSinceLaunch(Long userId) {
+    return launchedAt
+        .map(since -> learningProgressService.hasClearedScenarioSince(userId, since))
+        .orElse(false);
   }
 }

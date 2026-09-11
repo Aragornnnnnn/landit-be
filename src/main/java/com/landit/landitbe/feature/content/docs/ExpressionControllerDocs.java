@@ -52,6 +52,17 @@ public interface ExpressionControllerDocs {
       summary = "원어민 표현 학습 시작",
       description = "선택한 표현의 뜻, 설명과 대표 예문에 사용자의 학습 완료 여부를 더해 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)")
+  })
   ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
       AuthUserPrincipal principal, Long expressionId);
 
@@ -66,6 +77,17 @@ public interface ExpressionControllerDocs {
       summary = "원어민 표현 학습 추가 예문 조회",
       description = "눈으로 익히는 추가 예문 2건과 직접 푸는 작문 문제 2건(영어·한국어 각 1건)을 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)")
+  })
   ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
       AuthUserPrincipal principal, Long expressionId);
 
@@ -81,6 +103,17 @@ public interface ExpressionControllerDocs {
       summary = "원어민 표현 학습 완료",
       description = "시나리오는 순차 잠금, 프리톡은 세션 연결 검증 후 완료를 기록한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "프리미엄 구독 필요 (PREMIUM_REQUIRED)")
+  })
   ApiResponse<Map<String, Object>> finishLearning(
       AuthUserPrincipal principal, Long expressionId, ExpressionLearningFinishRequest request);
 }
