@@ -18,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -115,7 +116,11 @@ public class RemoteAiConversationClient implements AiConversationClient {
   public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
     return post(
             sessionLevelAssessmentUri(),
-            request,
+            Map.of(
+                "sessionId", request.sessionId(),
+                "scenario", request.scenario(),
+                "expectedMessageIds", request.expectedMessageIds(),
+                "assessmentMessages", request.assessmentMessages()),
             RemoteSessionLevelAssessmentResponse.class,
             ErrorCode.FEEDBACK_GENERATION_FAILED,
             properties.sessionFeedbackRequestTimeout())
