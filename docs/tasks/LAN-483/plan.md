@@ -49,7 +49,15 @@
 | 평가를 끄면 진단 시나리오의 과거 표현 수준이 없어짐. | `scenario_session.learning_level_at_completion`에 완료 당시 수준 보존. 조회는 평가 결과 → 완료 스냅샷 → 기존 과거 fallback 순서. |
 | 수준 평가 GET의 인증 matcher 누락으로 무인증 요청이 500 응답. | 해당 GET 경로에 기존 인증 정책 적용. 정상 사용자 소유권 검사도 유지. |
 
-- V97: `user_profile.learning_level`의 기존 NULL 보정과 DB 기본값 3. 이미 설정된 수준·수준 변경 시각·승급 신호는 보존.
-- V98: `scenario_session.learning_level_at_completion` nullable 컬럼만 추가. 과거 세션 소급 보정 없음.
+- V98: `user_profile.learning_level`의 기존 NULL 보정과 DB 기본값 3. 이미 설정된 수준·수준 변경 시각·승급 신호는 보존.
+- V99: `scenario_session.learning_level_at_completion` nullable 컬럼만 추가. 과거 세션 소급 보정 없음.
 - 새 테이블, 새 API, AI 변경 없음.
 - 기존 고급 콘텐츠 테스트는 고급 수준을 명시하도록 fixture를 수정. 신규 가입 기본값·구버전 NULL은 별도 회귀로 검증.
+
+## 마이그레이션 번호 충돌 수정.
+
+- 최신 `origin/develop`(`36a7136e`)의 `V97__add_free_talk_request_limits.sql`과 충돌하여 LAN-483 번호를 V98·V99로 이동.
+- 두 SQL의 내용과 적용 순서는 그대로 유지. 테스트 리소스 경로와 PR 설명도 같은 번호로 변경.
+- common+H2, common+PostgreSQL 각각 최신 develop과 합친 버전 중복 0개. SQL byte 동일·이전 파일명 참조 없음·독립 검수 통과.
+- 번호 변경 후 `./gradlew check --no-parallel --console=plain` 재통과: 1,114개 중 성공 1,110개·기존 조건부 제외 4개·실패 0개.
+- 실제 DB 마이그레이션·배포·기존 migration history 변경 없음.

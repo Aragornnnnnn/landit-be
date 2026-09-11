@@ -25,7 +25,7 @@ class Lan483LearningLevelMigrationTests {
       jdbc.execute("UPDATE user_profile SET promotion_streak=1 WHERE id=3");
       ScriptUtils.executeSqlScript(
           connection,
-          new ClassPathResource("db/migration/V97__default_user_learning_level_to_three.sql"));
+          new ClassPathResource("db/migration/V98__default_user_learning_level_to_three.sql"));
       jdbc.execute("INSERT INTO user_profile (id) VALUES (4)");
       assertThat(
               jdbc.queryForList(
