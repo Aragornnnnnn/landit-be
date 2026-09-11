@@ -35,7 +35,6 @@ import com.landit.landitbe.feature.content.repository.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
@@ -65,6 +64,7 @@ class ExpressionQueryServiceTest {
   @Mock private ScenarioService scenarioService;
 
   @Mock private UserProfileService userProfileService;
+  @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
 
@@ -239,7 +239,9 @@ class ExpressionQueryServiceTest {
     when(expression.getDifficultyLevel()).thenReturn(4);
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+    when(scenarioLearningLevelService.expressionLevel(
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_2_TO_3);
 
     assertThatThrownBy(
             () -> expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID))
@@ -255,7 +257,9 @@ class ExpressionQueryServiceTest {
     when(expression.getDifficultyLevel()).thenReturn(1);
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+    when(scenarioLearningLevelService.expressionLevel(
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_2_TO_3);
 
     assertThatThrownBy(
             () -> expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID))
@@ -271,7 +275,9 @@ class ExpressionQueryServiceTest {
     when(expression.getDifficultyLevel()).thenReturn(3);
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+    when(scenarioLearningLevelService.expressionLevel(
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_2_TO_3);
 
     ExpressionLearningResponse response =
         expressionQueryService.getExpressionForLearning(USER_ID, EXPRESSION_ID);
@@ -355,7 +361,9 @@ class ExpressionQueryServiceTest {
   private void givenExpressions(WritingExpression... expressions) {
     when(userProfileService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(Locale.EN, Locale.KR));
-    when(userProfileService.getLearningLevel(USER_ID)).thenReturn(new UserLearningLevelResponse(2));
+    when(scenarioLearningLevelService.expressionLevel(
+            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(com.landit.landitbe.feature.content.domain.ContentLearningLevel.LEVEL_2_TO_3);
     when(writingExpressionRepository.findScenarioExpressions(
             eq(SCENARIO_ID), eq(Locale.EN), eq(Locale.KR), eq(2), eq(3), eq(ActiveStatus.ACTIVE)))
         .thenReturn(List.of(expressions));

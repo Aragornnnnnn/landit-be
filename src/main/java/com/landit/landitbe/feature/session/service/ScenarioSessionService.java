@@ -9,8 +9,11 @@ import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
+import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +25,36 @@ public class ScenarioSessionService {
   private final ScenarioSessionRepository scenarioSessionRepository;
   private final ScenarioSessionStartQueryRepository startQueryRepository;
   private final ScenarioSessionMessageQueryRepository messageQueryRepository;
+
+  /**
+   * 최초 완료 세션의 질문 수준과 평가 후 수준을 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @param targetLocale 대상 언어
+   * @return 최초 완료 수준. 이력이 없으면 빈 값
+   */
+  public Optional<CompletedScenarioLevel> findFirstCompletedLevel(
+      long userId, long scenarioId, Locale targetLocale) {
+    return scenarioSessionRepository
+        .findFirstCompletedLevel(userId, scenarioId, targetLocale.name())
+        .map(
+            row ->
+                new CompletedScenarioLevel(
+                    ContentLearningLevel.valueOf(row.getQuestionLevelGroup()),
+                    row.getCurrentLevel(),
+                    row.getEndedAt()));
+  }
+
+  /**
+   * 최초 완료 시점의 콘텐츠 기준이다.
+   *
+   * @param questionLevelGroup 당시 질문 그룹
+   * @param currentLevel 당시 평가 이후 적용 수준
+   * @param endedAt 최초 완료 시각
+   */
+  public record CompletedScenarioLevel(
+      ContentLearningLevel questionLevelGroup, Integer currentLevel, LocalDateTime endedAt) {}
 
   /**
    * 사용자와 시나리오에 맞는 세션 시작 Projection을 조회한다.

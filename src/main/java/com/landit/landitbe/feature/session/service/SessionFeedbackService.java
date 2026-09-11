@@ -17,11 +17,13 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /** 완료된 세션의 최종 피드백을 생성하거나 저장된 결과를 조회한다. */
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class SessionFeedbackService {
 
   private final SessionFeedbackContextService contextService;
@@ -46,14 +48,41 @@ public class SessionFeedbackService {
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
-    AiSessionFeedbackResult result =
-        aiConversationClient.generateSessionFeedback(
-            new AiSessionFeedbackRequest(
-                context.sessionId(),
-                context.scenario(),
-                context.userMessages().stream().map(UserMessageContext::messageId).toList()));
-    Long summaryFeedbackId = completionService.record(userId, context, result);
+    AiSessionFeedbackRequest request = toAiFeedbackRequest(context);
+    AiSessionFeedbackResult result = generateOrFallback(request);
+    Long summaryFeedbackId = recordOrFallback(userId, context, result);
     return responseFor(context, summaryFeedbackId);
+  }
+
+  private Long recordOrFallback(
+      long userId, LoadedSessionFeedbackContext context, AiSessionFeedbackResult result) {
+    try {
+      return completionService.record(userId, context, result);
+    } catch (ApiException exception) {
+      if (exception.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID) {
+        throw exception;
+      }
+      log.warn("invalid session feedback fallback: sessionId={}", context.sessionId());
+      return completionService.record(
+          userId, context, AiSessionFeedbackResult.fallback(context.sessionId()));
+    }
+  }
+
+  private AiSessionFeedbackResult generateOrFallback(AiSessionFeedbackRequest request) {
+    try {
+      return aiConversationClient.generateSessionFeedback(request);
+    } catch (ApiException exception) {
+      if (exception.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID
+          && exception.getErrorCode() != ErrorCode.AI_GENERATION_FAILED
+          && exception.getErrorCode() != ErrorCode.FEEDBACK_GENERATION_FAILED) {
+        throw exception;
+      }
+      log.warn(
+          "session feedback fallback: sessionId={}, errorCode={}",
+          request.sessionId(),
+          exception.getErrorCode());
+      return AiSessionFeedbackResult.fallback(request.sessionId());
+    }
   }
 
   /** 저장된 최종 피드백과 평가 당시 사용자 메시지 컨텍스트를 API 응답으로 조립한다. */
@@ -61,7 +90,9 @@ public class SessionFeedbackService {
       LoadedSessionFeedbackContext context, Long summaryFeedbackId) {
     List<SessionHistoryMessageFeedback> feedbacks =
         sessionFeedbackDataService.findMessageFeedbacks(summaryFeedbackId);
-    if (feedbacks.size() != context.userMessages().size()) {
+    SessionHistorySummaryFeedback summary =
+        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
+    if (!feedbacks.isEmpty() && feedbacks.size() != context.userMessages().size()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     Map<Long, SessionHistoryMessageFeedback> feedbackByMessageId =
@@ -70,18 +101,17 @@ public class SessionFeedbackService {
                 Collectors.toMap(
                     SessionHistoryMessageFeedback::getSessionHistoryMessageId,
                     Function.identity()));
-    SessionHistorySummaryFeedback summary =
-        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
-
     return SessionFeedbackResponse.from(
         context.sessionId(),
         summary,
-        context.userMessages().stream()
-            .map(
-                userMessage ->
-                    messageFeedbackResponse(
-                        feedbackByMessageId.get(userMessage.messageId()), userMessage))
-            .toList());
+        feedbacks.isEmpty()
+            ? List.of()
+            : context.userMessages().stream()
+                .map(
+                    userMessage ->
+                        messageFeedbackResponse(
+                            feedbackByMessageId.get(userMessage.messageId()), userMessage))
+                .toList());
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
@@ -98,5 +128,31 @@ public class SessionFeedbackService {
             userMessage.evaluationContext().type(),
             userMessage.evaluationContext().content(),
             userMessage.evaluationContext().translatedContent()));
+  }
+
+  /** 완료 세션 컨텍스트를 기존 AI 최종 피드백 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiFeedbackRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList());
+  }
+
+  /** 완료 세션 컨텍스트를 AI 수준 평가 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiLevelAssessmentRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList(),
+        context.userMessages().stream()
+            .map(
+                message ->
+                    new AiSessionFeedbackRequest.AssessmentMessage(
+                        message.messageId(),
+                        message.evaluationContext().content(),
+                        message.content(),
+                        message.responseDemand(),
+                        message.requiredElements()))
+            .toList());
   }
 }

@@ -72,6 +72,28 @@ public interface PushDeliveryRepository extends JpaRepository<PushDelivery, Long
       @Param("deduplicationKeyPrefix") String deduplicationKeyPrefix);
 
   /**
+   * 지정한 Token에서 중복 방지 키 접두어와 상태에 맞는 발송 이력 ID를 조회한다.
+   *
+   * @param status 조회할 발송 상태
+   * @param deduplicationKeyPrefix 발송 이력 중복 방지 키 접두어
+   * @param userPushTokenIds 조회할 Token ID
+   * @return 조건을 만족하는 발송 이력 ID 목록
+   */
+  @Query(
+      """
+      select delivery.id
+      from PushDelivery delivery
+      where delivery.status = :status
+        and delivery.deduplicationKey like concat(:deduplicationKeyPrefix, '%')
+        and delivery.userPushTokenId in :userPushTokenIds
+      order by delivery.id
+      """)
+  List<Long> findIdsByStatusAndDeduplicationKeyPrefixAndTokenIds(
+      @Param("status") PushDeliveryStatus status,
+      @Param("deduplicationKeyPrefix") String deduplicationKeyPrefix,
+      @Param("userPushTokenIds") List<Long> userPushTokenIds);
+
+  /**
    * 중복 방지 키에 해당하는 발송 이력이 존재하는지 확인한다.
    *
    * @param deduplicationKey 발송 중복 방지 키

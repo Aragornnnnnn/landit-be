@@ -247,6 +247,39 @@ public class PushDeliveryService {
   }
 
   /**
+   * 지정한 Token에서 Ticket 접수 상태인 발송 이력 ID를 조회한다.
+   *
+   * @param deduplicationKeyPrefix 발송 이력 중복 방지 키 접두어
+   * @param userPushTokenIds 조회할 Token ID
+   * @return Ticket 접수 상태인 발송 이력 ID 목록
+   */
+  @Transactional(readOnly = true)
+  public List<Long> findAcceptedDeliveryIds(
+      String deduplicationKeyPrefix, List<Long> userPushTokenIds) {
+    return pushDeliveryRepository.findIdsByStatusAndDeduplicationKeyPrefixAndTokenIds(
+        PushDeliveryStatus.TICKET_ACCEPTED, deduplicationKeyPrefix, userPushTokenIds);
+  }
+
+  /**
+   * 지정한 Token 중 아직 Expo 요청 결과 기록을 기다리는 이력이 있는지 확인한다.
+   *
+   * @param deduplicationKeyPrefix 발송 이력 중복 방지 키 접두어
+   * @param userPushTokenIds 조회할 Token ID
+   * @return 요청 처리 중인 이력이 있으면 {@code true}
+   */
+  @Transactional(readOnly = true)
+  public boolean hasRequestedDeliveries(
+      String deduplicationKeyPrefix, List<Long> userPushTokenIds) {
+    if (userPushTokenIds.isEmpty()) {
+      return false;
+    }
+    return !pushDeliveryRepository
+        .findIdsByStatusAndDeduplicationKeyPrefixAndTokenIds(
+            PushDeliveryStatus.REQUESTED, deduplicationKeyPrefix, userPushTokenIds)
+        .isEmpty();
+  }
+
+  /**
    * Expo Push Ticket 결과를 발송 이력에 기록한다.
    *
    * @param pushDeliveryId Push Delivery ID

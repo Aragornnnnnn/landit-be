@@ -263,6 +263,13 @@ public class SessionHistoryMessage extends BaseTimeEntity {
     this.freeTalkTurnStatus = freeTalkTurnStatus;
   }
 
+  /** 요청에 실패한 피드백을 세션 완료 트랜잭션에서 실패 상태로 기록한다. */
+  public void markFeedbackFailed() {
+    if (feedbackProcessingStatus == ProcessingStatus.PREPARING) {
+      feedbackProcessingStatus = ProcessingStatus.FAILED;
+    }
+  }
+
   /** 생성에 실패한 속마음의 처리 상태를 기록한다. */
   public void markInnerThoughtFailed() {
     if (innerThoughtProcessingStatus == ProcessingStatus.PREPARING) {

@@ -31,6 +31,7 @@ public class SessionMessageSubmitService {
   private final SessionInnerThoughtGenerator sessionInnerThoughtGenerator;
   private final SessionMessageService sessionMessageService;
   private final SessionMessageFeedbackRequester sessionMessageFeedbackRequester;
+  private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
   private final GeneratedMessageService generatedMessageService;
   private final UserProfileService userProfileService;
   private final PlatformTransactionManager transactionManager;
@@ -42,6 +43,7 @@ public class SessionMessageSubmitService {
       SessionInnerThoughtGenerator sessionInnerThoughtGenerator,
       SessionMessageService sessionMessageService,
       SessionMessageFeedbackRequester sessionMessageFeedbackRequester,
+      SessionLevelAssessmentGenerationService levelAssessmentGenerationService,
       GeneratedMessageService generatedMessageService,
       UserProfileService userProfileService,
       PlatformTransactionManager transactionManager,
@@ -51,6 +53,7 @@ public class SessionMessageSubmitService {
     this.sessionInnerThoughtGenerator = sessionInnerThoughtGenerator;
     this.sessionMessageService = sessionMessageService;
     this.sessionMessageFeedbackRequester = sessionMessageFeedbackRequester;
+    this.levelAssessmentGenerationService = levelAssessmentGenerationService;
     this.generatedMessageService = generatedMessageService;
     this.userProfileService = userProfileService;
     this.transactionManager = transactionManager;
@@ -92,6 +95,9 @@ public class SessionMessageSubmitService {
                     submittedContext, generation, feedbackProcessingStatus);
               });
       recordInnerThoughtAfterMessageGeneration(asyncGenerationRequests);
+      if (response.progress().completed()) {
+        levelAssessmentGenerationService.startIfNeeded(userId, sessionId);
+      }
       log.info(
           "session message submitted: userId={}, sessionId={}, messageId={}, "
               + "inputType={}, contentLength={}",
@@ -147,7 +153,12 @@ public class SessionMessageSubmitService {
     if (!generation.completed()) {
       return ProcessingStatus.PREPARING;
     }
-    return requestMessageFeedback(submittedContext);
+    try {
+      return requestMessageFeedback(submittedContext);
+    } catch (RuntimeException exception) {
+      // 마지막 발화의 피드백 장애가 세션 완료와 독립 수준 평가를 막지 않게 한다.
+      return ProcessingStatus.FAILED;
+    }
   }
 
   private void recordInnerThoughtAfterMessageGeneration(

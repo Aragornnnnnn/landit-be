@@ -58,3 +58,12 @@
 - 추가 회귀: 500후보·5발송은 Expo 1회, 300후보·150발송은 100+50건, 마지막 잔여 198건은 100+98건, DB 묶음 유지, Receipt 실패의 미전송 잔여분 복구, 다음 선점 실패 복구, 원예외 보존.
 - 수정 전 희소 대상·묶음 경계 테스트 2개 실패로 회귀를 재현했다. 최종 `./gradlew test --tests '*NotificationDispatchServiceTest'` 17개 통과, `./gradlew check` 912개 통과(실패·건너뜀 0), Spotless·Checkstyle 통과.
 - 최종 독립 재리뷰에서 추가 결함 없음. DB SQL·잠금 구현은 변경하지 않았으며 이번 수정에서는 PostgreSQL을 별도로 재실행하지 않았다. 기존 500토큰 SQL 32회 검증은 전체 검사에 포함된 H2 통합 테스트에서 유지됐다.
+
+## develop 충돌 해결 · 2026-09-11
+
+- `origin/develop`의 `d2727246`을 병합해 기존 7개 기능 커밋을 보존했다. `SqsPushQueuePublisher`와 `NotificationDispatchService`에서 관리자 캠페인 추가분과 정기 발송 배치 추가분을 함께 유지했다.
+- 관리자 캠페인의 페이지별 Receipt 복구와 일시적 Expo 오류의 발송 종료 정책을 유지했다. 관리자 Queue payload·지연 시간과 실패 후 중복 발송 방지 회귀 테스트 2개를 추가했다.
+- 관련 검사: `./gradlew test --tests '*NotificationDispatchServiceTest' --tests '*SqsPushQueuePublisherTest' --tests '*PushDeliveryServiceTest' --tests '*PushDeliveryBatchIntegrationTests' --tests '*AdminPushCampaignIntegrationTests'` 65개 통과. 배치 DB 검증은 이번 실행에서는 H2를 사용했다.
+- 전체 `./gradlew check`는 기본 테스트 JVM의 메모리 부족과 시나리오 테스트 정리 오류로 실패했다. 저장소 설정 변경 없이 임시 Gradle init script에서 `Test.maxHeapSize = '2g'`로 재실행한 결과 1,066개 중 실패 4개·건너뜀 4개, Spotless·Checkstyle 통과였다.
+- 남은 4개 실패는 모두 `ScenarioSessionApiIntegrationTests.clearLearningData()`의 `user_level_assessment` → `learning_session` 외래 키 오류다. 원본 `d2727246` 임시 작업 디렉터리에서도 시나리오·구독 테스트 79개 중 같은 오류 3개가 재현됐다. 해당 시나리오 코드·테스트는 develop과 동일하며 이번 충돌 해결에서 수정하지 않았다.
+- 충돌 해결 범위의 독립 리뷰에서 추가 결함 없음. 충돌 표식·미해결 인덱스 없음, `git diff --check` 통과.

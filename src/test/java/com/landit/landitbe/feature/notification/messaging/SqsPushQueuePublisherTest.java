@@ -12,6 +12,7 @@ import com.landit.landitbe.config.notification.NotificationProperties;
 import com.landit.landitbe.feature.notification.client.PushNotificationException;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +97,39 @@ class SqsPushQueuePublisherTest {
     assertThatThrownBy(() -> publisher.scheduleReceiptCheck(10L, 1))
         .isInstanceOf(PushNotificationException.class)
         .hasMessage("Push Queue 설정이 올바르지 않습니다.");
+  }
+
+  /** Receipt 배치와 공존하는 관리자 작업은 지정한 payload를 지연 없이 발행한다. */
+  @Test
+  void publishesAdminCampaignAndTestWithoutReceiptDelay() {
+    stubSqsSendMessage();
+    UUID campaignId = UUID.randomUUID();
+
+    publisher.publishAdminCampaign(campaignId);
+    publisher.publishAdminTest(campaignId, 20L, "test-key");
+
+    ArgumentCaptor<SendMessageRequest> captor = ArgumentCaptor.forClass(SendMessageRequest.class);
+    org.mockito.Mockito.verify(sqsAsyncClient, org.mockito.Mockito.times(2))
+        .sendMessage(captor.capture());
+    assertThat(captor.getAllValues())
+        .allSatisfy(
+            request -> {
+              assertThat(request.queueUrl()).isEqualTo(properties.queueUrl());
+              assertThat(request.delaySeconds()).isZero();
+              assertThat(
+                      jsonMapper
+                          .readTree(request.messageBody())
+                          .get("payload")
+                          .get("campaignId")
+                          .asString())
+                  .isEqualTo(campaignId.toString());
+            });
+    JsonNode campaign = jsonMapper.readTree(captor.getAllValues().getFirst().messageBody());
+    JsonNode test = jsonMapper.readTree(captor.getAllValues().getLast().messageBody());
+    assertThat(campaign.get("messageType").asString()).isEqualTo("ADMIN_PUSH_CAMPAIGN");
+    assertThat(test.get("messageType").asString()).isEqualTo("ADMIN_PUSH_TEST");
+    assertThat(test.get("payload").get("adminId").asLong()).isEqualTo(20L);
+    assertThat(test.get("payload").get("requestKey").asString()).isEqualTo("test-key");
   }
 
   /** SQS 응답이 지연되면 설정된 요청 제한 시간 뒤 발행 실패로 처리한다. */

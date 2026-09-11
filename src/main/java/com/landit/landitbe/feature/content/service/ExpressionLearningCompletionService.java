@@ -41,6 +41,7 @@ public class ExpressionLearningCompletionService {
 
   private final WritingExpressionRepository writingExpressionRepository;
   private final UserProfileService userProfileService;
+  private final ScenarioLearningLevelService scenarioLearningLevelService;
   private final LearningProgressService learningProgressService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final LearningSessionRepository learningSessionRepository;
@@ -84,7 +85,8 @@ public class ExpressionLearningCompletionService {
     if (scenarioId == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
-    ContentLearningLevel contentLevel = contentLearningLevel(userId);
+    ContentLearningLevel contentLevel =
+        scenarioLearningLevelService.expressionLevel(userId, scenarioId);
     if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
         && !contentLevel.includesExpressionDifficulty(expression.getDifficultyLevel())) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
@@ -180,10 +182,5 @@ public class ExpressionLearningCompletionService {
 
     return firstIncompleteExpressionId.isPresent()
         && firstIncompleteExpressionId.get().equals(expressionId);
-  }
-
-  /** 사용자 학습 레벨을 콘텐츠 레벨 그룹으로 변환한다. */
-  private ContentLearningLevel contentLearningLevel(Long userId) {
-    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
   }
 }

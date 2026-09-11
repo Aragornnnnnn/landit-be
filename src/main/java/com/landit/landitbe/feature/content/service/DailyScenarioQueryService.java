@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.content.service;
 
-import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.dto.DailyScenarioResponse;
 import com.landit.landitbe.feature.content.dto.DailyScenarioResponse.ScenarioResponse;
@@ -36,6 +35,7 @@ public class DailyScenarioQueryService {
   private final DailyScenarioQueryRepository dailyScenarioQueryRepository;
   private final ExpressionQueryService expressionQueryService;
   private final Clock clock;
+  private final ScenarioLearningLevelService scenarioLearningLevelService;
 
   /**
    * 사용자의 오늘 배정 시나리오 또는 과거 최초 완료 이력을 조회한다.
@@ -109,10 +109,7 @@ public class DailyScenarioQueryService {
     DailyScenarioProjection projection =
         dailyScenarioQueryRepository
             .findDailyScenario(
-                userId,
-                scenarioId,
-                ContentLearningLevel.from(
-                    userProfileService.getLearningLevel(userId).learningLevel()))
+                userId, scenarioId, scenarioLearningLevelService.questionLevel(userId, scenarioId))
             .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
     return ScenarioResponse.from(
         projection,

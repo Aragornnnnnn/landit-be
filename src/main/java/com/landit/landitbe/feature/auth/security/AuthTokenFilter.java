@@ -23,6 +23,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class AuthTokenFilter extends OncePerRequestFilter {
 
   private static final String BEARER_PREFIX = "Bearer ";
+  private static final String WEBHOOK_PATH_PREFIX = "/webhooks/";
 
   private final LanditTokenService tokenService;
   private final UserProfileService userProfileService;
@@ -42,6 +43,12 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     this.tokenService = tokenService;
     this.userProfileService = userProfileService;
     this.failureResponseWriter = failureResponseWriter;
+  }
+
+  /** 외부 웹훅 경로는 Authorization 헤더를 각 웹훅이 직접 검증하므로 Bearer 파싱을 건너뛴다. */
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    return request.getRequestURI().startsWith(WEBHOOK_PATH_PREFIX);
   }
 
   @Override

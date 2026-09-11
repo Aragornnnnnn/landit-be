@@ -35,6 +35,10 @@ public class ScenarioQuestion extends BaseTimeEntity {
   private ContentLearningLevel questionLevelGroup;
 
   @Enumerated(EnumType.STRING)
+  @Column(name = "response_demand", nullable = false, length = 10)
+  private ResponseDemand responseDemand;
+
+  @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private ActiveStatus status;
 

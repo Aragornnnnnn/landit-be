@@ -9,10 +9,13 @@ import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
 import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -21,8 +24,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,7 @@ public class UserProfileService {
       List.of(AccentLocale.EN_US, AccentLocale.EN_GB, AccentLocale.EN_AU);
 
   private final UserProfileRepository userProfileRepository;
+  private final java.time.Clock clock;
 
   /**
    * 활성 사용자 프로필을 조회한다.
@@ -62,6 +66,50 @@ public class UserProfileService {
     return userProfileRepository
         .findActiveByIdForUpdate(userId)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN));
+  }
+
+  /**
+   * 결제 제공자 이벤트로 사용자 구독 상태를 갱신한다.
+   *
+   * <p>탈퇴한 사용자도 대상에 포함해 환불·만료 이벤트가 유실되지 않게 한다. 이미 반영한 이벤트보다 오래된 이벤트는 무시한다. 같은 사용자의 웹훅이 동시에 들어와도 오래된
+   * 이벤트가 최신 상태를 덮어쓰지 않도록 쓰기 잠금으로 조회한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param command 갱신할 구독 정보
+   * @return 갱신 처리 결과
+   */
+  @Transactional
+  public SubscriptionUpdateResult updateSubscription(
+      Long userId, SubscriptionUpdateCommand command) {
+    Optional<UserProfile> found = userProfileRepository.findByIdForUpdate(userId);
+    if (found.isEmpty()) {
+      return SubscriptionUpdateResult.USER_NOT_FOUND;
+    }
+    UserProfile userProfile = found.get();
+    if (userProfile.isSubscriptionEventStale(command.eventAt())) {
+      return SubscriptionUpdateResult.STALE_EVENT;
+    }
+    userProfile.updateSubscription(
+        command.status(),
+        command.periodType(),
+        command.expiresAt(),
+        command.eventAt(),
+        command.productId(),
+        command.store());
+    return SubscriptionUpdateResult.APPLIED;
+  }
+
+  /**
+   * 후보 ID 가운데 실제로 존재하는 첫 사용자 프로필 ID를 찾는다.
+   *
+   * <p>결제 제공자 웹훅이 이력을 저장하기 전에 사용자를 확정하는 용도라, 탈퇴한 사용자도 포함한다.
+   *
+   * @param candidateUserIds 확인할 사용자 ID 후보. 앞선 후보를 우선한다
+   * @return 존재하는 첫 사용자 프로필 ID. 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<Long> findExistingUserId(List<Long> candidateUserIds) {
+    return candidateUserIds.stream().filter(userProfileRepository::existsById).findFirst();
   }
 
   /**
@@ -230,7 +278,8 @@ public class UserProfileService {
    */
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
-    requireActive(userId).updateLearningLevel(learningLevel);
+    requireActiveForUpdate(userId)
+        .updateLearningLevel(learningLevel, java.time.LocalDateTime.now(clock));
   }
 
   /**
@@ -253,6 +302,18 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public UserAccentLocaleResponse getAccentLocale(Long userId) {
     return UserAccentLocaleResponse.from(requireActive(userId).getAccentLocale());
+  }
+
+  /**
+   * 활성 사용자의 서버 기준 구독 상태를 다른 기능이 쓸 스냅샷으로 반환한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 사용자 구독 상태 스냅샷
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public UserSubscriptionSnapshot getSubscription(Long userId) {
+    return UserSubscriptionSnapshot.from(requireActive(userId));
   }
 
   /**
@@ -283,12 +344,15 @@ public class UserProfileService {
    *
    * @param page 페이지 번호
    * @param size 페이지 크기
+   * @param active 활성 여부. 생략하면 모든 상태
+   * @param pushConsent 저장된 푸시 동의 여부. 생략하면 모든 권한 상태
    * @return 관리자 사용자 프로필 목록 페이지
    */
   @Transactional(readOnly = true)
-  public AdminUserProfilePage getAdminUserProfiles(int page, int size) {
-    Slice<UserProfile> profiles =
-        userProfileRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(page, size));
+  public AdminUserProfilePage getAdminUserProfiles(
+      int page, int size, Boolean active, Boolean pushConsent) {
+    Page<UserProfile> profiles =
+        userProfileRepository.findAdminUsers(active, pushConsent, PageRequest.of(page, size));
 
     return AdminUserProfilePage.from(profiles, page, size);
   }

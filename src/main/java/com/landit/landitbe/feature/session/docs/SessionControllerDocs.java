@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session.docs;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -42,7 +43,7 @@ public interface SessionControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "권한 없음"),
+        description = "권한 없음 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
@@ -120,6 +121,34 @@ public interface SessionControllerDocs {
         description = "최종 피드백 생성 실패")
   })
   ResponseEntity<ApiResponse<SessionFeedbackResponse>> getOrCreateFeedback(
+      AuthUserPrincipal principal, Long sessionId);
+
+  /**
+   * 세션 텍스트 수준 평가의 비동기 상태와 결과를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 수준 평가를 조회할 세션 ID
+   * @return 수준 평가 처리 상태와 결과
+   */
+  @Operation(
+      summary = "세션 텍스트 수준 평가 조회",
+      description = "비동기 수준 평가 상태와 완료된 영역별 평가 결과를 조회한다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "권한 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "세션 없음")
+  })
+  ResponseEntity<ApiResponse<SessionLevelAssessmentResponse>> getLevelAssessment(
       AuthUserPrincipal principal, Long sessionId);
 
   /**
