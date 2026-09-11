@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.feature.session.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.domain.LearningLevelPolicy.ChangeType;
+import com.landit.landitbe.feature.session.domain.UserLevelAssessment;
 import com.landit.landitbe.feature.session.repository.UserLevelAssessmentRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import java.time.Clock;
@@ -34,7 +35,8 @@ class SessionLevelAssessmentProfileTest {
     LocalDateTime requestedAt = LocalDateTime.now(CLOCK).minusSeconds(10);
     profile.updateAccentLocale(AccentLocale.EN_US);
     ReflectionTestUtils.setField(profile, "updatedAt", LocalDateTime.now());
-    assertThat(assess(profile, requestedAt)).isEqualTo(ChangeType.INITIALIZED);
+    assertThat(assess(profile, requestedAt, 4, true).getChangeType())
+        .isEqualTo(ChangeType.INITIALIZED);
     assertThat(profile.getLearningLevel()).isEqualTo(4);
     assertThat(profile.getLearningLevelUpdatedAt()).isEqualTo(LocalDateTime.now(CLOCK));
   }
@@ -44,12 +46,38 @@ class SessionLevelAssessmentProfileTest {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
     LocalDateTime requestedAt = LocalDateTime.now(CLOCK).minusSeconds(10);
     profile.updateLearningLevel(1, LocalDateTime.now(CLOCK));
-    assertThat(assess(profile, requestedAt)).isEqualTo(ChangeType.NOT_APPLIED);
+    assertThat(assess(profile, requestedAt, 4, true).getChangeType())
+        .isEqualTo(ChangeType.NOT_APPLIED);
     assertThat(profile.getLearningLevel()).isEqualTo(1);
     assertThat(profile.getPromotionStreak()).isZero();
   }
 
-  private ChangeType assess(UserProfile profile, LocalDateTime requestedAt) {
+  @Test
+  void replacesPreviouslySelectedLevelAndRecordsBothValues() {
+    UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+    profile.updateLearningLevel(4, LocalDateTime.now(CLOCK).minusMinutes(1));
+    var result = assess(profile, LocalDateTime.now(CLOCK).minusSeconds(10), 3, true);
+    assertThat(result.getChangeType()).isEqualTo(ChangeType.DEMOTED);
+    assertThat(result.getPreviousLevel()).isEqualTo(4);
+    assertThat(result.getCurrentLevel()).isEqualTo(3);
+    assertThat(result.getAssessedLevel()).isEqualTo(3);
+    assertThat(result.getAssessmentVersion()).isEqualTo("text-level-v1.2");
+    assertThat(profile.getLearningLevel()).isEqualTo(3);
+    assertThat(profile.getPromotionStreak()).isZero();
+  }
+
+  @Test
+  void nonLatestSessionPreservesProfileButKeepsItsAssessment() {
+    UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+    profile.updateLearningLevel(4, LocalDateTime.now(CLOCK).minusMinutes(1));
+    var result = assess(profile, LocalDateTime.now(CLOCK).minusSeconds(10), 3, false);
+    assertThat(result.getChangeType()).isEqualTo(ChangeType.NOT_APPLIED);
+    assertThat(result.getAssessedLevel()).isEqualTo(3);
+    assertThat(profile.getLearningLevel()).isEqualTo(4);
+  }
+
+  private UserLevelAssessment assess(
+      UserProfile profile, LocalDateTime requestedAt, int assessedLevel, boolean applyToProfile) {
     var profiles = mock(UserProfileRepository.class);
     var assessments = mock(UserLevelAssessmentRepository.class);
     when(profiles.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(profile));
@@ -61,7 +89,7 @@ class SessionLevelAssessmentProfileTest {
     when(context.userMessages()).thenReturn(inputs);
     var domain =
         new AiSessionLevelAssessment.Domain(
-            4, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, "I like coffee.");
+            assessedLevel, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, "I like coffee.");
     var domains = new AiSessionLevelAssessment.Domains(domain, domain, domain, domain, domain);
     var core =
         new AiSessionLevelAssessment.Core(
@@ -75,8 +103,7 @@ class SessionLevelAssessmentProfileTest {
                 .toList());
     return new SessionLevelAssessmentService(profiles, assessments, CLOCK)
         .assessApplyAndSave(
-            1L, context, new AiSessionLevelAssessment(core, null), true, requestedAt)
-        .getChangeType();
+            1L, context, new AiSessionLevelAssessment(core, null), applyToProfile, requestedAt);
   }
 
   private UserMessageContext input(long id) {

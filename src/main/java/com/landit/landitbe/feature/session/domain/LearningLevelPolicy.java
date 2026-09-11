@@ -1,15 +1,14 @@
-// 세션 평가 점수로 사용자 적용 수준과 승급 연속 횟수를 결정한다.
+// 유효한 최신 세션 평가로 기존 사용자 수준을 즉시 대체한다.
 
 package com.landit.landitbe.feature.session.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-/** 최초 수준 확정과 두 번 연속 상향 근거에 따른 한 단계 승급을 계산한다. */
+/** 충분한 평가 근거가 있으면 기존 설정과 무관하게 평가한 수준을 적용한다. */
 public final class LearningLevelPolicy {
 
-  private static final BigDecimal PROMOTION_GAP = new BigDecimal("0.70");
-  private static final BigDecimal PROMOTION_CONFIDENCE = new BigDecimal("0.75");
+  private static final BigDecimal MINIMUM_CONFIDENCE = new BigDecimal("0.75");
 
   private LearningLevelPolicy() {}
 
@@ -17,6 +16,7 @@ public final class LearningLevelPolicy {
   public enum ChangeType {
     INITIALIZED,
     PROMOTED,
+    DEMOTED,
     UNCHANGED,
     NOT_APPLIED
   }
@@ -33,21 +33,18 @@ public final class LearningLevelPolicy {
       boolean sufficientEvidence) {
     if (!sufficientEvidence
         || assessedScore == null
-        || assessmentConfidence.compareTo(PROMOTION_CONFIDENCE) < 0) {
+        || assessmentConfidence == null
+        || assessmentConfidence.compareTo(MINIMUM_CONFIDENCE) < 0) {
       return new Decision(currentLevel, promotionStreak, ChangeType.NOT_APPLIED);
     }
-    if (currentLevel == null) {
-      int initializedLevel =
-          Math.max(1, Math.min(5, assessedScore.setScale(0, RoundingMode.HALF_UP).intValue()));
-      return new Decision(initializedLevel, 0, ChangeType.INITIALIZED);
-    }
-    if (currentLevel < 5
-        && assessedScore.compareTo(BigDecimal.valueOf(currentLevel).add(PROMOTION_GAP)) >= 0) {
-      int nextStreak = promotionStreak + 1;
-      return nextStreak >= 2
-          ? new Decision(currentLevel + 1, 0, ChangeType.PROMOTED)
-          : new Decision(currentLevel, nextStreak, ChangeType.UNCHANGED);
-    }
-    return new Decision(currentLevel, 0, ChangeType.UNCHANGED);
+    int assessedLevel =
+        Math.max(1, Math.min(5, assessedScore.setScale(0, RoundingMode.HALF_UP).intValue()));
+    ChangeType changeType =
+        currentLevel == null
+            ? ChangeType.INITIALIZED
+            : assessedLevel > currentLevel
+                ? ChangeType.PROMOTED
+                : assessedLevel < currentLevel ? ChangeType.DEMOTED : ChangeType.UNCHANGED;
+    return new Decision(assessedLevel, 0, changeType);
   }
 }

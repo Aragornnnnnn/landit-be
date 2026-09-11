@@ -59,6 +59,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1752,6 +1753,65 @@ class ScenarioSessionApiIntegrationTests {
             });
   }
 
+  @ParameterizedTest
+  @CsvSource({"1, PROMOTED", "4, DEMOTED", "3, UNCHANGED"})
+  void validAssessmentReplacesSelectedLevelOnceAndReturnsChange(
+      int selectedLevel, String changeType) throws Exception {
+    final String accessToken =
+        login("replace-level@example.com").path("data").path("accessToken").asText();
+    seedCategory(1121, 1, "ACTIVE", "카페");
+    seedScenario(2121, 1121, 1, "USER", "ACTIVE", 1);
+    seedScenarioVariant(
+        3121,
+        2121,
+        "카페 주문",
+        "음료를 주문합니다.",
+        "음료 주문",
+        "음료를 주문하세요.",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "ACTIVE");
+    seedScenarioQuestion(4121, 2121, 1, "Would you like anything else?", "더 필요한 것은 없나요?");
+    long sessionId = startScenario(accessToken, 2121);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET learning_level=?, promotion_streak=1 "
+            + "WHERE id=(SELECT user_profile_id FROM learning_session WHERE id=?)",
+        selectedLevel,
+        sessionId);
+    fakeAiConversationClient.assessedDomainLevel = 3;
+    submitMessage(accessToken, sessionId, "Can I get an iced americano?");
+    submitMessage(accessToken, sessionId, "That is all, thank you.");
+    awaitLevelAssessment(sessionId, accessToken);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(3))
+          .andExpect(jsonPath("$.data.levelAssessment.previousLevel").value(selectedLevel))
+          .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(3))
+          .andExpect(jsonPath("$.data.levelAssessment.changeType").value(changeType));
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT learning_level FROM user_profile "
+                    + "WHERE id=(SELECT user_profile_id FROM learning_session WHERE id=?)",
+                Integer.class,
+                sessionId))
+        .isEqualTo(3);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_level_assessment WHERE learning_session_id=?",
+                Integer.class,
+                sessionId))
+        .isEqualTo(1);
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(1);
+  }
+
   @Test
   void partialAssessmentSurvivesStorageAndRetryWithoutInitializingProfile() throws Exception {
     JsonNode loginBody = login("partial-assessment@example.com");
@@ -3412,6 +3472,7 @@ class ScenarioSessionApiIntegrationTests {
     private int sessionFeedbackCallCount;
     private int sessionLevelAssessmentCallCount;
     private boolean unobservedPragmatics;
+    private int assessedDomainLevel = 5;
 
     private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
 
@@ -3563,7 +3624,7 @@ class ScenarioSessionApiIntegrationTests {
     private AiSessionLevelAssessment.Domains observedDomains(String evidence) {
       AiSessionLevelAssessment.Domain domain =
           new AiSessionLevelAssessment.Domain(
-              5, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
+              assessedDomainLevel, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
       return new AiSessionLevelAssessment.Domains(
           domain,
           domain,
@@ -3597,6 +3658,7 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackCallCount = 0;
       sessionLevelAssessmentCallCount = 0;
       unobservedPragmatics = false;
+      assessedDomainLevel = 5;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;
       messageFeedbackResponseSessionId = null;
