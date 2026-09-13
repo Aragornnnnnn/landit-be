@@ -1,6 +1,6 @@
 // 폐기 가능한 로컬 PostgreSQL에서 SQL 읽기 전용성과 실행 제한을 검증한다.
 
-package com.landit.landitbe.feature.notification.campaign.service;
+package com.landit.landitbe.feature.notification.campaign.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

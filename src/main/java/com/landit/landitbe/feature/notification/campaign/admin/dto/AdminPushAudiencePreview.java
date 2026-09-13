@@ -1,6 +1,6 @@
 // 캠페인의 조회 시점 예상 사용자 수와 토큰 수를 전달한다.
 
-package com.landit.landitbe.feature.notification.campaign.dto;
+package com.landit.landitbe.feature.notification.campaign.admin.dto;
 
 import java.time.LocalDateTime;
 

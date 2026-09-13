@@ -1,6 +1,6 @@
 // 한국 시간의 캠페인 예약 입력을 정의한다.
 
-package com.landit.landitbe.feature.notification.campaign.dto;
+package com.landit.landitbe.feature.notification.campaign.admin.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;

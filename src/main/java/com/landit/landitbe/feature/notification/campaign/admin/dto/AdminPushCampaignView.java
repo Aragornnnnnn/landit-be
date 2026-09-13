@@ -1,6 +1,6 @@
 // 관리자 푸시 캠페인의 원문과 발송 집계를 전달한다.
 
-package com.landit.landitbe.feature.notification.campaign.dto;
+package com.landit.landitbe.feature.notification.campaign.admin.dto;
 
 import com.landit.landitbe.feature.notification.campaign.domain.AdminPushAudienceType;
 import java.time.LocalDateTime;

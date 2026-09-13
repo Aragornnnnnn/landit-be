@@ -1,13 +1,13 @@
 // 관리자 푸시 캠페인 API 계약을 문서화한다.
 
-package com.landit.landitbe.feature.notification.campaign.docs;
+package com.landit.landitbe.feature.notification.campaign.admin.docs;
 
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushAudiencePreview;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushAudienceQueryRequest;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignPage;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignRequest;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignView;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushScheduleRequest;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushAudiencePreview;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushAudienceQueryRequest;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignPage;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignRequest;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignView;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushScheduleRequest;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

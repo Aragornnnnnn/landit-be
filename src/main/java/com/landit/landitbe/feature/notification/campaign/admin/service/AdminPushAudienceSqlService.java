@@ -1,6 +1,6 @@
 // 별도 읽기 전용 PostgreSQL 연결에서 관리자 대상 SQL을 제한된 시간과 행 수로 실행한다.
 
-package com.landit.landitbe.feature.notification.campaign.service;
+package com.landit.landitbe.feature.notification.campaign.admin.service;
 
 import com.landit.landitbe.feature.notification.campaign.client.AdminPushAudienceJdbcClient;
 import com.landit.landitbe.shared.exception.ApiException;

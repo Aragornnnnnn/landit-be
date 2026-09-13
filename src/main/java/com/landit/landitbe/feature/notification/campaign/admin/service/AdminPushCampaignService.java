@@ -1,13 +1,13 @@
 // 관리자 푸시 캠페인의 생성, 테스트, 일괄 발송을 관리한다.
 
-package com.landit.landitbe.feature.notification.campaign.service;
+package com.landit.landitbe.feature.notification.campaign.admin.service;
 
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushAudiencePreview;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignPage;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignRequest;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignView;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushAudiencePreview;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignPage;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignRequest;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignView;
 import com.landit.landitbe.feature.notification.campaign.repository.AdminPushRepository;
 import com.landit.landitbe.feature.notification.campaign.repository.AdminPushRepository.Campaign;
 import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePublisher;

@@ -1,6 +1,6 @@
 // 관리자 푸시 캠페인의 원문 입력을 정규화하고 기본 제약을 정의한다.
 
-package com.landit.landitbe.feature.notification.campaign.dto;
+package com.landit.landitbe.feature.notification.campaign.admin.dto;
 
 import com.landit.landitbe.feature.notification.campaign.domain.AdminPushAudienceType;
 import io.swagger.v3.oas.annotations.media.Schema;

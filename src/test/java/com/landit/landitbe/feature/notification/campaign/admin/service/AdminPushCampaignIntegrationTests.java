@@ -1,6 +1,6 @@
 // 관리자 캠페인의 대상 고정, 배치 발송과 중복 방지를 실제 DB로 검증한다.
 
-package com.landit.landitbe.feature.notification.campaign.service;
+package com.landit.landitbe.feature.notification.campaign.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -15,9 +15,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.campaign.domain.AdminPushAudienceType;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.campaign.repository.AdminPushRepository;
+import com.landit.landitbe.feature.notification.campaign.service.AdminPushProcessingService;
 import com.landit.landitbe.feature.notification.delivery.client.NotificationSender;
 import com.landit.landitbe.feature.notification.delivery.client.PushMessage;
 import com.landit.landitbe.feature.notification.delivery.client.PushTicketResult;

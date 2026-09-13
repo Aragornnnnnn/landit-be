@@ -1,6 +1,6 @@
 // 관리자 캠페인 목록과 페이지 번호 표시 정보를 전달한다.
 
-package com.landit.landitbe.feature.notification.campaign.dto;
+package com.landit.landitbe.feature.notification.campaign.admin.dto;
 
 import java.util.List;
 

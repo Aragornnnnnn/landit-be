@@ -1,6 +1,6 @@
 // 관리자 대상 SQL 미리보기의 입력 계약을 정의한다.
 
-package com.landit.landitbe.feature.notification.campaign.dto;
+package com.landit.landitbe.feature.notification.campaign.admin.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

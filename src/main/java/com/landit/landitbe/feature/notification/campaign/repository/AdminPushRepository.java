@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.notification.campaign.repository;
 
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushAudiencePreview;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignRequest;
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignView;
 import com.landit.landitbe.feature.notification.campaign.domain.AdminPushAudienceType;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushAudiencePreview;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignRequest;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignView;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;

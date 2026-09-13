@@ -1,6 +1,6 @@
 // 관리자 SQL의 지원 문법과 위험한 문법 차단을 검증한다.
 
-package com.landit.landitbe.feature.notification.campaign.service;
+package com.landit.landitbe.feature.notification.campaign.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

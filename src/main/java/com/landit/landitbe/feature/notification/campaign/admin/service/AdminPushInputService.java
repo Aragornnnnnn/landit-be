@@ -1,9 +1,9 @@
 // 관리자 푸시 입력과 딥 링크 형식을 검증한다.
 
-package com.landit.landitbe.feature.notification.campaign.service;
+package com.landit.landitbe.feature.notification.campaign.admin.service;
 
+import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.campaign.domain.AdminPushAudienceType;
-import com.landit.landitbe.feature.notification.campaign.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.exception.NotificationErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
