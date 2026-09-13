@@ -4,10 +4,10 @@ package com.landit.landitbe.feature.app.docs;
 
 import com.landit.landitbe.feature.app.dto.AdminAppVersionResponse;
 import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

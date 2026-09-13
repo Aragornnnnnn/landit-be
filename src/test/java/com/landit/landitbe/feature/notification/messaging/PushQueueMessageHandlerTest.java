@@ -10,10 +10,14 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
-import com.landit.landitbe.feature.notification.service.PushReceiptService;
-import com.landit.landitbe.feature.notification.service.ScheduledNotificationService;
-import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.delivery.messaging.MailboxReplyNotificationRequest;
+import com.landit.landitbe.feature.notification.delivery.messaging.PushQueueMessage;
+import com.landit.landitbe.feature.notification.delivery.messaging.PushQueueMessageHandler;
+import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePayload;
+import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
+import com.landit.landitbe.feature.notification.delivery.service.PushReceiptService;
+import com.landit.landitbe.feature.notification.scheduled.service.ScheduledNotificationService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

@@ -9,7 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
-import com.landit.landitbe.feature.notification.client.PushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.messaging.SqsPushQueuePublisher;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;

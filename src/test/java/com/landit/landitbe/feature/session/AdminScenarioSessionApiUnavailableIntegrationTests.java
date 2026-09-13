@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.session.service.AdminScenarioSessionStartService;
-import com.landit.landitbe.feature.session.service.ScenarioSessionStartService;
+import com.landit.landitbe.feature.session.scenario.service.AdminScenarioSessionStartService;
+import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionStartService;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.UUID;

@@ -3,15 +3,15 @@
 package com.landit.landitbe.feature.learning.expression.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
-import com.landit.landitbe.feature.content.dto.ExpressionLearningContent;
-import com.landit.landitbe.feature.content.service.ExpressionContentService;
-import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
-import com.landit.landitbe.feature.learning.service.LearningProgressService;
+import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSource;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningContent;
+import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
+import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
-import com.landit.landitbe.feature.session.dto.FreeTalkExpressionCompletion;
-import com.landit.landitbe.feature.session.service.FreeTalkExpressionLearningService;
+import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionCompletion;
+import com.landit.landitbe.feature.session.freetalk.expression.service.FreeTalkExpressionLearningService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;

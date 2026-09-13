@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.notification.dto.ExpoPushTokenUpdateRequest;
-import com.landit.landitbe.feature.notification.service.ExpoPushTokenService;
+import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateRequest;
+import com.landit.landitbe.feature.notification.token.service.ExpoPushTokenService;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDateTime;

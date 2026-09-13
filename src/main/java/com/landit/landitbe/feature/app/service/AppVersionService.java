@@ -2,8 +2,6 @@
 
 package com.landit.landitbe.feature.app.service;
 
-import com.landit.landitbe.feature.admin.domain.AdminAction;
-import com.landit.landitbe.feature.admin.service.AdminAuditService;
 import com.landit.landitbe.feature.app.domain.AppVersion;
 import com.landit.landitbe.feature.app.domain.AppVersionName;
 import com.landit.landitbe.feature.app.dto.AdminAppVersionResponse;
@@ -11,6 +9,8 @@ import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse.UpdateType;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
+import com.landit.landitbe.feature.audit.domain.AdminAction;
+import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AppPlatform;

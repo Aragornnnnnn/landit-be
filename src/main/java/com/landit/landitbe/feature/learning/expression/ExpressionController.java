@@ -2,15 +2,15 @@
 
 package com.landit.landitbe.feature.learning.expression;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
-import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
-import com.landit.landitbe.feature.content.dto.ExpressionResponse;
-import com.landit.landitbe.feature.content.service.ExpressionQueryService;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionPracticeResponse;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
+import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.learning.expression.docs.ExpressionControllerDocs;
 import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningCompletionService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;

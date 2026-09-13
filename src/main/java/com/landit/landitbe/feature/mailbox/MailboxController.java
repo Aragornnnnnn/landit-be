@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.mailbox;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.mailbox.docs.MailboxControllerDocs;
 import com.landit.landitbe.feature.mailbox.dto.MailboxFeedbackSubmitRequest;
 import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedDetailResponse;
@@ -12,6 +11,7 @@ import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.MailboxUnreadCountResponse;
 import com.landit.landitbe.feature.mailbox.service.MailboxService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

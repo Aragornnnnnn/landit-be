@@ -1,0 +1,35 @@
+// 프리톡 세션 시작 방식과 선택 주제를 받는다.
+
+package com.landit.landitbe.feature.session.freetalk.dto;
+
+import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+/**
+ * 프리톡 세션 시작 방식과 선택 주제를 받는다.
+ *
+ * @param startMode 첫 발화 주체
+ * @param topicId AI 선시작에서 선택한 추천 주제 ID
+ * @param characterId 선택한 프리톡 캐릭터 식별자
+ */
+@Schema(description = "프리톡 세션 시작 요청")
+public record FreeTalkSessionStartRequest(
+    @Schema(description = "첫 발화 주체", example = "AI_FIRST") FreeTalkStartMode startMode,
+    @Schema(description = "AI 선시작에서 선택한 활성 추천 주제 ID", example = "2") Long topicId,
+    @Schema(
+            description = "프리톡 캐릭터 식별자",
+            example = "chloe",
+            allowableValues = {"chloe", "marco", "teddy"},
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String characterId) {
+
+  /**
+   * 기존 내부 호출부가 기본 캐릭터로 요청을 생성한다.
+   *
+   * @param startMode 첫 발화 주체
+   * @param topicId 추천 주제 ID
+   */
+  public FreeTalkSessionStartRequest(FreeTalkStartMode startMode, Long topicId) {
+    this(startMode, topicId, "chloe");
+  }
+}

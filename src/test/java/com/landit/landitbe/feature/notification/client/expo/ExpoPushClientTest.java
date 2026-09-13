@@ -6,11 +6,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
-import com.landit.landitbe.feature.notification.client.PushMessage;
-import com.landit.landitbe.feature.notification.client.PushNotificationException;
-import com.landit.landitbe.feature.notification.client.PushReceiptStatus;
-import com.landit.landitbe.feature.notification.client.PushTicketResult;
-import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.client.PushMessage;
+import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.client.PushReceiptStatus;
+import com.landit.landitbe.feature.notification.delivery.client.PushTicketResult;
+import com.landit.landitbe.feature.notification.delivery.client.RetryablePushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.client.expo.ExpoPushClient;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;

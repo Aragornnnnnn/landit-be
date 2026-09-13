@@ -2,12 +2,12 @@
 
 package com.landit.landitbe.feature.learning.expression.docs;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
-import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
-import com.landit.landitbe.feature.content.dto.ExpressionResponse;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionPracticeResponse;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
 import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

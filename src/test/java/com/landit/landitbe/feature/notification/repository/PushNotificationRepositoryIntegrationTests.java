@@ -5,11 +5,13 @@ package com.landit.landitbe.feature.notification.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.notification.delivery.domain.PushDelivery;
+import com.landit.landitbe.feature.notification.delivery.domain.PushDeliveryStatus;
+import com.landit.landitbe.feature.notification.delivery.repository.PushDeliveryRepository;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.domain.PushDelivery;
-import com.landit.landitbe.feature.notification.domain.PushDeliveryStatus;
-import com.landit.landitbe.feature.notification.domain.UserPushToken;
-import com.landit.landitbe.feature.notification.domain.UserPushTokenStatus;
+import com.landit.landitbe.feature.notification.token.domain.UserPushToken;
+import com.landit.landitbe.feature.notification.token.domain.UserPushTokenStatus;
+import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;

@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.mailbox;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.mailbox.docs.AdminMailboxControllerDocs;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
@@ -19,6 +18,7 @@ import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.service.AdminMailboxService;
 import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;

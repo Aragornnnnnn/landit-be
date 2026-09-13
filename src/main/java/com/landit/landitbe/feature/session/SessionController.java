@@ -2,17 +2,17 @@
 
 package com.landit.landitbe.feature.session;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.session.docs.SessionControllerDocs;
-import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
-import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitRequest;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
+import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse;
+import com.landit.landitbe.feature.session.feedback.service.SessionFeedbackService;
+import com.landit.landitbe.feature.session.scenario.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitRequest;
+import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitResponse;
+import com.landit.landitbe.feature.session.scenario.service.SessionInnerThoughtQueryService;
+import com.landit.landitbe.feature.session.scenario.service.SessionMessageSubmitService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
-import com.landit.landitbe.feature.session.service.SessionFeedbackService;
-import com.landit.landitbe.feature.session.service.SessionInnerThoughtQueryService;
-import com.landit.landitbe.feature.session.service.SessionMessageSubmitService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

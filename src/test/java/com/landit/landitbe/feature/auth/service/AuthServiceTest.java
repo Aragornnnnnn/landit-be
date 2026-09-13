@@ -20,7 +20,7 @@ import com.landit.landitbe.feature.auth.dto.TokenRefreshRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
-import com.landit.landitbe.feature.content.service.AiTutorService;
+import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;

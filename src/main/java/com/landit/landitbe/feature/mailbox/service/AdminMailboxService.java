@@ -4,8 +4,8 @@ package com.landit.landitbe.feature.mailbox.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.admin.domain.AdminAction;
-import com.landit.landitbe.feature.admin.service.AdminAuditService;
+import com.landit.landitbe.feature.audit.domain.AdminAction;
+import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.mailbox.domain.MailboxFeedback;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetter;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetterRecipient;

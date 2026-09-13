@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.mailbox.docs;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
@@ -18,6 +17,7 @@ import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

@@ -12,9 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
-import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

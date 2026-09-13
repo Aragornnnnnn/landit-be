@@ -2,12 +2,12 @@
 
 package com.landit.landitbe.feature.session.docs;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.session.dto.SessionFeedbackResponse;
-import com.landit.landitbe.feature.session.dto.SessionInnerThoughtResponse;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitRequest;
-import com.landit.landitbe.feature.session.dto.SessionMessageSubmitResponse;
+import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse;
+import com.landit.landitbe.feature.session.scenario.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitRequest;
+import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

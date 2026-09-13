@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
-import com.landit.landitbe.feature.content.repository.projection.ScenarioQuestionProjection;
+import com.landit.landitbe.feature.content.scenario.repository.ScenarioQuestionQueryRepository;
+import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

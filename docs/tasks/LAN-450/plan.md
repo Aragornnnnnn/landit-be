@@ -14,7 +14,7 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 
 - [x] 프로필과 표현 경계. UserLearningProfile record로 프로필 읽기/잠금 결과를 제공한다. Entity 변경은 profile 내부에 유지한다. 표현 완료의 세션 검증/변경은 session 소유 Service로 옮기고 기존 외부 트랜잭션과 검증→표현 잠금→세션 변경 순서를 유지한다. 세션 이력에서 표현을 일괄 조회하는 공개 record 계약을 사용한다.
 - [x] 기억 경계. session→memory 단방향으로 정리한다. 생성/dispatch 오케스트레이터를 session으로 옮기고 memory AI 포트/계약을 memory가 소유한다. memory 저장은 사용자 잠금과 기억만 소유한다. session ContextService의 트랜잭션에서 memory 저장 후 READY 변경을 수행해 기존 원자성과 사용자→세션 잠금 순서를 보존한다. STALE 시 저장/READY 전환 없음, 실패 보상 동작 유지.
-- [ ] 패키지 분류. content의 scenario/expression/tutor, session의 scenario/freetalk/feedback/history, notification의 token/delivery/scheduled로 관련 Service·Repository·DTO를 함께 배치한다. 공개 record는 서비스 구현과 분리한다. profile 조회 계약에서 admin 전용 이름을 제거한다. SQL 전용 알림 Service는 조회 Repository로 분리한다.
+- [x] 패키지 분류. content의 scenario/expression/tutor, session의 scenario/freetalk/feedback/history, notification의 token/delivery/scheduled로 관련 Service·Repository·DTO를 함께 배치한다. 공개 record는 서비스 구현과 분리한다. profile 조회 계약에서 admin 전용 이름을 제거한다. SQL 전용 알림 Service는 조회 Repository로 분리한다.
 - [ ] 오류와 네이밍. 기능 ErrorCode 소유권을 정리하고 공통 HTTP 변환을 유지한다. 관리자 페이지 Bean Validation과 기존 오류 응답을 함께 검증한다. 행위가 불분명한 관련 메서드 이름을 정리한다.
 - [ ] 경계 검증과 문서. 타 기능 Repository/Entity 참조와 memory→session 역참조의 회귀를 검사한다. 조회 JOIN과 남은 결합의 허용 범위를 아키텍처 문서에 명시한다. 전체 check와 실제 Spring HTTP/DB 통합 테스트, 독립 Sol 리뷰를 통과한 후 논리 단위로 커밋한다.
 
@@ -33,3 +33,8 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - memory는 공개 ConversationMemoryPlanningService로 AI 추출/검증을 제공하고 mapper/resolution 내부 구현은 package-private로 유지했다.
 - 메서드 검증의 기존 INVALID_REQUEST 응답과 size/page 경계를 HTTP 통합 테스트로 검증했다.
 - 회귀 검사 추가: 외부 Repository/Entity import 금지, content/memory→session 및 shared→feature import 금지. SQL JOIN은 이 Java import 검사의 대상이 아니다.
+
+- 2차 업무 패키지 재배치 `./gradlew spotlessApply check` 성공(34초). main 타입 307개를 업무별로 이동했다. session/scenario/service의 12개가 session의 최대 Service 패키지이며 notification은 token/delivery/scheduled로 분류했다.
+- 패키지 분리 과정에서 메시지 피드백의 순수 변환을 AiMessageFeedbackEvaluationContext.from으로 옮겨 package-private 구현 노출을 피했다. 검증 규칙은 동일하다.
+- 모듈 내부 Repository 공유는 허용하고 모듈 외부 직접 접근은 금지하도록 문서와 AGENTS를 정렬했다. Repository당 위임 Service를 강제하는 기존 문구는 거대 Service/불필요한 위임을 유발하므로 업무 소유권 기준으로 구체화했다.
+- 감사 로그는 audit, 인증 사용자 식별 record는 shared.security에 배치해 admin/auth 화면 계층으로의 역참조를 줄였다.

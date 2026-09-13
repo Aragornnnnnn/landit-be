@@ -3,8 +3,8 @@
 package com.landit.landitbe.feature.admin.dto;
 
 import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
-import com.landit.landitbe.feature.content.domain.DailyScenarioType;
-import com.landit.landitbe.feature.content.dto.ScenarioSummary;
+import com.landit.landitbe.feature.content.scenario.domain.DailyScenarioType;
+import com.landit.landitbe.feature.content.scenario.dto.ScenarioSummary;
 import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;

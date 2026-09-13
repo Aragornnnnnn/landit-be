@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-import com.landit.landitbe.feature.content.domain.TtsVoice;
-import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import com.landit.landitbe.feature.content.tutor.domain.TtsVoice;
+import com.landit.landitbe.feature.content.tutor.repository.TtsVoiceRepository;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;

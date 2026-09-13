@@ -6,10 +6,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.landit.landitbe.feature.admin.service.AdminAuditService;
 import com.landit.landitbe.feature.app.domain.AppVersion;
 import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
+import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDateTime;

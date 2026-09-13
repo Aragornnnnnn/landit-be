@@ -3,9 +3,9 @@
 package com.landit.landitbe.feature.admin.security;
 
 import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

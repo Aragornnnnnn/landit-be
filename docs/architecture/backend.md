@@ -61,34 +61,52 @@ Worker가 어느 저장소에서 구현되고 배포되는지는 기능 착수 �
 Landit 백엔드는 하나의 코드베이스에서 시작합니다.
 기능 경계는 테이블명이 아니라 사용자 기능과 비즈니스 흐름 기준으로 나눕니다.
 
-기능 모듈은 아래 패키지 구조를 따릅니다.
+큰 기능은 업무별 하위 패키지로 묶고, 각 업무 안에서 필요한 역할만 분리합니다.
+작은 기능에는 빈 레이어나 단순 위임 Facade를 만들지 않습니다.
 
 ```text
 com.landit.landitbe
 ├── feature
-│   └── <feature>
-│       ├── <Feature>Controller.java
-│       ├── docs
-│       ├── dto
-│       ├── domain
-│       ├── repository
-│       ├── service
-│       ├── client
-│       └── exception
+│   ├── content
+│   │   ├── scenario
+│   │   ├── expression
+│   │   └── tutor
+│   ├── learning
+│   │   ├── expression       # 표현 학습 요청 조율
+│   │   ├── progress         # 누적 학습 진행과 완료 이력
+│   │   └── access           # 시나리오 복습 권한
+│   ├── session
+│   │   ├── scenario
+│   │   ├── freetalk
+│   │   │   ├── expression
+│   │   │   ├── memory
+│   │   │   └── history
+│   │   ├── feedback
+│   │   └── history
+│   ├── notification
+│   │   ├── token
+│   │   ├── delivery
+│   │   └── scheduled
+│   ├── memory
+│   ├── profile
+│   ├── admin
+│   └── audit
 ├── config
 └── shared
 ```
 
-예시 기능 경계는 인증, 학습 세션, 시나리오, 피드백, 복습, 알림처럼 사용자가 이해할 수 있는 업무 단위입니다.
-`user`, `session`, `message` 같은 테이블명만 보고 모듈을 만들지 않습니다.
+각 업무 패키지에는 Controller와 필요한 `service`, `repository`, `domain`, `dto`,
+`docs`, `client`, `exception`을 둡니다. 같은 업무의 변경 파일을 함께 찾을 수 있게 합니다.
+`session` 내부의 하위 패키지는 분류 단위이며 각각 독립 배포 모듈이라는 뜻은 아닙니다.
+`learning.expression`은 요청 조율, `learning.progress/access`는 상태 소유 역할을 구분합니다.
 
 ## 패키지 역할
 
 | 패키지 | 역할 |
 | --- | --- |
-| 기능 패키지 루트 | Controller를 두어 HTTP 진입점을 노출 |
+| 업무 패키지 루트 | Controller를 두어 HTTP 진입점을 노출 |
 | `docs` | Swagger 문서 인터페이스 |
-| `dto` | HTTP 요청과 응답 record |
+| `dto` | HTTP 요청·응답 및 다른 업무에 공개하는 값 record |
 | `domain` | 핵심 비즈니스 규칙 |
 | `repository` | JPA Repository와 조회 Projection |
 | `service` | 요청 흐름, 트랜잭션과 기능 동작 |
@@ -118,12 +136,40 @@ config -> feature/shared
 핵심 규칙은 단순합니다.
 
 - Controller는 Service만 의존합니다.
-- 모든 Repository는 하나의 기능 Service가 소유합니다.
+- Repository와 Entity는 하나의 업무 모듈이 소유하며 해당 모듈의 Service만 직접 접근합니다.
 - Service는 다른 기능의 Repository와 Entity를 직접 사용하지 않습니다.
-- 다른 기능과는 공개 Service와 record로 통신합니다.
+- 다른 기능과는 공개 Service와 record로 통신합니다. Entity와 Repository projection을 넘기지 않습니다.
+- 같은 기능 내부의 Service를 Repository마다 한 개로 강제하지 않습니다. 의미 없는 위임 Service나 거대 Service를 만들지 않습니다.
 - `shared`는 어떤 `feature`에도 의존하지 않습니다.
 - 순수 Entity·Projection 변환은 응답 record의 `from()`이 담당합니다.
 - 요청 record에서 Entity를 만들 때는 `toEntity()`를 사용합니다.
+
+## 상태 변경과 조회 결합의 경계
+
+- 콘텐츠는 표현 본문·난이도·활성 상태·시나리오 시작 콘텐츠를 제공합니다.
+- 표현 완료 흐름은 `learning.expression`에서 콘텐츠 잠금, 세션 표현 완료, 누적 진행 저장을 조율합니다.
+- `session`이 세션 소유권과 완료 상태를 검증하고 세션 Entity를 변경합니다.
+- `session → memory`로 기억 생성을 요청합니다. `memory`는 session 타입이나 Repository를 참조하지 않습니다.
+- 기억 추출·판정은 트랜잭션 밖에서 수행하고, `persistAndComplete`의 외부 프록시 트랜잭션에서
+  사용자 잠금 → 기억 snapshot 재검증·저장 → 세션 잠금·READY 전환을 수행합니다.
+- 프로필 조회는 `UserLearningProfile` 등 불변 값을 제공합니다. 잠금 조회는 호출 트랜잭션 종료까지 잠금을 유지합니다.
+- 인증 사용자 식별 정보는 `shared.security.AuthUserPrincipal`, 기능 간 감사 기록은 `audit`가 소유합니다.
+
+DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 허용하지만, 다른 기능의 쓰기 책임은 넘기지 않습니다.
+
+| 조회 경계 | 남아 있는 결합과 이유 |
+| --- | --- |
+| content의 시나리오/표현 조회 Repository | 사용자 언어·학습 진행을 함께 조회하는 JPQL/SQL. 기존 정렬·필터와 일괄 조회를 유지합니다. |
+| session의 메시지 컨텍스트 조회 Repository | 세션에 연결된 시나리오 콘텐츠를 조회합니다. |
+| learning.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 session/content를 JOIN합니다. |
+| notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
+| memory의 검색/원본 계보 저장 | 공유 DB의 기억 원본 메시지·세션 FK 관계를 유지합니다. |
+
+이 예외는 공유 DB 조회 결합의 목록이며 MSA 분리 완료를 뜻하지 않습니다.
+새로운 교차 조회는 이 목록과 소유 경계를 함께 검토합니다.
+`FeatureBoundaryTest`는 타 기능 Repository/Entity의 Java import,
+content/memory의 session 역참조, shared의 feature 참조를 검사합니다.
+SQL 문자열과 모든 런타임 의존성을 검증하는 테스트는 아니므로 JOIN은 별도로 리뷰합니다.
 
 ## Service 기준
 
@@ -136,7 +182,7 @@ config -> feature/shared
 | Repository 소유 Service | 하나의 기능에서 Repository 조회와 상태 변경을 제공 | `UserProfileService`, `LearningSessionService` |
 
 단순 기능은 하나의 Service가 요청 처리와 Repository 소유를 함께 담당할 수 있습니다.
-Repository가 단순 위임만 제공하더라도 다른 클래스가 Repository를 우회하지 않도록 Service 경계를 유지합니다.
+다른 기능의 호출자는 공개 Service를 사용합니다. 같은 업무 내부에서 조회와 변경 Service가 Repository를 함께 쓰는 것은 허용합니다.
 
 ## Port와 Adapter 기준
 

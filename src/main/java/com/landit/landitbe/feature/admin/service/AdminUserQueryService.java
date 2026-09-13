@@ -6,10 +6,10 @@ import com.landit.landitbe.feature.admin.dto.AdminUserDetailResponse;
 import com.landit.landitbe.feature.admin.dto.AdminUserListResponse;
 import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
 import com.landit.landitbe.feature.character.service.StreakService;
-import com.landit.landitbe.feature.content.dto.CurrentScenario;
-import com.landit.landitbe.feature.content.service.ScenarioProgressionService;
-import com.landit.landitbe.feature.content.service.ScenarioQueryService;
-import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
+import com.landit.landitbe.feature.content.scenario.dto.CurrentScenario;
+import com.landit.landitbe.feature.content.scenario.service.CurrentScenarioSelectionService;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioQueryService;
+import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
@@ -27,7 +27,7 @@ public class AdminUserQueryService {
   private final UserProfileService userProfileService;
   private final ScenarioAccessService scenarioAccessService;
   private final StreakService streakService;
-  private final ScenarioProgressionService scenarioProgressionService;
+  private final CurrentScenarioSelectionService scenarioProgressionService;
   private final ScenarioQueryService scenarioQueryService;
   private final Clock clock;
 
