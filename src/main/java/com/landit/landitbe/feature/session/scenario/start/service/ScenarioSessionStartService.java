@@ -21,6 +21,7 @@ import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartRespon
 import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse.CurrentMessageResponse;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.subscription.dto.ExistingLearningRequest;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -46,7 +47,7 @@ public class ScenarioSessionStartService {
   private final UserProfileService userProfileService;
   private final LearningProgressService learningProgressService;
   private final ScenarioAccessService scenarioAccessService;
-  private final CurrentScenarioSelectionService scenarioProgressionService;
+  private final CurrentScenarioSelectionService currentScenarioSelectionService;
   private final LearningSessionService learningSessionService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionHistoryService sessionHistoryService;
@@ -81,7 +82,15 @@ public class ScenarioSessionStartService {
         && !accessGrants.premium(userId)
         && existing.get().scenarioId() == scenarioId
         && accessGrants.allowsExisting(
-            userId, "SCENARIO", existing.get().sessionId(), null, false)
+            userId,
+            new ExistingLearningRequest(
+                "SCENARIO",
+                existing.get().sessionId(),
+                null,
+                false,
+                learningSessionService
+                    .findOwnedStart(userId, existing.get().sessionId(), "SCENARIO")
+                    .orElse(null)))
         && !isCompleted(userId, existing.get().sessionId())) {
       return resume(userId, scenarioId, existing.get().sessionId());
     }
@@ -205,7 +214,7 @@ public class ScenarioSessionStartService {
       return;
     }
 
-    if (!scenarioProgressionService.isCurrentScenario(
+    if (!currentScenarioSelectionService.isCurrentScenario(
         userProfile.id(), scenarioId, userProfile.targetLocale(), startedInstant)) {
       throw new ApiException(ContentErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE);
     }

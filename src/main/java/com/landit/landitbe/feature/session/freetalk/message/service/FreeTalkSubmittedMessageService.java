@@ -154,7 +154,8 @@ public class FreeTalkSubmittedMessageService {
                     && message.getFreeTalkTurnStatus() == null)) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
-    accessGrants.requireSessionContinuation(userId, "FREE_TALK", learningSession.getId());
+    accessGrants.requireSessionContinuation(
+        userId, "FREE_TALK", learningSession.getId(), learningSession.getStartedAt());
     int userTurnNumber = nextUserTurnNumber(messages);
     DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.reserve(userId, request.utteranceDurationMs());

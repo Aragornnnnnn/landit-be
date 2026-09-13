@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -183,5 +184,50 @@ public class LearningSessionService {
     LearningSession learningSession = findOwnedInProgressForUpdate(userId, sessionId);
     learningSession.interruptByUser(LocalDateTime.now());
     log.info("learning session ended by user: userId={}, sessionId={}", userId, sessionId);
+  }
+
+  /**
+   * 요청자가 소유한 지정 종류 세션의 시작 시각을 제공한다.
+   *
+   * @param userId 요청 사용자
+   * @param sessionId 세션 ID
+   * @param kind 세션 종류
+   * @return 소유자와 종류가 일치하는 세션 시작 시각
+   */
+  @Transactional(readOnly = true)
+  public Optional<java.time.LocalDateTime> findOwnedStart(
+      long userId, long sessionId, String kind) {
+    return findOwnedIfPresent(userId, sessionId)
+        .filter(session -> session.sessionType().name().equals(kind))
+        .map(LearningSessionAccess::startedAt);
+  }
+
+  /**
+   * 저장 응답의 재전송 대상이 요청자의 시나리오인지 확인한다.
+   *
+   * @param userId 요청 사용자
+   * @param sessionId 세션 ID
+   * @return 소유한 시나리오 세션이면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean ownsScenario(long userId, long sessionId) {
+    return findOwnedIfPresent(userId, sessionId)
+        .filter(session -> session.sessionType().name().equals("SCENARIO"))
+        .isPresent();
+  }
+
+  /**
+   * 결과 재생성 대상이 요청자의 완료된 프리톡인지 확인한다.
+   *
+   * @param userId 요청 사용자
+   * @param sessionId 세션 ID
+   * @return 소유한 완료 프리톡이면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean ownsCompletedFreeTalk(long userId, long sessionId) {
+    return findOwnedIfPresent(userId, sessionId)
+        .filter(session -> session.sessionType().name().equals("FREE_TALK"))
+        .filter(session -> session.status() == LearningSessionStatus.COMPLETED)
+        .isPresent();
   }
 }

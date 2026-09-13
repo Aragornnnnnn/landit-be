@@ -1,7 +1,9 @@
 // 유료 기능 API 요청을 구독 상태로 제한한다.
 
-package com.landit.landitbe.feature.subscription.security;
+package com.landit.landitbe.config.security;
 
+import com.landit.landitbe.feature.session.service.LearningSessionService;
+import com.landit.landitbe.feature.subscription.dto.ExistingLearningRequest;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.service.UserSubscriptionService;
@@ -52,6 +54,7 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
               HttpMethod.POST, "/api/v1/expressions/*/pronunciation/**"));
 
   private final UserSubscriptionService userSubscriptionService;
+  private final LearningSessionService sessions;
   private final SecurityFailureResponseWriter failureResponseWriter;
   private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService grants;
   private static final RequestMatcher FREE_TALK_ACTION =
@@ -72,9 +75,11 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
    */
   public PremiumAccessFilter(
       UserSubscriptionService userSubscriptionService,
+      LearningSessionService sessions,
       SecurityFailureResponseWriter failureResponseWriter,
       com.landit.landitbe.feature.subscription.service.LearningAccessGrantService grants) {
     this.userSubscriptionService = userSubscriptionService;
+    this.sessions = sessions;
     this.failureResponseWriter = failureResponseWriter;
     this.grants = grants;
   }
@@ -126,23 +131,34 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
     }
     var resultRetry = FREE_TALK_RESULT_RETRY.matcher(request);
     if (resultRetry.isMatch()) {
-      return grants.ownsCompletedFreeTalk(
+      return sessions.ownsCompletedFreeTalk(
           userId, targetId(resultRetry.getVariables().get("sessionId")));
     }
     var freeTalk = FREE_TALK_ACTION.matcher(request);
     if (freeTalk.isMatch()) {
       return grants.allowsExisting(
-          userId, "FREE_TALK", targetId(freeTalk.getVariables().get("sessionId")), null, false);
+          userId,
+          new ExistingLearningRequest(
+              "FREE_TALK",
+              targetId(freeTalk.getVariables().get("sessionId")),
+              null,
+              false,
+              sessions
+                  .findOwnedStart(
+                      userId, targetId(freeTalk.getVariables().get("sessionId")), "FREE_TALK")
+                  .orElse(null)));
     }
     var expression = EXPRESSION_ACTION.matcher(request);
     if (expression.isMatch()) {
       String action = expression.getVariables().get("action");
       return grants.allowsExisting(
           userId,
-          "EXPRESSION",
-          targetId(expression.getVariables().get("expressionId")),
-          request.getHeader("X-Learning-Attempt-Id"),
-          action.endsWith("/learning-finish"));
+          new ExistingLearningRequest(
+              "EXPRESSION",
+              targetId(expression.getVariables().get("expressionId")),
+              request.getHeader("X-Learning-Attempt-Id"),
+              action.endsWith("/learning-finish"),
+              null));
     }
     return false;
   }

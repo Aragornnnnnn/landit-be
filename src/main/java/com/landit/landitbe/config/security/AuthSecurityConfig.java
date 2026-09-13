@@ -6,7 +6,6 @@ import com.landit.landitbe.config.web.CorsProperties;
 import com.landit.landitbe.feature.admin.security.AdminAuthorizationFilter;
 import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.security.AuthTokenFilter;
-import com.landit.landitbe.feature.subscription.security.PremiumAccessFilter;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.DispatcherType;

@@ -16,7 +16,6 @@ import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse.
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.scenario.message.feedback.service.MessageFeedbackWorkService;
-import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Duration;
@@ -38,7 +37,7 @@ public class SessionFeedbackService {
   private final AiConversationClient aiConversationClient;
   private final MessageFeedbackWorkService feedbackWorkService;
   private final AiClientProperties properties;
-  private final LearningAccessGrantService accessGrants;
+  private final ScenarioFeedbackAccessService feedbackAccess;
 
   /**
    * 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다.
@@ -123,7 +122,7 @@ public class SessionFeedbackService {
                         messageFeedbackResponse(
                             feedbackByMessageId.get(userMessage.messageId()), userMessage))
                 .toList(),
-        accessGrants.detailFeedbackLocked(userId, context.sessionId()));
+        feedbackAccess.detailFeedbackLocked(userId, context.sessionId()));
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
