@@ -1,6 +1,6 @@
 // 편지함 어드민 공지·업데이트 페이지 응답을 정의한다.
 
-package com.landit.landitbe.feature.mailbox.letter.dto;
+package com.landit.landitbe.feature.mailbox.admin.letter.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;

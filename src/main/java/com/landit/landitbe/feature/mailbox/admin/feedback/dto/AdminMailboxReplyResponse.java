@@ -1,6 +1,6 @@
 // 편지함 어드민 일괄 답장 결과를 정의한다.
 
-package com.landit.landitbe.feature.mailbox.feedback.dto;
+package com.landit.landitbe.feature.mailbox.admin.feedback.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;

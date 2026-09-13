@@ -1,6 +1,6 @@
 // 편지함 어드민 공지·업데이트 수정 요청을 정의한다.
 
-package com.landit.landitbe.feature.mailbox.letter.dto;
+package com.landit.landitbe.feature.mailbox.admin.letter.dto;
 
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;

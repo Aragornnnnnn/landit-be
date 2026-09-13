@@ -1,13 +1,13 @@
 // 관리자 문의 검색과 답장 이력을 조회한다.
 
-package com.landit.landitbe.feature.mailbox.feedback.service;
+package com.landit.landitbe.feature.mailbox.admin.feedback.service;
 
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackDetailResponse;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackListResponse;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackResponse;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackDetailResponse;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackListResponse;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackResponse;
 import com.landit.landitbe.feature.mailbox.feedback.repository.AdminMailboxFeedbackRepository;
 import com.landit.landitbe.feature.mailbox.feedback.repository.AdminMailboxFeedbackRepository.AdminMailboxFeedbackSummary;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetter;

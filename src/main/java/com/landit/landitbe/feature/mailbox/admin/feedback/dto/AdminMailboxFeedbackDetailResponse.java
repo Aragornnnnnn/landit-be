@@ -1,6 +1,6 @@
 // 편지함 어드민 피드백 상세 응답을 정의한다.
 
-package com.landit.landitbe.feature.mailbox.feedback.dto;
+package com.landit.landitbe.feature.mailbox.admin.feedback.dto;
 
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;

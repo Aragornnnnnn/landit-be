@@ -1,15 +1,15 @@
 // 문의 일괄 답장과 처리 상태·수신자 저장을 하나의 트랜잭션에서 처리한다.
 
-package com.landit.landitbe.feature.mailbox.feedback.service;
+package com.landit.landitbe.feature.mailbox.admin.feedback.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyRequest;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedback;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyRequest;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.feedback.event.MailboxReplyCreatedEvent;
 import com.landit.landitbe.feature.mailbox.feedback.repository.AdminMailboxFeedbackRepository;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetter;

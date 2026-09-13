@@ -1,6 +1,6 @@
 // 편지함 어드민 공지·업데이트 생성 요청을 정의한다.
 
-package com.landit.landitbe.feature.mailbox.letter.dto;
+package com.landit.landitbe.feature.mailbox.admin.letter.dto;
 
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
 import io.swagger.v3.oas.annotations.media.Schema;

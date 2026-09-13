@@ -1,24 +1,24 @@
 // 편지함 어드민 API의 HTTP 요청을 처리한다.
 
-package com.landit.landitbe.feature.mailbox;
+package com.landit.landitbe.feature.mailbox.admin;
 
-import com.landit.landitbe.feature.mailbox.docs.AdminMailboxControllerDocs;
+import com.landit.landitbe.feature.mailbox.admin.docs.AdminMailboxControllerDocs;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackDetailResponse;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackListResponse;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyRequest;
+import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyResponse;
+import com.landit.landitbe.feature.mailbox.admin.feedback.service.AdminMailboxFeedbackQueryService;
+import com.landit.landitbe.feature.mailbox.admin.feedback.service.AdminMailboxReplyService;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterCreateRequest;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterListResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterPatchRequest;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.service.AdminMailboxLetterService;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackDetailResponse;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackListResponse;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyRequest;
-import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyResponse;
-import com.landit.landitbe.feature.mailbox.feedback.service.AdminMailboxFeedbackQueryService;
-import com.landit.landitbe.feature.mailbox.feedback.service.AdminMailboxReplyService;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterCreateRequest;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterListResponse;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterPatchRequest;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterResponse;
-import com.landit.landitbe.feature.mailbox.letter.service.AdminMailboxLetterService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;

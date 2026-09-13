@@ -1,18 +1,18 @@
 // 관리자 편지 초안·게시와 수정 흐름을 처리한다.
 
-package com.landit.landitbe.feature.mailbox.letter.service;
+package com.landit.landitbe.feature.mailbox.admin.letter.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterCreateRequest;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterListResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterPatchRequest;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterResponse;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetter;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterCreateRequest;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterListResponse;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterPatchRequest;
-import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterResponse;
 import com.landit.landitbe.feature.mailbox.letter.repository.AdminMailboxLetterRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
