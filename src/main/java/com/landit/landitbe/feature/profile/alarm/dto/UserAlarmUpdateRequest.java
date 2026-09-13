@@ -1,6 +1,6 @@
 // 사용자별 일일 알람의 시각과 활성 상태 변경 요청을 검증한다.
 
-package com.landit.landitbe.feature.profile.dto;
+package com.landit.landitbe.feature.profile.alarm.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;

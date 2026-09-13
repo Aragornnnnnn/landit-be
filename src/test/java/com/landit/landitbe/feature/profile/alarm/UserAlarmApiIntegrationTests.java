@@ -1,6 +1,6 @@
 // 사용자 일일 알람 API의 저장·변경·검증·접근 제어와 동시 등록을 검증한다.
 
-package com.landit.landitbe.feature.profile;
+package com.landit.landitbe.feature.profile.alarm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,9 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.profile.dto.UserAlarmResponse;
-import com.landit.landitbe.feature.profile.dto.UserAlarmUpdateRequest;
-import com.landit.landitbe.feature.profile.service.UserAlarmService;
+import com.landit.landitbe.feature.profile.alarm.dto.UserAlarmResponse;
+import com.landit.landitbe.feature.profile.alarm.dto.UserAlarmUpdateRequest;
+import com.landit.landitbe.feature.profile.alarm.service.UserAlarmService;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;

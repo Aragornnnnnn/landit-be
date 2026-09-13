@@ -1,6 +1,6 @@
 // 클라이언트에서 매일 반복 예약할 사용자별 알람 시각과 활성 상태를 저장한다.
 
-package com.landit.landitbe.feature.profile.domain;
+package com.landit.landitbe.feature.profile.alarm.domain;
 
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;

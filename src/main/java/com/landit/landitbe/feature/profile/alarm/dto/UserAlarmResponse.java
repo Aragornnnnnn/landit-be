@@ -1,8 +1,8 @@
 // 클라이언트가 매일 반복 예약에 사용할 사용자 알람 설정을 반환한다.
 
-package com.landit.landitbe.feature.profile.dto;
+package com.landit.landitbe.feature.profile.alarm.dto;
 
-import com.landit.landitbe.feature.profile.domain.UserAlarm;
+import com.landit.landitbe.feature.profile.alarm.domain.UserAlarm;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.format.DateTimeFormatter;
 

@@ -1,12 +1,13 @@
 // 사용자별 일일 알람 설정 조회와 저장을 담당하며 기기 예약은 수행하지 않는다.
 
-package com.landit.landitbe.feature.profile.service;
+package com.landit.landitbe.feature.profile.alarm.service;
 
-import com.landit.landitbe.feature.profile.domain.UserAlarm;
-import com.landit.landitbe.feature.profile.dto.UserAlarmResponse;
-import com.landit.landitbe.feature.profile.dto.UserAlarmUpdateRequest;
+import com.landit.landitbe.feature.profile.alarm.domain.UserAlarm;
+import com.landit.landitbe.feature.profile.alarm.dto.UserAlarmResponse;
+import com.landit.landitbe.feature.profile.alarm.dto.UserAlarmUpdateRequest;
+import com.landit.landitbe.feature.profile.alarm.repository.UserAlarmRepository;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
-import com.landit.landitbe.feature.profile.repository.UserAlarmRepository;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.LocalTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

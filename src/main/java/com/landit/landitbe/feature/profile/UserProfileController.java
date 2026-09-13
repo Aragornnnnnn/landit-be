@@ -3,8 +3,6 @@
 package com.landit.landitbe.feature.profile;
 
 import com.landit.landitbe.feature.profile.docs.UserProfileControllerDocs;
-import com.landit.landitbe.feature.profile.dto.UserAlarmResponse;
-import com.landit.landitbe.feature.profile.dto.UserAlarmUpdateRequest;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelUpdateRequest;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
@@ -12,7 +10,6 @@ import com.landit.landitbe.feature.profile.preference.dto.AccentLocaleOptionResp
 import com.landit.landitbe.feature.profile.preference.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.preference.dto.UserAccentLocaleUpdateRequest;
 import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
-import com.landit.landitbe.feature.profile.service.UserAlarmService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
@@ -31,24 +28,6 @@ public class UserProfileController implements UserProfileControllerDocs {
 
   private final ProfilePreferenceService profilePreferenceService;
   private final ProfileLearningService profileLearningService;
-  private final UserAlarmService userAlarmService;
-
-  /** {@inheritDoc} */
-  @Override
-  @GetMapping("/api/v1/me/alarm")
-  public ApiResponse<UserAlarmResponse> getAlarm(
-      @AuthenticationPrincipal AuthUserPrincipal principal) {
-    return ApiResponse.success(userAlarmService.getAlarm(principal.userId()));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  @PutMapping("/api/v1/me/alarm")
-  public ApiResponse<UserAlarmResponse> updateAlarm(
-      @AuthenticationPrincipal AuthUserPrincipal principal,
-      @Valid @RequestBody UserAlarmUpdateRequest request) {
-    return ApiResponse.success(userAlarmService.updateAlarm(principal.userId(), request));
-  }
 
   /** {@inheritDoc} */
   @Override

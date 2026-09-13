@@ -57,3 +57,12 @@ PUT 요청과 성공 응답의 `data`는 다음 구조다.
 - `./gradlew spotlessApply check` 통과(1분 1초): 총 1,211개, 성공 1,205개, 실패·오류 0개, 기존 환경 조건 생략 6개. 알람 API 통합 테스트 7개는 모두 통과했다.
 - 새로 추가한 알람 소스·테스트·SQL 7개는 기존 브랜치와 byte 단위로 동일하다(SQL 파일명 제외). `git diff --check`도 통과했다.
 - H2에서 최신 마이그레이션 전체와 JPA 스키마 검증을 통과했다. 이번 rebase에서는 운영 PostgreSQL 적용·외부 AI 실호출·배포·실제 기기 예약은 검증하지 않았다.
+
+## 2026-09-14 알람 업무 경계 분리
+
+- `profile.alarm` 아래 Controller·docs·dto·service·domain·repository와 통합 테스트를 함께 배치했다. 기존 `UserProfileController`·문서에서는 알람 책임을 제거했다.
+- `UserAlarmController`가 기존 GET·PUT `/api/v1/me/alarm`을 처리한다. 요청·응답·검증·인증과 기존 OpenAPI 태그·설명을 유지한다.
+- 알람 Entity·Repository는 알람 업무가 소유한다. 활성 사용자 확인과 최초 등록 직렬화는 `UserProfileService`의 공개 계약을 계속 사용하며, 공통 프로필 저장소에 직접 접근하지 않는다.
+- `FeatureBoundaryTest`에서 `profile.alarm`을 별도 업무로 식별하도록 해 프로필 내부에서도 알람 저장소 소유권과 순환 의존을 검사한다. 아키텍처 문서에 동일한 경계를 반영했다.
+- `./gradlew spotlessApply check` 통과(55초): 총 1,211개 중 1,205개 성공, 실패·오류 0개, 기존 환경 조건 생략 6개. 알람 API 7개와 경계 검사 9개가 모두 통과했다.
+- 이동한 구현·DTO·Entity·Repository 5개의 본문, 알람 HTTP 처리 메서드와 OpenAPI 선언이 패키지·import·공백을 제외하고 기존과 동일함을 확인했다. DB 마이그레이션과 보안 경로 설정은 변경하지 않았다.
