@@ -1,13 +1,13 @@
 // 관리자 앱 버전 정책 수정의 잠금 조회를 검증한다.
 
-package com.landit.landitbe.feature.app.service;
+package com.landit.landitbe.feature.app.admin.service;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.app.admin.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.domain.AppVersion;
-import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -21,7 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /** 관리자 앱 버전 정책 수정의 잠금 조회를 검증한다. */
 @ExtendWith(MockitoExtension.class)
-class AppVersionServiceTests {
+class AdminAppVersionServiceTests {
 
   @Mock private AppVersionRepository appVersionRepository;
 
@@ -36,10 +36,10 @@ class AppVersionServiceTests {
   void updateLoadsPolicyWithWriteLockBeforeRecordingAuditSnapshot() {
     when(appVersionRepository.findByPlatformForUpdate(AppPlatform.IOS))
         .thenReturn(Optional.of(appVersion));
-    AppVersionService appVersionService =
-        new AppVersionService(appVersionRepository, adminAuditService, userProfileService);
+    AdminAppVersionService adminAppVersionService =
+        new AdminAppVersionService(appVersionRepository, adminAuditService, userProfileService);
 
-    appVersionService.update(1L, AppPlatform.IOS, updateRequest());
+    adminAppVersionService.update(1L, AppPlatform.IOS, updateRequest());
 
     verify(appVersionRepository).findByPlatformForUpdate(AppPlatform.IOS);
     verify(appVersionRepository, never()).findByPlatform(AppPlatform.IOS);

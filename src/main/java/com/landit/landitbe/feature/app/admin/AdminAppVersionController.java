@@ -1,11 +1,11 @@
 // 관리자 앱 버전 정책 관리 요청을 처리한다.
 
-package com.landit.landitbe.feature.app;
+package com.landit.landitbe.feature.app.admin;
 
-import com.landit.landitbe.feature.app.docs.AdminAppVersionControllerDocs;
-import com.landit.landitbe.feature.app.dto.AdminAppVersionResponse;
-import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
-import com.landit.landitbe.feature.app.service.AppVersionService;
+import com.landit.landitbe.feature.app.admin.docs.AdminAppVersionControllerDocs;
+import com.landit.landitbe.feature.app.admin.dto.AdminAppVersionResponse;
+import com.landit.landitbe.feature.app.admin.dto.AdminAppVersionUpdateRequest;
+import com.landit.landitbe.feature.app.admin.service.AdminAppVersionService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
@@ -21,22 +21,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AdminAppVersionController implements AdminAppVersionControllerDocs {
 
-  private final AppVersionService appVersionService;
+  private final AdminAppVersionService adminAppVersionService;
 
   /**
    * 관리자 앱 버전 정책 Service를 주입받는다.
    *
-   * @param appVersionService 앱 버전 정책 Service
+   * @param adminAppVersionService 앱 버전 정책 Service
    */
-  public AdminAppVersionController(AppVersionService appVersionService) {
-    this.appVersionService = appVersionService;
+  public AdminAppVersionController(AdminAppVersionService adminAppVersionService) {
+    this.adminAppVersionService = adminAppVersionService;
   }
 
   /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/admin/app-versions")
   public ApiResponse<List<AdminAppVersionResponse>> list() {
-    return ApiResponse.success(appVersionService.list());
+    return ApiResponse.success(adminAppVersionService.list());
   }
 
   /** {@inheritDoc} */
@@ -46,6 +46,7 @@ public class AdminAppVersionController implements AdminAppVersionControllerDocs 
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @PathVariable AppPlatform platform,
       @RequestBody AdminAppVersionUpdateRequest request) {
-    return ApiResponse.success(appVersionService.update(principal.userId(), platform, request));
+    return ApiResponse.success(
+        adminAppVersionService.update(principal.userId(), platform, request));
   }
 }

@@ -1,6 +1,6 @@
 // 관리자 앱 버전 정책 수정 요청을 검증한다.
 
-package com.landit.landitbe.feature.app.dto;
+package com.landit.landitbe.feature.app.admin.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

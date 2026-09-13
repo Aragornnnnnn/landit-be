@@ -1,9 +1,9 @@
 // 관리자 앱 버전 정책 관리 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.app.docs;
+package com.landit.landitbe.feature.app.admin.docs;
 
-import com.landit.landitbe.feature.app.dto.AdminAppVersionResponse;
-import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
+import com.landit.landitbe.feature.app.admin.dto.AdminAppVersionResponse;
+import com.landit.landitbe.feature.app.admin.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;

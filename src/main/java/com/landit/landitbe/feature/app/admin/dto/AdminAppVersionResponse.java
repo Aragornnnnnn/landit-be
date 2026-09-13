@@ -1,6 +1,6 @@
 // 관리자 앱 버전 정책 조회 결과를 반환한다.
 
-package com.landit.landitbe.feature.app.dto;
+package com.landit.landitbe.feature.app.admin.dto;
 
 import com.landit.landitbe.feature.app.domain.AppVersion;
 import com.landit.landitbe.shared.domain.AppPlatform;
