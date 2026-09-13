@@ -2,10 +2,14 @@
 
 package com.landit.landitbe.feature.session.exception;
 
+import com.landit.landitbe.shared.exception.ApiErrorCode;
 import org.springframework.http.HttpStatus;
 
 /** 세션 기능에서 예상 가능한 오류 코드와 HTTP 상태를 정의한다. */
-public enum SessionErrorCode {
+public enum SessionErrorCode implements ApiErrorCode {
+  FEEDBACK_NOT_READY(HttpStatus.CONFLICT, "메시지별 피드백이 아직 준비되지 않았습니다."),
+  FEEDBACK_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "최종 피드백 생성에 실패했습니다."),
+
   SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션을 찾을 수 없습니다."),
   RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
   FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),

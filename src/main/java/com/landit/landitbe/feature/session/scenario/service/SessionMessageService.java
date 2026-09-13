@@ -10,7 +10,6 @@ import com.landit.landitbe.feature.session.history.repository.SessionHistoryMess
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,7 +43,7 @@ public class SessionMessageService {
   public SessionHistoryMessage require(long messageId) {
     return sessionHistoryMessageRepository
         .findById(messageId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   /**

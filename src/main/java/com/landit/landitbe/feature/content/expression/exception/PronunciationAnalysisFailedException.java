@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.content.expression.exception;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 
 /**
  * AI 서버 발음 분석 호출이 실패했을 때 던지는 예외다.
@@ -22,11 +22,11 @@ public class PronunciationAnalysisFailedException extends ApiException {
    * @param message 실패 사유
    */
   public PronunciationAnalysisFailedException(String message) {
-    super(ErrorCode.PRONUNCIATION_ANALYSIS_FAILED, message);
+    super(ContentErrorCode.PRONUNCIATION_ANALYSIS_FAILED, message);
   }
 
   /** 오류 코드의 기본 메시지를 사용하는 예외를 생성한다. */
   public PronunciationAnalysisFailedException() {
-    super(ErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
+    super(ContentErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
   }
 }

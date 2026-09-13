@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.auth.security;
 
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -65,7 +65,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     }
     if (!userProfileService.existsActive(userId)) {
       SecurityContextHolder.clearContext();
-      failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
+      failureResponseWriter.write(response, AuthErrorCode.INVALID_TOKEN);
       return;
     }
 

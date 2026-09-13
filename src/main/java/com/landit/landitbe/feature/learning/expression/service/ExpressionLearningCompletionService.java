@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.learning.expression.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningContent;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
@@ -93,7 +94,7 @@ public class ExpressionLearningCompletionService {
     if (!isUnlockedExpression(
         userId, scenarioId, expressionId, contentLevel, completedExpressionIds.values())) {
       log.warn(LOCKED_EXPRESSION_LOG, userId, expressionId);
-      throw new ApiException(ErrorCode.EXPRESSION_LOCKED);
+      throw new ApiException(ContentErrorCode.EXPRESSION_LOCKED);
     }
 
     // 현재 학습 순서의 표현 완료 이력을 생성한다.

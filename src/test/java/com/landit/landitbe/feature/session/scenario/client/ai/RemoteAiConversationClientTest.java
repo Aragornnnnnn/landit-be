@@ -9,6 +9,7 @@ import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionMessageFeedbackResult;
@@ -538,7 +539,7 @@ class RemoteAiConversationClientTest {
             ApiException.class,
             exception ->
                 assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
+                    .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
   @Test
@@ -551,7 +552,8 @@ class RemoteAiConversationClientTest {
         .isInstanceOfSatisfying(
             ApiException.class,
             exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FEEDBACK_NOT_READY));
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(SessionErrorCode.FEEDBACK_NOT_READY));
   }
 
   @Test
@@ -578,7 +580,7 @@ class RemoteAiConversationClientTest {
             ApiException.class,
             exception ->
                 assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
+                    .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
   @Test
@@ -591,7 +593,7 @@ class RemoteAiConversationClientTest {
             ApiException.class,
             exception ->
                 assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.FEEDBACK_GENERATION_FAILED));
+                    .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
   private AiMessageFeedbackRequest aiMessageFeedbackRequest() {

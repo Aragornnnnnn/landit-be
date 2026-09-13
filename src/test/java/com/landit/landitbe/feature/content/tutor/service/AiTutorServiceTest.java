@@ -7,13 +7,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.tutor.domain.AiTutor;
 import com.landit.landitbe.feature.content.tutor.repository.AiTutorRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +53,6 @@ class AiTutorServiceTest {
             () -> aiTutorService.requireSingleActiveTutorId(AccentLocale.EN_US, Locale.EN))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
+        .isEqualTo(ContentErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
   }
 }

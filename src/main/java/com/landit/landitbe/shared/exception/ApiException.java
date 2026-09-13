@@ -7,22 +7,22 @@ import org.springframework.http.HttpStatus;
 /** 서비스 로직에서 공통 오류 코드로 실패를 표현하는 런타임 예외다. */
 public class ApiException extends RuntimeException {
 
-  private final ErrorCode errorCode;
+  private final ApiErrorCode errorCode;
 
   /** 오류 코드의 기본 메시지를 사용하는 API 예외를 생성한다. */
-  public ApiException(ErrorCode errorCode) {
+  public ApiException(ApiErrorCode errorCode) {
     super(errorCode.getMessage());
     this.errorCode = errorCode;
   }
 
   /** 오류 코드와 별도 메시지를 사용하는 API 예외를 생성한다. */
-  public ApiException(ErrorCode errorCode, String message) {
+  public ApiException(ApiErrorCode errorCode, String message) {
     super(message);
     this.errorCode = errorCode;
   }
 
   /** 예외에 대응하는 오류 코드를 반환한다. */
-  public ErrorCode getErrorCode() {
+  public ApiErrorCode getErrorCode() {
     return errorCode;
   }
 

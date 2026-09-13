@@ -8,12 +8,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.scenario.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.feature.session.scenario.repository.ScenarioSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -50,6 +50,6 @@ class ScenarioSessionServiceTest {
             () -> service.requireStartProjection(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.SCENARIO_NOT_FOUND);
+        .isEqualTo(ContentErrorCode.SCENARIO_NOT_FOUND);
   }
 }

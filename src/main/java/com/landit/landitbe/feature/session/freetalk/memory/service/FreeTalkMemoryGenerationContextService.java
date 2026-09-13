@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.domain.MemoryGenerationStatus;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
@@ -18,7 +19,6 @@ import com.landit.landitbe.feature.session.history.repository.SessionHistoryMess
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -53,11 +53,11 @@ public class FreeTalkMemoryGenerationContextService {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     LearningSession learningSession =
         learningSessionRepository
             .findById(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
 
     if (!isEligibleForClaim(learningSession, freeTalkSession)) {
       return null;
@@ -89,7 +89,7 @@ public class FreeTalkMemoryGenerationContextService {
   private SessionHistory loadHistory(long learningSessionId) {
     return sessionHistoryRepository
         .findByLearningSessionId(learningSessionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   /** 메시지 순서를 보존해 AI가 후보 원본 ID와 관찰 시각을 검증할 수 있게 한다. */
@@ -128,7 +128,7 @@ public class FreeTalkMemoryGenerationContextService {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.completeMemoryGeneration();
   }
 

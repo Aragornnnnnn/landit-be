@@ -2,9 +2,9 @@
 
 package com.landit.landitbe.feature.content.scenario.service;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.scenario.repository.ScenarioRepository;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +20,7 @@ public class ScenarioService {
   @Transactional(readOnly = true)
   public void validateExists(Long scenarioId) {
     if (!scenarioRepository.existsById(scenarioId)) {
-      throw new ApiException(ErrorCode.SCENARIO_NOT_FOUND);
+      throw new ApiException(ContentErrorCode.SCENARIO_NOT_FOUND);
     }
   }
 }

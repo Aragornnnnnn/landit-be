@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.content.expression.exception;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 
 /**
  * 발음 평가 녹음 파일이 형식·크기 제한에 맞지 않을 때 던지는 예외다.
@@ -22,11 +22,11 @@ public class InvalidAudioException extends ApiException {
    * @param message 실패 사유. 예: "오디오 파일이 10MB를 초과했습니다."
    */
   public InvalidAudioException(String message) {
-    super(ErrorCode.INVALID_AUDIO, message);
+    super(ContentErrorCode.INVALID_AUDIO, message);
   }
 
   /** 오류 코드의 기본 메시지를 사용하는 예외를 생성한다. */
   public InvalidAudioException() {
-    super(ErrorCode.INVALID_AUDIO);
+    super(ContentErrorCode.INVALID_AUDIO);
   }
 }

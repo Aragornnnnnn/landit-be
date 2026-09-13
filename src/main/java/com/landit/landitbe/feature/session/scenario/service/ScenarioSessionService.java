@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.session.scenario.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.scenario.domain.ScenarioSession;
@@ -36,7 +37,7 @@ public class ScenarioSessionService {
       long userId, long scenarioId, ContentLearningLevel questionLevelGroup) {
     return scenarioContentService
         .findStartContext(userId, scenarioId, questionLevelGroup)
-        .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(ContentErrorCode.SCENARIO_NOT_FOUND));
   }
 
   /**

@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.content.expression.exception;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 
 /**
  * 발음 평가 자산(기준 데이터·TTS)이 없어 평가를 열 수 없을 때 던지는 예외다.
@@ -18,6 +18,6 @@ public class PronunciationDataNotFoundException extends ApiException {
 
   /** 오류 코드의 기본 메시지를 사용하는 예외를 생성한다. */
   public PronunciationDataNotFoundException() {
-    super(ErrorCode.PRONUNCIATION_DATA_NOT_FOUND);
+    super(ContentErrorCode.PRONUNCIATION_DATA_NOT_FOUND);
   }
 }

@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.auth.dto.LogoutRequest;
 import com.landit.landitbe.feature.auth.dto.SocialLoginRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
@@ -24,7 +25,6 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -124,14 +124,14 @@ public class AuthService {
     Long userProfileId =
         refreshTokenRepository
             .findUserProfileIdByTokenHash(refreshTokenHash)
-            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+            .orElseThrow(() -> new ApiException(AuthErrorCode.REFRESH_TOKEN_INVALID));
     AuthProfile authProfile =
         userProfileService
             .findAuthenticationProfileForUpdate(userProfileId)
-            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+            .orElseThrow(() -> new ApiException(AuthErrorCode.REFRESH_TOKEN_INVALID));
     LocalDateTime now = LocalDateTime.now();
     if (refreshTokenRepository.revokeActiveByTokenHash(refreshTokenHash, now) != 1) {
-      throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.REFRESH_TOKEN_INVALID);
     }
     IssuedTokens issuedTokens = issueTokens(authProfile);
     TokenRefreshResponse response =
@@ -172,7 +172,7 @@ public class AuthService {
   @Transactional
   public void withdraw(Long userId) {
     if (!userProfileService.withdrawIfActiveForUpdate(userId)) {
-      throw new ApiException(ErrorCode.INVALID_TOKEN);
+      throw new ApiException(AuthErrorCode.INVALID_TOKEN);
     }
     conversationMemoryDeletionService.deleteAllByUserProfileId(userId);
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
@@ -202,7 +202,7 @@ public class AuthService {
                   userProfileService
                       .updateAuthenticationProfileForUpdate(
                           identity.getUserProfileId(), userInfo.email(), nickname)
-                      .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
+                      .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_TOKEN));
               identity.updateProviderEmail(userInfo.email());
               return new UserResult(authProfile, identity.getProvider(), false);
             })

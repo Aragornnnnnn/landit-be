@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessag
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClient;
@@ -192,7 +193,7 @@ public class FreeTalkExpressionGenerationService {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     LearningSession learningSession =
         learningSessionRepository.findById(learningSessionId).orElseThrow();
 
@@ -207,7 +208,7 @@ public class FreeTalkExpressionGenerationService {
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.startExpressionGeneration();
 
     // 트랜잭션 밖 AI 호출에 필요한 값만 불변 컨텍스트로 반환한다.

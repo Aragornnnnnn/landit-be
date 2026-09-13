@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.expression.client.ai;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.expression.client.ai.dto.AiPronunciationAnalysisRequest;
 import com.landit.landitbe.feature.content.expression.client.ai.dto.AiPronunciationJudgedWord;
 import com.landit.landitbe.feature.content.expression.exception.AiPronunciationResponseInvalidException;
@@ -96,7 +97,7 @@ public class RemoteAiPronunciationClient implements AiPronunciationClient {
           return new AiPronunciationResponseInvalidException();
         }
         // AI 서버의 오디오 검증(길이 30초 등)에 걸린 경우는 사용자 입력 문제로 그대로 전달한다.
-        if (ErrorCode.INVALID_AUDIO.name().equals(upstreamErrorCode)) {
+        if (ContentErrorCode.INVALID_AUDIO.name().equals(upstreamErrorCode)) {
           return new InvalidAudioException();
         }
       }

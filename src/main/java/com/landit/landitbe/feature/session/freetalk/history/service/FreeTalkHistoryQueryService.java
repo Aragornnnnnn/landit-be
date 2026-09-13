@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.ExpressionLearningStatus;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionDetailResponse;
@@ -98,7 +99,7 @@ public class FreeTalkHistoryQueryService {
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
 
     // 현재 세션의 추천 표현과 완료 상태를 결합해 학습 진행 상태를 계산한다.
     List<FreeTalkSessionExpression> sessionExpressions =
@@ -151,7 +152,7 @@ public class FreeTalkHistoryQueryService {
       Map<Long, ExpressionText> writingExpressionsById) {
     LearningSession learningSession = learningSessionsById.get(session.getLearningSessionId());
     if (learningSession == null) {
-      throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
+      throw new ApiException(SessionErrorCode.SESSION_NOT_FOUND);
     }
     ExpressionProgress progress =
         expressionProgress(
@@ -176,17 +177,17 @@ public class FreeTalkHistoryQueryService {
     LearningSession learningSession =
         learningSessionRepository
             .findById(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     if (!Long.valueOf(userId).equals(learningSession.getUserProfileId())) {
       throw new ApiException(ErrorCode.FORBIDDEN);
     }
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     if (learningSession.getStatus() != LearningSessionStatus.COMPLETED
         || freeTalkSession.getConversationStatus() != FreeTalkConversationStatus.COMPLETED) {
-      throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
+      throw new ApiException(SessionErrorCode.SESSION_NOT_FOUND);
     }
     return new CompletedSession(learningSession, freeTalkSession);
   }

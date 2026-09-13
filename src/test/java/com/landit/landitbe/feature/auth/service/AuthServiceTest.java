@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.auth.domain.RefreshToken;
 import com.landit.landitbe.feature.auth.dto.LogoutRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
@@ -27,7 +28,6 @@ import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -118,7 +118,7 @@ class AuthServiceTest {
     assertThatThrownBy(() -> authService.refresh(new TokenRefreshRequest(CURRENT_TOKEN)))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.REFRESH_TOKEN_INVALID);
+        .isEqualTo(AuthErrorCode.REFRESH_TOKEN_INVALID);
     verify(tokenService, never()).createAccessToken(any());
     verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
   }

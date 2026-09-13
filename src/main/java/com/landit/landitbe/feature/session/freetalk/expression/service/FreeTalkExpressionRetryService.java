@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.freetalk.expression.service;
 
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionRetryResponse;
@@ -41,12 +42,12 @@ public class FreeTalkExpressionRetryService {
                   if (learningSessionRepository.existsById(learningSessionId)) {
                     throw new ApiException(ErrorCode.FORBIDDEN);
                   }
-                  throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
+                  throw new ApiException(SessionErrorCode.SESSION_NOT_FOUND);
                 });
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     if (learningSession.getStatus() != LearningSessionStatus.COMPLETED
         || freeTalkSession.getConversationStatus() != FreeTalkConversationStatus.COMPLETED) {
       throw new ApiException(ErrorCode.CONFLICT);

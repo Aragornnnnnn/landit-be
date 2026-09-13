@@ -4,6 +4,7 @@ package com.landit.landitbe.config.security;
 
 import com.landit.landitbe.config.web.CorsProperties;
 import com.landit.landitbe.feature.admin.security.AdminAuthorizationFilter;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
 import com.landit.landitbe.feature.auth.security.AuthTokenFilter;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -148,7 +149,7 @@ public class AuthSecurityConfig {
 
   private AuthenticationEntryPoint authenticationEntryPoint() {
     return (request, response, authException) ->
-        failureResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
+        failureResponseWriter.write(response, AuthErrorCode.INVALID_TOKEN);
   }
 
   private AccessDeniedHandler accessDeniedHandler() {

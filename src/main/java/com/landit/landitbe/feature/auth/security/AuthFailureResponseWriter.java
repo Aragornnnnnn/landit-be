@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.exception.ApiErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -23,7 +23,7 @@ public class AuthFailureResponseWriter {
   }
 
   /** Security filter 구간에서 발생한 인증 실패를 공통 응답으로 쓴다. */
-  public void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+  public void write(HttpServletResponse response, ApiErrorCode errorCode) throws IOException {
     response.setStatus(errorCode.getStatus().value());
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);

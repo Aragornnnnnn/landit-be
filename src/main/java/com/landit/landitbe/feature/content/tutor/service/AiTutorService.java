@@ -2,13 +2,13 @@
 
 package com.landit.landitbe.feature.content.tutor.service;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.tutor.domain.AiTutor;
 import com.landit.landitbe.feature.content.tutor.repository.AiTutorRepository;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,7 +35,7 @@ public class AiTutorService {
         aiTutorRepository.findAllByAccentLocaleAndTargetLocaleAndStatus(
             accentLocale, targetLocale, ActiveStatus.ACTIVE);
     if (candidates.size() != 1) {
-      throw new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
+      throw new ApiException(ContentErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
     }
     return candidates.getFirst().getId();
   }

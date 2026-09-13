@@ -15,8 +15,8 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - [x] 프로필과 표현 경계. UserLearningProfile record로 프로필 읽기/잠금 결과를 제공한다. Entity 변경은 profile 내부에 유지한다. 표현 완료의 세션 검증/변경은 session 소유 Service로 옮기고 기존 외부 트랜잭션과 검증→표현 잠금→세션 변경 순서를 유지한다. 세션 이력에서 표현을 일괄 조회하는 공개 record 계약을 사용한다.
 - [x] 기억 경계. session→memory 단방향으로 정리한다. 생성/dispatch 오케스트레이터를 session으로 옮기고 memory AI 포트/계약을 memory가 소유한다. memory 저장은 사용자 잠금과 기억만 소유한다. session ContextService의 트랜잭션에서 memory 저장 후 READY 변경을 수행해 기존 원자성과 사용자→세션 잠금 순서를 보존한다. STALE 시 저장/READY 전환 없음, 실패 보상 동작 유지.
 - [x] 패키지 분류. content의 scenario/expression/tutor, session의 scenario/freetalk/feedback/history, notification의 token/delivery/scheduled로 관련 Service·Repository·DTO를 함께 배치한다. 공개 record는 서비스 구현과 분리한다. profile 조회 계약에서 admin 전용 이름을 제거한다. SQL 전용 알림 Service는 조회 Repository로 분리한다.
-- [ ] 오류와 네이밍. 기능 ErrorCode 소유권을 정리하고 공통 HTTP 변환을 유지한다. 관리자 페이지 Bean Validation과 기존 오류 응답을 함께 검증한다. 행위가 불분명한 관련 메서드 이름을 정리한다.
-- [ ] 경계 검증과 문서. 타 기능 Repository/Entity 참조와 memory→session 역참조의 회귀를 검사한다. 조회 JOIN과 남은 결합의 허용 범위를 아키텍처 문서에 명시한다. 전체 check와 실제 Spring HTTP/DB 통합 테스트, 독립 Sol 리뷰를 통과한 후 논리 단위로 커밋한다.
+- [x] 오류와 네이밍. 기능 ErrorCode 소유권을 정리하고 공통 HTTP 변환을 유지한다. 관리자 페이지 Bean Validation과 기존 오류 응답을 함께 검증한다. 행위가 불분명한 관련 메서드 이름을 정리한다.
+- [x] 경계 검증과 문서. 타 기능 Repository/Entity 참조와 memory→session 역참조의 회귀를 검사한다. 조회 JOIN과 남은 결합의 허용 범위를 아키텍처 문서에 명시한다. 전체 check와 실제 Spring HTTP/DB 통합 테스트, 독립 Sol 리뷰를 통과한 후 논리 단위로 커밋한다.
 
 ## 구현 분담
 
@@ -38,3 +38,11 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - 패키지 분리 과정에서 메시지 피드백의 순수 변환을 AiMessageFeedbackEvaluationContext.from으로 옮겨 package-private 구현 노출을 피했다. 검증 규칙은 동일하다.
 - 모듈 내부 Repository 공유는 허용하고 모듈 외부 직접 접근은 금지하도록 문서와 AGENTS를 정렬했다. Repository당 위임 Service를 강제하는 기존 문구는 거대 Service/불필요한 위임을 유발하므로 업무 소유권 기준으로 구체화했다.
 - 감사 로그는 audit, 인증 사용자 식별 record는 shared.security에 배치해 admin/auth 화면 계층으로의 역참조를 줄였다.
+
+- 3차 오류 소유권 분리 `./gradlew spotlessApply check` 성공(38초), 886 tests / 0 failures / 0 errors / 0 skipped. auth/content/session/app의 오류를 기능 소유로 옮기고 ApiErrorCode로 HTTP 계약만 공유한다.
+- 기준 커밋 대비 Mapping 어노테이션 58개와 오류 코드·HTTP 상태·메시지 31개가 동일함을 소스 비교로 확인했다. Flyway migration 변경은 없다. 이는 소스 호환성 확인이며 운영 배포 검증은 아니다.
+- 리뷰 그래프 갱신 결과 1,033 files / 5,641 nodes / 67,088 edges와 현재 HEAD 일치를 확인했다. 실제 판단은 소스·diff·테스트 결과를 함께 사용한다.
+- 이번 범위에서는 feature/config/shared, 생성·수정 시간 Base Entity, KST 기준 일별 조회의 날짜 기본값을 유지한다. 폴더 이름이나 상속 자체보다 데이터 소유권과 업무별 탐색성을 우선하고, 날짜 정책·로그 암호화 같은 동작 변경은 섞지 않는다.
+- SQL/JPQL text block 82개를 기준 커밋과 비교했다. DTO의 패키지 경로와 공백을 정규화한 조회 문자열 멀티셋이 동일하다. 리소스·빌드 설정에 이동 전 패키지 참조가 남지 않았으며 `git diff --check`도 통과했다.
+- 독립 Sol(medium) HIGH 리뷰 완료. 표현 잠금 순서, 기억 저장/READY 원자성과 rollback, profile snapshot, AI memory 계약, 오류 transport 및 패키지 이동을 diff·호출부·테스트 산출물로 검토했고 blocker/actionable finding은 없었다.
+- 최종 증거 범위는 로컬 Spring HTTP/H2 통합 테스트와 정적 구조 검사다. 운영 PostgreSQL, 실배포, 외부 AI 실호출은 검증하지 않았다.

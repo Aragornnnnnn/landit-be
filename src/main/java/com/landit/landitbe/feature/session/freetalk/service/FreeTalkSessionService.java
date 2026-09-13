@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.freetalk.service;
 
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.content.tutor.service.ConversationCharacterService;
 import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
@@ -177,7 +178,7 @@ public class FreeTalkSessionService {
 
   private Long requireAiTutorId(UserLearningProfile userProfile) {
     if (Objects.isNull(userProfile.aiTutorId())) {
-      throw new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
+      throw new ApiException(ContentErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
     }
     return userProfile.aiTutorId();
   }

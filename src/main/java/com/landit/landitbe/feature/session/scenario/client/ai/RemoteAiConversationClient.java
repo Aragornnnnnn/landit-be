@@ -6,10 +6,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
+import com.landit.landitbe.shared.exception.ApiErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.io.IOException;
@@ -101,12 +103,13 @@ public class RemoteAiConversationClient implements AiConversationClient {
             sessionFeedbackUri(),
             request,
             RemoteSessionFeedbackResponse.class,
-            ErrorCode.FEEDBACK_GENERATION_FAILED,
+            SessionErrorCode.FEEDBACK_GENERATION_FAILED,
             properties.sessionFeedbackRequestTimeout())
         .toResult();
   }
 
-  private <T> T post(URI uri, Object payload, Class<T> responseType, ErrorCode defaultErrorCode) {
+  private <T> T post(
+      URI uri, Object payload, Class<T> responseType, ApiErrorCode defaultErrorCode) {
     return post(uri, payload, responseType, defaultErrorCode, properties.requestTimeout());
   }
 
@@ -114,7 +117,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
       URI uri,
       Object payload,
       Class<T> responseType,
-      ErrorCode defaultErrorCode,
+      ApiErrorCode defaultErrorCode,
       Duration requestTimeout) {
     try {
       HttpRequest request =
@@ -144,7 +147,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
   }
 
   /** AI 서버 오류 응답에서 공개할 수 있는 오류 코드만 선별해 변환한다. */
-  private ApiException toApiException(String responseBody, ErrorCode defaultErrorCode) {
+  private ApiException toApiException(String responseBody, ApiErrorCode defaultErrorCode) {
     try {
       JsonNode root = jsonMapper.readTree(responseBody);
       if (root != null) {
@@ -152,9 +155,9 @@ public class RemoteAiConversationClient implements AiConversationClient {
         if (ErrorCode.AI_RESPONSE_INVALID.name().equals(upstreamErrorCode)) {
           return new ApiException(ErrorCode.AI_RESPONSE_INVALID);
         }
-        if (defaultErrorCode == ErrorCode.FEEDBACK_GENERATION_FAILED
+        if (defaultErrorCode == SessionErrorCode.FEEDBACK_GENERATION_FAILED
             && "MESSAGE_FEEDBACK_NOT_READY".equals(upstreamErrorCode)) {
-          return new ApiException(ErrorCode.FEEDBACK_NOT_READY);
+          return new ApiException(SessionErrorCode.FEEDBACK_NOT_READY);
         }
       }
     } catch (JacksonException ignored) {
@@ -194,10 +197,10 @@ public class RemoteAiConversationClient implements AiConversationClient {
   }
 
   private URI sessionFeedbackUri() {
-    return aiBaseUri(ErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_FEEDBACK_PATH);
+    return aiBaseUri(SessionErrorCode.FEEDBACK_GENERATION_FAILED).resolve(SESSION_FEEDBACK_PATH);
   }
 
-  private URI aiBaseUri(ErrorCode defaultErrorCode) {
+  private URI aiBaseUri(ApiErrorCode defaultErrorCode) {
     if (properties.baseUrl() == null || properties.baseUrl().isBlank()) {
       throw new ApiException(defaultErrorCode);
     }

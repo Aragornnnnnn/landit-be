@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkTurnResult;
@@ -79,7 +80,7 @@ public class FreeTalkSubmittedMessageService {
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository
             .findBySessionHistoryIdAndClientMessageId(history.getId(), request.clientMessageId())
@@ -148,7 +149,7 @@ public class FreeTalkSubmittedMessageService {
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository
             .findByIdAndSessionHistoryId(submittedMessageId, history.getId())
@@ -218,14 +219,14 @@ public class FreeTalkSubmittedMessageService {
   private SessionHistory requireHistory(long learningSessionId) {
     return sessionHistoryRepository
         .findByLearningSessionId(learningSessionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   private void validateReservable(
       LearningSession learningSession, FreeTalkSession freeTalkSession) {
     if (!learningSession.isInProgress()
         || freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED) {
-      throw new ApiException(ErrorCode.SESSION_ALREADY_COMPLETED);
+      throw new ApiException(SessionErrorCode.SESSION_ALREADY_COMPLETED);
     }
     if (freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.AWAITING_EXIT_DECISION
         || freeTalkSession.getProcessingClientMessageId() != null) {
@@ -481,7 +482,7 @@ public class FreeTalkSubmittedMessageService {
     SessionHistory history =
         sessionHistoryRepository
             .findByLearningSessionId(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository
             .findByIdAndSessionHistoryId(submittedMessageId, history.getId())
@@ -649,11 +650,11 @@ public class FreeTalkSubmittedMessageService {
     SessionHistory history =
         sessionHistoryRepository
             .findById(historyId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository
             .findById(userMessageId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     return new ManagedRecords(learningSessionId, learningSession, session, history, userMessage);
   }
 
@@ -661,25 +662,25 @@ public class FreeTalkSubmittedMessageService {
     LearningSession session =
         learningSessionRepository
             .findById(learningSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     if (!Long.valueOf(userId).equals(session.getUserProfileId())) {
       throw new ApiException(ErrorCode.FORBIDDEN);
     }
     return learningSessionRepository
         .findByIdAndUserProfileIdForUpdate(learningSessionId, userId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   private LearningSession requireOwnedSessionWithoutUser(long learningSessionId) {
     return learningSessionRepository
         .findById(learningSessionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   private FreeTalkSession requireFreeTalkForUpdate(long learningSessionId) {
     return freeTalkSessionRepository
         .findByLearningSessionIdForUpdate(learningSessionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   private void requireProcessingOwner(FreeTalkSession session, String processingClientMessageId) {
@@ -736,7 +737,7 @@ public class FreeTalkSubmittedMessageService {
         return index;
       }
     }
-    throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
+    throw new ApiException(SessionErrorCode.SESSION_NOT_FOUND);
   }
 
   private long speakingDurationUntil(List<SessionHistoryMessage> messages, int messageSequence) {

@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.session.scenario.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.scenario.service.CurrentScenarioSelectionService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
@@ -129,11 +130,11 @@ public class ScenarioSessionStartService {
   /** 카테고리 잠금과 시나리오 비활성 상태를 API 오류 코드로 변환한다. */
   private void assertContentActive(ScenarioStartContext startRow) {
     if (inactive(startRow.categoryStatus())) {
-      throw new ApiException(ErrorCode.CATEGORY_LOCKED);
+      throw new ApiException(ContentErrorCode.CATEGORY_LOCKED);
     }
 
     if (inactive(startRow.scenarioStatus()) || inactive(startRow.variantStatus())) {
-      throw new ApiException(ErrorCode.SCENARIO_LOCKED);
+      throw new ApiException(ContentErrorCode.SCENARIO_LOCKED);
     }
   }
 
@@ -146,7 +147,7 @@ public class ScenarioSessionStartService {
 
     if (!scenarioProgressionService.isCurrentScenario(
         userProfile.id(), scenarioId, userProfile.targetLocale(), startedInstant)) {
-      throw new ApiException(ErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE);
+      throw new ApiException(ContentErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE);
     }
   }
 

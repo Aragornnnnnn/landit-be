@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.scenario.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.content.scenario.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.scenario.dto.CurrentScenario;
@@ -117,7 +118,7 @@ public class DailyScenarioQueryService {
                 scenarioId,
                 ContentLearningLevel.from(
                     userProfileService.getLearningLevel(userId).learningLevel()))
-            .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
+            .orElseThrow(() -> new ApiException(ContentErrorCode.SCENARIO_NOT_FOUND));
     return ScenarioResponse.from(
         projection,
         dailyScenarioType,

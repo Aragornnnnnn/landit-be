@@ -171,6 +171,18 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 content/memory의 session 역참조, shared의 feature 참조를 검사합니다.
 SQL 문자열과 모든 런타임 의존성을 검증하는 테스트는 아니므로 JOIN은 별도로 리뷰합니다.
 
+## 오류 소유권
+
+인증 오류는 `auth.exception.AuthErrorCode`, 콘텐츠 오류는 `content.exception.ContentErrorCode`,
+세션·피드백 오류는 `session.exception.SessionErrorCode`, 앱 버전 정책 오류는 `app.exception.AppErrorCode`가 소유합니다.
+프로필의 기존 `UserProfileErrorCode`와 기능 예외 체계도 유지합니다.
+공통 `ErrorCode`에는 요청 검증·권한·서버 오류와 여러 기능에서 사용하는 AI 통신 오류만 둡니다.
+
+`ApiErrorCode`는 코드 문자열·HTTP 상태·기본 메시지의 공통 계약입니다.
+`ApiException`과 공통 HTTP 예외 처리기는 이 계약으로 응답을 변환합니다.
+기능 오류의 정의와 발생 조건은 소유 기능에서 관리하고, 동일한 HTTP 변환을 기능마다 복제하지 않습니다.
+외부에 전달하는 기존 코드 문자열·상태·메시지는 유지합니다.
+
 ## Service 기준
 
 모든 공개 비즈니스 로직 클래스는 `Service`로 끝냅니다.

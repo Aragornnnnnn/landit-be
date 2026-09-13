@@ -20,6 +20,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpression;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionEmbeddingMatch;
@@ -209,7 +210,7 @@ class ExpressionQueryServiceTest {
 
   @Test
   void shouldPropagateWhenScenarioNotFound() {
-    doThrow(new ApiException(ErrorCode.SCENARIO_NOT_FOUND))
+    doThrow(new ApiException(ContentErrorCode.SCENARIO_NOT_FOUND))
         .when(scenarioService)
         .validateExists(SCENARIO_ID);
 

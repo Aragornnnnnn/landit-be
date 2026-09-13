@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.expression.client.ai.dto.AiPronunciationAnalysisRequest;
 import com.landit.landitbe.feature.content.expression.client.ai.dto.AiPronunciationJudgedWord;
 import com.landit.landitbe.feature.content.expression.client.ai.dto.AiPronunciationWordStatus;
@@ -114,7 +115,7 @@ class RemoteAiPronunciationClientTest {
     assertThatThrownBy(() -> remoteClient().analyze(analysisRequest()))
         .isInstanceOf(PronunciationAnalysisFailedException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
+        .isEqualTo(ContentErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
   }
 
   @Test

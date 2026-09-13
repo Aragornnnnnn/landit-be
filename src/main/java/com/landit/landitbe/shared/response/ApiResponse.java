@@ -3,7 +3,7 @@
 package com.landit.landitbe.shared.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.exception.ApiErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,12 +34,12 @@ public record ApiResponse<T>(
   }
 
   /** 오류 코드의 기본 메시지로 실패 응답 본문을 생성한다. */
-  public static ApiResponse<Void> error(ErrorCode errorCode) {
+  public static ApiResponse<Void> error(ApiErrorCode errorCode) {
     return error(errorCode, errorCode.getMessage());
   }
 
   /** 오류 코드와 별도 메시지로 실패 응답 본문을 생성한다. */
-  public static ApiResponse<Void> error(ErrorCode errorCode, String message) {
+  public static ApiResponse<Void> error(ApiErrorCode errorCode, String message) {
     return new ApiResponse<>(false, null, new ErrorResponse(errorCode.name(), message));
   }
 

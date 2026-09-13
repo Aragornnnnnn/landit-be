@@ -16,6 +16,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpression;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
@@ -181,7 +182,7 @@ class ExpressionLearningCompletionServiceTest {
                 expressionLearningCompletionService.completeLearning(USER_ID, LOCKED_EXPRESSION_ID))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.EXPRESSION_LOCKED);
+        .isEqualTo(ContentErrorCode.EXPRESSION_LOCKED);
 
     // then: 저장 없음 + 어떤 사용자/표현이 막혔는지 warn 로그
     verify(learningProgressService, never())

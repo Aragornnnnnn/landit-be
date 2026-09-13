@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.app.dto.AdminAppVersionResponse;
 import com.landit.landitbe.feature.app.dto.AdminAppVersionUpdateRequest;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse;
 import com.landit.landitbe.feature.app.dto.AppVersionCheckResponse.UpdateType;
+import com.landit.landitbe.feature.app.exception.AppErrorCode;
 import com.landit.landitbe.feature.app.repository.AppVersionRepository;
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
@@ -57,7 +58,7 @@ public class AppVersionService {
     AppVersion policy =
         appVersionRepository
             .findByPlatform(platform)
-            .orElseThrow(() -> new ApiException(ErrorCode.APP_VERSION_POLICY_NOT_CONFIGURED));
+            .orElseThrow(() -> new ApiException(AppErrorCode.APP_VERSION_POLICY_NOT_CONFIGURED));
     UpdateType updateType = updateType(currentVersionName, policy);
     return AppVersionCheckResponse.from(policy, updateType, reason(updateType, policy));
   }
