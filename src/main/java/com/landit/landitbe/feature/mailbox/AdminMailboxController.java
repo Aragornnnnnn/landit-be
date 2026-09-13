@@ -3,24 +3,27 @@
 package com.landit.landitbe.feature.mailbox;
 
 import com.landit.landitbe.feature.mailbox.docs.AdminMailboxControllerDocs;
+import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
 import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyRequest;
 import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyResponse;
+import com.landit.landitbe.feature.mailbox.feedback.service.AdminMailboxFeedbackQueryService;
+import com.landit.landitbe.feature.mailbox.feedback.service.AdminMailboxReplyService;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterListResponse;
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterPatchRequest;
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterResponse;
-import com.landit.landitbe.feature.mailbox.service.AdminMailboxService;
-import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
+import com.landit.landitbe.feature.mailbox.letter.service.AdminMailboxLetterService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,18 +38,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 편지함 어드민 API의 HTTP 요청을 처리한다. */
 @RestController
+@RequiredArgsConstructor
 public class AdminMailboxController implements AdminMailboxControllerDocs {
 
-  private final AdminMailboxService adminMailboxService;
-
-  /**
-   * 편지함 어드민 Service를 주입받는다.
-   *
-   * @param adminMailboxService 편지함 어드민 Service
-   */
-  public AdminMailboxController(AdminMailboxService adminMailboxService) {
-    this.adminMailboxService = adminMailboxService;
-  }
+  private final AdminMailboxFeedbackQueryService adminMailboxFeedbackQueryService;
+  private final AdminMailboxReplyService adminMailboxReplyService;
+  private final AdminMailboxLetterService adminMailboxLetterService;
 
   /** {@inheritDoc} */
   @Override
@@ -58,7 +55,7 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
       @RequestParam(required = false) MailboxPublicationStatus publicationStatus,
       @RequestParam(required = false) Boolean pinned) {
     return ApiResponse.success(
-        adminMailboxService.getLetters(page, size, type, publicationStatus, pinned));
+        adminMailboxLetterService.getLetters(page, size, type, publicationStatus, pinned));
   }
 
   /** {@inheritDoc} */
@@ -68,7 +65,7 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @Valid @RequestBody AdminMailboxLetterCreateRequest request) {
     return ApiResponse.success(
-        HttpStatus.CREATED, adminMailboxService.createLetter(principal.userId(), request));
+        HttpStatus.CREATED, adminMailboxLetterService.createLetter(principal.userId(), request));
   }
 
   /** {@inheritDoc} */
@@ -79,7 +76,7 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
       @PathVariable Long letterId,
       @Valid @RequestBody AdminMailboxLetterPatchRequest request) {
     return ApiResponse.success(
-        adminMailboxService.updateLetter(principal.userId(), letterId, request));
+        adminMailboxLetterService.updateLetter(principal.userId(), letterId, request));
   }
 
   /** {@inheritDoc} */
@@ -95,9 +92,9 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
           LocalDate createdTo,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
-      @RequestParam(defaultValue = "NEWEST") FeedbackSort sort) {
+      @RequestParam(defaultValue = "NEWEST") MailboxFeedbackSort sort) {
     return ApiResponse.success(
-        adminMailboxService.getFeedbacks(
+        adminMailboxFeedbackQueryService.getFeedbacks(
             keyword, type, status, createdFrom, createdTo, page, size, sort));
   }
 
@@ -106,7 +103,7 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
   @GetMapping("/api/v1/admin/mailbox/feedbacks/{feedbackId}")
   public ApiResponse<AdminMailboxFeedbackDetailResponse> getFeedback(
       @PathVariable Long feedbackId) {
-    return ApiResponse.success(adminMailboxService.getFeedback(feedbackId));
+    return ApiResponse.success(adminMailboxFeedbackQueryService.getFeedback(feedbackId));
   }
 
   /** {@inheritDoc} */
@@ -116,6 +113,6 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @Valid @RequestBody AdminMailboxReplyRequest request) {
     return ApiResponse.success(
-        HttpStatus.CREATED, adminMailboxService.sendReplies(principal.userId(), request));
+        HttpStatus.CREATED, adminMailboxReplyService.sendReplies(principal.userId(), request));
   }
 }

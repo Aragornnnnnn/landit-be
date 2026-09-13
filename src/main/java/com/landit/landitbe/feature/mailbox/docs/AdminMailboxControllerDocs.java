@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.mailbox.docs;
 
+import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
 import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackDetailResponse;
@@ -14,7 +15,6 @@ import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterCreateRe
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterListResponse;
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterPatchRequest;
 import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterResponse;
-import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
@@ -92,7 +92,7 @@ public interface AdminMailboxControllerDocs {
       LocalDate createdTo,
       int page,
       int size,
-      FeedbackSort sort);
+      MailboxFeedbackSort sort);
 
   /**
    * 피드백 상세와 최신 답장을 조회한다.
