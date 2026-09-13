@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.content.repository;
 
+import com.landit.landitbe.feature.content.dto.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.dto.FreeTalkCandidateSearch;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

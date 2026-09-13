@@ -1,6 +1,6 @@
 // 임베딩 유사도 검색으로 찾은 표현 후보 한 건을 담는다.
 
-package com.landit.landitbe.feature.content.repository;
+package com.landit.landitbe.feature.content.dto;
 
 /**
  * 임베딩 유사도 검색으로 찾은 표현 후보 한 건을 담는다.

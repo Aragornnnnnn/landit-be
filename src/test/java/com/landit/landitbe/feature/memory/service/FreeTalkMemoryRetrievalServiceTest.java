@@ -13,14 +13,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.memory.MemoryProperties;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -32,7 +32,7 @@ import org.mockito.Mockito;
 /** 프리톡 세션 시작 장기기억 검색과 fail-open 경계를 검증한다. */
 class FreeTalkMemoryRetrievalServiceTest {
 
-  private AiFreeTalkClient aiClient;
+  private AiMemoryClient aiClient;
   private ConversationMemorySearchRepository searchRepository;
   private FreeTalkMemoryRetrievalTraceRepository traceRepository;
   private SimpleMeterRegistry meterRegistry;
@@ -40,7 +40,7 @@ class FreeTalkMemoryRetrievalServiceTest {
 
   @BeforeEach
   void setUp() {
-    aiClient = Mockito.mock(AiFreeTalkClient.class);
+    aiClient = Mockito.mock(AiMemoryClient.class);
     searchRepository = Mockito.mock(ConversationMemorySearchRepository.class);
     traceRepository = Mockito.mock(FreeTalkMemoryRetrievalTraceRepository.class);
     meterRegistry = new SimpleMeterRegistry();

@@ -2,13 +2,13 @@
 
 package com.landit.landitbe.feature.admin.dto;
 
-import com.landit.landitbe.feature.character.service.StreakService;
+import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
-import com.landit.landitbe.feature.content.service.ScenarioQueryService;
+import com.landit.landitbe.feature.content.dto.ScenarioSummary;
 import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
-import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
+import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.shared.domain.Locale;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -70,10 +70,10 @@ public record AdminUserDetailResponse(
    * @return 관리자 사용자 상세 응답
    */
   public static AdminUserDetailResponse from(
-      AdminUserProfile profile,
+      UserProfileDetails profile,
       long completedScenarioCount,
       CurrentScenario currentScenario,
-      StreakService.LearningActivitySummary activitySummary) {
+      LearningActivitySummary activitySummary) {
     LearningSummary learningSummary =
         new LearningSummary(
             completedScenarioCount,
@@ -142,7 +142,7 @@ public record AdminUserDetailResponse(
      * @return 현재 제공 대상 시나리오 응답
      */
     public static CurrentScenario from(
-        ScenarioQueryService.ScenarioSummary summary, DailyScenarioType dailyScenarioType) {
+        ScenarioSummary summary, DailyScenarioType dailyScenarioType) {
       return new CurrentScenario(
           summary.scenarioId(), summary.scenarioTitle(), summary.displayOrder(), dailyScenarioType);
     }

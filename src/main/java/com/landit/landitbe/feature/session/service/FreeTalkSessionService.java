@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.content.service.ConversationCharacterService;
-import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.domain.FreeTalkCharacter;
@@ -56,7 +56,7 @@ public class FreeTalkSessionService {
   @Transactional
   public StartedFreeTalkSession createStart(long userId, FreeTalkSessionStartRequest request) {
     validateStartRequest(request);
-    UserProfile userProfile = userProfileService.requireActiveForUpdate(userId);
+    UserLearningProfile userProfile = userProfileService.requireActiveForUpdate(userId);
     dailySpeakingUsageService.requireRemaining(userId);
     FreeTalkTopic topic = findTopic(request);
     FreeTalkCharacter character = FreeTalkCharacter.fromId(request.characterId());
@@ -65,10 +65,10 @@ public class FreeTalkSessionService {
     LearningSession learningSession =
         learningSessionRepository.save(
             LearningSession.startFreeTalk(
-                userProfile.getId(),
+                userProfile.id(),
                 requireAiTutorId(userProfile),
-                userProfile.getTargetLocale(),
-                userProfile.getBaseLocale(),
+                userProfile.targetLocale(),
+                userProfile.baseLocale(),
                 startedAt));
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository.save(
@@ -84,9 +84,9 @@ public class FreeTalkSessionService {
         sessionHistoryRepository.save(
             SessionHistory.startedFreeTalk(
                 learningSession.getId(),
-                userProfile.getId(),
-                userProfile.getTargetLocale(),
-                userProfile.getBaseLocale(),
+                userProfile.id(),
+                userProfile.targetLocale(),
+                userProfile.baseLocale(),
                 startedAt));
     return new StartedFreeTalkSession(
         learningSession.getId(),
@@ -97,8 +97,8 @@ public class FreeTalkSessionService {
         topic == null ? null : topic.getId(),
         topic == null ? null : topic.getDisplayName(),
         topic == null ? null : topic.getPromptDescription(),
-        userProfile.getTargetLocale().name(),
-        userProfile.getBaseLocale().name(),
+        userProfile.targetLocale().name(),
+        userProfile.baseLocale().name(),
         ttsVoice);
   }
 
@@ -175,11 +175,11 @@ public class FreeTalkSessionService {
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
-  private Long requireAiTutorId(UserProfile userProfile) {
-    if (Objects.isNull(userProfile.getAiTutorId())) {
+  private Long requireAiTutorId(UserLearningProfile userProfile) {
+    if (Objects.isNull(userProfile.aiTutorId())) {
       throw new ApiException(ErrorCode.DEFAULT_AI_TUTOR_NOT_CONFIGURED);
     }
-    return userProfile.getAiTutorId();
+    return userProfile.aiTutorId();
   }
 
   /**

@@ -2,9 +2,9 @@
 
 package com.landit.landitbe.feature.memory.service;
 
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;

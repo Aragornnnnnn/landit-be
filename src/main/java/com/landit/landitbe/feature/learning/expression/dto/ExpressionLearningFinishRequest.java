@@ -1,6 +1,6 @@
 // 표현 학습 완료 요청의 프리톡 진입 맥락을 전달한다.
 
-package com.landit.landitbe.feature.content.dto;
+package com.landit.landitbe.feature.learning.expression.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

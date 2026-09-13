@@ -5,10 +5,12 @@ package com.landit.landitbe.feature.content.service;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.domain.ScenarioAvailabilityStatus;
+import com.landit.landitbe.feature.content.dto.CurrentScenario;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.CategoryResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.OpeningPreviewResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioListResponse.ScenarioResponse;
+import com.landit.landitbe.feature.content.dto.ScenarioSummary;
 import com.landit.landitbe.feature.content.repository.ScenarioListQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioListProjection;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
@@ -63,13 +65,13 @@ public class ScenarioQueryService {
     List<ScenarioListProjection> scenarioRows =
         scenarioListQueryRepository.findScenarioList(userId, questionLevelGroup);
 
-    ScenarioProgressionService.CurrentScenario currentScenario =
+    CurrentScenario currentScenario =
         scenarioProgressionService
             .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
             .orElse(null);
 
     return ScenarioListResponse.from(
-        categoryGroups(scenarioRows).stream()
+        groupByCategory(scenarioRows).stream()
             .map(
                 categoryGroup ->
                     categoryGroup.asCategoryResponse(accessibleScenarioIds, currentScenario))
@@ -90,17 +92,8 @@ public class ScenarioQueryService {
         .map(row -> new ScenarioSummary(row.scenarioId(), row.scenarioTitle(), row.displayOrder()));
   }
 
-  /**
-   * 사용자 상세에 제공할 시나리오 기본 정보다.
-   *
-   * @param scenarioId 시나리오 ID
-   * @param scenarioTitle 시나리오 제목
-   * @param displayOrder 시나리오 노출 순서
-   */
-  public record ScenarioSummary(Long scenarioId, String scenarioTitle, int displayOrder) {}
-
   /** 평탄한 조회 결과를 응답 구조에 맞게 카테고리 단위로 묶는다. */
-  private List<CategoryGroup> categoryGroups(List<ScenarioListProjection> scenarioRows) {
+  private List<CategoryGroup> groupByCategory(List<ScenarioListProjection> scenarioRows) {
     Map<Long, CategoryGroup> categoryGroupsById = new LinkedHashMap<>();
     for (ScenarioListProjection scenarioRow : scenarioRows) {
       CategoryGroup categoryGroup =
@@ -116,7 +109,7 @@ public class ScenarioQueryService {
   private static ScenarioResponse toScenarioResponse(
       ScenarioListProjection scenarioRow,
       Set<Long> accessibleScenarioIds,
-      ScenarioProgressionService.CurrentScenario currentScenario) {
+      CurrentScenario currentScenario) {
     ScenarioAvailabilityStatus availabilityStatus =
         availabilityStatus(scenarioRow, accessibleScenarioIds, currentScenario);
 
@@ -132,7 +125,7 @@ public class ScenarioQueryService {
   private static ScenarioAvailabilityStatus availabilityStatus(
       ScenarioListProjection scenarioRow,
       Set<Long> accessibleScenarioIds,
-      ScenarioProgressionService.CurrentScenario currentScenario) {
+      CurrentScenario currentScenario) {
     if (inactive(scenarioRow.categoryStatus())
         || inactive(scenarioRow.scenarioStatus())
         || inactive(scenarioRow.variantStatus())) {
@@ -152,8 +145,7 @@ public class ScenarioQueryService {
 
   /** 오늘 시나리오에만 신규·재도전 구분을 반환한다. */
   private static DailyScenarioType dailyScenarioType(
-      ScenarioListProjection scenarioRow,
-      ScenarioProgressionService.CurrentScenario currentScenario) {
+      ScenarioListProjection scenarioRow, CurrentScenario currentScenario) {
     if (currentScenario == null || !scenarioRow.scenarioId().equals(currentScenario.scenarioId())) {
       return null;
     }
@@ -224,8 +216,7 @@ public class ScenarioQueryService {
 
     /** 누적한 시나리오에 일일 접근 규칙을 적용해 카테고리 응답을 만든다. */
     private CategoryResponse asCategoryResponse(
-        Set<Long> accessibleScenarioIds,
-        ScenarioProgressionService.CurrentScenario currentScenario) {
+        Set<Long> accessibleScenarioIds, CurrentScenario currentScenario) {
       List<ScenarioResponse> scenarios = new ArrayList<>();
       for (ScenarioListProjection scenarioRow : scenarioRows) {
         ScenarioResponse scenario =

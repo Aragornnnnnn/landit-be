@@ -3,12 +3,12 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.dto.ScenarioStartContext;
+import com.landit.landitbe.feature.content.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
 import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionMessageContextProjection;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 public class ScenarioSessionService {
 
   private final ScenarioSessionRepository scenarioSessionRepository;
-  private final ScenarioSessionStartQueryRepository startQueryRepository;
+  private final ScenarioContentService scenarioContentService;
   private final ScenarioSessionMessageQueryRepository messageQueryRepository;
 
   /**
@@ -32,10 +32,10 @@ public class ScenarioSessionService {
    * @return 세션 시작 Projection
    * @throws ApiException 시나리오 시작 정보를 찾을 수 없을 때
    */
-  public ScenarioSessionStartProjection requireStartProjection(
+  public ScenarioStartContext requireStartProjection(
       long userId, long scenarioId, ContentLearningLevel questionLevelGroup) {
-    return startQueryRepository
-        .findStartRow(userId, scenarioId, questionLevelGroup)
+    return scenarioContentService
+        .findStartContext(userId, scenarioId, questionLevelGroup)
         .orElseThrow(() -> new ApiException(ErrorCode.SCENARIO_NOT_FOUND));
   }
 

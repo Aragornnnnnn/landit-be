@@ -3,13 +3,13 @@
 package com.landit.landitbe.feature.memory.service;
 
 import com.landit.landitbe.config.memory.MemoryProperties;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +30,7 @@ public class FreeTalkMemoryRetrievalService {
   private static final int EMBEDDING_DIMENSION = 1536;
   private static final String EMBEDDING_MODEL = "openai/text-embedding-3-small";
 
-  private final AiFreeTalkClient aiClient;
+  private final AiMemoryClient aiClient;
   private final ConversationMemorySearchRepository searchRepository;
   private final FreeTalkMemoryRetrievalTraceRepository traceRepository;
   private final MemoryProperties memoryProperties;

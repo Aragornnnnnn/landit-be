@@ -3,10 +3,11 @@
 package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.service.ScenarioProgressionService;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
-import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
@@ -14,7 +15,6 @@ import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse;
 import com.landit.landitbe.feature.session.dto.SessionStartResponse.CurrentMessageResponse;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -64,10 +64,10 @@ public class ScenarioSessionStartService {
   private SessionStartResponse startScenarioSession(
       long userId, long scenarioId, boolean enforceProgression) {
     Instant startedInstant = clock.instant();
-    UserProfile userProfile = findActiveUser(userId);
+    UserLearningProfile userProfile = findActiveUser(userId);
     ContentLearningLevel questionLevelGroup =
-        ContentLearningLevel.from(userProfile.getLearningLevel());
-    ScenarioSessionStartProjection startRow = findStartRow(userId, scenarioId, questionLevelGroup);
+        ContentLearningLevel.from(userProfile.learningLevel());
+    ScenarioStartContext startRow = findStartRow(userId, scenarioId, questionLevelGroup);
 
     assertContentActive(startRow);
 
@@ -104,28 +104,28 @@ public class ScenarioSessionStartService {
   }
 
   /** 세션 시작 흐름을 직렬화할 수 있도록 활성 사용자 프로필을 쓰기 잠금으로 조회한다. */
-  private UserProfile findActiveUser(long userId) {
+  private UserLearningProfile findActiveUser(long userId) {
     // 같은 사용자의 동시 세션 시작 요청이 progress row 생성 구간을
     // 동시에 통과하지 못하도록 사용자 row를 잠근다.
     return userProfileService.requireActiveForUpdate(userId);
   }
 
   /** 사용자 언어 설정에 맞는 시나리오 시작 콘텐츠와 TTS 정보를 조회한다. */
-  private ScenarioSessionStartProjection findStartRow(
+  private ScenarioStartContext findStartRow(
       long userId, long scenarioId, ContentLearningLevel questionLevelGroup) {
     return scenarioSessionService.requireStartProjection(userId, scenarioId, questionLevelGroup);
   }
 
   /** 학습 세션에 반드시 연결할 AI 튜터 ID의 존재를 검증한다. */
-  private Long requireAiTutorId(UserProfile userProfile) {
-    if (userProfile.getAiTutorId() == null) {
+  private Long requireAiTutorId(UserLearningProfile userProfile) {
+    if (userProfile.aiTutorId() == null) {
       throw new ApiException(ErrorCode.INVALID_REQUEST, "AI 튜터가 설정되지 않았습니다.");
     }
-    return userProfile.getAiTutorId();
+    return userProfile.aiTutorId();
   }
 
   /** 카테고리 잠금과 시나리오 비활성 상태를 API 오류 코드로 변환한다. */
-  private void assertContentActive(ScenarioSessionStartProjection startRow) {
+  private void assertContentActive(ScenarioStartContext startRow) {
     if (inactive(startRow.categoryStatus())) {
       throw new ApiException(ErrorCode.CATEGORY_LOCKED);
     }
@@ -137,30 +137,29 @@ public class ScenarioSessionStartService {
 
   /** 복습 권한이 없으면 해당 시각에 사용자에게 제공된 시나리오인지 확인한다. */
   private void assertCurrentScenarioOrReplay(
-      UserProfile userProfile, Long scenarioId, Instant startedInstant) {
-    if (scenarioAccessService.hasAccess(
-        userProfile.getId(), scenarioId, userProfile.getTargetLocale())) {
+      UserLearningProfile userProfile, Long scenarioId, Instant startedInstant) {
+    if (scenarioAccessService.hasAccess(userProfile.id(), scenarioId, userProfile.targetLocale())) {
       return;
     }
 
     if (!scenarioProgressionService.isCurrentScenario(
-        userProfile.getId(), scenarioId, userProfile.getTargetLocale(), startedInstant)) {
+        userProfile.id(), scenarioId, userProfile.targetLocale(), startedInstant)) {
       throw new ApiException(ErrorCode.SCENARIO_LOCKED, DAILY_SCENARIO_NOT_AVAILABLE);
     }
   }
 
   /** 최초 시작과 재시도를 같은 흐름으로 처리하되, 기존 완료 성과는 유지한다. */
   private void ensureProgress(
-      UserProfile userProfile, ScenarioSessionStartProjection startRow, LocalDateTime startedAt) {
+      UserLearningProfile userProfile, ScenarioStartContext startRow, LocalDateTime startedAt) {
     learningProgressService.startScenario(
-        userProfile.getId(), startRow.scenarioId(), userProfile.getTargetLocale(), startedAt);
+        userProfile.id(), startRow.scenarioId(), userProfile.targetLocale(), startedAt);
   }
 
   /** 학습 세션과 시나리오 세션을 함께 생성해 시작한 언어 variant를 연결한다. */
   private LearningSession createLearningSession(
       long userId,
-      UserProfile userProfile,
-      ScenarioSessionStartProjection startRow,
+      UserLearningProfile userProfile,
+      ScenarioStartContext startRow,
       ContentLearningLevel questionLevelGroup,
       LocalDateTime startedAt) {
     LearningSession learningSession =
@@ -168,8 +167,8 @@ public class ScenarioSessionStartService {
             LearningSession.startScenario(
                 userId,
                 requireAiTutorId(userProfile),
-                userProfile.getTargetLocale(),
-                userProfile.getBaseLocale(),
+                userProfile.targetLocale(),
+                userProfile.baseLocale(),
                 startedAt));
 
     scenarioSessionService.save(
@@ -187,8 +186,8 @@ public class ScenarioSessionStartService {
   /** AI first 시나리오는 세션 시작과 동시에 히스토리와 첫 AI 메시지를 저장한다. */
   private CurrentMessageResponse saveAiOpeningMessage(
       Long learningSessionId,
-      UserProfile userProfile,
-      ScenarioSessionStartProjection startRow,
+      UserLearningProfile userProfile,
+      ScenarioStartContext startRow,
       LocalDateTime startedAt) {
     assertAiOpeningMessageConfigured(startRow);
 
@@ -199,7 +198,7 @@ public class ScenarioSessionStartService {
   }
 
   /** AI first 시작 데이터가 비어 있으면 콘텐츠 설정 오류로 본다. */
-  private void assertAiOpeningMessageConfigured(ScenarioSessionStartProjection startRow) {
+  private void assertAiOpeningMessageConfigured(ScenarioStartContext startRow) {
     if (startRow.aiOpeningMessage() == null || startRow.aiOpeningMessage().isBlank()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR, "AI 시작 메시지가 설정되지 않았습니다.");
     }
@@ -208,16 +207,16 @@ public class ScenarioSessionStartService {
   /** AI first 시나리오의 세션 히스토리와 첫 AI 메시지를 저장한다. */
   private SessionHistoryMessage saveAiOpeningHistoryMessage(
       Long learningSessionId,
-      UserProfile userProfile,
-      ScenarioSessionStartProjection startRow,
+      UserLearningProfile userProfile,
+      ScenarioStartContext startRow,
       LocalDateTime startedAt) {
     SessionHistory sessionHistory =
         sessionHistoryService.save(
             SessionHistory.startedScenario(
                 learningSessionId,
-                userProfile.getId(),
-                userProfile.getTargetLocale(),
-                userProfile.getBaseLocale(),
+                userProfile.id(),
+                userProfile.targetLocale(),
+                userProfile.baseLocale(),
                 startedAt));
 
     SessionHistoryMessage message =

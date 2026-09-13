@@ -14,8 +14,7 @@ import org.springframework.data.domain.Slice;
  * @param size 페이지 크기
  * @param hasNext 다음 페이지 존재 여부
  */
-public record AdminUserProfilePage(
-    List<AdminUserProfile> items, int page, int size, boolean hasNext) {
+public record UserProfilePage(List<UserProfileDetails> items, int page, int size, boolean hasNext) {
 
   /**
    * 사용자 프로필 Slice를 관리자 공개 페이지 계약으로 변환한다.
@@ -25,10 +24,10 @@ public record AdminUserProfilePage(
    * @param size 페이지 크기
    * @return 관리자 사용자 프로필 목록 페이지
    */
-  public static AdminUserProfilePage from(Slice<UserProfile> profiles, int page, int size) {
-    List<AdminUserProfile> items =
-        profiles.getContent().stream().map(AdminUserProfile::from).toList();
+  public static UserProfilePage from(Slice<UserProfile> profiles, int page, int size) {
+    List<UserProfileDetails> items =
+        profiles.getContent().stream().map(UserProfileDetails::from).toList();
 
-    return new AdminUserProfilePage(items, page, size, profiles.hasNext());
+    return new UserProfilePage(items, page, size, profiles.hasNext());
   }
 }

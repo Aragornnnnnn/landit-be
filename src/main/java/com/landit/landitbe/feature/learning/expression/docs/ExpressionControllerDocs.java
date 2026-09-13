@@ -1,12 +1,12 @@
 // 원어민 표현 학습 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.content.docs;
+package com.landit.landitbe.feature.learning.expression.docs;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.content.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
+import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

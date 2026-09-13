@@ -2,7 +2,10 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -33,6 +36,7 @@ public class FreeTalkMemoryGenerationContextService {
   private final LearningSessionRepository learningSessionRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final ConversationMemoryWriteService memoryWriteService;
   private final Clock clock;
 
   /**
@@ -45,7 +49,7 @@ public class FreeTalkMemoryGenerationContextService {
    * @throws IllegalArgumentException 생성 문맥의 ID, 캐릭터 또는 필수 값이 유효하지 않을 때
    */
   @Transactional
-  public GenerationContext claim(long learningSessionId) {
+  public ConversationMemoryGenerationRequest claim(long learningSessionId) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
@@ -60,9 +64,9 @@ public class FreeTalkMemoryGenerationContextService {
     }
 
     SessionHistory history = loadHistory(learningSessionId);
-    List<AiConversationHistoryMessage> historyMessages = loadHistoryMessages(history.getId());
+    List<ConversationMemoryHistoryMessage> historyMessages = loadHistoryMessages(history.getId());
     freeTalkSession.startMemoryGeneration(LocalDateTime.now(clock));
-    return new GenerationContext(
+    return new ConversationMemoryGenerationRequest(
         learningSessionId,
         learningSession.getUserProfileId(),
         freeTalkSession.getCharacterId(),
@@ -89,7 +93,7 @@ public class FreeTalkMemoryGenerationContextService {
   }
 
   /** 메시지 순서를 보존해 AI가 후보 원본 ID와 관찰 시각을 검증할 수 있게 한다. */
-  private List<AiConversationHistoryMessage> loadHistoryMessages(long historyId) {
+  private List<ConversationMemoryHistoryMessage> loadHistoryMessages(long historyId) {
     return sessionHistoryMessageRepository
         .findBySessionHistoryIdOrderByMessageSequenceAsc(historyId)
         .stream()
@@ -98,12 +102,12 @@ public class FreeTalkMemoryGenerationContextService {
   }
 
   /** AI 입력에는 원본 메시지의 식별자·순서·시각이 모두 필요하다. */
-  private AiConversationHistoryMessage toHistoryMessage(SessionHistoryMessage message) {
+  private ConversationMemoryHistoryMessage toHistoryMessage(SessionHistoryMessage message) {
     if (message.getId() == null || message.getRole() == null || message.getCreatedAt() == null) {
       throw new IllegalStateException("프리톡 이력 메시지 문맥이 유효하지 않습니다.");
     }
     OffsetDateTime occurredAt = message.getCreatedAt().atZone(clock.getZone()).toOffsetDateTime();
-    return new AiConversationHistoryMessage(
+    return new ConversationMemoryHistoryMessage(
         message.getId(),
         message.getTurnNumber(),
         message.getRole().name(),
@@ -129,6 +133,24 @@ public class FreeTalkMemoryGenerationContextService {
   }
 
   /**
+   * 장기기억 저장과 완료 상태 전환을 같은 트랜잭션에서 수행한다.
+   *
+   * @param request 장기기억 생성 문맥
+   * @param plans 후보별 저장 계획
+   * @return snapshot이 최신이어서 저장과 완료를 수행했으면 STORED, 아니면 STALE
+   */
+  @Transactional
+  public ConversationMemoryWriteService.PersistenceResult persistAndComplete(
+      ConversationMemoryGenerationRequest request, List<ConversationMemoryResolutionPlan> plans) {
+    ConversationMemoryWriteService.PersistenceResult result =
+        memoryWriteService.persistIfSnapshotCurrent(request.userProfileId(), plans);
+    if (result == ConversationMemoryWriteService.PersistenceResult.STORED) {
+      complete(request.learningSessionId());
+    }
+    return result;
+  }
+
+  /**
    * 실행 중인 장기기억 생성 작업을 조건부 실패 상태로 전환한다.
    *
    * @param learningSessionId 실패 처리할 학습 세션 ID
@@ -140,51 +162,5 @@ public class FreeTalkMemoryGenerationContextService {
         .findByLearningSessionIdForUpdate(learningSessionId)
         .filter(session -> session.getMemoryGenerationStatus() == MemoryGenerationStatus.PREPARING)
         .ifPresent(FreeTalkSession::failMemoryGeneration);
-  }
-
-  /**
-   * 외부 AI 호출에 필요한 선점 완료 문맥을 불변 값으로 보관한다.
-   *
-   * @param learningSessionId 프리톡 학습 세션 ID
-   * @param userProfileId 기억을 소유하는 사용자 프로필 ID
-   * @param characterId 프리톡 캐릭터 ID
-   * @param targetLocale 학습 언어 지역
-   * @param baseLocale 기준 언어 지역
-   * @param timezone 세션 시간대
-   * @param history 시간 순서가 보존된 대화 히스토리
-   */
-  public record GenerationContext(
-      long learningSessionId,
-      long userProfileId,
-      String characterId,
-      String targetLocale,
-      String baseLocale,
-      String timezone,
-      List<AiConversationHistoryMessage> history) {
-
-    /**
-     * 문맥 목록을 방어적으로 복사해 외부 호출 중 변경되지 않도록 한다.
-     *
-     * @param learningSessionId 프리톡 학습 세션 ID
-     * @param userProfileId 기억을 소유하는 사용자 프로필 ID
-     * @param characterId 프리톡 캐릭터 ID
-     * @param targetLocale 학습 언어 지역
-     * @param baseLocale 기준 언어 지역
-     * @param timezone 세션 시간대
-     * @param history 시간 순서가 보존된 대화 히스토리
-     * @throws IllegalArgumentException ID, 캐릭터 또는 문맥 값이 유효하지 않을 때
-     */
-    public GenerationContext {
-      if (learningSessionId <= 0 || userProfileId <= 0) {
-        throw new IllegalArgumentException("장기기억 생성 문맥 ID가 유효하지 않습니다.");
-      }
-      if (characterId == null || characterId.isBlank()) {
-        throw new IllegalArgumentException("장기기억 생성 캐릭터가 필요합니다.");
-      }
-      if (targetLocale == null || baseLocale == null || timezone == null || history == null) {
-        throw new IllegalArgumentException("장기기억 생성 문맥이 유효하지 않습니다.");
-      }
-      history = List.copyOf(history);
-    }
   }
 }

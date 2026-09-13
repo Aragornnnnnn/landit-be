@@ -2,6 +2,14 @@
 
 package com.landit.landitbe.feature.session.client.ai;
 
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import java.util.Arrays;
@@ -16,7 +24,7 @@ import org.springframework.stereotype.Component;
     name = "client-mode",
     havingValue = "local",
     matchIfMissing = true)
-public class LocalAiFreeTalkClient implements AiFreeTalkClient {
+public class LocalAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
 
   /** {@inheritDoc} */
   @Override

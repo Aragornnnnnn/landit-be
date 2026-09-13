@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import java.util.Optional;
@@ -31,7 +32,8 @@ class UserAccentLocaleResolverTest {
   void returnsAccentLocaleStoredOnUserProfile() {
     UserProfile userProfile = mock(UserProfile.class);
     when(userProfile.getAccentLocale()).thenReturn(AccentLocale.EN_GB);
-    when(userProfileService.requireActive(USER_ID)).thenReturn(userProfile);
+    UserLearningProfile learningProfile = UserLearningProfile.from(userProfile);
+    when(userProfileService.requireActive(USER_ID)).thenReturn(learningProfile);
 
     assertThat(resolver.require(USER_ID)).isEqualTo(AccentLocale.EN_GB);
   }
@@ -41,7 +43,8 @@ class UserAccentLocaleResolverTest {
   void tryResolveReturnsAccentLocaleStoredOnUserProfile() {
     UserProfile userProfile = mock(UserProfile.class);
     when(userProfile.getAccentLocale()).thenReturn(AccentLocale.EN_AU);
-    when(userProfileService.requireActive(USER_ID)).thenReturn(userProfile);
+    UserLearningProfile learningProfile = UserLearningProfile.from(userProfile);
+    when(userProfileService.requireActive(USER_ID)).thenReturn(learningProfile);
 
     assertThat(resolver.tryResolve(USER_ID)).isEqualTo(Optional.of(AccentLocale.EN_AU));
   }
@@ -50,7 +53,8 @@ class UserAccentLocaleResolverTest {
   @Test
   void tryResolveReturnsEmptyWhenAccentLocaleIsMissing() {
     UserProfile userProfile = mock(UserProfile.class);
-    when(userProfileService.requireActive(USER_ID)).thenReturn(userProfile);
+    UserLearningProfile learningProfile = UserLearningProfile.from(userProfile);
+    when(userProfileService.requireActive(USER_ID)).thenReturn(learningProfile);
 
     assertThat(resolver.tryResolve(USER_ID)).isEmpty();
   }

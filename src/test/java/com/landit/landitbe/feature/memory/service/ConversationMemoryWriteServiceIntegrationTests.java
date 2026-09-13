@@ -5,10 +5,12 @@ package com.landit.landitbe.feature.memory.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.session.service.FreeTalkMemoryGenerationContextService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +43,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
   @Autowired private ConversationMemoryWriteService writeService;
 
+  @Autowired private FreeTalkMemoryGenerationContextService contextService;
+
   @AfterEach
   void clearFixtures() {
     jdbcTemplate.update(
@@ -65,14 +69,12 @@ class ConversationMemoryWriteServiceIntegrationTests {
   }
 
   @Test
-  void storesAddAndSourceLineageThenCompletesSessionAtomically() {
+  void storesAddAndSourceLineageAtomically() {
     seedCompletedPreparingSession();
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+        contextService.persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
     assertThat(countMemories()).isEqualTo(1);
@@ -85,10 +87,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
     seedCompletedPreparingSession();
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())));
+        contextService.persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
     assertThat(countMemories()).isZero();
@@ -102,9 +102,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
     seedMemory(SECOND_OLD_MEMORY_ID, "second old memory", "ACTIVE");
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
+        contextService.persistAndComplete(
+            generationRequest(),
             List.of(
                 plan(
                     AiMemoryOperation.SUPERSEDE,
@@ -136,10 +135,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
     seedMemory(FIRST_OLD_MEMORY_ID, "new comparable memory", "ACTIVE");
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+        contextService.persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STALE);
     assertThat(countMemories()).isEqualTo(1);
@@ -154,7 +151,6 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThatThrownBy(
             () ->
                 writeService.persistIfSnapshotCurrent(
-                    LEARNING_SESSION_ID,
                     USER_ID,
                     List.of(
                         plan(
@@ -169,7 +165,28 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
     assertThat(countMemories()).isEqualTo(1);
     assertThat(statusOf(FIRST_OLD_MEMORY_ID)).isEqualTo("ACTIVE");
-    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
+  }
+
+  @Test
+  void rollsBackMemoryWhenSessionCompletionFailsAfterMemoryWrite() {
+    seedCompletedPreparingSession();
+    jdbcTemplate.update(
+        "update free_talk_session set memory_generation_status = 'READY', "
+            + "memory_generation_started_at = null where id = ?",
+        FREE_TALK_SESSION_ID);
+
+    ConversationMemoryGenerationRequest request =
+        new ConversationMemoryGenerationRequest(
+            LEARNING_SESSION_ID, USER_ID, "chloe", "EN", "KR", "Asia/Seoul", List.of());
+
+    assertThatThrownBy(
+            () ->
+                contextService.persistAndComplete(
+                    request, List.of(plan(AiMemoryOperation.ADD, List.of(), List.of()))))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(countMemories()).isZero();
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
   @Test
@@ -181,7 +198,6 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThatThrownBy(
             () ->
                 writeService.persistIfSnapshotCurrent(
-                    LEARNING_SESSION_ID,
                     USER_ID,
                     List.of(
                         plan(
@@ -192,13 +208,17 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
     assertThat(countMemories()).isZero();
     assertThat(statusOf(OTHER_USER_MEMORY_ID)).isEqualTo("ACTIVE");
-    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
   }
 
   private ConversationMemoryResolutionPlan plan(
       AiMemoryOperation operation, List<Long> supersededMemoryIds, List<Long> snapshotMemoryIds) {
     return new ConversationMemoryResolutionPlan(
         newMemory(), List.of(SOURCE_MESSAGE_ID), snapshotMemoryIds, operation, supersededMemoryIds);
+  }
+
+  private ConversationMemoryGenerationRequest generationRequest() {
+    return new ConversationMemoryGenerationRequest(
+        LEARNING_SESSION_ID, USER_ID, "chloe", "EN", "KR", "Asia/Seoul", List.of());
   }
 
   private NewConversationMemory newMemory() {

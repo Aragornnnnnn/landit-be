@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.client.ai;
 
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import java.util.List;
 
 /**

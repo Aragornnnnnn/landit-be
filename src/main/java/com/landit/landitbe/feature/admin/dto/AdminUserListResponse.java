@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.admin.dto;
 
-import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
+import com.landit.landitbe.feature.profile.dto.UserProfilePage;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -26,7 +26,7 @@ public record AdminUserListResponse(
    * @param profiles 사용자 프로필 목록 페이지
    * @return 관리자 사용자 목록 응답
    */
-  public static AdminUserListResponse from(AdminUserProfilePage profiles) {
+  public static AdminUserListResponse from(UserProfilePage profiles) {
     List<AdminUserListItem> items = profiles.items().stream().map(AdminUserListItem::from).toList();
 
     return new AdminUserListResponse(items, profiles.page(), profiles.size(), profiles.hasNext());

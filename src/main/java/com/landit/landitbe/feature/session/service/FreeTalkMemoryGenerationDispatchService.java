@@ -1,6 +1,6 @@
 // 완료 프리톡의 장기기억 생성 작업 등록 경계를 제공한다.
 
-package com.landit.landitbe.feature.memory.service;
+package com.landit.landitbe.feature.session.service;
 
 import com.landit.landitbe.config.memory.MemoryProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -16,13 +16,7 @@ public class FreeTalkMemoryGenerationDispatchService {
   private final TaskExecutor taskExecutor;
   private final MemoryProperties memoryProperties;
 
-  /**
-   * 장기기억 생성 등록에 필요한 실행기와 실패 보상 경계를 주입받는다.
-   *
-   * @param generationService 장기기억 생성과 실패 상태 전환 서비스
-   * @param taskExecutor 장기기억 생성을 비동기로 실행할 작업 실행기
-   * @param memoryProperties 장기기억 쓰기 기능 설정
-   */
+  /** 장기기억 생성 등록에 필요한 실행기와 실패 보상 경계를 주입받는다. */
   public FreeTalkMemoryGenerationDispatchService(
       FreeTalkMemoryGenerationService generationService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
@@ -32,11 +26,7 @@ public class FreeTalkMemoryGenerationDispatchService {
     this.memoryProperties = memoryProperties;
   }
 
-  /**
-   * 장기기억 생성 작업 등록이 활성화된 경우에만 후속 작업 경계를 연다. 작업 등록이 거부되면 준비 상태를 실패로 전환해 미완료 작업을 남기지 않는다.
-   *
-   * @param sessionId 장기기억을 생성할 프리톡 세션 ID
-   */
+  /** 장기기억 생성 작업을 등록하고 거부 시 실패 상태로 전환한다. */
   public void dispatch(long sessionId) {
     if (!memoryProperties.writeEnabled()) {
       return;

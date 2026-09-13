@@ -4,6 +4,14 @@ package com.landit.landitbe.feature.session.client.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -27,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Slf4j
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
-public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
+public class RemoteAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
 
   private static final String OPENING_PATH = "/api/v1/free-talk/opening";
   private static final String TURN_PATH = "/api/v1/free-talk/turn";

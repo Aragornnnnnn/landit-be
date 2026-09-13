@@ -14,11 +14,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;

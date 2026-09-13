@@ -7,16 +7,16 @@ import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
+import com.landit.landitbe.feature.content.dto.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionRecommendationCandidate;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
+import com.landit.landitbe.feature.content.dto.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.dto.WritingSentenceResponse;
-import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository;
-import com.landit.landitbe.feature.content.repository.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
@@ -44,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ExpressionQueryService {
-
   /**
    * 추가 예문 payload의 필수 문자열 키 목록이다.
    *

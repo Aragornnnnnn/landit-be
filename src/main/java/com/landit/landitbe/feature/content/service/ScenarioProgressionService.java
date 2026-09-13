@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
+import com.landit.landitbe.feature.content.dto.CurrentScenario;
 import com.landit.landitbe.feature.content.repository.ScenarioSequenceQueryRepository;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
 import com.landit.landitbe.shared.domain.Locale;
@@ -73,12 +74,4 @@ public class ScenarioProgressionService {
         .map(currentScenario -> currentScenario.scenarioId() == scenarioId)
         .orElse(false);
   }
-
-  /**
-   * 현재 제공 중인 시나리오의 식별자와 제공 유형을 담는다.
-   *
-   * @param scenarioId 현재 제공 중인 시나리오 ID
-   * @param type 신규 또는 재도전 제공 유형
-   */
-  public record CurrentScenario(Long scenarioId, DailyScenarioType type) {}
 }

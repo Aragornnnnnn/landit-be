@@ -1,6 +1,6 @@
 // 시나리오 세션 시작 응답과 검증에 필요한 조회 결과를 담는다.
 
-package com.landit.landitbe.feature.session.repository.projection;
+package com.landit.landitbe.feature.content.dto;
 
 import com.landit.landitbe.feature.content.domain.TtsVoiceGender;
 import com.landit.landitbe.feature.content.domain.TtsVoiceProvider;
@@ -31,7 +31,7 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
  * @param providerVoiceId TTS 제공자 음성 ID
  * @param ttsVoiceGender TTS 음성 성별
  */
-public record ScenarioSessionStartProjection(
+public record ScenarioStartContext(
     Long scenarioId,
     String characterId,
     Long categoryId,

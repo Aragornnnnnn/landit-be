@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.character.service;
 
 import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
+import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
 import java.time.Clock;
@@ -164,14 +165,6 @@ public class StreakService {
           summary.getCurrentStreakDays(), lastActivityDate.equals(today), today);
     }
   }
-
-  /**
-   * 관리자 사용자 상세에 제공할 학습 활동 요약이다.
-   *
-   * @param currentStreakDays 현재 스트릭 일수
-   * @param lastActivityDate 마지막 학습일
-   */
-  public record LearningActivitySummary(int currentStreakDays, LocalDate lastActivityDate) {}
 
   /**
    * 월별 스트릭 조회 결과다.

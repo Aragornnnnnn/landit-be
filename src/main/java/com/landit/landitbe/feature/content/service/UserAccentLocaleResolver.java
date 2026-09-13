@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.content.service;
 
-import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -30,11 +30,11 @@ public class UserAccentLocaleResolver {
    * @throws ApiException 억양이 설정되지 않았을 때
    */
   public AccentLocale require(Long userId) {
-    UserProfile userProfile = userProfileService.requireActive(userId);
-    if (userProfile.getAccentLocale() == null) {
+    UserLearningProfile userProfile = userProfileService.requireActive(userId);
+    if (userProfile.accentLocale() == null) {
       throw new ApiException(ErrorCode.INVALID_REQUEST, "영어 억양이 설정되지 않았습니다.");
     }
-    return userProfile.getAccentLocale();
+    return userProfile.accentLocale();
   }
 
   /**
@@ -44,7 +44,7 @@ public class UserAccentLocaleResolver {
    * @return 목표 억양. 도출할 수 없으면 빈 Optional
    */
   public Optional<AccentLocale> tryResolve(Long userId) {
-    UserProfile userProfile = userProfileService.requireActive(userId);
-    return Optional.ofNullable(userProfile.getAccentLocale());
+    UserLearningProfile userProfile = userProfileService.requireActive(userId);
+    return Optional.ofNullable(userProfile.accentLocale());
   }
 }

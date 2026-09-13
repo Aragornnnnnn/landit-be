@@ -12,6 +12,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.session.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
@@ -27,13 +35,6 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesResult;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryQueryEmbeddingResult;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
@@ -1551,7 +1552,7 @@ class FreeTalkSessionApiIntegrationTests {
     }
   }
 
-  static class FakeAiFreeTalkClient implements AiFreeTalkClient {
+  static class FakeAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
 
     private AiFreeTalkOpeningRequest lastOpeningRequest;
     private boolean openingTransactionActive;

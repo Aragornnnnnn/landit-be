@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
@@ -42,7 +43,8 @@ class UserProfileServiceTest {
     when(userProfileRepository.findByIdAndStatus(USER_ID, UserProfileStatus.ACTIVE))
         .thenReturn(Optional.of(userProfile));
 
-    assertThat(userProfileService.requireActive(USER_ID)).isSameAs(userProfile);
+    assertThat(userProfileService.requireActive(USER_ID))
+        .isEqualTo(UserLearningProfile.from(userProfile));
   }
 
   /** 활성 사용자의 학습 locale(target/base)을 프로필에서 그대로 반환하는지 검증한다. */

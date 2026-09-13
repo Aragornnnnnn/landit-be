@@ -3,11 +3,11 @@
 package com.landit.landitbe.feature.session.dto;
 
 import com.landit.landitbe.feature.content.dto.ConversationCharacterResponse;
+import com.landit.landitbe.feature.content.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.domain.SessionType;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -44,7 +44,7 @@ public record SessionStartResponse(
    */
   public static SessionStartResponse from(
       LearningSession learningSession,
-      ScenarioSessionStartProjection startProjection,
+      ScenarioStartContext startProjection,
       CurrentMessageResponse currentMessage) {
     String userOpeningInstruction =
         startProjection.firstSpeaker() == ConversationSpeaker.USER
@@ -133,7 +133,7 @@ public record SessionStartResponse(
      * @param startProjection 시나리오 시작 조회 Projection
      * @return 첫 턴 세션 진행도 응답
      */
-    public static SessionProgressResponse from(ScenarioSessionStartProjection startProjection) {
+    public static SessionProgressResponse from(ScenarioStartContext startProjection) {
       return new SessionProgressResponse(1, startProjection.totalQuestionCount(), false);
     }
   }

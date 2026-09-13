@@ -6,13 +6,14 @@ import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
-import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
-import com.landit.landitbe.feature.profile.dto.AdminUserProfilePage;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
+import com.landit.landitbe.feature.profile.dto.UserProfilePage;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -44,7 +45,11 @@ public class UserProfileService {
    * @throws UserProfileException 활성 프로필이 없을 때
    */
   @Transactional(readOnly = true)
-  public UserProfile requireActive(Long userId) {
+  public UserLearningProfile requireActive(Long userId) {
+    return UserLearningProfile.from(requireActiveEntity(userId));
+  }
+
+  private UserProfile requireActiveEntity(Long userId) {
     return userProfileRepository
         .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN));
@@ -58,21 +63,20 @@ public class UserProfileService {
    * @throws UserProfileException 활성 프로필이 없을 때
    */
   @Transactional
-  public UserProfile requireActiveForUpdate(Long userId) {
-    return userProfileRepository
-        .findActiveByIdForUpdate(userId)
+  public UserLearningProfile requireActiveForUpdate(Long userId) {
+    return findActiveLearningProfileForUpdate(userId)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN));
   }
 
   /**
-   * 사용자 프로필을 저장한다.
+   * 활성 사용자 잠금을 획득하고 학습 설정을 반환한다. 잠금은 호출 트랜잭션 종료까지 유지된다.
    *
-   * @param userProfile 저장할 사용자 프로필
-   * @return 저장된 사용자 프로필
+   * @param userId 잠글 사용자 ID
+   * @return 활성 학습 설정. 활성 사용자가 없으면 빈 값
    */
   @Transactional
-  public UserProfile save(UserProfile userProfile) {
-    return userProfileRepository.save(userProfile);
+  public Optional<UserLearningProfile> findActiveLearningProfileForUpdate(Long userId) {
+    return userProfileRepository.findActiveByIdForUpdate(userId).map(UserLearningProfile::from);
   }
 
   /**
@@ -190,7 +194,7 @@ public class UserProfileService {
    */
   @Transactional(readOnly = true)
   public UserLocale getUserLocale(Long userId) {
-    UserProfile userProfile = requireActive(userId);
+    UserProfile userProfile = requireActiveEntity(userId);
 
     return new UserLocale(userProfile.getTargetLocale(), userProfile.getBaseLocale());
   }
@@ -204,7 +208,7 @@ public class UserProfileService {
    */
   @Transactional(readOnly = true)
   public UserLearningLevelResponse getLearningLevel(Long userId) {
-    return new UserLearningLevelResponse(requireActive(userId).getLearningLevel());
+    return new UserLearningLevelResponse(requireActiveEntity(userId).getLearningLevel());
   }
 
   /**
@@ -230,7 +234,7 @@ public class UserProfileService {
    */
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
-    requireActive(userId).updateLearningLevel(learningLevel);
+    requireActiveEntity(userId).updateLearningLevel(learningLevel);
   }
 
   /**
@@ -252,7 +256,7 @@ public class UserProfileService {
    */
   @Transactional(readOnly = true)
   public UserAccentLocaleResponse getAccentLocale(Long userId) {
-    return UserAccentLocaleResponse.from(requireActive(userId).getAccentLocale());
+    return UserAccentLocaleResponse.from(requireActiveEntity(userId).getAccentLocale());
   }
 
   /**
@@ -264,7 +268,7 @@ public class UserProfileService {
    */
   @Transactional
   public void updateAccentLocale(Long userId, AccentLocale accentLocale) {
-    requireActive(userId).updateAccentLocale(accentLocale);
+    requireActiveEntity(userId).updateAccentLocale(accentLocale);
   }
 
   /**
@@ -275,7 +279,10 @@ public class UserProfileService {
    */
   @Transactional
   public void grantPushPermission(Long userId) {
-    requireActiveForUpdate(userId).grantPushPermission(LocalDateTime.now());
+    userProfileRepository
+        .findActiveByIdForUpdate(userId)
+        .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN))
+        .grantPushPermission(LocalDateTime.now());
   }
 
   /**
@@ -286,11 +293,11 @@ public class UserProfileService {
    * @return 관리자 사용자 프로필 목록 페이지
    */
   @Transactional(readOnly = true)
-  public AdminUserProfilePage getAdminUserProfiles(int page, int size) {
+  public UserProfilePage getUserProfiles(int page, int size) {
     Slice<UserProfile> profiles =
         userProfileRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(page, size));
 
-    return AdminUserProfilePage.from(profiles, page, size);
+    return UserProfilePage.from(profiles, page, size);
   }
 
   /**
@@ -301,10 +308,10 @@ public class UserProfileService {
    * @throws UserProfileException 사용자가 없을 때
    */
   @Transactional(readOnly = true)
-  public AdminUserProfile getAdminUserProfile(long userProfileId) {
+  public UserProfileDetails getUserProfileDetails(long userProfileId) {
     return userProfileRepository
         .findById(userProfileId)
-        .map(AdminUserProfile::from)
+        .map(UserProfileDetails::from)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.USER_PROFILE_NOT_FOUND));
   }
 }

@@ -2,14 +2,14 @@
 
 package com.landit.landitbe.feature.memory.service;
 
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
-import com.landit.landitbe.feature.session.service.FreeTalkMemoryGenerationContextService;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,7 +27,7 @@ final class FreeTalkMemoryResolutionService {
 
   private static final int MAX_COMPARABLE_MEMORIES = 3;
 
-  private final AiFreeTalkClient aiClient;
+  private final AiMemoryClient aiClient;
   private final ConversationMemorySearchRepository searchRepository;
   private final Clock clock;
 
@@ -39,9 +39,8 @@ final class FreeTalkMemoryResolutionService {
    * @return 후보별 추가, 유지 또는 대체 저장 계획
    * @throws IllegalArgumentException 비교 기억 또는 AI 상태 판정 결과가 계약에 맞지 않을 때
    */
-  List<ConversationMemoryResolutionPlan> plan(
-      FreeTalkMemoryGenerationContextService.GenerationContext context,
-      List<FreeTalkMemoryCandidate> candidates) {
+  public List<ConversationMemoryResolutionPlan> plan(
+      ConversationMemoryGenerationRequest context, List<FreeTalkMemoryCandidate> candidates) {
     if (candidates.isEmpty()) {
       return List.of();
     }
@@ -61,8 +60,7 @@ final class FreeTalkMemoryResolutionService {
 
   /** 같은 사용자·캐릭터·유형의 활성 기억만 비교 대상으로 제한한다. */
   private FreeTalkMemoryCandidate addComparables(
-      FreeTalkMemoryGenerationContextService.GenerationContext context,
-      FreeTalkMemoryCandidate candidate) {
+      ConversationMemoryGenerationRequest context, FreeTalkMemoryCandidate candidate) {
     List<ConversationMemoryMatch> comparable =
         searchRepository.searchActiveComparable(
             candidate.memory().embedding(),

@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.content.repository;
 
+import com.landit.landitbe.feature.content.dto.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.dto.FreeTalkCandidateSearch;
 import java.util.List;
 
 /** 임베딩 벡터로 공용 프리톡 표현 후보를 유사도 순으로 검색한다. */

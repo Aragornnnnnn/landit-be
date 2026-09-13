@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -198,12 +199,17 @@ class AdminUserApiIntegrationTests {
             get("/api/v1/admin/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isForbidden());
     String adminAccessToken = loginAdmin();
-    mockMvc
-        .perform(
-            get("/api/v1/admin/users")
-                .param("size", "51")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
-        .andExpect(status().isBadRequest());
+    for (String[] parameters :
+        List.of(new String[] {"0", "51"}, new String[] {"-1", "20"}, new String[] {"0", "0"})) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/users")
+                  .param("page", parameters[0])
+                  .param("size", parameters[1])
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
   }
 
   @DisplayName("관리자 사용자 목록과 상세 API를 OpenAPI 문서에 노출한다.")

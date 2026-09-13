@@ -1,6 +1,6 @@
 // 공용 프리톡 표현 후보 검색의 조건을 담는다.
 
-package com.landit.landitbe.feature.content.repository;
+package com.landit.landitbe.feature.content.dto;
 
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.List;

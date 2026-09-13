@@ -2,12 +2,12 @@
 
 package com.landit.landitbe.feature.memory.service;
 
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
-import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesResult;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.session.service.FreeTalkMemoryGenerationContextService;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -38,11 +38,10 @@ final class FreeTalkMemoryCandidateMapper {
    * @return 검증된 장기기억 후보 목록
    * @throws IllegalArgumentException 추출 응답이나 원본 메시지가 장기기억 계약에 맞지 않을 때
    */
-  List<FreeTalkMemoryCandidate> mapCandidates(
-      FreeTalkMemoryGenerationContextService.GenerationContext context,
-      AiMemoryCandidatesResult extraction) {
+  public List<FreeTalkMemoryCandidate> mapCandidates(
+      ConversationMemoryGenerationRequest context, AiMemoryCandidatesResult extraction) {
     validateExtractionResult(extraction);
-    Map<Long, AiConversationHistoryMessage> historyById = historyById(context.history());
+    Map<Long, ConversationMemoryHistoryMessage> historyById = historyById(context.history());
     return extraction.candidates().stream()
         .map(
             candidate ->
@@ -52,12 +51,12 @@ final class FreeTalkMemoryCandidateMapper {
 
   /** 원본 계보와 후보 계약을 확인한 뒤 저장·resolution 입력을 같은 관찰 시각으로 만든다. */
   private FreeTalkMemoryCandidate mapCandidate(
-      FreeTalkMemoryGenerationContextService.GenerationContext context,
+      ConversationMemoryGenerationRequest context,
       AiMemoryCandidatesResult.Candidate candidate,
       String extractorVersion,
-      Map<Long, AiConversationHistoryMessage> historyById) {
+      Map<Long, ConversationMemoryHistoryMessage> historyById) {
     validateSourceMessageIds(candidate);
-    List<AiConversationHistoryMessage> sources =
+    List<ConversationMemoryHistoryMessage> sources =
         candidate.sourceMessageIds().stream().map(historyById::get).toList();
     if (sources.stream().anyMatch(message -> message == null || !"USER".equals(message.role()))) {
       throw new IllegalArgumentException("장기기억 원본은 사용자 메시지만 허용됩니다.");
@@ -75,16 +74,16 @@ final class FreeTalkMemoryCandidateMapper {
   }
 
   /** 여러 원본 중 가장 최근 사용자 메시지 시각을 기억 관찰 시각으로 사용한다. */
-  private static OffsetDateTime latestObservedAt(List<AiConversationHistoryMessage> sources) {
+  private static OffsetDateTime latestObservedAt(List<ConversationMemoryHistoryMessage> sources) {
     return sources.stream()
-        .map(AiConversationHistoryMessage::occurredAt)
+        .map(ConversationMemoryHistoryMessage::occurredAt)
         .max((left, right) -> left.toInstant().compareTo(right.toInstant()))
         .orElseThrow();
   }
 
   /** 후보의 시간대와 PROFILE 범위를 저장 모델의 불변 규칙에 맞춰 변환한다. */
   private NewConversationMemory toMemory(
-      FreeTalkMemoryGenerationContextService.GenerationContext context,
+      ConversationMemoryGenerationRequest context,
       AiMemoryCandidatesResult.Candidate candidate,
       LocalDateTime observedAt,
       String extractorVersion) {
@@ -132,8 +131,7 @@ final class FreeTalkMemoryCandidateMapper {
 
   /** 저장·검색 계약을 지키도록 locale, confidence, 유효기간, 임베딩을 함께 검증한다. */
   private static void validateCandidateContract(
-      FreeTalkMemoryGenerationContextService.GenerationContext context,
-      AiMemoryCandidatesResult.Candidate candidate) {
+      ConversationMemoryGenerationRequest context, AiMemoryCandidatesResult.Candidate candidate) {
     if (candidate.candidateIndex() == null
         || candidate.confidence() == null
         || candidate.memoryType() == null
@@ -152,13 +150,13 @@ final class FreeTalkMemoryCandidateMapper {
   }
 
   /** AI가 참조한 원본을 실제 사용자 이력으로 확정하기 위해 ID 유일성을 검증한다. */
-  private static Map<Long, AiConversationHistoryMessage> historyById(
-      List<AiConversationHistoryMessage> history) {
+  private static Map<Long, ConversationMemoryHistoryMessage> historyById(
+      List<ConversationMemoryHistoryMessage> history) {
     if (history == null) {
       throw new IllegalArgumentException("장기기억 생성 이력이 필요합니다.");
     }
-    Map<Long, AiConversationHistoryMessage> byId = new HashMap<>();
-    for (AiConversationHistoryMessage message : history) {
+    Map<Long, ConversationMemoryHistoryMessage> byId = new HashMap<>();
+    for (ConversationMemoryHistoryMessage message : history) {
       if (message == null
           || message.messageId() == null
           || message.role() == null

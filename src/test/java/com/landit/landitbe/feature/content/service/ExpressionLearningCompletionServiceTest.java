@@ -20,6 +20,7 @@ import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningCompletionService;
 import com.landit.landitbe.feature.learning.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
@@ -34,6 +35,7 @@ import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -45,7 +47,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -77,10 +78,17 @@ class ExpressionLearningCompletionServiceTest {
 
   @Mock private FreeTalkSessionExpressionRepository sessionExpressionRepository;
 
-  @InjectMocks private ExpressionLearningCompletionService expressionLearningCompletionService;
+  private ExpressionLearningCompletionService expressionLearningCompletionService;
 
   @BeforeEach
   void allowAllExistingScenarioExpressions() {
+    expressionLearningCompletionService =
+        new ExpressionLearningCompletionService(
+            new ExpressionContentService(writingExpressionRepository),
+            userProfileService,
+            learningProgressService,
+            new FreeTalkExpressionLearningService(
+                freeTalkSessionRepository, learningSessionRepository, sessionExpressionRepository));
     lenient()
         .when(userProfileService.getLearningLevel(USER_ID))
         .thenReturn(new UserLearningLevelResponse(null));
@@ -230,13 +238,15 @@ class ExpressionLearningCompletionServiceTest {
   /** 프리톡 추천 표현은 시나리오 학습 순서와 관계없이 완료한다. */
   @Test
   void shouldCompleteScenarioExpressionFromFreeTalkWithoutOrderLock() {
-    long learningSessionId = 701L;
+    final long learningSessionId = 701L;
     long freeTalkSessionId = 901L;
     WritingExpression expression = expressionInScenario();
-    FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
-    LearningSession learningSession = mock(LearningSession.class);
+    final FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
+    final LearningSession learningSession = mock(LearningSession.class);
     FreeTalkSessionExpression sessionExpression =
         FreeTalkSessionExpression.link(freeTalkSessionId, LOCKED_EXPRESSION_ID, 1);
+    org.springframework.test.util.ReflectionTestUtils.setField(sessionExpression, "id", 902L);
+    when(sessionExpressionRepository.findById(902L)).thenReturn(Optional.of(sessionExpression));
     when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
     when(writingExpressionRepository.findByIdAndStatusForUpdate(
@@ -271,9 +281,9 @@ class ExpressionLearningCompletionServiceTest {
   /** 다른 사용자의 프리톡 세션으로는 표현을 완료할 수 없다. */
   @Test
   void shouldRejectFreeTalkCompletionForAnotherUser() {
-    long learningSessionId = 701L;
-    FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
-    LearningSession learningSession = mock(LearningSession.class);
+    final long learningSessionId = 701L;
+    final FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
+    final LearningSession learningSession = mock(LearningSession.class);
     WritingExpression expression = expressionInScenario();
     when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
@@ -299,9 +309,9 @@ class ExpressionLearningCompletionServiceTest {
   /** 완료되지 않은 프리톡 세션의 표현 완료를 시도하면 RESOURCE_NOT_FOUND 예외를 던진다. */
   @Test
   void shouldRejectFreeTalkCompletionForIncompleteSession() {
-    long learningSessionId = 701L;
-    FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
-    LearningSession learningSession = mock(LearningSession.class);
+    final long learningSessionId = 701L;
+    final FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
+    final LearningSession learningSession = mock(LearningSession.class);
     WritingExpression expression = expressionInScenario();
     when(writingExpressionRepository.findByIdAndStatus(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));

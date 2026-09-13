@@ -10,8 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.content.ExpressionSearchProperties;
-import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
-import com.landit.landitbe.feature.content.repository.FreeTalkCandidateSearch;
+import com.landit.landitbe.feature.content.dto.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.dto.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.shared.domain.Locale;

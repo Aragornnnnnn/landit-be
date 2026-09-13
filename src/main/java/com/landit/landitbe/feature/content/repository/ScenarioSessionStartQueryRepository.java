@@ -1,10 +1,10 @@
 // 시나리오 세션 시작에 필요한 콘텐츠와 잠금 정보를 조회한다.
 
-package com.landit.landitbe.feature.session.repository;
+package com.landit.landitbe.feature.content.repository;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.Scenario;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
+import com.landit.landitbe.feature.content.dto.ScenarioStartContext;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -23,7 +23,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
    */
   @Query(
       """
-            SELECT new com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection(
+            SELECT new com.landit.landitbe.feature.content.dto.ScenarioStartContext(
                 s.id,
                 s.characterId,
                 s.categoryId,
@@ -71,7 +71,7 @@ public interface ScenarioSessionStartQueryRepository extends JpaRepository<Scena
              AND tv.status = com.landit.landitbe.shared.domain.ActiveStatus.ACTIVE
             WHERE up.id = :userId
       """)
-  Optional<ScenarioSessionStartProjection> findStartRow(
+  Optional<ScenarioStartContext> findStartRow(
       @Param("userId") long userId,
       @Param("scenarioId") long scenarioId,
       @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup);

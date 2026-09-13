@@ -6,6 +6,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionResult;
+import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -757,14 +766,14 @@ class RemoteAiFreeTalkClientTest {
         "KR",
         "Asia/Seoul",
         List.of(
-            new AiConversationHistoryMessage(
+            new ConversationMemoryHistoryMessage(
                 3001L,
                 1,
                 "AI",
                 "How was your weekend?",
                 "주말은 어땠어?",
                 OffsetDateTime.parse("2026-08-25T20:00:00+09:00")),
-            new AiConversationHistoryMessage(
+            new ConversationMemoryHistoryMessage(
                 3002L,
                 1,
                 "USER",

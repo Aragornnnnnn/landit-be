@@ -3,12 +3,13 @@
 package com.landit.landitbe.feature.content.service;
 
 import com.landit.landitbe.feature.content.domain.ScenarioCalendarType;
+import com.landit.landitbe.feature.content.dto.CurrentScenario;
 import com.landit.landitbe.feature.content.dto.ScenarioCalendarResponse;
 import com.landit.landitbe.feature.content.dto.ScenarioCalendarResponse.CalendarDayResponse;
 import com.landit.landitbe.feature.content.repository.ScenarioSequenceQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.ScenarioThumbnailProjection;
+import com.landit.landitbe.feature.learning.dto.DailyCompletion;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
-import com.landit.landitbe.feature.learning.service.ScenarioAccessService.DailyCompletion;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.Clock;
@@ -159,7 +160,7 @@ public class ScenarioCalendarService {
   private Long assignedScenarioId(long userId, UserLocale userLocale, Instant evaluatedAt) {
     return scenarioProgressionService
         .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
-        .map(ScenarioProgressionService.CurrentScenario::scenarioId)
+        .map(CurrentScenario::scenarioId)
         .orElse(null);
   }
 

@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.admin.dto;
 
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
-import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
+import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
@@ -36,7 +36,7 @@ public record AdminUserListItem(
    * @param profile 변환할 관리자 프로필 계약
    * @return 관리자 사용자 목록 항목
    */
-  public static AdminUserListItem from(AdminUserProfile profile) {
+  public static AdminUserListItem from(UserProfileDetails profile) {
     return new AdminUserListItem(
         profile.userProfileId(),
         profile.email(),

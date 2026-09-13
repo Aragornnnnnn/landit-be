@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.session.service;
 
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTopic;

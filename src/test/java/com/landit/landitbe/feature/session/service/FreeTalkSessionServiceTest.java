@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.service.ConversationCharacterService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.dto.FreeTalkSessionStartRequest;
@@ -56,7 +57,8 @@ class FreeTalkSessionServiceTest {
   @Test
   void checksDailySpeakingTimeAfterLockingUser() {
     UserProfile userProfile = mock(UserProfile.class);
-    when(userProfileService.requireActiveForUpdate(1L)).thenReturn(userProfile);
+    UserLearningProfile learningProfile = UserLearningProfile.from(userProfile);
+    when(userProfileService.requireActiveForUpdate(1L)).thenReturn(learningProfile);
     SessionException exception =
         new SessionException(SessionErrorCode.FREE_TALK_DAILY_SPEAKING_LIMIT_EXCEEDED);
     org.mockito.Mockito.doThrow(exception).when(dailySpeakingUsageService).requireRemaining(1L);

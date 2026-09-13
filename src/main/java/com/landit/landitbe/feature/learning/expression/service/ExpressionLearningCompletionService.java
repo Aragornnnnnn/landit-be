@@ -1,25 +1,17 @@
 // 원어민 표현 학습 완료 흐름을 처리한다.
 
-package com.landit.landitbe.feature.content.service;
+package com.landit.landitbe.feature.learning.expression.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.domain.WritingExpression;
 import com.landit.landitbe.feature.content.domain.WritingExpressionSource;
-import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.content.dto.ExpressionLearningContent;
+import com.landit.landitbe.feature.content.service.ExpressionContentService;
 import com.landit.landitbe.feature.learning.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
-import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
-import com.landit.landitbe.feature.session.domain.FreeTalkSession;
-import com.landit.landitbe.feature.session.domain.FreeTalkSessionExpression;
-import com.landit.landitbe.feature.session.domain.LearningSession;
-import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
-import com.landit.landitbe.feature.session.repository.FreeTalkSessionExpressionRepository;
-import com.landit.landitbe.feature.session.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
-import com.landit.landitbe.shared.domain.ActiveStatus;
+import com.landit.landitbe.feature.session.dto.FreeTalkExpressionCompletion;
+import com.landit.landitbe.feature.session.service.FreeTalkExpressionLearningService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
@@ -39,12 +31,10 @@ public class ExpressionLearningCompletionService {
   private static final String LOCKED_EXPRESSION_LOG =
       "표현 학습 완료 실패: 아직 잠긴 표현입니다. userId={}, expressionId={}";
 
-  private final WritingExpressionRepository writingExpressionRepository;
+  private final ExpressionContentService expressionContentService;
   private final UserProfileService userProfileService;
   private final LearningProgressService learningProgressService;
-  private final FreeTalkSessionRepository freeTalkSessionRepository;
-  private final LearningSessionRepository learningSessionRepository;
-  private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
+  private final FreeTalkExpressionLearningService freeTalkExpressionLearningService;
 
   /**
    * 학습 순서에 맞는 활성 표현의 완료 이력을 생성하거나 완료 시각을 갱신한다.
@@ -68,15 +58,14 @@ public class ExpressionLearningCompletionService {
    */
   @Transactional
   public void completeLearning(Long userId, Long expressionId, Long freeTalkSessionId) {
-    WritingExpression expression =
-        writingExpressionRepository
-            .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
-            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    Long scenarioId = expression.getScenarioId();
+    ExpressionLearningContent expression =
+        expressionContentService.requireLearningContent(expressionId);
+    Long scenarioId = expression.scenarioId();
 
     if (freeTalkSessionId != null) {
-      FreeTalkSessionExpression sessionExpression =
-          validateFreeTalkCompletion(userId, freeTalkSessionId, expressionId);
+      FreeTalkExpressionCompletion sessionExpression =
+          freeTalkExpressionLearningService.validateCompletion(
+              userId, freeTalkSessionId, expressionId);
       completeFreeTalkExpression(userId, scenarioId, expressionId, sessionExpression);
       return;
     }
@@ -85,13 +74,11 @@ public class ExpressionLearningCompletionService {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     ContentLearningLevel contentLevel = contentLearningLevel(userId);
-    if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
-        && !contentLevel.includesExpressionDifficulty(expression.getDifficultyLevel())) {
+    if (expression.expressionSource() == WritingExpressionSource.SCENARIO
+        && !contentLevel.includesExpressionDifficulty(expression.difficultyLevel())) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
-    writingExpressionRepository
-        .findByIdAndStatusForUpdate(expressionId, ActiveStatus.ACTIVE)
-        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+    expressionContentService.lockActiveExpression(expressionId);
 
     CompletedExpressionIds completedExpressionIds =
         learningProgressService.findCompletedExpressionIds(userId, scenarioId);
@@ -119,36 +106,10 @@ public class ExpressionLearningCompletionService {
       Long userId,
       Long scenarioId,
       Long expressionId,
-      FreeTalkSessionExpression sessionExpression) {
-    writingExpressionRepository
-        .findByIdAndStatusForUpdate(expressionId, ActiveStatus.ACTIVE)
-        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    sessionExpression.complete();
+      FreeTalkExpressionCompletion sessionExpression) {
+    expressionContentService.lockActiveExpression(expressionId);
+    freeTalkExpressionLearningService.completeExpression(sessionExpression.sessionExpressionId());
     learningProgressService.completeFreeTalkExpression(userId, scenarioId, expressionId);
-  }
-
-  // 완료 요청이 사용자의 완료 프리톡에서 추천된 표현인지 검증한다.
-  private FreeTalkSessionExpression validateFreeTalkCompletion(
-      Long userId, Long freeTalkSessionId, Long expressionId) {
-    FreeTalkSession freeTalkSession =
-        freeTalkSessionRepository
-            .findByLearningSessionId(freeTalkSessionId)
-            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    LearningSession learningSession =
-        learningSessionRepository
-            .findById(freeTalkSession.getLearningSessionId())
-            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    if (!userId.equals(learningSession.getUserProfileId())) {
-      throw new ApiException(ErrorCode.FORBIDDEN);
-    }
-    if (learningSession.getStatus() != LearningSessionStatus.COMPLETED
-        || freeTalkSession.getConversationStatus() != FreeTalkConversationStatus.COMPLETED
-        || freeTalkSession.getExpressionGenerationStatus() != ExpressionGenerationStatus.READY) {
-      throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
-    }
-    return sessionExpressionRepository
-        .findByFreeTalkSessionIdAndWritingExpressionId(freeTalkSession.getId(), expressionId)
-        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
   /** 사용자 로케일과 학습 순서로 표현의 잠금 해제 여부를 판단한다. */
@@ -162,21 +123,11 @@ public class ExpressionLearningCompletionService {
     UserLocale userLocale = userProfileService.getUserLocale(userId);
 
     // 사용자 로케일에 맞는 활성 표현을 노출 순서대로 조회한다.
-    List<WritingExpression> expressions =
-        writingExpressionRepository.findScenarioExpressions(
-            scenarioId,
-            userLocale.targetLocale(),
-            userLocale.baseLocale(),
-            contentLevel.minimumExpressionDifficulty(),
-            contentLevel.maximumExpressionDifficulty(),
-            ActiveStatus.ACTIVE);
-
-    // 가장 앞선 미완료 표현의 ID를 찾는다.
+    List<Long> expressionIds =
+        expressionContentService.findScenarioExpressionIds(
+            scenarioId, userLocale.targetLocale(), userLocale.baseLocale(), contentLevel);
     Optional<Long> firstIncompleteExpressionId =
-        expressions.stream()
-            .map(WritingExpression::getId)
-            .filter(id -> !completedExpressionIds.contains(id))
-            .findFirst();
+        expressionIds.stream().filter(id -> !completedExpressionIds.contains(id)).findFirst();
 
     return firstIncompleteExpressionId.isPresent()
         && firstIncompleteExpressionId.get().equals(expressionId);

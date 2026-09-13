@@ -8,10 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
+import com.landit.landitbe.feature.content.dto.ScenarioStartContext;
+import com.landit.landitbe.feature.content.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.feature.session.repository.ScenarioSessionRepository;
-import com.landit.landitbe.feature.session.repository.ScenarioSessionStartQueryRepository;
-import com.landit.landitbe.feature.session.repository.projection.ScenarioSessionStartProjection;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.Optional;
@@ -22,8 +22,7 @@ class ScenarioSessionServiceTest {
 
   private final ScenarioSessionRepository scenarioSessionRepository =
       mock(ScenarioSessionRepository.class);
-  private final ScenarioSessionStartQueryRepository startQueryRepository =
-      mock(ScenarioSessionStartQueryRepository.class);
+  private final ScenarioContentService startQueryRepository = mock(ScenarioContentService.class);
   private final ScenarioSessionMessageQueryRepository messageQueryRepository =
       mock(ScenarioSessionMessageQueryRepository.class);
   private final ScenarioSessionService service =
@@ -33,8 +32,8 @@ class ScenarioSessionServiceTest {
   /** 사용자 언어에 맞는 시작 Projection을 반환한다. */
   @Test
   void returnsStartProjection() {
-    ScenarioSessionStartProjection projection = mock(ScenarioSessionStartProjection.class);
-    when(startQueryRepository.findStartRow(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
+    ScenarioStartContext projection = mock(ScenarioStartContext.class);
+    when(startQueryRepository.findStartContext(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
         .thenReturn(Optional.of(projection));
 
     assertThat(service.requireStartProjection(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
@@ -44,7 +43,7 @@ class ScenarioSessionServiceTest {
   /** 시작 Projection이 없으면 시나리오 없음 오류로 변환한다. */
   @Test
   void rejectsMissingStartProjection() {
-    when(startQueryRepository.findStartRow(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
+    when(startQueryRepository.findStartContext(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(

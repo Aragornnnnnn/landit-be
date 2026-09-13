@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.memory.domain;
 
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.content.domain.WritingExpression;
-import com.landit.landitbe.feature.content.repository.WritingExpressionRepository;
+import com.landit.landitbe.feature.content.dto.ExpressionText;
+import com.landit.landitbe.feature.content.service.ExpressionContentService;
 import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.ExpressionLearningStatus;
 import com.landit.landitbe.feature.session.domain.FreeTalkConversationStatus;
@@ -42,7 +42,7 @@ public class FreeTalkHistoryQueryService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
-  private final WritingExpressionRepository writingExpressionRepository;
+  private final ExpressionContentService expressionContentService;
 
   /**
    * 완료 프리톡을 최신순 페이지로 조회한다.
@@ -67,8 +67,7 @@ public class FreeTalkHistoryQueryService {
             freeTalkSessions.stream().map(FreeTalkSession::getId).toList());
     List<FreeTalkSessionExpression> sessionExpressions =
         expressionsByFreeTalkSessionId.values().stream().flatMap(List::stream).toList();
-    Map<Long, WritingExpression> writingExpressionsById =
-        writingExpressionsById(sessionExpressions);
+    Map<Long, ExpressionText> writingExpressionsById = writingExpressionsById(sessionExpressions);
     // 일괄 조회한 데이터를 세션별 목록 응답으로 조립한다.
     List<FreeTalkSessionListResponse.Item> items =
         freeTalkSessions.stream()
@@ -149,7 +148,7 @@ public class FreeTalkHistoryQueryService {
       FreeTalkSession session,
       Map<Long, LearningSession> learningSessionsById,
       Map<Long, List<FreeTalkSessionExpression>> expressionsByFreeTalkSessionId,
-      Map<Long, WritingExpression> writingExpressionsById) {
+      Map<Long, ExpressionText> writingExpressionsById) {
     LearningSession learningSession = learningSessionsById.get(session.getLearningSessionId());
     if (learningSession == null) {
       throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
@@ -217,14 +216,14 @@ public class FreeTalkHistoryQueryService {
   }
 
   // 세션 추천 표현에 연결된 원어민 표현을 ID 기준으로 조회한다.
-  private Map<Long, WritingExpression> writingExpressionsById(
+  private Map<Long, ExpressionText> writingExpressionsById(
       List<FreeTalkSessionExpression> sessionExpressions) {
     List<Long> expressionIds =
         sessionExpressions.stream().map(FreeTalkSessionExpression::getWritingExpressionId).toList();
-    Map<Long, WritingExpression> expressionsById = new HashMap<>();
-    writingExpressionRepository
-        .findAllById(expressionIds)
-        .forEach(expression -> expressionsById.put(expression.getId(), expression));
+    Map<Long, ExpressionText> expressionsById = new HashMap<>();
+    expressionContentService
+        .findExpressionTexts(expressionIds)
+        .forEach(expression -> expressionsById.put(expression.id(), expression));
     return expressionsById;
   }
 
@@ -232,7 +231,7 @@ public class FreeTalkHistoryQueryService {
   private ExpressionProgress expressionProgress(
       FreeTalkSession session,
       List<FreeTalkSessionExpression> sessionExpressions,
-      Map<Long, WritingExpression> writingExpressionsById,
+      Map<Long, ExpressionText> writingExpressionsById,
       Map<Long, LocalDateTime> lastRecommendedAtByExpressionId) {
     if (session.getExpressionGenerationStatus() != ExpressionGenerationStatus.READY) {
       return ExpressionProgress.empty();
@@ -260,18 +259,18 @@ public class FreeTalkHistoryQueryService {
   // 세션 추천 표현을 완료 이력이 포함된 상세 응답으로 변환한다.
   private FreeTalkSessionDetailResponse.Expression toExpressionResponse(
       FreeTalkSessionExpression sessionExpression,
-      Map<Long, WritingExpression> writingExpressionsById,
+      Map<Long, ExpressionText> writingExpressionsById,
       Map<Long, LocalDateTime> lastRecommendedAtByExpressionId) {
     long expressionId = sessionExpression.getWritingExpressionId();
-    WritingExpression expression = writingExpressionsById.get(expressionId);
+    ExpressionText expression = writingExpressionsById.get(expressionId);
     if (expression == null) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     return new FreeTalkSessionDetailResponse.Expression(
         expressionId,
         sessionExpression.getDisplayOrder(),
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
+        expression.targetExpressionText(),
+        expression.baseExpressionMeaningText(),
         sessionExpression.getCompletedAt() != null,
         lastRecommendedAtByExpressionId.get(expressionId));
   }

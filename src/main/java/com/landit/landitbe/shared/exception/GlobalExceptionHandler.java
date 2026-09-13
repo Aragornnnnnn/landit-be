@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -43,6 +44,21 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<Void>> handleFeatureException(FeatureException exception) {
     return ResponseEntity.status(exception.getStatus())
         .body(ApiResponse.error(exception.getCode(), exception.getMessage()));
+  }
+
+  /**
+   * 메서드 인자 검증 실패를 요청 오류로 변환한다. 반환값 위반은 서버 오류다.
+   *
+   * @param exception 메서드 검증 실패
+   * @return 기존 요청 오류 형식
+   */
+  @ExceptionHandler(HandlerMethodValidationException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodValidation(
+      HandlerMethodValidationException exception) {
+    if (exception.isForReturnValue()) {
+      return handleUnexpectedException(exception);
+    }
+    return error(ErrorCode.INVALID_REQUEST);
   }
 
   /** 요청 본문 Bean Validation 실패를 공통 검증 오류로 변환한다. */

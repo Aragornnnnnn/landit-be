@@ -1,15 +1,15 @@
 // 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다.
 
-package com.landit.landitbe.feature.content;
+package com.landit.landitbe.feature.learning.expression;
 
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.content.docs.ExpressionControllerDocs;
-import com.landit.landitbe.feature.content.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.content.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.dto.ExpressionResponse;
-import com.landit.landitbe.feature.content.service.ExpressionLearningCompletionService;
 import com.landit.landitbe.feature.content.service.ExpressionQueryService;
+import com.landit.landitbe.feature.learning.expression.docs.ExpressionControllerDocs;
+import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningCompletionService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import java.util.List;
 import java.util.Map;

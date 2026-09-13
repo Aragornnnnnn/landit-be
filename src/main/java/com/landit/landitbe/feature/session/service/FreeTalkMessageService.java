@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.service;
 
-import com.landit.landitbe.feature.memory.service.FreeTalkMemoryGenerationDispatchService;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
@@ -11,7 +11,6 @@ import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkInnerThoughtResult;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.client.ai.AiFreeTalkTurnResult;

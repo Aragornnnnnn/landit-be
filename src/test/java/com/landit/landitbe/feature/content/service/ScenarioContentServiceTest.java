@@ -19,7 +19,7 @@ class ScenarioContentServiceTest {
 
   private final ScenarioQuestionQueryRepository repository =
       mock(ScenarioQuestionQueryRepository.class);
-  private final ScenarioContentService service = new ScenarioContentService(repository);
+  private final ScenarioContentService service = new ScenarioContentService(null, repository);
 
   /** Repository Projection을 Session이 사용할 공개 record로 변환한다. */
   @Test

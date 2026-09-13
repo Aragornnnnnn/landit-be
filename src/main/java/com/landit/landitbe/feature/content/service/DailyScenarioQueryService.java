@@ -4,12 +4,13 @@ package com.landit.landitbe.feature.content.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.domain.DailyScenarioType;
+import com.landit.landitbe.feature.content.dto.CurrentScenario;
 import com.landit.landitbe.feature.content.dto.DailyScenarioResponse;
 import com.landit.landitbe.feature.content.dto.DailyScenarioResponse.ScenarioResponse;
 import com.landit.landitbe.feature.content.repository.DailyScenarioQueryRepository;
 import com.landit.landitbe.feature.content.repository.projection.DailyScenarioProjection;
+import com.landit.landitbe.feature.learning.dto.ScenarioAccessHistory;
 import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
-import com.landit.landitbe.feature.learning.service.ScenarioAccessService.ScenarioAccessHistory;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -55,8 +56,9 @@ public class DailyScenarioQueryService {
     UserLocale userLocale = userProfileService.getUserLocale(userId);
     return scenarioAccessService
         .findAccessGrantedOn(userId, userLocale.targetLocale(), queryDate)
-        .map(history -> completedResponse(userId, queryDate, history))
-        .orElseGet(() -> currentOrEmptyResponse(userId, queryDate, today, userLocale, evaluatedAt));
+        .map(history -> buildCompletedResponse(userId, queryDate, history))
+        .orElseGet(
+            () -> buildCurrentOrEmptyResponse(userId, queryDate, today, userLocale, evaluatedAt));
   }
 
   /** 미래 날짜는 사용자 완료 여부에 따라 배정이 확정되지 않았으므로 조회를 거절한다. */
@@ -67,30 +69,31 @@ public class DailyScenarioQueryService {
   }
 
   /** 완료 이력이 없는 과거 날짜는 비어 있고, 오늘은 현재 제공 시나리오를 반환한다. */
-  private DailyScenarioResponse currentOrEmptyResponse(
+  private DailyScenarioResponse buildCurrentOrEmptyResponse(
       long userId, LocalDate date, LocalDate today, UserLocale userLocale, Instant evaluatedAt) {
     if (date.isBefore(today)) {
       return DailyScenarioResponse.empty(date);
     }
     return scenarioProgressionService
         .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
-        .map(current -> currentResponse(userId, date, current))
+        .map(current -> buildCurrentResponse(userId, date, current))
         .orElseGet(() -> DailyScenarioResponse.empty(date));
   }
 
   /** 현재 제공 중인 미완료 시나리오를 응답으로 변환한다. */
-  private DailyScenarioResponse currentResponse(
-      long userId, LocalDate date, ScenarioProgressionService.CurrentScenario currentScenario) {
+  private DailyScenarioResponse buildCurrentResponse(
+      long userId, LocalDate date, CurrentScenario currentScenario) {
     ScenarioResponse scenario =
-        scenarioResponse(userId, currentScenario.scenarioId(), currentScenario.type(), false, null);
+        buildScenarioResponse(
+            userId, currentScenario.scenarioId(), currentScenario.type(), false, null);
     return DailyScenarioResponse.playable(date, scenario);
   }
 
   /** 특정 날짜에 최초 완료한 시나리오를 복습 가능한 응답으로 변환한다. */
-  private DailyScenarioResponse completedResponse(
+  private DailyScenarioResponse buildCompletedResponse(
       long userId, LocalDate date, ScenarioAccessHistory accessHistory) {
     ScenarioResponse scenario =
-        scenarioResponse(
+        buildScenarioResponse(
             userId,
             accessHistory.scenarioId(),
             DailyScenarioType.CLEARED,
@@ -100,7 +103,7 @@ public class DailyScenarioQueryService {
   }
 
   /** 콘텐츠·표현 진행도를 조회해 날짜별 시나리오 상세 응답을 조립한다. */
-  private ScenarioResponse scenarioResponse(
+  private ScenarioResponse buildScenarioResponse(
       long userId,
       Long scenarioId,
       DailyScenarioType dailyScenarioType,

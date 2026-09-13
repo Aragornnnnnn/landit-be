@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.learning.service;
 
 import com.landit.landitbe.feature.learning.domain.UserScenarioAccess;
+import com.landit.landitbe.feature.learning.dto.DailyCompletion;
+import com.landit.landitbe.feature.learning.dto.ScenarioAccessHistory;
 import com.landit.landitbe.feature.learning.repository.UserScenarioAccessRepository;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.Locale;
@@ -144,14 +146,6 @@ public class ScenarioAccessService {
   }
 
   /**
-   * 사용자가 하루 동안 완료한 시나리오를 담는다.
-   *
-   * @param date 완료한 날짜
-   * @param scenarioId 완료한 시나리오 ID
-   */
-  public record DailyCompletion(LocalDate date, Long scenarioId) {}
-
-  /**
    * 사용자가 대상 언어에서 처음으로 시나리오를 완료한 날짜를 조회한다.
    *
    * @param userProfileId 사용자 프로필 ID
@@ -184,12 +178,4 @@ public class ScenarioAccessService {
     userScenarioAccessRepository.save(
         UserScenarioAccess.grant(userProfileId, scenarioId, targetLocale, grantedAt));
   }
-
-  /**
-   * 날짜별 시나리오 이력 조회에 필요한 최초 복습 권한 정보를 담는다.
-   *
-   * @param scenarioId 최초 완료한 시나리오 ID
-   * @param grantedAt 최초 완료 시각
-   */
-  public record ScenarioAccessHistory(Long scenarioId, LocalDateTime grantedAt) {}
 }

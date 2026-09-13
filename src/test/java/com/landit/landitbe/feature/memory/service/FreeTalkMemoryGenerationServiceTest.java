@@ -11,17 +11,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.client.ai.AiMemoryResolutionResult;
+import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
-import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
-import com.landit.landitbe.feature.session.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryCandidatesResult;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.session.service.FreeTalkMemoryGenerationContextService;
+import com.landit.landitbe.feature.session.service.FreeTalkMemoryGenerationService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -53,9 +55,8 @@ class FreeTalkMemoryGenerationServiceTest {
   private static final Clock CLOCK =
       Clock.fixed(Instant.parse("2026-08-26T02:00:00Z"), ZoneOffset.ofHours(9));
 
-  private AiFreeTalkClient aiClient;
+  private AiMemoryClient aiClient;
   private ConversationMemorySearchRepository searchRepository;
-  private ConversationMemoryWriteService writeService;
   private FreeTalkMemoryGenerationContextService contextService;
   private FreeTalkMemoryGenerationService generationService;
   private final JsonMapper jsonMapper =
@@ -63,19 +64,18 @@ class FreeTalkMemoryGenerationServiceTest {
 
   @BeforeEach
   void setUp() {
-    aiClient = Mockito.mock(AiFreeTalkClient.class);
+    aiClient = Mockito.mock(AiMemoryClient.class);
     searchRepository = Mockito.mock(ConversationMemorySearchRepository.class);
-    writeService = Mockito.mock(ConversationMemoryWriteService.class);
     contextService = Mockito.mock(FreeTalkMemoryGenerationContextService.class);
     generationService =
         new FreeTalkMemoryGenerationService(
             contextService,
-            aiClient,
-            writeService,
-            new FreeTalkMemoryCandidateMapper(CLOCK),
-            new FreeTalkMemoryResolutionService(aiClient, searchRepository, CLOCK));
+            new ConversationMemoryPlanningService(
+                aiClient,
+                new FreeTalkMemoryCandidateMapper(CLOCK),
+                new FreeTalkMemoryResolutionService(aiClient, searchRepository, CLOCK)));
     when(contextService.claim(LEARNING_SESSION_ID)).thenReturn(context());
-    when(writeService.persistIfSnapshotCurrent(anyLong(), anyLong(), any()))
+    when(contextService.persistAndComplete(any(), any()))
         .thenReturn(ConversationMemoryWriteService.PersistenceResult.STORED);
   }
 
@@ -88,8 +88,8 @@ class FreeTalkMemoryGenerationServiceTest {
 
     ArgumentCaptor<List<ConversationMemoryResolutionPlan>> plans =
         ArgumentCaptor.forClass(List.class);
-    verify(writeService)
-        .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), plans.capture());
+    verify(contextService)
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), plans.capture());
     assertThat(plans.getValue()).isEmpty();
     verify(aiClient, never()).resolveMemory(any());
     verify(contextService, never()).fail(anyLong());
@@ -108,8 +108,8 @@ class FreeTalkMemoryGenerationServiceTest {
 
     ArgumentCaptor<List<ConversationMemoryResolutionPlan>> plans =
         ArgumentCaptor.forClass(List.class);
-    verify(writeService)
-        .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), plans.capture());
+    verify(contextService)
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), plans.capture());
     assertThat(plans.getValue())
         .singleElement()
         .satisfies(
@@ -146,8 +146,8 @@ class FreeTalkMemoryGenerationServiceTest {
         ArgumentCaptor.forClass(AiMemoryResolutionRequest.class);
     verify(aiClient).resolveMemory(request.capture());
     assertThat(request.getValue().candidates()).hasSize(2);
-    verify(writeService)
-        .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), any());
+    verify(contextService)
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), any());
   }
 
   @Test
@@ -158,7 +158,7 @@ class FreeTalkMemoryGenerationServiceTest {
 
     generationService.generate(LEARNING_SESSION_ID);
 
-    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService, never()).persistAndComplete(any(), any());
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 
@@ -183,7 +183,7 @@ class FreeTalkMemoryGenerationServiceTest {
 
     verify(searchRepository, never())
         .searchActiveComparable(any(), anyLong(), any(), any(), anyInt());
-    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService, never()).persistAndComplete(any(), any());
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 
@@ -212,7 +212,7 @@ class FreeTalkMemoryGenerationServiceTest {
                 List.of(
                     new AiMemoryResolutionResult.Resolution(
                         0, AiMemoryOperation.SUPERSEDE, List.of(909L)))));
-    when(writeService.persistIfSnapshotCurrent(anyLong(), anyLong(), any()))
+    when(contextService.persistAndComplete(any(), any()))
         .thenReturn(ConversationMemoryWriteService.PersistenceResult.STALE);
 
     generationService.generate(LEARNING_SESSION_ID);
@@ -221,8 +221,8 @@ class FreeTalkMemoryGenerationServiceTest {
         .searchActiveComparable(
             any(), eq(USER_PROFILE_ID), eq("chloe"), eq(ConversationMemoryType.EVENT), eq(3));
     verify(aiClient).resolveMemory(any());
-    verify(writeService)
-        .persistIfSnapshotCurrent(eq(LEARNING_SESSION_ID), eq(USER_PROFILE_ID), any());
+    verify(contextService)
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), any());
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 
@@ -233,11 +233,11 @@ class FreeTalkMemoryGenerationServiceTest {
     generationService.generate(LEARNING_SESSION_ID);
 
     verify(aiClient, never()).extractMemoryCandidates(any());
-    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService, never()).persistAndComplete(any(), any());
   }
 
-  private FreeTalkMemoryGenerationContextService.GenerationContext context() {
-    return new FreeTalkMemoryGenerationContextService.GenerationContext(
+  private ConversationMemoryGenerationRequest context() {
+    return new ConversationMemoryGenerationRequest(
         LEARNING_SESSION_ID,
         USER_PROFILE_ID,
         "chloe",
@@ -245,9 +245,9 @@ class FreeTalkMemoryGenerationServiceTest {
         "KR",
         "Asia/Seoul",
         List.of(
-            new AiConversationHistoryMessage(
+            new ConversationMemoryHistoryMessage(
                 USER_MESSAGE_ID, 1, "USER", "hello", null, USER_OCCURRED_AT),
-            new AiConversationHistoryMessage(
+            new ConversationMemoryHistoryMessage(
                 AI_MESSAGE_ID, 1, "AI", "hi", null, USER_OCCURRED_AT.plusMinutes(1))));
   }
 
@@ -280,7 +280,7 @@ class FreeTalkMemoryGenerationServiceTest {
 
     generationService.generate(LEARNING_SESSION_ID);
 
-    verify(writeService, never()).persistIfSnapshotCurrent(anyLong(), anyLong(), any());
+    verify(contextService, never()).persistAndComplete(any(), any());
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 

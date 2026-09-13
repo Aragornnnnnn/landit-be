@@ -4,7 +4,9 @@ package com.landit.landitbe.feature.content.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.dto.NextQuestionContext;
+import com.landit.landitbe.feature.content.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.repository.ScenarioQuestionQueryRepository;
+import com.landit.landitbe.feature.content.repository.ScenarioSessionStartQueryRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,20 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ScenarioContentService {
+  private final ScenarioSessionStartQueryRepository startQueryRepository;
+
+  /**
+   * 사용자 언어와 수준에 맞는 세션 시작 콘텐츠를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @param questionLevelGroup 질문 레벨 그룹
+   * @return 세션 시작에 필요한 콘텐츠
+   */
+  public Optional<ScenarioStartContext> findStartContext(
+      long userId, long scenarioId, ContentLearningLevel questionLevelGroup) {
+    return startQueryRepository.findStartRow(userId, scenarioId, questionLevelGroup);
+  }
 
   private final ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
 

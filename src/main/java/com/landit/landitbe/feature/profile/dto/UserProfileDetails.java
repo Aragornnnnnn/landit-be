@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
  * @param createdAt 가입 시각
  * @param updatedAt 수정 시각
  */
-public record AdminUserProfile(
+public record UserProfileDetails(
     Long userProfileId,
     String email,
     String nickname,
@@ -47,8 +47,8 @@ public record AdminUserProfile(
    * @param userProfile 사용자 프로필 엔티티
    * @return 관리자 사용자 프로필
    */
-  public static AdminUserProfile from(UserProfile userProfile) {
-    return new AdminUserProfile(
+  public static UserProfileDetails from(UserProfile userProfile) {
+    return new UserProfileDetails(
         userProfile.getId(),
         userProfile.getEmail(),
         userProfile.getNickname(),
