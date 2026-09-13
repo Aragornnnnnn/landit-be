@@ -1,6 +1,6 @@
 // 발음 평가 자산의 2단계 임포트(기준 데이터 → TTS)와 커버리지 계산을 처리한다.
 
-package com.landit.landitbe.feature.content.expression.pronunciation.service;
+package com.landit.landitbe.feature.content.expression.pronunciation.admin.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,10 +10,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpression;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.dto.AdminPronunciationAssetCoverageResponse;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.dto.AdminPronunciationAssetImportResult;
 import com.landit.landitbe.feature.content.expression.pronunciation.client.PronunciationManifestReadable;
 import com.landit.landitbe.feature.content.expression.pronunciation.domain.ExpressionPronunciationAsset;
-import com.landit.landitbe.feature.content.expression.pronunciation.dto.AdminPronunciationAssetCoverageResponse;
-import com.landit.landitbe.feature.content.expression.pronunciation.dto.AdminPronunciationAssetImportResult;
 import com.landit.landitbe.feature.content.expression.pronunciation.dto.PronunciationReferenceManifest;
 import com.landit.landitbe.feature.content.expression.pronunciation.dto.PronunciationTtsManifest;
 import com.landit.landitbe.feature.content.expression.pronunciation.repository.ExpressionPronunciationAssetRepository;

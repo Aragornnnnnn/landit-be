@@ -1,6 +1,6 @@
 // 발음 평가 자산의 억양별 커버리지 현황을 표현한다.
 
-package com.landit.landitbe.feature.content.expression.pronunciation.dto;
+package com.landit.landitbe.feature.content.expression.pronunciation.admin.dto;
 
 import com.landit.landitbe.shared.domain.AccentLocale;
 import io.swagger.v3.oas.annotations.media.Schema;

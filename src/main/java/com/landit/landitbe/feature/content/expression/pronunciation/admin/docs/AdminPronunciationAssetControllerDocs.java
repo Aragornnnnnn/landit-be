@@ -1,9 +1,9 @@
 // 관리자 발음 평가 자산 임포트 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.content.expression.pronunciation.docs;
+package com.landit.landitbe.feature.content.expression.pronunciation.admin.docs;
 
-import com.landit.landitbe.feature.content.expression.pronunciation.dto.AdminPronunciationAssetCoverageResponse;
-import com.landit.landitbe.feature.content.expression.pronunciation.dto.AdminPronunciationAssetImportResult;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.dto.AdminPronunciationAssetCoverageResponse;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.dto.AdminPronunciationAssetImportResult;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

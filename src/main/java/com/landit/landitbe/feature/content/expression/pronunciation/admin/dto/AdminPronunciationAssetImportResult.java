@@ -1,6 +1,6 @@
 // 관리자 발음 평가 자산 일괄 임포트 결과를 표현한다.
 
-package com.landit.landitbe.feature.content.expression.pronunciation.dto;
+package com.landit.landitbe.feature.content.expression.pronunciation.admin.dto;
 
 import com.landit.landitbe.shared.domain.AccentLocale;
 import io.swagger.v3.oas.annotations.media.Schema;

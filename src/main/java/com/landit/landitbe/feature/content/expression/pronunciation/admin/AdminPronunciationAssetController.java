@@ -1,11 +1,11 @@
 // 관리자 발음 평가 자산 임포트 요청을 처리한다.
 
-package com.landit.landitbe.feature.content.expression.pronunciation;
+package com.landit.landitbe.feature.content.expression.pronunciation.admin;
 
-import com.landit.landitbe.feature.content.expression.pronunciation.docs.AdminPronunciationAssetControllerDocs;
-import com.landit.landitbe.feature.content.expression.pronunciation.dto.AdminPronunciationAssetCoverageResponse;
-import com.landit.landitbe.feature.content.expression.pronunciation.dto.AdminPronunciationAssetImportResult;
-import com.landit.landitbe.feature.content.expression.pronunciation.service.ExpressionPronunciationAssetService;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.docs.AdminPronunciationAssetControllerDocs;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.dto.AdminPronunciationAssetCoverageResponse;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.dto.AdminPronunciationAssetImportResult;
+import com.landit.landitbe.feature.content.expression.pronunciation.admin.service.ExpressionPronunciationAssetService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.constraints.NotBlank;
