@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
+import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +29,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
   private final LanditTokenService tokenService;
   private final UserProfileService userProfileService;
-  private final AuthFailureResponseWriter failureResponseWriter;
+  private final SecurityFailureResponseWriter failureResponseWriter;
 
   /**
    * 토큰 검증과 활성 사용자 확인에 필요한 협력 객체를 주입받는다.
@@ -40,7 +41,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
   public AuthTokenFilter(
       LanditTokenService tokenService,
       UserProfileService userProfileService,
-      AuthFailureResponseWriter failureResponseWriter) {
+      SecurityFailureResponseWriter failureResponseWriter) {
     this.tokenService = tokenService;
     this.userProfileService = userProfileService;
     this.failureResponseWriter = failureResponseWriter;

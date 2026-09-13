@@ -1,6 +1,6 @@
 // 인증 실패를 공통 API 오류 응답으로 쓰는 컴포넌트다.
 
-package com.landit.landitbe.feature.auth.security;
+package com.landit.landitbe.shared.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.shared.exception.ApiErrorCode;
@@ -14,12 +14,12 @@ import org.springframework.stereotype.Component;
 
 /** 인증 실패를 공통 API 오류 응답으로 쓰는 컴포넌트다. */
 @Component
-public class AuthFailureResponseWriter {
+public class SecurityFailureResponseWriter {
 
   private final ObjectMapper objectMapper;
 
   /** 인증 실패 응답을 JSON으로 직렬화할 작성기를 생성한다. */
-  public AuthFailureResponseWriter() {
+  public SecurityFailureResponseWriter() {
     this.objectMapper = new ObjectMapper();
   }
 

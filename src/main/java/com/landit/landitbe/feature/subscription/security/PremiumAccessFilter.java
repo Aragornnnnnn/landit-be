@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.subscription.security;
 
-import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.service.UserSubscriptionService;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
+import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,7 +52,7 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
               HttpMethod.POST, "/api/v1/expressions/*/pronunciation/**"));
 
   private final UserSubscriptionService userSubscriptionService;
-  private final AuthFailureResponseWriter failureResponseWriter;
+  private final SecurityFailureResponseWriter failureResponseWriter;
   private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService grants;
   private static final RequestMatcher FREE_TALK_ACTION =
       PathPatternRequestMatcher.pathPattern(
@@ -72,7 +72,7 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
    */
   public PremiumAccessFilter(
       UserSubscriptionService userSubscriptionService,
-      AuthFailureResponseWriter failureResponseWriter,
+      SecurityFailureResponseWriter failureResponseWriter,
       com.landit.landitbe.feature.subscription.service.LearningAccessGrantService grants) {
     this.userSubscriptionService = userSubscriptionService;
     this.failureResponseWriter = failureResponseWriter;

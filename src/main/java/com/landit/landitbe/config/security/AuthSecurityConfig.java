@@ -5,10 +5,10 @@ package com.landit.landitbe.config.security;
 import com.landit.landitbe.config.web.CorsProperties;
 import com.landit.landitbe.feature.admin.security.AdminAuthorizationFilter;
 import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
-import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
 import com.landit.landitbe.feature.auth.security.AuthTokenFilter;
 import com.landit.landitbe.feature.subscription.security.PremiumAccessFilter;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -38,7 +38,7 @@ public class AuthSecurityConfig {
   private final AuthTokenFilter authTokenFilter;
   private final AdminAuthorizationFilter adminAuthorizationFilter;
   private final PremiumAccessFilter premiumAccessFilter;
-  private final AuthFailureResponseWriter failureResponseWriter;
+  private final SecurityFailureResponseWriter failureResponseWriter;
 
   /**
    * 인증 필터와 실패 응답 작성기를 주입받아 보안 설정을 구성한다.
@@ -52,7 +52,7 @@ public class AuthSecurityConfig {
       AuthTokenFilter authTokenFilter,
       AdminAuthorizationFilter adminAuthorizationFilter,
       PremiumAccessFilter premiumAccessFilter,
-      AuthFailureResponseWriter failureResponseWriter) {
+      SecurityFailureResponseWriter failureResponseWriter) {
     this.authTokenFilter = authTokenFilter;
     this.adminAuthorizationFilter = adminAuthorizationFilter;
     this.premiumAccessFilter = premiumAccessFilter;
