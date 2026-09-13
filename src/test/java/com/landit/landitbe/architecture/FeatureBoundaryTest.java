@@ -74,6 +74,33 @@ class FeatureBoundaryTest {
   }
 
   @Test
+  void administrativeHttpEntrypointsStayInAdminPackages() {
+    for (Class<?> type : types) {
+      for (var method : type.getDeclaredMethods()) {
+        var mapping =
+            org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation(
+                method, org.springframework.web.bind.annotation.RequestMapping.class);
+        if (mapping != null
+            && java.util.Arrays.stream(mapping.path())
+                .anyMatch(path -> path.startsWith("/api/v1/admin/"))) {
+          assertThat(type.getPackageName()).as(type.getName()).contains(".admin");
+        }
+      }
+    }
+  }
+
+  @Test
+  void userControllersDoNotDependOnAdministrativeContracts() {
+    assertThat(
+            dependencies.stream()
+                .filter(edge -> outerType(edge.source()).endsWith("Controller"))
+                .filter(edge -> !edge.source().contains(".admin."))
+                .filter(edge -> edge.target().contains(".admin."))
+                .toList())
+        .isEmpty();
+  }
+
+  @Test
   void infrastructureAndCatalogRespectExplicitDependencyDirections() {
     assertThat(
             dependencies.stream()
