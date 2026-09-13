@@ -37,6 +37,8 @@ import com.landit.landitbe.feature.session.freetalk.innerthought.client.ai.AiFre
 import com.landit.landitbe.feature.session.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkExitDecisionReservation;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse.NextMessageResponse;
@@ -60,6 +62,8 @@ import org.springframework.core.task.TaskExecutor;
 
 /** 프리톡 발화 이후 속마음 저장 실패 처리를 검증한다. */
 class FreeTalkMessageServiceTest {
+  private final FreeTalkMessageReplayService replayService =
+      mock(FreeTalkMessageReplayService.class);
 
   private final FreeTalkSubmittedMessageService submittedMessageService =
       mock(FreeTalkSubmittedMessageService.class);
@@ -75,6 +79,7 @@ class FreeTalkMessageServiceTest {
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
           submittedMessageService,
+          replayService,
           aiFreeTalkClient,
           sessionMessageService,
           directExecutor,
@@ -84,7 +89,7 @@ class FreeTalkMessageServiceTest {
 
   @Test
   void retrievesMemoryOnlyForTheFirstUserTurnAndRecordsUsedResponse() {
-    FreeTalkSubmittedMessageService.Reservation reservation = reservation();
+    FreeTalkMessageReservation reservation = reservation();
     MemoryRetrievalResult memoryResult =
         new MemoryRetrievalResult(
             30L,
@@ -143,7 +148,7 @@ class FreeTalkMessageServiceTest {
 
   @Test
   void marksInnerThoughtFailedWhenPersistingCompletedThoughtFails() {
-    FreeTalkSubmittedMessageService.Reservation reservation = reservation();
+    FreeTalkMessageReservation reservation = reservation();
     when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
         .thenReturn(reservation);
     when(aiFreeTalkClient.generateTurn(any()))
@@ -206,7 +211,7 @@ class FreeTalkMessageServiceTest {
   void startsInnerThoughtBeforeGeneratingTurn() {
     TaskExecutor taskExecutor = mock(TaskExecutor.class);
     final FreeTalkMessageService concurrentService = service(taskExecutor);
-    FreeTalkSubmittedMessageService.Reservation reservation = reservation();
+    FreeTalkMessageReservation reservation = reservation();
     when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
         .thenReturn(reservation);
     when(aiFreeTalkClient.generateTurn(any()))
@@ -247,7 +252,7 @@ class FreeTalkMessageServiceTest {
   /** 완료 응답이 트랜잭션 확정 뒤에만 기억 생성 dispatcher로 전달되는지 확인한다. */
   @Test
   void dispatchesMemoryGenerationAfterNewlyCompletedResponse() {
-    FreeTalkSubmittedMessageService.Reservation reservation = timeLimitReservation();
+    FreeTalkMessageReservation reservation = timeLimitReservation();
     when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
         .thenReturn(reservation);
     when(aiFreeTalkClient.generateClosing(any())).thenReturn(closingResult());
@@ -276,7 +281,7 @@ class FreeTalkMessageServiceTest {
   /** 이미 저장된 완료 응답을 재생할 때 기억 생성 dispatcher를 중복 호출하지 않는다. */
   @Test
   void doesNotDispatchMemoryGenerationForReplayedResponse() {
-    when(submittedMessageService.findCompletedResponse(any(Long.class), any(Long.class), any()))
+    when(replayService.findCompletedResponse(any(Long.class), any(Long.class), any()))
         .thenReturn(completedResponse());
 
     service.submit(1L, 300L, request());
@@ -288,7 +293,7 @@ class FreeTalkMessageServiceTest {
   /** 종료 확정으로 새로 완료된 응답도 기억 생성 dispatcher로 전달한다. */
   @Test
   void dispatchesMemoryGenerationAfterUserConfirmedCompletion() {
-    FreeTalkSubmittedMessageService.DecisionReservation reservation = decisionReservation();
+    FreeTalkExitDecisionReservation reservation = decisionReservation();
     when(submittedMessageService.reserveDecision(
             any(Long.class), any(Long.class), any(Long.class), any()))
         .thenReturn(reservation);
@@ -342,6 +347,7 @@ class FreeTalkMessageServiceTest {
   private FreeTalkMessageService service(TaskExecutor taskExecutor) {
     return new FreeTalkMessageService(
         submittedMessageService,
+        replayService,
         aiFreeTalkClient,
         sessionMessageService,
         taskExecutor,
@@ -350,8 +356,8 @@ class FreeTalkMessageServiceTest {
         memoryRetrievalService);
   }
 
-  private FreeTalkSubmittedMessageService.Reservation reservation() {
-    return new FreeTalkSubmittedMessageService.Reservation(
+  private FreeTalkMessageReservation reservation() {
+    return new FreeTalkMessageReservation(
         1L,
         java.time.LocalDate.now(),
         300L,
@@ -369,8 +375,8 @@ class FreeTalkMessageServiceTest {
         List.of(new AiConversationHistoryMessage(7L, 1, "USER", "I went hiking.", null)));
   }
 
-  private FreeTalkSubmittedMessageService.Reservation timeLimitReservation() {
-    return new FreeTalkSubmittedMessageService.Reservation(
+  private FreeTalkMessageReservation timeLimitReservation() {
+    return new FreeTalkMessageReservation(
         1L,
         java.time.LocalDate.now(),
         300L,
@@ -418,8 +424,8 @@ class FreeTalkMessageServiceTest {
     return new AiFreeTalkClosingResult("하이킹", "See you!", "또 봐요!", CharacterEmotion.HAPPY);
   }
 
-  private FreeTalkSubmittedMessageService.DecisionReservation decisionReservation() {
-    return new FreeTalkSubmittedMessageService.DecisionReservation(
+  private FreeTalkExitDecisionReservation decisionReservation() {
+    return new FreeTalkExitDecisionReservation(
         1L,
         300L,
         3L,

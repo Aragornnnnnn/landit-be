@@ -21,6 +21,8 @@ import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalk
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkExitDecisionReservation;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
@@ -42,6 +44,7 @@ import org.springframework.stereotype.Service;
 public class FreeTalkMessageService {
 
   private final FreeTalkSubmittedMessageService submittedMessageService;
+  private final FreeTalkMessageReplayService replayService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final SessionMessageService sessionMessageService;
   private final TaskExecutor taskExecutor;
@@ -51,6 +54,7 @@ public class FreeTalkMessageService {
 
   FreeTalkMessageService(
       FreeTalkSubmittedMessageService submittedMessageService,
+      FreeTalkMessageReplayService replayService,
       AiFreeTalkClient aiFreeTalkClient,
       SessionMessageService sessionMessageService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
@@ -58,6 +62,7 @@ public class FreeTalkMessageService {
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
       FreeTalkMemoryRetrievalService memoryRetrievalService) {
     this.submittedMessageService = submittedMessageService;
+    this.replayService = replayService;
     this.aiFreeTalkClient = aiFreeTalkClient;
     this.sessionMessageService = sessionMessageService;
     this.taskExecutor = taskExecutor;
@@ -79,11 +84,11 @@ public class FreeTalkMessageService {
   public FreeTalkMessageSubmitResponse submit(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
     FreeTalkMessageSubmitResponse replayedResponse =
-        submittedMessageService.findCompletedResponse(userId, learningSessionId, request);
+        replayService.findCompletedResponse(userId, learningSessionId, request);
     if (replayedResponse != null) {
       return replayedResponse;
     }
-    FreeTalkSubmittedMessageService.Reservation reservation =
+    FreeTalkMessageReservation reservation =
         submittedMessageService.reserve(userId, learningSessionId, request);
     AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
@@ -116,8 +121,7 @@ public class FreeTalkMessageService {
   }
 
   /** 일반 턴에서 첫 사용자 기억 조회, AI 생성, 저장, 사용 trace를 순서대로 처리한다. */
-  private FreeTalkMessageSubmitResponse processRegularTurn(
-      FreeTalkSubmittedMessageService.Reservation reservation) {
+  private FreeTalkMessageSubmitResponse processRegularTurn(FreeTalkMessageReservation reservation) {
     MemoryRetrievalResult memoryResult = retrieveFirstUserMemory(reservation);
     AiFreeTalkTurnResult turnResult =
         generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult);
@@ -154,12 +158,12 @@ public class FreeTalkMessageService {
   public FreeTalkMessageSubmitResponse decideExit(
       long userId, long learningSessionId, FreeTalkExitDecisionRequest request) {
     FreeTalkMessageSubmitResponse replayedResponse =
-        submittedMessageService.findCompletedDecisionResponse(
+        replayService.findCompletedDecisionResponse(
             userId, learningSessionId, request.submittedMessageId(), request.decision());
     if (replayedResponse != null) {
       return replayedResponse;
     }
-    FreeTalkSubmittedMessageService.DecisionReservation reservation =
+    FreeTalkExitDecisionReservation reservation =
         submittedMessageService.reserveDecision(
             userId, learningSessionId, request.submittedMessageId(), request.decision());
     return processExitDecision(reservation);
@@ -167,7 +171,7 @@ public class FreeTalkMessageService {
 
   /** 속마음·결정 확정·보상 순서를 한 예외 경계에서 보존한다. */
   private FreeTalkMessageSubmitResponse processExitDecision(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation) {
     AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
@@ -185,7 +189,7 @@ public class FreeTalkMessageService {
 
   /** 종료 선택에 따라 END 또는 CONTINUE의 상태 확정 경계를 선택한다. */
   private FreeTalkMessageSubmitResponse finalizeDecision(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation) {
     if (reservation.decision() == FreeTalkExitDecision.END) {
       return finalizeEndDecision(reservation);
     }
@@ -194,7 +198,7 @@ public class FreeTalkMessageService {
 
   /** END 선택은 closing AI 응답과 완료 확정을 한 경계에서 처리한다. */
   private FreeTalkMessageSubmitResponse finalizeEndDecision(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation) {
     AiFreeTalkClosingRequest closingRequest =
         closingRequestForDecision(reservation, AiFreeTalkClosingReason.USER_CONFIRMED);
     AiFreeTalkClosingResult closingResult = aiFreeTalkClient.generateClosing(closingRequest);
@@ -203,7 +207,7 @@ public class FreeTalkMessageService {
 
   /** CONTINUE 선택은 후속 turn AI 응답과 진행 확정을 한 경계에서 처리한다. */
   private FreeTalkMessageSubmitResponse finalizeContinueDecision(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation) {
     AiFreeTalkTurnRequest turnRequest =
         turnRequestForDecision(reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED);
     AiFreeTalkTurnResult turnResult = aiFreeTalkClient.generateTurn(turnRequest);
@@ -211,7 +215,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkTurnRequest turnRequest(
-      FreeTalkSubmittedMessageService.Reservation reservation,
+      FreeTalkMessageReservation reservation,
       AiFreeTalkResponseMode responseMode,
       List<AiFreeTalkMemoryContext> memoryContext) {
     return new AiFreeTalkTurnRequest(
@@ -229,8 +233,7 @@ public class FreeTalkMessageService {
   }
 
   /** 장기기억은 제목 생성이 필요한 실제 첫 사용자 턴에서만 조회한다. */
-  private MemoryRetrievalResult retrieveFirstUserMemory(
-      FreeTalkSubmittedMessageService.Reservation reservation) {
+  private MemoryRetrievalResult retrieveFirstUserMemory(FreeTalkMessageReservation reservation) {
     if (!isFirstUserTurn(reservation)) {
       return null;
     }
@@ -245,7 +248,7 @@ public class FreeTalkMessageService {
   }
 
   /** 첫 사용자 발화의 비어 있지 않은 본문만 검색 임베딩 입력으로 사용한다. */
-  private String firstUserMessageQuery(FreeTalkSubmittedMessageService.Reservation reservation) {
+  private String firstUserMessageQuery(FreeTalkMessageReservation reservation) {
     return reservation.history().stream()
         .filter(message -> "USER".equals(message.role()))
         .map(message -> message.content())
@@ -254,14 +257,14 @@ public class FreeTalkMessageService {
         .orElse("");
   }
 
-  private boolean isFirstUserTurn(FreeTalkSubmittedMessageService.Reservation reservation) {
+  private boolean isFirstUserTurn(FreeTalkMessageReservation reservation) {
     return reservation.titleGenerationRequired()
         && reservation.history().stream().filter(message -> "USER".equals(message.role())).count()
             == 1;
   }
 
   private AiFreeTalkTurnResult generateTurn(
-      FreeTalkSubmittedMessageService.Reservation reservation,
+      FreeTalkMessageReservation reservation,
       AiFreeTalkResponseMode responseMode,
       MemoryRetrievalResult memoryResult) {
     List<AiFreeTalkMemoryContext> memoryContext =
@@ -278,8 +281,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkClosingRequest closingRequest(
-      FreeTalkSubmittedMessageService.Reservation reservation,
-      AiFreeTalkClosingReason closingReason) {
+      FreeTalkMessageReservation reservation, AiFreeTalkClosingReason closingReason) {
     return new AiFreeTalkClosingRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -294,8 +296,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkTurnRequest turnRequestForDecision(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation,
-      AiFreeTalkResponseMode responseMode) {
+      FreeTalkExitDecisionReservation reservation, AiFreeTalkResponseMode responseMode) {
     return new AiFreeTalkTurnRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -311,8 +312,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkClosingRequest closingRequestForDecision(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation,
-      AiFreeTalkClosingReason closingReason) {
+      FreeTalkExitDecisionReservation reservation, AiFreeTalkClosingReason closingReason) {
     return new AiFreeTalkClosingRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -327,7 +327,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
-      FreeTalkSubmittedMessageService.Reservation reservation) {
+      FreeTalkMessageReservation reservation) {
     return new AiFreeTalkInnerThoughtRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -340,7 +340,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
-      FreeTalkSubmittedMessageService.DecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation) {
     return new AiFreeTalkInnerThoughtRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),

@@ -19,6 +19,8 @@ import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkExitDecisionReservation;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.freetalk.topic.client.ai.AiFreeTalkTopic;
@@ -60,6 +62,8 @@ class FreeTalkSubmittedMessageServiceTest {
 
   private FreeTalkSubmittedMessageService service(MemoryProperties memoryProperties) {
     return new FreeTalkSubmittedMessageService(
+        new FreeTalkMessageSessionService(learningSessionRepository, freeTalkSessionRepository),
+        new FreeTalkMessageResponseService(dailySpeakingUsageService),
         userProfileService,
         learningSessionRepository,
         freeTalkSessionRepository,
@@ -224,8 +228,8 @@ class FreeTalkSubmittedMessageServiceTest {
     verify(freeTalkSession, never()).clearProcessing();
   }
 
-  private FreeTalkSubmittedMessageService.Reservation messageReservation() {
-    return new FreeTalkSubmittedMessageService.Reservation(
+  private FreeTalkMessageReservation messageReservation() {
+    return new FreeTalkMessageReservation(
         1L,
         java.time.LocalDate.now(),
         300L,
@@ -243,8 +247,8 @@ class FreeTalkSubmittedMessageServiceTest {
         List.of(new AiConversationHistoryMessage(7L, 1, "USER", "Hello.", null)));
   }
 
-  private FreeTalkSubmittedMessageService.DecisionReservation decisionReservation() {
-    return new FreeTalkSubmittedMessageService.DecisionReservation(
+  private FreeTalkExitDecisionReservation decisionReservation() {
+    return new FreeTalkExitDecisionReservation(
         1L,
         300L,
         3L,
