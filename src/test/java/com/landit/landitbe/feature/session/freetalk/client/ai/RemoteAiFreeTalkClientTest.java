@@ -7,15 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
-import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionResult;
-import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
-import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
@@ -38,7 +30,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -182,104 +173,6 @@ class RemoteAiFreeTalkClientTest {
                 .asLong())
         .isEqualTo(7L);
     assertThat(recommendations.recommendations()).hasSize(1);
-  }
-
-  @Test
-  void postsMemoryCandidateContractAndMapsSuccessfulResponse() throws Exception {
-    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
-    registerJsonResponse(
-        "/api/v1/free-talk/memory-candidates",
-        requests,
-        successResponse(memoryCandidateData("memory-candidate-v1", 0, "EVENT")));
-
-    AiMemoryCandidatesResult result =
-        remoteClient().extractMemoryCandidates(memoryCandidatesRequest());
-
-    JsonNode request = requests.get("/api/v1/free-talk/memory-candidates");
-    assertThat(request.get("sessionId").asLong()).isEqualTo(300L);
-    assertThat(request.get("characterId").asText()).isEqualTo("chloe");
-    assertThat(request.get("timezone").asText()).isEqualTo("Asia/Seoul");
-    assertThat(request.get("conversationHistory").get(0).get("messageId").asLong())
-        .isEqualTo(3001L);
-    assertThat(request.get("conversationHistory").get(0).get("occurredAt").asText())
-        .isEqualTo("2026-08-25T20:00:00+09:00");
-    assertThat(result.extractorVersion()).isEqualTo("memory-candidate-v1");
-    assertThat(result.candidates()).hasSize(1);
-    assertThat(result.candidates().getFirst().embedding()).hasSize(1536);
-    assertThat(result.candidates().getFirst().embeddingModel())
-        .isEqualTo("openai/text-embedding-3-small");
-  }
-
-  @Test
-  void postsMemoryResolutionContractAndMapsSuccessfulResponse() throws Exception {
-    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
-    registerJsonResponse(
-        "/api/v1/free-talk/memory-resolution",
-        requests,
-        successResponse(
-            "{\"resolutions\":[{\"candidateIndex\":0,\"operation\":\"SUPERSEDE\","
-                + "\"supersededMemoryIds\":[77]}]}"));
-
-    AiMemoryResolutionResult result = remoteClient().resolveMemory(memoryResolutionRequest());
-
-    JsonNode request = requests.get("/api/v1/free-talk/memory-resolution");
-    assertThat(request.get("candidates").get(0).get("candidateIndex").asInt()).isZero();
-    assertThat(request.get("candidates").get(0).get("observedAt").asText())
-        .isEqualTo("2026-08-29T19:20:00+09:00");
-    assertThat(
-            request
-                .get("candidates")
-                .get(0)
-                .get("comparableMemories")
-                .get(0)
-                .get("memoryId")
-                .asLong())
-        .isEqualTo(77L);
-    JsonNode source = request.get("candidates").get(0).get("sourceMessages").get(0);
-    assertThat(source.get("messageId").asLong()).isEqualTo(3002L);
-    assertThat(source.get("role").asText()).isEqualTo("USER");
-    assertThat(source.get("content").asText()).isEqualTo("I passed the interview.");
-    assertThat(source.get("occurredAt").asText()).isEqualTo("2026-08-29T19:20:00+09:00");
-    assertThat(result.resolutions().getFirst().operation()).isEqualTo(AiMemoryOperation.SUPERSEDE);
-    assertThat(result.resolutions().getFirst().supersededMemoryIds()).containsExactly(77L);
-  }
-
-  @Test
-  void postsMemoryQueryEmbeddingContractAndMapsFixedDimensionVector() throws Exception {
-    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
-    registerJsonResponse(
-        "/api/v1/free-talk/memory-query-embedding",
-        requests,
-        successResponse(
-            "{\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
-                + embeddingJson()
-                + "}"));
-
-    AiMemoryQueryEmbeddingResult result =
-        remoteClient().embedMemoryQuery(new AiMemoryQueryEmbeddingRequest(" weekend plans "));
-
-    assertThat(requests.get("/api/v1/free-talk/memory-query-embedding").get("query").asText())
-        .isEqualTo(" weekend plans ");
-    assertThat(result.embeddingModel()).isEqualTo("openai/text-embedding-3-small");
-    assertThat(result.embedding()).hasSize(1536);
-  }
-
-  @Test
-  void memoryQueryTimesOutBeforeDelayedSuccessfulResponse() {
-    registerDelayedResponse(
-        "/api/v1/free-talk/memory-query-embedding",
-        3_000,
-        successResponse(
-            "{\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
-                + embeddingJson()
-                + "}"));
-    long started = System.nanoTime();
-    assertGenerationError(
-        () ->
-            remoteClient(Duration.ofSeconds(5))
-                .embedMemoryQuery(new AiMemoryQueryEmbeddingRequest("weekend plans")),
-        ErrorCode.AI_GENERATION_FAILED);
-    assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(2_900));
   }
 
   @Test
@@ -721,48 +614,6 @@ class RemoteAiFreeTalkClientTest {
         "}");
   }
 
-  private String learningContentData(
-      String targetExpressionText, String meaning, String usageSummary, int practiceCount) {
-    return "{\"expressions\":["
-        + learningContentItem(targetExpressionText, meaning, usageSummary, practiceCount)
-        + "]}";
-  }
-
-  private String learningContentItem(
-      String targetExpressionText, String meaning, String usageSummary, int practiceCount) {
-    String practiceExample =
-        String.join(
-            "\n",
-            "{",
-            "  \"imageUrl\": null,",
-            "  \"sentenceText\": \"I'm up for hiking.\",",
-            "  \"sentenceWords\": [\"I'm\", \"up\", \"for\", \"hiking\"],",
-            "  \"highlightingPart\": \"I'm up for\",",
-            "  \"practiceQuestion\": \"Want to hike?\",",
-            "  \"sentenceTranslation\": \"등산하는 거 좋아.\",",
-            "  \"sentenceWordChoices\": [\"hiking\", \"I'm\", \"up\", \"for\", \"to\"],",
-            "  \"practiceQuestionTranslation\": \"등산 갈래?\"",
-            "}");
-    return String.join(
-        "\n",
-        "{",
-        "  \"targetExpressionText\": \"%s\",".formatted(targetExpressionText),
-        "  \"baseExpressionMeaningText\": \"%s\",".formatted(meaning),
-        "  \"usageSummary\": \"%s\",".formatted(usageSummary),
-        "  \"usageDescription\": \"친근한 제안에 동의할 때 사용합니다.\",",
-        "  \"representativeQuestionText\": \"Want to go hiking?\",",
-        "  \"representativeQuestionTranslation\": \"등산 갈래?\",",
-        "  \"representativeSentenceText\": \"I'm up for that.\",",
-        "  \"representativeSentenceTranslation\": \"좋아, 그거 하자.\",",
-        "  \"representativeSentenceWords\": [\"I'm\", \"up\", \"for\", \"that\"],",
-        "  \"representativeSentenceWordChoices\": [\"that\", \"I'm\", \"up\", \"for\", \"to\"],",
-        "  \"representativeImageUrl\": null,",
-        "  \"practiceExamples\": [%s]"
-            .formatted(
-                String.join(",", java.util.Collections.nCopies(practiceCount, practiceExample))),
-        "}");
-  }
-
   private AiFreeTalkOpeningRequest openingRequest() {
     return new AiFreeTalkOpeningRequest(
         300L,
@@ -820,82 +671,5 @@ class RemoteAiFreeTalkClientTest {
   private List<AiConversationHistoryMessage> history() {
     return List.of(
         new AiConversationHistoryMessage(3002L, 1, "USER", "I'm going hiking with friends.", null));
-  }
-
-  private AiMemoryCandidatesRequest memoryCandidatesRequest() {
-    return new AiMemoryCandidatesRequest(
-        300L,
-        "chloe",
-        "EN",
-        "KR",
-        "Asia/Seoul",
-        List.of(
-            new ConversationMemoryHistoryMessage(
-                3001L,
-                1,
-                "AI",
-                "How was your weekend?",
-                "주말은 어땠어?",
-                OffsetDateTime.parse("2026-08-25T20:00:00+09:00")),
-            new ConversationMemoryHistoryMessage(
-                3002L,
-                1,
-                "USER",
-                "I have an interview next Friday.",
-                null,
-                OffsetDateTime.parse("2026-08-25T20:10:00+09:00"))));
-  }
-
-  private AiMemoryResolutionRequest memoryResolutionRequest() {
-    return new AiMemoryResolutionRequest(
-        List.of(
-            new AiMemoryResolutionRequest.Candidate(
-                0,
-                "사용자는 면접에 합격했다.",
-                ConversationMemoryType.EVENT,
-                List.of(3002L),
-                List.of(
-                    new ConversationMemoryHistoryMessage(
-                        3002L,
-                        1,
-                        "USER",
-                        "I passed the interview.",
-                        null,
-                        OffsetDateTime.parse("2026-08-29T19:20:00+09:00"))),
-                OffsetDateTime.parse("2026-08-29T19:20:00+09:00"),
-                List.of(
-                    new AiMemoryResolutionRequest.ComparableMemory(
-                        77L,
-                        "사용자는 다음 주에 면접이 있다.",
-                        OffsetDateTime.parse("2026-08-25T20:10:00+09:00"),
-                        null,
-                        OffsetDateTime.parse("2026-08-25T20:10:00+09:00"))))));
-  }
-
-  private String memoryCandidateData(
-      String extractorVersion, int candidateIndex, String memoryType) {
-    return "{\"extractorVersion\":\""
-        + extractorVersion
-        + "\",\"candidates\":["
-        + memoryCandidateJson(candidateIndex, memoryType)
-        + "]}";
-  }
-
-  private String memoryCandidateJson(int candidateIndex, String memoryType) {
-    return "{\"candidateIndex\":"
-        + candidateIndex
-        + ",\"memoryType\":\""
-        + memoryType
-        + "\",\"content\":\"사용자는 2026년 8월 28일에 면접이 있다.\","
-        + "\"contentLocale\":\"KR\",\"sourceMessageIds\":[3002],"
-        + "\"confidence\":0.94,"
-        + "\"validFrom\":\"2026-08-25T20:10:00+09:00\",\"validTo\":null,"
-        + "\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
-        + embeddingJson()
-        + "}";
-  }
-
-  private String embeddingJson() {
-    return "[" + String.join(",", java.util.Collections.nCopies(1536, "0.0")) + "]";
   }
 }

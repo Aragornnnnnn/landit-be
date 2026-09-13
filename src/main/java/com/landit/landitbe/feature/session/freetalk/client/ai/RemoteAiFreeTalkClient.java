@@ -5,13 +5,6 @@ package com.landit.landitbe.feature.session.freetalk.client.ai;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
-import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionResult;
-import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
-import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
@@ -28,50 +21,20 @@ import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalk
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.shared.client.ai.AiHttpClient;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 원격 AI 서버의 프리톡 생성 API를 호출한다. */
-@Slf4j
+/** 원격 AI 호출 계약을 구현한다. */
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
-public class RemoteAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
-
-  private static final String OPENING_PATH = "/api/v1/free-talk/opening";
-  private static final String TURN_PATH = "/api/v1/free-talk/turn";
-  private static final String MEMORY_QUERY_EMBEDDING_PATH =
-      "/api/v1/free-talk/memory-query-embedding";
-  private static final String INNER_THOUGHT_PATH = "/api/v1/free-talk/inner-thought";
-  private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
-  private static final String EXPRESSION_RECOMMENDATIONS_PATH =
-      "/api/v1/free-talk/expression-recommendations";
-  private static final String CONVERSATION_EMBEDDINGS_PATH =
-      "/api/v1/free-talk/conversation-embeddings";
-  private static final String MEMORY_CANDIDATES_PATH = "/api/v1/free-talk/memory-candidates";
-  private static final String MEMORY_RESOLUTION_PATH = "/api/v1/free-talk/memory-resolution";
-  private static final int MAX_CONVERSATION_EXCERPTS = 4;
-  private static final Duration MEMORY_QUERY_TIMEOUT = Duration.ofSeconds(2);
-  private static final String AI_CALL_ELAPSED_LOG = "AI 호출 소요 시간. path={}, elapsedMs={}";
-
-  private final HttpClient httpClient;
-  private final JsonMapper jsonMapper;
-  private final AiClientProperties properties;
+public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
+  private final AiHttpClient http;
 
   /**
    * JSON 변환기와 AI 서버 설정으로 원격 프리톡 클라이언트를 구성한다.
@@ -80,45 +43,43 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient 
    * @param properties AI 서버 연결 설정
    */
   public RemoteAiFreeTalkClient(JsonMapper jsonMapper, AiClientProperties properties) {
-    this.jsonMapper = jsonMapper;
-    this.properties = properties;
-    this.httpClient = HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
+    this.http = new AiHttpClient(jsonMapper, properties);
   }
+
+  private static final String OPENING_PATH = "/api/v1/free-talk/opening";
+  private static final String TURN_PATH = "/api/v1/free-talk/turn";
+  private static final String INNER_THOUGHT_PATH = "/api/v1/free-talk/inner-thought";
+  private static final String CLOSING_PATH = "/api/v1/free-talk/closing";
+  private static final String EXPRESSION_RECOMMENDATIONS_PATH =
+      "/api/v1/free-talk/expression-recommendations";
+  private static final String CONVERSATION_EMBEDDINGS_PATH =
+      "/api/v1/free-talk/conversation-embeddings";
+  private static final int MAX_CONVERSATION_EXCERPTS = 4;
 
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
-    return post(OPENING_PATH, request, RemoteOpeningResponse.class)
+    return http.post(OPENING_PATH, request, RemoteOpeningResponse.class)
         .toResult(request.memoryContext());
   }
 
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request) {
-    return post(TURN_PATH, request, RemoteTurnResponse.class).toResult(request.memoryContext());
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
-    return post(
-            MEMORY_QUERY_EMBEDDING_PATH,
-            request,
-            RemoteMemoryQueryEmbeddingResponse.class,
-            MEMORY_QUERY_TIMEOUT)
-        .toResult();
+    return http.post(TURN_PATH, request, RemoteTurnResponse.class)
+        .toResult(request.memoryContext());
   }
 
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
-    return post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class).toResult();
+    return http.post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class).toResult();
   }
 
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request) {
-    return post(CLOSING_PATH, request, RemoteClosingResponse.class).toResult();
+    return http.post(CLOSING_PATH, request, RemoteClosingResponse.class).toResult();
   }
 
   /**
@@ -131,7 +92,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient 
   @Override
   public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
       AiFreeTalkExpressionRecommendationsRequest request) {
-    return post(
+    return http.post(
             EXPRESSION_RECOMMENDATIONS_PATH, request, RemoteExpressionRecommendationsResponse.class)
         .toResult(request);
   }
@@ -146,96 +107,9 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient 
   @Override
   public AiConversationEmbeddingsResult extractConversationEmbeddings(
       AiConversationEmbeddingsRequest request) {
-    return post(CONVERSATION_EMBEDDINGS_PATH, request, RemoteConversationEmbeddingsResponse.class)
+    return http.post(
+            CONVERSATION_EMBEDDINGS_PATH, request, RemoteConversationEmbeddingsResponse.class)
         .toResult();
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
-    return post(MEMORY_CANDIDATES_PATH, request, AiMemoryCandidatesResult.class);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
-    return post(MEMORY_RESOLUTION_PATH, request, AiMemoryResolutionResult.class);
-  }
-
-  private <T> T post(String path, Object payload, Class<T> responseType) {
-    return post(path, payload, responseType, properties.requestTimeout());
-  }
-
-  private <T> T post(String path, Object payload, Class<T> responseType, Duration requestTimeout) {
-    long startNanos = System.nanoTime();
-    try {
-      HttpRequest request =
-          properties
-              .authorize(HttpRequest.newBuilder(aiUri(path)))
-              .version(HttpClient.Version.HTTP_1_1)
-              .header("Accept", "application/json")
-              .header("Content-Type", "application/json")
-              .timeout(requestTimeout)
-              .POST(
-                  HttpRequest.BodyPublishers.ofString(
-                      jsonMapper.writeValueAsString(payload), StandardCharsets.UTF_8))
-              .build();
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-      if (response.statusCode() < 200 || response.statusCode() >= 300) {
-        throw toApiException(response.statusCode(), response.body());
-      }
-      return readData(response.body(), responseType);
-    } catch (ApiException exception) {
-      throw exception;
-    } catch (InterruptedException exception) {
-      Thread.currentThread().interrupt();
-      throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
-    } catch (IOException | IllegalArgumentException exception) {
-      throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
-    } finally {
-      // 성공과 실패를 가리지 않고 왕복 시간을 남겨 지연 구간을 특정한다.
-      log.info(
-          AI_CALL_ELAPSED_LOG, path, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
-    }
-  }
-
-  private ApiException toApiException(int statusCode, String responseBody) {
-    try {
-      JsonNode root = jsonMapper.readTree(responseBody);
-      if (statusCode == 502
-          && root != null
-          && ErrorCode.AI_RESPONSE_INVALID
-              .name()
-              .equals(root.path("error").path("code").asString())) {
-        return new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-      }
-    } catch (JacksonException ignored) {
-      // 오류 본문을 해석할 수 없으면 외부 AI 호출 실패로 처리한다.
-    }
-    return new ApiException(ErrorCode.AI_GENERATION_FAILED);
-  }
-
-  private <T> T readData(String responseBody, Class<T> responseType) {
-    try {
-      JsonNode root = jsonMapper.readTree(responseBody);
-      JsonNode data = root.get("data");
-      if (!root.path("success").asBoolean(false) || data == null || data.isNull()) {
-        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-      }
-      return jsonMapper.treeToValue(data, responseType);
-    } catch (ApiException exception) {
-      throw exception;
-    } catch (JacksonException exception) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-    }
-  }
-
-  private URI aiUri(String path) {
-    if (properties.baseUrl() == null || properties.baseUrl().isBlank()) {
-      throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
-    }
-    return URI.create(properties.baseUrl()).resolve(path);
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -289,21 +163,6 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient 
 
     private boolean hasGeneratedField() {
       return aiMessage != null || translatedMessage != null || emotion != null;
-    }
-  }
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record RemoteMemoryQueryEmbeddingResponse(String embeddingModel, List<Float> embedding) {
-
-    /** 원격 query embedding이 차원·유한값 계약을 지키는지 검증한다. */
-    private AiMemoryQueryEmbeddingResult toResult() {
-      if (blank(embeddingModel)
-          || embedding == null
-          || embedding.size() != 1536
-          || embedding.stream().anyMatch(value -> value == null || !Float.isFinite(value))) {
-        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
-      }
-      return new AiMemoryQueryEmbeddingResult(embeddingModel, embedding);
     }
   }
 

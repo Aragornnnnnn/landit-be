@@ -2,14 +2,6 @@
 
 package com.landit.landitbe.feature.session.freetalk.client.ai;
 
-import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionRequest;
-import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionResult;
-import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
-import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
@@ -38,7 +30,7 @@ import org.springframework.stereotype.Component;
     name = "client-mode",
     havingValue = "local",
     matchIfMissing = true)
-public class LocalAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
+public class LocalAiFreeTalkClient implements AiFreeTalkClient {
 
   /** {@inheritDoc} */
   @Override
@@ -60,12 +52,6 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
         "흥미롭다. 조금 더 이야기해줘.",
         CharacterEmotion.HAPPY,
         List.of());
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public AiMemoryQueryEmbeddingResult embedMemoryQuery(AiMemoryQueryEmbeddingRequest request) {
-    return new AiMemoryQueryEmbeddingResult("openai/text-embedding-3-small", firstAxisEmbedding());
   }
 
   /** {@inheritDoc} */
@@ -104,24 +90,6 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient, AiMemoryClient {
       AiConversationEmbeddingsRequest request) {
     return new AiConversationEmbeddingsResult(
         List.of(new AiConversationExcerpt("That sounds interesting.", firstAxisEmbedding())));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
-    return new AiMemoryCandidatesResult("memory-candidate-v1", List.of());
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
-    return new AiMemoryResolutionResult(
-        request.candidates().stream()
-            .map(
-                candidate ->
-                    new AiMemoryResolutionResult.Resolution(
-                        candidate.candidateIndex(), AiMemoryOperation.ADD, List.of()))
-            .toList());
   }
 
   // 테스트에서 예측할 수 있도록 첫 성분만 1인 고정 임베딩을 만든다.
