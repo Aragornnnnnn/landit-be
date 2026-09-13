@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.session.freetalk.topic.service;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.freetalk.topic.dto.FreeTalkTopicResponse;
+import com.landit.landitbe.feature.session.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import java.util.List;
@@ -42,8 +43,7 @@ public class FreeTalkTopicService {
    */
   @Transactional(readOnly = true)
   public FreeTalkMainResponse getMain(long userId) {
-    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
-        dailySpeakingUsageService.usage(userId);
+    DailySpeakingUsage dailyUsage = dailySpeakingUsageService.usage(userId);
     return FreeTalkMainResponse.of(
         getActiveTopics(),
         dailySpeakingUsageService.speakingTimeLimitMs(),

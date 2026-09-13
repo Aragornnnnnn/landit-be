@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
+import com.landit.landitbe.feature.character.dto.CurrentStreak;
+import com.landit.landitbe.feature.character.dto.StreakCalendar;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
 import java.time.Clock;
@@ -146,7 +148,7 @@ class StreakServiceTest {
     when(clock.instant()).thenReturn(Instant.parse("2026-08-05T00:00:00Z"));
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
 
-    StreakService.CurrentStreak currentStreak = streakService.getCurrentStreak(USER_ID);
+    CurrentStreak currentStreak = streakService.getCurrentStreak(USER_ID);
 
     assertThat(currentStreak.currentStreakDays()).isZero();
     assertThat(currentStreak.activeToday()).isFalse();
@@ -174,8 +176,7 @@ class StreakServiceTest {
             USER_ID, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 1)))
         .thenReturn(List.of(firstActivity, secondActivity));
 
-    StreakService.StreakCalendar calendar =
-        streakService.getCalendar(USER_ID, YearMonth.of(2026, 7));
+    StreakCalendar calendar = streakService.getCalendar(USER_ID, YearMonth.of(2026, 7));
 
     assertThat(calendar.firstActiveDate()).isEqualTo(firstDate);
     assertThat(calendar.totalActiveDays()).isEqualTo(2);

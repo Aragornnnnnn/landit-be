@@ -7,8 +7,9 @@ import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
-import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.retrieval.repository.FreeTalkMemoryRetrievalTraceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -43,9 +44,9 @@ public class FreeTalkMemoryRetrievalService {
    * @param request 장기기억 검색에 필요한 세션·사용자·질의 정보
    * @return 검색 문맥과 trace 선점 여부. 검색 실패 시 빈 문맥을 반환한다.
    */
-  public RetrievalResult retrieve(RetrievalRequest request) {
+  public MemoryRetrievalResult retrieve(MemoryRetrievalRequest request) {
     if (!memoryProperties.useEnabled()) {
-      return RetrievalResult.empty(request.sessionId(), request.stage());
+      return MemoryRetrievalResult.empty(request.sessionId(), request.stage());
     }
     try {
       return retrieveWhenEnabled(request);
@@ -56,9 +57,9 @@ public class FreeTalkMemoryRetrievalService {
   }
 
   /** 선점한 단계에서 임베딩·검색·후보 trace를 한 흐름으로 처리한다. */
-  private RetrievalResult retrieveWhenEnabled(RetrievalRequest request) {
+  private MemoryRetrievalResult retrieveWhenEnabled(MemoryRetrievalRequest request) {
     if (!traceRepository.claim(request.sessionId(), request.stage(), POLICY_VERSION)) {
-      return RetrievalResult.empty(request.sessionId(), request.stage());
+      return MemoryRetrievalResult.empty(request.sessionId(), request.stage());
     }
     AiMemoryQueryEmbeddingResult embeddingResult =
         aiClient.embedMemoryQuery(new AiMemoryQueryEmbeddingRequest(request.query()));
@@ -66,12 +67,12 @@ public class FreeTalkMemoryRetrievalService {
     List<ConversationMemoryMatch> matches = searchMatches(request, embeddingResult);
     List<AiFreeTalkMemoryContext> contexts = toContexts(matches);
     traceRepository.saveCandidates(request.sessionId(), request.stage(), matches, POLICY_VERSION);
-    return new RetrievalResult(request.sessionId(), request.stage(), contexts, true);
+    return new MemoryRetrievalResult(request.sessionId(), request.stage(), contexts, true);
   }
 
   /** 검색 저장소 결과를 최대 반환 수로 제한하고 null 응답을 거부한다. */
   private List<ConversationMemoryMatch> searchMatches(
-      RetrievalRequest request, AiMemoryQueryEmbeddingResult embeddingResult) {
+      MemoryRetrievalRequest request, AiMemoryQueryEmbeddingResult embeddingResult) {
     List<ConversationMemoryMatch> matches =
         searchRepository.searchActive(
             request.userProfileId(),
@@ -92,9 +93,9 @@ public class FreeTalkMemoryRetrievalService {
   }
 
   /** 검색 실패는 대화 요청을 막지 않고 빈 문맥으로 전환한다. */
-  private RetrievalResult fallback(RetrievalRequest request) {
+  private MemoryRetrievalResult fallback(MemoryRetrievalRequest request) {
     log.warn("프리톡 장기기억 검색을 건너뜁니다. stage={} policyVersion={}", request.stage(), POLICY_VERSION);
-    return RetrievalResult.empty(request.sessionId(), request.stage());
+    return MemoryRetrievalResult.empty(request.sessionId(), request.stage());
   }
 
   /**
@@ -105,7 +106,7 @@ public class FreeTalkMemoryRetrievalService {
    * @param responseMessageId 장기기억을 사용한 AI 응답 메시지 ID
    */
   public void recordUsage(
-      RetrievalResult result, List<Long> usedMemoryIds, Long responseMessageId) {
+      MemoryRetrievalResult result, List<Long> usedMemoryIds, Long responseMessageId) {
     if (!result.claimed()) {
       return;
     }
@@ -161,53 +162,6 @@ public class FreeTalkMemoryRetrievalService {
         || result.embedding().size() != EMBEDDING_DIMENSION
         || result.embedding().stream().anyMatch(value -> value == null || !Float.isFinite(value))) {
       throw new IllegalArgumentException("장기기억 query embedding 계약이 유효하지 않습니다.");
-    }
-  }
-
-  /**
-   * 장기기억 검색에 필요한 입력을 표현한다.
-   *
-   * @param sessionId 검색할 프리톡 세션 ID
-   * @param userProfileId 검색 대상 사용자 프로필 ID
-   * @param characterId 검색할 캐릭터 ID
-   * @param stage 검색을 수행하는 세션 시작 단계
-   * @param query 임베딩으로 변환할 자연어 검색 질의
-   */
-  public record RetrievalRequest(
-      long sessionId,
-      long userProfileId,
-      String characterId,
-      MemoryRetrievalStage stage,
-      String query) {}
-
-  /**
-   * 검색 결과와 이후 사용 trace 연결 정보를 표현한다.
-   *
-   * @param sessionId 검색한 프리톡 세션 ID
-   * @param stage 검색을 수행한 세션 시작 단계
-   * @param contexts AI에 제공할 장기기억 문맥 목록
-   * @param claimed 이번 단계의 검색 marker를 선점했는지 여부
-   */
-  public record RetrievalResult(
-      long sessionId,
-      MemoryRetrievalStage stage,
-      List<AiFreeTalkMemoryContext> contexts,
-      boolean claimed) {
-
-    static RetrievalResult empty(long sessionId, MemoryRetrievalStage stage) {
-      return new RetrievalResult(sessionId, stage, List.of(), false);
-    }
-
-    /**
-     * 검색 결과의 사용 문맥을 방어적으로 복사한다.
-     *
-     * @param sessionId 검색한 프리톡 세션 ID
-     * @param stage 검색을 수행한 세션 시작 단계
-     * @param contexts AI에 제공할 장기기억 문맥 목록
-     * @param claimed 이번 단계의 검색 marker를 선점했는지 여부
-     */
-    public RetrievalResult {
-      contexts = contexts == null ? List.of() : List.copyOf(contexts);
     }
   }
 }

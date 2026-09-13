@@ -20,6 +20,8 @@ import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbed
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.retrieval.repository.FreeTalkMemoryRetrievalTraceRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -63,9 +65,9 @@ class FreeTalkMemoryRetrievalServiceTest {
     when(searchRepository.searchActive(20L, "chloe", embedding(), 3))
         .thenReturn(List.of(match(1L, 0.1), match(2L, 0.2), match(3L, 0.3), match(4L, 0.4)));
 
-    FreeTalkMemoryRetrievalService.RetrievalResult result =
+    MemoryRetrievalResult result =
         service.retrieve(
-            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+            new MemoryRetrievalRequest(
                 10L, 20L, "chloe", MemoryRetrievalStage.OPENING, "weekend plans"));
 
     assertThat(result.contexts())
@@ -95,9 +97,9 @@ class FreeTalkMemoryRetrievalServiceTest {
     when(searchRepository.searchActive(20L, "chloe", embedding(), 3))
         .thenReturn(List.of(match(1L, 0.79), match(2L, 0.81), match(3L, 0.95)));
 
-    FreeTalkMemoryRetrievalService.RetrievalResult result =
+    MemoryRetrievalResult result =
         service.retrieve(
-            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+            new MemoryRetrievalRequest(
                 10L, 20L, "chloe", MemoryRetrievalStage.FIRST_USER_TURN, "Saturday routine"));
 
     assertThat(result.contexts()).extracting(AiFreeTalkMemoryContext::memoryId).containsExactly(1L);
@@ -109,9 +111,9 @@ class FreeTalkMemoryRetrievalServiceTest {
         .thenReturn(true);
     when(aiClient.embedMemoryQuery(any())).thenThrow(new RuntimeException("AI unavailable"));
 
-    FreeTalkMemoryRetrievalService.RetrievalResult result =
+    MemoryRetrievalResult result =
         service.retrieve(
-            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+            new MemoryRetrievalRequest(
                 10L, 20L, "chloe", MemoryRetrievalStage.FIRST_USER_TURN, "I like hiking"));
 
     assertThat(result.contexts()).isEmpty();
@@ -130,9 +132,9 @@ class FreeTalkMemoryRetrievalServiceTest {
     when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v2"))
         .thenReturn(false);
 
-    FreeTalkMemoryRetrievalService.RetrievalResult result =
+    MemoryRetrievalResult result =
         service.retrieve(
-            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+            new MemoryRetrievalRequest(
                 10L, 20L, "chloe", MemoryRetrievalStage.OPENING, "weekend plans"));
 
     assertThat(result.contexts()).isEmpty();

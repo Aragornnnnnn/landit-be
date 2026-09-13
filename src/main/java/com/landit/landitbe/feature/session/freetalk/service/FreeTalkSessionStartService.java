@@ -4,6 +4,8 @@ package com.landit.landitbe.feature.session.freetalk.service;
 
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkCharacter;
@@ -11,9 +13,9 @@ import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
+import com.landit.landitbe.feature.session.freetalk.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningResult;
-import com.landit.landitbe.feature.session.freetalk.service.FreeTalkSessionService.StartedFreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import lombok.RequiredArgsConstructor;
@@ -53,9 +55,9 @@ public class FreeTalkSessionStartService {
   /** AI-first 세션은 검색 문맥을 먼저 만들고 실패하면 시작 작업을 정리한다. */
   private FreeTalkSessionStartResponse startAiFirstSession(
       long userId, StartedFreeTalkSession startedSession) {
-    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
+    MemoryRetrievalResult memoryResult =
         memoryRetrievalService.retrieve(
-            new FreeTalkMemoryRetrievalService.RetrievalRequest(
+            new MemoryRetrievalRequest(
                 startedSession.freeTalkSessionId(),
                 userId,
                 startedSession.characterId(),
@@ -75,8 +77,7 @@ public class FreeTalkSessionStartService {
   }
 
   private AiFreeTalkOpeningResult generateOpening(
-      StartedFreeTalkSession startedSession,
-      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
+      StartedFreeTalkSession startedSession, MemoryRetrievalResult memoryResult) {
     return aiFreeTalkClient.generateOpening(
         openingRequest(startedSession, memoryResult.contexts()));
   }

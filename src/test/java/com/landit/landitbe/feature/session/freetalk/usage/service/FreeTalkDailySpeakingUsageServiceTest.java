@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.freetalk.usage.domain.FreeTalkDailySpeakingUsage;
+import com.landit.landitbe.feature.session.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.session.freetalk.usage.repository.FreeTalkDailySpeakingUsageRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -54,7 +55,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
     when(repository.findByUserProfileIdAndUsageDateForUpdate(eq(1L), any(LocalDate.class)))
         .thenReturn(Optional.of(usage));
 
-    FreeTalkDailySpeakingUsageService.DailySpeakingUsage result = service.reserve(1L, 3_000L);
+    DailySpeakingUsage result = service.reserve(1L, 3_000L);
 
     assertThat(result.usedSpeakingDurationMs()).isEqualTo(62_000L);
     assertThat(result.remainingMs()).isZero();

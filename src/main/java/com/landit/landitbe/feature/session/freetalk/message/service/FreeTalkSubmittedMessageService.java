@@ -25,6 +25,7 @@ import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageS
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.freetalk.topic.client.ai.AiFreeTalkTopic;
+import com.landit.landitbe.feature.session.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
@@ -248,7 +249,7 @@ public class FreeTalkSubmittedMessageService {
     if (existingMessage.getFreeTalkTurnStatus() != null) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
-    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+    DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.reserve(userId, existingMessage.getUtteranceDurationMs());
     freeTalkSession.startProcessing(request.clientMessageId());
     return reservation(
@@ -278,7 +279,7 @@ public class FreeTalkSubmittedMessageService {
     }
     accessGrants.requireSessionContinuation(userId, "FREE_TALK", learningSession.getId());
     int userTurnNumber = nextUserTurnNumber(messages);
-    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
+    DailySpeakingUsage dailyUsage =
         dailySpeakingUsageService.reserve(userId, request.utteranceDurationMs());
     SessionHistoryMessage userMessage =
         sessionHistoryMessageRepository.save(
@@ -783,8 +784,7 @@ public class FreeTalkSubmittedMessageService {
       SessionHistoryMessage userMessage,
       SessionHistoryMessage aiMessage,
       long userId) {
-    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
-        dailySpeakingUsageService.usage(userId);
+    DailySpeakingUsage dailyUsage = dailySpeakingUsageService.usage(userId);
     return new FreeTalkMessageSubmitResponse(
         learningSessionId,
         session.getTitle(),
@@ -810,8 +810,7 @@ public class FreeTalkSubmittedMessageService {
       long accumulatedSpeakingDurationMs,
       long userId,
       ExpressionGenerationStatus expressionGenerationStatus) {
-    FreeTalkDailySpeakingUsageService.DailySpeakingUsage dailyUsage =
-        dailySpeakingUsageService.usage(userId);
+    DailySpeakingUsage dailyUsage = dailySpeakingUsageService.usage(userId);
     return new FreeTalkMessageSubmitResponse(
         learningSessionId,
         title,

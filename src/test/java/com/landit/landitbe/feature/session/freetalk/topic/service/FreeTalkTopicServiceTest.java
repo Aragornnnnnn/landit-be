@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.freetalk.topic.domain.FreeTalkTopic;
+import com.landit.landitbe.feature.session.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import java.util.List;
@@ -33,9 +34,7 @@ class FreeTalkTopicServiceTest {
     when(topicRepository.findAllByStatusOrderByDisplayOrderAsc(ActiveStatus.ACTIVE))
         .thenReturn(List.of(topic));
     when(dailySpeakingUsageService.usage(1L))
-        .thenReturn(
-            new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
-                java.time.LocalDate.now(), 42_000L, 18_000L));
+        .thenReturn(new DailySpeakingUsage(java.time.LocalDate.now(), 42_000L, 18_000L));
     when(dailySpeakingUsageService.speakingTimeLimitMs()).thenReturn(9_999_999L);
 
     FreeTalkMainResponse response = service.getMain(1L);
@@ -53,9 +52,7 @@ class FreeTalkTopicServiceTest {
     when(topicRepository.findAllByStatusOrderByDisplayOrderAsc(ActiveStatus.ACTIVE))
         .thenReturn(List.of());
     when(dailySpeakingUsageService.usage(1L))
-        .thenReturn(
-            new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
-                java.time.LocalDate.now(), 60_000L, 0L));
+        .thenReturn(new DailySpeakingUsage(java.time.LocalDate.now(), 60_000L, 0L));
 
     FreeTalkMainResponse response = service.getMain(1L);
 

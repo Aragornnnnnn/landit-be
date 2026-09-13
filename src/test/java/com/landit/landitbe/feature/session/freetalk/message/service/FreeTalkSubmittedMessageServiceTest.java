@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalk
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.freetalk.topic.client.ai.AiFreeTalkTopic;
+import com.landit.landitbe.feature.session.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
@@ -175,9 +176,7 @@ class FreeTalkSubmittedMessageServiceTest {
     when(sessionHistoryMessageRepository.countBySessionHistoryIdAndRole(any(Long.class), any()))
         .thenReturn(1L);
     when(dailySpeakingUsageService.usage(1L))
-        .thenReturn(
-            new FreeTalkDailySpeakingUsageService.DailySpeakingUsage(
-                java.time.LocalDate.now(), 1_200L, 58_800L));
+        .thenReturn(new DailySpeakingUsage(java.time.LocalDate.now(), 1_200L, 58_800L));
   }
 
   private AiFreeTalkClosingResult closingResult() {

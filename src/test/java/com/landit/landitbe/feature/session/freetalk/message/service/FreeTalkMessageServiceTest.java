@@ -21,6 +21,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
@@ -84,8 +85,8 @@ class FreeTalkMessageServiceTest {
   @Test
   void retrievesMemoryOnlyForTheFirstUserTurnAndRecordsUsedResponse() {
     FreeTalkSubmittedMessageService.Reservation reservation = reservation();
-    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
-        new FreeTalkMemoryRetrievalService.RetrievalResult(
+    MemoryRetrievalResult memoryResult =
+        new MemoryRetrievalResult(
             30L,
             MemoryRetrievalStage.FIRST_USER_TURN,
             List.of(new AiFreeTalkMemoryContext(11L, ConversationMemoryType.EVENT, "hiking")),
@@ -123,8 +124,8 @@ class FreeTalkMessageServiceTest {
 
   @Test
   void doesNotRetryTurnWhenAiRejectsMemoryUsageMetadata() {
-    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
-        new FreeTalkMemoryRetrievalService.RetrievalResult(
+    MemoryRetrievalResult memoryResult =
+        new MemoryRetrievalResult(
             30L,
             MemoryRetrievalStage.FIRST_USER_TURN,
             List.of(new AiFreeTalkMemoryContext(11L, ConversationMemoryType.EVENT, "hiking")),

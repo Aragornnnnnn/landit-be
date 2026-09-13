@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.character.dto;
 
-import com.landit.landitbe.feature.character.service.StreakService;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -36,7 +35,7 @@ public record StreakCalendarResponse(
    * @param calendar 월별 스트릭 조회 결과
    * @return 월별 스트릭 달력 API 응답
    */
-  public static StreakCalendarResponse from(StreakService.StreakCalendar calendar) {
+  public static StreakCalendarResponse from(StreakCalendar calendar) {
     return new StreakCalendarResponse(
         calendar.yearMonth().getYear(),
         calendar.yearMonth().getMonthValue(),

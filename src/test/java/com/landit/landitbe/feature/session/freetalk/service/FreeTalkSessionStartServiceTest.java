@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
@@ -25,6 +26,7 @@ import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
+import com.landit.landitbe.feature.session.freetalk.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -50,8 +52,8 @@ class FreeTalkSessionStartServiceTest {
 
   @Test
   void returnsConfiguredSpeakingTimeLimit() {
-    FreeTalkSessionService.StartedFreeTalkSession startedSession =
-        new FreeTalkSessionService.StartedFreeTalkSession(
+    StartedFreeTalkSession startedSession =
+        new StartedFreeTalkSession(
             100L,
             200L,
             300L,
@@ -77,8 +79,8 @@ class FreeTalkSessionStartServiceTest {
 
   @Test
   void retrievesOpeningMemoryWithTopicAndCharacterQuery() {
-    FreeTalkSessionService.StartedFreeTalkSession startedSession =
-        new FreeTalkSessionService.StartedFreeTalkSession(
+    StartedFreeTalkSession startedSession =
+        new StartedFreeTalkSession(
             100L,
             200L,
             300L,
@@ -90,8 +92,8 @@ class FreeTalkSessionStartServiceTest {
             "EN",
             "KO",
             null);
-    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
-        new FreeTalkMemoryRetrievalService.RetrievalResult(
+    MemoryRetrievalResult memoryResult =
+        new MemoryRetrievalResult(
             300L,
             MemoryRetrievalStage.OPENING,
             List.of(new AiFreeTalkMemoryContext(55L, ConversationMemoryType.EVENT, "hiking")),
@@ -129,8 +131,8 @@ class FreeTalkSessionStartServiceTest {
 
   @Test
   void doesNotRetryOpeningWhenAiRejectsMemoryUsageMetadata() {
-    FreeTalkSessionService.StartedFreeTalkSession startedSession =
-        new FreeTalkSessionService.StartedFreeTalkSession(
+    StartedFreeTalkSession startedSession =
+        new StartedFreeTalkSession(
             100L,
             200L,
             300L,
@@ -142,8 +144,8 @@ class FreeTalkSessionStartServiceTest {
             "EN",
             "KO",
             null);
-    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
-        new FreeTalkMemoryRetrievalService.RetrievalResult(
+    MemoryRetrievalResult memoryResult =
+        new MemoryRetrievalResult(
             300L,
             MemoryRetrievalStage.OPENING,
             List.of(new AiFreeTalkMemoryContext(55L, ConversationMemoryType.EVENT, "hiking")),

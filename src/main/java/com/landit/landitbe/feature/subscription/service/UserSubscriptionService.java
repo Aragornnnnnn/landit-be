@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.learning.progress.service.LearningProgressSer
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
+import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
 import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
@@ -110,7 +111,7 @@ public class UserSubscriptionService {
   }
 
   private boolean hasCompletedConversationSinceLaunch(
-      Long userId, SubscriptionLaunchPolicyService.Policy policy) {
+      Long userId, SubscriptionLaunchPolicy policy) {
     return policies.enabledFor(policy, userId)
         && learningProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
   }

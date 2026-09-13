@@ -4,6 +4,8 @@ package com.landit.landitbe.feature.session.freetalk.message.service;
 
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
+import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkResponseMode;
@@ -116,8 +118,7 @@ public class FreeTalkMessageService {
   /** 일반 턴에서 첫 사용자 기억 조회, AI 생성, 저장, 사용 trace를 순서대로 처리한다. */
   private FreeTalkMessageSubmitResponse processRegularTurn(
       FreeTalkSubmittedMessageService.Reservation reservation) {
-    FreeTalkMemoryRetrievalService.RetrievalResult memoryResult =
-        retrieveFirstUserMemory(reservation);
+    MemoryRetrievalResult memoryResult = retrieveFirstUserMemory(reservation);
     AiFreeTalkTurnResult turnResult =
         generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult);
     FreeTalkMessageSubmitResponse response =
@@ -128,7 +129,7 @@ public class FreeTalkMessageService {
 
   /** 생성 응답의 memory ID를 해당 턴에 제공한 검색 결과와 연결해 기록한다. */
   private void recordMemoryUsage(
-      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult,
+      MemoryRetrievalResult memoryResult,
       AiFreeTalkTurnResult turnResult,
       FreeTalkMessageSubmitResponse response) {
     if (memoryResult == null) {
@@ -228,14 +229,14 @@ public class FreeTalkMessageService {
   }
 
   /** 장기기억은 제목 생성이 필요한 실제 첫 사용자 턴에서만 조회한다. */
-  private FreeTalkMemoryRetrievalService.RetrievalResult retrieveFirstUserMemory(
+  private MemoryRetrievalResult retrieveFirstUserMemory(
       FreeTalkSubmittedMessageService.Reservation reservation) {
     if (!isFirstUserTurn(reservation)) {
       return null;
     }
     String query = firstUserMessageQuery(reservation);
     return memoryRetrievalService.retrieve(
-        new FreeTalkMemoryRetrievalService.RetrievalRequest(
+        new MemoryRetrievalRequest(
             reservation.freeTalkSessionId(),
             reservation.userId(),
             reservation.characterId(),
@@ -262,7 +263,7 @@ public class FreeTalkMessageService {
   private AiFreeTalkTurnResult generateTurn(
       FreeTalkSubmittedMessageService.Reservation reservation,
       AiFreeTalkResponseMode responseMode,
-      FreeTalkMemoryRetrievalService.RetrievalResult memoryResult) {
+      MemoryRetrievalResult memoryResult) {
     List<AiFreeTalkMemoryContext> memoryContext =
         memoryResult == null ? List.of() : memoryResult.contexts();
     return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, memoryContext));

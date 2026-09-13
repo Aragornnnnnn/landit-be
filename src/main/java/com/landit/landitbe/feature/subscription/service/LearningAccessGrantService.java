@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.subscription.domain.LearningAccessGrant;
 import com.landit.landitbe.feature.subscription.dto.ExpressionLearningAttempt;
 import com.landit.landitbe.feature.subscription.dto.FreeScenarioAccess;
 import com.landit.landitbe.feature.subscription.dto.StartAccess;
+import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionException;
 import com.landit.landitbe.feature.subscription.repository.FreeScenarioReservationRepository;
@@ -326,7 +327,7 @@ public class LearningAccessGrantService {
             && LocalDateTime.now(clock).isBefore(grant.getExpiresAt()));
   }
 
-  private void requireStartsOpen(SubscriptionLaunchPolicyService.Policy policy) {
+  private void requireStartsOpen(SubscriptionLaunchPolicy policy) {
     if (policy.newStartsPaused()) {
       throw new ApiException(ErrorCode.CONFLICT, "배포 중입니다. 잠시 후 새 학습을 시작해 주세요.");
     }
