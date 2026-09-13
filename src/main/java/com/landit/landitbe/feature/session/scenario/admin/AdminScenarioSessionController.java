@@ -1,8 +1,8 @@
 // 관리자 시나리오 테스트 세션 시작 요청을 처리한다.
 
-package com.landit.landitbe.feature.session.scenario.start;
+package com.landit.landitbe.feature.session.scenario.admin;
 
-import com.landit.landitbe.feature.session.scenario.start.docs.AdminScenarioSessionControllerDocs;
+import com.landit.landitbe.feature.session.scenario.admin.docs.AdminScenarioSessionControllerDocs;
 import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse;
 import com.landit.landitbe.feature.session.scenario.start.service.AdminScenarioSessionStartService;
 import com.landit.landitbe.shared.response.ApiResponse;
