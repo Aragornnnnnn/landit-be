@@ -425,6 +425,8 @@ class ExpressionLearningApiIntegrationTests {
             .andExpect(status().isOk())
             .andReturn();
     JsonNode body = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+    // 이 클래스는 고급 표현 fixture를 검증하므로 기본 수준과 무관하게 고급 수준을 선택한다.
+    jdbcTemplate.update("UPDATE user_profile SET learning_level=5 WHERE email=?", email);
     return body.get("data").get("accessToken").asText();
   }
 }

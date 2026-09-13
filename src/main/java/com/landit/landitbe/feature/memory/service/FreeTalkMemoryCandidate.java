@@ -39,6 +39,7 @@ record FreeTalkMemoryCandidate(
             resolutionCandidate().content(),
             resolutionCandidate().memoryType(),
             resolutionCandidate().sourceMessageIds(),
+            resolutionCandidate().sourceMessages(),
             resolutionCandidate().observedAt(),
             comparableMemories.stream().map(memory -> toComparable(memory, zoneId)).toList());
     return new FreeTalkMemoryCandidate(

@@ -67,7 +67,8 @@ class FreeTalkSubmittedMessageServiceTest {
         dailySpeakingUsageService,
         streakService,
         memoryProperties,
-        Clock.systemUTC());
+        Clock.systemUTC(),
+        mock(com.landit.landitbe.feature.subscription.service.LearningAccessGrantService.class));
   }
 
   private final LearningSession learningSession = mock(LearningSession.class);

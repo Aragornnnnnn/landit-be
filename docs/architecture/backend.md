@@ -81,14 +81,17 @@ com.landit.landitbe
 │   │   │   ├── expression
 │   │   │   ├── memory
 │   │   │   └── history
+│   │   ├── assessment
 │   │   ├── feedback
 │   │   └── history
 │   ├── notification
 │   │   ├── token
 │   │   ├── delivery
-│   │   └── scheduled
+│   │   ├── scheduled
+│   │   └── campaign
 │   ├── memory
 │   ├── profile
+│   ├── subscription
 │   ├── admin
 │   └── audit
 ├── config
@@ -153,6 +156,8 @@ config -> feature/shared
 - 기억 추출·판정은 트랜잭션 밖에서 수행하고, `persistAndComplete`의 외부 프록시 트랜잭션에서
   사용자 잠금 → 기억 snapshot 재검증·저장 → 세션 잠금·READY 전환을 수행합니다.
 - 프로필 조회는 `UserLearningProfile` 등 불변 값을 제공합니다. 잠금 조회는 호출 트랜잭션 종료까지 잠금을 유지합니다.
+- 수준 평가에서 사용자 상태는 profile의 잠금 snapshot으로 읽고, 같은 상위 트랜잭션 안에서 profile Service가 적용합니다. 점수 계산과 평가 이력은 session.assessment가 소유합니다.
+- subscription은 무료 예약·표현 학습 시도를 값 record로 반환하고, session의 소유 상태 역시 값 record로 조회합니다. 서로의 Entity를 변경하지 않습니다.
 - 인증 사용자 식별 정보는 `shared.security.AuthUserPrincipal`, 기능 간 감사 기록은 `audit`가 소유합니다.
 
 DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 허용하지만, 다른 기능의 쓰기 책임은 넘기지 않습니다.
@@ -160,6 +165,7 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | 조회 경계 | 남아 있는 결합과 이유 |
 | --- | --- |
 | content의 시나리오/표현 조회 Repository | 사용자 언어·학습 진행을 함께 조회하는 JPQL/SQL. 기존 정렬·필터와 일괄 조회를 유지합니다. |
+| content.scenario의 ScenarioLearningHistoryQueryRepository | 최초 완료한 세션·수준 평가를 읽어 과거 복습 콘텐츠 수준을 보존합니다. 기존 SQL을 유지합니다. |
 | session의 메시지 컨텍스트 조회 Repository | 세션에 연결된 시나리오 콘텐츠를 조회합니다. |
 | learning.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 session/content를 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
@@ -175,7 +181,8 @@ SQL 문자열과 모든 런타임 의존성을 검증하는 테스트는 아니�
 
 인증 오류는 `auth.exception.AuthErrorCode`, 콘텐츠 오류는 `content.exception.ContentErrorCode`,
 세션·피드백 오류는 `session.exception.SessionErrorCode`, 앱 버전 정책 오류는 `app.exception.AppErrorCode`가 소유합니다.
-프로필의 기존 `UserProfileErrorCode`와 기능 예외 체계도 유지합니다.
+알림 오류는 `notification.exception.NotificationErrorCode`가 소유합니다.
+프로필의 기존 `UserProfileErrorCode`와 구독의 `SubscriptionErrorCode` 및 기능 예외 체계도 유지합니다.
 공통 `ErrorCode`에는 요청 검증·권한·서버 오류와 여러 기능에서 사용하는 AI 통신 오류만 둡니다.
 
 `ApiErrorCode`는 코드 문자열·HTTP 상태·기본 메시지의 공통 계약입니다.

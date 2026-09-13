@@ -222,6 +222,11 @@ class RemoteAiFreeTalkClientTest {
                 .get("memoryId")
                 .asLong())
         .isEqualTo(77L);
+    JsonNode source = request.get("candidates").get(0).get("sourceMessages").get(0);
+    assertThat(source.get("messageId").asLong()).isEqualTo(3002L);
+    assertThat(source.get("role").asText()).isEqualTo("USER");
+    assertThat(source.get("content").asText()).isEqualTo("I passed the interview.");
+    assertThat(source.get("occurredAt").asText()).isEqualTo("2026-08-29T19:20:00+09:00");
     assertThat(result.resolutions().getFirst().operation()).isEqualTo(AiMemoryOperation.SUPERSEDE);
     assertThat(result.resolutions().getFirst().supersededMemoryIds()).containsExactly(77L);
   }
@@ -244,6 +249,51 @@ class RemoteAiFreeTalkClientTest {
         .isEqualTo(" weekend plans ");
     assertThat(result.embeddingModel()).isEqualTo("openai/text-embedding-3-small");
     assertThat(result.embedding()).hasSize(1536);
+  }
+
+  @Test
+  void memoryQueryTimesOutBeforeDelayedSuccessfulResponse() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/memory-query-embedding",
+        3_000,
+        successResponse(
+            "{\"embeddingModel\":\"openai/text-embedding-3-small\",\"embedding\":"
+                + embeddingJson()
+                + "}"));
+    long started = System.nanoTime();
+    assertGenerationError(
+        () ->
+            remoteClient(Duration.ofSeconds(5))
+                .embedMemoryQuery(new AiMemoryQueryEmbeddingRequest("weekend plans")),
+        ErrorCode.AI_GENERATION_FAILED);
+    assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(2_900));
+  }
+
+  @Test
+  void normalOpeningWaitsBeyondMemoryTimeout() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/opening",
+        2_300,
+        successResponse("{\"aiMessage\":\"Hello!\",\"translatedMessage\":\"안녕!\"}"));
+    assertThat(remoteClient(Duration.ofSeconds(5)).generateOpening(openingRequest()).aiMessage())
+        .isEqualTo("Hello!");
+  }
+
+  private void registerDelayedResponse(String path, long delayMillis, String response) {
+    server.createContext(
+        path,
+        exchange -> {
+          try {
+            Thread.sleep(delayMillis);
+            byte[] body = response.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          } finally {
+            exchange.close();
+          }
+        });
   }
 
   @Test
@@ -791,6 +841,14 @@ class RemoteAiFreeTalkClientTest {
                 "사용자는 면접에 합격했다.",
                 ConversationMemoryType.EVENT,
                 List.of(3002L),
+                List.of(
+                    new ConversationMemoryHistoryMessage(
+                        3002L,
+                        1,
+                        "USER",
+                        "I passed the interview.",
+                        null,
+                        OffsetDateTime.parse("2026-08-29T19:20:00+09:00"))),
                 OffsetDateTime.parse("2026-08-29T19:20:00+09:00"),
                 List.of(
                     new AiMemoryResolutionRequest.ComparableMemory(

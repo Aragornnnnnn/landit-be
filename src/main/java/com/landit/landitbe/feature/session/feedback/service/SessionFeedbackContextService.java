@@ -2,10 +2,16 @@
 
 package com.landit.landitbe.feature.session.feedback.service;
 
+import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.dto.NextQuestionContext;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.exception.SessionException;
+import com.landit.landitbe.feature.session.feedback.dto.ExistingSummaryFeedbackContext;
+import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
+import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
@@ -27,13 +33,14 @@ import org.springframework.transaction.annotation.Transactional;
 /** 최종 피드백 생성에 필요한 완료 세션 컨텍스트를 불변 값으로 조회한다. */
 @RequiredArgsConstructor
 @Component
-class SessionFeedbackContextService {
+public class SessionFeedbackContextService {
 
   private final LearningSessionService learningSessionService;
   private final SessionHistoryService sessionHistoryService;
   private final SessionMessageService sessionMessageService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
+  private final ScenarioContentService scenarioContentService;
   private final AiConversationSettings aiConversationSettings;
 
   /**
@@ -63,6 +70,7 @@ class SessionFeedbackContextService {
         sessionHistory.getId(),
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
+        scenarioContext.questionLevelGroup(),
         AiScenarioContext.from(scenarioContext, aiConversationSettings),
         userMessages(historyMessages, scenarioContext),
         sessionFeedbackDataService
@@ -91,17 +99,61 @@ class SessionFeedbackContextService {
       if (message.getRole() != ConversationSpeaker.USER) {
         continue;
       }
+      var evaluationContext =
+          AiMessageFeedbackEvaluationContext.from(
+              scenarioContext, conversationHistory.subList(0, index + 1));
+      NextQuestionContext question = questionFor(message.getTurnNumber(), scenarioContext);
       userMessages.add(
           new UserMessageContext(
               message.getId(),
               message.getTurnNumber(),
               message.getContent(),
-              AiMessageFeedbackEvaluationContext.from(
-                  scenarioContext, conversationHistory.subList(0, index + 1))));
+              evaluationContext,
+              question == null
+                  ? defaultDemand(scenarioContext.questionLevelGroup())
+                  : question.responseDemand(),
+              (question == null
+                          || question.requiredResponseElement() == null
+                          || question.requiredResponseElement().isBlank()
+                      ? evaluationContext.content()
+                      : question.requiredResponseElement())
+                  .lines()
+                  .map(String::strip)
+                  .filter(element -> !element.isEmpty())
+                  .toList()));
     }
     if (userMessages.isEmpty()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     return List.copyOf(userMessages);
+  }
+
+  /** AI first는 같은 턴, USER first는 첫 발화 이후 직전 순서의 질문 메타데이터를 사용한다. */
+  private NextQuestionContext questionFor(
+      int userTurnNumber, ScenarioSessionMessageContextProjection scenarioContext) {
+    if (scenarioContext.firstSpeaker() == ConversationSpeaker.USER && userTurnNumber <= 1) {
+      return null;
+    }
+    int questionOrder =
+        scenarioContext.firstSpeaker() == ConversationSpeaker.AI
+            ? userTurnNumber
+            : userTurnNumber - 1;
+    return scenarioContentService
+        .findActiveQuestion(
+            scenarioContext.scenarioId(),
+            questionOrder,
+            scenarioContext.questionLevelGroup(),
+            scenarioContext.targetLocale(),
+            scenarioContext.baseLocale())
+        .orElse(null);
+  }
+
+  private ResponseDemand defaultDemand(
+      com.landit.landitbe.feature.content.domain.ContentLearningLevel group) {
+    return switch (group) {
+      case LEVEL_1 -> ResponseDemand.LOW;
+      case LEVEL_2_TO_3, DIAGNOSTIC -> ResponseDemand.MEDIUM;
+      case LEVEL_4_TO_5 -> ResponseDemand.HIGH;
+    };
   }
 }

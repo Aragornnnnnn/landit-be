@@ -10,6 +10,7 @@ public enum ErrorCode implements ApiErrorCode {
   INVALID_REQUEST(HttpStatus.BAD_REQUEST, "잘못된 요청입니다."),
   FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
   RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+  SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "요청 기능의 외부 연동 설정을 확인해 주세요."),
   CONFLICT(HttpStatus.CONFLICT, "요청이 현재 상태와 충돌합니다."),
   AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI 응답 형식이 올바르지 않습니다."),
   AI_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 응답 생성에 실패했습니다."),

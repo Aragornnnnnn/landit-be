@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.notification.delivery.domain.PushDelivery;
 import com.landit.landitbe.feature.notification.delivery.domain.PushDeliveryStatus;
 import com.landit.landitbe.feature.notification.delivery.dto.PreparePushDeliveryCommand;
 import com.landit.landitbe.feature.notification.delivery.dto.PushReceiptTarget;
+import com.landit.landitbe.feature.notification.delivery.repository.PushDeliveryBatchRepository;
 import com.landit.landitbe.feature.notification.delivery.repository.PushDeliveryRepository;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
@@ -40,13 +41,16 @@ class PushDeliveryServiceTest {
 
   @Mock private UserPushTokenDeliveryService userPushTokenDeliveryService;
 
+  @Mock private PushDeliveryBatchRepository pushDeliveryBatchRepository;
+
   private PushDeliveryService pushDeliveryService;
 
   /** 각 테스트에서 발송 이력 Repository와 사용자 Push Token Service를 사용하는 Service를 생성한다. */
   @BeforeEach
   void setUp() {
     pushDeliveryService =
-        new PushDeliveryService(pushDeliveryRepository, userPushTokenDeliveryService);
+        new PushDeliveryService(
+            pushDeliveryRepository, userPushTokenDeliveryService, pushDeliveryBatchRepository);
   }
 
   /** 발송 직전에 설치가 비활성화되면 발송 이력을 만들지 않는다. */

@@ -29,6 +29,28 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
   @Autowired private ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
 
   @Test
+  void keepsHistoricalDiagnosticScenarioQuestionsInTheirOriginalGroups() {
+    seedScenario(1L);
+    seedQuestion(991211L, 1L, 1, ContentLearningLevel.LEVEL_1, "ACTIVE");
+    seedQuestion(991212L, 1L, 1, ContentLearningLevel.DIAGNOSTIC, "ACTIVE");
+    seedQuestionLanguageVariant(991311L, 991211L, "EN", "KR", "Old question", "기존 질문", "ACTIVE");
+    seedQuestionLanguageVariant(
+        991312L, 991212L, "EN", "KR", "New diagnostic question", "신규 진단 질문", "ACTIVE");
+    assertThat(
+            scenarioQuestionQueryRepository.findActiveQuestion(
+                1L, 1, ContentLearningLevel.LEVEL_1, Locale.EN, Locale.KR))
+        .get()
+        .extracting(ScenarioQuestionProjection::questionText)
+        .isEqualTo("Old question");
+    assertThat(
+            scenarioQuestionQueryRepository.findActiveQuestion(
+                1L, 1, ContentLearningLevel.DIAGNOSTIC, Locale.EN, Locale.KR))
+        .get()
+        .extracting(ScenarioQuestionProjection::questionText)
+        .isEqualTo("New diagnostic question");
+  }
+
+  @Test
   void findsActiveQuestionByScenarioDisplayOrderAndLocale() {
     seedScenario(991101L);
     seedQuestion(991201L, 991101L, 1, ContentLearningLevel.LEVEL_4_TO_5, "ACTIVE");
@@ -96,7 +118,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
                         values (?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         scenarioId,
-        scenarioId);
+        scenarioId + 991000L);
     jdbcTemplate.update(
         """
                         insert into scenario (

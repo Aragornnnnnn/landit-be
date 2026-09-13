@@ -9,6 +9,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.Getter;
 
@@ -22,6 +23,15 @@ public class FreeTalkDailySpeakingUsage {
 
   @Column(name = "used_speaking_duration_ms", nullable = false)
   private long usedSpeakingDurationMs;
+
+  @Column(name = "request_count", nullable = false)
+  private int requestCount;
+
+  @Column(name = "request_minute")
+  private LocalDateTime requestMinute;
+
+  @Column(name = "minute_request_count", nullable = false)
+  private int minuteRequestCount;
 
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkDailySpeakingUsage() {}
@@ -76,6 +86,20 @@ public class FreeTalkDailySpeakingUsage {
       throw new IllegalArgumentException("되돌릴 사용자 발화 시간이 올바르지 않습니다.");
     }
     usedSpeakingDurationMs -= utteranceDurationMs;
+  }
+
+  /**
+   * 서버가 허용한 생성 요청을 일일 및 고정 1분 구간에 기록한다.
+   *
+   * @param minute 초와 나노초를 버린 요청 시각. 한도 검증과 잠금은 호출 서비스가 담당한다.
+   */
+  public void recordRequest(LocalDateTime minute) {
+    if (!minute.equals(requestMinute)) {
+      requestMinute = minute;
+      minuteRequestCount = 0;
+    }
+    requestCount++;
+    minuteRequestCount++;
   }
 
   /** 복합 기본 키를 정의한다. */

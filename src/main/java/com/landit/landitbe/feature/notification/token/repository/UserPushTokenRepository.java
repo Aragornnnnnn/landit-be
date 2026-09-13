@@ -16,6 +16,26 @@ import org.springframework.data.repository.query.Param;
 public interface UserPushTokenRepository extends JpaRepository<UserPushToken, Long> {
 
   /**
+   * 발송 대상 Token을 ID 순서로 잠근다.
+   *
+   * @param ids Token ID 목록
+   * @return 현재 Token 목록
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select t from UserPushToken t where t.id in :ids order by t.id")
+  List<UserPushToken> findAllByIdsForUpdate(@Param("ids") List<Long> ids);
+
+  /**
+   * 실패한 Expo Token의 현재 소유 행을 ID 순서로 잠근다.
+   *
+   * @param values Expo Token 값 목록
+   * @return 현재 Token 목록
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select t from UserPushToken t where t.expoPushToken in :values order by t.id")
+  List<UserPushToken> findAllByValuesForUpdate(@Param("values") List<String> values);
+
+  /**
    * 발송 직전 Token 상태와 소유자를 확인하도록 식별자로 쓰기 잠금 조회한다.
    *
    * @param userPushTokenId 사용자 Push Token ID

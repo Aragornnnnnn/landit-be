@@ -20,7 +20,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class AdminAuthorizationFilter extends OncePerRequestFilter {
 
-  private static final String ADMIN_API_PATH = "/api/v1/admin";
+  private static final org.springframework.security.web.util.matcher.RequestMatcher ADMIN_API_PATH =
+      org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern(
+          "/api/v1/admin/**");
 
   private final UserProfileService userProfileService;
   private final AuthFailureResponseWriter failureResponseWriter;
@@ -45,8 +47,7 @@ public class AdminAuthorizationFilter extends OncePerRequestFilter {
    */
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    String requestUri = request.getRequestURI();
-    return !requestUri.equals(ADMIN_API_PATH) && !requestUri.startsWith(ADMIN_API_PATH + "/");
+    return !ADMIN_API_PATH.matches(request);
   }
 
   /**

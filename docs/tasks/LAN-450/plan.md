@@ -46,3 +46,23 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - SQL/JPQL text block 82개를 기준 커밋과 비교했다. DTO의 패키지 경로와 공백을 정규화한 조회 문자열 멀티셋이 동일하다. 리소스·빌드 설정에 이동 전 패키지 참조가 남지 않았으며 `git diff --check`도 통과했다.
 - 독립 Sol(medium) HIGH 리뷰 완료. 표현 잠금 순서, 기억 저장/READY 원자성과 rollback, profile snapshot, AI memory 계약, 오류 transport 및 패키지 이동을 diff·호출부·테스트 산출물로 검토했고 blocker/actionable finding은 없었다.
 - 최종 증거 범위는 로컬 Spring HTTP/H2 통합 테스트와 정적 구조 검사다. 운영 PostgreSQL, 실배포, 외부 AI 실호출은 검증하지 않았다.
+
+## 2026-09-13 최신 develop 반영
+
+현재 기준은 `066764a0a3bd5ad393b9040ff4c51fec43370a91`이다. 기존 기준 이후 130개 커밋의 구독·수준 평가·피드백 복구·관리자 푸시 동작을 보존하면서 기존 LAN-450 세 커밋에 병합한다. 기존 검증 기록은 당시 결과로 유지하며 아래 결과가 최신화 검증이다.
+
+- [x] 최신 기능의 패키지를 통합한다. 관리자 캠페인은 `notification.campaign`, 수준 평가 관련 코드는 `session.assessment`로 분류한다. 공유 피드백 입력 record는 `session.feedback.dto`에서 제공한다.
+- [x] 새 경계 위반을 보완한다. 수준 평가의 profile Repository 접근은 프로필 잠금 상태 record와 프로필 적용 메서드로 바꾼다. `applyAssessedLearningLevel`은 기존 상위 트랜잭션을 필수로 사용하고 이미 잠근 영속 Entity에 적용한다. 기존 사용자→세션→평가 저장 순서를 유지한다.
+- [x] 복습 수준 조회 SQL을 `content.scenario.repository.ScenarioLearningHistoryQueryRepository`로 옮긴다. content→session Service 역참조를 제거하고 같은 공유 DB 조회·정렬·fallback을 유지한다.
+- [x] 구독의 무료 시나리오 예약·표현 학습 시작, 세션 소유 상태 조회는 Entity 대신 값 record로 제공한다. 시도 ID·만료 시각·세션 종류·완료 상태와 최신 develop의 권한 검사를 유지한다.
+- [x] 관리자 푸시 오류는 `NotificationErrorCode`로 옮긴다. 공통 오류에는 외부 연동 설정용 SERVICE_UNAVAILABLE을 유지한다.
+- [x] 전체 검사와 독립 리뷰를 마친 뒤 통합 커밋을 저장한다.
+
+현재 정적 검증에서 최신 develop의 HTTP Mapping 어노테이션 70개, 오류 코드·상태·메시지 36개, SQL/JPQL text block 100개가 동일하다. SQL 비교는 DTO FQCN과 공백만 정규화했다. `src/main/resources` 전체 diff가 없어 DB 마이그레이션·운영 설정 변경이 없다.
+
+전체 테스트의 첫 실행에서 테스트 스캔 범위/fixture 연결 실패 18건을 확인했다. 푸시 배치 독립 Context는 token/delivery 양쪽 Repository·Entity를 스캔하도록 고쳤고, 변경된 반환 record와 기능 오류 enum을 테스트 fixture에 반영했다. 실제 검사 결과를 확인해 순차 재검증한다.
+
+- 수정 대상 테스트 44개 재검증 성공(5초). 최종 `./gradlew check` 성공(54초). XML 집계 1,191 tests / 0 failures / 0 errors / 6 skipped로 실행된 1,185개가 모두 통과했다.
+- 생략된 6개는 기존 환경 조건에 따른 PostgreSQL 관리자 대상 SQL 검사 4개, 실제 AI 호환성 1개, FE·BE·AI 교차 검증 1개다. 운영 PostgreSQL·외부 AI·배포 검증은 이번 증거에 포함하지 않는다.
+- 독립 리뷰는 최신 기준과 현재 staged/unstaged 전체 diff, 구독 snapshot, 메시지 피드백 복구, 수준 평가의 잠금과 적용, 복습 SQL, 표현 완료와 기억 저장 원자성을 확인했다. actionable blocker는 없었다.
+- 충돌 표식과 미해결 인덱스 항목이 없고 `git diff --check`가 통과했다. 이전 세 커밋은 보존한 채 최신 develop을 통합한다.

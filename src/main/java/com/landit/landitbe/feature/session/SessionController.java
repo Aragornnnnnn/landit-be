@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.session;
 
+import com.landit.landitbe.feature.session.assessment.dto.SessionLevelAssessmentResponse;
+import com.landit.landitbe.feature.session.assessment.service.SessionLevelAssessmentGenerationService;
 import com.landit.landitbe.feature.session.docs.SessionControllerDocs;
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.feedback.service.SessionFeedbackService;
@@ -33,6 +35,7 @@ public class SessionController implements SessionControllerDocs {
   private final SessionFeedbackService sessionFeedbackService;
   private final SessionMessageSubmitService sessionMessageSubmitService;
   private final SessionInnerThoughtQueryService sessionInnerThoughtQueryService;
+  private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
 
   /** {@inheritDoc} */
   @Override
@@ -65,6 +68,15 @@ public class SessionController implements SessionControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
     return ApiResponse.success(
         HttpStatus.OK, sessionFeedbackService.getOrCreate(principal.userId(), sessionId));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/sessions/{sessionId}/level-assessment")
+  public ResponseEntity<ApiResponse<SessionLevelAssessmentResponse>> getLevelAssessment(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long sessionId) {
+    return ApiResponse.success(
+        HttpStatus.OK, levelAssessmentGenerationService.get(principal.userId(), sessionId));
   }
 
   /** {@inheritDoc} */

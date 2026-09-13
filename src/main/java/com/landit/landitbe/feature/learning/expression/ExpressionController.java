@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다. */
@@ -62,9 +63,13 @@ public class ExpressionController implements ExpressionControllerDocs {
   public ApiResponse<Map<String, Object>> finishLearning(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @PathVariable Long expressionId,
-      @RequestBody(required = false) ExpressionLearningFinishRequest request) {
+      @RequestBody(required = false) ExpressionLearningFinishRequest request,
+      @RequestHeader(value = "X-Learning-Attempt-Id", required = false) String attemptId) {
     expressionLearningCompletionService.completeLearning(
-        principal.userId(), expressionId, request == null ? null : request.freeTalkSessionId());
+        principal.userId(),
+        expressionId,
+        request == null ? null : request.freeTalkSessionId(),
+        attemptId);
     return ApiResponse.success(Map.of());
   }
 }

@@ -2,18 +2,26 @@
 
 package com.landit.landitbe.feature.profile.service;
 
+import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
+import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
+import com.landit.landitbe.feature.profile.dto.SubscriptionNotificationTarget;
+import com.landit.landitbe.feature.profile.dto.SubscriptionTransferResult;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateCommand;
+import com.landit.landitbe.feature.profile.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
+import com.landit.landitbe.feature.profile.dto.UserLearningAssessmentState;
 import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.dto.UserLocale;
 import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.dto.UserProfilePage;
+import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
@@ -22,8 +30,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +44,25 @@ public class UserProfileService {
       List.of(AccentLocale.EN_US, AccentLocale.EN_GB, AccentLocale.EN_AU);
 
   private final UserProfileRepository userProfileRepository;
+  private final java.time.Clock clock;
+
+  /**
+   * 활성 사용자의 구독과 알림 연락처를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @return 탈퇴했거나 존재하지 않으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<SubscriptionNotificationTarget> findSubscriptionNotificationTarget(Long userId) {
+    return userProfileRepository
+        .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
+        .map(
+            profile ->
+                new SubscriptionNotificationTarget(
+                    UserSubscriptionSnapshot.fromUserProfile(profile),
+                    profile.getEmail(),
+                    profile.getPushPermissionStatus() == PushPermissionStatus.GRANTED));
+  }
 
   /**
    * 활성 사용자 프로필을 조회한다.
@@ -66,6 +93,100 @@ public class UserProfileService {
   public UserLearningProfile requireActiveForUpdate(Long userId) {
     return findActiveLearningProfileForUpdate(userId)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN));
+  }
+
+  /**
+   * 결제 제공자 이벤트로 사용자 구독 상태를 갱신한다.
+   *
+   * <p>탈퇴한 사용자도 대상에 포함해 환불·만료 이벤트가 유실되지 않게 한다. 이미 반영한 이벤트보다 오래된 이벤트는 무시한다. 같은 사용자의 웹훅이 동시에 들어와도 오래된
+   * 이벤트가 최신 상태를 덮어쓰지 않도록 쓰기 잠금으로 조회한다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param command 갱신할 구독 정보
+   * @return 갱신 처리 결과
+   */
+  @Transactional
+  public SubscriptionUpdateResult updateSubscription(
+      Long userId, SubscriptionUpdateCommand command) {
+    Optional<UserProfile> found = userProfileRepository.findByIdForUpdate(userId);
+    if (found.isEmpty()) {
+      return SubscriptionUpdateResult.USER_NOT_FOUND;
+    }
+    UserProfile userProfile = found.get();
+    if (userProfile.isSubscriptionEventStale(command.eventAt())) {
+      return SubscriptionUpdateResult.STALE_EVENT;
+    }
+    userProfile.updateSubscription(
+        command.status(),
+        command.periodType(),
+        command.expiresAt(),
+        command.eventAt(),
+        command.productId(),
+        command.store());
+    return SubscriptionUpdateResult.APPLIED;
+  }
+
+  /**
+   * 결제 제공자가 알린 계정 간 구독 이전을 반영한다.
+   *
+   * <p>넘겨준 계정의 구독 정보를 넘겨받은 계정에 복사하고 넘겨준 계정은 구독 없음으로 비운다. 두 계정을 ID 오름차순으로 쓰기 잠금해 교착을 막고, 어느 한쪽이라도 이미
+   * 반영한 이벤트보다 오래된 이벤트면 아무것도 바꾸지 않는다. 두 계정이 같거나, 넘겨준 계정이 프리미엄이 아니면(구독 없음·만료) 두 계정 모두 건드리지 않는다.
+   *
+   * @param fromUserId 구독을 넘겨준 사용자 ID
+   * @param toUserId 구독을 넘겨받은 사용자 ID
+   * @param eventAt 이벤트 발생 시각
+   * @return 이전 처리 결과와 복사된 구독 정보
+   */
+  @Transactional
+  public SubscriptionTransferResult transferSubscription(
+      Long fromUserId, Long toUserId, LocalDateTime eventAt) {
+    if (fromUserId.equals(toUserId)) {
+      // 같은 계정으로의 이전은 옮길 것이 없다. 아래 로직을 타면 자기 구독을 비워 버린다.
+      return SubscriptionTransferResult.applied(null);
+    }
+    // 두 계정을 항상 작은 ID부터 잠근다. 웹훅 두 개가 동시에 서로 반대 순서로 잠그면 교착이 생기기 때문이다.
+    Long lowerId = Math.min(fromUserId, toUserId);
+    Long higherId = Math.max(fromUserId, toUserId);
+
+    Optional<UserProfile> lower = userProfileRepository.findByIdForUpdate(lowerId);
+    Optional<UserProfile> higher = userProfileRepository.findByIdForUpdate(higherId);
+
+    if (lower.isEmpty() || higher.isEmpty()) {
+      return SubscriptionTransferResult.userNotFound();
+    }
+    // 잠근 뒤에는 다시 넘겨준 계정(from)과 넘겨받은 계정(to)으로 나눠 쓴다.
+    UserProfile from = lowerId.equals(fromUserId) ? lower.get() : higher.get();
+    UserProfile to = lowerId.equals(fromUserId) ? higher.get() : lower.get();
+    if (from.isSubscriptionEventStale(eventAt) || to.isSubscriptionEventStale(eventAt)) {
+      return SubscriptionTransferResult.stale();
+    }
+    if (!from.isPremium()) {
+      // 구독이 없거나 만료된 계정에서는 옮길 것이 없다. 넘겨받은 계정의 살아 있는 구독을 덮어쓰지 않는다.
+      return SubscriptionTransferResult.applied(null);
+    }
+    UserSubscriptionSnapshot moved = UserSubscriptionSnapshot.fromUserProfile(from);
+    to.updateSubscription(
+        moved.subscriptionStatus(),
+        moved.periodType(),
+        moved.expiresAt(),
+        eventAt,
+        moved.productId(),
+        moved.store());
+    from.updateSubscription(SubscriptionStatus.NONE, null, null, eventAt, null, null);
+    return SubscriptionTransferResult.applied(moved);
+  }
+
+  /**
+   * 후보 ID 가운데 실제로 존재하는 첫 사용자 프로필 ID를 찾는다.
+   *
+   * <p>결제 제공자 웹훅이 이력을 저장하기 전에 사용자를 확정하는 용도라, 탈퇴한 사용자도 포함한다.
+   *
+   * @param candidateUserIds 확인할 사용자 ID 후보. 앞선 후보를 우선한다
+   * @return 존재하는 첫 사용자 프로필 ID. 없으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<Long> findExistingUserId(List<Long> candidateUserIds) {
+    return candidateUserIds.stream().filter(userProfileRepository::existsById).findFirst();
   }
 
   /**
@@ -203,7 +324,7 @@ public class UserProfileService {
    * 활성 사용자의 학습 수준을 조회한다.
    *
    * @param userId 조회할 사용자 ID
-   * @return 사용자가 선택한 학습 수준. 미설정이면 {@code null}
+   * @return 현재 적용 학습 수준. 미설정 값도 기본 수준 3으로 반환
    * @throws UserProfileException 활성 프로필이 없을 때
    */
   @Transactional(readOnly = true)
@@ -215,10 +336,10 @@ public class UserProfileService {
    * 프로필 상태와 무관하게 학습 수준을 조회한다.
    *
    * <p>사용자 요청이 아니라 백그라운드 콘텐츠 추천에서 쓰는 조회다. 프로필이 비활성이라는 이유로 추천 작업을 실패시키지 않도록 {@link
-   * #requireActive(Long)}와 달리 예외를 던지지 않는다. 값이 없으면 호출부가 학습 수준을 모르는 경우로 처리한다.
+   * #requireActive(Long)}와 달리 예외를 던지지 않는다. 프로필은 있으나 수준이 미설정이면 기본 수준 3을 반환한다.
    *
    * @param userProfileId 조회할 사용자 ID
-   * @return 사용자가 선택한 학습 수준. 프로필이 없거나 학습 수준이 미설정이면 빈 값
+   * @return 현재 적용 학습 수준. 프로필 자체가 없으면 빈 값
    */
   @Transactional(readOnly = true)
   public Optional<Integer> findLearningLevel(Long userProfileId) {
@@ -234,7 +355,10 @@ public class UserProfileService {
    */
   @Transactional
   public void updateLearningLevel(Long userId, int learningLevel) {
-    requireActiveEntity(userId).updateLearningLevel(learningLevel);
+    userProfileRepository
+        .findActiveByIdForUpdate(userId)
+        .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.INVALID_TOKEN))
+        .updateLearningLevel(learningLevel, java.time.LocalDateTime.now(clock));
   }
 
   /**
@@ -257,6 +381,18 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public UserAccentLocaleResponse getAccentLocale(Long userId) {
     return UserAccentLocaleResponse.from(requireActiveEntity(userId).getAccentLocale());
+  }
+
+  /**
+   * 활성 사용자의 서버 기준 구독 상태를 다른 기능이 쓸 스냅샷으로 반환한다.
+   *
+   * @param userId 조회할 사용자 ID
+   * @return 사용자 구독 상태 스냅샷
+   * @throws UserProfileException 활성 프로필이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public UserSubscriptionSnapshot getSubscription(Long userId) {
+    return UserSubscriptionSnapshot.fromUserProfile(requireActiveEntity(userId));
   }
 
   /**
@@ -290,12 +426,14 @@ public class UserProfileService {
    *
    * @param page 페이지 번호
    * @param size 페이지 크기
+   * @param active 활성 여부. 생략하면 모든 상태
+   * @param pushConsent 저장된 푸시 동의 여부. 생략하면 모든 권한 상태
    * @return 관리자 사용자 프로필 목록 페이지
    */
   @Transactional(readOnly = true)
-  public UserProfilePage getUserProfiles(int page, int size) {
-    Slice<UserProfile> profiles =
-        userProfileRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(page, size));
+  public UserProfilePage getUserProfiles(int page, int size, Boolean active, Boolean pushConsent) {
+    Page<UserProfile> profiles =
+        userProfileRepository.findAdminUsers(active, pushConsent, PageRequest.of(page, size));
 
     return UserProfilePage.from(profiles, page, size);
   }
@@ -313,5 +451,39 @@ public class UserProfileService {
         .findById(userProfileId)
         .map(UserProfileDetails::from)
         .orElseThrow(() -> new UserProfileException(UserProfileErrorCode.USER_PROFILE_NOT_FOUND));
+  }
+
+  /**
+   * 활성 사용자를 잠그고 수준 평가에 필요한 상태를 반환한다.
+   *
+   * @param userId 평가 대상 사용자
+   * @return 잠근 프로필의 수준 상태. 비활성이거나 없으면 빈 값
+   */
+  @Transactional
+  public Optional<UserLearningAssessmentState> findLearningAssessmentStateForUpdate(long userId) {
+    return userProfileRepository
+        .findActiveByIdForUpdate(userId)
+        .map(
+            profile ->
+                new UserLearningAssessmentState(
+                    profile.getLearningLevel(),
+                    profile.getPromotionStreak(),
+                    profile.getLearningLevelUpdatedAt()));
+  }
+
+  /**
+   * 같은 트랜잭션에서 잠근 사용자의 평가 결과를 적용한다.
+   *
+   * @param userId findLearningAssessmentStateForUpdate로 잠근 사용자
+   * @param learningLevel 적용할 수준
+   * @param promotionStreak 연속 승급 근거 횟수
+   * @param assessedAt 적용 시각
+   */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public void applyAssessedLearningLevel(
+      long userId, Integer learningLevel, int promotionStreak, LocalDateTime assessedAt) {
+    userProfileRepository
+        .getReferenceById(userId)
+        .applyAssessedLearningLevel(learningLevel, promotionStreak, assessedAt);
   }
 }

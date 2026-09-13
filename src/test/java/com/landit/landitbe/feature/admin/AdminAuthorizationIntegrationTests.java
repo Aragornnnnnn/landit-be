@@ -58,6 +58,23 @@ class AdminAuthorizationIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
+  /** 인코딩된 관리자 경로로 공개 정책 변경 권한을 우회할 수 없다. */
+  @Test
+  void rejectsEncodedAdminPolicyMutation() throws Exception {
+    String token = login("encoded-policy-denied");
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                    java.net.URI.create("/api/v1/%61dmin/subscription-policy"))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"expectedVersion":0,"mode":"OFF","newStartsPaused":false,"reviewUserIds":[]}
+                    """))
+        .andExpect(status().isForbidden());
+  }
+
   /** 관리자 역할을 가진 사용자는 관리자 경로의 다음 처리 단계까지 도달한다. */
   @Test
   void allowsRegisteredAdminToReachAdminPath() throws Exception {

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.scenario.client.ai;
 
+import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
@@ -82,5 +83,16 @@ public class LocalAiConversationClient implements AiConversationClient {
                         null,
                         "Your message clearly communicates the main idea."))
             .toList());
+  }
+
+  /**
+   * 로컬 환경에서는 수준 평가를 생략하고 BE fallback 경로를 사용한다.
+   *
+   * @param request 세션 수준 평가 입력
+   * @return fallback 처리를 위한 null
+   */
+  @Override
+  public AiSessionLevelAssessment generateSessionLevelAssessment(AiSessionFeedbackRequest request) {
+    return null;
   }
 }

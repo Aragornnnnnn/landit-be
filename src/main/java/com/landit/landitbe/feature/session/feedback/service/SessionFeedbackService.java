@@ -2,16 +2,24 @@
 
 package com.landit.landitbe.feature.session.feedback.service;
 
+import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.session.feedback.domain.SessionHistorySummaryFeedback;
+import com.landit.landitbe.feature.session.feedback.dto.ExistingSummaryFeedbackContext;
+import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse.EvaluationContextResponse;
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse.MessageFeedbackResponse;
+import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
+import com.landit.landitbe.feature.session.scenario.service.MessageFeedbackWorkService;
+import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,9 +36,15 @@ public class SessionFeedbackService {
   private final SessionFeedbackCompletionService completionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final AiConversationClient aiConversationClient;
+  private final MessageFeedbackWorkService feedbackWorkService;
+  private final AiClientProperties properties;
+  private final LearningAccessGrantService accessGrants;
 
   /**
    * 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다.
+   *
+   * <p>피드백은 항상 전부 생성해 저장하고, 무료 사용자에게 상세 피드백이 잠긴 세션이면 응답의 메시지별 피드백만 비워 내린다. 결제 후 다시 조회하면 저장된 결과를 전부
+   * 돌려준다.
    *
    * @param userId 세션 소유자 ID
    * @param sessionId 피드백을 조회할 학습 세션 ID
@@ -42,26 +56,54 @@ public class SessionFeedbackService {
     ExistingSummaryFeedbackContext existingSummary = context.existingSummary().orElse(null);
     if (existingSummary != null) {
       // 이미 확정된 결과는 AI를 다시 호출하지 않고 그대로 반환한다.
-      return responseFor(context, existingSummary.summaryFeedbackId());
+      return responseFor(context, existingSummary.summaryFeedbackId(), userId);
     }
 
     // 외부 AI 호출은 DB 트랜잭션 밖에서 수행한다.
-    AiSessionFeedbackResult result =
-        aiConversationClient.generateSessionFeedback(
-            new AiSessionFeedbackRequest(
-                context.sessionId(),
-                context.scenario(),
-                context.userMessages().stream().map(UserMessageContext::messageId).toList()));
+    long deadline = System.nanoTime() + properties.sessionFeedbackRequestTimeout().toNanos();
+    AiSessionFeedbackResult result;
+    try {
+      result =
+          aiConversationClient.generateSessionFeedback(toRequest(context), remaining(deadline));
+    } catch (ApiException exception) {
+      if (exception.getErrorCode() != SessionErrorCode.FEEDBACK_NOT_READY) {
+        throw exception;
+      }
+      feedbackWorkService.recoverMissing(userId, context);
+      feedbackWorkService.awaitRecovery(context, remaining(deadline).dividedBy(2));
+      result =
+          aiConversationClient.generateSessionFeedback(toRequest(context), remaining(deadline));
+    }
     Long summaryFeedbackId = completionService.record(userId, context, result);
-    return responseFor(context, summaryFeedbackId);
+    return responseFor(context, summaryFeedbackId, userId);
   }
 
-  /** 저장된 최종 피드백과 평가 당시 사용자 메시지 컨텍스트를 API 응답으로 조립한다. */
+  private AiSessionFeedbackRequest toRequest(LoadedSessionFeedbackContext context) {
+    List<Long> ids = context.userMessages().stream().map(UserMessageContext::messageId).toList();
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        ids,
+        List.of(),
+        feedbackWorkService.completedResults(context.sessionId(), ids));
+  }
+
+  private Duration remaining(long deadline) {
+    long nanos = deadline - System.nanoTime();
+    if (nanos <= 0) {
+      throw new ApiException(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
+    }
+    return Duration.ofNanos(nanos);
+  }
+
+  /** 저장된 최종 피드백과 평가 당시 사용자 메시지 컨텍스트를 API 응답으로 조립하고, 잠긴 상세 피드백은 비워 내린다. */
   private SessionFeedbackResponse responseFor(
-      LoadedSessionFeedbackContext context, Long summaryFeedbackId) {
+      LoadedSessionFeedbackContext context, Long summaryFeedbackId, long userId) {
     List<SessionHistoryMessageFeedback> feedbacks =
         sessionFeedbackDataService.findMessageFeedbacks(summaryFeedbackId);
-    if (feedbacks.size() != context.userMessages().size()) {
+    SessionHistorySummaryFeedback summary =
+        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
+    if (!feedbacks.isEmpty() && feedbacks.size() != context.userMessages().size()) {
       throw new ApiException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
     Map<Long, SessionHistoryMessageFeedback> feedbackByMessageId =
@@ -70,18 +112,18 @@ public class SessionFeedbackService {
                 Collectors.toMap(
                     SessionHistoryMessageFeedback::getSessionHistoryMessageId,
                     Function.identity()));
-    SessionHistorySummaryFeedback summary =
-        sessionFeedbackDataService.requireSummary(summaryFeedbackId);
-
     return SessionFeedbackResponse.from(
         context.sessionId(),
         summary,
-        context.userMessages().stream()
-            .map(
-                userMessage ->
-                    messageFeedbackResponse(
-                        feedbackByMessageId.get(userMessage.messageId()), userMessage))
-            .toList());
+        feedbacks.isEmpty()
+            ? List.of()
+            : context.userMessages().stream()
+                .map(
+                    userMessage ->
+                        messageFeedbackResponse(
+                            feedbackByMessageId.get(userMessage.messageId()), userMessage))
+                .toList(),
+        accessGrants.detailFeedbackLocked(userId, context.sessionId()));
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
@@ -98,5 +140,13 @@ public class SessionFeedbackService {
             userMessage.evaluationContext().type(),
             userMessage.evaluationContext().content(),
             userMessage.evaluationContext().translatedContent()));
+  }
+
+  /** 완료 세션 컨텍스트를 기존 AI 최종 피드백 요청으로 변환한다. */
+  static AiSessionFeedbackRequest toAiFeedbackRequest(LoadedSessionFeedbackContext context) {
+    return new AiSessionFeedbackRequest(
+        context.sessionId(),
+        context.scenario(),
+        context.userMessages().stream().map(UserMessageContext::messageId).toList());
   }
 }

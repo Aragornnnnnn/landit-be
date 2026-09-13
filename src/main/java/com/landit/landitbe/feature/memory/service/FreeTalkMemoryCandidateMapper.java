@@ -69,7 +69,7 @@ final class FreeTalkMemoryCandidateMapper {
     return new FreeTalkMemoryCandidate(
         candidate.candidateIndex(),
         memory,
-        toResolutionCandidate(candidate, observedAt),
+        toResolutionCandidate(candidate, observedAt, sources),
         List.of());
   }
 
@@ -107,12 +107,15 @@ final class FreeTalkMemoryCandidateMapper {
   }
 
   private static AiMemoryResolutionRequest.Candidate toResolutionCandidate(
-      AiMemoryCandidatesResult.Candidate candidate, OffsetDateTime observedAt) {
+      AiMemoryCandidatesResult.Candidate candidate,
+      OffsetDateTime observedAt,
+      List<ConversationMemoryHistoryMessage> sourceMessages) {
     return new AiMemoryResolutionRequest.Candidate(
         candidate.candidateIndex(),
         candidate.content(),
         candidate.memoryType(),
         candidate.sourceMessageIds(),
+        sourceMessages,
         observedAt,
         List.of());
   }

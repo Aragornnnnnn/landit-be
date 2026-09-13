@@ -26,7 +26,7 @@ public record FreeTalkSessionStartResponse(
     @Schema(description = "첫 발화 주체") String startMode,
     @Schema(description = "프리톡 캐릭터 정보") ConversationCharacterResponse character,
     @Schema(description = "AI 선시작 주제명. 사용자 선시작은 null") String title,
-    @Schema(description = "사용자 일일 발화 시간 제한 밀리초", example = "60000") long speakingTimeLimitMs,
+    @Schema(description = "사용자 일일 발화 시간 제한 밀리초", example = "7200000") long speakingTimeLimitMs,
     @Schema(description = "AI 선시작의 첫 AI 메시지. 사용자 선시작은 null")
         CurrentMessageResponse currentMessage) {
 

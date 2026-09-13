@@ -15,6 +15,7 @@ public record AiMemoryResolutionRequest(List<Candidate> candidates) {
       String content,
       ConversationMemoryType memoryType,
       List<Long> sourceMessageIds,
+      List<ConversationMemoryHistoryMessage> sourceMessages,
       OffsetDateTime observedAt,
       List<ComparableMemory> comparableMemories) {}
 

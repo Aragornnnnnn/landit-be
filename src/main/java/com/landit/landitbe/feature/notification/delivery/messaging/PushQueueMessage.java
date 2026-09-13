@@ -20,6 +20,10 @@ public record PushQueueMessage(
     Instant occurredAt,
     PushQueuePayload payload) {
 
+  public static final String NOTIFICATION_JOB = "NOTIFICATION_JOB";
+
   public static final String MAILBOX_REPLY_NOTIFICATION_BATCH = "MAILBOX_REPLY_NOTIFICATION_BATCH";
   public static final String PUSH_RECEIPT_CHECK = "PUSH_RECEIPT_CHECK";
+  public static final String ADMIN_PUSH_CAMPAIGN = "ADMIN_PUSH_CAMPAIGN";
+  public static final String ADMIN_PUSH_TEST = "ADMIN_PUSH_TEST";
 }

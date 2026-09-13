@@ -1282,6 +1282,38 @@ class DatabaseSchemaIntegrationTests {
         .isEqualTo(202L);
   }
 
+  /** 기존 발화 사용량은 보존하고 요청 횟수는 0에서 시작하도록 V97을 적용한다. */
+  @Test
+  void v97PreservesSpeakingUsageAndInitializesRequestCounters() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "32");
+    insertAiTutor(migrationJdbcTemplate, 990401L, "ACTIVE");
+    insertUserProfile(migrationJdbcTemplate, 990402L, 990401L);
+    migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_daily_speaking_usage "
+            + "(user_profile_id, usage_date, used_speaking_duration_ms) "
+            + "VALUES (990402, CURRENT_DATE, 12345)");
+    migrateToVersion(databaseUrl, "96");
+
+    migrateToVersion(databaseUrl, "97");
+
+    Map<String, Object> usage =
+        migrationJdbcTemplate.queryForMap(
+            "SELECT used_speaking_duration_ms, request_count, request_minute, minute_request_count "
+                + "FROM free_talk_daily_speaking_usage WHERE user_profile_id = 990402");
+    assertThat(usage.get("used_speaking_duration_ms")).isEqualTo(12345L);
+    assertThat(usage.get("request_count")).isEqualTo(0);
+    assertThat(usage.get("minute_request_count")).isEqualTo(0);
+    assertThat(usage.get("request_minute")).isNull();
+    assertThatThrownBy(
+            () ->
+                migrationJdbcTemplate.update(
+                    "UPDATE free_talk_daily_speaking_usage SET request_count = -1"))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
   private String migrationTestDatabaseUrl() {
     return "jdbc:h2:mem:lan100-v14-"
         + UUID.randomUUID()

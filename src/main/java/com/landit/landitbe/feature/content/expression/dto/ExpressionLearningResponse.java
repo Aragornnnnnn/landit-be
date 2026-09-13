@@ -68,7 +68,9 @@ public record ExpressionLearningResponse(
             example = "https://cdn.landit.com/content/expression-pronunciation-audio/101/expr.mp3")
         String targetExpressionAudioUrl,
     @Schema(description = "이 표현의 학습 완료 여부. 시나리오·프리톡 어느 경로의 표현이든 완료 이력이 있으면 true", example = "true")
-        boolean completed) {
+        boolean completed,
+    @Schema(description = "같은 표현 학습을 재개할 때 사용하는 시도 ID") String learningAttemptId,
+    @Schema(description = "새 입력을 제출할 수 있는 시각 한계") java.time.LocalDateTime learningExpiresAt) {
 
   /**
    * 표현 엔티티와 원어민 TTS URL들을 학습 시작 응답으로 변환한다.
@@ -98,6 +100,29 @@ public record ExpressionLearningResponse(
         expression.getRepresentativeImageUrl(),
         representativeSentenceAudioUrl,
         targetExpressionAudioUrl,
-        completed);
+        completed,
+        null,
+        null);
+  }
+
+  /** 기존 표현 정보에 저장된 학습 시도 식별자를 추가한다. */
+  public ExpressionLearningResponse withAttempt(String id, java.time.LocalDateTime expiresAt) {
+    return new ExpressionLearningResponse(
+        expressionId,
+        targetExpressionText,
+        baseExpressionMeaningText,
+        usageDescription,
+        representativeQuestionText,
+        representativeQuestionTranslation,
+        representativeSentenceText,
+        representativeSentenceTranslation,
+        representativeSentenceWords,
+        representativeSentenceWordChoices,
+        representativeImageUrl,
+        representativeSentenceAudioUrl,
+        targetExpressionAudioUrl,
+        completed,
+        id,
+        expiresAt);
   }
 }

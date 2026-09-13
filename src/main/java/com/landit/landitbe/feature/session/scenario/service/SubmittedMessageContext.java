@@ -34,4 +34,5 @@ record SubmittedMessageContext(
     ScenarioSessionMessageContextProjection scenarioContext,
     List<AiConversationHistoryMessage> conversationHistory,
     Optional<NextQuestionContext> nextQuestion,
-    boolean createdSessionHistory) {}
+    boolean createdSessionHistory,
+    String attemptToken) {}

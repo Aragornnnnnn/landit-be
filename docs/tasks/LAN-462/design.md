@@ -1,0 +1,160 @@
+# LAN-462 어드민 푸시 캠페인 설계
+
+## 목표
+
+관리자가 제목, 내용, 딥 링크를 가진 캠페인을 만들고 본인 테스트 후 전체 또는 선택 사용자의 활성 Expo Push Token에 즉시 또는 한국 시간 예약으로 비동기 발송한다. 선택 사용자는 개별 클릭, ID 붙여넣기, 읽기 SQL을 조합한다. 캠페인 생성 후 원문과 대상 조건은 수정하지 않는다.
+
+## API
+
+- `POST /api/v1/admin/push-campaigns`: 캠페인 생성.
+- `GET /api/v1/admin/push-campaigns?scheduled=true&status=SCHEDULED&page=0&size=20`: 캠페인 목록·필터·페이지 정보 조회.
+- `GET /api/v1/admin/push-campaigns/{campaignId}`: 원문, 상태, 집계 조회.
+- `GET /api/v1/admin/push-campaigns/{campaignId}/audience-preview`: 현재 예상 사용자·Token 수 조회.
+- `POST /api/v1/admin/push-campaigns/{campaignId}/test`: 관리자 본인 테스트를 SQS에 발행.
+- `POST /api/v1/admin/push-campaigns/{campaignId}/send`: 저장된 대상 조건의 발송을 SQS에 발행.
+
+- `POST /api/v1/admin/push-campaigns/audience-query`: `{"sql":"SELECT ..."}` → 중복 없는 ID 배열. 발송은 하지 않는다.
+- `POST /api/v1/admin/push-campaigns/{campaignId}/schedule`: `{"scheduledAt":"2026-09-10T19:00:00+09:00"}`. `Idempotency-Key` 필수.
+- `POST /api/v1/admin/push-campaigns/{campaignId}/cancel-schedule`: 시작 전 예약 취소.
+
+모든 API는 기존 `/api/v1/admin/**` 권한 검사를 사용한다. 생성·테스트·발송·SQL 미리보기·예약·취소는 기존 관리자 감사 로그에 기록한다. 감사 로그에 SQL 원문이나 DB 자격 증명을 넣지 않는다.
+
+## 입력 계약
+
+### 어드민 사용자 선택용 목록
+
+기존 `GET /api/v1/admin/users`에 선택 필터를 추가한다. 두 필터는 AND 조건이며, 생략하면 해당 조건을 제한하지 않는다. 필터 적용 후 가입일·ID 내림차순으로 기존 `page`, `size` 페이지를 조회한다.
+
+- `active=true`: 활성 사용자(`ACTIVE`). `false`: 탈퇴·차단 사용자(`WITHDRAWN`, `BANNED`).
+- `pushConsent=true`: 저장된 푸시 권한이 `GRANTED`. `false`: `DENIED` 또는 `NOT_DETERMINED`.
+- 목록에 `userProfileId`, 기존 기본 정보와 `pushPermissionStatus`를 반환한다.
+- 푸시 동의 필터는 서버 저장값이다. 실제 기기 권한이나 활성 Token 보유 여부를 의미하지 않는다.
+- 예: `/api/v1/admin/users?active=true&pushConsent=true&page=0&size=20`.
+- 응답의 `totalCount`, `totalPages`는 필터 적용 결과 기준이다. 결과가 없으면 둘 다 0이며, 범위 밖 페이지는 빈 목록과 실제 전체 수를 반환한다.
+- API의 `page`는 0부터 시작한다. 화면은 `page + 1`로 표시하며 마지막 페이지 요청 값은 `totalPages - 1`이다. 기존 `hasNext`도 유지한다.
+
+### 캠페인 입력
+
+- 제목, 내용, 딥 링크는 필수이며 최대 길이는 각각 255자, 500자, 1,000자다.
+- 실제 Expo 표시 payload는 UTF-8 기준 3,000바이트 이하여야 한다.
+- 딥 링크는 `/`로 시작하는 앱 내부 경로 또는 사용자 정보가 없는 `https` URL만 허용한다.
+- 캠페인 생성과 테스트는 `Idempotency-Key`를 사용한다.
+- `audienceType`: `ALL`(생략 시 기본값) 또는 `SELECTED`.
+- `ALL`은 `userProfileIds`를 생략하거나 빈 목록으로 보낸다. ID가 포함되면 오류다.
+- `SELECTED`는 `userProfileIds` 또는 `audienceSql`을 받는다. 제외 ID만 있는 생성 요청은 거부하며, 유효한 선택에서 제외를 적용한 결과가 0명인 경우는 허용한다. 캠페인 1,000명 제한은 없으며 DB 조회·저장은 내부에서 1,000개씩 처리한다.
+- 대상은 `(SQL 결과 ∪ userProfileIds) − excludedUserProfileIds`다. 제외가 우선한다. 수동 입력 ID는 양수·실재 여부를 검증하고 중복 제거·정렬한다. SQL 결과에 없는 사용자나 비활성 사용자는 실제 대상에서 제외된다.
+- 개별 클릭과 쉼표·공백·줄바꿈으로 붙여넣은 ID는 어드민 UI에서 같은 `userProfileIds` 배열로 보낸다. 이 저장소는 BE API만 제공한다.
+- SQL 결과를 고정하려면 미리보기 ID를 `userProfileIds`에 넣고 SQL을 생략한다. 발송 시 재조회하려면 `audienceSql`을 저장한다.
+- SQL이 없는 선택에서 모든 ID를 제외하면 발송 대상은 0명이다. 빈 결과를 ALL로 대체하지 않는다.
+- 같은 생성 요청 키에서 대상 유형이나 사용자 집합이 달라지면 충돌이다. 순서·중복만 달라진 목록은 같은 요청으로 처리한다.
+- 선택 사용자가 비활성이거나 활성 Token이 없으면 실제 대상에 포함하지 않는다. 대상 수는 입력 ID 수가 아닌 발송 가능한 사용자·Token 수다.
+- 생성·목록·상세 응답에 `audienceType`, 정규화된 `userProfileIds`, `audienceSql`, `excludedUserProfileIds`, UTC `scheduledAt`을 반환한다. 본인 테스트는 이 목록과 관계없이 인증 관리자에게 발송한다.
+
+```json
+{"title":"공지","body":"내용","deepLink":"/home","audienceType":"SELECTED","userProfileIds":[123,456]}
+```
+
+## 발송 흐름
+
+1. SQL 없는 즉시 발송은 API 요청에서 대상을 고정한다. SQL 즉시 발송은 `PENDING`을 저장한 뒤 SQS Worker가 SQL을 실행해 대상을 고정한다. 예약도 예약 시각의 Worker에서 조회·고정한다. 조회 실패 시 대상 일부나 ALL로 발송하지 않는다.
+2. SQS에는 캠페인 ID만 발행한다.
+3. 소비자는 고정된 대상을 최대 100개 조회한다. 실제 발송 적격성은 다음 단계에서 확인한다.
+4. 기존 `PushDeliveryService`가 Token을 다시 확인하고 `push_delivery`를 선점한다.
+5. 기존 Expo 배치 발송과 `PUSH_RECEIPT_CHECK` 흐름으로 Ticket과 Receipt를 기록한다.
+6. 마지막 대상 ID를 캠페인 커서에 저장하고 다음 페이지를 SQS에 발행한다.
+
+별도의 실행, lease, polling, rate-limit 테이블은 두지 않는다. SQS 재전달은 `push_delivery.deduplication_key` 유일 제약으로 무해하게 처리한다. 외부 요청 전에 만들어진 이력은 자동 재제출하지 않아 중복 발송을 우선 방지한다. Ticket 저장 후 Receipt 예약이 실패한 경우에는 재처리에서 접수된 Ticket의 Receipt 작업만 다시 예약한다.
+
+전체 발송 키는 다음과 같다.
+
+```text
+push:admin-broadcast:{campaignId}:{userProfileId}:{userPushTokenId}
+```
+
+테스트는 별도 키 공간을 사용하므로 이후 전체 발송을 막지 않는다.
+
+```text
+push:admin-broadcast-test:{campaignId}:{idempotencyKey}:{userPushTokenId}
+```
+
+## 데이터와 상태
+
+`admin_push_campaign`에는 불변 원문, 생성 멱등성 키, `DRAFT/PENDING/SCHEDULE_PENDING/SCHEDULED/CANCELLED/QUEUED/SENDING/COMPLETED` 상태, 대상 수와 처리 커서를 저장한다. `admin_push_target`에는 발송 시작 시 고정한 사용자와 Token ID만 저장한다. 결과 수는 기존 `push_delivery`에서 캠페인 키 접두어로 집계한다.
+
+V83에서 `audience_type`과 `admin_push_campaign_user(campaign_id, user_profile_id)`를 추가한다. 캠페인과 선택 목록은 한 트랜잭션에 저장한다. 기존 캠페인은 ALL로 유지하며 기존 생성 요청 해시도 호환된다.
+
+- 성공: Receipt가 `DELIVERED`인 Token 수.
+- 실패: Ticket 또는 Receipt가 `FAILED`인 Token 수.
+- 대기: `REQUESTED` 또는 `TICKET_ACCEPTED`인 Token 수.
+- 제외: 처리 완료 커서 이하의 대상 수에서 같은 범위의 발송 이력 수를 뺀 값.
+
+`COMPLETED`는 대상 페이지 제출 완료를 뜻하며 실제 기기 표시나 전원 성공을 뜻하지 않는다.
+
+V84에서 `audience_sql`, `scheduled_at`과 선택 목록의 `excluded`를 추가한다. 기존 데이터와 V82/V83 체크섬은 유지한다.
+
+## SQL 조회와 설문 미응답자
+
+사용자가 제공한 `public.survey_responses(user_id PK, email, answers JSONB, created_at TIMESTAMPTZ)`는 같은 BE DB에 있다. `user_id`는 `user_profile.id`와 연결하며, 행 존재를 응답으로 판단한다. 설문 ID·완료 여부 컬럼이 없으므로 여러 설문 회차나 임시 저장을 구분할 수 없다. 이 테이블의 소유권·스키마는 변경하지 않는다.
+
+```sql
+SELECT u.id AS user_profile_id
+FROM public.user_profile u
+WHERE u.status = 'ACTIVE'
+  AND NOT EXISTS (
+    SELECT 1 FROM public.survey_responses s WHERE s.user_id = u.id
+  )
+```
+
+- `SELECT` 또는 읽기 `WITH`만 지원한다. 결과는 `user_profile_id` 하나의 SMALLINT/INTEGER/BIGINT 컬럼이어야 한다. 데이터 수신 전에 JDBC Describe로 검사한다.
+- 세미콜론, SQL 주석, 역슬래시·달러 문자열, 따옴표 식별자, 쓰기 CTE, 임의 함수·UNION은 거부한다. 함수는 `count/min/max/sum/avg/coalesce/nullif/lower/upper/length`만 지원하며 최종 결과는 정수 타입이어야 한다. 일반 JOIN, NOT EXISTS, IN, 조건 비교를 지원한다.
+- 별도 JDBC client Adapter가 원격 DB의 TLS `verify-full`과 JVM 신뢰 저장소(DefaultJavaSSLFactory)를 강제한다. URL의 약한 SSL 옵션과 계정·타임아웃 옵션은 정책을 덮을 수 없다. 정확한 localhost/127.0.0.1/[::1]만 로컬 테스트용 비암호화 연결을 허용한다. 배포 환경의 JVM이 서버 인증서 체인을 신뢰해야 하며 실패 시 약한 TLS로 대체하지 않는다.
+- 별도 읽기 계정의 `READ ONLY` 트랜잭션에서 실행하고 항상 롤백한다. 애플리케이션 DB 연결로 대체하지 않는다. 관리자 권한·문법 검사만으로 쓰기 차단을 보장한다고 가정하지 않는다.
+- DB statement timeout 10초, lock timeout 1초, 연결 제한 5초, socket timeout 15초다. 서버 커서를 사용하지 않아 SELECT 실행 전체에 statement timeout을 적용한다.
+- 기본 결과 상한 100,000행은 SQL 자원 보호용이며 초과하면 조회 전체가 실패한다. 일부 결과로 캠페인을 진행하지 않는다. 중복 제거 전 행 수에 적용하며 환경 설정으로 조정한다. 수동 SELECTED 캠페인의 1,000명 제한과는 별개다.
+- `LANDIT_PUSH_AUDIENCE_DB_URL/USERNAME/PASSWORD`를 API와 소비 환경 모두 설정한다. 같은 BE DB의 별도 로그인 역할 `landit_push_reader`에 `public` 업무 테이블 전체의 SELECT를 부여한다. superuser/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS 역할은 서버에서 거부한다. 역할 상속·쓰기·스키마 생성·추가 함수 실행 권한은 부여하지 않는다. 서버의 읽기 트랜잭션과 SQL 검증은 유지한다.
+- 사용자 승인에 따라 두 테이블 제한을 없애고 `public` 전체로 확장한다. [grant-push-reader.sql](grant-push-reader.sql)을 Supabase SQL Editor에서 테이블 소유자 권한으로 실행한다. 기존 계정·비밀번호·데이터는 변경하지 않는다. `auth`, `storage` 스키마에 새 권한을 부여하지 않는다.
+- `GRANT ... ON ALL TABLES`와 기본 권한의 PostgreSQL 범위에는 뷰·외부 테이블도 포함된다. 특히 `public`의 소유자 권한으로 실행하는 뷰가 다른 스키마를 노출하지 않는지 적용 환경에서 확인한다. 일반 함수에 대한 새로운 EXECUTE 권한은 부여하지 않는다.
+- 스크립트는 일반·파티션 테이블마다 계정 전용 `FOR SELECT ... USING (true)` 정책을 추가하며 RLS 활성화 여부와 다른 역할의 정책은 유지한다. 같은 이름의 다른 정책, 이 역할에 적용되는 제한 SELECT 정책, 기존 테이블·컬럼 쓰기 권한 또는 생성 역할의 전역·public 쓰기 기본 권한이 있으면 전체 트랜잭션을 중단한다. 스크립트 재실행은 같은 정책을 중복 생성하지 않는다.
+- 앞으로의 SELECT 자동 부여는 현재 `public` 객체 소유자들과 실행 역할이 만드는 테이블에 적용한다. 다른 역할을 새로 테이블 생성자로 쓰면 그 역할의 `ALTER DEFAULT PRIVILEGES`도 설정해야 한다. 실행자가 해당 역할의 기본 권한을 바꿀 수 없으면 전체 스크립트가 실패하므로 소유자 권한으로 실행한다.
+- **기본 권한은 RLS 정책을 자동 생성하지 않는다.** 새 테이블을 만드는 마이그레이션에서 RLS 정책도 함께 추가하거나, 노출 전에 위 스크립트를 재실행한다. 별도의 DDL 이벤트 트리거는 추가하지 않는다. RLS 때문에 SQL 결과가 일부만 보이는 상태를 허용하지 않도록 운영 연결 검증에서 관리자와 읽기 계정의 행 수를 비교한다.
+- 스크립트 마지막 표는 테이블별 `can_read=true`, `can_write=false`를 확인하는 용도다. 실제 읽기 계정의 연결과 행 가시성 검증은 별도로 수행한다. 권한 확장 스크립트는 로컬 검증 대상이며 운영 적용 완료를 의미하지 않는다.
+
+## 한국 시간 예약
+
+- 전체·예약 목록은 `GET /api/v1/admin/push-campaigns` 하나로 조회한다. `scheduled=true`는 예약 시각이 있는 캠페인, `false`는 없는 캠페인(초안 포함), 생략하면 전체다. AWS 목록 조회나 SQL 대상 재조회는 수행하지 않는다.
+- `status`는 `scheduled`와 AND로 적용되며 생략하면 모든 상태다. `DRAFT`, `PENDING`, `SCHEDULE_PENDING`, `SCHEDULED`, `QUEUED`, `SENDING`, `COMPLETED`, `CANCELLED`를 지원한다. `SCHEDULE_PENDING`은 AWS 등록 확인이 필요한 상태이며 `SCHEDULED`와 구별한다.
+- 모든 목록의 정렬은 생성 시각·ID 내림차순이다. `page`는 0부터, `size`는 기본 20·최대 50이다. 응답은 `{items, page, size, hasNext, totalCount, totalPages}`이며 전체 수는 같은 예약 여부·상태 필터 기준이다. 빈 결과는 전체 수·페이지 수 모두 0이고, 범위 밖 페이지는 빈 목록과 실제 전체 수를 반환한다.
+- 배열이었던 기존 목록의 `data`는 `{items, page, size, hasNext, totalCount, totalPages}` 객체로 변경한다. FE는 `data.items`를 사용한다. 별도 `/schedules` 경로는 제거한다.
+- 목록은 페이지 크기와 무관하게 전체 수·캠페인·선택/제외 ID·발송 집계 총 4회 쿼리로 조회한다. 집계는 스냅샷 대상의 정확한 멱등성 키로 이력을 조인한다.
+- 각 항목은 캠페인 상세와 같은 원문·`scheduledAt`·상태·대상/발송 집계를 제공한다. 표시 시각은 한국 시간으로, 페이지 번호는 `page + 1`로 변환한다.
+
+- 입력은 초 단위 `+09:00` 오프셋이며 최초 요청은 현재보다 1분 이후여야 한다. DB에는 TIMESTAMPTZ로 저장하고 어드민은 `Asia/Seoul`로 표시한다.
+- DB에 `SCHEDULE_PENDING`과 불변 예약 시각을 먼저 저장한 뒤 EventBridge Scheduler의 일회성 `at(...)` 예약을 만든다. 예약 이름은 `admin-push-{campaignId}`로 고정한다.
+- Scheduler는 `Asia/Seoul`, flexible window OFF, 완료 후 DELETE로 기존 Push SQS에 캠페인 ID를 보낸다. 분 단위 예약이며 정각 초 단위 기기 수신을 보장하지 않는다.
+- 등록 성공 후 `SCHEDULED`로 변경한다. 등록 실패·응답 유실은 같은 캠페인·같은 시각의 schedule API로 재시도한다. 그때 이미 예약 시각이 지났다면 SQS에 즉시 발행한다. 시각 변경은 409이며 취소 후 새 캠페인을 만든다.
+- 발송 대상은 예약 당시가 아니라 실제 시작 시 고정한다. 그전에 설문을 응답한 사용자는 재조회 결과에서 빠진다. 수동 추가 ID는 SQL과 별도의 명시적 포함이므로 계속 포함된다.
+- 취소와 대상 고정은 같은 DB 행의 조건부 갱신으로 경쟁한다. 대상 고정이 먼저 성공하면 취소는 409다. 취소가 먼저면 남은 Scheduler/SQS 작업도 발송하지 않는다. DB 취소 후 AWS 삭제가 실패하면 취소 API를 재호출한다.
+- `LANDIT_PUSH_SCHEDULER_GROUP`, `LANDIT_PUSH_SCHEDULER_QUEUE_ARN`, `LANDIT_PUSH_SCHEDULER_ROLE_ARN`, `LANDIT_PUSH_SCHEDULER_DLQ_ARN` 설정이 필요하다. API 역할에는 지정 그룹의 Create/Get/DeleteSchedule과 지정 실행 역할의 PassRole, Scheduler 실행 역할에는 기존 Push SQS와 같은 환경 Push DLQ의 SendMessage가 필요하다. 환경별 그룹을 사용한다.
+- Scheduler가 SQS 전달 재시도를 소진하면 기존 Push DLQ에 실패를 보관한다. Scheduler 오류 속성·원본 Target Input과 캠페인 상태를 확인해 수동 복구하며 일반 소비 실패 메시지와 섞어 일괄 redrive하지 않는다. 새 DLQ ARN과 IAM 권한을 IaC로 적용한 뒤 BE를 배포한다.
+- Worker SQL/설정 오류는 SQS 재시도와 기존 DLQ로 처리한다. 상태가 PENDING/예약 대기에 남으면 DLQ·설정을 확인하고 기존 메시지를 재처리한다. 새로운 자동 복구/폴링 시스템은 추가하지 않는다.
+
+## 독립성 및 한계
+
+- 일괄 공지는 `user_notification_state`를 읽거나 변경하지 않는다.
+- 예약 학습 알림과 다른 `NotificationType` 및 중복 키를 사용한다.
+- 발송 시작 후 활성화되거나 소유자가 바뀐 Token은 대상에 포함하지 않는다.
+- SQS 발행 실패 시 같은 캠페인의 전체 발송 API를 다시 호출하면 미완료 캠페인을 재발행한다.
+- 실제 운영 DB 적용, 실제 기기 테스트, FE 외부 URL 이동, 운영 전체 발송은 별도 승인과 검증이 필요하다.
+
+## 검증
+
+- 캠페인 생성 멱등성, 입력과 URL 형식.
+- 대상 범위 고정, 비활성 Token 제외, 100건 배치.
+- 중복 SQS 처리 시 동일 Token 재발송 방지.
+- 테스트와 전체 발송 및 예약 학습 알림 키의 독립성.
+- 캠페인 상태와 대상·성공·실패·제외 집계.
+- `./gradlew check`와 인증·동시성·마이그레이션 독립 리뷰.
+
+예약 동작의 외부 계약은 [AWS Scheduler 공식 문서](https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html)를 기준으로 한다.
+
+계정 권한의 외부 계약: [PostgreSQL 기본 권한](https://www.postgresql.org/docs/current/sql-alterdefaultprivileges.html), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
