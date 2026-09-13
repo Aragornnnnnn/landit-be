@@ -24,7 +24,7 @@ import com.landit.landitbe.feature.content.scenario.service.ScenarioService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -97,7 +97,7 @@ public class ExpressionQueryService {
   private final Random random = new Random();
 
   private final ScenarioService scenarioService;
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final WritingExpressionRepository writingExpressionRepository;
   private final ExpressionPronunciationAssetRepository pronunciationAssetRepository;
   private final UserAccentLocaleResolver accentLocaleResolver;
@@ -118,7 +118,7 @@ public class ExpressionQueryService {
     scenarioService.validateExists(scenarioId);
 
     // 사용자 로케일에 맞는 표현을 로케일별 노출 순서로 조회한다.
-    UserLocale userLocale = userProfileService.getUserLocale(userId);
+    UserLocale userLocale = profileLearningService.getUserLocale(userId);
     ContentLearningLevel contentLevel =
         scenarioLearningLevelService.expressionLevel(userId, scenarioId);
     List<WritingExpression> expressions =
@@ -154,7 +154,7 @@ public class ExpressionQueryService {
    */
   @Transactional(readOnly = true)
   public ExpressionProgress getExpressionProgress(Long userId, Long scenarioId) {
-    UserLocale userLocale = userProfileService.getUserLocale(userId);
+    UserLocale userLocale = profileLearningService.getUserLocale(userId);
     ContentLearningLevel contentLevel =
         scenarioLearningLevelService.expressionLevel(userId, scenarioId);
     List<WritingExpression> expressions =

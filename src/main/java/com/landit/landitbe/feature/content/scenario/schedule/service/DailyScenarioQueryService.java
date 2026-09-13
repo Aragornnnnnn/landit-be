@@ -14,7 +14,7 @@ import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLeve
 import com.landit.landitbe.feature.learning.access.dto.ScenarioAccessHistory;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Clock;
@@ -33,7 +33,7 @@ public class DailyScenarioQueryService {
 
   private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
 
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final ScenarioAccessService scenarioAccessService;
   private final CurrentScenarioSelectionService scenarioProgressionService;
   private final DailyScenarioQueryRepository dailyScenarioQueryRepository;
@@ -56,7 +56,7 @@ public class DailyScenarioQueryService {
     LocalDate queryDate = date != null ? date : today;
     validateNotFuture(queryDate, today);
 
-    UserLocale userLocale = userProfileService.getUserLocale(userId);
+    UserLocale userLocale = profileLearningService.getUserLocale(userId);
     return scenarioAccessService
         .findAccessGrantedOn(userId, userLocale.targetLocale(), queryDate)
         .map(history -> buildCompletedResponse(userId, queryDate, history))

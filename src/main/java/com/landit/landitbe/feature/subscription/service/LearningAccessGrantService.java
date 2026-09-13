@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.subscription.service;
 
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import com.landit.landitbe.feature.subscription.domain.FreeScenarioReservation;
 import com.landit.landitbe.feature.subscription.domain.LearningAccessGrant;
 import com.landit.landitbe.feature.subscription.dto.ExpressionLearningAttempt;
@@ -31,6 +32,7 @@ public class LearningAccessGrantService {
   private final FreeScenarioReservationRepository reservations;
   private final SubscriptionLaunchPolicyService policies;
   private final UserProfileService profiles;
+  private final ProfileSubscriptionService profileSubscriptions;
   private final Clock clock;
   private final com.landit.landitbe.feature.session.service.LearningSessionService sessions;
   private final com.landit.landitbe.feature.session.service.ScenarioSessionService scenarioSessions;
@@ -52,7 +54,7 @@ public class LearningAccessGrantService {
    * @return 실제 만료 전 프리미엄이면 true
    */
   public boolean premium(long userId) {
-    var snapshot = profiles.getSubscription(userId);
+    var snapshot = profileSubscriptions.getSubscription(userId);
     return snapshot.premium()
         && (snapshot.expiresAt() == null
             || LocalDateTime.now(clock).isBefore(snapshot.expiresAt()));

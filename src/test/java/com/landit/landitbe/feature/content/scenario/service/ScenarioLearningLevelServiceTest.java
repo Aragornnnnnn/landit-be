@@ -11,7 +11,7 @@ import com.landit.landitbe.feature.content.scenario.repository.ScenarioLearningH
 import com.landit.landitbe.feature.content.scenario.repository.projection.CompletedScenarioLevelProjection;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.Locale;
 import java.time.Clock;
 import java.time.Instant;
@@ -24,7 +24,7 @@ class ScenarioLearningLevelServiceTest {
   @Test
   void preservesPastGroupsButUsesAssessedLevelForDiagnosticExpressions() {
     var sessions = mock(ScenarioLearningHistoryQueryRepository.class);
-    var profiles = mock(UserProfileService.class);
+    var profiles = mock(ProfileLearningService.class);
     var clock = Clock.fixed(Instant.parse("2026-09-07T00:00:00Z"), ZoneId.of("Asia/Seoul"));
     var service = new ScenarioLearningLevelService(sessions, profiles, clock);
     when(profiles.getUserLocale(1L)).thenReturn(new UserLocale(Locale.EN, Locale.KR));

@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session.assessment.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningAssessmentState;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.assessment.domain.LearningLevelPolicy;
 import com.landit.landitbe.feature.session.assessment.domain.SessionLevelAssessment;
@@ -31,7 +31,7 @@ class SessionLevelAssessmentService {
   private static final String ASSESSMENT_VERSION = "text-level-v1.3";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final UserLevelAssessmentRepository userLevelAssessmentRepository;
   private final java.time.Clock clock;
   private final SessionLevelAssessmentLaunchService launchService;
@@ -43,7 +43,7 @@ class SessionLevelAssessmentService {
       boolean applyToProfile,
       java.time.LocalDateTime requestedAt) {
     UserLearningAssessmentState profile =
-        userProfileService
+        profileLearningService
             .findLearningAssessmentStateForUpdate(userId)
             .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
     Integer previousLevel = profile.learningLevel();
@@ -68,7 +68,7 @@ class SessionLevelAssessmentService {
                 profile.promotionStreak(),
                 LearningLevelPolicy.ChangeType.NOT_APPLIED);
     if (decision.changeType() != LearningLevelPolicy.ChangeType.NOT_APPLIED) {
-      userProfileService.applyAssessedLearningLevel(
+      profileLearningService.applyAssessedLearningLevel(
           userId, decision.level(), decision.promotionStreak(), java.time.LocalDateTime.now(clock));
     }
 

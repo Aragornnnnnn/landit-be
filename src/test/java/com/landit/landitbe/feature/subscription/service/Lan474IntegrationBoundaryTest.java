@@ -48,11 +48,16 @@ class Lan474IntegrationBoundaryTest {
   @Test
   void sandboxPurchaseAndTransferDoNotReadOrWriteSubscriptionState() {
     var profiles = mock(UserProfileService.class);
+    var subscriptionProfiles =
+        mock(
+            com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService
+                .class);
     var events = mock(SubscriptionEventRepository.class);
     var service =
         new RevenueCatWebhookService(
             new RevenueCatProperties("test-auth", false),
             profiles,
+            subscriptionProfiles,
             events,
             Clock.systemUTC(),
             mock(com.landit.landitbe.feature.notification.service.NotificationJobService.class));
@@ -71,6 +76,6 @@ class Lan474IntegrationBoundaryTest {
       assertThatThrownBy(() -> service.handle("wrong-auth", request))
           .isInstanceOf(SubscriptionException.class);
     }
-    verifyNoInteractions(profiles, events);
+    verifyNoInteractions(profiles, subscriptionProfiles, events);
   }
 }

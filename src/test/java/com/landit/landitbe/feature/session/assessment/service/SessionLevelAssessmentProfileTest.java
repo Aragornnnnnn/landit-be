@@ -11,8 +11,8 @@ import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.assessment.domain.LearningLevelPolicy.ChangeType;
 import com.landit.landitbe.feature.session.assessment.domain.UserLevelAssessment;
@@ -147,7 +147,7 @@ class SessionLevelAssessmentProfileTest {
                             domains))
                 .toList());
     return new SessionLevelAssessmentService(
-            new UserProfileService(profiles, CLOCK), assessments, CLOCK, launch)
+            new ProfileLearningService(profiles, CLOCK), assessments, CLOCK, launch)
         .assessApplyAndSave(
             1L, context, new AiSessionLevelAssessment(core, null), applyToProfile, requestedAt);
   }

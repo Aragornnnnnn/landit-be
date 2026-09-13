@@ -8,7 +8,7 @@ import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepository;
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -24,7 +24,7 @@ public class ConversationMemoryWriteService {
 
   private static final int MAX_COMPARABLE_MEMORIES = 3;
 
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final ConversationMemoryRepository memoryRepository;
   private final ConversationMemorySearchRepository searchRepository;
 
@@ -55,7 +55,7 @@ public class ConversationMemoryWriteService {
       throw new IllegalArgumentException("장기기억 판정 계획이 필요합니다.");
     }
 
-    userProfileService
+    profileLearningService
         .findActiveLearningProfileForUpdate(userProfileId)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     validatePlans(userProfileId, plans);

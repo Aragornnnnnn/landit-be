@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.session.freetalk.expression.service;
 
 import com.landit.landitbe.feature.content.expression.domain.ExpressionDifficultyPolicy;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
@@ -65,7 +65,7 @@ public class FreeTalkExpressionGenerationService {
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionQueryService expressionQueryService;
   private final ExpressionCandidateSelectionService candidateSelectionService;
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
 
@@ -221,7 +221,9 @@ public class FreeTalkExpressionGenerationService {
         learningSession.getTargetLocale(),
         learningSession.getBaseLocale(),
         ExpressionDifficultyPolicy.maxDifficultyFor(
-            userProfileService.findLearningLevel(learningSession.getUserProfileId()).orElse(null)),
+            profileLearningService
+                .findLearningLevel(learningSession.getUserProfileId())
+                .orElse(null)),
         sessionHistoryMessageRepository
             .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
             .stream()

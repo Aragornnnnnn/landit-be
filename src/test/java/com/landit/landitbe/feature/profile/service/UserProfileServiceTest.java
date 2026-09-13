@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
@@ -17,6 +18,7 @@ import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
@@ -29,6 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /** UserProfileService의 사용자 locale 조회를 단위 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
+  @InjectMocks private ProfileAuthenticationService profileAuthenticationService;
+  @InjectMocks private ProfileLearningService profileLearningService;
 
   private static final Long USER_ID = 1L;
 
@@ -58,7 +62,7 @@ class UserProfileServiceTest {
         .thenReturn(Optional.of(userProfile));
 
     // when
-    UserLocale locale = userProfileService.getUserLocale(USER_ID);
+    UserLocale locale = profileLearningService.getUserLocale(USER_ID);
 
     // then
     assertThat(locale.targetLocale()).isEqualTo(Locale.EN);
@@ -73,7 +77,7 @@ class UserProfileServiceTest {
         .thenReturn(Optional.empty());
 
     // when & then
-    assertThatThrownBy(() -> userProfileService.getUserLocale(USER_ID))
+    assertThatThrownBy(() -> profileLearningService.getUserLocale(USER_ID))
         .isInstanceOf(UserProfileException.class)
         .extracting("errorCode")
         .isEqualTo(UserProfileErrorCode.INVALID_TOKEN);
@@ -91,7 +95,7 @@ class UserProfileServiceTest {
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
         .thenReturn(Optional.of(userProfile));
 
-    assertThat(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
+    assertThat(profileAuthenticationService.findAuthenticationProfileForUpdate(USER_ID))
         .contains(
             new AuthProfile(
                 USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE));
@@ -110,7 +114,7 @@ class UserProfileServiceTest {
         .thenReturn(Optional.of(userProfile));
 
     AuthProfile profile =
-        userProfileService
+        profileAuthenticationService
             .updateAuthenticationProfileForUpdate(
                 USER_ID, "updated@example.com", "updated nickname")
             .orElseThrow();
@@ -136,7 +140,7 @@ class UserProfileServiceTest {
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
         .thenReturn(Optional.of(userProfile));
 
-    assertThat(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
+    assertThat(profileAuthenticationService.findAuthenticationProfileForUpdate(USER_ID))
         .contains(new AuthProfile(USER_ID, "nickname", "user@example.com", null, null));
   }
 
@@ -146,7 +150,7 @@ class UserProfileServiceTest {
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID)).thenReturn(Optional.empty());
 
     assertThat(
-            userProfileService.updateAuthenticationProfileForUpdate(
+            profileAuthenticationService.updateAuthenticationProfileForUpdate(
                 USER_ID, "updated@example.com", "updated nickname"))
         .isEmpty();
   }
@@ -169,7 +173,7 @@ class UserProfileServiceTest {
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID))
         .thenReturn(Optional.of(userProfile));
 
-    assertThat(userProfileService.withdrawIfActiveForUpdate(USER_ID)).isTrue();
+    assertThat(profileAuthenticationService.withdrawIfActiveForUpdate(USER_ID)).isTrue();
     verify(userProfile).withdraw();
   }
 }

@@ -11,7 +11,7 @@ import com.landit.landitbe.feature.content.scenario.schedule.repository.projecti
 import com.landit.landitbe.feature.learning.access.dto.DailyCompletion;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -39,7 +39,7 @@ public class ScenarioCalendarService {
   private final ScenarioSequenceQueryRepository scenarioSequenceQueryRepository;
   private final CurrentScenarioSelectionService scenarioProgressionService;
   private final ScenarioAccessService scenarioAccessService;
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final Clock clock;
 
   /**
@@ -63,7 +63,7 @@ public class ScenarioCalendarService {
     // 창 마지막 날의 다음 날이다. granted_at이 시각이라 자정 경계 비교(< 다음 날 00:00)에 그대로 쓴다.
     LocalDate windowEndExclusive = windowStart.plusDays(windowDays);
 
-    UserLocale userLocale = userProfileService.getUserLocale(userId);
+    UserLocale userLocale = profileLearningService.getUserLocale(userId);
     Map<LocalDate, Long> completedScenarioIdsByDate =
         completedScenarioIdsByDate(userId, userLocale, windowStart, windowEndExclusive);
 

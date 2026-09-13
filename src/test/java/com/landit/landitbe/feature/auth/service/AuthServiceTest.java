@@ -23,10 +23,10 @@ import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
+import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,7 +42,8 @@ class AuthServiceTest {
   private static final String CURRENT_TOKEN = "current-refresh-token";
   private static final String CURRENT_TOKEN_HASH = "current-refresh-token-hash";
 
-  private final UserProfileService userProfileService = mock(UserProfileService.class);
+  private final ProfileAuthenticationService userProfileService =
+      mock(ProfileAuthenticationService.class);
   private final AiTutorService aiTutorService = mock(AiTutorService.class);
   private final OauthIdentityRepository oauthIdentityRepository =
       mock(OauthIdentityRepository.class);

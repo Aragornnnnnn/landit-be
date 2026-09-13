@@ -6,7 +6,7 @@ import com.landit.landitbe.feature.notification.token.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateRequest;
 import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,18 +15,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpoPushTokenPersistenceService {
 
   private final UserPushTokenRepository userPushTokenRepository;
-  private final UserProfileService userProfileService;
+  private final ProfilePreferenceService profilePreferenceService;
 
   /**
    * 사용자 Expo Push Token Repository를 주입받는다.
    *
    * @param userPushTokenRepository 사용자 Expo Push Token Repository
-   * @param userProfileService 사용자 프로필 Service
+   * @param profilePreferenceService 사용자 프로필 Service
    */
   public ExpoPushTokenPersistenceService(
-      UserPushTokenRepository userPushTokenRepository, UserProfileService userProfileService) {
+      UserPushTokenRepository userPushTokenRepository,
+      ProfilePreferenceService profilePreferenceService) {
     this.userPushTokenRepository = userPushTokenRepository;
-    this.userProfileService = userProfileService;
+    this.profilePreferenceService = profilePreferenceService;
   }
 
   /**
@@ -46,7 +47,7 @@ public class ExpoPushTokenPersistenceService {
                 userPushTokenRepository.saveAndFlush(
                     UserPushToken.register(
                         userProfileId, request.platform(), request.expoPushToken())));
-    userProfileService.grantPushPermission(userProfileId);
+    profilePreferenceService.grantPushPermission(userProfileId);
   }
 
   /**
@@ -64,7 +65,7 @@ public class ExpoPushTokenPersistenceService {
         .map(
             token -> {
               token.claim(userProfileId, request.platform());
-              userProfileService.grantPushPermission(userProfileId);
+              profilePreferenceService.grantPushPermission(userProfileId);
               return true;
             })
         .orElse(false);

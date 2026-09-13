@@ -17,6 +17,7 @@ import com.landit.landitbe.feature.learning.progress.service.LearningProgressSer
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import com.landit.landitbe.feature.session.dto.LearningSessionAccess;
 import com.landit.landitbe.feature.session.scenario.dto.ScenarioSessionMessageContext;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
@@ -52,6 +53,8 @@ class Lan474LearningAccessGrantServiceTest {
   private final FreeScenarioReservationRepository reservations =
       mock(FreeScenarioReservationRepository.class);
   private final UserProfileService profiles = mock(UserProfileService.class);
+  private final ProfileSubscriptionService profileSubscriptions =
+      mock(ProfileSubscriptionService.class);
   private final LearningSessionService sessions = mock(LearningSessionService.class);
   private final ScenarioSessionService scenarioSessions = mock(ScenarioSessionService.class);
   private final Map<String, LearningAccessGrant> storedGrants = new HashMap<>();
@@ -61,7 +64,7 @@ class Lan474LearningAccessGrantServiceTest {
           new SubscriptionProperties("2026-09-11T11:00:00+09:00"), CLOCK);
   private final LearningAccessGrantService service =
       new LearningAccessGrantService(
-          repository, reservations, policies, profiles, CLOCK, sessions, scenarioSessions);
+          repository, reservations, policies, profiles, profileSubscriptions, CLOCK, sessions, scenarioSessions);
 
   /** Repository 대신 사용자와 대상별 저장 내용을 보관해 여러 서비스 호출의 결과를 연결한다. */
   @BeforeEach
@@ -300,7 +303,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   private void subscription(SubscriptionStatus status, LocalDateTime expiresAt) {
-    when(profiles.getSubscription(USER_ID))
+    when(profileSubscriptions.getSubscription(USER_ID))
         .thenReturn(
             new UserSubscriptionSnapshot(status, status.isPremium(), null, expiresAt, null, null));
   }

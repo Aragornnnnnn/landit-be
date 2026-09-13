@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,7 +32,8 @@ class UserSubscriptionServiceTest {
   private static final LocalDateTime LAUNCH_TIME =
       LocalDateTime.ofInstant(LAUNCH_INSTANT, SERVICE_ZONE);
 
-  private final UserProfileService userProfileService = mock(UserProfileService.class);
+  private final ProfileSubscriptionService userProfileService =
+      mock(ProfileSubscriptionService.class);
   private final LearningProgressService learningProgressService =
       mock(LearningProgressService.class);
 
@@ -111,6 +112,7 @@ class UserSubscriptionServiceTest {
 
   private UserSubscriptionService service(String launchedAt, Clock clock) {
     return new UserSubscriptionService(
+        mock(com.landit.landitbe.feature.profile.service.UserProfileService.class),
         userProfileService,
         learningProgressService,
         mock(SubscriptionEventRepository.class),

@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.content.scenario.service;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.scenario.dto.CompletedScenarioLevel;
 import com.landit.landitbe.feature.content.scenario.repository.ScenarioLearningHistoryQueryRepository;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.Locale;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ScenarioLearningLevelService {
   private final ScenarioLearningHistoryQueryRepository learningHistoryRepository;
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final Clock clock;
 
   /**
@@ -31,7 +31,7 @@ public class ScenarioLearningLevelService {
    * @return 사용할 질문 그룹
    */
   public ContentLearningLevel questionLevel(long userId, long scenarioId) {
-    var locale = userProfileService.getUserLocale(userId).targetLocale();
+    var locale = profileLearningService.getUserLocale(userId).targetLocale();
     return findFirstCompletedLevel(userId, scenarioId, locale)
         .map(CompletedScenarioLevel::questionLevelGroup)
         .orElseGet(() -> scenarioId == 1L ? ContentLearningLevel.DIAGNOSTIC : currentLevel(userId));
@@ -45,7 +45,7 @@ public class ScenarioLearningLevelService {
    * @return 사용할 표현 수준 그룹
    */
   public ContentLearningLevel expressionLevel(long userId, long scenarioId) {
-    var locale = userProfileService.getUserLocale(userId).targetLocale();
+    var locale = profileLearningService.getUserLocale(userId).targetLocale();
     return findFirstCompletedLevel(userId, scenarioId, locale)
         .filter(history -> history.endedAt().toLocalDate().isBefore(LocalDate.now(clock)))
         .map(
@@ -59,7 +59,8 @@ public class ScenarioLearningLevelService {
   }
 
   private ContentLearningLevel currentLevel(long userId) {
-    return ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
+    return ContentLearningLevel.from(
+        profileLearningService.getLearningLevel(userId).learningLevel());
   }
 
   /**

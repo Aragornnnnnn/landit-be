@@ -5,10 +5,11 @@ package com.landit.landitbe.feature.profile;
 import com.landit.landitbe.feature.profile.docs.UserProfileControllerDocs;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelUpdateRequest;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.profile.preference.dto.AccentLocaleOptionResponse;
 import com.landit.landitbe.feature.profile.preference.dto.UserAccentLocaleResponse;
 import com.landit.landitbe.feature.profile.preference.dto.UserAccentLocaleUpdateRequest;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
@@ -25,14 +26,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UserProfileController implements UserProfileControllerDocs {
 
-  private final UserProfileService userProfileService;
+  private final ProfilePreferenceService profilePreferenceService;
+  private final ProfileLearningService profileLearningService;
 
   /** {@inheritDoc} */
   @Override
   @GetMapping("/api/v1/me/learning-level")
   public ApiResponse<UserLearningLevelResponse> getLearningLevel(
       @AuthenticationPrincipal AuthUserPrincipal principal) {
-    return ApiResponse.success(userProfileService.getLearningLevel(principal.userId()));
+    return ApiResponse.success(profileLearningService.getLearningLevel(principal.userId()));
   }
 
   /** {@inheritDoc} */
@@ -41,7 +43,7 @@ public class UserProfileController implements UserProfileControllerDocs {
   public ApiResponse<Void> updateLearningLevel(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @Valid @RequestBody UserLearningLevelUpdateRequest request) {
-    userProfileService.updateLearningLevel(principal.userId(), request.learningLevel());
+    profileLearningService.updateLearningLevel(principal.userId(), request.learningLevel());
     return ApiResponse.success(null);
   }
 
@@ -49,7 +51,7 @@ public class UserProfileController implements UserProfileControllerDocs {
   @Override
   @GetMapping("/api/v1/accent-locales")
   public ApiResponse<List<AccentLocaleOptionResponse>> getAccentLocales() {
-    return ApiResponse.success(userProfileService.getAccentLocales());
+    return ApiResponse.success(profilePreferenceService.getAccentLocales());
   }
 
   /** {@inheritDoc} */
@@ -57,7 +59,7 @@ public class UserProfileController implements UserProfileControllerDocs {
   @GetMapping("/api/v1/me/accent-locale")
   public ApiResponse<UserAccentLocaleResponse> getAccentLocale(
       @AuthenticationPrincipal AuthUserPrincipal principal) {
-    return ApiResponse.success(userProfileService.getAccentLocale(principal.userId()));
+    return ApiResponse.success(profilePreferenceService.getAccentLocale(principal.userId()));
   }
 
   /** {@inheritDoc} */
@@ -66,7 +68,7 @@ public class UserProfileController implements UserProfileControllerDocs {
   public ApiResponse<Void> updateAccentLocale(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @Valid @RequestBody UserAccentLocaleUpdateRequest request) {
-    userProfileService.updateAccentLocale(principal.userId(), request.accentLocale());
+    profilePreferenceService.updateAccentLocale(principal.userId(), request.accentLocale());
     return ApiResponse.success(null);
   }
 }

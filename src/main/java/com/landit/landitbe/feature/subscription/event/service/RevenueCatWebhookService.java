@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionTransfer
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateResult;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import com.landit.landitbe.feature.subscription.event.domain.SubscriptionEvent;
 import com.landit.landitbe.feature.subscription.event.domain.SubscriptionEventType;
 import com.landit.landitbe.feature.subscription.event.dto.RevenueCatWebhookEvent;
@@ -43,6 +44,7 @@ public class RevenueCatWebhookService {
 
   private final RevenueCatProperties revenueCatProperties;
   private final UserProfileService userProfileService;
+  private final ProfileSubscriptionService profileSubscriptionService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final Clock clock;
   private final com.landit.landitbe.feature.notification.service.NotificationJobService
@@ -192,7 +194,7 @@ public class RevenueCatWebhookService {
     LocalDateTime eventAt =
         toLocalDateTime(event.eventTimestampMs()).orElseGet(() -> LocalDateTime.now(clock));
     SubscriptionTransferResult transfer =
-        userProfileService.transferSubscription(fromUserId.get(), toUserId.get(), eventAt);
+        profileSubscriptionService.transferSubscription(fromUserId.get(), toUserId.get(), eventAt);
 
     boolean saved = transfer.moved() != null;
     if (saved) {
@@ -358,7 +360,8 @@ public class RevenueCatWebhookService {
   private void applyToUser(
       RevenueCatWebhookEvent event, SubscriptionStatus targetStatus, Long userId) {
     SubscriptionUpdateCommand command = toCommand(event, targetStatus);
-    SubscriptionUpdateResult result = userProfileService.updateSubscription(userId, command);
+    SubscriptionUpdateResult result =
+        profileSubscriptionService.updateSubscription(userId, command);
     if (result == SubscriptionUpdateResult.APPLIED) {
       notificationJobService.recordTrial(userId, event.environment());
     }

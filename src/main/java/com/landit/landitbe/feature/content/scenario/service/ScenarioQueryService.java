@@ -16,7 +16,7 @@ import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioSummary
 import com.landit.landitbe.feature.content.scenario.schedule.service.CurrentScenarioSelectionService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import java.time.Clock;
@@ -43,7 +43,7 @@ public class ScenarioQueryService {
   private final ScenarioListQueryRepository scenarioListQueryRepository;
   private final CurrentScenarioSelectionService scenarioProgressionService;
   private final ScenarioAccessService scenarioAccessService;
-  private final UserProfileService userProfileService;
+  private final ProfileLearningService profileLearningService;
   private final Clock clock;
 
   /**
@@ -56,9 +56,9 @@ public class ScenarioQueryService {
   public ScenarioListResponse getScenarioList(long userId) {
     // 접근 권한과 오늘 시나리오를 동일한 기준 시각으로 계산한다.
     Instant evaluatedAt = clock.instant();
-    UserLocale userLocale = userProfileService.getUserLocale(userId);
+    UserLocale userLocale = profileLearningService.getUserLocale(userId);
     ContentLearningLevel questionLevelGroup =
-        ContentLearningLevel.from(userProfileService.getLearningLevel(userId).learningLevel());
+        ContentLearningLevel.from(profileLearningService.getLearningLevel(userId).learningLevel());
 
     Set<Long> accessibleScenarioIds =
         Set.copyOf(

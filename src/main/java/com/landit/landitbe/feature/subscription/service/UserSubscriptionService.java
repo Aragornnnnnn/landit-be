@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.subscription.service;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserSubscriptionService {
 
   private final UserProfileService userProfileService;
+  private final ProfileSubscriptionService profileSubscriptionService;
   private final LearningProgressService learningProgressService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final SubscriptionLaunchPolicyService policies;
@@ -27,7 +29,8 @@ public class UserSubscriptionService {
   /**
    * 구독 상태와 동일한 실행 정책을 조회할 협력 Service를 주입받는다.
    *
-   * @param userProfileService 구독 상태 스냅샷을 제공하는 프로필 Service
+   * @param userProfileService 활성 사용자 여부를 확인하는 프로필 Service
+   * @param profileSubscriptionService 구독 상태 스냅샷을 제공하는 프로필 Service
    * @param learningProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
    * @param subscriptionEventRepository 결제 이력 Repository
    * @param policies 서버 실행 정책
@@ -35,11 +38,13 @@ public class UserSubscriptionService {
    */
   public UserSubscriptionService(
       UserProfileService userProfileService,
+      ProfileSubscriptionService profileSubscriptionService,
       LearningProgressService learningProgressService,
       SubscriptionEventRepository subscriptionEventRepository,
       SubscriptionLaunchPolicyService policies,
       LearningAccessGrantService grants) {
     this.userProfileService = userProfileService;
+    this.profileSubscriptionService = profileSubscriptionService;
     this.learningProgressService = learningProgressService;
     this.subscriptionEventRepository = subscriptionEventRepository;
     this.policies = policies;
@@ -58,7 +63,7 @@ public class UserSubscriptionService {
    */
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
-    UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
+    UserSubscriptionSnapshot snapshot = profileSubscriptionService.getSubscription(userId);
     var policy = policies.current();
     boolean enabled = policies.enabledFor(policy, userId);
     boolean premium = grants.premium(userId);

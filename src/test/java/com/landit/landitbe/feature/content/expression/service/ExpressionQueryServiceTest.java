@@ -40,7 +40,7 @@ import com.landit.landitbe.feature.content.scenario.service.ScenarioService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -70,7 +70,7 @@ class ExpressionQueryServiceTest {
   @Mock
   private com.landit.landitbe.feature.subscription.service.LearningAccessGrantService accessGrants;
 
-  @Mock private UserProfileService userProfileService;
+  @Mock private ProfileLearningService profileLearningService;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
   @Mock private WritingExpressionRepository writingExpressionRepository;
@@ -377,7 +377,7 @@ class ExpressionQueryServiceTest {
    * 불리면 전달받은 표현 mock들을 그대로 돌려주도록 스터빙한다. (전달 순서 = displayOrder 오름차순 정렬 결과라고 가정하고 테스트를 작성한다)
    */
   private void givenExpressions(WritingExpression... expressions) {
-    when(userProfileService.getUserLocale(USER_ID))
+    when(profileLearningService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(Locale.EN, Locale.KR));
     when(scenarioLearningLevelService.expressionLevel(
             org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))

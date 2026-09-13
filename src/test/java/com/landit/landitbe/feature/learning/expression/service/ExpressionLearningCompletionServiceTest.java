@@ -26,7 +26,7 @@ import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.progress.repository.UserWritingExpressionCompletionRepository;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
@@ -70,7 +70,7 @@ class ExpressionLearningCompletionServiceTest {
   @Mock
   private com.landit.landitbe.feature.subscription.service.LearningAccessGrantService accessGrants;
 
-  @Mock private UserProfileService userProfileService;
+  @Mock private ProfileLearningService profileLearningService;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
   @Mock private LearningProgressService learningProgressService;
@@ -91,7 +91,7 @@ class ExpressionLearningCompletionServiceTest {
         new ExpressionLearningCompletionService(
             accessGrants,
             new ExpressionContentService(writingExpressionRepository),
-            userProfileService,
+            profileLearningService,
             scenarioLearningLevelService,
             learningProgressService,
             new FreeTalkExpressionLearningService(
@@ -370,7 +370,7 @@ class ExpressionLearningCompletionServiceTest {
 
   /** 사용자 로케일에 맞는 시나리오 표현 목록을 스터빙한다. */
   private void givenUserLocaleExpressionList(WritingExpression... expressions) {
-    when(userProfileService.getUserLocale(USER_ID))
+    when(profileLearningService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(TARGET_LOCALE, BASE_LOCALE));
     when(writingExpressionRepository.findScenarioExpressions(
             SCENARIO_ID, TARGET_LOCALE, BASE_LOCALE, 4, 5, ActiveStatus.ACTIVE))
