@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.session.freetalk.expression.service;
 
 import com.landit.landitbe.feature.content.expression.domain.ExpressionDifficultyPolicy;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
+import com.landit.landitbe.feature.content.expression.recommendation.service.ExpressionRecommendationService;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -63,7 +63,7 @@ public class FreeTalkExpressionGenerationService {
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
-  private final ExpressionQueryService expressionQueryService;
+  private final ExpressionRecommendationService expressionRecommendationService;
   private final ExpressionCandidateSelectionService candidateSelectionService;
   private final ProfileLearningService profileLearningService;
   private final AiFreeTalkClient aiFreeTalkClient;
@@ -176,7 +176,7 @@ public class FreeTalkExpressionGenerationService {
   // 후보 ID로 공용 활성 표현을 다시 읽어 추천 요청 형식으로 변환한다.
   private List<AiFreeTalkExistingExpression> candidateExpressions(
       GenerationContext context, List<Long> candidateIds) {
-    return expressionQueryService
+    return expressionRecommendationService
         .getExpressionCandidatesByIds(candidateIds, context.targetLocale(), context.baseLocale())
         .stream()
         .map(
@@ -274,7 +274,7 @@ public class FreeTalkExpressionGenerationService {
   // 기존 표현 추천을 검증하고 세션 연결 엔티티로 변환한다.
   private FreeTalkSessionExpression existingSessionExpression(
       GenerationContext context, AiFreeTalkExpressionRecommendation recommendation) {
-    expressionQueryService.validatePublicFreeTalkExpression(
+    expressionRecommendationService.validatePublicFreeTalkExpression(
         recommendation.existingExpressionId(), context.targetLocale(), context.baseLocale());
     return FreeTalkSessionExpression.link(
         context.freeTalkSessionId(),

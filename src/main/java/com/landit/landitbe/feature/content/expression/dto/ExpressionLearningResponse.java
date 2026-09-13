@@ -125,4 +125,33 @@ public record ExpressionLearningResponse(
         id,
         expiresAt);
   }
+
+  /**
+   * 표현 콘텐츠에 사용자의 발음 음성과 완료 상태를 적용한다.
+   *
+   * @param audio 사용자의 억양에 맞는 발음 음성
+   * @param isCompleted 학습 완료 여부
+   * @return 학습 상태를 적용한 새 응답
+   */
+  public ExpressionLearningResponse withLearningState(
+      com.landit.landitbe.feature.content.expression.pronunciation.dto.ExpressionAudio audio,
+      boolean isCompleted) {
+    return new ExpressionLearningResponse(
+        expressionId,
+        targetExpressionText,
+        baseExpressionMeaningText,
+        usageDescription,
+        representativeQuestionText,
+        representativeQuestionTranslation,
+        representativeSentenceText,
+        representativeSentenceTranslation,
+        representativeSentenceWords,
+        representativeSentenceWordChoices,
+        representativeImageUrl,
+        audio.sentenceAudioUrl(),
+        audio.expressionAudioUrl(),
+        isCompleted,
+        learningAttemptId,
+        learningExpiresAt);
+  }
 }

@@ -70,7 +70,7 @@ class ExpressionLearningCompletionServiceTest {
   @Mock
   private com.landit.landitbe.feature.subscription.service.LearningAccessGrantService accessGrants;
 
-  @Mock private ProfileLearningService profileLearningService;
+  @Mock private ProfileLearningService userProfileService;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
   @Mock private LearningProgressService learningProgressService;
@@ -91,7 +91,7 @@ class ExpressionLearningCompletionServiceTest {
         new ExpressionLearningCompletionService(
             accessGrants,
             new ExpressionContentService(writingExpressionRepository),
-            profileLearningService,
+            userProfileService,
             scenarioLearningLevelService,
             learningProgressService,
             new FreeTalkExpressionLearningService(
@@ -370,7 +370,7 @@ class ExpressionLearningCompletionServiceTest {
 
   /** 사용자 로케일에 맞는 시나리오 표현 목록을 스터빙한다. */
   private void givenUserLocaleExpressionList(WritingExpression... expressions) {
-    when(profileLearningService.getUserLocale(USER_ID))
+    when(userProfileService.getUserLocale(USER_ID))
         .thenReturn(new UserLocale(TARGET_LOCALE, BASE_LOCALE));
     when(writingExpressionRepository.findScenarioExpressions(
             SCENARIO_ID, TARGET_LOCALE, BASE_LOCALE, 4, 5, ActiveStatus.ACTIVE))

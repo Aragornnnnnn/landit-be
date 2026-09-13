@@ -5,10 +5,12 @@ package com.landit.landitbe.feature.learning.expression;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
+import com.landit.landitbe.feature.content.expression.practice.service.ExpressionPracticeService;
 import com.landit.landitbe.feature.learning.expression.docs.ExpressionControllerDocs;
 import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningCompletionService;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningQueryService;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningStartService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import java.util.List;
@@ -27,7 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ExpressionController implements ExpressionControllerDocs {
 
-  private final ExpressionQueryService expressionQueryService;
+  private final ExpressionLearningQueryService expressionLearningQueryService;
+  private final ExpressionLearningStartService expressionLearningStartService;
+  private final ExpressionPracticeService expressionPracticeService;
   private final ExpressionLearningCompletionService expressionLearningCompletionService;
 
   /** {@inheritDoc} */
@@ -36,7 +40,7 @@ public class ExpressionController implements ExpressionControllerDocs {
   public ApiResponse<List<ExpressionResponse>> getExpressions(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long scenarioId) {
     return ApiResponse.success(
-        expressionQueryService.getExpressionsPerScenario(principal.userId(), scenarioId));
+        expressionLearningQueryService.getExpressionsPerScenario(principal.userId(), scenarioId));
   }
 
   /** {@inheritDoc} */
@@ -45,7 +49,7 @@ public class ExpressionController implements ExpressionControllerDocs {
   public ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
     return ApiResponse.success(
-        expressionQueryService.getExpressionForLearning(principal.userId(), expressionId));
+        expressionLearningStartService.startLearning(principal.userId(), expressionId));
   }
 
   /** {@inheritDoc} */
@@ -54,7 +58,7 @@ public class ExpressionController implements ExpressionControllerDocs {
   public ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
     return ApiResponse.success(
-        expressionQueryService.getExtraPracticeExamples(principal.userId(), expressionId));
+        expressionPracticeService.getExtraPracticeExamples(principal.userId(), expressionId));
   }
 
   /** {@inheritDoc} */

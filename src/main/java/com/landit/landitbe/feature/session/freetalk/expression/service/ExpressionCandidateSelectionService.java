@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session.freetalk.expression.service;
 import com.landit.landitbe.config.content.ExpressionSearchProperties;
 import com.landit.landitbe.feature.content.expression.recommendation.dto.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.expression.recommendation.dto.FreeTalkCandidateSearch;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
+import com.landit.landitbe.feature.content.expression.recommendation.service.ExpressionRecommendationService;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ExpressionCandidateSelectionService {
 
-  private final ExpressionQueryService expressionQueryService;
+  private final ExpressionRecommendationService expressionRecommendationService;
   private final ExpressionSearchProperties properties;
 
   /**
@@ -48,7 +48,7 @@ public class ExpressionCandidateSelectionService {
     Map<Long, Double> bestDistanceByExpressionId = new HashMap<>();
     for (AiConversationExcerpt excerpt : excerpts) {
       for (ExpressionEmbeddingMatch match :
-          expressionQueryService.searchFreeTalkCandidatesByEmbedding(
+          expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(
               new FreeTalkCandidateSearch(
                   excerpt.embedding(),
                   userProfileId,

@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import com.landit.landitbe.config.content.ExpressionSearchProperties;
 import com.landit.landitbe.feature.content.expression.recommendation.dto.ExpressionEmbeddingMatch;
 import com.landit.landitbe.feature.content.expression.recommendation.dto.FreeTalkCandidateSearch;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
+import com.landit.landitbe.feature.content.expression.recommendation.service.ExpressionRecommendationService;
 import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -35,12 +35,12 @@ class ExpressionCandidateSelectionServiceTest {
   private static final AiConversationExcerpt SECOND_EXCERPT =
       new AiConversationExcerpt("I cook every day.", List.of(0.5f));
 
-  @Mock private ExpressionQueryService expressionQueryService;
+  @Mock private ExpressionRecommendationService expressionRecommendationService;
 
   private ExpressionCandidateSelectionService selectionService(
       int maxCandidates, double distanceThreshold) {
     return new ExpressionCandidateSelectionService(
-        expressionQueryService,
+        expressionRecommendationService,
         new ExpressionSearchProperties("in-memory", maxCandidates, distanceThreshold));
   }
 
@@ -57,11 +57,13 @@ class ExpressionCandidateSelectionServiceTest {
 
   @Test
   void mergesExcerptResultsWithMinimumDistanceAndSortsAscending() {
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(searchFor(FIRST_EXCERPT)))
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(
+            searchFor(FIRST_EXCERPT)))
         .thenReturn(
             List.of(
                 new ExpressionEmbeddingMatch(201L, 0.5), new ExpressionEmbeddingMatch(202L, 0.3)));
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(searchFor(SECOND_EXCERPT)))
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(
+            searchFor(SECOND_EXCERPT)))
         .thenReturn(
             List.of(
                 new ExpressionEmbeddingMatch(201L, 0.1), // 같은 표현이 더 가까운 거리로 재등장 → 병합
@@ -74,7 +76,7 @@ class ExpressionCandidateSelectionServiceTest {
 
   @Test
   void filtersCandidatesOverDistanceThreshold() {
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(any()))
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
         .thenReturn(
             List.of(
                 new ExpressionEmbeddingMatch(201L, 0.2),
@@ -88,7 +90,7 @@ class ExpressionCandidateSelectionServiceTest {
 
   @Test
   void keepsClosestCandidateWhenNoneMeetsThreshold() {
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(any()))
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
         .thenReturn(
             List.of(
                 new ExpressionEmbeddingMatch(201L, 0.8), new ExpressionEmbeddingMatch(202L, 0.7)));
@@ -100,7 +102,7 @@ class ExpressionCandidateSelectionServiceTest {
 
   @Test
   void limitsPassingCandidatesToMaxCandidates() {
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(any()))
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
         .thenReturn(
             List.of(
                 new ExpressionEmbeddingMatch(201L, 0.1),
@@ -114,14 +116,14 @@ class ExpressionCandidateSelectionServiceTest {
 
   @Test
   void passesSearchConditionsIncludingMaxDifficultyLevel() {
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(any()))
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
         .thenReturn(List.of(new ExpressionEmbeddingMatch(201L, 0.1)));
 
     selectWith(selectionService(30, 0.6), FIRST_EXCERPT);
 
     ArgumentCaptor<FreeTalkCandidateSearch> captor =
         ArgumentCaptor.forClass(FreeTalkCandidateSearch.class);
-    verify(expressionQueryService).searchFreeTalkCandidatesByEmbedding(captor.capture());
+    verify(expressionRecommendationService).searchFreeTalkCandidatesByEmbedding(captor.capture());
     FreeTalkCandidateSearch search = captor.getValue();
     assertThat(search.maxDifficultyLevel()).isEqualTo(MAX_DIFFICULTY_LEVEL);
     assertThat(search.userProfileId()).isEqualTo(USER_ID);
@@ -132,7 +134,8 @@ class ExpressionCandidateSelectionServiceTest {
 
   @Test
   void failsWhenSearchReturnsNoCandidateAtAll() {
-    when(expressionQueryService.searchFreeTalkCandidatesByEmbedding(any())).thenReturn(List.of());
+    when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
+        .thenReturn(List.of());
 
     assertThatThrownBy(() -> selectWith(selectionService(30, 0.6), FIRST_EXCERPT))
         .isInstanceOf(ApiException.class)
