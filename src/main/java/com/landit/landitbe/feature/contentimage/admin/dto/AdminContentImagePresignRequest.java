@@ -1,6 +1,6 @@
 // 관리자 콘텐츠 이미지 업로드 URL 발급 요청을 정의한다.
 
-package com.landit.landitbe.feature.contentimage.dto;
+package com.landit.landitbe.feature.contentimage.admin.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;

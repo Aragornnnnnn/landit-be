@@ -1,9 +1,9 @@
 // 관리자 콘텐츠 이미지 업로드 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.contentimage.docs;
+package com.landit.landitbe.feature.contentimage.admin.docs;
 
-import com.landit.landitbe.feature.contentimage.dto.AdminContentImagePresignRequest;
-import com.landit.landitbe.feature.contentimage.dto.AdminContentImagePresignResponse;
+import com.landit.landitbe.feature.contentimage.admin.dto.AdminContentImagePresignRequest;
+import com.landit.landitbe.feature.contentimage.admin.dto.AdminContentImagePresignResponse;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;

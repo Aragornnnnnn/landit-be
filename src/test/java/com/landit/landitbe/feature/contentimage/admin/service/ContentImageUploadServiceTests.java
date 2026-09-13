@@ -1,6 +1,6 @@
 // 콘텐츠 이미지 업로드 요청 검증과 응답 생성을 검증한다.
 
-package com.landit.landitbe.feature.contentimage.service;
+package com.landit.landitbe.feature.contentimage.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -8,10 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.content.ContentImageProperties;
+import com.landit.landitbe.feature.contentimage.admin.dto.AdminContentImagePresignRequest;
+import com.landit.landitbe.feature.contentimage.admin.dto.AdminContentImagePresignResponse;
 import com.landit.landitbe.feature.contentimage.client.ContentImageUploadClient;
 import com.landit.landitbe.feature.contentimage.client.ContentImageUploadCommand;
-import com.landit.landitbe.feature.contentimage.dto.AdminContentImagePresignRequest;
-import com.landit.landitbe.feature.contentimage.dto.AdminContentImagePresignResponse;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.net.URI;

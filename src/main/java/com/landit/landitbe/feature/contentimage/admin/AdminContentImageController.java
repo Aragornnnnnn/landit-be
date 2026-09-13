@@ -1,11 +1,11 @@
 // 관리자 콘텐츠 이미지 업로드 URL 발급 요청을 처리한다.
 
-package com.landit.landitbe.feature.contentimage;
+package com.landit.landitbe.feature.contentimage.admin;
 
-import com.landit.landitbe.feature.contentimage.docs.AdminContentImageControllerDocs;
-import com.landit.landitbe.feature.contentimage.dto.AdminContentImagePresignRequest;
-import com.landit.landitbe.feature.contentimage.dto.AdminContentImagePresignResponse;
-import com.landit.landitbe.feature.contentimage.service.ContentImageUploadService;
+import com.landit.landitbe.feature.contentimage.admin.docs.AdminContentImageControllerDocs;
+import com.landit.landitbe.feature.contentimage.admin.dto.AdminContentImagePresignRequest;
+import com.landit.landitbe.feature.contentimage.admin.dto.AdminContentImagePresignResponse;
+import com.landit.landitbe.feature.contentimage.admin.service.ContentImageUploadService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
