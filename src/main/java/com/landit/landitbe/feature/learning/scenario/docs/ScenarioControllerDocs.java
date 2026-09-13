@@ -1,11 +1,11 @@
 // 시나리오 조회 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.content.scenario.docs;
+package com.landit.landitbe.feature.learning.scenario.docs;
 
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.domain.ScenarioCalendarType;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.DailyScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioCalendarResponse;
+import com.landit.landitbe.feature.learning.scenario.domain.ScenarioCalendarType;
+import com.landit.landitbe.feature.learning.scenario.dto.DailyScenarioResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioCalendarResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioListResponse;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

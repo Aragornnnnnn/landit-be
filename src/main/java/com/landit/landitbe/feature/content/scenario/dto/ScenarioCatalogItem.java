@@ -1,6 +1,6 @@
-// 시나리오 목록 조회 결과 한 행을 담는 JPA projection record다.
+// 시나리오 카탈로그의 콘텐츠와 표시 메타데이터를 전달한다.
 
-package com.landit.landitbe.feature.content.scenario.repository.projection;
+package com.landit.landitbe.feature.content.scenario.dto;
 
 import com.landit.landitbe.feature.content.scenario.domain.ScenarioDifficulty;
 import com.landit.landitbe.feature.content.tutor.domain.TtsVoiceGender;
@@ -11,7 +11,7 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
 import java.math.BigDecimal;
 
 /**
- * 시나리오 목록 조회 결과 한 행을 담는 JPA projection record다.
+ * 시나리오 카탈로그의 콘텐츠와 표시 메타데이터를 전달한다.
  *
  * @param categoryId 카테고리 ID
  * @param categoryName 카테고리 이름
@@ -39,7 +39,7 @@ import java.math.BigDecimal;
  * @param ttsVoiceGender TTS 음성 성별
  * @param bestStarRating 최고 별점
  */
-public record ScenarioListProjection(
+public record ScenarioCatalogItem(
     Long categoryId,
     String categoryName,
     int categoryDisplayOrder,

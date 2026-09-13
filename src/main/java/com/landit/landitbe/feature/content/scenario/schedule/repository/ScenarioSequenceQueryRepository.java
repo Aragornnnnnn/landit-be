@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.content.scenario.schedule.repository;
 
 import com.landit.landitbe.feature.content.scenario.domain.Scenario;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.projection.ScenarioThumbnailProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioThumbnail;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -51,13 +51,13 @@ public interface ScenarioSequenceQueryRepository extends JpaRepository<Scenario,
    */
   @Query(
       """
-            SELECT new com.landit.landitbe.feature.content.scenario.schedule.repository.projection.ScenarioThumbnailProjection(
+            SELECT new com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioThumbnail(
                 s.id,
                 s.thumbnailUrl
             )
             FROM Scenario s
             WHERE s.id IN :scenarioIds
       """)
-  List<ScenarioThumbnailProjection> findThumbnailsByScenarioIds(
+  List<ScenarioThumbnail> findThumbnailsByScenarioIds(
       @Param("scenarioIds") Collection<Long> scenarioIds);
 }

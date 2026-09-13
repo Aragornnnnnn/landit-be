@@ -1,6 +1,6 @@
 // 날짜별 시나리오의 신규·재도전·완료 상태를 정의한다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.domain;
+package com.landit.landitbe.feature.learning.scenario.domain;
 
 /** 날짜별 시나리오의 신규·재도전·완료 상태를 정의한다. */
 public enum DailyScenarioType {

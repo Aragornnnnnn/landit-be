@@ -1,18 +1,18 @@
 // 날짜별 시나리오 조회 정책과 콘텐츠 응답 조립을 담당한다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.service;
+package com.landit.landitbe.feature.learning.scenario.service;
 
 import com.landit.landitbe.feature.content.exception.ContentErrorCode;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
-import com.landit.landitbe.feature.content.scenario.schedule.domain.DailyScenarioType;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.CurrentScenario;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.DailyScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.DailyScenarioResponse.ScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.DailyScenarioQueryRepository;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.projection.DailyScenarioProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioDetail;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioCatalogService;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.learning.access.dto.ScenarioAccessHistory;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.progress.service.ExpressionProgressService;
+import com.landit.landitbe.feature.learning.scenario.domain.DailyScenarioType;
+import com.landit.landitbe.feature.learning.scenario.dto.CurrentScenario;
+import com.landit.landitbe.feature.learning.scenario.dto.DailyScenarioResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.DailyScenarioResponse.ScenarioResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -35,9 +35,9 @@ public class DailyScenarioQueryService {
 
   private final ProfileLearningService profileLearningService;
   private final ScenarioAccessService scenarioAccessService;
-  private final CurrentScenarioSelectionService scenarioProgressionService;
-  private final DailyScenarioQueryRepository dailyScenarioQueryRepository;
-  private final ExpressionQueryService expressionQueryService;
+  private final CurrentScenarioSelectionService currentScenarioSelectionService;
+  private final ScenarioCatalogService scenarioCatalogService;
+  private final ExpressionProgressService expressionProgressService;
   private final Clock clock;
   private final ScenarioLearningLevelService scenarioLearningLevelService;
 
@@ -77,7 +77,7 @@ public class DailyScenarioQueryService {
     if (date.isBefore(today)) {
       return DailyScenarioResponse.empty(date);
     }
-    return scenarioProgressionService
+    return currentScenarioSelectionService
         .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
         .map(current -> buildCurrentResponse(userId, date, current))
         .orElseGet(() -> DailyScenarioResponse.empty(date));
@@ -112,9 +112,9 @@ public class DailyScenarioQueryService {
       DailyScenarioType dailyScenarioType,
       boolean completed,
       OffsetDateTime completedAt) {
-    DailyScenarioProjection projection =
-        dailyScenarioQueryRepository
-            .findDailyScenario(
+    ScenarioDetail projection =
+        scenarioCatalogService
+            .findDetail(
                 userId, scenarioId, scenarioLearningLevelService.questionLevel(userId, scenarioId))
             .orElseThrow(() -> new ApiException(ContentErrorCode.SCENARIO_NOT_FOUND));
     return ScenarioResponse.from(
@@ -122,6 +122,6 @@ public class DailyScenarioQueryService {
         dailyScenarioType,
         completed,
         completedAt,
-        expressionQueryService.getExpressionProgress(userId, scenarioId));
+        expressionProgressService.getExpressionProgress(userId, scenarioId));
   }
 }

@@ -1,12 +1,12 @@
 // 날짜별 시나리오 조회 API의 응답 구조를 정의한다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.dto;
+package com.landit.landitbe.feature.learning.scenario.dto;
 
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService.ExpressionProgress;
-import com.landit.landitbe.feature.content.scenario.schedule.domain.DailyScenarioType;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.projection.DailyScenarioProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioDetail;
 import com.landit.landitbe.feature.content.tutor.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
+import com.landit.landitbe.feature.learning.progress.dto.ExpressionProgress;
+import com.landit.landitbe.feature.learning.scenario.domain.DailyScenarioType;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -93,7 +93,7 @@ public record DailyScenarioResponse(
      * @return 날짜별 시나리오 상세 응답
      */
     public static ScenarioResponse from(
-        DailyScenarioProjection projection,
+        ScenarioDetail projection,
         DailyScenarioType dailyScenarioType,
         boolean completed,
         OffsetDateTime completedAt,
@@ -143,7 +143,7 @@ public record DailyScenarioResponse(
      * @param projection 시나리오 콘텐츠 조회 결과
      * @return 시작 메시지 미리보기
      */
-    public static OpeningPreviewResponse from(DailyScenarioProjection projection) {
+    public static OpeningPreviewResponse from(ScenarioDetail projection) {
       if (projection.firstSpeaker() == ConversationSpeaker.AI) {
         return new OpeningPreviewResponse(
             projection.aiOpeningMessage(),

@@ -1,11 +1,11 @@
 // 사용자별 현재 시나리오와 재도전 여부를 계산한다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.service;
+package com.landit.landitbe.feature.learning.scenario.service;
 
-import com.landit.landitbe.feature.content.scenario.schedule.domain.DailyScenarioType;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.CurrentScenario;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.ScenarioSequenceQueryRepository;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioCatalogService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.scenario.domain.DailyScenarioType;
+import com.landit.landitbe.feature.learning.scenario.dto.CurrentScenario;
 import com.landit.landitbe.shared.domain.Locale;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -23,7 +23,7 @@ public class CurrentScenarioSelectionService {
 
   private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
 
-  private final ScenarioSequenceQueryRepository scenarioSequenceQueryRepository;
+  private final ScenarioCatalogService scenarioCatalogService;
   private final ScenarioAccessService scenarioAccessService;
 
   /**
@@ -37,7 +37,7 @@ public class CurrentScenarioSelectionService {
   @Transactional(readOnly = true)
   public Optional<CurrentScenario> findCurrentScenario(
       long userId, Locale targetLocale, Instant evaluatedAt) {
-    List<Long> scenarioIds = scenarioSequenceQueryRepository.findScenarioIdsInDisplayOrder(userId);
+    List<Long> scenarioIds = scenarioCatalogService.findOrderedScenarioIds(userId);
     Set<Long> accessibleScenarioIds =
         Set.copyOf(scenarioAccessService.findAccessibleScenarioIds(userId, targetLocale));
     Optional<Long> firstUnclearedScenarioId =

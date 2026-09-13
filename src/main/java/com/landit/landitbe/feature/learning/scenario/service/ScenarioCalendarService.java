@@ -1,15 +1,15 @@
 // 사용자별 시나리오 캘린더 조회 응답을 조립한다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.service;
+package com.landit.landitbe.feature.learning.scenario.service;
 
-import com.landit.landitbe.feature.content.scenario.schedule.domain.ScenarioCalendarType;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.CurrentScenario;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioCalendarResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioCalendarResponse.CalendarDayResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.ScenarioSequenceQueryRepository;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.projection.ScenarioThumbnailProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioThumbnail;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioCatalogService;
 import com.landit.landitbe.feature.learning.access.dto.DailyCompletion;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.scenario.domain.ScenarioCalendarType;
+import com.landit.landitbe.feature.learning.scenario.dto.CurrentScenario;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioCalendarResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioCalendarResponse.CalendarDayResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import java.time.Clock;
@@ -36,8 +36,8 @@ public class ScenarioCalendarService {
   private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
   private static final int WEEK_WINDOW_DAYS = 7;
 
-  private final ScenarioSequenceQueryRepository scenarioSequenceQueryRepository;
-  private final CurrentScenarioSelectionService scenarioProgressionService;
+  private final ScenarioCatalogService scenarioCatalogService;
+  private final CurrentScenarioSelectionService currentScenarioSelectionService;
   private final ScenarioAccessService scenarioAccessService;
   private final ProfileLearningService profileLearningService;
   private final Clock clock;
@@ -158,7 +158,7 @@ public class ScenarioCalendarService {
 
   /** 오늘 배정된 시나리오 ID를 조회한다. 모든 시나리오를 완료했으면 null이다. */
   private Long assignedScenarioId(long userId, UserLocale userLocale, Instant evaluatedAt) {
-    return scenarioProgressionService
+    return currentScenarioSelectionService
         .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
         .map(CurrentScenario::scenarioId)
         .orElse(null);
@@ -171,8 +171,7 @@ public class ScenarioCalendarService {
     }
 
     Map<Long, String> thumbnailUrls = new HashMap<>();
-    for (ScenarioThumbnailProjection thumbnail :
-        scenarioSequenceQueryRepository.findThumbnailsByScenarioIds(scenarioIds)) {
+    for (ScenarioThumbnail thumbnail : scenarioCatalogService.findThumbnails(scenarioIds)) {
       thumbnailUrls.put(thumbnail.scenarioId(), thumbnail.thumbnailUrl());
     }
 

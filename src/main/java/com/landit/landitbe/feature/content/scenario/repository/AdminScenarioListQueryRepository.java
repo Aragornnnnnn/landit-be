@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.content.scenario.repository;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.scenario.domain.Scenario;
-import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection;
+import com.landit.landitbe.feature.content.scenario.dto.ScenarioCatalogItem;
 import java.util.List;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -22,7 +22,7 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
    */
   @Query(
       """
-            SELECT new com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection(
+            SELECT new com.landit.landitbe.feature.content.scenario.dto.ScenarioCatalogItem(
                 c.id,
                 clv.name,
                 c.displayOrder,
@@ -89,7 +89,7 @@ public interface AdminScenarioListQueryRepository extends Repository<Scenario, L
             WHERE up.id = :userId
             ORDER BY c.displayOrder ASC, s.displayOrder ASC, s.id ASC
       """)
-  List<ScenarioListProjection> findActiveScenarioList(
+  List<ScenarioCatalogItem> findActiveScenarioList(
       @Param("userId") long userId,
       @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup);
 }

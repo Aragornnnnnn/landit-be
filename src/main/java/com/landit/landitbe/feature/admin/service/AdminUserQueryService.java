@@ -6,10 +6,10 @@ import com.landit.landitbe.feature.admin.dto.AdminUserDetailResponse;
 import com.landit.landitbe.feature.admin.dto.AdminUserListResponse;
 import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
 import com.landit.landitbe.feature.character.service.StreakService;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.CurrentScenario;
-import com.landit.landitbe.feature.content.scenario.schedule.service.CurrentScenarioSelectionService;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioQueryService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.scenario.dto.CurrentScenario;
+import com.landit.landitbe.feature.learning.scenario.service.CurrentScenarioSelectionService;
+import com.landit.landitbe.feature.learning.scenario.service.ScenarioQueryService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
@@ -27,7 +27,7 @@ public class AdminUserQueryService {
   private final UserProfileService userProfileService;
   private final ScenarioAccessService scenarioAccessService;
   private final StreakService streakService;
-  private final CurrentScenarioSelectionService scenarioProgressionService;
+  private final CurrentScenarioSelectionService currentScenarioSelectionService;
   private final ScenarioQueryService scenarioQueryService;
   private final Clock clock;
 
@@ -79,7 +79,7 @@ public class AdminUserQueryService {
    */
   private AdminUserDetailResponse.CurrentScenario findCurrentScenario(UserProfileDetails profile) {
     CurrentScenario currentScenario =
-        scenarioProgressionService
+        currentScenarioSelectionService
             .findCurrentScenario(profile.userProfileId(), profile.targetLocale(), clock.instant())
             .orElse(null);
     if (currentScenario == null) {

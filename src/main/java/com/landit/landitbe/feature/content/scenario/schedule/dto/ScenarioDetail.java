@@ -1,6 +1,6 @@
 // 날짜별 시나리오 조회에 필요한 단건 콘텐츠 정보를 담는다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.repository.projection;
+package com.landit.landitbe.feature.content.scenario.schedule.dto;
 
 import com.landit.landitbe.feature.content.scenario.domain.ScenarioDifficulty;
 import com.landit.landitbe.feature.content.tutor.domain.TtsVoiceGender;
@@ -32,7 +32,7 @@ import java.math.BigDecimal;
  * @param ttsVoiceGender TTS 음성 성별
  * @param bestStarRating 사용자 최고 별점
  */
-public record DailyScenarioProjection(
+public record ScenarioDetail(
     Long scenarioId,
     String characterId,
     String scenarioTitle,

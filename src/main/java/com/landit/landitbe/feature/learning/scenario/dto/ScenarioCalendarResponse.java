@@ -1,8 +1,8 @@
 // 시나리오 캘린더 조회 API의 응답 구조를 정의한다.
 
-package com.landit.landitbe.feature.content.scenario.schedule.dto;
+package com.landit.landitbe.feature.learning.scenario.dto;
 
-import com.landit.landitbe.feature.content.scenario.schedule.domain.ScenarioCalendarType;
+import com.landit.landitbe.feature.learning.scenario.domain.ScenarioCalendarType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.format.TextStyle;

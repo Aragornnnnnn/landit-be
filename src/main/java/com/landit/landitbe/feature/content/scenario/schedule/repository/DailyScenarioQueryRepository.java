@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.content.scenario.schedule.repository;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.scenario.domain.Scenario;
-import com.landit.landitbe.feature.content.scenario.schedule.repository.projection.DailyScenarioProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioDetail;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -25,7 +25,7 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
    */
   @Query(
       """
-            SELECT new com.landit.landitbe.feature.content.scenario.schedule.repository.projection.DailyScenarioProjection(
+            SELECT new com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioDetail(
                 s.id,
                 s.characterId,
                 slv.title,
@@ -75,7 +75,7 @@ public interface DailyScenarioQueryRepository extends JpaRepository<Scenario, Lo
              AND usp.targetLocale = up.targetLocale
             WHERE up.id = :userId
       """)
-  Optional<DailyScenarioProjection> findDailyScenario(
+  Optional<ScenarioDetail> findDailyScenario(
       @Param("userId") long userId,
       @Param("scenarioId") long scenarioId,
       @Param("questionLevelGroup") ContentLearningLevel questionLevelGroup);

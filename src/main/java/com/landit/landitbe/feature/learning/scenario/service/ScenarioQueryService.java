@@ -1,20 +1,19 @@
 // 시나리오 목록 조회 결과를 사용자별 응답 형태로 조립한다.
 
-package com.landit.landitbe.feature.content.scenario.service;
+package com.landit.landitbe.feature.learning.scenario.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.domain.ScenarioAvailabilityStatus;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.CategoryResponse;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.OpeningPreviewResponse;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.ScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.repository.ScenarioListQueryRepository;
-import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection;
-import com.landit.landitbe.feature.content.scenario.schedule.domain.DailyScenarioType;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.CurrentScenario;
+import com.landit.landitbe.feature.content.scenario.dto.OpeningPreviewResponse;
+import com.landit.landitbe.feature.content.scenario.dto.ScenarioCatalogItem;
 import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioSummary;
-import com.landit.landitbe.feature.content.scenario.schedule.service.CurrentScenarioSelectionService;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioCatalogService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.scenario.domain.DailyScenarioType;
+import com.landit.landitbe.feature.learning.scenario.domain.ScenarioAvailabilityStatus;
+import com.landit.landitbe.feature.learning.scenario.dto.CurrentScenario;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioListResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioListResponse.CategoryResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioListResponse.ScenarioResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
@@ -40,8 +39,8 @@ public class ScenarioQueryService {
   private static final String SCENARIO_LOCK_REASON = "현재 사용할 수 없는 시나리오입니다.";
   private static final String DAILY_SCENARIO_NOT_AVAILABLE = "DAILY_SCENARIO_NOT_AVAILABLE";
 
-  private final ScenarioListQueryRepository scenarioListQueryRepository;
-  private final CurrentScenarioSelectionService scenarioProgressionService;
+  private final ScenarioCatalogService scenarioCatalogService;
+  private final CurrentScenarioSelectionService currentScenarioSelectionService;
   private final ScenarioAccessService scenarioAccessService;
   private final ProfileLearningService profileLearningService;
   private final Clock clock;
@@ -63,11 +62,11 @@ public class ScenarioQueryService {
     Set<Long> accessibleScenarioIds =
         Set.copyOf(
             scenarioAccessService.findAccessibleScenarioIds(userId, userLocale.targetLocale()));
-    List<ScenarioListProjection> scenarioRows =
-        scenarioListQueryRepository.findScenarioList(userId, questionLevelGroup);
+    List<ScenarioCatalogItem> scenarioRows =
+        scenarioCatalogService.findCatalog(userId, questionLevelGroup);
 
     CurrentScenario currentScenario =
-        scenarioProgressionService
+        currentScenarioSelectionService
             .findCurrentScenario(userId, userLocale.targetLocale(), evaluatedAt)
             .orElse(null);
 
@@ -88,15 +87,15 @@ public class ScenarioQueryService {
    */
   @Transactional(readOnly = true)
   public Optional<ScenarioSummary> findScenarioSummary(long userId, long scenarioId) {
-    return scenarioListQueryRepository
-        .findScenarioSummary(userId, scenarioId)
+    return scenarioCatalogService
+        .findSummary(userId, scenarioId)
         .map(row -> new ScenarioSummary(row.scenarioId(), row.scenarioTitle(), row.displayOrder()));
   }
 
   /** 평탄한 조회 결과를 응답 구조에 맞게 카테고리 단위로 묶는다. */
-  private List<CategoryGroup> groupByCategory(List<ScenarioListProjection> scenarioRows) {
+  private List<CategoryGroup> groupByCategory(List<ScenarioCatalogItem> scenarioRows) {
     Map<Long, CategoryGroup> categoryGroupsById = new LinkedHashMap<>();
-    for (ScenarioListProjection scenarioRow : scenarioRows) {
+    for (ScenarioCatalogItem scenarioRow : scenarioRows) {
       CategoryGroup categoryGroup =
           categoryGroupsById.computeIfAbsent(
               scenarioRow.categoryId(), ignored -> new CategoryGroup(scenarioRow));
@@ -108,7 +107,7 @@ public class ScenarioQueryService {
 
   /** 조회 row 하나에 접근 상태와 잠금 규칙을 적용해 시나리오 응답으로 조립한다. */
   private static ScenarioResponse toScenarioResponse(
-      ScenarioListProjection scenarioRow,
+      ScenarioCatalogItem scenarioRow,
       Set<Long> accessibleScenarioIds,
       CurrentScenario currentScenario) {
     ScenarioAvailabilityStatus availabilityStatus =
@@ -124,7 +123,7 @@ public class ScenarioQueryService {
 
   /** 콘텐츠 활성 상태와 접근 권한, 현재 제공 시나리오 순으로 시나리오 접근 상태를 계산한다. */
   private static ScenarioAvailabilityStatus availabilityStatus(
-      ScenarioListProjection scenarioRow,
+      ScenarioCatalogItem scenarioRow,
       Set<Long> accessibleScenarioIds,
       CurrentScenario currentScenario) {
     if (inactive(scenarioRow.categoryStatus())
@@ -146,7 +145,7 @@ public class ScenarioQueryService {
 
   /** 오늘 시나리오에만 신규·재도전 구분을 반환한다. */
   private static DailyScenarioType dailyScenarioType(
-      ScenarioListProjection scenarioRow, CurrentScenario currentScenario) {
+      ScenarioCatalogItem scenarioRow, CurrentScenario currentScenario) {
     if (currentScenario == null || !scenarioRow.scenarioId().equals(currentScenario.scenarioId())) {
       return null;
     }
@@ -156,7 +155,7 @@ public class ScenarioQueryService {
 
   /** 잠금된 시나리오의 콘텐츠 상태와 일일 접근 사유를 결정한다. */
   private static String lockReason(
-      ScenarioListProjection scenarioRow, ScenarioAvailabilityStatus availabilityStatus) {
+      ScenarioCatalogItem scenarioRow, ScenarioAvailabilityStatus availabilityStatus) {
     if (availabilityStatus != ScenarioAvailabilityStatus.LOCKED) {
       return null;
     }
@@ -174,7 +173,7 @@ public class ScenarioQueryService {
 
   /** 잠기지 않은 시나리오의 첫 화자에 맞춰 시작 화면 미리보기를 조립한다. */
   private static OpeningPreviewResponse openingPreview(
-      ScenarioListProjection scenarioRow, ScenarioAvailabilityStatus availabilityStatus) {
+      ScenarioCatalogItem scenarioRow, ScenarioAvailabilityStatus availabilityStatus) {
     if (availabilityStatus == ScenarioAvailabilityStatus.LOCKED) {
       return null;
     }
@@ -197,10 +196,10 @@ public class ScenarioQueryService {
       int displayOrder,
       boolean categoryLocked,
       String categoryLockReason,
-      List<ScenarioListProjection> scenarioRows) {
+      List<ScenarioCatalogItem> scenarioRows) {
 
     /** 카테고리 메타데이터는 같은 카테고리의 첫 조회 결과에서 가져오고, 시나리오는 이후에 누적한다. */
-    private CategoryGroup(ScenarioListProjection firstScenarioRow) {
+    private CategoryGroup(ScenarioCatalogItem firstScenarioRow) {
       this(
           firstScenarioRow.categoryId(),
           firstScenarioRow.categoryName(),
@@ -211,7 +210,7 @@ public class ScenarioQueryService {
     }
 
     /** 같은 카테고리에 속한 시나리오 조회 row를 표시 순서대로 누적한다. */
-    private void addScenarioRow(ScenarioListProjection scenarioRow) {
+    private void addScenarioRow(ScenarioCatalogItem scenarioRow) {
       scenarioRows.add(scenarioRow);
     }
 
@@ -219,7 +218,7 @@ public class ScenarioQueryService {
     private CategoryResponse asCategoryResponse(
         Set<Long> accessibleScenarioIds, CurrentScenario currentScenario) {
       List<ScenarioResponse> scenarios = new ArrayList<>();
-      for (ScenarioListProjection scenarioRow : scenarioRows) {
+      for (ScenarioCatalogItem scenarioRow : scenarioRows) {
         ScenarioResponse scenario =
             toScenarioResponse(scenarioRow, accessibleScenarioIds, currentScenario);
         scenarios.add(scenario);

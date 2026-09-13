@@ -1,15 +1,15 @@
 // 시나리오 조회 API 요청을 받아 공통 응답으로 반환한다.
 
-package com.landit.landitbe.feature.content.scenario;
+package com.landit.landitbe.feature.learning.scenario;
 
-import com.landit.landitbe.feature.content.scenario.docs.ScenarioControllerDocs;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.domain.ScenarioCalendarType;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.DailyScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioCalendarResponse;
-import com.landit.landitbe.feature.content.scenario.schedule.service.DailyScenarioQueryService;
-import com.landit.landitbe.feature.content.scenario.schedule.service.ScenarioCalendarService;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioQueryService;
+import com.landit.landitbe.feature.learning.scenario.docs.ScenarioControllerDocs;
+import com.landit.landitbe.feature.learning.scenario.domain.ScenarioCalendarType;
+import com.landit.landitbe.feature.learning.scenario.dto.DailyScenarioResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioCalendarResponse;
+import com.landit.landitbe.feature.learning.scenario.dto.ScenarioListResponse;
+import com.landit.landitbe.feature.learning.scenario.service.DailyScenarioQueryService;
+import com.landit.landitbe.feature.learning.scenario.service.ScenarioCalendarService;
+import com.landit.landitbe.feature.learning.scenario.service.ScenarioQueryService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import java.time.LocalDate;

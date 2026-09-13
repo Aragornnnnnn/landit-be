@@ -2,8 +2,6 @@
 
 package com.landit.landitbe.feature.content.scenario.dto;
 
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.OpeningPreviewResponse;
-import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,11 +21,11 @@ public record AdminScenarioListResponse(List<CategoryResponse> categories) {
    * @param rows 시나리오 목록 조회 결과
    * @return 카테고리별 관리자 시나리오 목록 응답
    */
-  public static AdminScenarioListResponse from(List<ScenarioListProjection> rows) {
+  public static AdminScenarioListResponse from(List<ScenarioCatalogItem> rows) {
     // 조회 정렬을 유지하면서 같은 카테고리의 시나리오를
     // 하나의 응답 그룹으로 묶는다.
     Map<Long, CategoryResponseBuilder> builders = new LinkedHashMap<>();
-    for (ScenarioListProjection row : rows) {
+    for (ScenarioCatalogItem row : rows) {
       CategoryResponseBuilder builder =
           builders.computeIfAbsent(
               row.categoryId(),
@@ -82,7 +80,7 @@ public record AdminScenarioListResponse(List<CategoryResponse> categories) {
      * @param row 시나리오 목록 조회 결과
      * @return 관리자 시나리오 응답
      */
-    public static ScenarioResponse from(ScenarioListProjection row) {
+    public static ScenarioResponse from(ScenarioCatalogItem row) {
       OpeningPreviewResponse openingPreview =
           row.firstSpeaker() == ConversationSpeaker.AI
               ? OpeningPreviewResponse.fromAi(row)
