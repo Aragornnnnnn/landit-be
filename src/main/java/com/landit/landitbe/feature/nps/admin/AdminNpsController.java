@@ -1,10 +1,10 @@
 // 관리자 NPS 목록 요청을 처리한다.
 
-package com.landit.landitbe.feature.nps;
+package com.landit.landitbe.feature.nps.admin;
 
-import com.landit.landitbe.feature.nps.docs.AdminNpsControllerDocs;
-import com.landit.landitbe.feature.nps.dto.AdminNpsResponsePage;
-import com.landit.landitbe.feature.nps.service.NpsService;
+import com.landit.landitbe.feature.nps.admin.docs.AdminNpsControllerDocs;
+import com.landit.landitbe.feature.nps.admin.dto.AdminNpsResponsePage;
+import com.landit.landitbe.feature.nps.admin.service.AdminNpsQueryService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AdminNpsController implements AdminNpsControllerDocs {
 
-  private final NpsService npsService;
+  private final AdminNpsQueryService adminNpsQueryService;
 
   /** {@inheritDoc} */
   @Override
@@ -29,6 +29,6 @@ public class AdminNpsController implements AdminNpsControllerDocs {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
 
-    return ApiResponse.success(npsService.getAdminResponses(page, size));
+    return ApiResponse.success(adminNpsQueryService.getAdminResponses(page, size));
   }
 }

@@ -1,8 +1,8 @@
 // 관리자 NPS 목록 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.nps.docs;
+package com.landit.landitbe.feature.nps.admin.docs;
 
-import com.landit.landitbe.feature.nps.dto.AdminNpsResponsePage;
+import com.landit.landitbe.feature.nps.admin.dto.AdminNpsResponsePage;
 import com.landit.landitbe.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

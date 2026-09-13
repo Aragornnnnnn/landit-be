@@ -1,6 +1,6 @@
 // 관리자 NPS 목록의 페이지 응답 구조를 정의한다.
 
-package com.landit.landitbe.feature.nps.dto;
+package com.landit.landitbe.feature.nps.admin.dto;
 
 import com.landit.landitbe.feature.nps.repository.projection.AdminNpsResponseProjection;
 import java.time.LocalDateTime;
