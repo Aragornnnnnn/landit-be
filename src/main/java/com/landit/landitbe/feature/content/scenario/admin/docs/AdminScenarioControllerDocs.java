@@ -1,8 +1,8 @@
 // 관리자 시나리오 테스트 목록 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.content.scenario.docs;
+package com.landit.landitbe.feature.content.scenario.admin.docs;
 
-import com.landit.landitbe.feature.content.scenario.dto.AdminScenarioListResponse;
+import com.landit.landitbe.feature.content.scenario.admin.dto.AdminScenarioListResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;

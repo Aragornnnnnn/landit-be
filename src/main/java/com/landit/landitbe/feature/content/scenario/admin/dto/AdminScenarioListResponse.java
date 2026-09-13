@@ -1,7 +1,9 @@
 // 관리자 시나리오 테스트 목록의 응답 구조를 정의한다.
 
-package com.landit.landitbe.feature.content.scenario.dto;
+package com.landit.landitbe.feature.content.scenario.admin.dto;
 
+import com.landit.landitbe.feature.content.scenario.dto.OpeningPreviewResponse;
+import com.landit.landitbe.feature.content.scenario.dto.ScenarioCatalogItem;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

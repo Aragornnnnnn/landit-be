@@ -1,10 +1,10 @@
 // 관리자 시나리오 테스트 목록 요청을 처리한다.
 
-package com.landit.landitbe.feature.content.scenario;
+package com.landit.landitbe.feature.content.scenario.admin;
 
-import com.landit.landitbe.feature.content.scenario.docs.AdminScenarioControllerDocs;
-import com.landit.landitbe.feature.content.scenario.dto.AdminScenarioListResponse;
-import com.landit.landitbe.feature.content.scenario.service.AdminScenarioQueryService;
+import com.landit.landitbe.feature.content.scenario.admin.docs.AdminScenarioControllerDocs;
+import com.landit.landitbe.feature.content.scenario.admin.dto.AdminScenarioListResponse;
+import com.landit.landitbe.feature.content.scenario.admin.service.AdminScenarioQueryService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import lombok.RequiredArgsConstructor;

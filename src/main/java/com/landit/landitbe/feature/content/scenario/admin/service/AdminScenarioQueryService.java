@@ -1,9 +1,9 @@
 // 관리자 시나리오 테스트 목록 조회를 처리한다.
 
-package com.landit.landitbe.feature.content.scenario.service;
+package com.landit.landitbe.feature.content.scenario.admin.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.dto.AdminScenarioListResponse;
+import com.landit.landitbe.feature.content.scenario.admin.dto.AdminScenarioListResponse;
 import com.landit.landitbe.feature.content.scenario.repository.AdminScenarioListQueryRepository;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import lombok.RequiredArgsConstructor;
