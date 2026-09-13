@@ -17,6 +17,7 @@ Landit BE 서버에서 Codex와 다른 코딩 에이전트가 지켜야 할 저�
 - 기능 모듈은 테이블 기준이 아니라 사용자 기능과 비즈니스 흐름 기준으로 나눕니다.
 - 최상위 패키지는 사용자 기능을 모은 `feature`, 애플리케이션 설정을 모은 `config`, 기능 독립적인 공통 코드를 모은 `shared`로 나눕니다.
 - 큰 기능은 업무별 하위 패키지로 나누고, Controller를 해당 업무 패키지 바로 아래에 노출하고 `docs`, `dto`, `domain`, `repository`, `service`, `client`, `exception`처럼 실제 역할이 드러나는 패키지를 사용합니다.
+- 관리자 Controller·문서·요청/응답·전용 Service는 소유 업무의 `admin` 하위 패키지에 둡니다. 공통 관리자 조율과 비공개 협력 메서드의 예외는 `docs/architecture/backend.md`를 따릅니다.
 - 모든 공개 비즈니스 로직 클래스는 `Service`로 끝내며 `UseCase`, `UseCaseService`, `Finder` 접미사를 사용하지 않습니다.
 - Repository와 Entity는 하나의 업무 모듈이 소유하며, Controller와 다른 기능은 직접 참조하지 않습니다. 같은 업무 내부의 조회·변경 Service가 Repository를 함께 사용하는 것은 허용합니다.
 - 다른 기능과는 공개 Service와 값 record로 통신하고 Entity나 Repository projection을 넘기지 않습니다. 공유 DB 교차 조회의 허용 범위는 `docs/architecture/backend.md`에서 관리합니다.

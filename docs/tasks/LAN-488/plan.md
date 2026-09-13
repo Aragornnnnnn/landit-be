@@ -1,3 +1,7 @@
+# LAN-488 작업 기록
+
+사용자가 이슈 번호를 LAN-450에서 LAN-488로 정정했다. 아래 LAN-450과 과거 SHA는 이전 실행 기록이며, 현재 브랜치와 재구성 커밋은 LAN-488을 사용한다.
+
 # LAN-450 모듈 경계와 패키지 구조 정리
 
 ## 승인된 방향과 완료 기준
@@ -83,3 +87,56 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - main 타입 617개를 기준과 비교했다. 파일 누락이 없고, package/import·타입 경로·포맷 공백을 정규화한 클래스 본문은 전부 동일하다. 타입명·공개 범위·메서드 로직의 변경이 없음을 함께 확인했다.
 - HTTP Mapping 70개와 SQL/JPQL text block 100개가 동일하다. `src/main/resources`, 빌드 파일, 배포 workflow에는 변경이 없다. Apple 이전 CLI의 mainClass도 기존 진입점을 유지한다.
 - 독립 리뷰에서 214개 타입의 이동 누락·중복, private 접근성, JPQL 경로, JPA 스캔, CLI 진입점, 테스트 보존을 확인했고 actionable blocker는 없었다. 170개 테스트 파일의 본문을 보존했으며 이 중 18개의 패키지 위치가 변경됐다. staged `git diff --check`도 통과했다.
+
+## 전체 구조 감사 후 책임 분리 보완
+
+사용자가 `75a66e7e` 전체 감사에서 발견한 추가 작업을 승인했다. 앞선 패키지 이동의 회귀 안전성과 구조 정리 완료를 구분하며, 다음 책임을 실제 코드와 검증 규칙에 반영한다. 기존 API·SQL·DB 스키마·오류·시간대·트랜잭션 및 잠금 순서는 보존한다.
+
+- [x] 콘텐츠 조회와 학습 조율을 분리한다. 사용자별 시나리오 선택·조회는 `learning.scenario`, 표현 시작·완료는 `learning.expression`이 소유하고 content는 콘텐츠 값 조회·추천·연습 규칙을 제공한다. `learning.access/progress`는 독립 상태 소유 업무이며 세션이나 학습 조율에 의존하지 않는다.
+- [x] 구독의 세션 역참조를 제거한다. 세션 소유권·상태는 session에서 검증하고 구독은 값으로 받은 시작 이력과 자체 권한만 판단한다. HTTP 경로별 보안 조율은 config.security에 두고 공통 실패 응답 작성기는 shared에 둔다.
+- [x] 프로필의 인증·학습·설정·구독, 우편함의 편지·문의·답장 책임을 실제 Service로 나누며 같은 소유 Repository와 기존 트랜잭션을 유지한다. 프리톡은 재전송 응답 복원·응답 변환을 분리하고 예약·확정·보상 잠금은 유지한다.
+- [x] memory의 AI 구현체를 memory가 소유하게 하고 공통 HTTP 전송만 shared에서 재사용한다. 외부에 사용하는 Service 내부 공개 record 10개를 업무별 DTO로 분리한다.
+- [x] 컴파일된 타입 참조로 기능 경계·허용 업무 의존·순환·Controller 저장소 접근을 검사한다. 기존 import 정규식 검사보다 FQCN과 메서드 시그니처를 포함하는 검증을 사용한다.
+- [x] 관련 회귀 검사, 전체 `./gradlew check`, 독립 리뷰 후 논리 단위로 커밋한다.
+
+
+### 구현과 검증 결과
+
+- 콘텐츠 조회는 `ScenarioCatalogService`, 표현 추천·연습·음성 조회는 각각의 content Service가 소유한다. 개인화 시나리오 화면은 `learning.scenario`, 표현 목록·시작·완료 조율은 `learning.expression`에 둔다. 관리자와 학습 화면이 함께 쓰는 `OpeningPreviewResponse`는 콘텐츠 값으로 별도 분리했다.
+- `learning` 전체를 독립 모듈 하나로 취급하지 않는다. access/progress/review의 상태·값 계약과 expression/scenario 조율을 별도 업무 단위로 명시하고 실제 타입 의존 순환을 검사한다. 상위 learning/session 폴더 사이에는 양쪽 참조가 보이지만 업무 단위의 순환은 없다.
+- Profile 인증·학습·설정·구독의 기존 구현을 각각 옮겼다. UserProfileService는 462줄에서 147줄, ExpressionQueryService는 475줄에서 99줄로 줄었다. AdminMailboxService 589줄의 업무는 편지 265줄·문의 조회 186줄·답장 185줄로 분리했다. FreeTalkSubmittedMessageService는 902줄에서 602줄로 줄었고 재전송 복원 196줄, 응답 조립과 내부 잠금 helper를 따로 둔다. 파일 수를 줄이는 목적이 아니라 변경 책임을 찾는 기준이다.
+- Service 내부 공개 record 10개를 업무별 DTO로 옮겼다. main 파일 수는 617개에서 651개가 됐다. 기존 예약·확정·보상, memory 저장/READY 원자성, 프로필 잠금과 평가 적용의 트랜잭션은 유지한다.
+- memory local/remote 어댑터를 memory가 소유한다. HTTP 계약 테스트를 해당 패키지로 옮겼고, session 구성을 전혀 등록하지 않은 Spring Context에서 기본/local/remote 모드의 단일 Bean 구성을 확인했다. 공통 전송의 파싱·오류·제한 시간은 기존 계약을 유지한다.
+- 구독은 사용자·세션 종류가 확인된 시작 시각을 값으로 받는다. 도입 전 시작의 24시간 경계, 미검증 시각 거부, 만료된 저장 권한의 유예 우회 거부, 세션 소유자·종류 불일치를 회귀 테스트로 검증했다.
+- `FeatureBoundaryTest`는 JDK `jdeps`의 컴파일 결과를 사용한다. FQCN으로 서로 참조하는 fixture를 실제 컴파일해 검출했고, 업무 간 Repository/Entity 접근, 같은 업무의 Controller 저장소 접근, 역참조, 순환, Service 공개 내부 record, memory 어댑터 소유를 검사한다.
+- 기존 추천·연습·학습 흐름 및 memory AI 테스트는 새 책임 패키지로 분류하면서 검증 사례를 보존했다. 최종 `./gradlew spotlessApply check` 성공(55초): 1,202 tests / 0 failures / 0 errors / 6 skipped. 실행된 1,196개가 모두 통과했다. 생략된 6개는 기존 PostgreSQL·실제 AI·교차 저장소 환경 검사다.
+- 독립 소스 리뷰에서 실제 동작 회귀를 발견하지 못했다. 주 세션에서도 HTTP 매핑 70개와 SQL/JPQL 100개를 포함한 Java text block 102개가 이름·패키지·공백 정규화 후 기준과 같은지 재확인했다. resources·Gradle·배포 workflow 변경이 없고 `git diff --check`가 통과했다.
+- 물리 Gradle 모듈 분리나 MSA 전환은 하지 않았다. 공유 DB 교차 JOIN과 내부 Repository 공유의 허용 경계는 `docs/architecture/backend.md`에 유지한다. 로컬 검증은 운영 PostgreSQL·실제 외부 AI·배포 증거를 대신하지 않는다.
+
+## 관리자 기능 분류와 커밋 재구성
+
+- 관리자 Controller·docs·DTO·전용 Service를 소유 업무의 admin 하위 패키지로 모았다. 우편함은 admin 아래 편지와 문의/답장을 나눴다.
+- 앱 버전 공개 확인과 관리자 정책 관리, NPS 사용자 제출과 관리자 조회를 실제 Service로 분리했다. 기존 조회·수정·감사 기록 트랜잭션과 Repository 소유권을 유지했다.
+- 시나리오 테스트 시작 Service는 비공개 진행 제한 우회 메서드와의 결합 때문에 start.service에 남긴다. Controller는 scenario.admin으로 이동하고 develop 프로필 제한은 유지했다.
+- 캠페인 발송 처리·스케줄러·외부 클라이언트, 감사 기록, Repository/Entity는 기존 업무 소유 패키지를 유지한다.
+- 기존 이력과 완성 트리를 백업한 뒤 origin/develop을 기준으로 논리적 변경 단위로 재구성한다. 각 커밋의 컴파일과 최종 전체 check, 트리 일치를 확인한다.
+
+### 최종 검증과 커밋 구성
+
+- 관리자 추가 분리 후 `./gradlew check` 성공(51초). XML 집계 1,204 tests / 0 failures / 0 errors / 6 skipped이며 실행된 1,198개가 통과했다. 생략 범위는 기존 외부 PostgreSQL·실제 AI·교차 저장소 검사다.
+- 관리자 분리 전 `b46fab45`와 비교해 HTTP Mapping 70개와 Java text block 102개(기존 SQL/JPQL 포함)가 동일하다. 패키지·타입 경로와 공백만 정규화했다. main Java 타입은 651개에서 653개로 늘었다.
+- 재구성 후 `src` 전체는 관리자 변경을 검증한 백업 `87ba665a`와 byte 단위로 동일하다. DB 스키마·리소스·배포 설정 변경은 없다.
+- 새로 분리한 책임 변경 9개와 관리자 변경 8개는 각각 `spotlessApply compileTestJava`를 통과했다. 경계 검사 변경은 전체 check로 검증했다. 기존 첫 5개 커밋은 검증된 트리를 보존하고 이슈 번호와 변경 타입을 정렬했다.
+- 현재 브랜치는 `feat/LAN-488`이다. 기존 `feat/LAN-450`과 검증 완료 트리 `backup/LAN-488-complete-tree`를 보존했다. push·PR·merge·배포는 수행하지 않았다.
+
+| 구분 | 개수 | 분리 기준 |
+| --- | --- | --- |
+| 기존 소유권·업무 패키지·오류 정리 | 4 | 기존 검증 트리를 보존했다. 순수 경로 이동은 rename, 책임 변경을 포함한 재배치는 refactor다. |
+| develop 통합 | 1 | 개발 기준 갱신의 merge 이력이며 독립 기능 커밋으로 세지 않는다. |
+| 추가 책임 분리 | 9 | 공개 값 계약, 프로필, 우편함, memory AI, 개인화 시나리오, 표현 학습, 프리톡 재전송, 공통 보안 응답, 구독/세션 경계. |
+| 관리자 기능 분리 | 8 | 앱 버전, NPS, 시나리오 콘텐츠, 발음 자산, 이미지 업로드, 우편함, 푸시 캠페인, 시나리오 테스트 진입점. |
+| 경계 검사 | 2 | 컴파일된 모듈 의존과 관리자 진입점/사용자 Controller 참조. |
+| 문서 | 1 | 관리자 패키지 기준, LAN-488 작업 경로, 최종 검증과 커밋 구성. |
+| 합계 | 25 | 작업 커밋 24개와 develop 통합 merge 1개. |
+
+30줄은 권장 크기이며 이번 작업에서는 파일 이동과 필수 import 변경, 큰 기존 구현의 추출로 초과한다. 줄 수만 맞추려고 호출부·계약·검증을 떨어뜨리지 않았다. 이력 분리는 전체 변경량을 줄이지 않으므로 PR을 만들 때는 별도로 리뷰 범위를 나눌 필요가 있다.
