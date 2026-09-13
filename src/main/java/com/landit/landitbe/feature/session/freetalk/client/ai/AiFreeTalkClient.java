@@ -2,6 +2,18 @@
 
 package com.landit.landitbe.feature.session.freetalk.client.ai;
 
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.session.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.session.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkClosingRequest;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningResult;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnRequest;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.shared.exception.ApiException;
 
 /** 프리톡에 필요한 AI 서버 호출을 추상화한다. */

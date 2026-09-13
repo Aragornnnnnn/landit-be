@@ -3,10 +3,10 @@
 package com.landit.landitbe.feature.subscription.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.landit.landitbe.feature.profile.domain.SubscriptionPeriodType;
-import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
-import com.landit.landitbe.feature.profile.domain.SubscriptionStore;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionPeriodType;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStore;
+import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 

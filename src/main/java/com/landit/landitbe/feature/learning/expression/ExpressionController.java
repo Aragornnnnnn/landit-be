@@ -3,8 +3,8 @@
 package com.landit.landitbe.feature.learning.expression;
 
 import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
-import com.landit.landitbe.feature.content.expression.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
+import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.learning.expression.docs.ExpressionControllerDocs;
 import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;

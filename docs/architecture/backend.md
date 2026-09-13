@@ -68,16 +68,17 @@ Landit 백엔드는 하나의 코드베이스에서 시작합니다.
 com.landit.landitbe
 ├── feature
 │   ├── content
-│   │   ├── scenario
-│   │   ├── expression
+│   │   ├── scenario         # category / question / schedule
+│   │   ├── expression       # pronunciation / practice / recommendation
 │   │   └── tutor
 │   ├── learning
 │   │   ├── expression       # 표현 학습 요청 조율
 │   │   ├── progress         # 누적 학습 진행과 완료 이력
-│   │   └── access           # 시나리오 복습 권한
+│   │   ├── access           # 시나리오 복습 권한
+│   │   └── review           # 복습 문항과 결과
 │   ├── session
-│   │   ├── scenario
-│   │   ├── freetalk
+│   │   ├── scenario         # start / message / innerthought
+│   │   ├── freetalk         # message / topic / usage / innerthought
 │   │   │   ├── expression
 │   │   │   ├── memory
 │   │   │   └── history
@@ -89,9 +90,10 @@ com.landit.landitbe
 │   │   ├── delivery
 │   │   ├── scheduled
 │   │   └── campaign
-│   ├── memory
-│   ├── profile
-│   ├── subscription
+│   ├── memory              # planning / retrieval
+│   ├── profile             # learning / preference / subscription
+│   ├── subscription        # event
+│   ├── mailbox             # feedback / letter
 │   ├── admin
 │   └── audit
 ├── config
@@ -102,6 +104,29 @@ com.landit.landitbe
 `docs`, `client`, `exception`을 둡니다. 같은 업무의 변경 파일을 함께 찾을 수 있게 합니다.
 `session` 내부의 하위 패키지는 분류 단위이며 각각 독립 배포 모듈이라는 뜻은 아닙니다.
 `learning.expression`은 요청 조율, `learning.progress/access`는 상태 소유 역할을 구분합니다.
+
+## 큰 패키지를 나누는 기준
+
+같이 변경되는 업무를 먼저 묶고 그 안에서 `service`, `repository`, `domain`, `dto`, `client` 역할을 구분합니다. 클래스 수 자체에 상한을 두거나 파일 수만 맞추기 위한 패키지를 만들지는 않습니다.
+
+| 찾으려는 코드 | 위치 |
+| --- | --- |
+| 시나리오 시작·재개 | `session.scenario.start` |
+| 시나리오 발화 접수·AI 생성·저장 | `session.scenario.message` |
+| 메시지 피드백 작업·복구 | `session.scenario.message.feedback` |
+| 프리톡 대화·표현 추천 AI 계약 | 각각 `session.freetalk.message.client.ai`, `session.freetalk.expression.client.ai` |
+| 표현 발음 자산·발음 평가 | `content.expression.pronunciation` |
+| 연습 예문·표현 추천 검색 | `content.expression.practice`, `content.expression.recommendation` |
+| 시나리오 질문·일별 배정 | `content.scenario.question`, `content.scenario.schedule` |
+| 프로필 학습·언어 설정·구독 값 계약 | `profile.learning`, `profile.preference`, `profile.subscription` |
+| 우편함 문의·편지 모델 | `mailbox.feedback`, `mailbox.letter` |
+| 기억 후보 판정·검색 | `memory.planning`, `memory.retrieval` |
+| 결제 이벤트 수신·이력 | `subscription.event` |
+| Apple 사용자 이전 CLI | `auth.migration` 진입점과 역할별 하위 패키지 |
+
+HTTP Controller가 여러 하위 업무를 조율하면 공통 상위 패키지에 유지합니다. 예를 들어 `UserProfileController`와 `UserProfileService`는 프로필 소유권을 유지하고, 사용 목적이 다른 값 계약을 하위 패키지로 분류합니다. 단순 위임 Service를 추가하지 않습니다.
+
+시나리오 메시지 처리와 기억 후보 판정의 package-private helper는 각각 구현 Service와 같은 패키지에 둡니다. 패키지 이동을 위해 공개 범위를 넓히지 않습니다. 여러 대화 유형이 사용하는 `session.domain`의 상태·종료·입력 타입과 기능 독립적인 `shared.domain`은 공통 위치를 유지합니다.
 
 ## 패키지 역할
 

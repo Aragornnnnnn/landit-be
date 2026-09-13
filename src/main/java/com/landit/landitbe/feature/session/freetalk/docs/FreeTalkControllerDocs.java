@@ -4,13 +4,13 @@ package com.landit.landitbe.feature.session.freetalk.docs;
 
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkMainResponse;
-import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkMessageSubmitRequest;
-import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkMessageSubmitResponse;
-import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionDetailResponse;
-import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionRetryResponse;
+import com.landit.landitbe.feature.session.freetalk.history.dto.FreeTalkSessionDetailResponse;
+import com.landit.landitbe.feature.session.freetalk.history.dto.FreeTalkSessionListResponse;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitRequest;
+import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;

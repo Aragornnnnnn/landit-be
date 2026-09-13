@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.session.feedback.service;
 
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
-import com.landit.landitbe.feature.content.scenario.dto.NextQuestionContext;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.question.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
@@ -15,11 +15,11 @@ import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiScenarioContext;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContext;
+import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.scenario.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionService;
-import com.landit.landitbe.feature.session.scenario.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;

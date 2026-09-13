@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session.feedback.dto;
 import com.landit.landitbe.feature.session.feedback.domain.FeedbackType;
 import com.landit.landitbe.feature.session.feedback.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.session.feedback.domain.SessionHistorySummaryFeedback;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackEvaluationContextType;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContextType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;

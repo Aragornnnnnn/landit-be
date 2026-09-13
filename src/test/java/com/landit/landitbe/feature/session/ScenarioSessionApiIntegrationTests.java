@@ -14,28 +14,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import com.landit.landitbe.feature.content.scenario.repository.AdminScenarioListQueryRepository;
-import com.landit.landitbe.feature.content.scenario.repository.DailyScenarioQueryRepository;
 import com.landit.landitbe.feature.content.scenario.repository.ScenarioListQueryRepository;
+import com.landit.landitbe.feature.content.scenario.schedule.repository.DailyScenarioQueryRepository;
 import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.assessment.repository.UserLevelAssessmentRepository;
-import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.domain.FeedbackType;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiClosingMessageRequest;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiClosingMessageResult;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiInnerThoughtRequest;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiInnerThoughtResult;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackRequest;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackResult;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiNextMessageRequest;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiNextMessageResult;
+import com.landit.landitbe.feature.session.scenario.domain.GoalCompletionStatus;
+import com.landit.landitbe.feature.session.scenario.innerthought.client.ai.AiInnerThoughtRequest;
+import com.landit.landitbe.feature.session.scenario.innerthought.client.ai.AiInnerThoughtResult;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiClosingMessageRequest;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiClosingMessageResult;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiNextMessageRequest;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiNextMessageResult;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackRequest;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackResult;
 import com.landit.landitbe.feature.session.scenario.repository.ScenarioSessionMessageQueryRepository;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -101,13 +101,14 @@ class ScenarioSessionApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired
-  private com.landit.landitbe.feature.session.scenario.service.MessageFeedbackWorkService
+  private com.landit.landitbe.feature.session.scenario.message.feedback.service
+          .MessageFeedbackWorkService
       feedbackWorkService;
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired
-  private com.landit.landitbe.feature.session.scenario.service.SessionMessageService
+  private com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService
       sessionMessages;
 
   @Autowired private ScenarioSessionMessageQueryRepository scenarioContextRepository;
@@ -123,7 +124,8 @@ class ScenarioSessionApiIntegrationTests {
   @Autowired private MutableClock mutableClock;
 
   @Autowired
-  private com.landit.landitbe.feature.session.scenario.repository.MessageFeedbackWorkRepository
+  private com.landit.landitbe.feature.session.scenario.message.feedback.repository
+          .MessageFeedbackWorkRepository
       feedbackWorks;
 
   @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;

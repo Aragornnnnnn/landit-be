@@ -3,12 +3,12 @@
 package com.landit.landitbe.feature.subscription.service;
 
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
-import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
-import com.landit.landitbe.feature.subscription.repository.SubscriptionEventRepository;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
+import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

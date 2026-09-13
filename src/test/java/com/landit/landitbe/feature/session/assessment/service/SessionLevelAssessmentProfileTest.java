@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.feature.profile.service.UserProfileService;

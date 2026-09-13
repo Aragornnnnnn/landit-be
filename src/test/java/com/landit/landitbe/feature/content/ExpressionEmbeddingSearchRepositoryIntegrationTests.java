@@ -5,9 +5,9 @@ package com.landit.landitbe.feature.content;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.landit.landitbe.feature.content.expression.dto.ExpressionEmbeddingMatch;
-import com.landit.landitbe.feature.content.expression.dto.FreeTalkCandidateSearch;
-import com.landit.landitbe.feature.content.expression.repository.ExpressionEmbeddingSearchRepository;
+import com.landit.landitbe.feature.content.expression.recommendation.dto.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.expression.recommendation.dto.FreeTalkCandidateSearch;
+import com.landit.landitbe.feature.content.expression.recommendation.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.List;
 import org.junit.jupiter.api.Test;

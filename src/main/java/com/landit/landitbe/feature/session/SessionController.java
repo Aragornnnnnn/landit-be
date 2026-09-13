@@ -7,11 +7,11 @@ import com.landit.landitbe.feature.session.assessment.service.SessionLevelAssess
 import com.landit.landitbe.feature.session.docs.SessionControllerDocs;
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.session.feedback.service.SessionFeedbackService;
-import com.landit.landitbe.feature.session.scenario.dto.SessionInnerThoughtResponse;
-import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitRequest;
-import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitResponse;
-import com.landit.landitbe.feature.session.scenario.service.SessionInnerThoughtQueryService;
-import com.landit.landitbe.feature.session.scenario.service.SessionMessageSubmitService;
+import com.landit.landitbe.feature.session.scenario.innerthought.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.scenario.innerthought.service.SessionInnerThoughtQueryService;
+import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitRequest;
+import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitResponse;
+import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageSubmitService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

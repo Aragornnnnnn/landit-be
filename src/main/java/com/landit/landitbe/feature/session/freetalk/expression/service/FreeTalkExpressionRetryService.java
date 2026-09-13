@@ -9,7 +9,7 @@ import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationS
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.freetalk.service.FreeTalkDailySpeakingUsageService;
+import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;

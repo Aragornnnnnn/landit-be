@@ -3,18 +3,19 @@
 package com.landit.landitbe.feature.content.scenario.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.scenario.domain.ScenarioAvailabilityStatus;
-import com.landit.landitbe.feature.content.scenario.dto.CurrentScenario;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.CategoryResponse;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.OpeningPreviewResponse;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse.ScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioSummary;
 import com.landit.landitbe.feature.content.scenario.repository.ScenarioListQueryRepository;
 import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.domain.DailyScenarioType;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.CurrentScenario;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioSummary;
+import com.landit.landitbe.feature.content.scenario.schedule.service.CurrentScenarioSelectionService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
-import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;

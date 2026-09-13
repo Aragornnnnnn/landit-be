@@ -10,9 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import java.time.Clock;
 import java.time.Duration;

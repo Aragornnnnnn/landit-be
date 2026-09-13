@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.scenario.docs;
 
-import com.landit.landitbe.feature.session.scenario.dto.SessionStartResponse;
+import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;

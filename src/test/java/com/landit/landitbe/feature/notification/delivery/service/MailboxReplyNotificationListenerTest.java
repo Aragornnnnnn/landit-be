@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
-import com.landit.landitbe.feature.mailbox.service.MailboxReplyCreatedEvent;
+import com.landit.landitbe.feature.mailbox.feedback.event.MailboxReplyCreatedEvent;
 import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePublisher;
 import java.util.List;

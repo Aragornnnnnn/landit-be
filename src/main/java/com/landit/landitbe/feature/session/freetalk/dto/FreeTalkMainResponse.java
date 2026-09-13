@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.freetalk.dto;
 
+import com.landit.landitbe.feature.session.freetalk.topic.dto.FreeTalkTopicResponse;
 import java.util.List;
 
 /**

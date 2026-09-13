@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.subscription.docs;
 
-import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;

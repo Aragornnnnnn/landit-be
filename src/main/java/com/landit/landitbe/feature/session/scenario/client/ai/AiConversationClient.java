@@ -5,6 +5,14 @@ package com.landit.landitbe.feature.session.scenario.client.ai;
 import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
+import com.landit.landitbe.feature.session.scenario.innerthought.client.ai.AiInnerThoughtRequest;
+import com.landit.landitbe.feature.session.scenario.innerthought.client.ai.AiInnerThoughtResult;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiClosingMessageRequest;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiClosingMessageResult;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiNextMessageRequest;
+import com.landit.landitbe.feature.session.scenario.message.client.ai.AiNextMessageResult;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackRequest;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackResult;
 import java.time.Duration;
 
 /** 대화 진행에 필요한 AI 서버 호출을 추상화한다. */

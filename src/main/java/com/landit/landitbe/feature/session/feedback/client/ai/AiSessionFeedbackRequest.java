@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.feedback.client.ai;
 
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiScenarioContext;

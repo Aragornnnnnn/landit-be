@@ -66,3 +66,20 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - 생략된 6개는 기존 환경 조건에 따른 PostgreSQL 관리자 대상 SQL 검사 4개, 실제 AI 호환성 1개, FE·BE·AI 교차 검증 1개다. 운영 PostgreSQL·외부 AI·배포 검증은 이번 증거에 포함하지 않는다.
 - 독립 리뷰는 최신 기준과 현재 staged/unstaged 전체 diff, 구독 snapshot, 메시지 피드백 복구, 수준 평가의 잠금과 적용, 복습 SQL, 표현 완료와 기억 저장 원자성을 확인했다. actionable blocker는 없었다.
 - 충돌 표식과 미해결 인덱스 항목이 없고 `git diff --check`가 통과했다. 이전 세 커밋은 보존한 채 최신 develop을 통합한다.
+
+## 2026-09-13 전체 패키지 밀집도 재정리
+
+사용자가 최신화 결과 전체에서 클래스가 몰린 패키지를 다시 정리하도록 요청했다. 이번 기준은 `6f69542f`이며 이전 모듈 소유권·외부 계약·트랜잭션은 유지한다. 클래스 개수만을 맞추려고 같은 구현의 package-private helper를 공개하지 않는다.
+
+- [x] main 소스 전체의 실제 파일 수와 같은 패키지 타입 참조를 확인했다. 주요 밀집은 프리톡 AI 21개, 표현/profile DTO 각 16개, mailbox DTO 15개, 시나리오 Service와 공통 session domain 각 13개였다.
+- [x] 표현을 pronunciation/practice/recommendation, 시나리오 콘텐츠를 category/question/schedule, 시나리오 세션을 start/message/innerthought와 메시지 feedback으로 묶었다. AI 요청·응답도 각 업무의 client/ai로 이동한다.
+- [x] profile은 learning/preference/subscription 값 계약, mailbox는 feedback/letter, memory는 planning/retrieval, Apple 이전 CLI는 client/repository/service/dto/config/domain/exception 역할로 분류한다. 학습 복습 모델은 review, RevenueCat 이벤트는 subscription.event로 묶는다.
+- [x] package-private 메시지 처리 helper 5개와 컨텍스트는 메시지 구현과 함께 두고, 기억 후보·매핑·판정 helper도 planning 구현과 함께 둔다. 접근 제한 변경이나 새 Service/인터페이스/DTO 추가는 없다.
+- [x] 전체 check와 독립 리뷰, 계약 보존 검증 후 논리 단위로 커밋한다.
+
+214개 main 타입의 위치를 바꿨다. 업무별 이동이며 새로운 배포 모듈이나 트랜잭션 경계 도입이 아니다. 9개 session 공통 domain은 시나리오·프리톡이 함께 쓰는 상태·종료·입력 계약이므로 유지하고, 8개 shared domain도 공통 코드다. 실제 최대 Service 패키지는 메시지 처리의 8개다.
+
+- `./gradlew spotlessApply check` 성공(1분 2초). XML 집계 1,191 tests / 0 failures / 0 errors / 6 skipped로 실행된 1,185개가 통과했다. 생략 범위는 앞선 최신화 검증과 동일한 외부 PostgreSQL·AI 검사다.
+- main 타입 617개를 기준과 비교했다. 파일 누락이 없고, package/import·타입 경로·포맷 공백을 정규화한 클래스 본문은 전부 동일하다. 타입명·공개 범위·메서드 로직의 변경이 없음을 함께 확인했다.
+- HTTP Mapping 70개와 SQL/JPQL text block 100개가 동일하다. `src/main/resources`, 빌드 파일, 배포 workflow에는 변경이 없다. Apple 이전 CLI의 mainClass도 기존 진입점을 유지한다.
+- 독립 리뷰에서 214개 타입의 이동 누락·중복, private 접근성, JPQL 경로, JPA 스캔, CLI 진입점, 테스트 보존을 확인했고 actionable blocker는 없었다. 170개 테스트 파일의 본문을 보존했으며 이 중 18개의 패키지 위치가 변경됐다. staged `git diff --check`도 통과했다.

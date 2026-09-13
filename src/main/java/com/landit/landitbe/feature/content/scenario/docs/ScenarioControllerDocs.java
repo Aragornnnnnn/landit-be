@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.content.scenario.docs;
 
-import com.landit.landitbe.feature.content.scenario.domain.ScenarioCalendarType;
-import com.landit.landitbe.feature.content.scenario.dto.DailyScenarioResponse;
-import com.landit.landitbe.feature.content.scenario.dto.ScenarioCalendarResponse;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioListResponse;
+import com.landit.landitbe.feature.content.scenario.schedule.domain.ScenarioCalendarType;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.DailyScenarioResponse;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioCalendarResponse;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

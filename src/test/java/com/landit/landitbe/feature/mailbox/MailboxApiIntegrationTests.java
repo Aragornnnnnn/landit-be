@@ -11,12 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.mailbox.domain.MailboxLetter;
-import com.landit.landitbe.feature.mailbox.domain.MailboxLetterRecipient;
-import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
-import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterRecipientRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterRepository;
+import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetter;
+import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterRecipient;
+import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
+import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterRecipientRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterRepository;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;

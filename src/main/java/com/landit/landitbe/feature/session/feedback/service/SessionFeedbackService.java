@@ -15,7 +15,7 @@ import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse.
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse.MessageFeedbackResponse;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
-import com.landit.landitbe.feature.session.scenario.service.MessageFeedbackWorkService;
+import com.landit.landitbe.feature.session.scenario.message.feedback.service.MessageFeedbackWorkService;
 import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;

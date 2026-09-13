@@ -10,7 +10,7 @@ import com.landit.landitbe.feature.content.expression.service.ExpressionContentS
 import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.dto.UserLocale;
+import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionCompletion;
 import com.landit.landitbe.feature.session.freetalk.expression.service.FreeTalkExpressionLearningService;

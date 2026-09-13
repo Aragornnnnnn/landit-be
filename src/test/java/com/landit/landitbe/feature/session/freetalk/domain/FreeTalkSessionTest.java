@@ -5,8 +5,8 @@ package com.landit.landitbe.feature.session.freetalk.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
-import com.landit.landitbe.feature.session.domain.MemoryGenerationStatus;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.freetalk.memory.domain.MemoryGenerationStatus;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 

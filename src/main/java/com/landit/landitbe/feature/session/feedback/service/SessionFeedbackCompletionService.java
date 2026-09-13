@@ -14,7 +14,7 @@ import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackCon
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
-import com.landit.landitbe.feature.session.scenario.service.SessionMessageService;
+import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;

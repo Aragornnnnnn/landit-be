@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.freetalk.repository;
 
-import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkTopic;
+import com.landit.landitbe.feature.session.freetalk.topic.domain.FreeTalkTopic;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import java.util.List;
 import java.util.Optional;

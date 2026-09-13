@@ -3,12 +3,12 @@
 package com.landit.landitbe.feature.mailbox;
 
 import com.landit.landitbe.feature.mailbox.docs.MailboxControllerDocs;
-import com.landit.landitbe.feature.mailbox.dto.MailboxFeedbackSubmitRequest;
-import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedListResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.MailboxUnreadCountResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxFeedbackSubmitRequest;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackDetailResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackListResponse;
+import com.landit.landitbe.feature.mailbox.letter.dto.MailboxReceivedDetailResponse;
+import com.landit.landitbe.feature.mailbox.letter.dto.MailboxReceivedListResponse;
 import com.landit.landitbe.feature.mailbox.service.MailboxService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

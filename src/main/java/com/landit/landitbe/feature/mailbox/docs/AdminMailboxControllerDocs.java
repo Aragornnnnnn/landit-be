@@ -2,18 +2,18 @@
 
 package com.landit.landitbe.feature.mailbox.docs;
 
-import com.landit.landitbe.feature.mailbox.domain.MailboxLetterType;
-import com.landit.landitbe.feature.mailbox.domain.MailboxPublicationStatus;
-import com.landit.landitbe.feature.mailbox.domain.UserFeedbackStatus;
-import com.landit.landitbe.feature.mailbox.domain.UserFeedbackType;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxFeedbackListResponse;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterCreateRequest;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterListResponse;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterPatchRequest;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxLetterResponse;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyRequest;
-import com.landit.landitbe.feature.mailbox.dto.AdminMailboxReplyResponse;
+import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
+import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
+import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackDetailResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxFeedbackListResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyRequest;
+import com.landit.landitbe.feature.mailbox.feedback.dto.AdminMailboxReplyResponse;
+import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
+import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;
+import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterCreateRequest;
+import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterListResponse;
+import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterPatchRequest;
+import com.landit.landitbe.feature.mailbox.letter.dto.AdminMailboxLetterResponse;
 import com.landit.landitbe.feature.mailbox.service.AdminMailboxService.FeedbackSort;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;

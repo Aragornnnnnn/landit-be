@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.freetalk.expression.dto;
 
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
 
 /**
  * 프리톡 맞춤 표현 생성 재시도 결과를 반환한다.

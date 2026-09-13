@@ -2,9 +2,9 @@
 
 package com.landit.landitbe.feature.content.scenario.dto;
 
-import com.landit.landitbe.feature.content.scenario.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.scenario.domain.ScenarioAvailabilityStatus;
 import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.domain.DailyScenarioType;
 import com.landit.landitbe.feature.content.tutor.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
 import io.swagger.v3.oas.annotations.media.Schema;

@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.session.freetalk.expression.service;
 
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionCompletion;
 import com.landit.landitbe.feature.session.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;

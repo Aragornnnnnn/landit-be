@@ -2,6 +2,12 @@
 
 package com.landit.landitbe.feature.memory.client.ai;
 
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionRequest;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionResult;
+import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
+import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.shared.exception.ApiException;
 
 /** 장기기억 기능이 사용하는 AI 호출 경계를 정의한다. */

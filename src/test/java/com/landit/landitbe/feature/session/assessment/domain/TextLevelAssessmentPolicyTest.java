@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session.assessment.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;

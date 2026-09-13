@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.session.scenario.domain;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.session.domain.GoalCompletionStatus;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

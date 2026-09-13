@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.content.expression.domain.ExpressionPronunciationAsset;
+import com.landit.landitbe.feature.content.expression.pronunciation.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +51,7 @@ class ExpressionPronunciationApiIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired
-  private com.landit.landitbe.feature.content.expression.repository
+  private com.landit.landitbe.feature.content.expression.pronunciation.repository
           .ExpressionPronunciationAssetRepository
       assetRepository;
 

@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.content.scenario.repository;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.scenario.domain.Scenario;
 import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioListProjection;
-import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioSummaryProjection;
+import com.landit.landitbe.feature.content.scenario.schedule.repository.projection.ScenarioSummaryProjection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -102,7 +102,7 @@ public interface ScenarioListQueryRepository extends JpaRepository<Scenario, Lon
    */
   @Query(
       """
-            SELECT new com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioSummaryProjection(
+            SELECT new com.landit.landitbe.feature.content.scenario.schedule.repository.projection.ScenarioSummaryProjection(
                 s.id,
                 slv.title,
                 s.displayOrder

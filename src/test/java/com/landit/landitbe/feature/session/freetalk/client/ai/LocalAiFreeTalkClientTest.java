@@ -5,6 +5,12 @@ package com.landit.landitbe.feature.session.freetalk.client.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.session.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnRequest;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

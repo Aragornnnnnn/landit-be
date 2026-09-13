@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.session.freetalk.expression.service;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;

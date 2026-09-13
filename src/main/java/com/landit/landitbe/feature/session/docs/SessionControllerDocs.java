@@ -4,9 +4,9 @@ package com.landit.landitbe.feature.session.docs;
 
 import com.landit.landitbe.feature.session.assessment.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.session.feedback.dto.SessionFeedbackResponse;
-import com.landit.landitbe.feature.session.scenario.dto.SessionInnerThoughtResponse;
-import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitRequest;
-import com.landit.landitbe.feature.session.scenario.dto.SessionMessageSubmitResponse;
+import com.landit.landitbe.feature.session.scenario.innerthought.dto.SessionInnerThoughtResponse;
+import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitRequest;
+import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;

@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.tutor.service.ConversationCharacterService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
-import com.landit.landitbe.feature.profile.dto.UserLearningProfile;
+import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.exception.SessionException;
@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
+import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
 import com.landit.landitbe.feature.session.repository.LearningSessionRepository;

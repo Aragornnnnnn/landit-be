@@ -7,10 +7,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
-import com.landit.landitbe.feature.content.scenario.dto.NextQuestionContext;
-import com.landit.landitbe.feature.content.scenario.repository.ScenarioQuestionQueryRepository;
-import com.landit.landitbe.feature.content.scenario.repository.projection.ScenarioQuestionProjection;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
+import com.landit.landitbe.feature.content.scenario.question.dto.NextQuestionContext;
+import com.landit.landitbe.feature.content.scenario.question.repository.ScenarioQuestionQueryRepository;
+import com.landit.landitbe.feature.content.scenario.question.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

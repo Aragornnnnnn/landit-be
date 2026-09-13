@@ -2,12 +2,12 @@
 
 package com.landit.landitbe.feature.memory.service;
 
-import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
-import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepository;
-import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
+import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;

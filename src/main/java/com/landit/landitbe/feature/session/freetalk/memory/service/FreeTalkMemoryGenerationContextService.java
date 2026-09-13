@@ -8,10 +8,10 @@ import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationReques
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
-import com.landit.landitbe.feature.session.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;

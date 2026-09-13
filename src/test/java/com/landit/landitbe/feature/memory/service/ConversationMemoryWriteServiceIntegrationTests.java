@@ -5,11 +5,11 @@ package com.landit.landitbe.feature.memory.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.landit.landitbe.feature.memory.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.session.freetalk.memory.service.FreeTalkMemoryGenerationContextService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;

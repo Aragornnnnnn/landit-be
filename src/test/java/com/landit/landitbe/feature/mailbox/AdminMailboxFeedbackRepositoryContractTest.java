@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.mailbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.landit.landitbe.feature.mailbox.repository.AdminMailboxFeedbackRepository;
+import com.landit.landitbe.feature.mailbox.feedback.repository.AdminMailboxFeedbackRepository;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;

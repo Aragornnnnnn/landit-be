@@ -3,11 +3,11 @@
 package com.landit.landitbe.feature.profile;
 
 import com.landit.landitbe.feature.profile.docs.UserProfileControllerDocs;
-import com.landit.landitbe.feature.profile.dto.AccentLocaleOptionResponse;
-import com.landit.landitbe.feature.profile.dto.UserAccentLocaleResponse;
-import com.landit.landitbe.feature.profile.dto.UserAccentLocaleUpdateRequest;
-import com.landit.landitbe.feature.profile.dto.UserLearningLevelResponse;
-import com.landit.landitbe.feature.profile.dto.UserLearningLevelUpdateRequest;
+import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelResponse;
+import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelUpdateRequest;
+import com.landit.landitbe.feature.profile.preference.dto.AccentLocaleOptionResponse;
+import com.landit.landitbe.feature.profile.preference.dto.UserAccentLocaleResponse;
+import com.landit.landitbe.feature.profile.preference.dto.UserAccentLocaleUpdateRequest;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

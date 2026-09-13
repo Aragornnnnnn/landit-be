@@ -3,9 +3,9 @@
 package com.landit.landitbe.feature.content.scenario.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioStartContext;
-import com.landit.landitbe.feature.content.scenario.repository.ScenarioQuestionQueryRepository;
+import com.landit.landitbe.feature.content.scenario.question.dto.NextQuestionContext;
+import com.landit.landitbe.feature.content.scenario.question.repository.ScenarioQuestionQueryRepository;
 import com.landit.landitbe.feature.content.scenario.repository.ScenarioSessionStartQueryRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;

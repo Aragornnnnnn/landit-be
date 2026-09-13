@@ -3,18 +3,19 @@
 package com.landit.landitbe.feature.session.freetalk.service;
 
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
-import com.landit.landitbe.feature.memory.service.FreeTalkMemoryRetrievalService;
-import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClient;
-import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkOpeningRequest;
-import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkOpeningResult;
-import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.session.freetalk.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
+import com.landit.landitbe.feature.session.freetalk.message.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.session.freetalk.service.FreeTalkSessionService.StartedFreeTalkSession;
+import com.landit.landitbe.feature.session.freetalk.topic.client.ai.AiFreeTalkTopic;
+import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

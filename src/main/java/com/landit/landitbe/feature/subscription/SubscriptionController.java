@@ -3,8 +3,8 @@
 package com.landit.landitbe.feature.subscription;
 
 import com.landit.landitbe.feature.subscription.docs.SubscriptionControllerDocs;
-import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.service.UserSubscriptionService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;

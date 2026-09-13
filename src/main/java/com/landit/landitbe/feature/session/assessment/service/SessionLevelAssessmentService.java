@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.session.assessment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.profile.dto.UserLearningAssessmentState;
+import com.landit.landitbe.feature.profile.learning.dto.UserLearningAssessmentState;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.session.assessment.domain.LearningLevelPolicy;

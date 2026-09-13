@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.session.freetalk.memory.service;
 
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
-import com.landit.landitbe.feature.memory.service.ConversationMemoryPlanningService;
+import com.landit.landitbe.feature.memory.planning.service.ConversationMemoryPlanningService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.session.freetalk.domain;
 
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
-import com.landit.landitbe.feature.session.domain.MemoryGenerationStatus;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.session.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

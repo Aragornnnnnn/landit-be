@@ -3,10 +3,10 @@
 package com.landit.landitbe.feature.session.freetalk.expression.service;
 
 import com.landit.landitbe.config.content.ExpressionSearchProperties;
-import com.landit.landitbe.feature.content.expression.dto.ExpressionEmbeddingMatch;
-import com.landit.landitbe.feature.content.expression.dto.FreeTalkCandidateSearch;
+import com.landit.landitbe.feature.content.expression.recommendation.dto.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.expression.recommendation.dto.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
-import com.landit.landitbe.feature.session.freetalk.client.ai.AiConversationExcerpt;
+import com.landit.landitbe.feature.session.freetalk.expression.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;

@@ -3,8 +3,8 @@
 package com.landit.landitbe.feature.session.scenario;
 
 import com.landit.landitbe.feature.session.scenario.docs.ScenarioSessionControllerDocs;
-import com.landit.landitbe.feature.session.scenario.dto.SessionStartResponse;
-import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionStartService;
+import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse;
+import com.landit.landitbe.feature.session.scenario.start.service.ScenarioSessionStartService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import lombok.RequiredArgsConstructor;

@@ -9,10 +9,10 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.landit.landitbe.feature.mailbox.repository.MailboxFeedbackRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterReadRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterRecipientRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterRepository;
+import com.landit.landitbe.feature.mailbox.feedback.repository.MailboxFeedbackRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterReadRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterRecipientRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;

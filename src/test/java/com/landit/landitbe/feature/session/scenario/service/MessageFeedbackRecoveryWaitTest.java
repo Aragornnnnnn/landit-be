@@ -13,11 +13,13 @@ import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackEvaluationContext;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiScenarioContext;
-import com.landit.landitbe.feature.session.scenario.domain.MessageFeedbackWork;
-import com.landit.landitbe.feature.session.scenario.repository.MessageFeedbackWorkRepository;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContext;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContextType;
+import com.landit.landitbe.feature.session.scenario.message.feedback.domain.MessageFeedbackWork;
+import com.landit.landitbe.feature.session.scenario.message.feedback.repository.MessageFeedbackWorkRepository;
+import com.landit.landitbe.feature.session.scenario.message.feedback.service.MessageFeedbackWorkService;
+import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -50,7 +52,7 @@ class MessageFeedbackRecoveryWaitTest {
                   "Hello",
                   new AiMessageFeedbackEvaluationContext(
                       AiMessageFeedbackEvaluationContextType.AI_MESSAGE, "Hi", "안녕"),
-                  com.landit.landitbe.feature.content.scenario.domain.ResponseDemand.HIGH,
+                  com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand.HIGH,
                   List.of())),
           Optional.empty());
 

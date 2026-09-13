@@ -9,10 +9,10 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
-import com.landit.landitbe.feature.subscription.repository.SubscriptionEventRepository;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;

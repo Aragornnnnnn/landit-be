@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.session.feedback.dto;
 
-import com.landit.landitbe.feature.content.scenario.domain.ResponseDemand;
-import com.landit.landitbe.feature.session.scenario.client.ai.AiMessageFeedbackEvaluationContext;
+import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
+import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContext;
 import java.util.List;
 
 /**

@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.notification.delivery.service;
 
-import com.landit.landitbe.feature.mailbox.service.MailboxReplyCreatedEvent;
+import com.landit.landitbe.feature.mailbox.feedback.event.MailboxReplyCreatedEvent;
 import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.delivery.messaging.MailboxReplyNotificationRequest;
 import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePublisher;

@@ -14,9 +14,9 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.session.dto.LearningSessionAccess;
 import com.landit.landitbe.feature.session.scenario.dto.ScenarioSessionMessageContext;
 import com.landit.landitbe.feature.session.service.LearningSessionService;

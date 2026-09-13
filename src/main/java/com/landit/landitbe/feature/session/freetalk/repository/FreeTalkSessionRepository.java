@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.session.freetalk.repository;
 
-import com.landit.landitbe.feature.session.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
+import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
