@@ -81,7 +81,12 @@ public record SubscriptionEventResponse(
         event.getExpiresAt());
   }
 
-  /** 결제 없는 이벤트는 0으로 내리고, 58500.0000처럼 저장된 값은 58500으로 정리해 지수 표기 없이 내린다. */
+  /**
+   * 결제 없는 이벤트는 0으로 내리고, 58500.0000처럼 저장된 값은 58500으로 정리해 지수 표기 없이 내린다.
+   *
+   * @param price 저장된 결제 금액. 결제 없는 이벤트면 null
+   * @return 응답용 결제 금액
+   */
   private static BigDecimal toResponsePrice(BigDecimal price) {
     if (price == null) {
       return BigDecimal.ZERO;

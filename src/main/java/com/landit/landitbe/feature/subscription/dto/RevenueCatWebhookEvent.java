@@ -13,7 +13,8 @@ import java.util.List;
  *
  * <p>RevenueCat은 snake_case 키를 보내므로 각 구성 요소에 JSON 키를 명시한다.
  *
- * @param id RevenueCat 이벤트 고유 ID. 재시도 시 같은 값을 다시 보내며, 중복 판별 키라 필수다
+ * @param id RevenueCat 이벤트 고유 ID. UUID 형식이다(예: 12345678-1234-1234-1234-123456789012). 재시도 시 같은 값을
+ *     다시 보내며, 중복 판별 키라 필수다
  * @param type 이벤트 타입. 예: INITIAL_PURCHASE, RENEWAL, CANCELLATION, EXPIRATION
  * @param appUserId 이벤트 시점의 App User ID. 앱에서 Landit 사용자 ID로 설정한다
  * @param originalAppUserId 처음 사용한 App User ID
@@ -31,6 +32,9 @@ import java.util.List;
  * @param eventTimestampMs 이벤트 생성 시각(epoch ms)
  * @param transferredFrom TRANSFER 이벤트에서 구독을 넘겨준 App User ID 목록
  * @param transferredTo TRANSFER 이벤트에서 구독을 넘겨받은 App User ID 목록
+ * @see <a
+ *     href="https://www.revenuecat.com/docs/integrations/webhooks/event-types-and-fields">RevenueCat
+ *     웹훅 이벤트 타입과 필드</a>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RevenueCatWebhookEvent(

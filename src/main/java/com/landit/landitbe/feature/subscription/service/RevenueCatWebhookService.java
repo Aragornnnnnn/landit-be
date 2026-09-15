@@ -108,6 +108,12 @@ public class RevenueCatWebhookService {
         event.environment());
   }
 
+  /**
+   * Authorization 헤더가 설정된 웹훅 인증값과 같은지 확인한다.
+   *
+   * @param authorization 요청의 Authorization 헤더 값. 없으면 null
+   * @throws SubscriptionException 설정값이 비어 있거나 헤더가 설정값과 다를 때
+   */
   private void verifyAuthorization(String authorization) {
     if (!revenueCatProperties.hasWebhookAuthorization()) {
       log.warn("RevenueCat 웹훅 거절: LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION이 설정되지 않았다.");
@@ -120,6 +126,13 @@ public class RevenueCatWebhookService {
     }
   }
 
+  /**
+   * 두 문자열을 길이와 무관하게 일정한 시간으로 비교한다. 비교 시간 차이로 인증값을 추측하는 타이밍 공격을 막는다.
+   *
+   * @param actual 요청으로 받은 값
+   * @param expected 설정된 기댓값
+   * @return 두 값이 같으면 {@code true}
+   */
   private static boolean constantTimeEquals(String actual, String expected) {
     return MessageDigest.isEqual(
         actual.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
@@ -130,6 +143,9 @@ public class RevenueCatWebhookService {
    *
    * <p>환불은 RevenueCat이 별도 이벤트 대신 cancel_reason이 CUSTOMER_SUPPORT인 CANCELLATION으로 보내므로, 이 경우 해지 예약이
    * 아니라 즉시 종료(EXPIRED)로 처리한다. BILLING_ISSUE와 PRODUCT_CHANGE는 결제 이력으로만 남기고 상태는 바꾸지 않는다.
+   *
+   * @param event 웹훅 이벤트
+   * @return 목표 구독 상태. 구독 상태와 무관한 타입이면 빈 값
    */
   private static Optional<SubscriptionStatus> resolveTargetStatus(RevenueCatWebhookEvent event) {
     return SubscriptionEventType.fromRevenueCat(event.type())
@@ -153,6 +169,8 @@ public class RevenueCatWebhookService {
    *
    * <p>넘겨준 계정과 넘겨받은 계정을 각각 App User ID 목록에서 찾고, 프로필 기능에 상태 이전을 맡긴다. 이전이 반영되면 넘겨받은 계정의 이력에만
    * TRANSFER를 남긴다. 어느 한쪽 계정을 찾지 못하면 RevenueCat이 이후 실제 구독 이벤트를 새 계정으로 보내므로 로그만 남기고 끝낸다.
+   *
+   * @param event TRANSFER 웹훅 이벤트
    */
   private void handleTransfer(RevenueCatWebhookEvent event) {
     if (subscriptionEventRepository.existsByEventId(event.id())) {
@@ -179,6 +197,11 @@ public class RevenueCatWebhookService {
     logTransfer(event, fromUserId.get(), toUserId.get(), transfer, saved);
   }
 
+  /**
+   * TRANSFER의 넘겨준 계정이나 넘겨받은 계정을 찾지 못해 무시한 사실을 남긴다.
+   *
+   * @param event TRANSFER 웹훅 이벤트
+   */
   private void logUnresolvedTransfer(RevenueCatWebhookEvent event) {
     log.warn(
         "RevenueCat 웹훅 무시: TRANSFER 대상 계정을 찾지 못했다. eventId={}, transferredFrom={},"
@@ -188,7 +211,14 @@ public class RevenueCatWebhookService {
         event.transferredTo());
   }
 
-  /** 넘겨받은 계정의 이력에 TRANSFER를 남긴다. 구독 상세는 이벤트에 없으므로 넘겨준 계정에서 복사한 값을 쓴다. */
+  /**
+   * 넘겨받은 계정의 이력에 TRANSFER를 남긴다. 구독 상세는 이벤트에 없으므로 넘겨준 계정에서 복사한 값을 쓴다.
+   *
+   * @param event TRANSFER 웹훅 이벤트
+   * @param toUserId 구독을 넘겨받은 사용자 ID
+   * @param moved 넘겨준 계정에서 복사한 구독 정보
+   * @param eventAt 이벤트 발생 시각
+   */
   private void saveTransferEvent(
       RevenueCatWebhookEvent event,
       Long toUserId,
@@ -210,6 +240,15 @@ public class RevenueCatWebhookService {
             moved.expiresAt()));
   }
 
+  /**
+   * TRANSFER 처리 결과와 결제 이력 저장 여부를 남긴다.
+   *
+   * @param event TRANSFER 웹훅 이벤트
+   * @param fromUserId 구독을 넘겨준 사용자 ID
+   * @param toUserId 구독을 넘겨받은 사용자 ID
+   * @param transfer 구독 이전 처리 결과
+   * @param saved 넘겨받은 계정에 TRANSFER 결제 이력을 저장했는지
+   */
   private void logTransfer(
       RevenueCatWebhookEvent event,
       Long fromUserId,
@@ -228,7 +267,12 @@ public class RevenueCatWebhookService {
         event.environment());
   }
 
-  /** App User ID 목록에서 숫자 형태의 Landit 사용자 ID만 추려 실제로 존재하는 첫 사용자를 찾는다. */
+  /**
+   * App User ID 목록에서 숫자 형태의 Landit 사용자 ID만 추려 실제로 존재하는 첫 사용자를 찾는다.
+   *
+   * @param appUserIds RevenueCat이 보낸 App User ID 목록. 익명 ID($RCAnonymousID:...)가 섞일 수 있고 null도 허용한다
+   * @return 목록 순서상 처음으로 존재하는 Landit 사용자 ID. 없으면 빈 값
+   */
   private Optional<Long> findExistingUserId(List<String> appUserIds) {
     if (appUserIds == null) {
       return Optional.empty();
@@ -243,7 +287,12 @@ public class RevenueCatWebhookService {
     return userProfileService.findExistingUserId(candidateUserIds);
   }
 
-  /** App User ID 후보 가운데 실제로 존재하는 Landit 사용자를 찾는다. 없으면 경고를 남기고 빈 값을 반환한다. */
+  /**
+   * App User ID 후보 가운데 실제로 존재하는 Landit 사용자를 찾는다. 없으면 경고를 남기고 빈 값을 반환한다.
+   *
+   * @param event 웹훅 이벤트
+   * @return 존재하는 Landit 사용자 ID. 없으면 빈 값
+   */
   private Optional<Long> resolveUserId(RevenueCatWebhookEvent event) {
     List<Long> candidateUserIds = resolveCandidateUserIds(event);
     if (candidateUserIds.isEmpty()) {
@@ -266,7 +315,13 @@ public class RevenueCatWebhookService {
     return userId;
   }
 
-  /** 이벤트를 결제 이력으로 저장한다. 발생 시각은 결제 시각을 우선하고, 없으면 이벤트 생성 시각을 쓴다. */
+  /**
+   * 이벤트를 결제 이력으로 저장한다. 발생 시각은 결제 시각을 우선하고, 없으면 이벤트 생성 시각을 쓴다.
+   *
+   * @param event 웹훅 이벤트
+   * @param type 결제 이력 이벤트 타입
+   * @param userId 이력을 남길 사용자 ID
+   */
   private void saveEvent(RevenueCatWebhookEvent event, SubscriptionEventType type, Long userId) {
     LocalDateTime occurredAt =
         toLocalDateTime(event.purchasedAtMs())
@@ -288,6 +343,13 @@ public class RevenueCatWebhookService {
             toLocalDateTime(event.expirationAtMs()).orElse(null)));
   }
 
+  /**
+   * 사용자 구독 상태를 목표 상태로 갱신하고 처리 결과를 남긴다.
+   *
+   * @param event 웹훅 이벤트
+   * @param targetStatus 목표 구독 상태
+   * @param userId 갱신할 사용자 ID
+   */
   private void applyToUser(
       RevenueCatWebhookEvent event, SubscriptionStatus targetStatus, Long userId) {
     SubscriptionUpdateCommand command = toCommand(event, targetStatus);
@@ -306,7 +368,15 @@ public class RevenueCatWebhookService {
         event.environment());
   }
 
-  /** 프리미엄이 꺼지는 상태에서는 기간 종류·만료 시각·상품·스토어를 비워 응답에서 남은 구독처럼 보이지 않게 한다. */
+  /**
+   * 웹훅 이벤트를 구독 상태 갱신 명령으로 바꾼다.
+   *
+   * <p>프리미엄이 꺼지는 상태에서는 기간 종류·만료 시각·상품·스토어를 비워 응답에서 남은 구독처럼 보이지 않게 한다.
+   *
+   * @param event 웹훅 이벤트
+   * @param targetStatus 목표 구독 상태
+   * @return 구독 상태 갱신 명령
+   */
   private SubscriptionUpdateCommand toCommand(
       RevenueCatWebhookEvent event, SubscriptionStatus targetStatus) {
     LocalDateTime eventAt =
@@ -323,7 +393,12 @@ public class RevenueCatWebhookService {
         resolveStore(event));
   }
 
-  /** RevenueCat period_type을 기간 종류로 바꾼다. 알 수 없는 값은 경고를 남기고 null로 저장해 처리는 계속 진행한다. */
+  /**
+   * RevenueCat period_type을 기간 종류로 바꾼다. 알 수 없는 값은 경고를 남기고 null로 저장해 처리는 계속 진행한다.
+   *
+   * @param event 웹훅 이벤트
+   * @return 기간 종류. 값이 없거나 알 수 없으면 null
+   */
   private static SubscriptionPeriodType resolvePeriodType(RevenueCatWebhookEvent event) {
     Optional<SubscriptionPeriodType> periodType =
         SubscriptionPeriodType.fromRevenueCat(event.periodType());
@@ -336,7 +411,12 @@ public class RevenueCatWebhookService {
     return periodType.orElse(null);
   }
 
-  /** RevenueCat store를 스토어로 바꾼다. 알 수 없는 값은 경고를 남기고 null로 저장해 처리는 계속 진행한다. */
+  /**
+   * RevenueCat store를 스토어로 바꾼다. 알 수 없는 값은 경고를 남기고 null로 저장해 처리는 계속 진행한다.
+   *
+   * @param event 웹훅 이벤트
+   * @return 스토어. 값이 없거나 알 수 없으면 null
+   */
   private static SubscriptionStore resolveStore(RevenueCatWebhookEvent event) {
     Optional<SubscriptionStore> store = SubscriptionStore.fromRevenueCat(event.store());
     if (store.isEmpty() && event.store() != null) {
@@ -348,7 +428,12 @@ public class RevenueCatWebhookService {
     return store.orElse(null);
   }
 
-  /** App User ID, original App User ID, aliases 순으로 숫자 형태의 Landit 사용자 ID 후보를 모은다. */
+  /**
+   * App User ID, original App User ID, aliases 순으로 숫자 형태의 Landit 사용자 ID 후보를 모은다.
+   *
+   * @param event 웹훅 이벤트
+   * @return 중복을 뺀 Landit 사용자 ID 후보 목록. 없으면 빈 목록
+   */
   private static List<Long> resolveCandidateUserIds(RevenueCatWebhookEvent event) {
     List<String> aliases = event.aliases() == null ? List.of() : event.aliases();
     return Stream.concat(Stream.of(event.appUserId(), event.originalAppUserId()), aliases.stream())
@@ -359,6 +444,12 @@ public class RevenueCatWebhookService {
         .toList();
   }
 
+  /**
+   * App User ID를 Landit 사용자 ID로 해석한다.
+   *
+   * @param appUserId RevenueCat App User ID
+   * @return 숫자 형태면 Landit 사용자 ID. 익명 ID처럼 숫자가 아니면 빈 값
+   */
   private static Optional<Long> parseUserId(String appUserId) {
     try {
       return Optional.of(Long.parseLong(appUserId.trim()));
@@ -368,6 +459,12 @@ public class RevenueCatWebhookService {
     }
   }
 
+  /**
+   * 밀리초 단위 epoch 값을 서비스 시간대의 시각으로 바꾼다.
+   *
+   * @param epochMillis epoch 밀리초. 없으면 null
+   * @return 서비스 시간대 기준 시각. 입력이 null이면 빈 값
+   */
   private Optional<LocalDateTime> toLocalDateTime(Long epochMillis) {
     if (epochMillis == null) {
       return Optional.empty();
