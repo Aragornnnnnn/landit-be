@@ -105,7 +105,7 @@ public class UserProfileService {
    * 결제 제공자가 알린 계정 간 구독 이전을 반영한다.
    *
    * <p>넘겨준 계정의 구독 정보를 넘겨받은 계정에 복사하고 넘겨준 계정은 구독 없음으로 비운다. 두 계정을 ID 오름차순으로 쓰기 잠금해 교착을 막고, 어느 한쪽이라도 이미
-   * 반영한 이벤트보다 오래된 이벤트면 아무것도 바꾸지 않는다. 넘겨준 계정에 구독이 없으면 넘겨받은 계정도 건드리지 않는다.
+   * 반영한 이벤트보다 오래된 이벤트면 아무것도 바꾸지 않는다. 두 계정이 같거나, 넘겨준 계정이 프리미엄이 아니면(구독 없음·만료) 두 계정 모두 건드리지 않는다.
    *
    * @param fromUserId 구독을 넘겨준 사용자 ID
    * @param toUserId 구독을 넘겨받은 사용자 ID
@@ -115,11 +115,17 @@ public class UserProfileService {
   @Transactional
   public SubscriptionTransferResult transferSubscription(
       Long fromUserId, Long toUserId, LocalDateTime eventAt) {
+    if (fromUserId.equals(toUserId)) {
+      // 같은 계정으로의 이전은 옮길 것이 없다. 아래 로직을 타면 자기 구독을 비워 버린다.
+      return SubscriptionTransferResult.applied(null);
+    }
     // 두 계정을 항상 작은 ID부터 잠근다. 웹훅 두 개가 동시에 서로 반대 순서로 잠그면 교착이 생기기 때문이다.
     Long lowerId = Math.min(fromUserId, toUserId);
     Long higherId = Math.max(fromUserId, toUserId);
+
     Optional<UserProfile> lower = userProfileRepository.findByIdForUpdate(lowerId);
     Optional<UserProfile> higher = userProfileRepository.findByIdForUpdate(higherId);
+
     if (lower.isEmpty() || higher.isEmpty()) {
       return SubscriptionTransferResult.userNotFound();
     }
@@ -129,7 +135,8 @@ public class UserProfileService {
     if (from.isSubscriptionEventStale(eventAt) || to.isSubscriptionEventStale(eventAt)) {
       return SubscriptionTransferResult.stale();
     }
-    if (from.getSubscriptionStatus() == SubscriptionStatus.NONE) {
+    if (!from.isPremium()) {
+      // 구독이 없거나 만료된 계정에서는 옮길 것이 없다. 넘겨받은 계정의 살아 있는 구독을 덮어쓰지 않는다.
       return SubscriptionTransferResult.applied(null);
     }
     UserSubscriptionSnapshot moved = UserSubscriptionSnapshot.from(from);

@@ -531,6 +531,46 @@ class RevenueCatWebhookApiIntegrationTests {
         .containsExactly("INITIAL_PURCHASE");
   }
 
+  /** 넘겨준 계정이 만료 상태면 넘겨받은 계정의 살아 있는 구독을 덮어쓰지 않는다. */
+  @Test
+  void skipsTransferWhenSourceIsExpired() throws Exception {
+    Long fromUserId = createUser("rc-transfer-expired-from");
+    Long toUserId = createUser("rc-transfer-expired-to");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", fromUserId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(WEBHOOK_SECRET, event("EXPIRATION", fromUserId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET, event("INITIAL_PURCHASE", toUserId, BASE_EVENT_TIMESTAMP_MS + 2_000))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET, transferEvent(fromUserId, toUserId, BASE_EVENT_TIMESTAMP_MS + 3_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(fromUserId)).isEqualTo("EXPIRED");
+    assertThat(subscriptionStatus(toUserId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(toUserId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE");
+  }
+
+  /** 넘겨준 계정과 넘겨받은 계정이 같으면 아무것도 바꾸지 않는다. */
+  @Test
+  void skipsTransferToSameAccount() throws Exception {
+    Long userId = createUser("rc-transfer-self");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(WEBHOOK_SECRET, transferEvent(userId, userId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionEvents(userId))
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE");
+  }
+
   /** 익명 ID만 담겼거나 한쪽 계정이 없는 구독 이전은 로그만 남기고 200으로 응답한다. */
   @Test
   void acknowledgesTransferWithoutResolvableAccounts() throws Exception {
