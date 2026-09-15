@@ -139,7 +139,7 @@ public class UserProfileService {
       // 구독이 없거나 만료된 계정에서는 옮길 것이 없다. 넘겨받은 계정의 살아 있는 구독을 덮어쓰지 않는다.
       return SubscriptionTransferResult.applied(null);
     }
-    UserSubscriptionSnapshot moved = UserSubscriptionSnapshot.from(from);
+    UserSubscriptionSnapshot moved = UserSubscriptionSnapshot.fromUserProfile(from);
     to.updateSubscription(
         moved.subscriptionStatus(),
         moved.periodType(),
@@ -365,7 +365,7 @@ public class UserProfileService {
    */
   @Transactional(readOnly = true)
   public UserSubscriptionSnapshot getSubscription(Long userId) {
-    return UserSubscriptionSnapshot.from(requireActive(userId));
+    return UserSubscriptionSnapshot.fromUserProfile(requireActive(userId));
   }
 
   /**

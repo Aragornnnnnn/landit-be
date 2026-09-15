@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.subscription.domain.SubscriptionEvent;
 import com.landit.landitbe.feature.subscription.domain.SubscriptionEventType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 /**
@@ -86,6 +87,6 @@ public record SubscriptionEventResponse(
       return BigDecimal.ZERO;
     }
     BigDecimal stripped = price.stripTrailingZeros();
-    return stripped.scale() < 0 ? stripped.setScale(0) : stripped;
+    return stripped.scale() < 0 ? stripped.setScale(0, RoundingMode.DOWN) : stripped;
   }
 }

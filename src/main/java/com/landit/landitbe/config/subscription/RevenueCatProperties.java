@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.config.subscription;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -21,7 +22,7 @@ public record RevenueCatProperties(String webhookAuthorization, Boolean applySan
   @org.springframework.boot.context.properties.bind.ConstructorBinding
   public RevenueCatProperties {
     applySandboxEvents = applySandboxEvents == null || applySandboxEvents;
-    webhookAuthorization = webhookAuthorization == null ? "" : webhookAuthorization.trim();
+    webhookAuthorization = StringUtils.trimToEmpty(webhookAuthorization);
   }
 
   /**
@@ -30,6 +31,6 @@ public record RevenueCatProperties(String webhookAuthorization, Boolean applySan
    * @return 값이 비어 있지 않으면 {@code true}
    */
   public boolean hasWebhookAuthorization() {
-    return !webhookAuthorization.isBlank();
+    return StringUtils.isNotBlank(webhookAuthorization);
   }
 }
