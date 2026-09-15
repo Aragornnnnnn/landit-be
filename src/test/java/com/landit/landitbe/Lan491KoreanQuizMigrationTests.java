@@ -11,10 +11,10 @@ import com.landit.landitbe.feature.content.expression.practice.dto.ParsedPractic
 import com.landit.landitbe.feature.content.expression.practice.dto.WritingSentenceResponse;
 import com.landit.landitbe.shared.domain.Locale;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,40 +27,38 @@ class Lan491KoreanQuizMigrationTests {
   static final String MIGRATION_PATH = "db/postgresql/V106__add_korean_quiz_accepted_answers.sql";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Path DOCS = Path.of("docs/tasks/LAN-491");
+  // 검토 JSONL에서 독립적으로 복원한 매핑과 일치함을 확인한 뒤 고정한 UTF-8 체크섬이다.
+  private static final String REVIEWED_MANIFEST_SHA256 =
+      "4863d2d5272b551e7379e3f7efeb9e6e05ac7a06a8cd54d51033e21902edffb6";
 
   @Test
-  void embedsExactlyTheReviewedSixThousandExamplesAndThirtyThreeChoiceEdits() throws Exception {
-    Map<String, JsonNode> reviewed = readByKey("answers-6000.jsonl");
-    Map<String, JsonNode> removals = readByKey("distractor-removals.jsonl");
+  void preservesReviewedManifestAndExactlyScopedChoiceEdits() throws Exception {
+    String manifest = readManifestText();
+    assertThat(
+            HexFormat.of()
+                .formatHex(
+                    MessageDigest.getInstance("SHA-256")
+                        .digest(manifest.getBytes(StandardCharsets.UTF_8))))
+        .isEqualTo(REVIEWED_MANIFEST_SHA256);
     Set<String> seen = new HashSet<>();
     Set<Long> expressionIds = new HashSet<>();
     int changedChoices = 0;
-    for (JsonNode mapping : readManifest()) {
+    for (JsonNode mapping : MAPPER.readTree(manifest)) {
       String key = key(mapping);
       assertThat(seen.add(key)).as(key).isTrue();
       assertThat(mapping.path("practiceExampleNumber").asInt()).isIn(1, 2);
       expressionIds.add(mapping.path("expressionId").asLong());
-      JsonNode answer = reviewed.get(key);
-      assertThat(answer).as(key).isNotNull();
-      ObjectNode expected = expectedExample(answer);
-      if (removals.containsKey(key)) {
-        JsonNode removal = removals.get(key);
-        expected.set("sentenceTranslateWordChoices", removal.get("before"));
-        assertThat(mapping.get("wordChoices")).isEqualTo(removal.get("after"));
-        assertSingleDistractorRemoval(removal);
+      assertThat(mapping.path("expressionSource").asText()).isIn("SCENARIO", "FREE_TALK");
+      if (!mapping
+          .path("expectedExample")
+          .get("sentenceTranslateWordChoices")
+          .equals(mapping.get("wordChoices"))) {
+        assertSingleDistractorRemoval(mapping);
         changedChoices++;
       }
-      assertThat(mapping.get("expectedExample")).as(key).isEqualTo(expected);
-      assertThat(mapping.get("expressionSource")).isEqualTo(answer.get("expressionSource"));
-      assertThat(mapping.get("acceptedAnswers"))
-          .as(key)
-          .isEqualTo(answer.get("sentenceTranslateAcceptedAnswers"));
-      assertThat(mapping.get("wordChoices")).isEqualTo(answer.get("sentenceTranslateWordChoices"));
     }
-    assertThat(seen).hasSize(6000).containsExactlyInAnyOrderElementsOf(reviewed.keySet());
+    assertThat(seen).hasSize(6000);
     assertThat(expressionIds).hasSize(3000);
-    assertThat(removals).hasSize(33);
     assertThat(changedChoices).isEqualTo(33);
   }
 
@@ -139,42 +137,31 @@ class Lan491KoreanQuizMigrationTests {
   }
 
   static JsonNode readManifest() throws Exception {
+    return MAPPER.readTree(readManifestText());
+  }
+
+  private static String readManifestText() throws Exception {
     String sql = readSql();
     String delimiter = "$lan491_data$";
     int start = sql.indexOf(delimiter) + delimiter.length();
-    return MAPPER.readTree(sql.substring(start, sql.indexOf(delimiter, start)));
+    return sql.substring(start, sql.indexOf(delimiter, start));
   }
 
-  private Map<String, JsonNode> readByKey(String file) throws Exception {
-    Map<String, JsonNode> records = new HashMap<>();
-    for (String line : Files.readAllLines(DOCS.resolve(file))) {
-      JsonNode record = MAPPER.readTree(line);
-      assertThat(records.put(key(record), record)).isNull();
-    }
-    return records;
-  }
-
-  private ObjectNode expectedExample(JsonNode answer) {
-    ObjectNode expected = answer.deepCopy();
-    return expected.retain(
-        List.of(
-            "sentenceText",
-            "sentenceTranslation",
-            "practiceQuestion",
-            "practiceQuestionTranslation",
-            "sentenceTranslateWords",
-            "sentenceTranslateWordChoices"));
-  }
-
-  private void assertSingleDistractorRemoval(JsonNode removal) {
-    Map<String, Integer> before = tokenCounts(removal.get("before"));
-    Map<String, Integer> after = tokenCounts(removal.get("after"));
-    String removed = removal.path("removedWord").asText();
-    assertThat(tokenCounts(removal.get("sentenceTranslateWords"))).doesNotContainKey(removed);
-    after.merge(removed, 1, Integer::sum);
-    assertThat(after).isEqualTo(before);
-    assertThat(removal.get("before").size() - removal.get("sentenceTranslateWords").size())
-        .isEqualTo(4);
+  private void assertSingleDistractorRemoval(JsonNode mapping) {
+    JsonNode before = mapping.path("expectedExample").get("sentenceTranslateWordChoices");
+    JsonNode after = mapping.get("wordChoices");
+    JsonNode canonical = mapping.path("expectedExample").get("sentenceTranslateWords");
+    Map<String, Integer> removed = tokenCounts(before);
+    tokenCounts(after).forEach((word, count) -> removed.merge(word, -count, Integer::sum));
+    removed.values().removeIf(count -> count == 0);
+    assertThat(removed).hasSize(1);
+    var deletion = removed.entrySet().iterator().next();
+    assertThat(deletion.getValue()).isEqualTo(1);
+    assertThat(tokenCounts(canonical)).doesNotContainKey(deletion.getKey());
+    assertThat(before.size() - canonical.size()).isEqualTo(4);
+    assertThat(after.size() - canonical.size()).isEqualTo(3);
+    assertThat(MAPPER.convertValue(before, String[].class))
+        .containsSubsequence(MAPPER.convertValue(after, String[].class));
   }
 
   private Map<String, Integer> tokenCounts(JsonNode array) {
