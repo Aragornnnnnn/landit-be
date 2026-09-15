@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.session.client.ai.AiMessageFeedbackEvaluation
 import com.landit.landitbe.feature.session.domain.FeedbackType;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.session.domain.SessionHistorySummaryFeedback;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -17,7 +18,8 @@ import java.util.List;
  * @param starRating 세션 별점
  * @param highlightMessage 최종 피드백 강조 메시지
  * @param summaryMessage 최종 피드백 요약
- * @param messageFeedbacks 메시지별 피드백 목록
+ * @param messageFeedbacks 메시지별 피드백(상세 피드백) 목록. 잠긴 세션이면 빈 목록
+ * @param detailFeedbackLocked 무료 사용자에게 상세 피드백이 잠겨 메시지별 피드백을 비워 내렸는지
  */
 public record SessionFeedbackResponse(
     Long sessionId,
@@ -25,7 +27,13 @@ public record SessionFeedbackResponse(
     BigDecimal starRating,
     String highlightMessage,
     String summaryMessage,
-    List<MessageFeedbackResponse> messageFeedbacks) {
+    List<MessageFeedbackResponse> messageFeedbacks,
+    @Schema(
+            description =
+                "상세 피드백 잠금 여부. 유료 도입 후 무료 사용자는 첫 시나리오의 첫 완료 세션만 메시지별 피드백을 받고, 그 외 세션은"
+                    + " messageFeedbacks가 비고 이 값이 true다. 결제 후 다시 조회하면 false와 함께 전부 내려간다.",
+            example = "false")
+        boolean detailFeedbackLocked) {
 
   /**
    * 저장된 세션 요약 피드백과 메시지별 응답을 최종 피드백 응답으로 변환한다.
@@ -33,19 +41,22 @@ public record SessionFeedbackResponse(
    * @param sessionId 학습 세션 ID
    * @param summary 저장된 세션 요약 피드백
    * @param messageFeedbacks 메시지별 피드백 응답
+   * @param detailFeedbackLocked 상세 피드백 잠금 여부. true면 메시지별 피드백을 비워 내린다
    * @return 세션 최종 피드백 응답
    */
   public static SessionFeedbackResponse from(
       Long sessionId,
       SessionHistorySummaryFeedback summary,
-      List<MessageFeedbackResponse> messageFeedbacks) {
+      List<MessageFeedbackResponse> messageFeedbacks,
+      boolean detailFeedbackLocked) {
     return new SessionFeedbackResponse(
         sessionId,
         summary.getNativeScore(),
         summary.getStarRating(),
         summary.getHighlightMessage(),
         summary.getSummaryMessage(),
-        messageFeedbacks);
+        detailFeedbackLocked ? List.of() : messageFeedbacks,
+        detailFeedbackLocked);
   }
 
   /**

@@ -218,7 +218,7 @@ class PremiumAccessIntegrationTests {
         .andExpect(status().isUnauthorized());
   }
 
-  /** OpenAPI 문서에 게이트 대상 API의 403 응답이 기술된다. */
+  /** OpenAPI 문서에 게이트 대상 API의 403 응답과 피드백 응답의 상세 피드백 잠금 필드가 기술된다. */
   @Test
   void openApiDocsDescribePremiumRequired() throws Exception {
     mockMvc
@@ -237,7 +237,10 @@ class PremiumAccessIntegrationTests {
                 .exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/scenarios/{scenarioId}/sessions'].post.responses['403']")
-                .value(org.hamcrest.Matchers.hasEntry("description", "잠금 상태")));
+                .value(org.hamcrest.Matchers.hasEntry("description", "잠금 상태")))
+        .andExpect(
+            jsonPath("$.components.schemas.SessionFeedbackResponse.properties.detailFeedbackLocked")
+                .exists());
   }
 
   private void expectNotPremiumRequired(MockHttpServletRequestBuilder request, String accessToken)

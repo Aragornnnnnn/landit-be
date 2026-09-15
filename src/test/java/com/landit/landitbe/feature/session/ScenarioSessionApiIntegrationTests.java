@@ -47,6 +47,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -3275,6 +3276,288 @@ class ScenarioSessionApiIntegrationTests {
                   .content("{\"content\":\"Hello\",\"inputType\":\"TEXT\"}"))
           .andExpect(status().isOk());
     }
+  }
+
+  /** 무료 사용자는 첫 시나리오의 첫 완료 세션만 상세 피드백을 받고, 다른 시나리오와 같은 시나리오의 재완료는 총 피드백까지만 받는다. */
+  @Test
+  void lan499LocksDetailFeedbackOutsideFirstCompletionOfFirstScenario() throws Exception {
+    StartedSession first = startFreeUserFirstScenario("lan499-lock@example.com");
+    expectFeedbackDetail(first.accessToken(), first.sessionId(), false);
+
+    // 다른 시나리오: 시작은 허용(예전엔 403)되고 상세 피드백만 잠긴다.
+    seedAiFirstScenario(1499, 2498, 3498, 2);
+    grantScenarioAccess(first.userId(), 2498);
+    long second = startScenario(first.accessToken(), 2498);
+    submitMessage(first.accessToken(), second, "I like pizza.");
+    expectFeedbackDetail(first.accessToken(), second, true);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM session_history_message_feedback feedback
+                JOIN session_history_summary_feedback summary
+                  ON summary.id = feedback.session_history_summary_feedback_id
+                JOIN session_history history ON history.id = summary.session_history_id
+                WHERE history.learning_session_id = ?
+                """,
+                Integer.class,
+                second))
+        .as("잠긴 세션도 메시지별 피드백은 저장한다")
+        .isEqualTo(1);
+
+    // 첫 시나리오를 다시 대화한 두 번째 완료 세션도 잠기고, 첫 완료 세션은 계속 열려 있다.
+    long replay = startScenario(first.accessToken(), 2499);
+    submitMessage(first.accessToken(), replay, "I like pasta.");
+    expectFeedbackDetail(first.accessToken(), replay, true);
+    expectFeedbackDetail(first.accessToken(), first.sessionId(), false);
+  }
+
+  /** 잠긴 세션도 결제 후 다시 조회하면 저장된 메시지별 피드백을 전부 내린다. */
+  @Test
+  void lan499PremiumUnlocksDetailFeedbackOnRetry() throws Exception {
+    StartedSession first = startFreeUserFirstScenario("lan499-premium@example.com");
+    seedAiFirstScenario(1499, 2498, 3498, 2);
+    grantScenarioAccess(first.userId(), 2498);
+    long second = startScenario(first.accessToken(), 2498);
+    submitMessage(first.accessToken(), second, "I like pizza.");
+    expectFeedbackDetail(first.accessToken(), second, true);
+
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_status='ACTIVE',"
+            + " subscription_expires_at='2099-01-01 00:00:00' WHERE id=?",
+        first.userId());
+
+    expectFeedbackDetail(first.accessToken(), second, false);
+  }
+
+  /** 첫 시나리오를 중도 종료하고 하루 뒤 다시 시작해 끝낸 세션이 첫 완료 세션이라 상세 피드백을 받는다. */
+  @Test
+  void lan499AbandonedFirstStartDoesNotConsumeDetailFeedback() throws Exception {
+    JsonNode loginBody = login("lan499-abandon@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    makeFreeUser(userId);
+    seedCategory(1499, 1, "ACTIVE", "음식");
+    seedAiFirstScenario(1499, 2499, 3499, 1);
+    long abandoned = startScenario(accessToken, 2499);
+    mockMvc
+        .perform(
+            patch("/api/v1/sessions/{id}/end", abandoned)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk());
+
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT.plusSeconds(25 * 3600));
+    grantScenarioAccess(userId, 2499);
+    long retried = startScenario(accessToken, 2499);
+    assertThat(retried).isNotEqualTo(abandoned);
+    submitMessage(accessToken, retried, "I like pizza.");
+
+    expectFeedbackDetail(accessToken, retried, false);
+  }
+
+  /** 도입 전에 시작한 세션은 첫 시나리오가 아니어도 상세 피드백을 잠그지 않는다. */
+  @Test
+  void lan499SessionStartedBeforeLaunchKeepsDetailFeedback() throws Exception {
+    StartedSession first = startFreeUserFirstScenario("lan499-prelaunch@example.com");
+    seedAiFirstScenario(1499, 2498, 3498, 2);
+    grantScenarioAccess(first.userId(), 2498);
+    long second = startScenario(first.accessToken(), 2498);
+    submitMessage(first.accessToken(), second, "I like pizza.");
+    expectFeedbackDetail(first.accessToken(), second, true);
+
+    jdbcTemplate.update(
+        "UPDATE learning_session SET started_at='2026-06-30 23:59:00' WHERE id=?", second);
+
+    expectFeedbackDetail(first.accessToken(), second, false);
+  }
+
+  /**
+   * 도입 전에 시작한 세션은 첫 시나리오 기회를 소모하지 않고, 도입 후 처음 시작한 시나리오가 첫 시나리오가 되는지 실제 시계 흐름으로 검증한다.
+   *
+   * <p>흐름은 다음과 같다.
+   *
+   * <ol>
+   *   <li>도입 시각(7월 1일 0시) 직전인 6월 30일 23시 59분에 무료 사용자가 시나리오 A(2499)를 시작한다. 도입 전 시작이므로 예약이 남지 않아야 한다.
+   *   <li>시계를 도입 후(7월 28일)로 옮겨 A를 완료한다. 도입 전 시작 세션이므로 상세 피드백이 열려 있고, 여전히 예약이 없어야 한다.
+   *   <li>다음 날(7월 29일) 진행 순서상 다음인 시나리오 B(2498)를 시작해 완료한다. 이 시작이 도입 후 첫 무료 시작이므로 B가 첫 시나리오로 예약되고, 첫
+   *       완료 세션은 상세 피드백이 열려야 한다.
+   *   <li>B를 다시 대화해 두 번째로 완료한다. 첫 시나리오라도 두 번째 완료 세션은 총 피드백까지만 보여야 한다.
+   *   <li>도입 전에 시작한 A 세션은 그 뒤에도 계속 상세 피드백이 열려 있어야 한다.
+   * </ol>
+   */
+  @Test
+  void lan499PreLaunchSessionDoesNotConsumeFirstScenarioAndFirstPostLaunchScenarioIsReserved()
+      throws Exception {
+    JsonNode loginBody = login("lan499-prelaunch-flow@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    makeFreeUser(userId);
+    seedCategory(1499, 1, "ACTIVE", "음식");
+    seedAiFirstScenario(1499, 2499, 3499, 1);
+    seedAiFirstScenario(1499, 2498, 3498, 2);
+
+    // 1. 도입 직전에 A를 시작한다.
+    mutableClock.setInstant(Instant.parse("2026-06-30T14:59:00Z"));
+    long preLaunch = startScenario(accessToken, 2499);
+    assertThat(reservationCount(userId)).as("도입 전 시작은 예약을 남기지 않는다").isZero();
+
+    // 2. 도입 후에 A를 완료한다. 도입 전 시작이라 상세 피드백이 열려 있고 예약도 없다.
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT);
+    submitMessage(accessToken, preLaunch, "I like pizza.");
+    expectFeedbackDetail(accessToken, preLaunch, false);
+    assertThat(reservationCount(userId)).as("도입 전 세션 완료는 예약을 남기지 않는다").isZero();
+
+    // 3. 다음 날 진행 순서대로 B를 시작해 완료한다. B가 첫 시나리오로 예약된다.
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT.plus(1, ChronoUnit.DAYS));
+    long firstPostLaunch = startScenario(accessToken, 2498);
+    assertThat(reservedScenarioId(userId)).isEqualTo(2498L);
+    submitMessage(accessToken, firstPostLaunch, "I like pasta.");
+    expectFeedbackDetail(accessToken, firstPostLaunch, false);
+
+    // 4. B의 두 번째 완료 세션은 총 피드백까지만 본다.
+    long replay = startScenario(accessToken, 2498);
+    submitMessage(accessToken, replay, "I like sushi.");
+    expectFeedbackDetail(accessToken, replay, true);
+
+    // 5. 도입 전 세션은 계속 열려 있다.
+    expectFeedbackDetail(accessToken, preLaunch, false);
+  }
+
+  /**
+   * 첫 시나리오를 끝낸 무료 사용자가 다음 날 진행 순서상 다음 시나리오(오늘의 시나리오)를 시작·진행·완료하고 총 피드백까지 조회할 수 있는지 검증한다.
+   *
+   * <p>기존 잠금에서는 첫 시나리오 완료 후 새 세션 시작이 403이었다. 이 테스트는 복습 권한을 따로 주지 않고 실제 사용자처럼 날짜가 바뀌어 다음 시나리오가 열리는
+   * 경로로 시작한다. 검증 항목은 다음과 같다.
+   *
+   * <ul>
+   *   <li>다음 시나리오 시작이 201로 허용된다.
+   *   <li>메시지 전송으로 세션이 완료된다.
+   *   <li>피드백 조회가 200이고 총 피드백(점수·요약)은 내려오며, 상세 피드백은 비어 있고 detailFeedbackLocked가 true다.
+   *   <li>첫 시나리오 예약은 처음 시작한 시나리오(2499)에 그대로 남는다.
+   * </ul>
+   */
+  @Test
+  void lan499NextDailyScenarioIsPlayableUpToSummaryFeedbackForFreeUser() throws Exception {
+    StartedSession first = startFreeUserFirstScenario("lan499-next-daily@example.com");
+    seedAiFirstScenario(1499, 2498, 3498, 2);
+
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT.plus(1, ChronoUnit.DAYS));
+    long next = startScenario(first.accessToken(), 2498);
+    submitMessage(first.accessToken(), next, "I like pizza.");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT status FROM learning_session WHERE id=?", String.class, next))
+        .isEqualTo("COMPLETED");
+
+    expectFeedbackDetail(first.accessToken(), next, true);
+    assertThat(reservedScenarioId(first.userId())).isEqualTo(2499L);
+  }
+
+  /**
+   * 프리미엄 상태로 시나리오를 완료한 뒤 구독이 만료된 사용자의 세션은 잠기지 않는지 검증한다.
+   *
+   * <p>프리미엄 사용자의 시작은 첫 시나리오 예약을 남기지 않는다. 그 뒤 구독이 만료돼 무료 사용자가 되더라도, 아직 무료 상태로 시나리오를 시작한 적이 없어 예약이
+   * 없으므로 학습 보존 취지대로 이미 완료한 세션의 상세 피드백을 계속 볼 수 있어야 한다. 흐름은 다음과 같다.
+   *
+   * <ol>
+   *   <li>프리미엄 사용자(login 헬퍼가 ACTIVE로 설정)가 시나리오를 시작해 완료하고 상세 피드백을 본다. 예약은 없어야 한다.
+   *   <li>구독을 EXPIRED, 만료 시각을 과거로 바꿔 무료 사용자로 만든다.
+   *   <li>같은 세션의 피드백을 다시 조회하면 여전히 상세 피드백이 열려 있어야 한다.
+   *   <li>다음 날 무료 상태로 다른 시나리오를 시작하면 그 시나리오가 첫 시나리오로 예약된다. 이때부터 프리미엄 시절 세션은 첫 시나리오가 아니므로 규칙대로 상세
+   *       피드백이 잠겨야 한다.
+   * </ol>
+   */
+  @Test
+  void lan499SessionCompletedWhilePremiumStaysOpenAfterExpiry() throws Exception {
+    JsonNode loginBody = login("lan499-expired@example.com");
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    seedCategory(1499, 1, "ACTIVE", "음식");
+    seedAiFirstScenario(1499, 2499, 3499, 1);
+    long premiumSession = startScenario(accessToken, 2499);
+    submitMessage(accessToken, premiumSession, "I like pizza.");
+    expectFeedbackDetail(accessToken, premiumSession, false);
+    assertThat(reservationCount(userId)).as("프리미엄 시작은 예약을 남기지 않는다").isZero();
+
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_status='EXPIRED',"
+            + " subscription_expires_at='2026-07-01 00:00:00' WHERE id=?",
+        userId);
+
+    expectFeedbackDetail(accessToken, premiumSession, false);
+
+    // 무료 상태로 다른 시나리오를 시작하면 그 시나리오가 첫 시나리오로 예약되고, 프리미엄 시절 세션은 잠긴다.
+    seedAiFirstScenario(1499, 2498, 3498, 2);
+    mutableClock.setInstant(DEFAULT_TEST_INSTANT.plus(1, ChronoUnit.DAYS));
+    startScenario(accessToken, 2498);
+    assertThat(reservedScenarioId(userId)).isEqualTo(2498L);
+    expectFeedbackDetail(accessToken, premiumSession, true);
+  }
+
+  private int reservationCount(long userId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM free_scenario_reservation WHERE user_id=?", Integer.class, userId);
+  }
+
+  private Long reservedScenarioId(long userId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT scenario_id FROM free_scenario_reservation WHERE user_id=?", Long.class, userId);
+  }
+
+  /** 무료 사용자로 첫 시나리오(2499)를 시작해 끝까지 완료한 세션을 만든다. */
+  private StartedSession startFreeUserFirstScenario(String email) throws Exception {
+    JsonNode loginBody = login(email);
+    final long userId = loginBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginBody.get("data").get("accessToken").asText();
+    makeFreeUser(userId);
+    seedCategory(1499, 1, "ACTIVE", "음식");
+    seedAiFirstScenario(1499, 2499, 3499, 1);
+    long sessionId = startScenario(accessToken, 2499);
+    submitMessage(accessToken, sessionId, "I like pizza.");
+    return new StartedSession(userId, accessToken, sessionId);
+  }
+
+  /** 로그인 헬퍼가 심는 프리미엄을 지워 유료 도입 후 무료 사용자로 만든다. */
+  private void makeFreeUser(long userId) {
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_status='NONE',"
+            + " subscription_expires_at=null WHERE id=?",
+        userId);
+  }
+
+  /** 질문 하나짜리 AI 선발화 시나리오를 심어 발화 한 번으로 완료되게 한다. */
+  private void seedAiFirstScenario(
+      long categoryId, long scenarioId, long variantId, int displayOrder) {
+    seedScenario(scenarioId, categoryId, displayOrder, "AI", "ACTIVE", 1);
+    seedScenarioVariant(
+        variantId,
+        scenarioId,
+        "음식에 대한 대화",
+        "좋아하는 음식에 대해 이야기합니다.",
+        "음식 취향과 이유를 자연스럽게 설명합니다.",
+        null,
+        "What food do you like?",
+        "어떤 음식을 좋아해?",
+        null,
+        null,
+        null,
+        "ACTIVE");
+  }
+
+  /** 총 피드백은 항상 내려오고, 상세 피드백은 잠금 여부에 따라 비거나 채워지는지 확인한다. */
+  private void expectFeedbackDetail(String accessToken, long sessionId, boolean locked)
+      throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.nativeScore").value(90))
+        .andExpect(jsonPath("$.data.summaryMessage").isNotEmpty())
+        .andExpect(jsonPath("$.data.detailFeedbackLocked").value(locked))
+        .andExpect(
+            locked
+                ? jsonPath("$.data.messageFeedbacks").isEmpty()
+                : jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
   }
 
   /** 접수 후 실패한 같은 발화는 재시도하고, 완료 응답은 유예 만료 후에도 재전송한다. */
