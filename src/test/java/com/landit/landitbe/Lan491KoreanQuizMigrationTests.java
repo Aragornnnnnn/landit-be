@@ -110,6 +110,26 @@ class Lan491KoreanQuizMigrationTests {
         .isEqualTo(mapping.get("wordChoices"));
     assertThat(english.writingSentenceWords()).containsExactly("English");
     assertThat(english.writingSentenceWordChoices()).containsExactly("English", "distractor");
+    assertThat(english.writingSentenceAcceptedAnswers()).containsExactly(List.of("English"));
+    assertThat(MAPPER.<JsonNode>valueToTree(korean.writingSentenceAcceptedAnswers()))
+        .isEqualTo(mapping.get("acceptedAnswers"));
+  }
+
+  @Test
+  void deliversEveryReviewedAnswerThroughKoreanResponseWithoutTruncation() throws Exception {
+    for (JsonNode mapping : readManifest()) {
+      ObjectNode example = mapping.path("expectedExample").deepCopy();
+      example.put("highlightingPart", "fixture");
+      example.putArray("sentenceWords").add("English");
+      example.putArray("sentenceWordChoices").add("English").add("distractor");
+      example.set("sentenceTranslateAcceptedAnswers", mapping.get("acceptedAnswers"));
+      example.set("sentenceTranslateWordChoices", mapping.get("wordChoices"));
+      WritingSentenceResponse korean =
+          WritingSentenceResponse.from(ParsedPracticeSentence.from(example), Locale.KR);
+      assertThat(MAPPER.<JsonNode>valueToTree(korean.writingSentenceAcceptedAnswers()))
+          .as(key(mapping))
+          .isEqualTo(mapping.get("acceptedAnswers"));
+    }
   }
 
   static String readSql() throws Exception {

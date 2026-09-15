@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
@@ -132,6 +133,9 @@ class ExpressionPracticeApiIntegrationTests {
           .isEqualTo("질문해석-" + index);
 
       assertWordChoicesMatchQuizLanguage(writingSentence, index);
+      assertThat(writingSentence.get("writingSentenceAcceptedAnswers").size()).isEqualTo(1);
+      assertThat(writingSentence.get("writingSentenceAcceptedAnswers").get(0))
+          .isEqualTo(writingSentence.get("writingSentenceWords"));
     }
 
     assertThat(pickedTexts).doesNotHaveDuplicates();
@@ -139,6 +143,73 @@ class ExpressionPracticeApiIntegrationTests {
   }
 
   @DisplayName("사용자 학습 수준보다 어려운 표현의 연습 조회를 거부한다.")
+  @Test
+  void practiceReturnsAllKoreanAcceptedAnswersAndSingleEnglishAnswer() throws Exception {
+    JsonNode payload = objectMapper.readTree(practiceExamplesPayloadJson());
+    for (int index = 0; index < 2; index++) {
+      ObjectNode example = (ObjectNode) payload.get(index);
+      JsonNode canonical = example.get("sentenceTranslateWords");
+      example
+          .putArray("sentenceTranslateAcceptedAnswers")
+          .add(canonical)
+          .add(objectMapper.createArrayNode().add(canonical.get(1)).add(canonical.get(0)));
+    }
+    Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload.toString());
+    String token =
+        login(
+            "google-practice-multiple",
+            "practice-multiple@example.com",
+            "Multiple Answers",
+            "practice-multiple-nonce");
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.data.practiceSentence[0].sentenceTranslateAcceptedAnswers")
+                    .doesNotExist())
+            .andReturn();
+    JsonNode writings =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .path("data")
+            .path("writingSentence");
+    assertThat(writings.size()).isEqualTo(2);
+    for (int index = 0; index < 2; index++) {
+      JsonNode writing = writings.get(index);
+      boolean korean = writing.path("quizLanguage").asText().equals("KR");
+      JsonNode expected =
+          korean
+              ? payload.get(index).get("sentenceTranslateAcceptedAnswers")
+              : objectMapper.createArrayNode().add(payload.get(index).get("sentenceWords"));
+      assertThat(writing.get("writingSentenceAcceptedAnswers")).isEqualTo(expected);
+      assertThat(writing.get("writingSentenceWords")).isEqualTo(expected.get(0));
+      assertThat(writing.get("writingSentenceWordChoices"))
+          .isEqualTo(
+              payload
+                  .get(index)
+                  .get(korean ? "sentenceTranslateWordChoices" : "sentenceWordChoices"));
+    }
+  }
+
+  @Test
+  void practiceOpenApiDescribesNestedAnswersAndPreservesLegacyArraySchemas() throws Exception {
+    String properties = "$.components.schemas.WritingSentenceResponse.properties.";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(properties + "writingSentenceAcceptedAnswers.type").value("array"))
+        .andExpect(
+            jsonPath(properties + "writingSentenceAcceptedAnswers.items.type").value("array"))
+        .andExpect(
+            jsonPath(properties + "writingSentenceAcceptedAnswers.items.items.type")
+                .value("string"))
+        .andExpect(jsonPath(properties + "writingSentenceWords.items.type").value("string"))
+        .andExpect(jsonPath(properties + "writingSentenceWordChoices.items.type").value("string"));
+  }
+
   @Test
   void practiceRejectsExpressionAboveLearningLevel() throws Exception {
     Long expressionId = seedExpressionWithPracticeExamples();
