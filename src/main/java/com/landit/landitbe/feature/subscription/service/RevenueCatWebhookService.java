@@ -51,7 +51,8 @@ public class RevenueCatWebhookService {
    *
    * <p>이력 저장과 상태 갱신은 한 트랜잭션으로 묶어 한쪽만 반영되지 않게 한다. 이력·상태 모두와 무관한 이벤트 타입, Landit 사용자와 연결할 수 없는 이벤트, 이미
    * 저장한 이벤트 ID의 재전송은 로그만 남기고 정상 처리로 응답해 RevenueCat이 재시도하지 않게 한다. TRANSFER는 app_user_id 대신
-   * transferred_from·transferred_to로 계정을 찾아 구독 상태를 옮긴다.
+   * transferred_from·transferred_to로 계정을 찾아 구독 상태를 옮긴다. 인증을 통과한 웹훅은 처리 전에 API 버전과 함께 수신 로그를 남기고,
+   * 샌드박스 이벤트 반영이 꺼져 있으면 SANDBOX 이벤트는 로그만 남기고 끝낸다.
    *
    * @param authorization 요청의 Authorization 헤더 값. 없으면 null
    * @param request 웹훅 요청 본문
@@ -61,6 +62,7 @@ public class RevenueCatWebhookService {
   public void handle(String authorization, RevenueCatWebhookRequest request) {
     verifyAuthorization(authorization);
     RevenueCatWebhookEvent event = request.event();
+    logReceived(request.apiVersion(), event);
     if (!revenueCatProperties.applySandboxEvents() && "SANDBOX".equals(event.environment())) {
       log.info("RevenueCat sandbox event ignored: eventId={}", event.id());
       return;
@@ -89,6 +91,21 @@ public class RevenueCatWebhookService {
     }
     eventType.ifPresent(type -> saveEvent(event, type, userId.get()));
     targetStatus.ifPresent(status -> applyToUser(event, status, userId.get()));
+  }
+
+  /**
+   * 인증을 통과한 웹훅의 수신 사실을 API 버전과 함께 남긴다. 이후 처리 로그와는 eventId로 이어 본다.
+   *
+   * @param apiVersion RevenueCat 웹훅 API 버전
+   * @param event 웹훅 이벤트
+   */
+  private void logReceived(String apiVersion, RevenueCatWebhookEvent event) {
+    log.info(
+        "RevenueCat 웹훅 수신: apiVersion={}, eventId={}, type={}, environment={}",
+        apiVersion,
+        event.id(),
+        event.type(),
+        event.environment());
   }
 
   private void verifyAuthorization(String authorization) {
@@ -139,7 +156,7 @@ public class RevenueCatWebhookService {
    */
   private void handleTransfer(RevenueCatWebhookEvent event) {
     if (subscriptionEventRepository.existsByEventId(event.id())) {
-      log.info("RevenueCat 웹훅 무시: 이미 저장한 TRANSFER의 재전송. eventId={}", event.id());
+      log.debug("RevenueCat 웹훅 무시: 이미 저장한 TRANSFER의 재전송. eventId={}", event.id());
       return;
     }
 
@@ -155,10 +172,11 @@ public class RevenueCatWebhookService {
     SubscriptionTransferResult transfer =
         userProfileService.transferSubscription(fromUserId.get(), toUserId.get(), eventAt);
 
-    if (transfer.moved() != null) {
+    boolean saved = transfer.moved() != null;
+    if (saved) {
       saveTransferEvent(event, toUserId.get(), transfer.moved(), eventAt);
     }
-    logTransfer(event, fromUserId.get(), toUserId.get(), transfer);
+    logTransfer(event, fromUserId.get(), toUserId.get(), transfer, saved);
   }
 
   private void logUnresolvedTransfer(RevenueCatWebhookEvent event) {
@@ -196,11 +214,13 @@ public class RevenueCatWebhookService {
       RevenueCatWebhookEvent event,
       Long fromUserId,
       Long toUserId,
-      SubscriptionTransferResult transfer) {
+      SubscriptionTransferResult transfer,
+      boolean saved) {
     log.info(
-        "RevenueCat 웹훅 처리: TRANSFER result={}, fromUserId={}, toUserId={}, status={}, eventId={},"
-            + " environment={}",
+        "RevenueCat 웹훅 처리: TRANSFER result={}, saved={}, fromUserId={}, toUserId={}, status={},"
+            + " eventId={}, environment={}",
         transfer.result(),
+        saved,
         fromUserId,
         toUserId,
         transfer.moved() == null ? null : transfer.moved().subscriptionStatus(),
