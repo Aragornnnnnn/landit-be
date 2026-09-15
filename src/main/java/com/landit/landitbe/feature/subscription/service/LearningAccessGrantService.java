@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.subscription.service;
 
-import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.subscription.domain.FreeScenarioReservation;
 import com.landit.landitbe.feature.subscription.domain.LearningAccessGrant;
@@ -19,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사용자 잠금 아래 무료 기회와 학습별 권한을 발급한다. */
+/** 사용자 잠금 아래 첫 시나리오 예약과 학습별 권한을 발급한다. */
 @Service
 @RequiredArgsConstructor
 public class LearningAccessGrantService {
@@ -27,7 +26,6 @@ public class LearningAccessGrantService {
   private final FreeScenarioReservationRepository reservations;
   private final SubscriptionLaunchPolicyService policies;
   private final UserProfileService profiles;
-  private final LearningProgressService progress;
   private final Clock clock;
   private final com.landit.landitbe.feature.session.service.LearningSessionService sessions;
 
@@ -55,10 +53,10 @@ public class LearningAccessGrantService {
   }
 
   /**
-   * 소모된 첫 무료 기회의 세션을 반환하며 다른 대화로 재발급하지 않는다.
+   * 도입 후 무료 상태로 처음 시작한 시나리오의 예약을 반환한다. 예약은 한 번만 기록하며 다른 시나리오로 옮기지 않는다.
    *
    * @param userId 학습 사용자 ID
-   * @return 소모한 무료 기회의 예약 또는 빈 값
+   * @return 첫 시나리오 예약 또는 빈 값
    */
   @Transactional(readOnly = true)
   public Optional<FreeScenarioReservation> freeReservation(long userId) {
@@ -68,8 +66,13 @@ public class LearningAccessGrantService {
   /**
    * 새 시나리오 시작 전에 호출한다. 호출자는 사용자 잠금을 유지해야 한다.
    *
+   * <p>시나리오 대화는 구독과 관계없이 허용한다. 무료 사용자도 세션 시작·메시지 전송·완료·총 피드백(점수·요약) 조회까지 할 수 있고, 잠기는 것은 메시지별 상세
+   * 피드백뿐이다. 무료 사용자의 첫 시작은 FIRST_FREE로 판정해 첫 시나리오 예약을 남기고, 이후 시작은 FREE로 판정한다(둘 다 허용 범위는 같고 예약 여부만
+   * 다르다). 첫 시나리오 예약은 상세 피드백 잠금의 기준이 된다.
+   *
    * @param userId 학습 사용자 ID
    * @return 허용된 시작의 정책 버전과 근거
+   * @throws ApiException 배포 전환으로 새 학습 시작이 중지됐을 때
    */
   public StartAccess requireScenarioStart(long userId) {
     var policy = policies.current();
@@ -78,15 +81,12 @@ public class LearningAccessGrantService {
     if (!enabled || premium(userId)) {
       return new StartAccess(policy.version(), enabled ? "PREMIUM" : "BEFORE_LAUNCH");
     }
-    if (reservations.existsById(userId)
-        || progress.hasClearedScenarioSince(userId, policy.effectiveAt())) {
-      throw new SubscriptionException(SubscriptionErrorCode.PREMIUM_REQUIRED);
-    }
-    return new StartAccess(policy.version(), "FIRST_FREE");
+    return new StartAccess(
+        policy.version(), reservations.existsById(userId) ? "FREE" : "FIRST_FREE");
   }
 
   /**
-   * 시작한 시나리오와 첫 무료 예약을 같은 트랜잭션에 저장한다.
+   * 시작한 시나리오의 권한과, 첫 시작이면 첫 시나리오 예약을 같은 트랜잭션에 저장한다.
    *
    * @param userId 학습 사용자 ID
    * @param sessionId 학습 세션 ID
@@ -199,21 +199,6 @@ public class LearningAccessGrantService {
   }
 
   /**
-   * 저장 응답의 재전송 후보가 요청자의 시나리오인지 확인한다.
-   *
-   * @param userId 학습 사용자 ID
-   * @param sessionId 학습 세션 ID
-   * @return 본인의 시나리오 세션이면 true
-   */
-  @Transactional(readOnly = true)
-  public boolean ownsScenario(long userId, long sessionId) {
-    return sessions
-        .findOwnedIfPresent(userId, sessionId)
-        .filter(session -> session.getSessionType().name().equals("SCENARIO"))
-        .isPresent();
-  }
-
-  /**
    * 이미 완료한 스몰톡 결과의 재생성만 허용할 소유권을 확인한다.
    *
    * @param userId 소유자 ID
@@ -233,11 +218,12 @@ public class LearningAccessGrantService {
   }
 
   /**
-   * 새 발화 입력에만 적용하고 이미 접수된 발화의 결과 저장에는 적용하지 않는다.
+   * 프리톡의 새 발화 입력에만 적용하고 이미 접수된 발화의 결과 저장에는 적용하지 않는다. 시나리오 대화는 제한하지 않으므로 호출하지 않는다.
    *
    * @param userId 학습 사용자 ID
-   * @param kind SCENARIO, FREE_TALK 또는 EXPRESSION
+   * @param kind FREE_TALK 또는 EXPRESSION
    * @param sessionId 학습 세션 ID
+   * @throws SubscriptionException 미결제 상태에서 이어갈 권한이 없거나 만료됐을 때
    */
   public void requireSessionContinuation(long userId, String kind, long sessionId) {
     if (!policies.enabledFor(policies.current(), userId)

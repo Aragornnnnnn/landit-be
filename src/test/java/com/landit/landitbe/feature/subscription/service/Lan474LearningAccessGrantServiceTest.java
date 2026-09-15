@@ -1,4 +1,4 @@
-// 첫 무료 예약과 이미 시작한 학습의 소유자 및 24시간 완료 권한을 검증한다.
+// 첫 시나리오 예약과 이미 시작한 학습의 소유자 및 24시간 완료 권한을 검증한다.
 
 package com.landit.landitbe.feature.subscription.service;
 
@@ -13,7 +13,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
-import com.landit.landitbe.feature.learning.service.LearningProgressService;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -48,7 +47,6 @@ class Lan474LearningAccessGrantServiceTest {
   private final FreeScenarioReservationRepository reservations =
       mock(FreeScenarioReservationRepository.class);
   private final UserProfileService profiles = mock(UserProfileService.class);
-  private final LearningProgressService progress = mock(LearningProgressService.class);
   private final LearningSessionService sessions = mock(LearningSessionService.class);
   private final Map<String, LearningAccessGrant> storedGrants = new HashMap<>();
   private final Map<Long, FreeScenarioReservation> storedReservations = new HashMap<>();
@@ -57,7 +55,7 @@ class Lan474LearningAccessGrantServiceTest {
           new SubscriptionProperties("2026-09-11T11:00:00+09:00"), CLOCK);
   private final LearningAccessGrantService service =
       new LearningAccessGrantService(
-          repository, reservations, policies, profiles, progress, CLOCK, sessions);
+          repository, reservations, policies, profiles, CLOCK, sessions);
 
   /** Repository 대신 사용자와 대상별 저장 내용을 보관해 여러 서비스 호출의 결과를 연결한다. */
   @BeforeEach
@@ -107,7 +105,7 @@ class Lan474LearningAccessGrantServiceTest {
     assertThat(service.premium(USER_ID)).isFalse();
   }
 
-  /** 첫 무료 기회는 시작한 세션에 고정되며 이후 새 대화용 기회를 재발급하지 않는다. */
+  /** 첫 시나리오 예약은 처음 시작한 세션에 고정되고, 이후 시나리오 시작은 예약 없이 FREE로 허용한다. */
   @Test
   void firstFreeReservationStaysBoundToItsOriginalSession() {
     StartAccess start = service.requireScenarioStart(USER_ID);
@@ -121,20 +119,13 @@ class Lan474LearningAccessGrantServiceTest {
               assertThat(reservation.getSessionId()).isEqualTo(100L);
               assertThat(reservation.getScenarioId()).isEqualTo(300L);
             });
-    assertPremiumRequired(() -> service.requireScenarioStart(USER_ID));
+    StartAccess second = service.requireScenarioStart(USER_ID);
+    assertThat(second.basis()).isEqualTo("FREE");
+    service.recordScenario(USER_ID, 101L, 301L, NOW, second);
     assertThat(service.allowsExisting(USER_ID, "SCENARIO", 100L, null, false)).isTrue();
-    assertThat(service.allowsExisting(USER_ID, "SCENARIO", 101L, null, false)).isFalse();
+    assertThat(service.allowsExisting(USER_ID, "SCENARIO", 101L, null, false)).isTrue();
     assertThat(storedReservations).hasSize(1);
-  }
-
-  /** 구 코드에서 공개 이후 대화를 완료한 계정에도 추가 무료 기회를 주지 않는다. */
-  @Test
-  void legacyCompletionAlreadyConsumesTheFreeOpportunity() {
-    when(progress.hasClearedScenarioSince(USER_ID, policies.current().effectiveAt()))
-        .thenReturn(true);
-
-    assertPremiumRequired(() -> service.requireScenarioStart(USER_ID));
-    assertThat(storedReservations).isEmpty();
+    assertThat(storedReservations.get(USER_ID).getSessionId()).isEqualTo(100L);
   }
 
   /** 현재 유료 사용자의 시작은 첫 무료 기회를 소비하지 않는다. */

@@ -49,11 +49,10 @@ class UserSubscriptionServiceTest {
 
     assertThat(access.launched()).isFalse();
     assertThat(access.allowsPremiumOnlyFeature()).isTrue();
-    assertThat(access.allowsScenarioConversation()).isTrue();
     verifyNoInteractions(userProfileService, learningProgressService, grants);
   }
 
-  /** 도입 시각과 같거나 이후이면 시간대 표기와 관계없이 기존 비구독자 제한을 적용한다. */
+  /** 도입 시각과 같거나 이후이면 시간대 표기와 관계없이 프리미엄 전용 제한을 적용하고, 시나리오 대화는 완료 이력과 무관하게 열어 둔다. */
   @ParameterizedTest
   @CsvSource({
     "2026-09-13T14:44:00+09:00, 0",
@@ -69,15 +68,15 @@ class UserSubscriptionServiceTest {
 
     assertThat(access.launched()).isTrue();
     assertThat(access.allowsPremiumOnlyFeature()).isFalse();
-    assertThat(access.allowsScenarioConversation()).isTrue();
+    verifyNoInteractions(learningProgressService);
     when(learningProgressService.hasClearedScenarioSince(USER_ID, LAUNCH_TIME)).thenReturn(true);
-    assertThat(service.evaluateAccess(USER_ID).allowsScenarioConversation()).isFalse();
-    assertThat(service.getSubscription(USER_ID).conversationCompletedSinceLaunch()).isTrue();
+    var response = service.getSubscription(USER_ID);
+    assertThat(response.conversationCompletedSinceLaunch()).isTrue();
+    assertThat(response.canStartScenario()).isTrue();
 
     when(userProfileService.getSubscription(USER_ID)).thenReturn(snapshot(true));
     when(grants.premium(USER_ID)).thenReturn(true);
     assertThat(service.evaluateAccess(USER_ID).allowsPremiumOnlyFeature()).isTrue();
-    assertThat(service.evaluateAccess(USER_ID).allowsScenarioConversation()).isTrue();
   }
 
   /** 같은 서비스 인스턴스도 다음 요청의 시각이 도입 시각에 도달하면 제한을 시작한다. */

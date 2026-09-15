@@ -25,9 +25,9 @@ public interface SubscriptionControllerDocs {
   @Operation(
       summary = "사용자 구독 상태 조회",
       description =
-          "RevenueCat 웹훅으로 갱신된 서버 기준 구독 상태를 조회합니다. premium이 true면 프리미엄 혜택이 적용 중이고,"
-              + " conversationCompletedSinceLaunch && !premium 이면 앱은 페이월을 보여줍니다. productId와 store는"
-              + " 프리미엄이 켜져 있을 때만 값이 있습니다.",
+          "RevenueCat 웹훅으로 갱신된 서버 기준 구독 상태를 조회합니다. premium이 true면 프리미엄 혜택이 적용 중입니다."
+              + " 시나리오 대화는 구독과 관계없이 무료이고, 무료 사용자의 상세 피드백 잠금은 피드백 응답의"
+              + " detailFeedbackLocked로 판단합니다. productId와 store는 프리미엄이 켜져 있을 때만 값이 있습니다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

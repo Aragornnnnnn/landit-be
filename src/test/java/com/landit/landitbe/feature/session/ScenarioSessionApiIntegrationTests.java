@@ -408,9 +408,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(scenarioSessionPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(scenarioSessionPath + ".responses['201'].description").value("시작 성공"))
         .andExpect(jsonPath(scenarioSessionPath + ".responses['401'].description").value("인증 실패"))
-        .andExpect(
-            jsonPath(scenarioSessionPath + ".responses['403'].description")
-                .value("잠금 상태 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"))
+        .andExpect(jsonPath(scenarioSessionPath + ".responses['403'].description").value("잠금 상태"))
         .andExpect(jsonPath(scenarioSessionPath + ".responses['404'].description").value("시나리오 없음"))
         .andExpect(jsonPath(sessionEndPath + ".tags[0]").value("Session"))
         .andExpect(jsonPath(sessionEndPath + ".summary").value("세션 중도 종료"))
@@ -3267,6 +3265,7 @@ class ScenarioSessionApiIntegrationTests {
               jdbcTemplate.queryForObject(
                   "SELECT status FROM learning_session WHERE id=?", String.class, sessionId))
           .isEqualTo("IN_PROGRESS");
+      // 시나리오 대화는 구독과 관계없이 허용하므로 24시간이 지나도 이어갈 수 있다.
       mutableClock.setInstant(DEFAULT_TEST_INSTANT.plusSeconds(24 * 3600));
       mockMvc
           .perform(
@@ -3274,8 +3273,7 @@ class ScenarioSessionApiIntegrationTests {
                   .header(HttpHeaders.AUTHORIZATION, "Bearer " + seed.accessToken())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"content\":\"Hello\",\"inputType\":\"TEXT\"}"))
-          .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+          .andExpect(status().isOk());
     }
   }
 
