@@ -17,7 +17,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("landit.notification.trial-reminder")
 public record TrialReminderProperties(
     Set<String> annualProductIds, Duration leadTime, Duration maxLateness, boolean sandboxEnabled) {
-  /** 누락된 시간 설정은 24시간 전과 최대 2시간 지연으로 설정한다. */
+  /**
+   * 누락된 시간 설정은 24시간 전과 최대 2시간 지연으로 설정한다.
+   *
+   * @throws IllegalArgumentException leadTime이 0 이하이거나 maxLateness가 음수 또는 leadTime 이상인 경우
+   */
   public TrialReminderProperties {
     annualProductIds =
         annualProductIds == null
