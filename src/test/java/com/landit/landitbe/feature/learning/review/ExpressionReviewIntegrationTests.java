@@ -83,6 +83,56 @@ class ExpressionReviewIntegrationTests {
   }
 
   @Test
+  void reviewDailyReplayMustNotPostponeTheReviewNotificationWindow() throws Exception {
+    User user = user(0);
+    var daily = command(user, "daily", NotificationType.DAILY_SCENARIO_REMINDER);
+    final var review = command(user, "review", NotificationType.EXPRESSION_REVIEW);
+    assertThat(frequency.reserveAll(List.of(daily))).containsExactly(daily);
+    // 첫 daily 예약·발송 후 두 시간 뒤 동일 이벤트를 다시 처리한다.
+    now = now.plusSeconds(2 * 3600);
+    assertThat(frequency.reserveAll(List.of(daily))).containsExactly(daily);
+    // ScheduledNotificationService.processPage가 재시도 때 markSent(now)로 기록하는 상태다.
+    jdbcTemplate.update(
+        """
+        insert into user_notification_state
+        (user_profile_id, notification_type, status, last_sent_at, created_at, updated_at)
+        values (?, 'DAILY_SCENARIO_REMINDER', 'SENT', ?, ?, ?)
+        """,
+        user.id(),
+        local(),
+        local(),
+        local());
+    now = now.plusSeconds(3600);
+    assertThat(frequency.reserveAll(List.of(review)))
+        .as("최초 daily 예약으로부터 정확히 세 시간이 지난 복습은 허용해야 한다")
+        .containsExactly(review);
+  }
+
+  @Test
+  void legacyDailyWithoutMatchingDateSlotStillBlocksReviewAcrossMidnight() throws Exception {
+    User user = user(0);
+    now = LAUNCH.minusSeconds(60);
+    frequency.reserveAll(
+        List.of(command(user, "yesterday", NotificationType.DAILY_SCENARIO_REMINDER)));
+    now = now.plusSeconds(13 * 3600);
+    jdbcTemplate.update(
+        """
+        insert into user_notification_state
+        (user_profile_id, notification_type, status, last_sent_at, created_at, updated_at)
+        values (?, 'DAILY_SCENARIO_REMINDER', 'SENT', ?, ?, ?)
+        """,
+        user.id(),
+        local(),
+        local(),
+        local());
+    var review = command(user, "review", NotificationType.EXPRESSION_REVIEW);
+    now = now.plusSeconds(3 * 3600 - 1);
+    assertThat(frequency.reserveAll(List.of(review))).isEmpty();
+    now = now.plusSeconds(1);
+    assertThat(frequency.reserveAll(List.of(review))).containsExactly(review);
+  }
+
+  @Test
   void createsFixedThreeQuestionsAndRequiresAuthenticatedOwner() throws Exception {
     User user = user(3);
     ReviewOffer offer = offer(user);

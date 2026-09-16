@@ -101,14 +101,20 @@ public class LearningNotificationSlotRepository {
     if (own.isPresent() && !own.get().at().toLocalDate().equals(now.toLocalDate())) {
       return false;
     }
+    var userSlots =
+        slots.stream().filter(slot -> slot.userId() == command.userProfileId()).toList();
     LocalDateTime lastDaily = legacy.get(command.userProfileId());
     if (group(command).equals("REVIEW")
         && lastDaily != null
-        && lastDaily.isAfter(now.minusHours(gapHours))) {
+        && lastDaily.isAfter(now.minusHours(gapHours))
+        // 같은 날 DAILY 슬롯이 있으면 재시도로 갱신되는 상태 대신 최초 예약 시각을 따른다.
+        && userSlots.stream()
+            .noneMatch(
+                slot ->
+                    slot.group().equals("DAILY")
+                        && slot.at().toLocalDate().equals(lastDaily.toLocalDate()))) {
       return false;
     }
-    var userSlots =
-        slots.stream().filter(slot -> slot.userId() == command.userProfileId()).toList();
     if (userSlots.stream()
         .anyMatch(
             slot ->
