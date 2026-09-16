@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.learning.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.learning.review.dto.ReviewAnswerRequest;
 import com.landit.landitbe.feature.learning.review.dto.ReviewOffer;
 import com.landit.landitbe.feature.learning.review.dto.ReviewQuestion;
 import com.landit.landitbe.feature.learning.review.dto.ReviewResponse;
@@ -18,6 +20,7 @@ import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificatio
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.scheduled.service.LearningNotificationFrequencyService;
 import com.landit.landitbe.shared.domain.Locale;
+import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.support.ExpressionPracticeFixture;
 import java.time.Clock;
 import java.time.Instant;
@@ -109,6 +112,84 @@ class ExpressionReviewIntegrationTests {
     now = now.plusSeconds(300);
     assertThat(reviews.start(user.id(), offer.reviewId())).isEqualTo(initial);
     assertThat(reviews.offer(user.id(), date())).isEmpty();
+  }
+
+  @Test
+  void gradesMultipleAnswersMovesWrongToEndAndDeduplicatesSubmissions() throws Exception {
+    User user = user(3);
+    UUID id = offer(user).reviewId();
+    ReviewResponse state = reviews.start(user.id(), id);
+    ReviewQuestion first = current(state);
+    ReviewAnswerRequest wrong =
+        new ReviewAnswerRequest(UUID.randomUUID(), first.questionId(), List.of("wrong"));
+    var failed = reviews.answer(user.id(), id, wrong);
+    assertThat(failed.correct()).isFalse();
+    assertThat(failed.review().currentQuestionId()).isNotEqualTo(first.questionId());
+    assertThat(reviews.answer(user.id(), id, wrong)).isEqualTo(failed);
+    assertThat(failed.review().questions().getFirst().wrongCount()).isEqualTo(1);
+    assertThatThrownBy(
+            () ->
+                reviews.answer(
+                    user.id(),
+                    id,
+                    new ReviewAnswerRequest(
+                        wrong.submissionId(), first.questionId(), List.of("different"))))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("제출 키");
+    state = failed.review();
+    ReviewAnswerRequest last = null;
+    while (state.currentQuestionId() != null) {
+      ReviewQuestion question = current(state);
+      last =
+          new ReviewAnswerRequest(
+              UUID.randomUUID(),
+              question.questionId(),
+              question.quiz().writingSentenceAcceptedAnswers().getLast());
+      var result = reviews.answer(user.id(), id, last);
+      assertThat(result.correct()).isTrue();
+      state = result.review();
+    }
+    assertThat(state.status()).isEqualTo("COMPLETED");
+    assertThat(state.questions()).allMatch(q -> q.completedAt() != null);
+    assertThat(state.questions()).extracting(ReviewQuestion::targetExpressionText).hasSize(3);
+    assertThat(reviews.answer(user.id(), id, last).review()).isEqualTo(state);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from expression_review_submission where review_id = ?",
+                Long.class,
+                id))
+        .isEqualTo(4);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select max(last_completed_at) from user_writing_expression_completion"
+                    + " where user_profile_id = ?",
+                LocalDateTime.class,
+                user.id()))
+        .isEqualTo(local().minusDays(5));
+    now = LAUNCH.plusSeconds(10 * 86400);
+    assertThat(reviews.start(user.id(), id).status()).isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void handlesZeroOneTwoAndInvalidContentWithoutInventingQuestions() throws Exception {
+    User empty = user(0);
+    assertThat(reviews.offer(empty.id(), date())).isEmpty();
+    for (int count : List.of(1, 2)) {
+      User user = user(count);
+      var state = reviews.start(user.id(), offer(user).reviewId());
+      assertThat(state.questions()).hasSize(count);
+      if (count == 2) {
+        assertThat(state.questions())
+            .extracting(q -> q.quiz().quizLanguage())
+            .containsExactlyInAnyOrder(Locale.EN, Locale.KR);
+      }
+    }
+    User invalid = user(1);
+    jdbcTemplate.update(
+        "update writing_expression set practice_examples_payload = '[]' format json where id = ?",
+        invalid.expressions().getFirst());
+    assertThat(reviews.offer(invalid.id(), date())).isEmpty();
+    assertThat(countReviews(invalid)).isZero();
   }
 
   private SendPushNotificationCommand command(User user, String suffix, NotificationType type) {
