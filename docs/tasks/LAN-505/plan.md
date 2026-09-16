@@ -65,9 +65,13 @@
 ## 검증 결과와 남은 단계
 
 - `origin/main`의 `0e8dd221`에서 `hotfix/LAN-505`를 생성했다. 기준 브랜치의 다음 Flyway 버전인 V105를 사용한다.
-- `./gradlew check` 성공: 1,210개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 11개를 포함하며 Spotless·Checkstyle도 통과했다.
+- `./gradlew check` 성공: 1,211개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 12개를 포함하며 Spotless·Checkstyle도 통과했다.
 - 새 검증 범위: 웹훅과 예약 저장, 중복 이벤트, 푸시 미동의와 이메일 독립성, 구독 취소, 채널 OFF, 지연 제외, SES 재시도/UNKNOWN, 관리자 인증·주소 검증·멱등 요청, UTC 예약과 큐 payload, SES 발신 설정.
 - 개발 IaC는 별도 `landit-iac-LAN-505` 저장소의 `feat/LAN-505`에 준비했다. SES identity·configuration set·지표·개발 EC2 권한 4개 추가를 적용했고 실제 AWS 설정을 읽어 확인했다.
 - Vercel에 DKIM CNAME 3개를 등록했고 SES 도메인·DKIM 인증 SUCCESS와 발신 가능 상태를 확인했다. SES 샌드박스 해제 신청은 아직 하지 않았다.
 - 인증된 테스트 수신 주소로 SES API를 직접 호출해 테스트 메일 1통을 발송했다. SES 접수에 이어 사용자가 네이버 메일함 수신을 화면과 함께 확인했다. 발신 표시는 `Landit <no-reply@landit.im>`, 제목은 `[Landit] 이메일 발송 테스트`였다.
-- 관리자 API → DB 작업 → SQS → BE 소비자 → SES 경로의 실제 발송, BE 개발 배포와 runtime-env/SSM 문서 반영, 기기 푸시 수신은 아직 검증하지 않았다. 자동 채널은 기본 OFF로 유지된다.
+- 로컬 서버의 실제 관리자 HTTP API를 호출해 202 접수 → DB 작업 → 전용 AWS SQS → 실제 BE 소비자 → SES ACCEPTED를 확인했다. 외부 발송 모의 객체 없이 로컬 H2 DB와 실제 AWS SQS·SES를 사용했다. 같은 Idempotency-Key로 두 번 호출해 동일 작업 ID와 DB 작업 1건을 확인했다.
+- 관리자 API로 발송한 메일의 사용자 수신 확인은 대기 중이다. 이전 메일함 수신 확인은 SES 직접 호출로 보낸 별도 메일의 결과다.
+- 검증 후 로컬 서버를 종료하고 대기·처리 중 메시지 수가 모두 0인 전용 임시 SQS 큐를 삭제했다. 개발 DB와 개발 큐는 사용하지 않았다.
+- 브라우저에서 멱등 요청 헤더를 보낼 수 있도록 CORS에 Idempotency-Key를 허용하고 관리자 이메일 API preflight 회귀 테스트를 추가했다.
+- BE 개발 배포와 runtime-env/SSM 문서 반영, 기기 푸시 수신은 아직 검증하지 않았다. 자동 채널은 기본 OFF로 유지된다.
