@@ -12,16 +12,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param annualProductIds 정확히 일치해야 하는 연간 상품 ID
  * @param leadTime 체험 종료보다 앞선 발송 간격
  * @param maxLateness 발송 예정 시각 이후 허용할 지연
- * @param schedulingEnabled 체험 예약 및 발송 허용 여부
  * @param sandboxEnabled SANDBOX 체험 예약 허용 여부
  */
 @ConfigurationProperties("landit.notification.trial-reminder")
 public record TrialReminderProperties(
-    Set<String> annualProductIds,
-    Duration leadTime,
-    Duration maxLateness,
-    boolean schedulingEnabled,
-    boolean sandboxEnabled) {
+    Set<String> annualProductIds, Duration leadTime, Duration maxLateness, boolean sandboxEnabled) {
   /** 누락된 시간 설정은 24시간 전과 최대 2시간 지연으로 설정한다. */
   public TrialReminderProperties {
     annualProductIds =

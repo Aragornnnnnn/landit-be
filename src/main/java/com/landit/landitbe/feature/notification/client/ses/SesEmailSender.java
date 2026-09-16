@@ -23,7 +23,7 @@ public class SesEmailSender implements EmailSender {
   /** {@inheritDoc} */
   @Override
   public EmailSendResult send(String recipient, String subject, String body) {
-    if (!properties.enabled() || properties.from().isBlank()) {
+    if (properties.from().isBlank()) {
       throw new IllegalStateException("이메일 전송이 설정되지 않았습니다.");
     }
     var builder =

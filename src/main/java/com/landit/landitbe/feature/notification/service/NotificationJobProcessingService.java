@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.notification.service;
 
-import com.landit.landitbe.config.notification.EmailProperties;
 import com.landit.landitbe.config.notification.TrialReminderProperties;
 import com.landit.landitbe.feature.notification.client.EmailSendResult.Status;
 import com.landit.landitbe.feature.notification.client.EmailSender;
@@ -39,7 +38,6 @@ public class NotificationJobProcessingService {
   private final UserProfileService profiles;
   private final NotificationDispatchService push;
   private final EmailSender sender;
-  private final EmailProperties email;
   private final TrialReminderProperties policy;
   private final Clock clock;
   private final Validator validator;
@@ -107,7 +105,7 @@ public class NotificationJobProcessingService {
   }
 
   private void sendPush(NotificationJob job, SubscriptionNotificationTarget target) {
-    if (!policy.schedulingEnabled() || !jobs.settings().pushEnabled()) {
+    if (!jobs.settings().pushEnabled()) {
       skip(job, "CHANNEL_DISABLED");
       return;
     }
@@ -129,8 +127,7 @@ public class NotificationJobProcessingService {
   }
 
   private void sendEmail(NotificationJob job, String recipient) {
-    if (!email.enabled()
-        || (job.trial() && (!policy.schedulingEnabled() || !jobs.settings().emailEnabled()))) {
+    if (job.trial() && !jobs.settings().emailEnabled()) {
       skip(job, "CHANNEL_DISABLED");
       return;
     }

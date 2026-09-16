@@ -26,7 +26,7 @@ public interface AdminEmailControllerDocs {
    */
   @Operation(
       summary = "관리자 이메일 테스트 접수",
-      description = "수신자 허용 목록 없이 입력 주소로 고정 문구를 발송합니다. SES 접수 여부는 작업 조회 API에서 확인합니다.")
+      description = "체험 알림 ON/OFF와 무관하게 입력 주소로 테스트 메일을 발송합니다. SES 접수 여부는 작업 조회 API에서 확인합니다.")
   ApiResponse<NotificationJobView> test(
       AuthUserPrincipal principal, UUID key, AdminEmailTestRequest request);
 
@@ -56,7 +56,8 @@ public interface AdminEmailControllerDocs {
    */
   @Operation(
       summary = "무료 체험 알림 채널 설정 변경",
-      description = "서버 재시작 없이 발송 직전 설정을 확인합니다. 이미 외부에 접수된 알림은 취소되지 않습니다.")
+      description =
+          "DB에 채널별 ON/OFF를 저장하고 예약 등록 및 발송 직전에 확인합니다. 서버 재시작은 필요 없으며 이미 외부에 접수된 알림은 취소되지 않습니다.")
   ApiResponse<TrialReminderSettings> update(
       AuthUserPrincipal principal, TrialReminderSettings settings);
 }

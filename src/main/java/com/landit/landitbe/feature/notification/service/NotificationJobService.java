@@ -185,7 +185,7 @@ public class NotificationJobService {
    * @return 최대 100개 작업
    */
   public List<NotificationJob> pendingReservations() {
-    return repository.pendingReservations(clock.instant(), policy.schedulingEnabled());
+    return repository.pendingReservations(clock.instant());
   }
 
   /**
@@ -253,9 +253,7 @@ public class NotificationJobService {
   @Transactional
   public TrialReminderSettings updateSettings(long adminId, TrialReminderSettings settings) {
     if ((settings.pushEnabled() || settings.emailEnabled())
-        && (!consumerEnabled
-            || !policy.schedulingEnabled()
-            || policy.annualProductIds().isEmpty())) {
+        && (!consumerEnabled || policy.annualProductIds().isEmpty())) {
       throw new ApiException(ErrorCode.SERVICE_UNAVAILABLE);
     }
     if (settings.emailEnabled()) {
@@ -274,7 +272,7 @@ public class NotificationJobService {
   }
 
   private void requireEmail() {
-    if (!consumerEnabled || !email.enabled() || email.from().isBlank()) {
+    if (!consumerEnabled || email.from().isBlank()) {
       throw new ApiException(ErrorCode.SERVICE_UNAVAILABLE);
     }
   }

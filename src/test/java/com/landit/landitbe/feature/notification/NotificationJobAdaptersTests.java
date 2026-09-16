@@ -100,7 +100,7 @@ class NotificationJobAdaptersTests {
     SesV2Client client = mock(SesV2Client.class);
     SesEmailSender sender =
         new SesEmailSender(
-            client, new EmailProperties(true, "Landit <no-reply@landit.im>", "develop-mail"));
+            client, new EmailProperties("Landit <no-reply@landit.im>", "develop-mail"));
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenReturn(SendEmailResponse.builder().messageId("ses-1").build());
     assertThat(sender.send("recipient@example.com", "subject", "body").status())

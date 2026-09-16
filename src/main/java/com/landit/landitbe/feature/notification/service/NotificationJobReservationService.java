@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.notification.service;
 
-import com.landit.landitbe.config.notification.TrialReminderProperties;
 import com.landit.landitbe.feature.notification.messaging.NotificationJobScheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +20,6 @@ import org.springframework.stereotype.Service;
 public class NotificationJobReservationService {
   private final NotificationJobService jobs;
   private final NotificationJobScheduler scheduler;
-  private final TrialReminderProperties policy;
 
   /** 커밋된 예약 의도만 읽어 실패한 외부 예약을 재시도한다. */
   @Scheduled(
@@ -29,7 +27,7 @@ public class NotificationJobReservationService {
       initialDelayString = "${landit.notification.job-poll-delay:30000}")
   public void registerPending() {
     for (var job : jobs.pendingReservations()) {
-      if ((job.trial() && !policy.schedulingEnabled()) || !jobs.reserve(job.id())) {
+      if (!jobs.reserve(job.id())) {
         continue;
       }
       try {

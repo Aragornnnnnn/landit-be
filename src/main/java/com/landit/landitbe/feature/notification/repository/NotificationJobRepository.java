@@ -65,19 +65,21 @@ public class NotificationJobRepository {
    * 예약 발행을 재시도할 작업을 제한된 수로 조회한다.
    *
    * @param now 현재 시각
-   * @param includeTrials 체험 예약 포함 여부
    * @return 예약 미등록 작업
    */
-  public List<NotificationJob> pendingReservations(Instant now, boolean includeTrials) {
+  public List<NotificationJob> pendingReservations(Instant now) {
     return jdbc.query(
         """
         SELECT * FROM notification_job WHERE reservation_state = 'PENDING'
-          AND next_attempt_at <= ? AND status = 'PENDING' AND (kind = 'TEST_EMAIL' OR ?)
+          AND next_attempt_at <= ? AND status = 'PENDING'
+          AND (kind = 'TEST_EMAIL' OR EXISTS (
+            SELECT 1 FROM trial_reminder_settings WHERE id = 1
+              AND ((kind = 'TRIAL_PUSH' AND push_enabled)
+                OR (kind = 'TRIAL_EMAIL' AND email_enabled))))
         ORDER BY next_attempt_at, id LIMIT 100
         """,
         this::map,
-        time(now),
-        includeTrials);
+        time(now));
   }
 
   /**

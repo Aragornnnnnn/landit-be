@@ -15,10 +15,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.landit.landitbe.config.notification.EmailProperties;
 import com.landit.landitbe.config.notification.TrialReminderProperties;
 import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.notification.client.EmailSendResult;
@@ -54,9 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** 실제 DB와 보안 필터를 통과하고 외부 발송만 대체한다. */
 @SpringBootTest(
     properties = {
-      "landit.notification.email.enabled=true",
       "landit.notification.trial-reminder.annual-product-ids=annual",
-      "landit.notification.trial-reminder.scheduling-enabled=true",
       "landit.subscription.revenuecat.webhook-authorization=test-reminder-secret"
     })
 @ActiveProfiles("test")
@@ -67,7 +65,6 @@ class NotificationJobIntegrationTests {
   private static final Instant NOW = Instant.parse("2026-09-16T00:00:00Z");
   @Autowired private NotificationJobService jobs;
   @Autowired private UserProfileService profiles;
-  @Autowired private EmailProperties email;
   @Autowired private TrialReminderProperties policy;
   @Autowired private Validator validator;
   @Autowired private JdbcTemplate jdbc;
@@ -87,7 +84,7 @@ class NotificationJobIntegrationTests {
     push = mock(NotificationDispatchService.class);
     processor =
         new NotificationJobProcessingService(
-            jobs, profiles, push, sender, email, policy, clock, validator);
+            jobs, profiles, push, sender, policy, clock, validator);
     jdbc.update(
         """
         INSERT INTO user_profile (id, nickname, email, target_locale, base_locale, current_level,
@@ -182,6 +179,7 @@ class NotificationJobIntegrationTests {
 
   @Test
   void adminCanTestArbitraryRecipientWithIdempotencyAndValidation() throws Exception {
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(false, false));
     String key = UUID.randomUUID().toString();
     for (int i = 0; i < 2; i++) {
       mvc.perform(
@@ -212,6 +210,63 @@ class NotificationJobIntegrationTests {
         .thenReturn(new EmailSendResult(Status.ACCEPTED, "test-mail"));
     processor.process(job("TEST_EMAIL").id());
     verify(sender).send(eq("arbitrary@example.org"), contains("테스트"), anyString());
+  }
+
+  @Test
+  void adminSettingsImmediatelyControlEachReservationChannel() throws Exception {
+    jobs.recordTrial(USER_ID, "PRODUCTION");
+    mvc.perform(
+            put("/api/v1/admin/notifications/trial-reminder-settings")
+                .with(user(new AuthUserPrincipal(USER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"pushEnabled\":false,\"emailEnabled\":true}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pushEnabled").value(false))
+        .andExpect(jsonPath("$.data.emailEnabled").value(true));
+    assertThat(jobs.pendingReservations())
+        .extracting(NotificationJob::kind)
+        .containsExactly("TRIAL_EMAIL");
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(true, false));
+    assertThat(jobs.pendingReservations())
+        .extracting(NotificationJob::kind)
+        .containsExactly("TRIAL_PUSH");
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(false, false));
+    assertThat(jobs.pendingReservations()).isEmpty();
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(true, true));
+    assertThat(jobs.pendingReservations()).hasSize(2);
+  }
+
+  @Test
+  void disablingEmailAfterReservationDoesNotDisablePush() {
+    jobs.recordTrial(USER_ID, "PRODUCTION");
+    NotificationJob mail = job("TRIAL_EMAIL");
+    jobs.registered(mail.id());
+    jdbc.update("UPDATE user_profile SET push_permission_status = 'GRANTED' WHERE id = ?", USER_ID);
+    entityManager.clear();
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(true, false));
+    processor.process(mail.id());
+    processor.process(job("TRIAL_PUSH").id());
+    assertThat(jobs.find(mail.id()).orElseThrow().resultCode()).isEqualTo("CHANNEL_DISABLED");
+    assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().status()).isEqualTo("PROCESSED");
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(true, true));
+    processor.process(mail.id());
+    verifyNoInteractions(sender);
+    verify(push).sendAll(org.mockito.ArgumentMatchers.anyList());
+  }
+
+  @Test
+  void disabledPushDoesNotPreventEmailDelivery() {
+    jobs.recordTrial(USER_ID, "PRODUCTION");
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(false, true));
+    when(sender.send(anyString(), anyString(), anyString()))
+        .thenReturn(new EmailSendResult(Status.ACCEPTED, "email-only"));
+    processor.process(job("TRIAL_PUSH").id());
+    processor.process(job("TRIAL_EMAIL").id());
+    assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().resultCode())
+        .isEqualTo("CHANNEL_DISABLED");
+    assertThat(jobs.find(job("TRIAL_EMAIL").id()).orElseThrow().status()).isEqualTo("ACCEPTED");
+    verifyNoInteractions(push);
+    verify(sender).send(eq("member@example.com"), anyString(), anyString());
   }
 
   @Test
