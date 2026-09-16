@@ -17,7 +17,9 @@
 - SES 응답이 불확실한 경우 자동 재발송하지 않고 UNKNOWN으로 남긴다. SES 접수와 실제 수신은 별도 증거다.
 - 상품 ID는 설정한 연간 상품 목록과 정확히 비교한다. 개발에서만 SANDBOX 예약을 허용한다.
 - 예정 시각을 지나 도착한 작업은 허용 지연 범위 안에서만 처리하고, 체험이 끝난 알림은 보내지 않는다.
-- 런타임 채널 설정은 관리자 API로 변경하며, 서버 재시작 없이 새 발송 판단에 적용한다.
+- 런타임 ON/OFF는 DB의 `trial_reminder_settings.push_enabled`, `email_enabled`로만 관리한다. 관리자 API 변경을 예약 등록과 발송 직전에 확인하며 재시작은 필요 없다. 별도 이메일 허용·체험 예약 허용 환경 변수는 사용하지 않는다.
+- 채널 OFF 중에도 웹훅의 발송 의도는 저장하지만 외부 예약은 등록하지 않는다. ON으로 바꾸면 남은 PENDING 작업을 예약하며, 발송 시점의 구독 상태와 허용 지연을 다시 검사한다. 이미 SKIPPED 처리된 작업은 재활성화하지 않는다.
+- 관리자 테스트 이메일은 체험 채널 ON/OFF와 독립적이다. 기존 소비자 구동 설정과 발신 주소 등 전송에 필요한 설정은 유지한다.
 
 ## 확인 및 진행
 
@@ -47,10 +49,8 @@
 
 | 설정 | 기본값 / 의미 |
 | --- | --- |
-| `LANDIT_EMAIL_ENABLED` | `false`. 관리자 이메일 테스트와 자동 이메일의 서버 발송 스위치. |
 | `LANDIT_EMAIL_FROM` | `Landit <no-reply@landit.im>`. |
 | `LANDIT_EMAIL_CONFIGURATION_SET` | 개발은 `develop-landit-transactional`. |
-| `LANDIT_TRIAL_REMINDER_SCHEDULING_ENABLED` | `false`. 자동 체험 예약·발송 허용. |
 | `LANDIT_TRIAL_REMINDER_ANNUAL_PRODUCT_IDS` | 기본 빈 목록. 실제 연간 상품 ID를 쉼표로 구분한다. |
 | `LANDIT_TRIAL_REMINDER_LEAD_TIME` | `24h`. |
 | `LANDIT_TRIAL_REMINDER_MAX_LATENESS` | `2h`. lead-time보다 작게 설정한다. |
@@ -65,7 +65,7 @@
 ## 검증 결과와 남은 단계
 
 - `origin/main`의 `0e8dd221`에서 `hotfix/LAN-505`를 생성했다. 기준 브랜치의 다음 Flyway 버전인 V105를 사용한다.
-- `./gradlew check` 성공: 1,211개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 12개를 포함하며 Spotless·Checkstyle도 통과했다.
+- `./gradlew check` 성공: 1,214개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 15개를 포함하며 Spotless·Checkstyle도 통과했다.
 - 새 검증 범위: 웹훅과 예약 저장, 중복 이벤트, 푸시 미동의와 이메일 독립성, 구독 취소, 채널 OFF, 지연 제외, SES 재시도/UNKNOWN, 관리자 인증·주소 검증·멱등 요청, UTC 예약과 큐 payload, SES 발신 설정.
 - 개발 IaC는 별도 `landit-iac-LAN-505` 저장소의 `feat/LAN-505`에 준비했다. SES identity·configuration set·지표·개발 EC2 권한 4개 추가를 적용했고 실제 AWS 설정을 읽어 확인했다.
 - Vercel에 DKIM CNAME 3개를 등록했고 SES 도메인·DKIM 인증 SUCCESS와 발신 가능 상태를 확인했다.
@@ -76,3 +76,10 @@
 - 검증 후 로컬 서버를 종료하고 대기·처리 중 메시지 수가 모두 0인 전용 임시 SQS 큐를 삭제했다. 개발 DB와 개발 큐는 사용하지 않았다.
 - 브라우저에서 멱등 요청 헤더를 보낼 수 있도록 CORS에 Idempotency-Key를 허용하고 관리자 이메일 API preflight 회귀 테스트를 추가했다.
 - BE 개발 배포와 runtime-env/SSM 문서 반영, 기기 푸시 수신은 아직 검증하지 않았다. 자동 채널은 기본 OFF로 유지된다.
+
+## DB ON/OFF 통일
+
+- 사용자 결정에 따라 중복된 이메일 발송·체험 예약 환경 변수 스위치를 제거했다. 기존 DB 테이블과 기본 OFF 값은 유지하며 추가 스키마 변경은 없다.
+- 관리자 채널 활성화에는 소비자 구동과 연간 상품 ID가 필요하고 이메일에는 발신 주소가 필요하다. 이 항목들은 전송을 위한 구성 검증이며 별도 체험 채널 ON/OFF가 아니다.
+- 개발 IaC runtime-env에서도 제거한 스위치를 삭제했다. 실제 서버 배포와 DB 채널 활성화는 별도다.
+- `./gradlew spotlessApply check --no-daemon` 성공: 1,214개 테스트, 실패·오류 0개, 건너뜀 6개. 관리자 API의 즉시 예약 채널 변경, 예약 후 이메일 OFF와 푸시 독립성, 푸시 OFF와 이메일 독립성, 두 채널 OFF에서도 관리자 테스트 발송을 검증했다.
