@@ -114,3 +114,9 @@ Scheduler는 하루 한 번 호출하고 사용자별 3일 간격은 BE가 판�
 `occurredAt`이 처리 시점의 서울 날짜와 다르면 건너뛴다. 같은 날짜 재시도에서는 사용자별 `review:{date}:{userId}` 이벤트 키와 복습 UUID를 재사용하며, 기기별 중복 처리는 기존 `push_delivery` 경로에 맡긴다.
 
 FE는 `/reviews/{reviewId}?utm_source=push&utm_medium=notification&utm_campaign=expression_review`를 처리하고 시작 API를 호출해야 한다. 앱 내 일반 메뉴에는 진입점을 추가하지 않는다. 실제 기기 딥링크·푸시 수신, FE 화면, 클라우드 Scheduler, 배포와 운영 데이터 검증은 아직 수행하지 않았다.
+
+## 2026-09-16 hotfix 마이그레이션 번호 예약
+
+- PR #197의 V105~V107을 위해 선행 알람은 V108, 복수 정답은 V109, 이 PR의 복습은 `V110__add_expression_review.sql`로 변경했다. 세 SQL의 내용은 모두 보존했다. 위 V107 검증은 당시 파일명 기준 기록이다.
+- 개발·운영 DB의 Flyway 이력은 모두 V104까지 적용된 상태였다. 적용된 마이그레이션과 이력은 수정하지 않았다.
+- #197을 main에 배포한 뒤 develop으로 역병합하여 V105~V107을 포함해야 한다. 이후 #189의 V108 → #191의 V109 → 이 PR의 V110 순으로 적용하며 V108 이상을 먼저 배포하지 않는다.
