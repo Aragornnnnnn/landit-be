@@ -30,6 +30,8 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -279,6 +281,28 @@ class ExpressionReviewIntegrationTests {
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("유효기간");
     assertThat(reviews.get(user.id(), first).status()).isEqualTo("EXPIRED");
+  }
+
+  @Test
+  void serializesConcurrentOffersStartsAndDuplicateWrongAnswer() throws Exception {
+    User user = user(3);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      Callable<ReviewOffer> create = () -> offer(user);
+      var offers = executor.invokeAll(List.of(create, create));
+      UUID id = offers.getFirst().get().reviewId();
+      assertThat(offers.getLast().get().reviewId()).isEqualTo(id);
+      assertThat(countReviews(user)).isEqualTo(1);
+      Callable<ReviewResponse> start = () -> reviews.start(user.id(), id);
+      var starts = executor.invokeAll(List.of(start, start));
+      assertThat(starts.getFirst().get()).isEqualTo(starts.getLast().get());
+      UUID questionId = starts.getFirst().get().currentQuestionId();
+      var request = new ReviewAnswerRequest(UUID.randomUUID(), questionId, List.of("wrong"));
+      Callable<Boolean> submit = () -> reviews.answer(user.id(), id, request).correct();
+      for (var result : executor.invokeAll(List.of(submit, submit))) {
+        assertThat(result.get()).isFalse();
+      }
+      assertThat(reviews.get(user.id(), id).questions().getFirst().wrongCount()).isEqualTo(1);
+    }
   }
 
   private SendPushNotificationCommand command(User user, String suffix, NotificationType type) {
