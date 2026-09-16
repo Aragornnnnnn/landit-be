@@ -154,27 +154,21 @@ class PremiumAccessIntegrationTests {
     expectNotPremiumRequired(get("/api/v1/expressions/" + SCENARIO_ID), accessToken);
   }
 
-  /** 도입 이후 대화를 완료한 비프리미엄 사용자는 새 세션 시작과 메시지 전송이 막힌다. */
+  /** 도입 이후 대화를 완료한 비프리미엄 사용자도 새 세션 시작·메시지 전송·속마음 조회가 게이트를 통과한다. */
   @Test
-  void blocksNewConversationAfterCompletionForNonPremium() throws Exception {
+  void allowsNewConversationAfterCompletionForNonPremium() throws Exception {
     String userKey = "premium-gate-completed";
     String accessToken = login(userKey);
     insertClearedProgress(userIdOf(userKey));
 
-    mockMvc
-        .perform(
-            post("/api/v1/scenarios/" + SCENARIO_ID + "/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
-    mockMvc
-        .perform(
-            post("/api/v1/sessions/" + MISSING_ID + "/messages")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+    expectNotPremiumRequired(post("/api/v1/scenarios/" + SCENARIO_ID + "/sessions"), accessToken);
+    expectNotPremiumRequired(
+        post("/api/v1/sessions/" + MISSING_ID + "/messages")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"),
+        accessToken);
+    expectNotPremiumRequired(
+        get("/api/v1/sessions/" + MISSING_ID + "/messages/1/inner-thought"), accessToken);
   }
 
   /** 대화를 완료한 비프리미엄 사용자도 완료한 세션의 결과 보기와 마이페이지·스트릭·메일함은 쓸 수 있다. */
@@ -224,7 +218,7 @@ class PremiumAccessIntegrationTests {
         .andExpect(status().isUnauthorized());
   }
 
-  /** OpenAPI 문서에 게이트 대상 API의 403 응답이 기술된다. */
+  /** OpenAPI 문서에 게이트 대상 API의 403 응답과 피드백 응답의 상세 피드백 잠금 필드가 기술된다. */
   @Test
   void openApiDocsDescribePremiumRequired() throws Exception {
     mockMvc
@@ -243,6 +237,9 @@ class PremiumAccessIntegrationTests {
                 .exists())
         .andExpect(
             jsonPath("$.paths['/api/v1/scenarios/{scenarioId}/sessions'].post.responses['403']")
+                .value(org.hamcrest.Matchers.hasEntry("description", "잠금 상태")))
+        .andExpect(
+            jsonPath("$.components.schemas.SessionFeedbackResponse.properties.detailFeedbackLocked")
                 .exists());
   }
 

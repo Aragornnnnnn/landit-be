@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.domain.SessionHistory;
 import com.landit.landitbe.feature.session.domain.SessionHistoryMessage;
@@ -75,7 +76,8 @@ public class ScenarioSessionStartService {
         && !accessGrants.premium(userId)
         && existing.get().getScenarioId() == scenarioId
         && accessGrants.allowsExisting(
-            userId, "SCENARIO", existing.get().getSessionId(), null, false)) {
+            userId, "SCENARIO", existing.get().getSessionId(), null, false)
+        && !isCompleted(userId, existing.get().getSessionId())) {
       return resume(userId, scenarioId, existing.get().getSessionId());
     }
     final var startAccess = accessGrants.requireScenarioStart(userId);
@@ -113,7 +115,15 @@ public class ScenarioSessionStartService {
     return response;
   }
 
-  /** 첫 무료 시작의 응답이 유실되면 같은 세션의 현재 진행도를 반환한다. */
+  /** 이미 완료한 첫 시나리오 세션은 재개하지 않고 새 세션으로 다시 대화한다. */
+  private boolean isCompleted(long userId, long sessionId) {
+    return learningSessionService
+        .findOwnedIfPresent(userId, sessionId)
+        .filter(session -> session.getStatus() == LearningSessionStatus.COMPLETED)
+        .isPresent();
+  }
+
+  /** 첫 시나리오 시작의 응답이 유실되거나 중도 종료했으면 같은 세션의 현재 진행도를 반환한다. */
   private SessionStartResponse resume(long userId, long scenarioId, long sessionId) {
     LearningSession session = learningSessionService.findOwnedForUpdate(userId, sessionId);
     session.resumeInterruptedScenario();

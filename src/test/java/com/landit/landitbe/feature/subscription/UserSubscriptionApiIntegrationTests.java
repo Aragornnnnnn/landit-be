@@ -272,6 +272,32 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(true));
   }
 
+  /**
+   * 도입 후 시나리오를 완료한 무료 사용자에게도 구독 조회 응답이 새 시나리오 시작을 허용한다고 알리는지 검증한다.
+   *
+   * <p>기존 정책에서는 도입 후 대화를 완료한 무료 사용자에게 canStartScenario가 false였고, 앱은 이 값으로 시작 전 페이월을 띄웠다. 시나리오 대화가
+   * 무료가 되면서 완료 이력과 관계없이 canStartScenario는 true여야 하고, conversationCompletedSinceLaunch는 완료 여부를 그대로
+   * 알리며, 무료 상태로 시나리오를 시작한 적이 없어 freeScenarioSessionId는 null이어야 한다.
+   */
+  @Test
+  void keepsScenarioStartOpenForFreeUserAfterCompletionSinceLaunch() throws Exception {
+    String userKey = "subscription-start-open";
+    String accessToken = login(userKey);
+    insertScenarioProgress(userIdOf(userKey), "CLEARED", AFTER_LAUNCH);
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/subscription")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.premium").value(false))
+        .andExpect(jsonPath("$.data.paymentEnabled").value(true))
+        .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(true))
+        .andExpect(jsonPath("$.data.canStartScenario").value(true))
+        .andExpect(
+            jsonPath("$.data.freeScenarioSessionId").value(org.hamcrest.Matchers.nullValue()));
+  }
+
   /** 도입 시점 전에만 완료한 기존 사용자는 대화 완료로 보지 않는다. */
   @Test
   void ignoresScenarioClearedBeforeLaunch() throws Exception {
