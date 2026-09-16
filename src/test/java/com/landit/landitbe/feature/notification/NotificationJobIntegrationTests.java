@@ -96,7 +96,14 @@ class NotificationJobIntegrationTests {
         """,
         USER_ID,
         LocalDateTime.ofInstant(NOW.plusSeconds(86400), ZoneId.of("Asia/Seoul")));
-    jobs.updateSettings(USER_ID, new TrialReminderSettings(true, true));
+  }
+
+  @Test
+  void trialChannelsStartEnabledAndUseEnabledColumnDefaults() {
+    assertThat(jobs.settings()).isEqualTo(new TrialReminderSettings(true, true));
+    jdbc.update("DELETE FROM trial_reminder_settings WHERE id = 1");
+    jdbc.update("INSERT INTO trial_reminder_settings (id) VALUES (1)");
+    assertThat(jobs.settings()).isEqualTo(new TrialReminderSettings(true, true));
   }
 
   @Test

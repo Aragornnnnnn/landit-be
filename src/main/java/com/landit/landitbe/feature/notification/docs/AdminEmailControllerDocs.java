@@ -42,7 +42,7 @@ public interface AdminEmailControllerDocs {
   /**
    * 런타임 체험 알림 설정을 조회한다.
    *
-   * @return 기본값은 두 채널 모두 OFF
+   * @return 기본값은 두 채널 모두 ON
    */
   @Operation(summary = "무료 체험 알림 채널 설정 조회")
   ApiResponse<TrialReminderSettings> settings();
