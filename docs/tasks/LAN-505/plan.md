@@ -98,6 +98,15 @@
 - 운영 ECS API revision 15는 기존 revision 14의 코드 이미지를 유지하며 이메일 환경 변수와 연간 상품 ID SSM 연결만 추가한다. 새 알림 코드·V105/V106 마이그레이션 배포와 자동 체험 알림 종단 검증은 아직 별도다.
 - 상세 적용·검증 이력은 IaC 저장소 `docs/tasks/LAN-505/plan.md`에 기록한다.
 - 운영 설정 반영 완료 후 ECS rollout COMPLETED, desired/running 1/1, pending 0과 ALB healthy, API health UP을 확인했다. 코드 이미지 digest는 기존 운영과 동일하다.
+- 위 운영 설정의 소스는 IaC main `78b1caa`가 아니라 [landit-iac PR #45](https://github.com/Aragornnnnnn/landit-iac/pull/45)의 `feat/LAN-505`다. 운영 SES·Scheduler 정책은 [d6c5ebb](https://github.com/Aragornnnnnn/landit-iac/commit/d6c5ebb), ECS·개발 runtime 상품 연결은 [88467bc](https://github.com/Aragornnnnnn/landit-iac/commit/88467bc)에 포함되며, 적용·검증 기록을 포함한 공개 head는 `6a2dfcaa6a5a9135c426850b780c238ebb0a8e62`다. 인프라는 이미 적용됐고 IaC main 병합은 별도다.
+- 후속 타임아웃 apply로 운영 API는 revision 16이 됐다. PR 리뷰 대응 시 AWS에서 `prod-landit-api-task`의 별도 `prod-landit-email` 정책에 `ses:SendEmail`과 Scheduler Create/Get 권한, revision 16의 `/landit/prod/LANDIT_TRIAL_REMINDER_ANNUAL_PRODUCT_IDS` 연결을 재확인했다. SendRawEmail 권한은 추가하지 않았다. 개발 runtime-env 템플릿의 서버 반영은 아직 남아 있다.
+
+## PR 리뷰 반영
+
+- 미등록 예약 후보를 조회하기 전에 허용 지연을 넘긴 작업을 SKIPPED/TOO_LATE로 종료한다. 체험 알림은 설정값(기본 2시간), 관리자 테스트는 1시간을 사용하며 채널 OFF 작업도 정리한다. 선점 시에도 상태와 기한을 재검증해 오래된 조회 결과로 예약하지 않는다.
+- V107에 등록 시도 횟수를 추가한다. 서버 간 조건부 선점에서 횟수를 증가시키고 60초 선점이 끝난 뒤 최대 10회 시도를 소진한 미등록 작업을 FAILED/SCHEDULE_RETRIES_EXHAUSTED로 종료한다. 등록 성공·발송 처리 중 작업은 이 정리에서 제외한다. 상한 내 일시 실패는 재시도한다.
+- 시간 설정의 잘못된 입력에 대한 생성자 `@throws` 계약을 보완했다.
+- 최종 `./gradlew spotlessApply check --no-daemon` 성공: 1,222개 테스트, 실패·오류 0개, 건너뜀 6개. 기한 경계·채널 OFF 정리, 영구 등록 실패 상한, 일시 실패 후 재시도와 성공 보존을 추가 검증했다. 첫 실행의 테스트 변수 선언 Checkstyle 오류 2건은 수정 후 재검증했다.
 
 ## 선행 PR 통합과 독립 리뷰
 
