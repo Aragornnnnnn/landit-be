@@ -2,7 +2,11 @@
 
 package com.landit.landitbe.feature.learning.review.repository;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.content.expression.practice.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.learning.review.domain.ExpressionReview;
+import com.landit.landitbe.feature.learning.review.dto.ReviewQuestion;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -19,6 +23,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class ExpressionReviewRepository {
   private final JdbcTemplate jdbc;
+  private final ObjectMapper mapper = new ObjectMapper();
 
   /**
    * 완료 이력이 있는 활성 사용자를 커서로 조회한다.
@@ -131,6 +136,81 @@ public class ExpressionReviewRepository {
         > 0;
   }
 
+  /**
+   * 복습과 고정 문제를 함께 저장한다.
+   *
+   * @param review 새 복습
+   * @param questions 고정 문제
+   */
+  public void insert(ExpressionReview review, List<ReviewQuestion> questions) {
+    jdbc.update(
+        """
+        insert into expression_review(id, user_profile_id, scheduled_date, created_at, available_until)
+        values (?, ?, ?, ?, ?)
+        """,
+        review.id(),
+        review.userId(),
+        review.scheduledDate(),
+        review.createdAt(),
+        review.availableUntil());
+    for (ReviewQuestion q : questions) {
+      jdbc.update(
+          """
+          insert into expression_review_question
+          (id, review_id, expression_id, target_expression_text, base_expression_meaning_text,
+           quiz_json, display_order, queue_order, wrong_count)
+          values (?, ?, ?, ?, ?, ?, ?, ?, 0)
+          """,
+          q.questionId(),
+          review.id(),
+          q.expressionId(),
+          q.targetExpressionText(),
+          q.baseExpressionMeaningText(),
+          json(q.quiz()),
+          q.displayOrder(),
+          q.queueOrder());
+    }
+  }
+
+  /**
+   * 최초 시작과 서버가 정한 만료 시각을 저장한다.
+   *
+   * @param id 복습 ID
+   * @param now 시작 시각
+   * @param expiresAt 진행 기한
+   */
+  public void start(UUID id, LocalDateTime now, LocalDateTime expiresAt) {
+    jdbc.update(
+        "update expression_review set started_at = ?, expires_at = ?"
+            + " where id = ? and started_at is null",
+        now,
+        expiresAt,
+        id);
+  }
+
+  /**
+   * 최초 출제 순서로 고정 문제와 현재 상태를 조회한다.
+   *
+   * @param id 복습 ID
+   * @return 문제 목록
+   */
+  public List<ReviewQuestion> questions(UUID id) {
+    return jdbc.query(
+        "select * from expression_review_question where review_id = ? order by display_order",
+        (rs, row) ->
+            new ReviewQuestion(
+                rs.getObject("id", UUID.class),
+                rs.getLong("expression_id"),
+                rs.getString("target_expression_text"),
+                rs.getString("base_expression_meaning_text"),
+                readQuiz(rs.getString("quiz_json")),
+                rs.getInt("display_order"),
+                rs.getInt("queue_order"),
+                rs.getInt("wrong_count"),
+                time(rs, "completed_at")),
+        id);
+  }
+
   private ExpressionReview review(ResultSet rs, int row) throws SQLException {
     return new ExpressionReview(
         rs.getObject("id", UUID.class),
@@ -145,5 +225,21 @@ public class ExpressionReviewRepository {
 
   private LocalDateTime time(ResultSet rs, String name) throws SQLException {
     return rs.getObject(name, LocalDateTime.class);
+  }
+
+  private String json(Object value) {
+    try {
+      return mapper.writeValueAsString(value);
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("복습 스냅샷을 저장할 수 없습니다.", exception);
+    }
+  }
+
+  private WritingSentenceResponse readQuiz(String json) {
+    try {
+      return mapper.readValue(json, WritingSentenceResponse.class);
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("저장된 복습 문제를 읽을 수 없습니다.", exception);
+    }
   }
 }
