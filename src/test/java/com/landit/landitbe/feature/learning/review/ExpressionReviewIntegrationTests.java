@@ -370,6 +370,36 @@ class ExpressionReviewIntegrationTests {
         .isEqualTo(NotificationType.EXPRESSION_REVIEW);
   }
 
+  @Test
+  void rejectsOutOfOrderAndInvalidAnswersAndDocumentsAcceptedAnswers() throws Exception {
+    User user = user(3);
+    UUID id = offer(user).reviewId();
+    var state = reviews.start(user.id(), id);
+    var request =
+        new ReviewAnswerRequest(
+            UUID.randomUUID(), state.questions().getLast().questionId(), List.of("wrong"));
+    mvc.perform(
+            post("/api/v1/reviews/{id}/answers", id)
+                .header("Authorization", "Bearer " + user.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isConflict());
+    mvc.perform(
+            post("/api/v1/reviews/{id}/answers", id)
+                .header("Authorization", "Bearer " + user.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/reviews/{reviewId}/start'].post").exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.WritingSentenceResponse.properties"
+                        + ".writingSentenceAcceptedAnswers.items.type")
+                .value("array"));
+  }
+
   private SendPushNotificationCommand command(User user, String suffix, NotificationType type) {
     return new SendPushNotificationCommand(
         user.id() + ":" + suffix, user.id(), type, "title", "body", "/scenario");
