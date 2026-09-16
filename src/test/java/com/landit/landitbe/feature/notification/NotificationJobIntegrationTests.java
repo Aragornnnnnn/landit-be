@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -27,8 +28,10 @@ import com.landit.landitbe.feature.notification.client.EmailSender;
 import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
 import com.landit.landitbe.feature.notification.dto.NotificationJob;
 import com.landit.landitbe.feature.notification.dto.TrialReminderSettings;
+import com.landit.landitbe.feature.notification.messaging.NotificationJobScheduler;
 import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.service.NotificationJobProcessingService;
+import com.landit.landitbe.feature.notification.service.NotificationJobReservationService;
 import com.landit.landitbe.feature.notification.service.NotificationJobService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import jakarta.persistence.EntityManager;
@@ -96,6 +99,63 @@ class NotificationJobIntegrationTests {
         """,
         USER_ID,
         LocalDateTime.ofInstant(NOW.plusSeconds(86400), ZoneId.of("Asia/Seoul")));
+  }
+
+  @Test
+  void expiredReservationsCloseAtEachChannelDeadlineEvenWhenDisabled() {
+    jobs.recordTrial(USER_ID, "PRODUCTION");
+    final var test = jobs.requestTest(USER_ID, UUID.randomUUID(), "test@example.com");
+    final NotificationJob mail = job("TRIAL_EMAIL");
+    jobs.updateSettings(USER_ID, new TrialReminderSettings(false, false));
+    when(clock.instant()).thenReturn(NOW.plusSeconds(3600));
+    assertThat(jobs.pendingReservations()).isEmpty();
+    assertThat(jobs.find(test.id()).orElseThrow().resultCode()).isEqualTo("TOO_LATE");
+    assertThat(jobs.find(mail.id()).orElseThrow().status()).isEqualTo("PENDING");
+    when(clock.instant()).thenReturn(NOW.plusSeconds(7200));
+    assertThat(jobs.reserve(mail.id())).isFalse();
+    assertThat(jobs.pendingReservations()).isEmpty();
+    assertThat(jobs.find(mail.id()).orElseThrow().resultCode()).isEqualTo("TOO_LATE");
+    assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().status()).isEqualTo("SKIPPED");
+  }
+
+  @Test
+  void permanentReservationFailureStopsAtTenAttempts() {
+    jobs.recordTrial(USER_ID, "PRODUCTION");
+    NotificationJobScheduler scheduler = mock(NotificationJobScheduler.class);
+    doThrow(new IllegalStateException("unavailable"))
+        .when(scheduler)
+        .schedule(org.mockito.ArgumentMatchers.any());
+    var reservations = new NotificationJobReservationService(jobs, scheduler);
+    for (int minute = 0; minute <= 11; minute++) {
+      when(clock.instant()).thenReturn(NOW.plusSeconds(minute * 60L));
+      reservations.registerPending();
+    }
+    verify(scheduler, times(20)).schedule(org.mockito.ArgumentMatchers.any());
+    assertThat(jobs.find(job("TRIAL_EMAIL").id()).orElseThrow().status()).isEqualTo("FAILED");
+    assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().resultCode())
+        .isEqualTo("SCHEDULE_RETRIES_EXHAUSTED");
+    assertThat(jobs.pendingReservations()).isEmpty();
+  }
+
+  @Test
+  void temporaryReservationFailureRetriesAfterLeaseAndPreservesSuccess() {
+    jobs.requestTest(USER_ID, UUID.randomUUID(), "test@example.com");
+    NotificationJobScheduler scheduler = mock(NotificationJobScheduler.class);
+    doThrow(new IllegalStateException("temporary"))
+        .doNothing()
+        .when(scheduler)
+        .schedule(org.mockito.ArgumentMatchers.any());
+    var reservations = new NotificationJobReservationService(jobs, scheduler);
+    reservations.registerPending();
+    reservations.registerPending();
+    verify(scheduler).schedule(org.mockito.ArgumentMatchers.any());
+    when(clock.instant()).thenReturn(NOW.plusSeconds(60));
+    reservations.registerPending();
+    when(clock.instant()).thenReturn(NOW.plusSeconds(120));
+    reservations.registerPending();
+    verify(scheduler, times(2)).schedule(org.mockito.ArgumentMatchers.any());
+    assertThat(jobs.pendingReservations()).isEmpty();
+    assertThat(jobs.find(job("TEST_EMAIL").id()).orElseThrow().status()).isEqualTo("PENDING");
   }
 
   @Test

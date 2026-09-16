@@ -18,6 +18,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -180,12 +181,16 @@ public class NotificationJobService {
   }
 
   /**
-   * 외부 예약이 필요한 미등록 작업을 반환한다.
+   * 기한과 시도 상한이 지난 작업을 종료하고 외부 예약이 필요한 미등록 작업을 반환한다.
    *
    * @return 최대 100개 작업
    */
+  @Transactional
   public List<NotificationJob> pendingReservations() {
-    return repository.pendingReservations(clock.instant());
+    Instant now = clock.instant();
+    repository.closeExpiredReservations(
+        now, now.minus(policy.maxLateness()), now.minus(Duration.ofHours(1)));
+    return repository.pendingReservations(now);
   }
 
   /**
@@ -195,7 +200,9 @@ public class NotificationJobService {
    * @return 예약 소유 여부
    */
   public boolean reserve(UUID id) {
-    return repository.reserve(id, clock.instant());
+    Instant now = clock.instant();
+    return repository.reserve(
+        id, now, now.minus(policy.maxLateness()), now.minus(Duration.ofHours(1)));
   }
 
   /**

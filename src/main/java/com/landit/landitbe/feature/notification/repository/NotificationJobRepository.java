@@ -20,7 +20,39 @@ import org.springframework.stereotype.Repository;
 @Repository
 @RequiredArgsConstructor
 public class NotificationJobRepository {
+  private static final int MAX_RESERVATION_ATTEMPTS = 10;
   private final JdbcTemplate jdbc;
+
+  /**
+   * 발송 기한 또는 등록 시도 상한을 넘긴 미등록 작업을 종료한다. 진행 중인 선점은 보존한다.
+   *
+   * @param now 현재 시각
+   * @param trialCutoff 체험 알림의 허용 지연이 지난 예정 시각 경계
+   * @param testCutoff 관리자 테스트의 허용 지연이 지난 예정 시각 경계
+   */
+  public void closeExpiredReservations(Instant now, Instant trialCutoff, Instant testCutoff) {
+    jdbc.update(
+        """
+        UPDATE notification_job SET status = 'SKIPPED', result_code = 'TOO_LATE', updated_at = ?
+        WHERE reservation_state = 'PENDING' AND status = 'PENDING' AND next_attempt_at <= ?
+          AND ((kind = 'TEST_EMAIL' AND scheduled_at <= ?)
+            OR (kind <> 'TEST_EMAIL' AND scheduled_at <= ?))
+        """,
+        time(now),
+        time(now),
+        time(testCutoff),
+        time(trialCutoff));
+    jdbc.update(
+        """
+        UPDATE notification_job SET status = 'FAILED',
+          result_code = 'SCHEDULE_RETRIES_EXHAUSTED', updated_at = ?
+        WHERE reservation_state = 'PENDING' AND status = 'PENDING'
+          AND next_attempt_at <= ? AND reservation_attempts >= ?
+        """,
+        time(now),
+        time(now),
+        MAX_RESERVATION_ATTEMPTS);
+  }
 
   /**
    * 새 발송 의도를 저장한다. 호출자는 사용자 잠금으로 동일 구독 생성 요청을 직렬화한다.
@@ -87,18 +119,27 @@ public class NotificationJobRepository {
    *
    * @param id 작업 ID
    * @param now 현재 시각
+   * @param trialCutoff 체험 알림의 허용 지연이 지난 예정 시각 경계
+   * @param testCutoff 관리자 테스트의 허용 지연이 지난 예정 시각 경계
    * @return 선점 여부
    */
-  public boolean reserve(UUID id, Instant now) {
+  public boolean reserve(UUID id, Instant now, Instant trialCutoff, Instant testCutoff) {
     return jdbc.update(
             """
-            UPDATE notification_job SET next_attempt_at = ?, updated_at = ?
-            WHERE id = ? AND reservation_state = 'PENDING' AND next_attempt_at <= ?
+            UPDATE notification_job SET next_attempt_at = ?, updated_at = ?,
+              reservation_attempts = reservation_attempts + 1
+            WHERE id = ? AND reservation_state = 'PENDING' AND status = 'PENDING'
+              AND next_attempt_at <= ? AND reservation_attempts < ?
+              AND ((kind = 'TEST_EMAIL' AND scheduled_at > ?)
+                OR (kind <> 'TEST_EMAIL' AND scheduled_at > ?))
             """,
             time(now.plusSeconds(60)),
             time(now),
             id,
-            time(now))
+            time(now),
+            MAX_RESERVATION_ATTEMPTS,
+            time(testCutoff),
+            time(trialCutoff))
         == 1;
   }
 
