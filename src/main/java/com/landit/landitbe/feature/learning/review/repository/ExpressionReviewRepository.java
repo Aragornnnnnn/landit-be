@@ -3,9 +3,12 @@
 package com.landit.landitbe.feature.learning.review.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.content.expression.practice.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.learning.review.domain.ExpressionReview;
+import com.landit.landitbe.feature.learning.review.domain.ReviewSubmission;
+import com.landit.landitbe.feature.learning.review.dto.ReviewAnswerRequest;
 import com.landit.landitbe.feature.learning.review.dto.ReviewQuestion;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -211,6 +214,78 @@ public class ExpressionReviewRepository {
         id);
   }
 
+  /**
+   * 이미 처리한 제출을 조회한다.
+   *
+   * @param id 복습 ID
+   * @param submissionId 제출 키
+   * @return 저장한 제출
+   */
+  public Optional<ReviewSubmission> submission(UUID id, UUID submissionId) {
+    return jdbc
+        .query(
+            "select * from expression_review_submission where review_id = ? and submission_id = ?",
+            (rs, row) ->
+                new ReviewSubmission(
+                    rs.getObject("question_id", UUID.class),
+                    readWords(rs.getString("answer_json")),
+                    rs.getBoolean("correct")),
+            id,
+            submissionId)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * 정답이면 완료하고 오답이면 현재 큐의 뒤로 보낸다.
+   *
+   * @param reviewId 복습 ID
+   * @param request 제출 원문
+   * @param correct 서버 판정
+   * @param now 제출 시각
+   */
+  public void answer(
+      UUID reviewId, ReviewAnswerRequest request, boolean correct, LocalDateTime now) {
+    jdbc.update(
+        """
+        insert into expression_review_submission
+        (review_id, submission_id, question_id, answer_json, correct, created_at) values (?, ?, ?, ?, ?, ?)
+        """,
+        reviewId,
+        request.submissionId(),
+        request.questionId(),
+        json(request.words()),
+        correct,
+        now);
+    if (correct) {
+      jdbc.update(
+          "update expression_review_question set completed_at = ? where id = ? and review_id = ?",
+          now,
+          request.questionId(),
+          reviewId);
+    } else {
+      Integer next =
+          jdbc.queryForObject(
+              "select max(queue_order) + 1 from expression_review_question where review_id = ?",
+              Integer.class,
+              reviewId);
+      jdbc.update(
+          "update expression_review_question set wrong_count = wrong_count + 1, queue_order = ?"
+              + " where id = ? and review_id = ?",
+          next,
+          request.questionId(),
+          reviewId);
+    }
+    jdbc.update(
+        """
+        update expression_review set completed_at = ? where id = ? and completed_at is null
+          and not exists (select 1 from expression_review_question where review_id = ? and completed_at is null)
+        """,
+        now,
+        reviewId,
+        reviewId);
+  }
+
   private ExpressionReview review(ResultSet rs, int row) throws SQLException {
     return new ExpressionReview(
         rs.getObject("id", UUID.class),
@@ -240,6 +315,14 @@ public class ExpressionReviewRepository {
       return mapper.readValue(json, WritingSentenceResponse.class);
     } catch (JsonProcessingException exception) {
       throw new IllegalStateException("저장된 복습 문제를 읽을 수 없습니다.", exception);
+    }
+  }
+
+  private List<String> readWords(String json) {
+    try {
+      return mapper.readValue(json, new TypeReference<List<String>>() {});
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("저장된 복습 제출을 읽을 수 없습니다.", exception);
     }
   }
 }
