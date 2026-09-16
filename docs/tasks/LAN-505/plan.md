@@ -98,3 +98,12 @@
 - 운영 ECS API revision 15는 기존 revision 14의 코드 이미지를 유지하며 이메일 환경 변수와 연간 상품 ID SSM 연결만 추가한다. 새 알림 코드·V105/V106 마이그레이션 배포와 자동 체험 알림 종단 검증은 아직 별도다.
 - 상세 적용·검증 이력은 IaC 저장소 `docs/tasks/LAN-505/plan.md`에 기록한다.
 - 운영 설정 반영 완료 후 ECS rollout COMPLETED, desired/running 1/1, pending 0과 ALB healthy, API health UP을 확인했다. 코드 이미지 digest는 기존 운영과 동일하다.
+
+## 선행 PR 통합과 독립 리뷰
+
+- 사용자 요청으로 #196(LAN-504) → #195(LAN-506) → LAN-505 순서의 main 반영을 준비한다. #195가 열려 있는 동안 리뷰 base는 `feat/LAN-506`이며, 선행 PR의 main 병합 후 최신 main으로 정리하고 PR base를 변경한다.
+- #195의 `2d402567` 위로 기존 27개 커밋을 rebase했다. 충돌 없이 완료했고 `git range-diff`에서 모든 커밋의 변경 내용이 동일함을 확인했다. 선행 마이그레이션은 V104까지라 V105/V106과 충돌하지 않는다.
+- 별도 에이전트가 LAN-505 diff와 관련 호출 경로를 독립 리뷰했다. 예약·발송 선점, 중복 방지, 취소·프로모션 제외, 관리자 권한, 마이그레이션에서 확정 신규 결함을 찾지 못했다.
+- 실제 프로모션 웹훅 뒤 premium=true·isTrial=false, 신규 체험 예약 없음, 기존 체험 푸시·이메일 발송 제외를 검증하는 통합 테스트 2개를 추가했다. 앱의 표시용 isTrial과 서버의 발송 판단은 독립적으로 유지한다.
+- 최종 `./gradlew spotlessApply check --no-daemon` 성공: 1,219개 테스트, 실패·오류 0개, 건너뜀 6개. `git diff --check`도 통과했다.
+- 실 PostgreSQL 동시 소비와 EventBridge 자동 발화·기기 푸시 수신 종단 검증은 이번 독립 리뷰·로컬 검사에 포함하지 않는다.
