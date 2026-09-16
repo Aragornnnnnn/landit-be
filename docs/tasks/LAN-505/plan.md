@@ -68,5 +68,5 @@
 - `./gradlew check` 성공: 1,210개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 11개를 포함하며 Spotless·Checkstyle도 통과했다.
 - 새 검증 범위: 웹훅과 예약 저장, 중복 이벤트, 푸시 미동의와 이메일 독립성, 구독 취소, 채널 OFF, 지연 제외, SES 재시도/UNKNOWN, 관리자 인증·주소 검증·멱등 요청, UTC 예약과 큐 payload, SES 발신 설정.
 - 개발 IaC는 별도 `landit-iac-LAN-505` 저장소의 `feat/LAN-505`에 준비했다. SES identity·configuration set·지표·개발 EC2 권한 4개 추가를 적용했고 실제 AWS 설정을 읽어 확인했다.
-- DNS CNAME 등록은 아직 대기 중이며 SES 인증은 PENDING이다. SES 샌드박스 해제 신청과 실제 메일 발송은 하지 않았다.
+- Vercel의 `landit.im` DNS에 SES DKIM CNAME 3개를 등록했다. 권한 DNS와 공용 DNS에서 모두 일치함을 확인했으며, 등록 후 재조회 시 SES 인증은 아직 PENDING이다. SES 샌드박스 해제 신청과 실제 메일 발송은 하지 않았다.
 - BE 개발 배포, 개발 runtime-env/SSM 문서 반영, 실제 팀원 메일함 수신 및 기기 푸시 검증은 아직 하지 않았다. 자동 채널은 기본 OFF로 유지된다.
