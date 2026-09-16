@@ -69,16 +69,15 @@ public class UserSubscriptionService {
             enabled,
             policy.version(),
             policy.newStartsPaused(),
-            !policy.newStartsPaused()
-                && (!enabled || premium || (!completed && reservation == null)),
+            !policy.newStartsPaused(),
             reservation == null ? null : reservation.getSessionId());
   }
 
   /**
-   * 유료 기능 접근 제한에 필요한 사용자의 구독·대화 완료 상태를 평가한다.
+   * 유료 기능 접근 제한에 필요한 사용자의 구독 상태를 평가한다.
    *
    * <p>유료 구독 도입 시점이 설정되지 않았거나 아직 도달하지 않았으면 모든 기능을 허용한다. 요청마다 현재 시각을 비교하므로 서버를 재시작하지 않아도 도입 시점부터 기존
-   * 제한을 적용한다.
+   * 제한을 적용한다. 시나리오 대화는 제한하지 않으므로 대화 완료 여부는 조회하지 않는다.
    *
    * @param userId 평가할 사용자 ID
    * @return 유료 기능 접근 판단 결과
@@ -90,8 +89,7 @@ public class UserSubscriptionService {
     if (!policies.enabledFor(policy, userId)) {
       return PremiumAccess.beforeLaunch();
     }
-    return PremiumAccess.afterLaunch(
-        grants.premium(userId), hasCompletedConversationSinceLaunch(userId, policy));
+    return PremiumAccess.afterLaunch(grants.premium(userId));
   }
 
   /**

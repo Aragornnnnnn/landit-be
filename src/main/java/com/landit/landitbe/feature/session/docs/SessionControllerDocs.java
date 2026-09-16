@@ -43,7 +43,7 @@ public interface SessionControllerDocs {
         description = "인증 실패"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "403",
-        description = "권한 없음 또는 프리미엄 구독 필요 (PREMIUM_REQUIRED)"),
+        description = "권한 없음"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "404",
         description = "세션 없음"),
@@ -95,7 +95,10 @@ public interface SessionControllerDocs {
    */
   @Operation(
       summary = "대화 최종 피드백 생성 및 조회",
-      description = "완료된 세션의 요약 피드백과 메시지별 피드백을 생성하거나 조회한다.",
+      description =
+          "완료된 세션의 요약 피드백과 메시지별 피드백을 생성하거나 조회한다. 유료 도입 후 무료 사용자는 첫 시나리오의 첫 완료 세션만"
+              + " 메시지별 피드백을 받고, 그 외 세션은 messageFeedbacks가 비고 detailFeedbackLocked가 true다. 결제 후 다시"
+              + " 조회하면 전부 내려간다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

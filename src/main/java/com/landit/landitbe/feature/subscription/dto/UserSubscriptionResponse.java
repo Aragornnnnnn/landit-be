@@ -56,8 +56,9 @@ public record UserSubscriptionResponse(
     @Schema(description = "현재 계정에 페이월 표시와 서버 유료 제한을 적용하는지") boolean paymentEnabled,
     @Schema(description = "공개 정책 버전") long paymentPolicyVersion,
     @Schema(description = "배포 전환으로 새 학습 시작만 일시 중지됐는지") boolean newStartsPaused,
-    @Schema(description = "새 시나리오 대화를 시작할 수 있는지") boolean canStartScenario,
-    @Schema(description = "소모한 첫 무료 기회에 연결된 세션. 재개 가능 여부는 세션 조회로 확인한다")
+    @Schema(description = "새 시나리오 대화를 시작할 수 있는지. 시나리오 대화는 구독과 관계없이 허용하므로 배포 전환 중이 아니면 항상 true")
+        boolean canStartScenario,
+    @Schema(description = "유료 도입 후 무료 상태로 처음 시작한 첫 시나리오의 예약 세션. 24시간 내 같은 시나리오 재시작 시 이어간다")
         Long freeScenarioSessionId) {
 
   /**

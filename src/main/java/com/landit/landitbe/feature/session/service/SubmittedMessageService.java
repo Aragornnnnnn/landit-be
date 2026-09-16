@@ -24,8 +24,6 @@ import org.springframework.stereotype.Component;
 @Component
 class SubmittedMessageService {
 
-  private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
-      accessGrants;
   private final com.landit.landitbe.config.ai.AiClientProperties aiProperties;
   private final java.time.Clock clock;
   private final tools.jackson.databind.json.JsonMapper mapper;
@@ -59,8 +57,7 @@ class SubmittedMessageService {
       if (clientMessageId == null
           && pending.getClientMessageId() == null
           && (!pending.getContent().equals(content) || pending.getInputType() != inputType)) {
-        // 구 FE의 재녹음은 종료된 시도만 교체한다. 같은 세션 권한과 유예 기한을 다시 확인한다.
-        accessGrants.requireSessionContinuation(userId, "SCENARIO", sessionId);
+        // 구 FE의 재녹음은 종료된 시도만 교체한다.
         sessionMessageService.deleteIfExists(pending.getId());
         pending = null;
       } else {
@@ -68,7 +65,6 @@ class SubmittedMessageService {
       }
     } else {
       pending = null;
-      accessGrants.requireSessionContinuation(userId, "SCENARIO", sessionId);
     }
     int submittedTurnNumber =
         pending == null ? submittedTurnNumber(previousMessages) : pending.getTurnNumber();

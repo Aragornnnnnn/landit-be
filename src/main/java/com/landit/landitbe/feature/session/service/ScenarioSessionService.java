@@ -47,6 +47,23 @@ public class ScenarioSessionService {
   }
 
   /**
+   * 세션이 사용자가 특정 시각 이후 시작한 해당 시나리오 세션 가운데 처음 완료한 세션인지 확인한다.
+   *
+   * @param userId 사용자 ID
+   * @param scenarioId 시나리오 ID
+   * @param since 이 시각 이상에 시작한 세션만 센다
+   * @param sessionId 확인할 학습 세션 ID
+   * @return 처음 완료한 세션과 ID가 같으면 true
+   */
+  public boolean isFirstCompletedSince(
+      long userId, long scenarioId, LocalDateTime since, long sessionId) {
+    return scenarioSessionRepository
+        .findFirstCompletedSessionIdSince(userId, scenarioId, since)
+        .map(firstId -> firstId == sessionId)
+        .orElse(false);
+  }
+
+  /**
    * 최초 완료 시점의 콘텐츠 기준이다.
    *
    * @param questionLevelGroup 당시 질문 그룹

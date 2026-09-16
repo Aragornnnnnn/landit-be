@@ -32,7 +32,7 @@ public record UserSubscriptionSnapshot(
    * @param userProfile 변환할 사용자 프로필
    * @return 사용자 구독 상태 스냅샷
    */
-  public static UserSubscriptionSnapshot from(UserProfile userProfile) {
+  public static UserSubscriptionSnapshot fromUserProfile(UserProfile userProfile) {
     return new UserSubscriptionSnapshot(
         userProfile.getSubscriptionStatus(),
         userProfile.isPremium(),
