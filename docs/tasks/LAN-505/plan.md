@@ -68,5 +68,6 @@
 - `./gradlew check` 성공: 1,210개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 11개를 포함하며 Spotless·Checkstyle도 통과했다.
 - 새 검증 범위: 웹훅과 예약 저장, 중복 이벤트, 푸시 미동의와 이메일 독립성, 구독 취소, 채널 OFF, 지연 제외, SES 재시도/UNKNOWN, 관리자 인증·주소 검증·멱등 요청, UTC 예약과 큐 payload, SES 발신 설정.
 - 개발 IaC는 별도 `landit-iac-LAN-505` 저장소의 `feat/LAN-505`에 준비했다. SES identity·configuration set·지표·개발 EC2 권한 4개 추가를 적용했고 실제 AWS 설정을 읽어 확인했다.
-- Vercel의 `landit.im` DNS에 SES DKIM CNAME 3개를 등록했다. 권한 DNS와 공용 DNS에서 모두 일치함을 확인했으며, 등록 후 재조회 시 SES 인증은 아직 PENDING이다. SES 샌드박스 해제 신청과 실제 메일 발송은 하지 않았다.
-- BE 개발 배포, 개발 runtime-env/SSM 문서 반영, 실제 팀원 메일함 수신 및 기기 푸시 검증은 아직 하지 않았다. 자동 채널은 기본 OFF로 유지된다.
+- Vercel에 DKIM CNAME 3개를 등록했고 SES 도메인·DKIM 인증 SUCCESS와 발신 가능 상태를 확인했다. SES 샌드박스 해제 신청은 아직 하지 않았다.
+- 인증된 테스트 수신 주소로 SES API를 직접 호출해 테스트 메일 1통을 발송했다. SES 접수에 이어 사용자가 네이버 메일함 수신을 화면과 함께 확인했다. 발신 표시는 `Landit <no-reply@landit.im>`, 제목은 `[Landit] 이메일 발송 테스트`였다.
+- 관리자 API → DB 작업 → SQS → BE 소비자 → SES 경로의 실제 발송, BE 개발 배포와 runtime-env/SSM 문서 반영, 기기 푸시 수신은 아직 검증하지 않았다. 자동 채널은 기본 OFF로 유지된다.
