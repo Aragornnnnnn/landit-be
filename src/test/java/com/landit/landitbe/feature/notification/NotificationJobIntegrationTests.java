@@ -185,6 +185,52 @@ class NotificationJobIntegrationTests {
   }
 
   @Test
+  void promotionalGrantDoesNotScheduleTrialReminders() throws Exception {
+    grantPromotionalSubscription();
+    assertThat(jobs.pendingReservations()).isEmpty();
+  }
+
+  @Test
+  void promotionalGrantExcludesPreviouslyScheduledTrialReminders() throws Exception {
+    jobs.recordTrial(USER_ID, "PRODUCTION");
+    grantPromotionalSubscription();
+    processor.process(job("TRIAL_PUSH").id());
+    processor.process(job("TRIAL_EMAIL").id());
+    assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().resultCode())
+        .isEqualTo("TRIAL_CHANGED");
+    assertThat(jobs.find(job("TRIAL_EMAIL").id()).orElseThrow().resultCode())
+        .isEqualTo("TRIAL_CHANGED");
+    verifyNoInteractions(sender, push);
+  }
+
+  private void grantPromotionalSubscription() throws Exception {
+    String body =
+        """
+        {"api_version":"1.0","event":{"id":"%s","type":"NON_RENEWING_PURCHASE",
+          "app_user_id":"%s","environment":"PRODUCTION","period_type":"PROMOTIONAL",
+          "product_id":"rc_promo_premium_monthly","store":"PROMOTIONAL",
+          "event_timestamp_ms":%d,"expiration_at_ms":%d,"purchased_at_ms":%d}}
+        """
+            .formatted(
+                UUID.randomUUID(),
+                USER_ID,
+                NOW.toEpochMilli(),
+                NOW.plusSeconds(30 * 86400).toEpochMilli(),
+                NOW.toEpochMilli());
+    mvc.perform(
+            post("/webhooks/revenuecat")
+                .header("Authorization", "test-reminder-secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/me/subscription").with(user(new AuthUserPrincipal(USER_ID))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.premium").value(true))
+        .andExpect(jsonPath("$.data.isTrial").value(false))
+        .andExpect(jsonPath("$.data.periodType").value("PROMOTIONAL"));
+  }
+
+  @Test
   void adminCanTestArbitraryRecipientWithIdempotencyAndValidation() throws Exception {
     jobs.updateSettings(USER_ID, new TrialReminderSettings(false, false));
     String key = UUID.randomUUID().toString();
