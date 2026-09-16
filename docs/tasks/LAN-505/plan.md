@@ -68,7 +68,8 @@
 - `./gradlew check` 성공: 1,211개 테스트 중 실패 0개, 건너뜀 6개. 새 테스트 12개를 포함하며 Spotless·Checkstyle도 통과했다.
 - 새 검증 범위: 웹훅과 예약 저장, 중복 이벤트, 푸시 미동의와 이메일 독립성, 구독 취소, 채널 OFF, 지연 제외, SES 재시도/UNKNOWN, 관리자 인증·주소 검증·멱등 요청, UTC 예약과 큐 payload, SES 발신 설정.
 - 개발 IaC는 별도 `landit-iac-LAN-505` 저장소의 `feat/LAN-505`에 준비했다. SES identity·configuration set·지표·개발 EC2 권한 4개 추가를 적용했고 실제 AWS 설정을 읽어 확인했다.
-- Vercel에 DKIM CNAME 3개를 등록했고 SES 도메인·DKIM 인증 SUCCESS와 발신 가능 상태를 확인했다. SES 샌드박스 해제 신청은 아직 하지 않았다.
+- Vercel에 DKIM CNAME 3개를 등록했고 SES 도메인·DKIM 인증 SUCCESS와 발신 가능 상태를 확인했다.
+- 2026-09-16 사용자 요청으로 서울 리전(`ap-northeast-2`) SES 샌드박스 해제를 신청했다. 용도는 TRANSACTIONAL이며 서비스 URL, 무료 체험 종료·결제 예정 안내, 중복 방지, 반송·스팸 신고 suppression 및 CloudWatch 지표, 실제 수신 검증 결과를 제출했다. `get-account` 재조회에서 `Details.ReviewDetails.Status=PENDING`, `ProductionAccessEnabled=false`를 확인했다. 신청 접수 상태이며 승인 전에는 샌드박스 제한이 유지된다. 자동 알림 활성화는 별도다.
 - 인증된 테스트 수신 주소로 SES API를 직접 호출해 테스트 메일 1통을 발송했다. SES 접수에 이어 사용자가 네이버 메일함 수신을 화면과 함께 확인했다. 발신 표시는 `Landit <no-reply@landit.im>`, 제목은 `[Landit] 이메일 발송 테스트`였다.
 - 로컬 서버의 실제 관리자 HTTP API를 호출해 202 접수 → DB 작업 → 전용 AWS SQS → 실제 BE 소비자 → SES ACCEPTED를 확인했다. 외부 발송 모의 객체 없이 로컬 H2 DB와 실제 AWS SQS·SES를 사용했다. 같은 Idempotency-Key로 두 번 호출해 동일 작업 ID와 DB 작업 1건을 확인했다.
 - 사용자가 관리자 API로 발송한 메일의 실제 네이버 메일함 수신 화면을 제공했다. 2026-09-16 20:26 KST 수신 시각, 발신 주소, 제목 및 관리자 테스트 본문을 확인했다. 로컬 관리자 HTTP API부터 실제 메일함 수신까지의 검증을 완료했다.
