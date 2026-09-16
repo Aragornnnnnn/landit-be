@@ -24,7 +24,7 @@ import org.springframework.core.io.ClassPathResource;
 /** 검토본과 SQL의 6,000개 매핑, 토큰 중복 횟수와 기존 응답 호환성을 검증한다. */
 class Lan491KoreanQuizMigrationTests {
 
-  static final String MIGRATION_PATH = "db/postgresql/V106__add_korean_quiz_accepted_answers.sql";
+  static final String MIGRATION_PATH = "db/postgresql/V109__add_korean_quiz_accepted_answers.sql";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   // 검토 JSONL에서 독립적으로 복원한 매핑과 일치함을 확인한 뒤 고정한 UTF-8 체크섬이다.

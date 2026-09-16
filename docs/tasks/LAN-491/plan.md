@@ -9,7 +9,7 @@
 
 ## 마이그레이션.
 
-`src/main/resources/db/postgresql/V106__add_korean_quiz_accepted_answers.sql`이 적용 데이터의 기준이다. 기존 JSONB에 `sentenceTranslateAcceptedAnswers`를 추가하며 테이블 컬럼 변경은 없다.
+`src/main/resources/db/postgresql/V109__add_korean_quiz_accepted_answers.sql`이 적용 데이터의 기준이다. 기존 JSONB에 `sentenceTranslateAcceptedAnswers`를 추가하며 테이블 컬럼 변경은 없다.
 
 Flyway 트랜잭션 안에서 쓰기 잠금을 잡고 대상 ID·소스·예문 수·문장·질문·정답·보기의 정확한 일치를 확인한다. 기존 복수 정답 키가 있거나 원문이 다르면 표현 ID와 예문 번호를 포함한 오류로 중단한다. 적용 후 전체 payload에서 승인된 두 필드 외의 값이 유지되는지도 확인하며, 실패하면 모두 롤백한다. 대상 표현의 `updated_at`은 함께 갱신한다.
 
@@ -33,7 +33,7 @@ Flyway 트랜잭션 안에서 쓰기 잠금을 잡고 대상 ID·소스·예문 
 - 중복 CSV·JSONL·샘플·검토 기록 8개는 PR 파일 목록에서 제외했다. 정리 전 전체 자료는 커밋 `b5f5e6e199813924b474ec301d273b9fc8c515a6`의 `docs/tasks/LAN-491/`에서 복구할 수 있고, 로컬 Downloads의 `LAN-491-review-archive-b5f5e6e1`에도 체크섬과 함께 보관했다.
 - 제거 전에 검토 JSONL과 33개 수정 기록으로 SQL 매핑을 독립적으로 복원해 6,000개 모두 일치함을 확인했다. 테스트는 해당 매핑 문자열의 고정 SHA-256과 데이터 규칙을 검증하며 외부 검토 파일을 읽지 않는다.
 - 매핑 SHA-256: `4863d2d5272b551e7379e3f7efeb9e6e05ac7a06a8cd54d51033e21902edffb6`. 대상은 SQL의 두 `$lan491_data$` 구분자 사이 UTF-8 문자열이며 앞뒤 개행도 포함한다. 검토 없는 데이터 변경에 맞춰 체크섬을 갱신하면 안 된다.
-- V106 전체 파일 SHA-256: `4091549e2f0d5ebee9c17064b7897c1ae86299d2c244f30728c9df0e3390bd73`. 이번 정리에서 SQL과 적용 데이터는 변경하지 않았다.
+- V109 전체 파일 SHA-256: `4091549e2f0d5ebee9c17064b7897c1ae86299d2c244f30728c9df0e3390bd73`. 이번 정리에서 SQL과 적용 데이터는 변경하지 않았다.
 - 데이터 테스트는 6,000개 키·원본 우선·토큰 중복 횟수·정답 중복·보기 구성 가능 여부·33개 오답 제거와 순서 보존·23,392개 정답의 API 전달을 확인한다.
 - PostgreSQL 테스트 12개는 실제 Flyway 적용·재실행 생략·대상 밖 표현 보존과 전후 조건 실패의 전체 롤백을 검증한다. 원본 CSV의 12,000개 실제 예문을 복원한 로컬 DB에서도 적용 후 전체 payload 일치를 확인했다.
 - 정리 후 전용 PostgreSQL을 연결한 `./gradlew spotlessApply check`를 통과했다. 전체 1,237개 중 1,231개 성공, 환경 조건에 따른 6개 생략, 실패·오류 0개이다. 운영 DB 적용·배포·실제 앱 채점과 V1부터의 PostgreSQL 전체 마이그레이션 재생은 수행하지 않았다.
@@ -43,3 +43,10 @@ PostgreSQL 테스트는 전용 로컬 DB(`lan491_test`, 사용자 `lan491_test`,
 ```bash
 LAN491_TEST_POSTGRES_URL='jdbc:postgresql://127.0.0.1:55491/lan491_test?user=lan491_test' ./gradlew check
 ```
+
+## 2026-09-16 hotfix 마이그레이션 번호 예약.
+
+- PR #197의 V105~V107을 위해 선행 알람은 V108, 이 PR의 복수 정답은 V109로 변경했다. SQL 내용과 데이터 체크섬은 보존했다. 기존 PostgreSQL 검증 기록은 번호 변경 전 실행 결과다.
+- 개발·운영 DB의 Flyway 이력은 모두 V104까지 적용된 상태였다. 적용된 마이그레이션과 이력은 수정하지 않았다.
+- #197을 main에 배포한 뒤 develop으로 역병합하여 V105~V107을 포함해야 한다. 이후 #189의 V108, 이 PR의 V109 순으로 적용하며 V108 이상을 먼저 배포하지 않는다.
+- PostgreSQL 테스트의 리소스 경로·격리 스키마 baseline·적용 이력 검증도 V109 기준으로 맞췄다.

@@ -55,7 +55,7 @@ class Lan491KoreanQuizPostgresTests {
     manifest = Lan491KoreanQuizMigrationTests.readManifest();
     insertOriginalPayloads();
     Files.writeString(
-        migrationDirectory.resolve("V106__add_korean_quiz_accepted_answers.sql"),
+        migrationDirectory.resolve("V109__add_korean_quiz_accepted_answers.sql"),
         Lan491KoreanQuizMigrationTests.readSql());
     flyway =
         Flyway.configure()
@@ -64,7 +64,7 @@ class Lan491KoreanQuizPostgresTests {
             .defaultSchema(schema)
             .locations("filesystem:" + migrationDirectory)
             .baselineOnMigrate(true)
-            .baselineVersion("105")
+            .baselineVersion("108")
             .load();
   }
 
@@ -263,7 +263,7 @@ class Lan491KoreanQuizPostgresTests {
     try (var statement = connection.createStatement();
         var rows =
             statement.executeQuery(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '106'")) {
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '109'")) {
       rows.next();
       assertThat(rows.getInt(1)).isZero();
     }
