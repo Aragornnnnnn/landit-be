@@ -20,12 +20,14 @@ public interface SubscriptionControllerDocs {
    * 인증된 사용자의 서버 기준 구독 상태와 페이월 판단 근거를 조회한다.
    *
    * @param principal 인증된 사용자
-   * @return 구독 상태, 프리미엄 적용 여부, 결제 기간 종류, 만료 시각, 도입 이후 대화 완료 여부, 상품 ID, 스토어
+   * @return 구독 상태, 프리미엄 적용 여부, 무료 체험 여부, 결제 기간 종류, 만료 시각, 도입 이후 대화 완료 여부, 상품 ID, 스토어
    */
   @Operation(
       summary = "사용자 구독 상태 조회",
       description =
           "RevenueCat 웹훅으로 갱신된 서버 기준 구독 상태를 조회합니다. premium이 true면 프리미엄 혜택이 적용 중입니다."
+              + " isTrial이 true면 연간 구독의 7일 무료 체험 중이며 expiresAt이 체험 종료 시각입니다. 대시보드에서 부여한"
+              + " 프로모션 권한은 periodType이 PROMOTIONAL이고 isTrial은 false입니다."
               + " 시나리오 대화는 구독과 관계없이 무료이고, 무료 사용자의 상세 피드백 잠금은 피드백 응답의"
               + " detailFeedbackLocked로 판단합니다. productId와 store는 프리미엄이 켜져 있을 때만 값이 있습니다.",
       security = @SecurityRequirement(name = "bearerAuth"))

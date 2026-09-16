@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.subscription.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.landit.landitbe.feature.profile.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.domain.SubscriptionStore;
@@ -14,6 +15,8 @@ import java.time.LocalDateTime;
  *
  * @param subscriptionStatus 구독 상태
  * @param premium 프리미엄 혜택 적용 여부
+ * @param isTrial 연간 구독의 무료 체험 중이면 {@code true}. periodType이 TRIAL일 때만 참이고, 프리미엄이 꺼져 있으면 항상 {@code
+ *     false}
  * @param periodType 현재 결제 기간 종류. 무료 체험 중이면 TRIAL. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
@@ -29,6 +32,13 @@ public record UserSubscriptionResponse(
             example = "ACTIVE")
         SubscriptionStatus subscriptionStatus,
     @Schema(description = "프리미엄 혜택 적용 여부", example = "true") boolean premium,
+    @JsonProperty("isTrial")
+        @Schema(
+            description =
+                "무료 체험 중이면 true. periodType이 TRIAL일 때만 true이고 프리미엄이 꺼져 있으면 false. 체험 종료 시각은"
+                    + " expiresAt이며, 체험이 끝나면 스토어가 연간 요금을 결제한다. 대시보드 프로모션 권한(PROMOTIONAL)은 false",
+            example = "true")
+        boolean isTrial,
     @Schema(
             description =
                 "현재 결제 기간 종류. TRIAL(무료 체험), INTRO(할인 도입가), NORMAL(정가), PROMOTIONAL(프로모션 무료),"
@@ -73,6 +83,7 @@ public record UserSubscriptionResponse(
     return new UserSubscriptionResponse(
         snapshot.subscriptionStatus(),
         snapshot.premium(),
+        snapshot.periodType() == SubscriptionPeriodType.TRIAL,
         snapshot.periodType(),
         snapshot.expiresAt(),
         conversationCompletedSinceLaunch,
@@ -96,6 +107,7 @@ public record UserSubscriptionResponse(
     return new UserSubscriptionResponse(
         !effectivePremium && premium ? SubscriptionStatus.EXPIRED : subscriptionStatus,
         effectivePremium,
+        effectivePremium && isTrial,
         effectivePremium ? periodType : null,
         effectivePremium ? expiresAt : null,
         conversationCompletedSinceLaunch,
