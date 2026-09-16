@@ -229,6 +229,58 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.start(user.id(), offer(user).reviewId()).questions()).hasSize(1);
   }
 
+  @Test
+  void usesActualLaunchTimeForSendingAndStartingButPreservesStartedSession() throws Exception {
+    User started = user(1);
+    UUID startedId = offer(started).reviewId();
+    reviews.start(started.id(), startedId);
+    User unopened = user(1);
+    final UUID unopenedId = offer(unopened).reviewId();
+    now = LAUNCH;
+    User unpaid = user(1);
+    assertThat(reviews.offer(unpaid.id(), date())).isEmpty();
+    assertThat(reviews.offer(unopened.id(), date())).isEmpty();
+    mvc.perform(
+            post("/api/v1/reviews/{id}/start", unopenedId)
+                .header("Authorization", "Bearer " + unopened.token()))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+    assertThat(reviews.start(started.id(), startedId).status()).isEqualTo("IN_PROGRESS");
+    for (String status : List.of("ACTIVE", "CANCELED")) {
+      User paid = user(1);
+      subscribe(paid, status, local().plusDays(1));
+      assertThat(reviews.offer(paid.id(), date())).isPresent();
+    }
+    User expired = user(1);
+    subscribe(expired, "ACTIVE", local());
+    assertThat(reviews.offer(expired.id(), date())).isEmpty();
+    subscribe(expired, "EXPIRED", local().plusDays(1));
+    assertThat(reviews.offer(expired.id(), date())).isEmpty();
+    now = LAUNCH.minusSeconds(60).plusSeconds(86400);
+    mvc.perform(
+            post("/api/v1/reviews/{id}/start", startedId)
+                .header("Authorization", "Bearer " + started.token()))
+        .andExpect(status().isGone())
+        .andExpect(jsonPath("$.error.code").value("REVIEW_EXPIRED"));
+    assertThat(reviews.get(started.id(), startedId).questions()).isEmpty();
+  }
+
+  @Test
+  void respectsOfferIntervalAndSevenDayStartDeadline() throws Exception {
+    User user = user(1);
+    final UUID first = offer(user).reviewId();
+    subscribe(user, "ACTIVE", local().plusDays(30));
+    now = now.plusSeconds(3 * 86400 - 1);
+    assertThat(reviews.offer(user.id(), date())).isEmpty();
+    now = now.plusSeconds(1);
+    assertThat(offer(user).reviewId()).isNotEqualTo(first);
+    now = LAUNCH.minusSeconds(60).plusSeconds(7 * 86400);
+    assertThatThrownBy(() -> reviews.start(user.id(), first))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("유효기간");
+    assertThat(reviews.get(user.id(), first).status()).isEqualTo("EXPIRED");
+  }
+
   private SendPushNotificationCommand command(User user, String suffix, NotificationType type) {
     return new SendPushNotificationCommand(
         user.id() + ":" + suffix, user.id(), type, "title", "body", "/scenario");
