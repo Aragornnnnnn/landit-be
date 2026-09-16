@@ -178,10 +178,24 @@ public class ExpressionReviewService {
 
   // 기존 콘텐츠의 복수 정답 계약을 유지하며 최대 세 표현을 고정한다.
   private List<ReviewQuestion> selectQuestions(long userId, LocalDateTime cutoff) {
-    List<Long> candidates = new ArrayList<>(repository.candidateExpressions(userId, cutoff));
-    Collections.shuffle(candidates);
     List<Long> ids = new ArrayList<>();
     List<ExpressionPracticeResponse> content = new ArrayList<>();
+    int offset = 0;
+    while (ids.size() < 3) {
+      List<Long> candidates =
+          new ArrayList<>(repository.candidateExpressions(userId, cutoff, offset));
+      if (candidates.isEmpty()) {
+        break;
+      }
+      offset += candidates.size();
+      Collections.shuffle(candidates);
+      selectValidCandidates(candidates, ids, content);
+    }
+    return assembleQuestions(ids, content);
+  }
+
+  private void selectValidCandidates(
+      List<Long> candidates, List<Long> ids, List<ExpressionPracticeResponse> content) {
     for (Long id : candidates) {
       try {
         content.add(practice.getReviewPracticeExamples(id));
@@ -195,7 +209,6 @@ public class ExpressionReviewService {
         break;
       }
     }
-    return assembleQuestions(ids, content);
   }
 
   private List<ReviewQuestion> assembleQuestions(

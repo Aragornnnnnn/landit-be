@@ -41,6 +41,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -130,6 +132,35 @@ class ExpressionReviewIntegrationTests {
     assertThat(frequency.reserveAll(List.of(review))).isEmpty();
     now = now.plusSeconds(1);
     assertThat(frequency.reserveAll(List.of(review))).containsExactly(review);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"30, 0", "30, 1", "30, 3", "29, 3"})
+  void continuesPastInvalidCandidatesUntilThreeValidQuestionsOrExhaustion(
+      int invalidCount, int validCount) throws Exception {
+    User user = user(invalidCount + validCount);
+    for (long expressionId : user.expressions().subList(0, invalidCount)) {
+      jdbcTemplate.update(
+          "update writing_expression set practice_examples_payload = '[]' format json where id = ?",
+          expressionId);
+    }
+    var offered = reviews.offer(user.id(), date());
+    if (validCount == 0) {
+      assertThat(offered).isEmpty();
+      assertThat(countReviews(user)).isZero();
+      return;
+    }
+    assertThat(offered).isPresent();
+    var questions = reviews.start(user.id(), offered.orElseThrow().reviewId()).questions();
+    assertThat(questions)
+        .extracting(ReviewQuestion::expressionId)
+        .containsExactlyInAnyOrderElementsOf(
+            user.expressions().subList(invalidCount, invalidCount + validCount));
+    if (validCount == 3) {
+      assertThat(questions)
+          .extracting(question -> question.quiz().quizLanguage())
+          .containsExactlyInAnyOrder(Locale.EN, Locale.EN, Locale.KR);
+    }
   }
 
   @Test

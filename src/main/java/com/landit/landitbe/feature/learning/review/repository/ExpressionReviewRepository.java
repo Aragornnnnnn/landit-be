@@ -53,9 +53,10 @@ public class ExpressionReviewRepository {
    *
    * @param userId 소유 사용자
    * @param cutoff 최근 제외 기간 경계
+   * @param offset 이미 확인한 후보 수
    * @return 오래된 순서의 최대 30개 표현 ID
    */
-  public List<Long> candidateExpressions(long userId, LocalDateTime cutoff) {
+  public List<Long> candidateExpressions(long userId, LocalDateTime cutoff, int offset) {
     return jdbc.query(
         """
         select c.writing_expression_id
@@ -77,14 +78,15 @@ public class ExpressionReviewRepository {
         order by max(case when h.last_reviewed > c.last_completed_at
                           then h.last_reviewed else c.last_completed_at end),
                  c.writing_expression_id
-        limit 30
+        limit 30 offset ?
         """,
         (rs, row) -> rs.getLong(1),
         userId,
         userId,
         cutoff,
         cutoff,
-        cutoff);
+        cutoff,
+        offset);
   }
 
   /**
