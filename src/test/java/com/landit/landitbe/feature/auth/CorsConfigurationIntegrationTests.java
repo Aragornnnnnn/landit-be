@@ -43,4 +43,23 @@ class CorsConfigurationIntegrationTests {
             header()
                 .string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")));
   }
+
+  @Test
+  void adminEmailPreflightAllowsIdempotencyKeyFromConfiguredWebOrigin() throws Exception {
+    mockMvc
+        .perform(
+            options("/api/v1/admin/notifications/email-tests")
+                .header(HttpHeaders.ORIGIN, "https://web.landit.im")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                .header(
+                    HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                    "Authorization, Content-Type, Idempotency-Key"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://web.landit.im"))
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Idempotency-Key")));
+  }
 }
