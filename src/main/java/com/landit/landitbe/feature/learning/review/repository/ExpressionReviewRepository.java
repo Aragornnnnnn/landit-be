@@ -2,8 +2,14 @@
 
 package com.landit.landitbe.feature.learning.review.repository;
 
+import com.landit.landitbe.feature.learning.review.domain.ExpressionReview;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -71,5 +77,73 @@ public class ExpressionReviewRepository {
         cutoff,
         cutoff,
         cutoff);
+  }
+
+  /**
+   * 같은 날 생성한 복습을 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @param date 배치 날짜
+   * @return 기존 복습
+   */
+  public Optional<ExpressionReview> findScheduled(long userId, LocalDate date) {
+    return jdbc
+        .query(
+            "select * from expression_review where user_profile_id = ? and scheduled_date = ?",
+            this::review,
+            userId,
+            date)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * 소유자에 묶인 복습을 조회한다. 쓰기는 호출자가 사용자 잠금 후 수행한다.
+   *
+   * @param userId 사용자 ID
+   * @param id 복습 ID
+   * @return 소유한 복습
+   */
+  public Optional<ExpressionReview> findOwned(long userId, UUID id) {
+    return jdbc
+        .query(
+            "select * from expression_review where user_profile_id = ? and id = ?",
+            this::review,
+            userId,
+            id)
+        .stream()
+        .findFirst();
+  }
+
+  /**
+   * 최근 알림 생성이 있어 간격을 지켜야 하는지 확인한다.
+   *
+   * @param userId 사용자 ID
+   * @param cutoff 간격 경계
+   * @return 최근 복습이 있으면 true
+   */
+  public boolean recentlyOffered(long userId, LocalDateTime cutoff) {
+    return jdbc.queryForObject(
+            "select count(*) from expression_review where user_profile_id = ? and created_at > ?",
+            Long.class,
+            userId,
+            cutoff)
+        > 0;
+  }
+
+  private ExpressionReview review(ResultSet rs, int row) throws SQLException {
+    return new ExpressionReview(
+        rs.getObject("id", UUID.class),
+        rs.getLong("user_profile_id"),
+        rs.getObject("scheduled_date", LocalDate.class),
+        time(rs, "created_at"),
+        time(rs, "available_until"),
+        time(rs, "started_at"),
+        time(rs, "expires_at"),
+        time(rs, "completed_at"));
+  }
+
+  private LocalDateTime time(ResultSet rs, String name) throws SQLException {
+    return rs.getObject(name, LocalDateTime.class);
   }
 }
