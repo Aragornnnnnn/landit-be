@@ -4,6 +4,9 @@ package com.landit.landitbe.feature.learning.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -17,8 +20,11 @@ import com.landit.landitbe.feature.learning.review.dto.ReviewQuestion;
 import com.landit.landitbe.feature.learning.review.dto.ReviewResponse;
 import com.landit.landitbe.feature.learning.review.service.ExpressionReviewService;
 import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.scheduled.service.LearningNotificationFrequencyService;
+import com.landit.landitbe.feature.notification.scheduled.service.ReviewNotificationService;
+import com.landit.landitbe.feature.notification.token.service.UserPushTokenDeliveryService;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.support.ExpressionPracticeFixture;
@@ -29,11 +35,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -303,6 +311,63 @@ class ExpressionReviewIntegrationTests {
       }
       assertThat(reviews.get(user.id(), id).questions().getFirst().wrongCount()).isEqualTo(1);
     }
+  }
+
+  @Test
+  void reservesSeparateLearningSlotsAtExactGapAndNeverCountsDevicesTwice() throws Exception {
+    User user = user(0);
+    var daily = command(user, "daily", NotificationType.DAILY_SCENARIO_REMINDER);
+    final var review = command(user, "review", NotificationType.EXPRESSION_REVIEW);
+    assertThat(frequency.reserveAll(List.of(daily))).containsExactly(daily);
+    assertThat(frequency.reserveAll(List.of(daily))).containsExactly(daily);
+    now = now.plusSeconds(3 * 3600 - 1);
+    assertThat(frequency.reserveAll(List.of(review))).isEmpty();
+    now = now.plusSeconds(1);
+    assertThat(frequency.reserveAll(List.of(review))).containsExactly(review);
+    assertThat(frequency.reserveAll(List.of(daily))).isEmpty();
+    assertThat(frequency.reserveAll(List.of(review))).containsExactly(review);
+    now = now.plusSeconds(3 * 3600);
+    assertThat(
+            frequency.reserveAll(
+                List.of(command(user, "third", NotificationType.EXPRESSION_REVIEW))))
+        .isEmpty();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from learning_notification_slot where user_profile_id = ?",
+                Long.class,
+                user.id()))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void rollsBackOfferWhenDailyPushBlocksItAndReusesEventOnDispatchRetry() throws Exception {
+    User user = user(3);
+    var tokens = mock(UserPushTokenDeliveryService.class);
+    when(tokens.findSendableTokenIdsByUserProfileIds(any()))
+        .thenReturn(Map.of(user.id(), List.of(1L)));
+    var dispatch = mock(NotificationDispatchService.class);
+    var batch =
+        new ReviewNotificationService(
+            reviews, frequency, tokens, dispatch, clock, transactionManager);
+    frequency.reserveAll(
+        List.of(command(user, "first-daily", NotificationType.DAILY_SCENARIO_REMINDER)));
+    batch.process("batch", now, () -> {});
+    assertThat(countReviews(user)).isZero();
+    now = now.plusSeconds(3 * 3600);
+    subscribe(user, "ACTIVE", local().plusDays(1));
+    batch.process("batch", now, () -> {});
+    final UUID id = offer(user).reviewId();
+    batch.process("retry-message", now, () -> {});
+    assertThat(countReviews(user)).isEqualTo(1);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<SendPushNotificationCommand>> captor = ArgumentCaptor.forClass(List.class);
+    verify(dispatch, org.mockito.Mockito.atLeast(3)).sendAll(captor.capture());
+    var delivered = captor.getAllValues().stream().flatMap(List::stream).toList();
+    assertThat(delivered).hasSize(2);
+    assertThat(delivered.getFirst()).isEqualTo(delivered.getLast());
+    assertThat(delivered.getFirst().deepLink()).contains("/reviews/" + id);
+    assertThat(delivered.getFirst().notificationType())
+        .isEqualTo(NotificationType.EXPRESSION_REVIEW);
   }
 
   private SendPushNotificationCommand command(User user, String suffix, NotificationType type) {
