@@ -7,7 +7,7 @@
 - 푸시 동의와 이메일 발송을 분리하며, 두 채널은 운영자가 독립적으로 켜고 끈다. 기본값은 ON이다.
 - 발송 직전 구독 상태, 만료 시각, 사용자 상태와 채널 설정을 재확인한다.
 - 개발 서버에는 수신자 허용 목록을 두지 않는다. 관리자 전용 임의 수신 주소 테스트 기능을 제공한다.
-- 개발 SES와 서버 권한·설정을 준비한다. 운영 환경 활성화와 운영 사용자 발송은 범위에 포함하지 않는다.
+- 개발 SES와 서버 권한·설정을 준비한다. 후속 사용자 요청으로 운영 인프라와 상품 설정도 반영한다. 새 BE 코드의 운영 배포는 별도다.
 
 ## 구현 결정
 
@@ -24,7 +24,7 @@
 ## 확인 및 진행
 
 - 기존 웹훅에 TRIAL·상품·만료 시각이 저장되고, EventBridge/SQS/Expo 기반이 존재한다.
-- 서울 리전 SES는 샌드박스이며 운영 발송 승인은 아직 없다. 현재 한도는 하루 200통, 초당 1통이다.
+- 서울 리전 SES 샌드박스 해제가 승인됐다. ProductionAccessEnabled=true, 심사 상태 GRANTED이며 한도는 24시간당 50,000통, 초당 14통이다.
 - 구현 및 로컬 검증과 SES 기반 적용을 완료했다. 상세 결과와 남은 단계는 아래에 기록한다.
 
 ## 관리자 API와 사용 방법
@@ -69,7 +69,7 @@
 - 새 검증 범위: 웹훅과 예약 저장, 중복 이벤트, 푸시 미동의와 이메일 독립성, 구독 취소, 채널 OFF, 지연 제외, SES 재시도/UNKNOWN, 관리자 인증·주소 검증·멱등 요청, UTC 예약과 큐 payload, SES 발신 설정.
 - 개발 IaC는 별도 `landit-iac-LAN-505` 저장소의 `feat/LAN-505`에 준비했다. SES identity·configuration set·지표·개발 EC2 권한 4개 추가를 적용했고 실제 AWS 설정을 읽어 확인했다.
 - Vercel에 DKIM CNAME 3개를 등록했고 SES 도메인·DKIM 인증 SUCCESS와 발신 가능 상태를 확인했다.
-- 2026-09-16 사용자 요청으로 서울 리전(`ap-northeast-2`) SES 샌드박스 해제를 신청했다. 용도는 TRANSACTIONAL이며 서비스 URL, 무료 체험 종료·결제 예정 안내, 중복 방지, 반송·스팸 신고 suppression 및 CloudWatch 지표, 실제 수신 검증 결과를 제출했다. `get-account` 재조회에서 `Details.ReviewDetails.Status=PENDING`, `ProductionAccessEnabled=false`를 확인했다. 신청 접수 상태이며 승인 전에는 샌드박스 제한이 유지된다. 자동 알림 활성화는 별도다.
+- 2026-09-16 사용자 요청으로 서울 리전(`ap-northeast-2`) SES 샌드박스 해제를 신청했다. 용도는 TRANSACTIONAL이며 서비스 URL, 무료 체험 종료·결제 예정 안내, 중복 방지, 반송·스팸 신고 suppression 및 CloudWatch 지표, 실제 수신 검증 결과를 제출했다. `get-account` 재조회에서 `Details.ReviewDetails.Status=PENDING`, `ProductionAccessEnabled=false`를 확인했다. 당시 신청 접수 상태를 기록한 것이며, 후속 조회에서 GRANTED와 ProductionAccessEnabled=true를 확인했다.
 - 인증된 테스트 수신 주소로 SES API를 직접 호출해 테스트 메일 1통을 발송했다. SES 접수에 이어 사용자가 네이버 메일함 수신을 화면과 함께 확인했다. 발신 표시는 `Landit <no-reply@landit.im>`, 제목은 `[Landit] 이메일 발송 테스트`였다.
 - 로컬 서버의 실제 관리자 HTTP API를 호출해 202 접수 → DB 작업 → 전용 AWS SQS → 실제 BE 소비자 → SES ACCEPTED를 확인했다. 외부 발송 모의 객체 없이 로컬 H2 DB와 실제 AWS SQS·SES를 사용했다. 같은 Idempotency-Key로 두 번 호출해 동일 작업 ID와 DB 작업 1건을 확인했다.
 - 사용자가 관리자 API로 발송한 메일의 실제 네이버 메일함 수신 화면을 제공했다. 2026-09-16 20:26 KST 수신 시각, 발신 주소, 제목 및 관리자 테스트 본문을 확인했다. 로컬 관리자 HTTP API부터 실제 메일함 수신까지의 검증을 완료했다.
@@ -90,3 +90,11 @@
 - 기존 V105의 체크섬을 유지하고 V106에서 기본값을 변경한다. 관리자 API 변경 이력이 없는 초기 설정만 ON으로 전환하며, 관리자가 저장한 채널 설정은 보존한다.
 - 새 환경은 마이그레이션 후 두 채널이 ON이므로 소비자·상품·발송 설정이 준비되면 자동 체험 알림이 동작한다. 이번 작업에서는 실제 DB 적용이나 배포를 수행하지 않는다.
 - `./gradlew spotlessApply check --no-daemon` 성공: 1,215개 테스트, 실패·오류 0개, 건너뜀 6개. 마이그레이션 후 초기 설정과 컬럼 기본값이 모두 true인 것을 검증했다.
+
+## 운영 인프라와 실제 상품 ID
+
+- RevenueCat에서 확인한 연간 상품은 iOS `com.saynow.app.premium.yearly`, Android `com.saynow.app.premium.yearly:yearly`다. 이 목록을 개발·운영 SSM `LANDIT_TRIAL_REMINDER_ANNUAL_PRODUCT_IDS`에 등록했다. 월간 상품과 Test Store 상품은 포함하지 않는다.
+- 운영 SES configuration set `prod-landit-transactional`, 반송·신고 suppression과 이벤트 지표, API task의 SES·알림 Scheduler 권한을 적용했다.
+- 운영 ECS API revision 15는 기존 revision 14의 코드 이미지를 유지하며 이메일 환경 변수와 연간 상품 ID SSM 연결만 추가한다. 새 알림 코드·V105/V106 마이그레이션 배포와 자동 체험 알림 종단 검증은 아직 별도다.
+- 상세 적용·검증 이력은 IaC 저장소 `docs/tasks/LAN-505/plan.md`에 기록한다.
+- 운영 설정 반영 완료 후 ECS rollout COMPLETED, desired/running 1/1, pending 0과 ALB healthy, API health UP을 확인했다. 코드 이미지 digest는 기존 운영과 동일하다.
