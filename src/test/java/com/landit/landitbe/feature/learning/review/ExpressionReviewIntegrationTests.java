@@ -192,6 +192,43 @@ class ExpressionReviewIntegrationTests {
     assertThat(countReviews(invalid)).isZero();
   }
 
+  @Test
+  void excludesRecentInactiveOtherLanguageAndNeverCompletedExpressions() throws Exception {
+    User user = user(3);
+    jdbcTemplate.update(
+        "update user_writing_expression_completion set last_completed_at = ?"
+            + " where user_profile_id = ? and writing_expression_id = ?",
+        local(),
+        user.id(),
+        user.expressions().get(0));
+    jdbcTemplate.update(
+        "update writing_expression set status = 'INACTIVE' where id = ?",
+        user.expressions().get(1));
+    jdbcTemplate.update(
+        "update writing_expression set base_locale = 'EN' where id = ?", user.expressions().get(2));
+    seedExpressionWithPracticeExamples("ACTIVE", practiceExamplesPayloadJson());
+    assertThat(reviews.offer(user.id(), date())).isEmpty();
+  }
+
+  @Test
+  void excludesExpressionCompletedRecentlyThroughAnotherLearningSource() throws Exception {
+    User user = user(1);
+    jdbcTemplate.update(
+        """
+        insert into user_writing_expression_completion
+        (user_profile_id, writing_expression_id, learning_source, completed_at, last_completed_at)
+        values (?, ?, 'FREE_TALK', ?, ?)
+        """,
+        user.id(),
+        user.expressions().getFirst(),
+        local(),
+        local());
+    assertThat(reviews.offer(user.id(), date())).isEmpty();
+    subscribe(user, "ACTIVE", local().plusDays(30));
+    now = now.plusSeconds(3 * 86400);
+    assertThat(reviews.start(user.id(), offer(user).reviewId()).questions()).hasSize(1);
+  }
+
   private SendPushNotificationCommand command(User user, String suffix, NotificationType type) {
     return new SendPushNotificationCommand(
         user.id() + ":" + suffix, user.id(), type, "title", "body", "/scenario");
