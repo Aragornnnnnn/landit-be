@@ -40,6 +40,25 @@ class PushQueueMessageHandlerTest {
   @Mock private NotificationDispatchService notificationDispatchService;
 
   @Mock
+  private com.landit.landitbe.feature.notification.scheduled.service.ReviewNotificationService
+      reviewNotificationService;
+
+  @Test
+  void routesReviewBatchWithVisibilityExtension() {
+    Instant occurredAt = Instant.parse("2026-09-16T06:00:00Z");
+    Runnable extender = () -> {};
+    pushQueueMessageHandler.handle(
+        new PushQueueMessage(
+            1,
+            "review-batch",
+            PushQueueMessage.REVIEW_NOTIFICATION_BATCH,
+            occurredAt,
+            new PushQueuePayload(null, null)),
+        extender);
+    verify(reviewNotificationService).process("review-batch", occurredAt, extender);
+  }
+
+  @Mock
   private com.landit.landitbe.feature.notification.campaign.service.AdminPushProcessingService
       adminPushProcessingService;
 
