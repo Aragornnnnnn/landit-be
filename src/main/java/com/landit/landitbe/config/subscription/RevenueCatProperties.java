@@ -2,12 +2,14 @@
 
 package com.landit.landitbe.config.subscription;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * RevenueCat 웹훅 수신에 필요한 설정을 바인딩한다.
  *
  * @param webhookAuthorization RevenueCat 대시보드에 등록한 Authorization 헤더 값. 비어 있으면 모든 웹훅을 거절한다.
+ * @param applySandboxEvents SANDBOX 이벤트를 구독 상태에 반영할지. 설정하지 않으면 반영한다
  */
 @ConfigurationProperties(prefix = "landit.subscription.revenuecat")
 public record RevenueCatProperties(String webhookAuthorization, Boolean applySandboxEvents) {
@@ -21,7 +23,7 @@ public record RevenueCatProperties(String webhookAuthorization, Boolean applySan
   @org.springframework.boot.context.properties.bind.ConstructorBinding
   public RevenueCatProperties {
     applySandboxEvents = applySandboxEvents == null || applySandboxEvents;
-    webhookAuthorization = webhookAuthorization == null ? "" : webhookAuthorization.trim();
+    webhookAuthorization = StringUtils.trimToEmpty(webhookAuthorization);
   }
 
   /**
@@ -30,6 +32,6 @@ public record RevenueCatProperties(String webhookAuthorization, Boolean applySan
    * @return 값이 비어 있지 않으면 {@code true}
    */
   public boolean hasWebhookAuthorization() {
-    return !webhookAuthorization.isBlank();
+    return StringUtils.isNotBlank(webhookAuthorization);
   }
 }
