@@ -6,6 +6,8 @@ import com.landit.landitbe.config.learning.ReviewProperties;
 import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.expression.practice.service.ExpressionPracticeService;
 import com.landit.landitbe.feature.learning.review.domain.ExpressionReview;
+import com.landit.landitbe.feature.learning.review.dto.ReviewAnswerRequest;
+import com.landit.landitbe.feature.learning.review.dto.ReviewAnswerResponse;
 import com.landit.landitbe.feature.learning.review.dto.ReviewOffer;
 import com.landit.landitbe.feature.learning.review.dto.ReviewQuestion;
 import com.landit.landitbe.feature.learning.review.dto.ReviewResponse;
@@ -136,6 +138,42 @@ public class ExpressionReviewService {
       access.requirePremiumStart(userId);
     }
     return response(review);
+  }
+
+  /**
+   * 큐의 첫 미완료 문제를 채점하고 마지막 정답에서 복습을 자동 완료한다.
+   *
+   * @param userId 로그인 사용자
+   * @param id 복습 ID
+   * @param request 제출 키와 답안
+   * @return 서버 판정과 최신 복습 상태
+   * @throws ApiException 만료·시작 전·다른 문제 순서·멱등 키 내용 충돌일 때
+   */
+  @Transactional
+  public ReviewAnswerResponse answer(long userId, UUID id, ReviewAnswerRequest request) {
+    profiles.requireActiveForUpdate(userId);
+    ExpressionReview review = owned(userId, id);
+    var previous = repository.submission(id, request.submissionId());
+    if (previous.isPresent()) {
+      var saved = previous.get();
+      if (!saved.questionId().equals(request.questionId())
+          || !saved.words().equals(request.words())) {
+        throw new ApiException(ErrorCode.CONFLICT, "같은 제출 키의 내용이 다릅니다.");
+      }
+      return new ReviewAnswerResponse(saved.correct(), response(review));
+    }
+    requireUnexpired(review);
+    if (review.startedAt() == null) {
+      throw new ApiException(ReviewErrorCode.REVIEW_NOT_STARTED);
+    }
+    List<ReviewQuestion> questions = repository.questions(id);
+    ReviewQuestion question =
+        current(questions)
+            .filter(value -> value.questionId().equals(request.questionId()))
+            .orElseThrow(() -> new ApiException(ErrorCode.CONFLICT, "현재 풀 문제와 다릅니다."));
+    boolean correct = question.quiz().writingSentenceAcceptedAnswers().contains(request.words());
+    repository.answer(id, request, correct, LocalDateTime.now(clock));
+    return new ReviewAnswerResponse(correct, response(owned(userId, id)));
   }
 
   // 기존 콘텐츠의 복수 정답 계약을 유지하며 최대 세 표현을 고정한다.
