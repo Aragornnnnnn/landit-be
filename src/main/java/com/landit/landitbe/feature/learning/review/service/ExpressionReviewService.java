@@ -8,6 +8,8 @@ import com.landit.landitbe.feature.content.expression.practice.service.Expressio
 import com.landit.landitbe.feature.learning.review.domain.ExpressionReview;
 import com.landit.landitbe.feature.learning.review.dto.ReviewOffer;
 import com.landit.landitbe.feature.learning.review.dto.ReviewQuestion;
+import com.landit.landitbe.feature.learning.review.dto.ReviewResponse;
+import com.landit.landitbe.feature.learning.review.exception.ReviewErrorCode;
 import com.landit.landitbe.feature.learning.review.repository.ExpressionReviewRepository;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
@@ -19,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,6 +98,46 @@ public class ExpressionReviewService {
     return Optional.of(new ReviewOffer(review.id(), userId, questions.size()));
   }
 
+  /**
+   * 복습의 최초 시작 권한을 확인하고 시작 시간을 한 번만 기록한다.
+   *
+   * @param userId 로그인 사용자
+   * @param id 푸시로 전달된 복습 ID
+   * @return 같은 문제와 현재 진행 상태
+   * @throws ApiException 복습을 소유하지 않거나 만료됐을 때
+   */
+  @Transactional
+  public ReviewResponse start(long userId, UUID id) {
+    profiles.requireActiveForUpdate(userId);
+    ExpressionReview review = owned(userId, id);
+    requireUnexpired(review);
+    if (review.startedAt() == null) {
+      access.requirePremiumStart(userId);
+      LocalDateTime now = LocalDateTime.now(clock);
+      repository.start(id, now, now.plusHours(properties.sessionHours()));
+      review = owned(userId, id);
+    }
+    return response(review);
+  }
+
+  /**
+   * 시작 전에는 메타데이터만, 시작 후에는 고정 문제와 진행을 조회한다.
+   *
+   * @param userId 로그인 사용자
+   * @param id 복습 ID
+   * @return 복습 상태. 만료되면 EXPIRED와 빈 문제 목록
+   * @throws ApiException 소유한 복습이 없을 때
+   */
+  @Transactional(readOnly = true)
+  public ReviewResponse get(long userId, UUID id) {
+    profiles.requireActive(userId);
+    ExpressionReview review = owned(userId, id);
+    if (review.status(LocalDateTime.now(clock)).equals("READY")) {
+      access.requirePremiumStart(userId);
+    }
+    return response(review);
+  }
+
   // 기존 콘텐츠의 복수 정답 계약을 유지하며 최대 세 표현을 고정한다.
   private List<ReviewQuestion> selectQuestions(long userId, LocalDateTime cutoff) {
     List<Long> candidates = new ArrayList<>(repository.candidateExpressions(userId, cutoff));
@@ -144,5 +187,39 @@ public class ExpressionReviewService {
               null));
     }
     return List.copyOf(questions);
+  }
+
+  private ExpressionReview owned(long userId, UUID id) {
+    return repository
+        .findOwned(userId, id)
+        .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+  }
+
+  private void requireUnexpired(ExpressionReview review) {
+    if (review.status(LocalDateTime.now(clock)).equals("EXPIRED")) {
+      throw new ApiException(ReviewErrorCode.REVIEW_EXPIRED);
+    }
+  }
+
+  private ReviewResponse response(ExpressionReview review) {
+    String status = review.status(LocalDateTime.now(clock));
+    List<ReviewQuestion> questions =
+        status.equals("READY") || status.equals("EXPIRED")
+            ? List.of()
+            : repository.questions(review.id());
+    return new ReviewResponse(
+        review.id(),
+        status,
+        review.availableUntil(),
+        review.expiresAt(),
+        review.completedAt(),
+        current(questions).map(ReviewQuestion::questionId).orElse(null),
+        questions);
+  }
+
+  private Optional<ReviewQuestion> current(List<ReviewQuestion> questions) {
+    return questions.stream()
+        .filter(value -> value.completedAt() == null)
+        .min(Comparator.comparingInt(ReviewQuestion::queueOrder));
   }
 }
