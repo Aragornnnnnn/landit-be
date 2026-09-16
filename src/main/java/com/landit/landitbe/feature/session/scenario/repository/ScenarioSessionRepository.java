@@ -4,16 +4,17 @@ package com.landit.landitbe.feature.session.scenario.repository;
 
 import com.landit.landitbe.feature.session.scenario.domain.ScenarioSession;
 import java.time.LocalDateTime;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** 시나리오 세션 보조 엔티티의 저장을 담당한다. */
 public interface ScenarioSessionRepository extends JpaRepository<ScenarioSession, Long> {
 
   /** 학습 세션 ID로 시나리오 세션 보조 정보를 조회한다. */
   Optional<ScenarioSession> findByLearningSessionId(Long learningSessionId);
+
   /**
    * 사용자가 특정 시각 이후 시작한 시나리오 세션 가운데 처음 완료한 세션의 ID를 조회한다.
    *
@@ -39,5 +40,4 @@ public interface ScenarioSessionRepository extends JpaRepository<ScenarioSession
       @Param("userId") long userId,
       @Param("scenarioId") long scenarioId,
       @Param("since") LocalDateTime since);
-
 }

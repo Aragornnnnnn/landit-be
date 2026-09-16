@@ -228,6 +228,7 @@ config -> feature/shared
 - 프로필 조회는 `UserLearningProfile` 등 불변 값을 제공합니다. 잠금 조회는 호출 트랜잭션 종료까지 잠금을 유지합니다.
 - 수준 평가에서 사용자 상태는 profile의 잠금 snapshot으로 읽고, 같은 상위 트랜잭션 안에서 profile Service가 적용합니다. 점수 계산과 평가 이력은 session.assessment가 소유합니다.
 - subscription은 무료 예약·표현 학습 시도를 값 record로 반환합니다. `ExistingLearningRequest.startedAt`은 session이 사용자·유형을 확인한 값만 전달합니다. 이미 발급된 권한이 있으면 그 권한을 우선하며, 없을 때만 도입 전 시작 시각과 24시간 유예 조건을 확인합니다.
+- 시나리오 상세 피드백 공개 판단은 `session.feedback.ScenarioFeedbackAccessService`가 조율합니다. subscription의 공개 정책·프리미엄 여부·`FreeScenarioAccess`와 session의 소유권·최초 완료 이력을 조합하며 subscription은 session을 역참조하지 않습니다. 피드백 생성·저장은 유지하고 응답에서 메시지별 상세 피드백만 숨깁니다.
 - `config.security.PremiumAccessFilter`가 HTTP 경로별 세션 소유권과 구독 정책을 조율합니다. 기능 간 역참조를 보안 필터에 숨기지 않고 애플리케이션 조립 위치에서 명시합니다.
 - 프리톡 메시지는 예약·확정·보상, 완료 요청 재전송 복원, 응답 조립으로 나눕니다. 같은 패키지의 잠금 helper를 공유하고 학습 세션 → 프리톡 잠금 및 기존 외부 트랜잭션을 유지합니다.
 - 인증 사용자 식별 정보는 `shared.security.AuthUserPrincipal`, 기능 간 감사 기록은 `audit`가 소유합니다.
@@ -238,7 +239,7 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | --- | --- |
 | content의 시나리오/표현 조회 Repository | 사용자 언어·학습 진행을 함께 조회하는 JPQL/SQL. 기존 정렬·필터와 일괄 조회를 유지합니다. |
 | content.scenario의 ScenarioLearningHistoryQueryRepository | 최초 완료한 세션·수준 평가를 읽어 과거 복습 콘텐츠 수준을 보존합니다. 기존 SQL을 유지합니다. |
-| session의 메시지 컨텍스트 조회 Repository | 세션에 연결된 시나리오 콘텐츠를 조회합니다. |
+| session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 session이 소유합니다. |
 | learning.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 session/content를 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
 | memory의 검색/원본 계보 저장 | 공유 DB의 기억 원본 메시지·세션 FK 관계를 유지합니다. |

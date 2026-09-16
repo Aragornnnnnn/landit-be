@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.learning.scenario.service.CurrentScenarioSele
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
@@ -20,7 +21,6 @@ import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionServi
 import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse;
 import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse.CurrentMessageResponse;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
-import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.subscription.dto.ExistingLearningRequest;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
@@ -133,7 +133,7 @@ public class ScenarioSessionStartService {
   private boolean isCompleted(long userId, long sessionId) {
     return learningSessionService
         .findOwnedIfPresent(userId, sessionId)
-        .filter(session -> session.getStatus() == LearningSessionStatus.COMPLETED)
+        .filter(session -> session.status() == LearningSessionStatus.COMPLETED)
         .isPresent();
   }
 

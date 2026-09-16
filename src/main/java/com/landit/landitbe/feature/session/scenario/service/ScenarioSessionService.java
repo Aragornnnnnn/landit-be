@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.session.scenario.repository.ScenarioSessionRe
 import com.landit.landitbe.feature.session.scenario.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -1,4 +1,4 @@
-// 새 학습 권한과 이미 시작한 학습의 24시간 완료 권한을 구분하고, 무료 사용자의 상세 피드백 잠금을 판단한다.
+// 첫 시나리오 예약과 새 학습 권한, 이미 시작한 학습의 24시간 완료 권한을 관리한다.
 
 package com.landit.landitbe.feature.subscription.service;
 
@@ -24,7 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사용자 잠금 아래 첫 시나리오 예약과 학습별 권한을 발급하고, 무료 사용자의 상세 피드백 잠금을 판단한다. */
+/** 사용자 잠금 아래 첫 시나리오 예약과 학습별 권한을 발급한다. */
 @Service
 @RequiredArgsConstructor
 public class LearningAccessGrantService {

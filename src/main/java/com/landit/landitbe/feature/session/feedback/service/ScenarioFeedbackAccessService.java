@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.session.feedback.service;
 
-import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionService;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
 import com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -35,7 +35,7 @@ public class ScenarioFeedbackAccessService {
    */
   @Transactional(readOnly = true)
   public boolean detailFeedbackLocked(long userId, long sessionId) {
-    SubscriptionLaunchPolicyService.Policy policy = policies.current();
+    var policy = policies.current();
     if (!policies.enabledFor(policy, userId) || accessGrants.premium(userId)) {
       return false;
     }
@@ -57,5 +57,4 @@ public class ScenarioFeedbackAccessService {
     return !scenarioSessions.isFirstCompletedSince(
         userId, scenarioId, policy.effectiveAt(), sessionId);
   }
-
 }

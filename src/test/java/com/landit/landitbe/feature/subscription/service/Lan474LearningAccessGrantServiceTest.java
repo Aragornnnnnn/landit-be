@@ -57,12 +57,7 @@ class Lan474LearningAccessGrantServiceTest {
           new SubscriptionProperties("2026-09-11T11:00:00+09:00"), CLOCK);
   private final LearningAccessGrantService service =
       new LearningAccessGrantService(
-          repository,
-          reservations,
-          policies,
-          profiles,
-          profileSubscriptionService,
-          CLOCK);
+          repository, reservations, policies, profiles, profileSubscriptionService, CLOCK);
 
   /** Repository 대신 사용자와 대상별 저장 내용을 보관해 여러 서비스 호출의 결과를 연결한다. */
   @BeforeEach
@@ -129,8 +124,14 @@ class Lan474LearningAccessGrantServiceTest {
     StartAccess second = service.requireScenarioStart(USER_ID);
     assertThat(second.basis()).isEqualTo("FREE");
     service.recordScenario(USER_ID, 101L, 301L, NOW, second);
-    assertThat(service.allowsExisting(USER_ID, new ExistingLearningRequest("SCENARIO", 100L, null, false, null))).isTrue();
-    assertThat(service.allowsExisting(USER_ID, new ExistingLearningRequest("SCENARIO", 101L, null, false, null))).isTrue();
+    assertThat(
+            service.allowsExisting(
+                USER_ID, new ExistingLearningRequest("SCENARIO", 100L, null, false, null)))
+        .isTrue();
+    assertThat(
+            service.allowsExisting(
+                USER_ID, new ExistingLearningRequest("SCENARIO", 101L, null, false, null)))
+        .isTrue();
     assertThat(storedReservations).hasSize(1);
     assertThat(storedReservations.get(USER_ID).getSessionId()).isEqualTo(100L);
   }
@@ -304,10 +305,6 @@ class Lan474LearningAccessGrantServiceTest {
         .thenReturn(
             new UserSubscriptionSnapshot(status, status.isPremium(), null, expiresAt, null, null));
   }
-
-
-
-
 
   private LearningAccessGrant expressionGrant(LocalDateTime startedAt) {
     return new LearningAccessGrant(
