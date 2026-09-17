@@ -153,28 +153,68 @@ class FreeTalkSessionApiIntegrationTests {
     throw new IllegalStateException("프리톡 표현 생성이 제한 시간 안에 종료되지 않았습니다.");
   }
 
-  @DisplayName("활성 프리톡 주제만 노출 순서대로 반환한다.")
+  /** 주제 조회는 활성 주제만 무작위로 뽑고 뽑힌 순서대로 displayOrder를 1부터 다시 매긴다. */
+  @DisplayName("활성 프리톡 주제를 무작위로 선택하고 응답 순서를 1부터 부여한다.")
   @Test
-  void listTopicsReturnsOnlyActiveTopicsInDisplayOrder() throws Exception {
+  void listTopicsReturnsRandomActiveTopicsWithSequentialDisplayOrder() throws Exception {
     seedTopic(1002, "두 번째", "두 번째 설명", 2, "ACTIVE");
     seedTopic(1001, "첫 번째", "첫 번째 설명", 1, "ACTIVE");
     seedTopic(1003, "숨김", "숨김 설명", 3, "INACTIVE");
     String accessToken =
         login("free-talk-topics@example.com").get("data").get("accessToken").asText();
 
-    mockMvc
-        .perform(
-            get("/api/v1/free-talk/topics")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.dailySpeakingTimeLimitMs").value(7200000))
-        .andExpect(jsonPath("$.data.remainingSpeakingTimeMs").value(7200000))
-        .andExpect(jsonPath("$.data.topics.length()").value(2))
-        .andExpect(jsonPath("$.data.topics[0].topicId").value(1001))
-        .andExpect(jsonPath("$.data.topics[0].displayName").value("첫 번째"))
-        .andExpect(jsonPath("$.data.topics[0].displayOrder").value(1))
-        .andExpect(jsonPath("$.data.topics[1].topicId").value(1002));
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/free-talk/topics")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.dailySpeakingTimeLimitMs").value(7200000))
+            .andExpect(jsonPath("$.data.remainingSpeakingTimeMs").value(7200000))
+            .andExpect(jsonPath("$.data.topics.length()").value(2))
+            .andReturn();
+
+    JsonNode topics =
+        objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("topics");
+    List<Long> topicIds = new ArrayList<>();
+    List<Integer> displayOrders = new ArrayList<>();
+    for (JsonNode topic : topics) {
+      topicIds.add(topic.get("topicId").asLong());
+      displayOrders.add(topic.get("displayOrder").asInt());
+    }
+    assertThat(topicIds).containsExactlyInAnyOrder(1001L, 1002L);
+    assertThat(displayOrders).containsExactly(1, 2);
+  }
+
+  /** 활성 주제가 5개를 넘으면 그중 5개만 뽑아 내려준다. */
+  @Test
+  void listTopicsReturnsAtMostFiveTopics() throws Exception {
+    for (int index = 1; index <= 7; index++) {
+      seedTopic(1100 + index, "주제 " + index, "주제 설명 " + index, index, "ACTIVE");
+    }
+    String accessToken =
+        login("free-talk-topics-many@example.com").get("data").get("accessToken").asText();
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/free-talk/topics")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.topics.length()").value(5))
+            .andReturn();
+
+    JsonNode topics =
+        objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("topics");
+    List<Long> topicIds = new ArrayList<>();
+    List<Integer> displayOrders = new ArrayList<>();
+    for (JsonNode topic : topics) {
+      topicIds.add(topic.get("topicId").asLong());
+      displayOrders.add(topic.get("displayOrder").asInt());
+    }
+    assertThat(topicIds).doesNotHaveDuplicates().allMatch(id -> id >= 1101L && id <= 1107L);
+    assertThat(displayOrders).containsExactly(1, 2, 3, 4, 5);
   }
 
   @DisplayName("인증 없는 프리톡 주제 조회와 세션 요청은 표준 오류로 거부한다.")

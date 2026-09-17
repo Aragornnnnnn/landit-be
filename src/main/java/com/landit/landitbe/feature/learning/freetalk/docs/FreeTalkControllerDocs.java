@@ -32,7 +32,7 @@ public interface FreeTalkControllerDocs {
    */
   @Operation(
       summary = "프리톡 추천 주제 조회",
-      description = "활성 상태의 프리톡 추천 주제를 노출 순서대로 조회한다.",
+      description = "활성 프리톡 추천 주제 중 무작위로 최대 5개를 뽑아 반환한다. 주제 구성과 displayOrder는 요청마다 달라진다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

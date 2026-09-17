@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.DisplayName;
@@ -388,7 +389,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(
             jdbcTemplate.queryForList(
                 "select display_name from free_talk_topic order by display_order", String.class))
-        .containsExactly("오늘 하루 얘기", "주말 계획", "요즘 빠진 것", "스포츠", "고민 상담");
+        .startsWith("오늘 하루 얘기", "주말 계획", "요즘 빠진 것", "스포츠", "고민 상담");
 
     Integer defaultTutorLabelCount =
         jdbcTemplate.queryForObject(
@@ -403,6 +404,31 @@ class DatabaseSchemaIntegrationTests {
             """,
             Integer.class);
     assertThat(defaultTutorLabelCount).isEqualTo(1);
+  }
+
+  @DisplayName("V108 migration은 프리톡 주제 65개를 기존 5개 뒤에 활성 상태로 추가한다.")
+  @Test
+  void v108AddsSixtyFiveActiveFreeTalkTopicsAfterExistingSeed() {
+    Integer activeCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from free_talk_topic where status = 'ACTIVE'", Integer.class);
+    assertThat(activeCount).isEqualTo(70);
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select display_order from free_talk_topic order by display_order", Integer.class))
+        .containsExactlyElementsOf(IntStream.rangeClosed(1, 70).boxed().toList());
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select display_name from free_talk_topic where display_order between 6 and 70",
+                String.class))
+        .hasSize(65)
+        .doesNotHaveDuplicates()
+        .contains("요즘 하는 일", "밸런스 게임", "살고 싶은 집");
+    Integer blankPromptCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from free_talk_topic where trim(prompt_description) = ''",
+            Integer.class);
+    assertThat(blankPromptCount).isZero();
   }
 
   @DisplayName("프리톡 표현 연결 구조는 공용 표현만 참조한다.")
