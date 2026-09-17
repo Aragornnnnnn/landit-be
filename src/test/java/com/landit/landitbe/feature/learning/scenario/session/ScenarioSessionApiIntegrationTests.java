@@ -494,6 +494,7 @@ class ScenarioSessionApiIntegrationTests {
     seedScenarioQuestion(4102, 2101, 2, "What food did you eat recently?", "최근에는 어떤 음식을 먹었어?");
     long sessionId = startScenario(accessToken, 2101);
     fakeAiConversationClient.blockInnerThoughtGeneration();
+    fakeAiConversationClient.messageFeedbackRelease = new CountDownLatch(1);
 
     MvcResult result =
         mockMvc
@@ -601,7 +602,11 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo("좋아하는 음식이 있어? 왜 좋아해?");
     assertThat(fakeAiConversationClient.lastMessageFeedbackRequest().userMessage())
         .isEqualTo("I like pizza because it is spicy.");
-    assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
+    try {
+      assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
+    } finally {
+      fakeAiConversationClient.messageFeedbackRelease.countDown();
+    }
 
     List<Map<String, Object>> messages =
         jdbcTemplate.queryForList(
@@ -4478,6 +4483,8 @@ class ScenarioSessionApiIntegrationTests {
     @Override
     public AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request) {
       lastMessageFeedbackRequest = request;
+      messageFeedbackTransactionActive.add(
+          TransactionSynchronizationManager.isActualTransactionActive());
       messageFeedbackRequested.countDown();
       try {
         if (!messageFeedbackRelease.await(5, TimeUnit.SECONDS)) {
@@ -4487,8 +4494,6 @@ class ScenarioSessionApiIntegrationTests {
         Thread.currentThread().interrupt();
         throw new ApiException(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
       }
-      messageFeedbackTransactionActive.add(
-          TransactionSynchronizationManager.isActualTransactionActive());
       if (failMessageFeedbackRequest) {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
