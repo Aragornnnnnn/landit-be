@@ -62,7 +62,8 @@ public class RevenueCatWebhookService {
    *
    * @param authorization 요청의 Authorization 헤더 값. 없으면 null
    * @param request 웹훅 요청 본문
-   * @throws SubscriptionException Authorization 헤더가 설정값과 다르거나 설정값이 비어 있을 때
+   * @throws SubscriptionException Authorization 헤더가 설정값과 다를 때
+   * @throws com.landit.landitbe.shared.exception.ApiException 서버 인증 설정이 누락됐을 때
    */
   @Transactional
   public void handle(String authorization, RevenueCatWebhookRequest request) {
