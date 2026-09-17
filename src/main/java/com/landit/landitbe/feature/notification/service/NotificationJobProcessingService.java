@@ -120,7 +120,7 @@ public class NotificationJobProcessingService {
                 job.userProfileId(),
                 NotificationType.TRIAL_ENDING,
                 "무료 체험 종료 예정 안내",
-                body(job),
+                "무료 체험이 곧 종료돼요. 결제 전 구독 정보를 확인해 주세요.",
                 managementUrl(job))));
     // 중복 재시도에서 신규 Ticket이 0개여도 기존 Push Delivery가 최종 전달 상태를 소유한다.
     jobs.finish(job, "PROCESSED", "PUSH_DELIVERY_TRACKED", null);
