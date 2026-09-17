@@ -14,6 +14,7 @@ import com.landit.landitbe.feature.learning.scenario.feedback.dto.LoadedSessionF
 import com.landit.landitbe.feature.learning.scenario.feedback.service.SessionFeedbackContextService;
 import com.landit.landitbe.feature.learning.scenario.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -71,8 +72,8 @@ public class SessionLevelAssessmentGenerationService {
     try {
       taskExecutor.execute(() -> generateAndPersist(userId, context));
     } catch (RuntimeException exception) {
-      log.warn("수준 평가 비동기 작업 등록에 실패했습니다. sessionId={}", context.sessionId(), exception);
-      completeFallback(userId, context);
+      FailureObservation.failed("level_assessment", "dispatch", "operation_failed", exception);
+      persist(userId, context, null, true);
     }
   }
 
@@ -94,7 +95,7 @@ public class SessionLevelAssessmentGenerationService {
       LoadedSessionFeedbackContext context = contextService.load(userId, sessionId);
       dispatch(userId, context);
     } catch (RuntimeException exception) {
-      log.warn("수준 평가 시작에 필요한 세션 조회에 실패했습니다. sessionId={}", sessionId, exception);
+      FailureObservation.failed("level_assessment", "context_load", "operation_failed", exception);
     }
   }
 
@@ -126,6 +127,7 @@ public class SessionLevelAssessmentGenerationService {
 
   private void generateAndPersist(long userId, LoadedSessionFeedbackContext context) {
     AiSessionLevelAssessment aiAssessment = null;
+    boolean reported = false;
     try {
       LearningSessionSnapshot session =
           learningSessionService.findOwned(userId, context.sessionId());
@@ -139,13 +141,17 @@ public class SessionLevelAssessmentGenerationService {
       AiSessionFeedbackRequest request = AiSessionFeedbackRequest.forLevelAssessment(context);
       aiAssessment = aiConversationClient.generateSessionLevelAssessment(request);
     } catch (RuntimeException exception) {
-      log.warn("수준 평가 AI 호출에 실패해 fallback을 사용합니다. sessionId={}", context.sessionId(), exception);
+      FailureObservation.failed("level_assessment", "generation", "operation_failed", exception);
+      reported = true;
     }
-    persist(userId, context, aiAssessment);
+    persist(userId, context, aiAssessment, reported);
   }
 
   private void persist(
-      long userId, LoadedSessionFeedbackContext context, AiSessionLevelAssessment aiAssessment) {
+      long userId,
+      LoadedSessionFeedbackContext context,
+      AiSessionLevelAssessment aiAssessment,
+      boolean reported) {
     try {
       transactionTemplate.executeWithoutResult(
           status -> {
@@ -156,22 +162,30 @@ public class SessionLevelAssessmentGenerationService {
                 || assessmentRepository.findByLearningSessionId(context.sessionId()).isPresent()) {
               return;
             }
-            assessmentService.assessApplyAndSave(
-                userId,
-                context,
-                isExpired(session, null) ? null : aiAssessment,
-                learningSessionService.isLatestCompletedScenario(session),
-                session.getLevelAssessmentRequestedAt());
+            UserLevelAssessment saved =
+                assessmentService.assessApplyAndSave(
+                    userId,
+                    context,
+                    isExpired(session, null) ? null : aiAssessment,
+                    learningSessionService.isLatestCompletedScenario(session),
+                    session.getLevelAssessmentRequestedAt());
             learningSessionService.completeLevelAssessment(session.getId());
+            if (!reported
+                && saved != null
+                && saved.getSource()
+                    == com.landit.landitbe.feature.learning.scenario.assessment.domain
+                        .SessionLevelAssessment.Source.FALLBACK) {
+              FailureObservation.afterCommit("level_assessment", "result", "fallback_result", null);
+            }
           });
     } catch (RuntimeException exception) {
       markFailed(userId, context.sessionId());
-      log.error("수준 평가 결과 저장에 실패했습니다. sessionId={}", context.sessionId(), exception);
+      FailureObservation.failed("level_assessment", "persistence", "operation_failed", exception);
     }
   }
 
   private void completeFallback(long userId, LoadedSessionFeedbackContext context) {
-    persist(userId, context, null);
+    persist(userId, context, null, false);
   }
 
   private void markFailed(long userId, long sessionId) {
@@ -184,8 +198,9 @@ public class SessionLevelAssessmentGenerationService {
               learningSessionService.failLevelAssessment(session.getId());
             }
           });
-    } catch (RuntimeException ignored) {
-      // DB 장애 중에는 상태도 저장할 수 없으므로 다음 조회에서 오류를 반환한다.
+    } catch (RuntimeException exception) {
+      FailureObservation.failed(
+          "level_assessment", "failure_state_persistence", "storage_failed", exception);
     }
   }
 
