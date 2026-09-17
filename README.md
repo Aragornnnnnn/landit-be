@@ -75,6 +75,10 @@ OTEL_RESOURCE_ATTRIBUTES=service.namespace=landit,deployment.environment.name=<e
 
 `OTEL_EXPORTER_OTLP_HEADERS`는 인증정보이므로 SSM Parameter Store의 `SecureString`으로 관리합니다. 메트릭은 HTTP endpoint별 요청 수, 응답시간, 상태와 JVM memory, GC, thread 정보를 포함합니다. 외부 scrape를 사용하지 않으므로 Actuator HTTP endpoint는 `health`, `info`만 노출합니다.
 
+무료 플랜의 시계열 한도 안에서 배포 여유를 확보하도록 HTTP 응답시간의 자동 histogram 생성을 끄고, 50ms부터 120초까지 15개 SLO 경계만 전송합니다. Grafana의 classic histogram 변환 후에는 `+Inf`를 포함해 라벨 조합당 16개 bucket이 됩니다. 요청 수·오류율과 P50·P95·P99 쿼리는 유지되지만, 백분위 응답시간의 정밀도는 지정한 구간에 제한됩니다. 120초 초과 요청도 count·sum과 `+Inf`에 포함되며 세부 분포는 구분하지 않습니다.
+
+사용하지 않는 `http.server.requests.active`, `spring.data.repository.invocations`는 등록하지 않습니다. JVM·HikariCP·Tomcat과 `service.version`은 유지하며, 이 설정은 develop/prod에 공통 적용됩니다. 새·구 버전의 bucket 경계가 섞인 배포 직후 구간은 백분위 비교에서 제외하고, 기존 시계열이 수집 서버에서 정리된 뒤 한도 사용량을 확인합니다. 수집 주기 변경이나 재시작은 시계열 개수 제한의 해결책이 아닙니다.
+
 ## Run
 
 ```bash
