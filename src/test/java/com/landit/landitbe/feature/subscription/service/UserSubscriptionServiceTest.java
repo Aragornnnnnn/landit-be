@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
@@ -34,8 +34,8 @@ class UserSubscriptionServiceTest {
 
   private final ProfileSubscriptionService userProfileService =
       mock(ProfileSubscriptionService.class);
-  private final LearningProgressService learningProgressService =
-      mock(LearningProgressService.class);
+  private final ScenarioProgressService scenarioProgressService =
+      mock(ScenarioProgressService.class);
 
   private final LearningAccessGrantService grants = mock(LearningAccessGrantService.class);
 
@@ -50,7 +50,7 @@ class UserSubscriptionServiceTest {
 
     assertThat(access.launched()).isFalse();
     assertThat(access.allowsPremiumOnlyFeature()).isTrue();
-    verifyNoInteractions(userProfileService, learningProgressService, grants);
+    verifyNoInteractions(userProfileService, scenarioProgressService, grants);
   }
 
   /** 도입 시각과 같거나 이후이면 시간대 표기와 관계없이 프리미엄 전용 제한을 적용하고, 시나리오 대화는 완료 이력과 무관하게 열어 둔다. */
@@ -69,8 +69,8 @@ class UserSubscriptionServiceTest {
 
     assertThat(access.launched()).isTrue();
     assertThat(access.allowsPremiumOnlyFeature()).isFalse();
-    verifyNoInteractions(learningProgressService);
-    when(learningProgressService.hasClearedScenarioSince(USER_ID, LAUNCH_TIME)).thenReturn(true);
+    verifyNoInteractions(scenarioProgressService);
+    when(scenarioProgressService.hasClearedScenarioSince(USER_ID, LAUNCH_TIME)).thenReturn(true);
     var response = service.getSubscription(USER_ID);
     assertThat(response.conversationCompletedSinceLaunch()).isTrue();
     assertThat(response.canStartScenario()).isTrue();
@@ -107,14 +107,14 @@ class UserSubscriptionServiceTest {
     assertThat(response.premium()).isEqualTo(premium);
     assertThat(response.subscriptionStatus()).isEqualTo(snapshot(premium).subscriptionStatus());
     assertThat(response.conversationCompletedSinceLaunch()).isFalse();
-    verifyNoInteractions(learningProgressService);
+    verifyNoInteractions(scenarioProgressService);
   }
 
   private UserSubscriptionService service(String launchedAt, Clock clock) {
     return new UserSubscriptionService(
         mock(com.landit.landitbe.feature.profile.service.UserProfileService.class),
         userProfileService,
-        learningProgressService,
+        scenarioProgressService,
         mock(SubscriptionEventRepository.class),
         new SubscriptionLaunchPolicyService(new SubscriptionProperties(launchedAt), clock),
         grants);

@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.session.feedback.service;
 
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionMessageFeedbackResult;
@@ -35,7 +35,7 @@ class SessionFeedbackCompletionService {
   private final SessionHistoryService sessionHistoryService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final SessionMessageService sessionMessageService;
-  private final LearningProgressService learningProgressService;
+  private final ScenarioProgressService scenarioProgressService;
 
   /** 유효한 AI 최종 피드백을 저장하고 세션 결과를 최초 한 번 확정한다. */
   @Transactional
@@ -196,7 +196,7 @@ class SessionFeedbackCompletionService {
       LearningSession learningSession,
       int nativeScore,
       BigDecimal starRating) {
-    learningProgressService.completeScenario(
+    scenarioProgressService.completeScenario(
         learningSession.getUserProfileId(),
         context.scenario().scenarioId(),
         learningSession.getTargetLocale(),

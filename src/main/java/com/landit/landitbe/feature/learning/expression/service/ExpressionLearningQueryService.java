@@ -4,7 +4,7 @@ package com.landit.landitbe.feature.learning.expression.service;
 
 import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpressionLearningQueryService {
 
   private final ExpressionQueryService expressionQueryService;
-  private final LearningProgressService learningProgressService;
+  private final ExpressionCompletionService expressionCompletionService;
 
   /**
    * 시나리오 표현 콘텐츠에 사용자의 완료와 순서 잠금을 적용한다.
@@ -31,7 +31,7 @@ public class ExpressionLearningQueryService {
     List<ExpressionResponse> expressions =
         expressionQueryService.getScenarioExpressions(userId, scenarioId);
     Set<Long> completedIds =
-        learningProgressService.findCompletedExpressionIds(userId, scenarioId).values();
+        expressionCompletionService.findCompletedExpressionIds(userId, scenarioId).values();
     Long firstIncompleteId =
         expressions.stream()
             .map(ExpressionResponse::expressionId)

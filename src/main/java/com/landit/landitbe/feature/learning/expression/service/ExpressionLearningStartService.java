@@ -6,7 +6,7 @@ import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResp
 import com.landit.landitbe.feature.content.expression.pronunciation.dto.ExpressionAudio;
 import com.landit.landitbe.feature.content.expression.pronunciation.service.ExpressionPronunciationQueryService;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
 import com.landit.landitbe.shared.exception.ApiException;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ public class ExpressionLearningStartService {
   private final ExpressionQueryService expressionQueryService;
   private final LearningAccessGrantService accessGrants;
   private final ExpressionPronunciationQueryService pronunciationQueryService;
-  private final LearningProgressService learningProgressService;
+  private final ExpressionCompletionService expressionCompletionService;
 
   /**
    * 접근 가능한 표현의 학습 시도를 시작하거나 재개한다.
@@ -39,7 +39,7 @@ public class ExpressionLearningStartService {
     ExpressionAudio audio = pronunciationQueryService.findAudio(userId, expressionId);
     return content
         .withLearningState(
-            audio, learningProgressService.hasCompletedExpression(userId, expressionId))
+            audio, expressionCompletionService.hasCompletedExpression(userId, expressionId))
         .withAttempt(attempt.id(), attempt.expiresAt());
   }
 }

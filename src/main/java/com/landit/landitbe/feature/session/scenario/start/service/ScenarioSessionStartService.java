@@ -6,7 +6,7 @@ import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.learning.scenario.service.CurrentScenarioSelectionService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
@@ -45,7 +45,7 @@ public class ScenarioSessionStartService {
   private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
 
   private final UserProfileService userProfileService;
-  private final LearningProgressService learningProgressService;
+  private final ScenarioProgressService scenarioProgressService;
   private final ScenarioAccessService scenarioAccessService;
   private final CurrentScenarioSelectionService currentScenarioSelectionService;
   private final LearningSessionService learningSessionService;
@@ -223,7 +223,7 @@ public class ScenarioSessionStartService {
   /** 최초 시작과 재시도를 같은 흐름으로 처리하되, 기존 완료 성과는 유지한다. */
   private void ensureProgress(
       UserLearningProfile userProfile, ScenarioStartContext startRow, LocalDateTime startedAt) {
-    learningProgressService.startScenario(
+    scenarioProgressService.startScenario(
         userProfile.id(), startRow.scenarioId(), userProfile.targetLocale(), startedAt);
   }
 

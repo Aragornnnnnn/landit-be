@@ -22,7 +22,7 @@ public class ExpressionProgressService {
   private final ProfileLearningService profileLearningService;
   private final ScenarioLearningLevelService scenarioLearningLevelService;
   private final ExpressionContentService expressionContentService;
-  private final LearningProgressService learningProgressService;
+  private final ExpressionCompletionService expressionCompletionService;
 
   /**
    * 날짜별 시나리오 화면에 표시할 표현 학습 진행도를 조회한다.
@@ -40,7 +40,7 @@ public class ExpressionProgressService {
         expressionContentService.findScenarioExpressionIds(
             scenarioId, userLocale.targetLocale(), userLocale.baseLocale(), contentLevel);
     Set<Long> completedExpressionIds =
-        learningProgressService.findCompletedExpressionIds(userId, scenarioId).values();
+        expressionCompletionService.findCompletedExpressionIds(userId, scenarioId).values();
     int completedExpressionCount =
         (int) expressionIds.stream().filter(completedExpressionIds::contains).count();
     return new ExpressionProgress(expressionIds.size(), completedExpressionCount);

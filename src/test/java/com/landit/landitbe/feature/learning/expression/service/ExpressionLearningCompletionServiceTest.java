@@ -24,7 +24,7 @@ import com.landit.landitbe.feature.content.expression.service.ExpressionContentS
 import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.progress.repository.UserWritingExpressionCompletionRepository;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.domain.LearningSession;
@@ -73,7 +73,7 @@ class ExpressionLearningCompletionServiceTest {
   @Mock private ProfileLearningService userProfileService;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
 
-  @Mock private LearningProgressService learningProgressService;
+  @Mock private ExpressionCompletionService expressionCompletionService;
 
   @Mock private UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
@@ -93,7 +93,7 @@ class ExpressionLearningCompletionServiceTest {
             new ExpressionContentService(writingExpressionRepository),
             userProfileService,
             scenarioLearningLevelService,
-            learningProgressService,
+            expressionCompletionService,
             new FreeTalkExpressionLearningService(
                 freeTalkSessionRepository, learningSessionRepository, sessionExpressionRepository));
     lenient()
@@ -119,7 +119,7 @@ class ExpressionLearningCompletionServiceTest {
         .extracting("errorCode")
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
 
-    verify(learningProgressService, never())
+    verify(expressionCompletionService, never())
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
@@ -137,13 +137,13 @@ class ExpressionLearningCompletionServiceTest {
     expressionLearningCompletionService.completeLearning(USER_ID, UNLOCKED_EXPRESSION_ID);
 
     // then: 완료 이력을 확인하고 갱신하기 전에 표현 잠금을 획득한다
-    InOrder inOrder = inOrder(writingExpressionRepository, learningProgressService);
+    InOrder inOrder = inOrder(writingExpressionRepository, expressionCompletionService);
     inOrder
         .verify(writingExpressionRepository)
         .findByIdAndStatusForUpdate(UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
-    inOrder.verify(learningProgressService).findCompletedExpressionIds(USER_ID, SCENARIO_ID);
+    inOrder.verify(expressionCompletionService).findCompletedExpressionIds(USER_ID, SCENARIO_ID);
     inOrder
-        .verify(learningProgressService)
+        .verify(expressionCompletionService)
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
@@ -157,14 +157,14 @@ class ExpressionLearningCompletionServiceTest {
     when(writingExpressionRepository.findByIdAndStatusForUpdate(
             UNLOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
-    when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
+    when(expressionCompletionService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
         .thenReturn(new CompletedExpressionIds(Set.of(UNLOCKED_EXPRESSION_ID)));
 
     // when: 같은 표현을 다시 완료해도
     expressionLearningCompletionService.completeLearning(USER_ID, UNLOCKED_EXPRESSION_ID);
 
     // then: 새 기록 없이 기존 완료 시각만 갱신한다.
-    verify(learningProgressService)
+    verify(expressionCompletionService)
         .completeExpression(USER_ID, SCENARIO_ID, UNLOCKED_EXPRESSION_ID);
   }
 
@@ -193,7 +193,7 @@ class ExpressionLearningCompletionServiceTest {
         .isEqualTo(ContentErrorCode.EXPRESSION_LOCKED);
 
     // then: 저장 없음 + 어떤 사용자/표현이 막혔는지 warn 로그
-    verify(learningProgressService, never())
+    verify(expressionCompletionService, never())
         .completeExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
     assertThat(logAppender.list)
         .anySatisfy(
@@ -283,11 +283,11 @@ class ExpressionLearningCompletionServiceTest {
         USER_ID, LOCKED_EXPRESSION_ID, learningSessionId);
 
     assertThat(sessionExpression.getCompletedAt()).isNotNull();
-    verify(learningProgressService)
+    verify(expressionCompletionService)
         .completeFreeTalkExpression(USER_ID, expression.getScenarioId(), LOCKED_EXPRESSION_ID);
     verify(writingExpressionRepository)
         .findByIdAndStatusForUpdate(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
-    verify(learningProgressService, never())
+    verify(expressionCompletionService, never())
         .completeExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
   }
 
@@ -315,7 +315,7 @@ class ExpressionLearningCompletionServiceTest {
         .extracting("errorCode")
         .isEqualTo(ErrorCode.FORBIDDEN);
 
-    verify(learningProgressService, never())
+    verify(expressionCompletionService, never())
         .completeFreeTalkExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
   }
 
@@ -346,7 +346,7 @@ class ExpressionLearningCompletionServiceTest {
         .extracting("errorCode")
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
 
-    verify(learningProgressService, never())
+    verify(expressionCompletionService, never())
         .completeFreeTalkExpression(USER_ID, SCENARIO_ID, LOCKED_EXPRESSION_ID);
   }
 
@@ -364,7 +364,7 @@ class ExpressionLearningCompletionServiceTest {
             writingExpressionRepository.findByIdAndStatusForUpdate(
                 any(), org.mockito.ArgumentMatchers.eq(ActiveStatus.ACTIVE)))
         .thenReturn(Optional.of(expression));
-    when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
+    when(expressionCompletionService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
         .thenReturn(new CompletedExpressionIds(Set.of()));
   }
 

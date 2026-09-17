@@ -9,7 +9,7 @@ import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningCont
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionCompletion;
@@ -38,7 +38,7 @@ public class ExpressionLearningCompletionService {
   private final ExpressionContentService expressionContentService;
   private final ProfileLearningService profileLearningService;
   private final ScenarioLearningLevelService scenarioLearningLevelService;
-  private final LearningProgressService learningProgressService;
+  private final ExpressionCompletionService expressionCompletionService;
   private final FreeTalkExpressionLearningService freeTalkExpressionLearningService;
 
   /**
@@ -103,11 +103,11 @@ public class ExpressionLearningCompletionService {
     expressionContentService.lockActiveExpression(expressionId);
 
     CompletedExpressionIds completedExpressionIds =
-        learningProgressService.findCompletedExpressionIds(userId, scenarioId);
+        expressionCompletionService.findCompletedExpressionIds(userId, scenarioId);
 
     // 이미 완료한 표현은 최초 완료 시각을 유지하고 마지막 완료 시각만 갱신한다.
     if (completedExpressionIds.values().contains(expressionId)) {
-      learningProgressService.completeExpression(userId, scenarioId, expressionId);
+      expressionCompletionService.completeExpression(userId, scenarioId, expressionId);
       return;
     }
 
@@ -119,7 +119,7 @@ public class ExpressionLearningCompletionService {
     }
 
     // 현재 학습 순서의 표현 완료 이력을 생성한다.
-    learningProgressService.completeExpression(userId, scenarioId, expressionId);
+    expressionCompletionService.completeExpression(userId, scenarioId, expressionId);
     log.info("expression learning completed: userId={}, expressionId={}", userId, expressionId);
   }
 
@@ -131,7 +131,7 @@ public class ExpressionLearningCompletionService {
       FreeTalkExpressionCompletion sessionExpression) {
     expressionContentService.lockActiveExpression(expressionId);
     freeTalkExpressionLearningService.completeExpression(sessionExpression.sessionExpressionId());
-    learningProgressService.completeFreeTalkExpression(userId, scenarioId, expressionId);
+    expressionCompletionService.completeFreeTalkExpression(userId, scenarioId, expressionId);
   }
 
   /** 사용자 로케일과 학습 순서로 표현의 잠금 해제 여부를 판단한다. */

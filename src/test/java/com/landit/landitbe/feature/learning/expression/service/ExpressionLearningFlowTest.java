@@ -33,7 +33,7 @@ import com.landit.landitbe.feature.content.expression.service.ExpressionQuerySer
 import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
@@ -69,7 +69,7 @@ class ExpressionLearningFlowTest {
 
   @Mock private ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
 
-  @Mock private LearningProgressService learningProgressService;
+  @Mock private ExpressionCompletionService expressionCompletionService;
 
   // learning-start의 발음 음성 URL 조회에 쓰는 의존성. 목으로 선언하지 않으면 @InjectMocks가
   // null로 둔 채 지나가서 관련 테스트가 NPE로 깨진다.
@@ -85,14 +85,14 @@ class ExpressionLearningFlowTest {
   @org.junit.jupiter.api.BeforeEach
   void allowLearningStart() {
     expressionLearningQueryService =
-        new ExpressionLearningQueryService(expressionQueryService, learningProgressService);
+        new ExpressionLearningQueryService(expressionQueryService, expressionCompletionService);
     expressionLearningStartService =
         new ExpressionLearningStartService(
             expressionQueryService,
             accessGrants,
             new ExpressionPronunciationQueryService(
                 pronunciationAssetRepository, accentLocaleResolver),
-            learningProgressService);
+            expressionCompletionService);
     expressionPracticeService =
         new ExpressionPracticeService(writingExpressionRepository, scenarioLearningLevelService);
     expressionRecommendationService =
@@ -244,7 +244,8 @@ class ExpressionLearningFlowTest {
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
     // 완료 이력이 있는 사용자로 가정해 완료 여부가 응답에 실리는지 함께 본다.
-    when(learningProgressService.hasCompletedExpression(USER_ID, EXPRESSION_ID)).thenReturn(true);
+    when(expressionCompletionService.hasCompletedExpression(USER_ID, EXPRESSION_ID))
+        .thenReturn(true);
 
     // when: getExpressionForLearning()를 호출하면
     ExpressionLearningResponse response =
@@ -324,7 +325,7 @@ class ExpressionLearningFlowTest {
    * 스터빙한다. 아무 인자도 안 넘기면(빈 가변인자) "하나도 완료하지 않은 상황"이 된다.
    */
   private void givenCompletedExpressionIds(Long... completedExpressionIds) {
-    when(learningProgressService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
+    when(expressionCompletionService.findCompletedExpressionIds(USER_ID, SCENARIO_ID))
         .thenReturn(
             new CompletedExpressionIds(
                 new HashSet<>(java.util.Arrays.asList(completedExpressionIds))));

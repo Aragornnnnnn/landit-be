@@ -1,4 +1,4 @@
-// LearningProgressService의 표현 완료와 시나리오 시작 저장 정책을 검증한다.
+// 분리된 표현 완료와 시나리오 진도 Service의 저장 정책을 검증한다.
 
 package com.landit.landitbe.feature.learning.progress.service;
 
@@ -25,9 +25,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** LearningProgressService의 표현 완료와 시나리오 시작 저장 정책을 검증한다. */
+/** 분리된 표현 완료와 시나리오 진도 Service의 저장 정책을 검증한다. */
 @ExtendWith(MockitoExtension.class)
-class LearningProgressServiceTest {
+class LearningProgressPersistenceTest {
 
   private static final Long USER_ID = 1L;
   private static final Long SCENARIO_ID = 2L;
@@ -37,7 +37,9 @@ class LearningProgressServiceTest {
 
   @Mock private UserWritingExpressionCompletionRepository expressionCompletionRepository;
 
-  @InjectMocks private LearningProgressService learningProgressService;
+  @InjectMocks private ExpressionCompletionService learningProgressService;
+
+  @InjectMocks private ScenarioProgressService scenarioProgressService;
 
   /** 처음 완료한 표현은 새 완료 기록으로 저장한다. */
   @Test
@@ -104,7 +106,7 @@ class LearningProgressServiceTest {
             USER_ID, SCENARIO_ID, Locale.EN))
         .thenReturn(Optional.of(progress));
 
-    learningProgressService.startScenario(USER_ID, SCENARIO_ID, Locale.EN, startedAt);
+    scenarioProgressService.startScenario(USER_ID, SCENARIO_ID, Locale.EN, startedAt);
 
     verify(progress).markStarted(startedAt);
     verify(userScenarioProgressRepository, never()).save(any());

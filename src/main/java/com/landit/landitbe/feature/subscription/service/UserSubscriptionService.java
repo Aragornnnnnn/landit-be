@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.subscription.service;
 
-import com.landit.landitbe.feature.learning.progress.service.LearningProgressService;
+import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
@@ -21,7 +21,7 @@ public class UserSubscriptionService {
 
   private final UserProfileService userProfileService;
   private final ProfileSubscriptionService profileSubscriptionService;
-  private final LearningProgressService learningProgressService;
+  private final ScenarioProgressService scenarioProgressService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final SubscriptionLaunchPolicyService policies;
   private final LearningAccessGrantService grants;
@@ -31,7 +31,7 @@ public class UserSubscriptionService {
    *
    * @param userProfileService 활성 사용자 여부를 확인하는 프로필 Service
    * @param profileSubscriptionService 구독 상태 스냅샷을 제공하는 프로필 Service
-   * @param learningProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
+   * @param scenarioProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
    * @param subscriptionEventRepository 결제 이력 Repository
    * @param policies 서버 실행 정책
    * @param grants 저장된 학습 권한
@@ -39,13 +39,13 @@ public class UserSubscriptionService {
   public UserSubscriptionService(
       UserProfileService userProfileService,
       ProfileSubscriptionService profileSubscriptionService,
-      LearningProgressService learningProgressService,
+      ScenarioProgressService scenarioProgressService,
       SubscriptionEventRepository subscriptionEventRepository,
       SubscriptionLaunchPolicyService policies,
       LearningAccessGrantService grants) {
     this.userProfileService = userProfileService;
     this.profileSubscriptionService = profileSubscriptionService;
-    this.learningProgressService = learningProgressService;
+    this.scenarioProgressService = scenarioProgressService;
     this.subscriptionEventRepository = subscriptionEventRepository;
     this.policies = policies;
     this.grants = grants;
@@ -118,6 +118,6 @@ public class UserSubscriptionService {
   private boolean hasCompletedConversationSinceLaunch(
       Long userId, SubscriptionLaunchPolicy policy) {
     return policies.enabledFor(policy, userId)
-        && learningProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
+        && scenarioProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
   }
 }
