@@ -20,6 +20,7 @@ import com.landit.landitbe.feature.subscription.event.dto.SubscriptionChangedEve
 import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionException;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -67,9 +68,9 @@ public class RevenueCatWebhookService {
   public void handle(String authorization, RevenueCatWebhookRequest request) {
     verifyAuthorization(authorization);
     RevenueCatWebhookEvent event = request.event();
-    logReceived(request.apiVersion(), event);
+    log.info("RevenueCat webhook received");
     if (!revenueCatProperties.applySandboxEvents() && "SANDBOX".equals(event.environment())) {
-      log.info("RevenueCat sandbox event ignored: eventId={}", event.id());
+      log.info("RevenueCat sandbox event ignored");
       return;
     }
     Optional<SubscriptionEventType> eventType = SubscriptionEventType.fromRevenueCat(event.type());
@@ -79,7 +80,8 @@ public class RevenueCatWebhookService {
     }
     Optional<SubscriptionStatus> targetStatus = resolveTargetStatus(event);
     if (eventType.isEmpty() && targetStatus.isEmpty()) {
-      log.info("RevenueCat 웹훅 무시: 구독 상태와 무관한 이벤트. eventId={}, type={}", event.id(), event.type());
+      FailureObservation.observed(
+          "subscription_webhook", "routing", "unsupported_event", "expected_rejection");
       return;
     }
     Optional<Long> userId = resolveUserId(event);
@@ -87,11 +89,7 @@ public class RevenueCatWebhookService {
       return;
     }
     if (subscriptionEventRepository.existsByEventId(event.id())) {
-      log.info(
-          "RevenueCat 웹훅 무시: 이미 저장한 이벤트의 재전송. eventId={}, type={}, userId={}",
-          event.id(),
-          event.type(),
-          userId.get());
+      log.info("RevenueCat duplicate event ignored");
       return;
     }
     eventType.ifPresent(type -> saveEvent(event, type, userId.get()));
@@ -99,34 +97,25 @@ public class RevenueCatWebhookService {
   }
 
   /**
-   * 인증을 통과한 웹훅의 수신 사실을 API 버전과 함께 남긴다. 이후 처리 로그와는 eventId로 이어 본다.
-   *
-   * @param apiVersion RevenueCat 웹훅 API 버전
-   * @param event 웹훅 이벤트
-   */
-  private void logReceived(String apiVersion, RevenueCatWebhookEvent event) {
-    log.info(
-        "RevenueCat 웹훅 수신: apiVersion={}, eventId={}, type={}, environment={}",
-        apiVersion,
-        event.id(),
-        event.type(),
-        event.environment());
-  }
-
-  /**
    * Authorization 헤더가 설정된 웹훅 인증값과 같은지 확인한다.
    *
    * @param authorization 요청의 Authorization 헤더 값. 없으면 null
-   * @throws SubscriptionException 설정값이 비어 있거나 헤더가 설정값과 다를 때
+   * @throws SubscriptionException 헤더가 설정값과 다를 때
+   * @throws com.landit.landitbe.shared.exception.ApiException 서버 인증 설정이 누락됐을 때
    */
   private void verifyAuthorization(String authorization) {
     if (!revenueCatProperties.hasWebhookAuthorization()) {
-      log.warn("RevenueCat 웹훅 거절: LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION이 설정되지 않았다.");
-      throw new SubscriptionException(SubscriptionErrorCode.WEBHOOK_UNAUTHORIZED);
+      var exception =
+          new com.landit.landitbe.shared.exception.ApiException(
+              com.landit.landitbe.shared.exception.ErrorCode.SERVICE_UNAVAILABLE);
+      FailureObservation.failed(
+          "subscription_webhook", "configuration", "authentication_not_configured", exception);
+      throw exception;
     }
     if (authorization == null
         || !constantTimeEquals(authorization, revenueCatProperties.webhookAuthorization())) {
-      log.warn("RevenueCat 웹훅 거절: Authorization 헤더가 설정값과 다르다.");
+      FailureObservation.observed(
+          "subscription_webhook", "authentication", "invalid_credentials", "expected_rejection");
       throw new SubscriptionException(SubscriptionErrorCode.WEBHOOK_UNAUTHORIZED);
     }
   }
@@ -181,7 +170,7 @@ public class RevenueCatWebhookService {
    */
   private void handleTransfer(RevenueCatWebhookEvent event) {
     if (subscriptionEventRepository.existsByEventId(event.id())) {
-      log.debug("RevenueCat 웹훅 무시: 이미 저장한 TRANSFER의 재전송. eventId={}", event.id());
+      log.debug("RevenueCat duplicate transfer ignored");
       return;
     }
 
@@ -212,12 +201,8 @@ public class RevenueCatWebhookService {
    * @param event TRANSFER 웹훅 이벤트
    */
   private void logUnresolvedTransfer(RevenueCatWebhookEvent event) {
-    log.warn(
-        "RevenueCat 웹훅 무시: TRANSFER 대상 계정을 찾지 못했다. eventId={}, transferredFrom={},"
-            + " transferredTo={}",
-        event.id(),
-        event.transferredFrom(),
-        event.transferredTo());
+    FailureObservation.observed(
+        "subscription_webhook", "identity", "transfer_identity_unresolved", "expected_rejection");
   }
 
   /**
@@ -264,16 +249,7 @@ public class RevenueCatWebhookService {
       Long toUserId,
       SubscriptionTransferResult transfer,
       boolean saved) {
-    log.info(
-        "RevenueCat 웹훅 처리: TRANSFER result={}, saved={}, fromUserId={}, toUserId={}, status={},"
-            + " eventId={}, environment={}",
-        transfer.result(),
-        saved,
-        fromUserId,
-        toUserId,
-        transfer.moved() == null ? null : transfer.moved().subscriptionStatus(),
-        event.id(),
-        event.environment());
+    log.info("RevenueCat transfer result={} saved={}", transfer.result(), saved);
   }
 
   /**
@@ -305,21 +281,14 @@ public class RevenueCatWebhookService {
   private Optional<Long> resolveUserId(RevenueCatWebhookEvent event) {
     List<Long> candidateUserIds = resolveCandidateUserIds(event);
     if (candidateUserIds.isEmpty()) {
-      log.warn(
-          "RevenueCat 웹훅 무시: Landit 사용자 ID로 해석할 수 없는 app_user_id. eventId={}, type={},"
-              + " appUserId={}",
-          event.id(),
-          event.type(),
-          event.appUserId());
+      FailureObservation.observed(
+          "subscription_webhook", "identity", "invalid_user_id", "expected_rejection");
       return Optional.empty();
     }
     Optional<Long> userId = userProfileService.findExistingUserId(candidateUserIds);
     if (userId.isEmpty()) {
-      log.warn(
-          "RevenueCat 웹훅 무시: 일치하는 사용자 프로필이 없다. eventId={}, type={}, candidateUserIds={}",
-          event.id(),
-          event.type(),
-          candidateUserIds);
+      FailureObservation.observed(
+          "subscription_webhook", "identity", "user_not_found", "expected_rejection");
     }
     return userId;
   }
@@ -367,18 +336,7 @@ public class RevenueCatWebhookService {
     if (result == SubscriptionUpdateResult.APPLIED) {
       eventPublisher.publishEvent(new SubscriptionChangedEvent(userId, event.environment()));
     }
-    log.info(
-        "RevenueCat 웹훅 처리: result={}, userId={}, status={}, periodType={}, productId={}, store={},"
-            + " eventId={}, type={}, environment={}",
-        result,
-        userId,
-        command.status(),
-        command.periodType(),
-        command.productId(),
-        command.store(),
-        event.id(),
-        event.type(),
-        event.environment());
+    log.info("RevenueCat webhook result={} status={}", result, command.status());
   }
 
   /**
@@ -416,10 +374,8 @@ public class RevenueCatWebhookService {
     Optional<SubscriptionPeriodType> periodType =
         SubscriptionPeriodType.fromRevenueCat(event.periodType());
     if (periodType.isEmpty() && event.periodType() != null) {
-      log.warn(
-          "RevenueCat 웹훅 period_type 해석 실패: 알 수 없는 값이라 기간 종류를 비운다. eventId={}, periodType={}",
-          event.id(),
-          event.periodType());
+      FailureObservation.observed(
+          "subscription_webhook", "normalization", "unknown_period_type", "recovered");
     }
     return periodType.orElse(null);
   }
@@ -433,10 +389,8 @@ public class RevenueCatWebhookService {
   private static SubscriptionStore resolveStore(RevenueCatWebhookEvent event) {
     Optional<SubscriptionStore> store = SubscriptionStore.fromRevenueCat(event.store());
     if (store.isEmpty() && event.store() != null) {
-      log.warn(
-          "RevenueCat 웹훅 store 해석 실패: 알 수 없는 값이라 스토어를 비운다. eventId={}, store={}",
-          event.id(),
-          event.store());
+      FailureObservation.observed(
+          "subscription_webhook", "normalization", "unknown_store", "recovered");
     }
     return store.orElse(null);
   }
