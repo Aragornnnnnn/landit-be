@@ -21,9 +21,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -147,6 +149,20 @@ class GlobalExceptionHandlerTests {
     assertThat(response.getHeaders().getAllow()).containsExactly(HttpMethod.GET);
     assertThat(errorLogs()).isEmpty();
   }
+
+  @Test
+  void missingPathVariableUsesServerErrorCodeWithServerStatus() throws Exception {
+    Method method = getClass().getDeclaredMethod("pathVariableTarget", String.class);
+    var exception = new MissingPathVariableException("id", new MethodParameter(method, 0));
+
+    var response = handler.handleHttpContract(exception);
+
+    assertError(
+        response, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다.");
+    assertSingleErrorLog(exception, "server_contract");
+  }
+
+  private void pathVariableTarget(String id) {}
 
   @Test
   void authenticatedContractViolationIsReportedDespiteClientStatus() {

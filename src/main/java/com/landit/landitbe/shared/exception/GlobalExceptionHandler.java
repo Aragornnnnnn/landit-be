@@ -178,7 +178,11 @@ public class GlobalExceptionHandler {
     }
     return ResponseEntity.status(response.getStatusCode())
         .headers(response.getHeaders())
-        .body(ApiResponse.error(ErrorCode.INVALID_REQUEST));
+        .body(
+            ApiResponse.error(
+                response.getStatusCode().is5xxServerError()
+                    ? ErrorCode.INTERNAL_SERVER_ERROR
+                    : ErrorCode.INVALID_REQUEST));
   }
 
   private void observeRequest(Exception exception) {
