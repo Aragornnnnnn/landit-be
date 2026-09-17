@@ -6,7 +6,7 @@ import com.landit.landitbe.config.memory.MemoryProperties;
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
-import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
@@ -29,7 +29,7 @@ import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -52,7 +52,7 @@ public class FreeTalkSubmittedMessageService {
   private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
   private final UserProfileService userProfileService;
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
@@ -76,7 +76,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageReservation reserve(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
-    final LearningSession learningSession =
+    final LearningSessionSnapshot learningSession =
         sessionService.requireOwnedSession(userId, learningSessionId);
     FreeTalkSession freeTalkSession = sessionService.requireFreeTalkForUpdate(learningSessionId);
     sessionService.clearExpiredProcessing(freeTalkSession);
@@ -104,7 +104,7 @@ public class FreeTalkSubmittedMessageService {
   }
 
   private void validateReservable(
-      LearningSession learningSession, FreeTalkSession freeTalkSession) {
+      LearningSessionSnapshot learningSession, FreeTalkSession freeTalkSession) {
     if (!learningSession.isInProgress()
         || freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED) {
       throw new ApiException(SessionErrorCode.SESSION_ALREADY_COMPLETED);
@@ -118,7 +118,7 @@ public class FreeTalkSubmittedMessageService {
   private FreeTalkMessageReservation reserveExistingMessage(
       long userId,
       FreeTalkMessageSubmitRequest request,
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       FreeTalkSession freeTalkSession,
       SessionHistory history,
       SessionHistoryMessage existingMessage,
@@ -143,7 +143,7 @@ public class FreeTalkSubmittedMessageService {
   private FreeTalkMessageReservation reserveNewMessage(
       long userId,
       FreeTalkMessageSubmitRequest request,
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       FreeTalkSession freeTalkSession,
       SessionHistory history,
       List<SessionHistoryMessage> messages) {
@@ -185,7 +185,7 @@ public class FreeTalkSubmittedMessageService {
   private FreeTalkMessageReservation reservation(
       long userId,
       LocalDate usageDate,
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       FreeTalkSession freeTalkSession,
       SessionHistory history,
       SessionHistoryMessage userMessage,
@@ -299,7 +299,8 @@ public class FreeTalkSubmittedMessageService {
     prepareMemoryGeneration(session);
     session.clearProcessing();
     LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
-    records.learningSession().completeFreeTalkByTimeLimit(completedAt);
+    learningSessionService.completeFreeTalkByTimeLimit(
+        records.learningSession().getId(), completedAt);
     records
         .history()
         .complete(
@@ -360,7 +361,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkExitDecisionReservation reserveDecision(
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
-    final LearningSession learningSession =
+    final LearningSessionSnapshot learningSession =
         sessionService.requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = sessionService.requireFreeTalkForUpdate(learningSessionId);
     sessionService.clearExpiredProcessing(session);
@@ -468,7 +469,7 @@ public class FreeTalkSubmittedMessageService {
     prepareMemoryGeneration(records.freeTalkSession());
     records.freeTalkSession().clearProcessing();
     LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
-    records.learningSession().completeFreeTalkByUser(completedAt);
+    learningSessionService.completeFreeTalkByUser(records.learningSession().getId(), completedAt);
     records
         .history()
         .complete(
@@ -510,7 +511,7 @@ public class FreeTalkSubmittedMessageService {
 
   private ManagedRecords managedRecords(
       long learningSessionId, long historyId, long userMessageId) {
-    LearningSession learningSession = requireOwnedSessionWithoutUser(learningSessionId);
+    LearningSessionSnapshot learningSession = requireOwnedSessionWithoutUser(learningSessionId);
     FreeTalkSession session = sessionService.requireFreeTalkForUpdate(learningSessionId);
     SessionHistory history =
         sessionHistoryRepository
@@ -523,9 +524,9 @@ public class FreeTalkSubmittedMessageService {
     return new ManagedRecords(learningSessionId, learningSession, session, history, userMessage);
   }
 
-  private LearningSession requireOwnedSessionWithoutUser(long learningSessionId) {
-    return learningSessionRepository
-        .findById(learningSessionId)
+  private LearningSessionSnapshot requireOwnedSessionWithoutUser(long learningSessionId) {
+    return learningSessionService
+        .findSession(learningSessionId)
         .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
@@ -595,7 +596,7 @@ public class FreeTalkSubmittedMessageService {
 
   private record ManagedRecords(
       long learningSessionId,
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       FreeTalkSession freeTalkSession,
       SessionHistory history,
       SessionHistoryMessage userMessage) {}

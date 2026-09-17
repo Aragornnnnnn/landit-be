@@ -2,15 +2,15 @@
 
 package com.landit.landitbe.feature.session.freetalk.expression.service;
 
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionCompletion;
 import com.landit.landitbe.feature.session.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FreeTalkExpressionLearningService {
   private final FreeTalkSessionRepository freeTalkSessionRepository;
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
 
   /**
@@ -41,9 +41,9 @@ public class FreeTalkExpressionLearningService {
         freeTalkSessionRepository
             .findByLearningSessionId(freeTalkSessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    LearningSession learningSession =
-        learningSessionRepository
-            .findById(freeTalkSession.getLearningSessionId())
+    LearningSessionSnapshot learningSession =
+        learningSessionService
+            .findSession(freeTalkSession.getLearningSessionId())
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     if (!userId.equals(learningSession.getUserProfileId())) {
       throw new ApiException(ErrorCode.FORBIDDEN);

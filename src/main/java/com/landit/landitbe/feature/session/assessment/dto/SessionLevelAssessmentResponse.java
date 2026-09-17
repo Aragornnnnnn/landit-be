@@ -3,8 +3,8 @@
 package com.landit.landitbe.feature.session.assessment.dto;
 
 import com.landit.landitbe.feature.session.assessment.domain.SessionLevelAssessment;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -39,7 +39,7 @@ public record SessionLevelAssessmentResponse(
    * @return 세션 처리 상태와 선택적 평가 결과
    */
   public static SessionLevelAssessmentResponse from(
-      LearningSession session, SessionLevelAssessment assessment) {
+      LearningSessionSnapshot session, SessionLevelAssessment assessment) {
     return new SessionLevelAssessmentResponse(
         session.getId(),
         statusOf(session.getLevelAssessmentProcessingStatus(), assessment != null),

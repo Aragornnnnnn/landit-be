@@ -6,8 +6,8 @@ import com.landit.landitbe.feature.content.expression.domain.ExpressionDifficult
 import com.landit.landitbe.feature.content.expression.recommendation.service.ExpressionRecommendationService;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
@@ -24,7 +24,7 @@ import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRe
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -59,7 +59,7 @@ public class FreeTalkExpressionGenerationService {
       "프리톡 표현 생성 실패. learningSessionId={}, totalMs={}, stages=[{}]";
 
   private final FreeTalkSessionRepository freeTalkSessionRepository;
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
@@ -195,8 +195,8 @@ public class FreeTalkExpressionGenerationService {
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
-    LearningSession learningSession =
-        learningSessionRepository.findById(learningSessionId).orElseThrow();
+    LearningSessionSnapshot learningSession =
+        learningSessionService.findSession(learningSessionId).orElseThrow();
 
     // 완료된 프리톡에서 아직 실행되지 않은 PREPARING 작업만 선점한다.
     if (learningSession.getStatus() != LearningSessionStatus.COMPLETED

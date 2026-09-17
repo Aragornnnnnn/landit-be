@@ -48,7 +48,8 @@ class FreeTalkSessionServiceTest {
           org.mockito.Mockito.mock(
               com.landit.landitbe.feature.subscription.service.LearningAccessGrantService.class),
           userProfileService,
-          learningSessionRepository,
+          new com.landit.landitbe.feature.session.service.LearningSessionService(
+              learningSessionRepository),
           freeTalkSessionRepository,
           freeTalkTopicRepository,
           sessionHistoryRepository,

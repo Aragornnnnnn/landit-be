@@ -62,10 +62,14 @@ class FreeTalkSubmittedMessageServiceTest {
 
   private FreeTalkSubmittedMessageService service(MemoryProperties memoryProperties) {
     return new FreeTalkSubmittedMessageService(
-        new FreeTalkMessageSessionService(learningSessionRepository, freeTalkSessionRepository),
+        new FreeTalkMessageSessionService(
+            new com.landit.landitbe.feature.session.service.LearningSessionService(
+                learningSessionRepository),
+            freeTalkSessionRepository),
         new FreeTalkMessageResponseService(dailySpeakingUsageService),
         userProfileService,
-        learningSessionRepository,
+        new com.landit.landitbe.feature.session.service.LearningSessionService(
+            learningSessionRepository),
         freeTalkSessionRepository,
         freeTalkTopicRepository,
         sessionHistoryRepository,

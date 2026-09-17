@@ -95,7 +95,10 @@ class ExpressionLearningCompletionServiceTest {
             scenarioLearningLevelService,
             expressionCompletionService,
             new FreeTalkExpressionLearningService(
-                freeTalkSessionRepository, learningSessionRepository, sessionExpressionRepository));
+                freeTalkSessionRepository,
+                new com.landit.landitbe.feature.session.service.LearningSessionService(
+                    learningSessionRepository),
+                sessionExpressionRepository));
     lenient()
         .when(
             scenarioLearningLevelService.expressionLevel(

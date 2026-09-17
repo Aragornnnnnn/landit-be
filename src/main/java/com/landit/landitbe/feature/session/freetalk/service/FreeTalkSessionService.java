@@ -7,7 +7,7 @@ import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.content.tutor.service.ConversationCharacterService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
@@ -23,7 +23,7 @@ import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -41,7 +41,7 @@ public class FreeTalkSessionService {
   private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
       accessGrants;
   private final UserProfileService userProfileService;
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
@@ -71,14 +71,13 @@ public class FreeTalkSessionService {
         conversationCharacterService.requireActiveTtsVoice(character.id());
     dailySpeakingUsageService.reserveRequest(userId);
     LocalDateTime startedAt = LocalDateTime.now();
-    LearningSession learningSession =
-        learningSessionRepository.save(
-            LearningSession.startFreeTalk(
-                userProfile.id(),
-                requireAiTutorId(userProfile),
-                userProfile.targetLocale(),
-                userProfile.baseLocale(),
-                startedAt));
+    LearningSessionSnapshot learningSession =
+        learningSessionService.startFreeTalk(
+            userProfile.id(),
+            requireAiTutorId(userProfile),
+            userProfile.targetLocale(),
+            userProfile.baseLocale(),
+            startedAt);
     accessGrants.recordFreeTalk(userId, learningSession.getId(), startedAt, startAccess);
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository.save(
@@ -159,8 +158,7 @@ public class FreeTalkSessionService {
               freeTalkSessionRepository.delete(freeTalkSession);
               freeTalkSessionRepository.flush();
             });
-    learningSessionRepository.deleteById(learningSessionId);
-    learningSessionRepository.flush();
+    learningSessionService.deleteStart(learningSessionId);
   }
 
   private void validateStartRequest(FreeTalkSessionStartRequest request) {

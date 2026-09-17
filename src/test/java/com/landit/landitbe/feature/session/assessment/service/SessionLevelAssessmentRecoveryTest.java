@@ -17,6 +17,7 @@ import com.landit.landitbe.feature.session.assessment.repository.UserLevelAssess
 import com.landit.landitbe.feature.session.domain.CompletionReason;
 import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.service.SessionFeedbackContextService;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
@@ -34,21 +35,23 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 class SessionLevelAssessmentRecoveryTest {
   @Test
   void futureLaunchReturnsNullForInProgressSessionAndSkipsAssessmentWork() {
-    var sessions = mock(LearningSessionService.class);
-    var profiles = mock(UserProfileService.class);
-    var contexts = mock(SessionFeedbackContextService.class);
-    var evaluator = mock(SessionLevelAssessmentService.class);
-    var repository = mock(UserLevelAssessmentRepository.class);
-    var ai = mock(AiConversationClient.class);
-    var transactions = mock(PlatformTransactionManager.class);
-    var executor = mock(org.springframework.core.task.TaskExecutor.class);
+    final var sessions = mock(LearningSessionService.class);
+    final var profiles = mock(UserProfileService.class);
+    final var contexts = mock(SessionFeedbackContextService.class);
+    final var evaluator = mock(SessionLevelAssessmentService.class);
+    final var repository = mock(UserLevelAssessmentRepository.class);
+    final var ai = mock(AiConversationClient.class);
+    final var transactions = mock(PlatformTransactionManager.class);
+    final var executor = mock(org.springframework.core.task.TaskExecutor.class);
     var clock = mock(Clock.class);
     Instant launchInstant = Instant.parse("2026-07-01T00:00:00Z");
     when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     when(clock.instant()).thenReturn(launchInstant.minusSeconds(1));
     var session =
         LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
-    when(sessions.findOwned(1L, 10L)).thenReturn(session);
+    org.springframework.test.util.ReflectionTestUtils.setField(session, "id", 10L);
+    when(sessions.findOwned(1L, 10L))
+        .thenAnswer(invocation -> LearningSessionSnapshot.from(session));
     var service =
         new SessionLevelAssessmentGenerationService(
             sessions,
@@ -94,14 +97,23 @@ class SessionLevelAssessmentRecoveryTest {
     when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     var session =
         LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
+    org.springframework.test.util.ReflectionTestUtils.setField(session, "id", 10L);
     session.completeBySystem(CompletionReason.MAX_TURNS_REACHED, LocalDateTime.now(clock));
     session.prepareLevelAssessment(LocalDateTime.now(clock));
+    when(sessions.completeLevelAssessment(10L))
+        .thenAnswer(
+            invocation -> {
+              session.completeLevelAssessment();
+              return LearningSessionSnapshot.from(session);
+            });
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
     when(contexts.load(1L, 10L)).thenReturn(context);
-    when(sessions.findOwned(1L, 10L)).thenReturn(session);
-    when(sessions.findOwnedCompletedForUpdate(1L, 10L)).thenReturn(session);
-    when(sessions.isLatestCompletedScenario(session)).thenReturn(true);
+    when(sessions.findOwned(1L, 10L))
+        .thenAnswer(invocation -> LearningSessionSnapshot.from(session));
+    when(sessions.findOwnedCompletedForUpdate(1L, 10L))
+        .thenAnswer(invocation -> LearningSessionSnapshot.from(session));
+    when(sessions.isLatestCompletedScenario(any(LearningSessionSnapshot.class))).thenReturn(true);
     var queued = new java.util.concurrent.atomic.AtomicReference<Runnable>();
     var service =
         new SessionLevelAssessmentGenerationService(
@@ -155,15 +167,24 @@ class SessionLevelAssessmentRecoveryTest {
     var clock = Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneOffset.UTC);
     var session =
         LearningSession.startScenario(1L, 1L, Locale.EN, Locale.KR, LocalDateTime.now(clock));
+    org.springframework.test.util.ReflectionTestUtils.setField(session, "id", 10L);
     session.completeBySystem(CompletionReason.MAX_TURNS_REACHED, LocalDateTime.now(clock));
     session.prepareLevelAssessment(LocalDateTime.now(clock).minusMinutes(3));
+    when(sessions.completeLevelAssessment(10L))
+        .thenAnswer(
+            invocation -> {
+              session.completeLevelAssessment();
+              return LearningSessionSnapshot.from(session);
+            });
     var context = mock(LoadedSessionFeedbackContext.class);
     when(context.sessionId()).thenReturn(10L);
     when(contexts.load(1L, 10L))
         .thenThrow(new IllegalStateException("temporary failure"))
         .thenReturn(context);
-    when(sessions.findOwned(1L, 10L)).thenReturn(session);
-    when(sessions.findOwnedCompletedForUpdate(1L, 10L)).thenReturn(session);
+    when(sessions.findOwned(1L, 10L))
+        .thenAnswer(invocation -> LearningSessionSnapshot.from(session));
+    when(sessions.findOwnedCompletedForUpdate(1L, 10L))
+        .thenAnswer(invocation -> LearningSessionSnapshot.from(session));
     when(repository.findByLearningSessionId(10L)).thenReturn(Optional.empty());
     var service =
         new SessionLevelAssessmentGenerationService(

@@ -10,8 +10,8 @@ import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressSer
 import com.landit.landitbe.feature.learning.scenario.service.CurrentScenarioSelectionService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
@@ -111,7 +111,7 @@ public class ScenarioSessionStartService {
 
     // 관리자 테스트도 실제 학습과 동일한 진행도와 세션 기록을 남긴다.
     ensureProgress(userProfile, startRow, now);
-    LearningSession learningSession =
+    LearningSessionSnapshot learningSession =
         createLearningSession(userId, userProfile, startRow, questionLevelGroup, now);
     accessGrants.recordScenario(userId, learningSession.getId(), scenarioId, now, startAccess);
 
@@ -140,8 +140,8 @@ public class ScenarioSessionStartService {
 
   /** 첫 시나리오 시작의 응답이 유실되거나 중도 종료했으면 같은 세션의 현재 진행도를 반환한다. */
   private SessionStartResponse resume(long userId, long scenarioId, long sessionId) {
-    LearningSession session = learningSessionService.findOwnedForUpdate(userId, sessionId);
-    session.resumeInterruptedScenario();
+    LearningSessionSnapshot session = learningSessionService.findOwnedForUpdate(userId, sessionId);
+    session = learningSessionService.resumeInterruptedScenario(session.getId());
     var context = scenarioSessionService.requireMessageContext(sessionId);
     var row = findStartRow(userId, scenarioId, context.questionLevelGroup());
     var history = sessionHistoryService.findByLearningSessionId(sessionId);
@@ -229,20 +229,19 @@ public class ScenarioSessionStartService {
   }
 
   /** 학습 세션과 시나리오 세션을 함께 생성해 시작한 언어 variant를 연결한다. */
-  private LearningSession createLearningSession(
+  private LearningSessionSnapshot createLearningSession(
       long userId,
       UserLearningProfile userProfile,
       ScenarioStartContext startRow,
       ContentLearningLevel questionLevelGroup,
       LocalDateTime startedAt) {
-    LearningSession learningSession =
-        learningSessionService.save(
-            LearningSession.startScenario(
-                userId,
-                requireAiTutorId(userProfile),
-                userProfile.targetLocale(),
-                userProfile.baseLocale(),
-                startedAt));
+    LearningSessionSnapshot learningSession =
+        learningSessionService.startScenario(
+            userId,
+            requireAiTutorId(userProfile),
+            userProfile.targetLocale(),
+            userProfile.baseLocale(),
+            startedAt);
 
     scenarioSessionService.save(
         ScenarioSession.start(

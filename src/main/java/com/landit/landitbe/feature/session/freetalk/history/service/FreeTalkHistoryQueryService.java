@@ -4,8 +4,8 @@ package com.landit.landitbe.feature.session.freetalk.history.service;
 
 import com.landit.landitbe.feature.content.expression.dto.ExpressionText;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
@@ -19,7 +19,7 @@ import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRe
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkHistoryQueryService {
 
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
@@ -60,7 +60,7 @@ public class FreeTalkHistoryQueryService {
     List<FreeTalkSession> freeTalkSessions = sessions.getContent();
 
     // 페이지에 포함된 세션·표현·완료 상태를 일괄 조회해 반복 쿼리를 피한다.
-    Map<Long, LearningSession> learningSessionsById =
+    Map<Long, LearningSessionSnapshot> learningSessionsById =
         learningSessionsById(
             freeTalkSessions.stream().map(FreeTalkSession::getLearningSessionId).toList());
     Map<Long, List<FreeTalkSessionExpression>> expressionsByFreeTalkSessionId =
@@ -147,10 +147,11 @@ public class FreeTalkHistoryQueryService {
 
   private FreeTalkSessionListResponse.Item toListItem(
       FreeTalkSession session,
-      Map<Long, LearningSession> learningSessionsById,
+      Map<Long, LearningSessionSnapshot> learningSessionsById,
       Map<Long, List<FreeTalkSessionExpression>> expressionsByFreeTalkSessionId,
       Map<Long, ExpressionText> writingExpressionsById) {
-    LearningSession learningSession = learningSessionsById.get(session.getLearningSessionId());
+    LearningSessionSnapshot learningSession =
+        learningSessionsById.get(session.getLearningSessionId());
     if (learningSession == null) {
       throw new ApiException(SessionErrorCode.SESSION_NOT_FOUND);
     }
@@ -174,9 +175,9 @@ public class FreeTalkHistoryQueryService {
   }
 
   private CompletedSession requireCompleted(long userId, long learningSessionId) {
-    LearningSession learningSession =
-        learningSessionRepository
-            .findById(learningSessionId)
+    LearningSessionSnapshot learningSession =
+        learningSessionService
+            .findSession(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     if (!Long.valueOf(userId).equals(learningSession.getUserProfileId())) {
       throw new ApiException(ErrorCode.FORBIDDEN);
@@ -193,10 +194,10 @@ public class FreeTalkHistoryQueryService {
   }
 
   // 학습 세션 목록을 ID 기준 조회 맵으로 변환한다.
-  private Map<Long, LearningSession> learningSessionsById(List<Long> learningSessionIds) {
-    Map<Long, LearningSession> learningSessionsById = new HashMap<>();
-    learningSessionRepository
-        .findAllById(learningSessionIds)
+  private Map<Long, LearningSessionSnapshot> learningSessionsById(List<Long> learningSessionIds) {
+    Map<Long, LearningSessionSnapshot> learningSessionsById = new HashMap<>();
+    learningSessionService
+        .findSessions(learningSessionIds)
         .forEach(session -> learningSessionsById.put(session.getId(), session));
     return learningSessionsById;
   }
@@ -327,7 +328,7 @@ public class FreeTalkHistoryQueryService {
   }
 
   private record CompletedSession(
-      LearningSession learningSession, FreeTalkSession freeTalkSession) {}
+      LearningSessionSnapshot learningSession, FreeTalkSession freeTalkSession) {}
 
   private record ExpressionProgress(
       ExpressionLearningStatus learningStatus,

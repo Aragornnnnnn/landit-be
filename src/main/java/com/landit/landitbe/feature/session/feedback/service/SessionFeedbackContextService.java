@@ -7,7 +7,7 @@ import com.landit.landitbe.feature.content.scenario.question.dto.NextQuestionCon
 import com.landit.landitbe.feature.content.scenario.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
-import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.feedback.dto.ExistingSummaryFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
@@ -54,7 +54,8 @@ public class SessionFeedbackContextService {
    */
   @Transactional(readOnly = true)
   public LoadedSessionFeedbackContext load(long userId, long sessionId) {
-    LearningSession learningSession = learningSessionService.findOwnedCompleted(userId, sessionId);
+    LearningSessionSnapshot learningSession =
+        learningSessionService.findOwnedCompleted(userId, sessionId);
     SessionHistory sessionHistory =
         sessionHistoryService
             .findByLearningSessionId(sessionId)

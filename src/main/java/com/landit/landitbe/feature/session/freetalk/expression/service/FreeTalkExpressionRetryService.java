@@ -2,15 +2,15 @@
 
 package com.landit.landitbe.feature.session.freetalk.expression.service;
 
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.expression.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkExpressionRetryService {
 
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
 
@@ -37,12 +37,12 @@ public class FreeTalkExpressionRetryService {
    */
   @Transactional
   public FreeTalkExpressionRetryResponse retry(long userId, long learningSessionId) {
-    LearningSession learningSession =
-        learningSessionRepository
-            .findByIdAndUserProfileIdForUpdate(learningSessionId, userId)
+    LearningSessionSnapshot learningSession =
+        learningSessionService
+            .lockOwnedSnapshot(learningSessionId, userId)
             .orElseGet(
                 () -> {
-                  if (learningSessionRepository.existsById(learningSessionId)) {
+                  if (learningSessionService.exists(learningSessionId)) {
                     throw new ApiException(ErrorCode.FORBIDDEN);
                   }
                   throw new ApiException(SessionErrorCode.SESSION_NOT_FOUND);

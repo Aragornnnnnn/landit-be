@@ -7,8 +7,8 @@ import com.landit.landitbe.feature.session.assessment.client.ai.AiSessionLevelAs
 import com.landit.landitbe.feature.session.assessment.domain.UserLevelAssessment;
 import com.landit.landitbe.feature.session.assessment.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.session.assessment.repository.UserLevelAssessmentRepository;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.service.SessionFeedbackContextService;
@@ -87,7 +87,7 @@ public class SessionLevelAssessmentGenerationService {
       return;
     }
     try {
-      LearningSession session = learningSessionService.findOwned(userId, sessionId);
+      LearningSessionSnapshot session = learningSessionService.findOwned(userId, sessionId);
       if (!canProcess(session)) {
         return;
       }
@@ -106,7 +106,7 @@ public class SessionLevelAssessmentGenerationService {
    * @return 처리 상태와 저장된 평가 결과. 비활성 또는 도입 전 완료 세션이면 null
    */
   public @Nullable SessionLevelAssessmentResponse get(long userId, long sessionId) {
-    LearningSession session = learningSessionService.findOwned(userId, sessionId);
+    LearningSessionSnapshot session = learningSessionService.findOwned(userId, sessionId);
     if (!launchService.isEnabledFor(userId)
         || (session.getEndedAt() != null
             && !launchService.includes(session.getUserProfileId(), session.getEndedAt()))) {
@@ -127,7 +127,8 @@ public class SessionLevelAssessmentGenerationService {
   private void generateAndPersist(long userId, LoadedSessionFeedbackContext context) {
     AiSessionLevelAssessment aiAssessment = null;
     try {
-      LearningSession session = learningSessionService.findOwned(userId, context.sessionId());
+      LearningSessionSnapshot session =
+          learningSessionService.findOwned(userId, context.sessionId());
       if (!canProcess(session)) {
         return;
       }
@@ -149,7 +150,7 @@ public class SessionLevelAssessmentGenerationService {
       transactionTemplate.executeWithoutResult(
           status -> {
             userProfileService.requireActiveForUpdate(userId);
-            LearningSession session =
+            LearningSessionSnapshot session =
                 learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
             if (!canProcess(session)
                 || assessmentRepository.findByLearningSessionId(context.sessionId()).isPresent()) {
@@ -161,7 +162,7 @@ public class SessionLevelAssessmentGenerationService {
                 isExpired(session, null) ? null : aiAssessment,
                 learningSessionService.isLatestCompletedScenario(session),
                 session.getLevelAssessmentRequestedAt());
-            session.completeLevelAssessment();
+            learningSessionService.completeLevelAssessment(session.getId());
           });
     } catch (RuntimeException exception) {
       markFailed(userId, context.sessionId());
@@ -177,10 +178,10 @@ public class SessionLevelAssessmentGenerationService {
     try {
       transactionTemplate.executeWithoutResult(
           status -> {
-            LearningSession session =
+            LearningSessionSnapshot session =
                 learningSessionService.findOwnedCompletedForUpdate(userId, sessionId);
             if (session.getLevelAssessmentProcessingStatus() == ProcessingStatus.PREPARING) {
-              session.failLevelAssessment();
+              learningSessionService.failLevelAssessment(session.getId());
             }
           });
     } catch (RuntimeException ignored) {
@@ -188,7 +189,7 @@ public class SessionLevelAssessmentGenerationService {
     }
   }
 
-  private boolean isExpired(LearningSession session, UserLevelAssessment assessment) {
+  private boolean isExpired(LearningSessionSnapshot session, UserLevelAssessment assessment) {
     return assessment == null
         && session.getLevelAssessmentProcessingStatus() == ProcessingStatus.PREPARING
         && session.getLevelAssessmentRequestedAt() != null
@@ -198,7 +199,7 @@ public class SessionLevelAssessmentGenerationService {
             .isAfter(LocalDateTime.now(clock));
   }
 
-  private boolean canProcess(LearningSession session) {
+  private boolean canProcess(LearningSessionSnapshot session) {
     return launchService.includes(session.getUserProfileId(), session.getEndedAt())
         && session.getLevelAssessmentProcessingStatus() == ProcessingStatus.PREPARING;
   }

@@ -50,7 +50,8 @@ class FreeTalkHistoryQueryServiceTest {
   void createService() {
     historyQueryService =
         new FreeTalkHistoryQueryService(
-            learningSessionRepository,
+            new com.landit.landitbe.feature.session.service.LearningSessionService(
+                learningSessionRepository),
             freeTalkSessionRepository,
             sessionHistoryRepository,
             sessionHistoryMessageRepository,

@@ -5,8 +5,8 @@ package com.landit.landitbe.feature.session.scenario.start.dto;
 import com.landit.landitbe.feature.content.scenario.dto.ScenarioStartContext;
 import com.landit.landitbe.feature.content.tutor.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionType;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -43,7 +43,7 @@ public record SessionStartResponse(
    * @return 시나리오 세션 시작 응답
    */
   public static SessionStartResponse from(
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       ScenarioStartContext startProjection,
       CurrentMessageResponse currentMessage) {
     String userOpeningInstruction =

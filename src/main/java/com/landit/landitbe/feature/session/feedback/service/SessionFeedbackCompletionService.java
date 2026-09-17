@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.session.feedback.service;
 
 import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.domain.FeedbackType;
@@ -43,7 +43,7 @@ class SessionFeedbackCompletionService {
     validateResult(context, result);
     BigDecimal starRating = result.starRating();
     // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
-    final LearningSession learningSession =
+    final LearningSessionSnapshot learningSession =
         learningSessionService.findOwnedCompletedForUpdate(userId, context.sessionId());
     SessionHistorySummaryFeedback existing =
         sessionFeedbackDataService.findSummaryByHistoryId(context.sessionHistoryId()).orElse(null);
@@ -182,7 +182,7 @@ class SessionFeedbackCompletionService {
 
   /** 세션 종료 시각을 기준으로 히스토리의 종료 정보와 사용자 메시지 수를 확정한다. */
   private void completeSessionHistory(
-      LoadedSessionFeedbackContext context, LearningSession learningSession) {
+      LoadedSessionFeedbackContext context, LearningSessionSnapshot learningSession) {
     SessionHistory sessionHistory = sessionHistoryService.require(context.sessionHistoryId());
     int userMessageCount =
         Math.toIntExact(
@@ -193,7 +193,7 @@ class SessionFeedbackCompletionService {
   /** 신규 최종 피드백 저장 시점에만 시나리오 진행도와 최고 성과를 갱신한다. */
   private void completeScenarioProgress(
       LoadedSessionFeedbackContext context,
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       int nativeScore,
       BigDecimal starRating) {
     scenarioProgressService.completeScenario(

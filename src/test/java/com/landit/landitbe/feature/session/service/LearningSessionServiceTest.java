@@ -23,14 +23,24 @@ class LearningSessionServiceTest {
   private final LearningSessionRepository repository = mock(LearningSessionRepository.class);
   private final LearningSessionService service = new LearningSessionService(repository);
 
-  /** 소유한 진행 중 세션은 잠금 조회 결과를 그대로 반환한다. */
+  /** 잠금 조회 결과는 이후 영속 상태 변경과 분리된 값으로 반환한다. */
   @Test
   void returnsOwnedInProgressSessionForUpdate() {
-    LearningSession session = mock(LearningSession.class);
-    when(session.isInProgress()).thenReturn(true);
+    LearningSession session =
+        LearningSession.startScenario(
+            1L,
+            2L,
+            com.landit.landitbe.shared.domain.Locale.EN,
+            com.landit.landitbe.shared.domain.Locale.KR,
+            LocalDateTime.now());
+    org.springframework.test.util.ReflectionTestUtils.setField(session, "id", 10L);
     when(repository.findByIdAndUserProfileIdForUpdate(10L, 1L)).thenReturn(Optional.of(session));
 
-    assertThat(service.findOwnedInProgressForUpdate(1L, 10L)).isSameAs(session);
+    var result = service.findOwnedInProgressForUpdate(1L, 10L);
+    session.interruptByUser(LocalDateTime.now());
+    assertThat(result.id()).isEqualTo(10L);
+    assertThat(result.userProfileId()).isEqualTo(1L);
+    assertThat(result.isInProgress()).isTrue();
   }
 
   /** 존재하지만 다른 사용자의 세션이면 권한 오류로 변환한다. */

@@ -5,8 +5,8 @@ package com.landit.landitbe.feature.session.scenario.message.service;
 import com.landit.landitbe.feature.content.scenario.question.dto.NextQuestionContext;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioContentService;
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.SessionMessageInputType;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
@@ -43,7 +43,7 @@ class SubmittedMessageService {
       String content,
       SessionMessageInputType inputType,
       String clientMessageId) {
-    LearningSession learningSession =
+    LearningSessionSnapshot learningSession =
         learningSessionService.findOwnedInProgressForUpdate(userId, sessionId);
     ScenarioSessionMessageContextProjection scenarioContext = findScenarioContext(sessionId);
     SessionHistoryLookup sessionHistoryLookup = findOrCreateSessionHistory(learningSession);
@@ -173,7 +173,7 @@ class SubmittedMessageService {
     return scenarioSessionService.requireMessageContext(sessionId);
   }
 
-  private SessionHistoryLookup findOrCreateSessionHistory(LearningSession learningSession) {
+  private SessionHistoryLookup findOrCreateSessionHistory(LearningSessionSnapshot learningSession) {
     Optional<SessionHistory> sessionHistory =
         sessionHistoryService.findByLearningSessionId(learningSession.getId());
     if (sessionHistory.isPresent()) {
@@ -232,7 +232,7 @@ class SubmittedMessageService {
   }
 
   private Optional<NextQuestionContext> findNextQuestion(
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       ScenarioSessionMessageContextProjection scenarioContext,
       int nextQuestionOrder) {
     return scenarioContentService.findActiveQuestion(

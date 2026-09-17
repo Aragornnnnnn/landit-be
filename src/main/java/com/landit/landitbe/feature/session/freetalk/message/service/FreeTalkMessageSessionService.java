@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.session.freetalk.message.service;
 
-import com.landit.landitbe.feature.session.domain.LearningSession;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -19,19 +19,19 @@ import org.springframework.stereotype.Service;
 class FreeTalkMessageSessionService {
 
   private static final long PROCESSING_TIMEOUT_SECONDS = 90;
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
 
-  LearningSession requireOwnedSession(long userId, long learningSessionId) {
-    LearningSession session =
-        learningSessionRepository
-            .findById(learningSessionId)
+  LearningSessionSnapshot requireOwnedSession(long userId, long learningSessionId) {
+    LearningSessionSnapshot session =
+        learningSessionService
+            .findSession(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     if (!Long.valueOf(userId).equals(session.getUserProfileId())) {
       throw new ApiException(ErrorCode.FORBIDDEN);
     }
-    return learningSessionRepository
-        .findByIdAndUserProfileIdForUpdate(learningSessionId, userId)
+    return learningSessionService
+        .lockOwnedSnapshot(learningSessionId, userId)
         .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 

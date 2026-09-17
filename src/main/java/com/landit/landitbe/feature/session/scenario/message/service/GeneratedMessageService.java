@@ -6,8 +6,8 @@ import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.learning.access.service.ScenarioAccessService;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.feature.session.assessment.service.SessionLevelAssessmentLaunchService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.scenario.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitResponse;
@@ -41,7 +41,7 @@ class GeneratedMessageService {
       SubmittedMessageContext submittedContext,
       SessionMessageAiGenerator.Generation generation,
       ProcessingStatus feedbackProcessingStatus) {
-    final LearningSession learningSession =
+    final LearningSessionSnapshot learningSession =
         learningSessionService.findOwnedInProgressForUpdate(
             submittedContext.userId(), submittedContext.sessionId());
     final ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
@@ -59,11 +59,12 @@ class GeneratedMessageService {
         saveAiMessage(submittedMessage, generation.aiMessage(), generation.translatedMessage());
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
-      learningSession.completeBySystem(generation.completionReason(), completedAt);
+      learningSessionService.completeBySystem(
+          learningSession.getId(), generation.completionReason(), completedAt);
       scenarioSession.recordCompletedLearningLevel(
           profileLearningService.getLearningLevel(submittedContext.userId()).learningLevel());
       if (assessmentLaunchService.includes(submittedContext.userId(), completedAt)) {
-        learningSession.prepareLevelAssessment(completedAt);
+        learningSessionService.prepareLevelAssessment(learningSession.getId(), completedAt);
       }
       grantScenarioAccess(learningSession, submittedContext, completedAt);
       streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
@@ -85,7 +86,7 @@ class GeneratedMessageService {
 
   /** 시나리오 세션을 정상 완료하면 해당 시나리오의 복습 권한을 멱등하게 부여한다. */
   private void grantScenarioAccess(
-      LearningSession learningSession,
+      LearningSessionSnapshot learningSession,
       SubmittedMessageContext submittedContext,
       LocalDateTime completedAt) {
     scenarioAccessService.grantAccess(

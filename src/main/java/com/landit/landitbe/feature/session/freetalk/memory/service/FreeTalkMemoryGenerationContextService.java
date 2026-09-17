@@ -6,8 +6,8 @@ import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMes
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
@@ -17,7 +17,7 @@ import com.landit.landitbe.feature.session.history.domain.SessionHistory;
 import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FreeTalkMemoryGenerationContextService {
 
   private final FreeTalkSessionRepository freeTalkSessionRepository;
-  private final LearningSessionRepository learningSessionRepository;
+  private final LearningSessionService learningSessionService;
   private final SessionHistoryRepository sessionHistoryRepository;
   private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
   private final ConversationMemoryWriteService memoryWriteService;
@@ -54,9 +54,9 @@ public class FreeTalkMemoryGenerationContextService {
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
-    LearningSession learningSession =
-        learningSessionRepository
-            .findById(learningSessionId)
+    LearningSessionSnapshot learningSession =
+        learningSessionService
+            .findSession(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
 
     if (!isEligibleForClaim(learningSession, freeTalkSession)) {
@@ -78,7 +78,7 @@ public class FreeTalkMemoryGenerationContextService {
 
   /** 완료 후 아직 다른 worker가 선점하지 않은 세션만 장기기억 생성 대상이다. */
   private static boolean isEligibleForClaim(
-      LearningSession learningSession, FreeTalkSession freeTalkSession) {
+      LearningSessionSnapshot learningSession, FreeTalkSession freeTalkSession) {
     return learningSession.getStatus() == LearningSessionStatus.COMPLETED
         && freeTalkSession.getConversationStatus() == FreeTalkConversationStatus.COMPLETED
         && freeTalkSession.getMemoryGenerationStatus() == MemoryGenerationStatus.PREPARING
