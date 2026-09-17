@@ -1,6 +1,6 @@
 // 관리자에게 발송 작업의 접수 상태와 제공자 접수 식별자를 제공한다.
 
-package com.landit.landitbe.feature.notification.dto;
+package com.landit.landitbe.feature.notification.job.dto;
 
 import java.util.UUID;
 

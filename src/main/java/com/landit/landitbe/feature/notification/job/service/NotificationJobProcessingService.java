@@ -1,16 +1,19 @@
 // 예약된 체험 푸시와 이메일을 현재 상태 확인 후 채널별로 발송한다.
 
-package com.landit.landitbe.feature.notification.service;
+package com.landit.landitbe.feature.notification.job.service;
 
 import com.landit.landitbe.config.notification.TrialReminderProperties;
-import com.landit.landitbe.feature.notification.client.EmailSendResult.Status;
-import com.landit.landitbe.feature.notification.client.EmailSender;
-import com.landit.landitbe.feature.notification.client.RetryablePushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.client.RetryablePushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.dto.AdminEmailTestRequest;
-import com.landit.landitbe.feature.notification.dto.NotificationJob;
-import com.landit.landitbe.feature.profile.dto.SubscriptionNotificationTarget;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.notification.email.client.EmailSendResult.Status;
+import com.landit.landitbe.feature.notification.email.client.EmailSender;
+import com.landit.landitbe.feature.notification.email.dto.EmailRecipient;
+import com.landit.landitbe.feature.notification.email.service.NotificationEmailTemplateService;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJob;
+import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionNotificationTarget;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Duration;
@@ -35,7 +38,7 @@ import org.springframework.stereotype.Service;
     havingValue = "true")
 public class NotificationJobProcessingService {
   private final NotificationJobService jobs;
-  private final UserProfileService profiles;
+  private final ProfileSubscriptionService profiles;
   private final NotificationDispatchService push;
   private final EmailSender sender;
   private final NotificationEmailTemplateService emailTemplate;
@@ -132,7 +135,7 @@ public class NotificationJobProcessingService {
       skip(job, "CHANNEL_DISABLED");
       return;
     }
-    if (!validator.validate(new AdminEmailTestRequest(recipient)).isEmpty()) {
+    if (!validator.validate(new EmailRecipient(recipient)).isEmpty()) {
       skip(job, "NO_VALID_EMAIL");
       return;
     }

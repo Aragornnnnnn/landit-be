@@ -25,7 +25,8 @@ public class PushQueueMessageHandler {
   private static final String SCHEDULED_NOTIFICATION_BATCH = "SCHEDULED_NOTIFICATION_BATCH";
   private static final String MAILBOX_REPLY_TITLE = "문의에 답변이 도착했어요";
 
-  private final com.landit.landitbe.feature.notification.service.NotificationJobProcessingService
+  private final com.landit.landitbe.feature.notification.job.service
+          .NotificationJobProcessingService
       notificationJobProcessingService;
 
   private final PushReceiptService pushReceiptService;

@@ -1,12 +1,12 @@
 // 관리자 이메일 테스트와 체험 알림 설정 계약을 문서화한다.
 
-package com.landit.landitbe.feature.notification.docs;
+package com.landit.landitbe.feature.notification.job.admin.docs;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.notification.dto.AdminEmailTestRequest;
-import com.landit.landitbe.feature.notification.dto.NotificationJobView;
-import com.landit.landitbe.feature.notification.dto.TrialReminderSettings;
+import com.landit.landitbe.feature.notification.job.admin.dto.AdminEmailTestRequest;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJobView;
+import com.landit.landitbe.feature.notification.job.dto.TrialReminderSettings;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

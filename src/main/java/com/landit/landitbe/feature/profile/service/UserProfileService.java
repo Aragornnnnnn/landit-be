@@ -2,11 +2,9 @@
 
 package com.landit.landitbe.feature.profile.service;
 
-import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
-import com.landit.landitbe.feature.profile.dto.SubscriptionNotificationTarget;
 import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.dto.UserProfilePage;
@@ -28,24 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserProfileService {
 
   private final UserProfileRepository userProfileRepository;
-
-  /**
-   * 활성 사용자의 구독과 알림 연락처를 조회한다.
-   *
-   * @param userId 사용자 ID
-   * @return 탈퇴했거나 존재하지 않으면 빈 값
-   */
-  @Transactional(readOnly = true)
-  public Optional<SubscriptionNotificationTarget> findSubscriptionNotificationTarget(Long userId) {
-    return userProfileRepository
-        .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
-        .map(
-            profile ->
-                new SubscriptionNotificationTarget(
-                    UserSubscriptionSnapshot.fromUserProfile(profile),
-                    profile.getEmail(),
-                    profile.getPushPermissionStatus() == PushPermissionStatus.GRANTED));
-  }
 
   /**
    * 활성 사용자 프로필을 조회한다.

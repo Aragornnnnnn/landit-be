@@ -1,16 +1,17 @@
 // 관리자 이메일 테스트와 무료 체험 알림 채널 설정 API를 제공한다.
 
-package com.landit.landitbe.feature.notification;
+package com.landit.landitbe.feature.notification.job.admin;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.notification.docs.AdminEmailControllerDocs;
-import com.landit.landitbe.feature.notification.dto.AdminEmailTestRequest;
-import com.landit.landitbe.feature.notification.dto.NotificationJobView;
-import com.landit.landitbe.feature.notification.dto.TrialReminderSettings;
-import com.landit.landitbe.feature.notification.service.NotificationJobService;
+import com.landit.landitbe.feature.notification.job.admin.docs.AdminEmailControllerDocs;
+import com.landit.landitbe.feature.notification.job.admin.dto.AdminEmailTestRequest;
+import com.landit.landitbe.feature.notification.job.admin.service.AdminNotificationJobService;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJobView;
+import com.landit.landitbe.feature.notification.job.dto.TrialReminderSettings;
+import com.landit.landitbe.feature.notification.job.service.NotificationJobService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AdminEmailController implements AdminEmailControllerDocs {
   private final NotificationJobService jobs;
+  private final AdminNotificationJobService adminJobs;
 
   /** {@inheritDoc} */
   @Override
@@ -41,7 +43,7 @@ public class AdminEmailController implements AdminEmailControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @RequestHeader("Idempotency-Key") UUID key,
       @Valid @RequestBody AdminEmailTestRequest request) {
-    return ApiResponse.success(jobs.requestTest(principal.userId(), key, request.recipient()));
+    return ApiResponse.success(adminJobs.requestTest(principal.userId(), key, request.recipient()));
   }
 
   /** {@inheritDoc} */
@@ -65,6 +67,6 @@ public class AdminEmailController implements AdminEmailControllerDocs {
   public ApiResponse<TrialReminderSettings> update(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @Valid @RequestBody TrialReminderSettings settings) {
-    return ApiResponse.success(jobs.updateSettings(principal.userId(), settings));
+    return ApiResponse.success(adminJobs.updateSettings(principal.userId(), settings));
   }
 }

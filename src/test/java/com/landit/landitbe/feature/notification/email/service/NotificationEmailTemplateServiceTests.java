@@ -1,10 +1,9 @@
 // 이메일 HTML의 이스케이프와 구독 관리 버튼 표시 조건을 검증한다.
 
-package com.landit.landitbe.feature.notification;
+package com.landit.landitbe.feature.notification.email.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.landit.landitbe.feature.notification.service.NotificationEmailTemplateService;
 import org.junit.jupiter.api.Test;
 
 class NotificationEmailTemplateServiceTests {

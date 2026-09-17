@@ -1,6 +1,6 @@
 // 알림 이메일의 이미지 배너와 HTML 본문을 구성한다.
 
-package com.landit.landitbe.feature.notification.service;
+package com.landit.landitbe.feature.notification.email.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;

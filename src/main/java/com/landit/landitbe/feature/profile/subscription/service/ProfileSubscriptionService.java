@@ -2,12 +2,14 @@
 
 package com.landit.landitbe.feature.profile.subscription.service;
 
+import com.landit.landitbe.feature.profile.domain.PushPermissionStatus;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionNotificationTarget;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionTransferResult;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateResult;
@@ -121,5 +123,23 @@ public class ProfileSubscriptionService {
   @Transactional(readOnly = true)
   public UserSubscriptionSnapshot getSubscription(Long userId) {
     return UserSubscriptionSnapshot.fromUserProfile(requireActiveEntity(userId));
+  }
+
+  /**
+   * 활성 사용자의 구독과 알림 연락처를 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @return 탈퇴했거나 존재하지 않으면 빈 값
+   */
+  @Transactional(readOnly = true)
+  public Optional<SubscriptionNotificationTarget> findSubscriptionNotificationTarget(Long userId) {
+    return userProfileRepository
+        .findByIdAndStatus(userId, UserProfileStatus.ACTIVE)
+        .map(
+            profile ->
+                new SubscriptionNotificationTarget(
+                    UserSubscriptionSnapshot.fromUserProfile(profile),
+                    profile.getEmail(),
+                    profile.getPushPermissionStatus() == PushPermissionStatus.GRANTED));
   }
 }

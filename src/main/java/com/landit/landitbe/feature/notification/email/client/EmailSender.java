@@ -1,6 +1,6 @@
 // 이메일 발송 제공자와 알림 기능 사이의 계약을 정의한다.
 
-package com.landit.landitbe.feature.notification.client;
+package com.landit.landitbe.feature.notification.email.client;
 
 /** 이메일 발송 제공자의 접수 결과를 반환한다. */
 public interface EmailSender {

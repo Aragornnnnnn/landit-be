@@ -1,6 +1,6 @@
 // 예약 전달 계약과 SES 응답의 재시도 분류를 검증한다.
 
-package com.landit.landitbe.feature.notification;
+package com.landit.landitbe.feature.notification.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -12,10 +12,10 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.notification.EmailProperties;
 import com.landit.landitbe.config.notification.NotificationProperties;
-import com.landit.landitbe.feature.notification.client.EmailSendResult.Status;
-import com.landit.landitbe.feature.notification.client.ses.SesEmailSender;
-import com.landit.landitbe.feature.notification.dto.NotificationJob;
-import com.landit.landitbe.feature.notification.messaging.EventBridgeNotificationJobScheduler;
+import com.landit.landitbe.feature.notification.email.client.EmailSendResult.Status;
+import com.landit.landitbe.feature.notification.email.client.ses.SesEmailSender;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJob;
+import com.landit.landitbe.feature.notification.job.messaging.EventBridgeNotificationJobScheduler;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

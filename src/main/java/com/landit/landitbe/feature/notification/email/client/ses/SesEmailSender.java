@@ -1,11 +1,11 @@
 // AWS SES로 텍스트와 이미지가 포함된 HTML 이메일을 보내고 접수 여부를 분류한다.
 
-package com.landit.landitbe.feature.notification.client.ses;
+package com.landit.landitbe.feature.notification.email.client.ses;
 
 import com.landit.landitbe.config.notification.EmailProperties;
-import com.landit.landitbe.feature.notification.client.EmailSendResult;
-import com.landit.landitbe.feature.notification.client.EmailSendResult.Status;
-import com.landit.landitbe.feature.notification.client.EmailSender;
+import com.landit.landitbe.feature.notification.email.client.EmailSendResult;
+import com.landit.landitbe.feature.notification.email.client.EmailSendResult.Status;
+import com.landit.landitbe.feature.notification.email.client.EmailSender;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import lombok.RequiredArgsConstructor;

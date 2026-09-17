@@ -1,6 +1,6 @@
 // 관리자가 직접 지정한 테스트 이메일 수신 주소를 검증한다.
 
-package com.landit.landitbe.feature.notification.dto;
+package com.landit.landitbe.feature.notification.job.admin.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

@@ -1,9 +1,11 @@
 // 채널별 알림을 EventBridge 또는 SQS로 멱등 등록한다.
 
-package com.landit.landitbe.feature.notification.messaging;
+package com.landit.landitbe.feature.notification.job.messaging;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
-import com.landit.landitbe.feature.notification.dto.NotificationJob;
+import com.landit.landitbe.feature.notification.delivery.messaging.PushQueueMessage;
+import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePayload;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJob;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;

@@ -151,3 +151,14 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - `./gradlew spotlessApply check` 통과: 총 1,216개, 성공 1,210개, 실패·오류 0개, 환경 조건 생략 6개. 운영 DB·외부 AI·배포 검증은 수행하지 않았다.
 - develop 마이그레이션은 V104까지이며 후속 LAN-461/V105, LAN-491/V106, LAN-494/V107과 충돌하지 않는다. LAN-488의 리소스·DB 마이그레이션은 변경하지 않았다.
 - 원격 갱신 전 HEAD는 `backup/LAN-488-before-develop-20260916`에 보존했다. 후속 PR은 LAN-488 → LAN-461 → LAN-491 → LAN-494 순서로 각 직전 브랜치를 기준으로 유지한다.
+
+
+## 2026-09-17 develop rebase와 새 알림 경계
+
+- 기준은 `origin/develop`의 `017bd552`다. 프로모션 구독 처리, `isTrial`, 체험 종료 알림·관리자 이메일, 이메일 배너·관리 링크, HTTP 지표 histogram 축소를 보존했다.
+- 사용자 승인에 따라 새 알림 코드를 `notification.job`, `notification.email`, `notification.job.admin`으로 배치했다. 관리자 테스트 접수·설정 변경은 `AdminNotificationJobService`, 일반 예약·선점·발송은 job의 Service가 소유한다.
+- 발송 수신자 검증은 email의 `EmailRecipient`를 사용해 관리자 요청 DTO 의존을 제거했다. 기존 검증 어노테이션은 동일하다. 알림 대상 조회는 `ProfileSubscriptionService`로 옮겼다.
+- 기존 job/admin 메서드 14개의 서명과 본문을 비교해 오류 enum 소유권을 제외한 동작이 같음을 확인했다. 저장소·예약 Service·이메일 템플릿·SES 구현·관리자 API 문서·구독 응답·이벤트 enum도 package/import/공백 외 내용이 동일하다.
+- `./gradlew spotlessApply check` 통과: 총 1,243개, 성공 1,237개, 실패·오류 0개, 환경 조건 생략 6개. 기능 경계와 새 알림·관리자 HTTP·구독·지표 회귀 테스트를 포함한다.
+- build.gradle과 src/main/resources 전체가 최신 develop과 동일하다. 배포된 체험 알림 V105~V107과 원격에서 이미 조정된 후속 V108·V109·V110을 보존한다. 운영 DB·SES·EventBridge 실호출·서버 배포 검증은 수행하지 않았다.
+- 시작 시점의 네 원격 HEAD를 `backup/LAN-{488,461,491,494}-before-develop-20260917`에 보존했다. 후속 PR은 각 직전 브랜치 위로 rebase한다. 이번 검증은 최종 브랜치 기준이며 중간 커밋 전체의 재컴파일은 수행하지 않았다.

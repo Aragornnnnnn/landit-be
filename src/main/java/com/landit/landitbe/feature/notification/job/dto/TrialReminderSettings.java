@@ -1,6 +1,6 @@
 // 운영자가 변경하는 체험 알림 채널 설정을 전달한다.
 
-package com.landit.landitbe.feature.notification.dto;
+package com.landit.landitbe.feature.notification.job.dto;
 
 import jakarta.validation.constraints.NotNull;
 

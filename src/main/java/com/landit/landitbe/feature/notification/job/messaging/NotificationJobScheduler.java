@@ -1,8 +1,8 @@
 // 알림 작업의 일회성 예약 또는 즉시 큐 발행 계약을 정의한다.
 
-package com.landit.landitbe.feature.notification.messaging;
+package com.landit.landitbe.feature.notification.job.messaging;
 
-import com.landit.landitbe.feature.notification.dto.NotificationJob;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJob;
 
 /** 알림 예약을 외부 서비스에 등록한다. */
 public interface NotificationJobScheduler {

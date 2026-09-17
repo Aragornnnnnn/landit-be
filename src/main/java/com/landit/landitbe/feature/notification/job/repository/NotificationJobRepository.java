@@ -1,9 +1,9 @@
 // 알림 예약 의도와 발송 소유권을 원자적으로 저장한다.
 
-package com.landit.landitbe.feature.notification.repository;
+package com.landit.landitbe.feature.notification.job.repository;
 
-import com.landit.landitbe.feature.notification.dto.NotificationJob;
-import com.landit.landitbe.feature.notification.dto.TrialReminderSettings;
+import com.landit.landitbe.feature.notification.job.dto.NotificationJob;
+import com.landit.landitbe.feature.notification.job.dto.TrialReminderSettings;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;

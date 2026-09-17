@@ -47,7 +47,7 @@ public class RevenueCatWebhookService {
   private final ProfileSubscriptionService profileSubscriptionService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final Clock clock;
-  private final com.landit.landitbe.feature.notification.service.NotificationJobService
+  private final com.landit.landitbe.feature.notification.job.service.NotificationJobService
       notificationJobService;
 
   /**

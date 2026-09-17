@@ -1,8 +1,8 @@
 // DB에 남은 예약 의도를 외부 예약 서비스에 등록하고 실패를 복구한다.
 
-package com.landit.landitbe.feature.notification.service;
+package com.landit.landitbe.feature.notification.job.service;
 
-import com.landit.landitbe.feature.notification.messaging.NotificationJobScheduler;
+import com.landit.landitbe.feature.notification.job.messaging.NotificationJobScheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

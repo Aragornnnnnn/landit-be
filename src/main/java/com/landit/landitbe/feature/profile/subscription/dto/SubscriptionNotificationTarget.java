@@ -1,6 +1,6 @@
 // 알림 발송 직전 필요한 활성 사용자 구독과 연락처 정보를 전달한다.
 
-package com.landit.landitbe.feature.profile.dto;
+package com.landit.landitbe.feature.profile.subscription.dto;
 
 /**
  * 활성 사용자에게만 제공하는 알림 대상 정보다.

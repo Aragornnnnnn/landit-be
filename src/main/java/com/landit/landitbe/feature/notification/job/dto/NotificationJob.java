@@ -1,6 +1,6 @@
 // 예약과 발송 서비스 사이에서 불변 알림 작업을 전달한다.
 
-package com.landit.landitbe.feature.notification.dto;
+package com.landit.landitbe.feature.notification.job.dto;
 
 import java.time.Instant;
 import java.util.UUID;

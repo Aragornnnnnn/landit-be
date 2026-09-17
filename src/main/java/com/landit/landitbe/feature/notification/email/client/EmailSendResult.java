@@ -1,6 +1,6 @@
 // 제공자 접수와 안전한 재시도 및 불확실한 발송 결과를 구분한다.
 
-package com.landit.landitbe.feature.notification.client;
+package com.landit.landitbe.feature.notification.email.client;
 
 /**
  * 이메일 제공자 접수 결과다.
