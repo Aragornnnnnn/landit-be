@@ -28,6 +28,7 @@ import com.landit.landitbe.feature.profile.learning.service.ProfileLearningServi
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,8 +56,6 @@ public class FreeTalkExpressionGenerationService {
   private static final String GENERATION_COMPLETED_LOG =
       "프리톡 표현 생성 완료. learningSessionId={}, historyMessageCount={}, excerptCount={},"
           + " candidateCount={}, recommendationCount={}, totalMs={}, stages=[{}]";
-  private static final String GENERATION_FAILED_LOG =
-      "프리톡 표현 생성 실패. learningSessionId={}, totalMs={}, stages=[{}]";
 
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final LearningSessionService learningSessionService;
@@ -77,7 +76,13 @@ public class FreeTalkExpressionGenerationService {
   public void generate(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     // 중복 실행을 막는 상태 전이는 짧은 트랜잭션에서 먼저 확정한다.
-    GenerationContext context = transactionTemplate.execute(status -> prepare(learningSessionId));
+    GenerationContext context;
+    try {
+      context = transactionTemplate.execute(status -> prepare(learningSessionId));
+    } catch (RuntimeException exception) {
+      FailureObservation.failed("expression", "claim", "storage_failed", exception);
+      throw exception;
+    }
     if (context == null) {
       return;
     }
@@ -97,10 +102,15 @@ public class FreeTalkExpressionGenerationService {
           timings);
     } catch (RuntimeException exception) {
       // 부분 결과를 남기지 않고 재시도할 수 있도록 실패 상태만 기록한다.
-      log.warn(
-          GENERATION_FAILED_LOG, learningSessionId, elapsedMillis(startNanos), timings, exception);
-      transactionTemplate.executeWithoutResult(
-          status -> fail(learningSessionId, context.attempt()));
+      FailureObservation.failed("expression", timings.activeStage, "operation_failed", exception);
+      try {
+        transactionTemplate.executeWithoutResult(
+            status -> fail(learningSessionId, context.attempt()));
+      } catch (RuntimeException persistenceException) {
+        FailureObservation.failed(
+            "expression", "failure_state_persistence", "storage_failed", persistenceException);
+        throw persistenceException;
+      }
     }
   }
 
@@ -111,7 +121,14 @@ public class FreeTalkExpressionGenerationService {
    */
   public void markFailed(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-    transactionTemplate.executeWithoutResult(status -> fail(learningSessionId, null));
+    FailureObservation.failed("expression", "dispatch", "executor_unavailable", null);
+    try {
+      transactionTemplate.executeWithoutResult(status -> fail(learningSessionId, null));
+    } catch (RuntimeException exception) {
+      FailureObservation.failed(
+          "expression", "failure_state_persistence", "storage_failed", exception);
+      throw exception;
+    }
   }
 
   // 대화 임베딩부터 추천 저장까지를 단계별 소요 시간과 함께 실행한다.
@@ -301,10 +318,12 @@ public class FreeTalkExpressionGenerationService {
   /** 표현 생성 단계별 소요 시간을 실행 순서대로 모아 로그 한 줄로 표현한다. */
   private static final class StageTimings {
 
+    private String activeStage = "generation";
     private final Map<String, Long> elapsedMillisByStage = new LinkedHashMap<>();
 
     // 값을 반환하는 단계를 실행하고 예외 발생 여부와 무관하게 소요 시간을 남긴다.
     private <T> T measure(String stageName, Supplier<T> stage) {
+      activeStage = stageName;
       long startNanos = System.nanoTime();
       try {
         return stage.get();
@@ -315,6 +334,7 @@ public class FreeTalkExpressionGenerationService {
 
     // 반환값이 없는 단계를 실행하고 예외 발생 여부와 무관하게 소요 시간을 남긴다.
     private void measureVoid(String stageName, Runnable stage) {
+      activeStage = stageName;
       long startNanos = System.nanoTime();
       try {
         stage.run();
