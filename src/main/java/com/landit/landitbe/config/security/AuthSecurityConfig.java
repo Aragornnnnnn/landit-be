@@ -31,7 +31,7 @@ public class AuthSecurityConfig {
   private static final List<String> CORS_ALLOWED_METHODS =
       List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
   private static final List<String> CORS_ALLOWED_HEADERS =
-      List.of("Authorization", "Content-Type", "Accept", "Origin");
+      List.of("Authorization", "Content-Type", "Accept", "Origin", "Idempotency-Key");
   private static final boolean CORS_ALLOW_CREDENTIALS = true;
 
   private final AuthTokenFilter authTokenFilter;

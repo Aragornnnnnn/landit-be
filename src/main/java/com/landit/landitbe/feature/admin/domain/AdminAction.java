@@ -4,6 +4,10 @@ package com.landit.landitbe.feature.admin.domain;
 
 /** 관리자 쓰기 작업의 감사 로그 유형을 정의한다. */
 public enum AdminAction {
+  /** 관리자 이메일 테스트 접수다. */
+  EMAIL_TEST_REQUESTED,
+  /** 무료 체험 알림 채널 설정 변경이다. */
+  TRIAL_REMINDER_SETTINGS_UPDATED,
   /** 관리자 푸시 캠페인 생성이다. */
   PUSH_CAMPAIGN_CREATED,
   /** 관리자 본인 테스트 요청이다. */
