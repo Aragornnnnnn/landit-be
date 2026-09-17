@@ -92,6 +92,14 @@ landit:
       apply-sandbox-events: ${LANDIT_REVENUECAT_APPLY_SANDBOX_EVENTS:true}
       webhook-authorization: ${LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION:}
   notification:
+    email:
+      from: ${LANDIT_EMAIL_FROM:Landit <no-reply@landit.im>}
+      configuration-set: ${LANDIT_EMAIL_CONFIGURATION_SET:}
+    trial-reminder:
+      annual-product-ids: ${LANDIT_TRIAL_REMINDER_ANNUAL_PRODUCT_IDS:}
+      lead-time: ${LANDIT_TRIAL_REMINDER_LEAD_TIME:24h}
+      max-lateness: ${LANDIT_TRIAL_REMINDER_MAX_LATENESS:2h}
+      sandbox-enabled: ${LANDIT_TRIAL_REMINDER_SANDBOX_ENABLED:false}
     expo-base-url: ${LANDIT_NOTIFICATION_EXPO_BASE_URL:https://exp.host}
     expo-access-token: ${LANDIT_NOTIFICATION_EXPO_ACCESS_TOKEN:}
     connect-timeout: ${LANDIT_NOTIFICATION_CONNECT_TIMEOUT:5s}

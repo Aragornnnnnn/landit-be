@@ -50,7 +50,11 @@ class Lan474IntegrationBoundaryTest {
     var events = mock(SubscriptionEventRepository.class);
     var service =
         new RevenueCatWebhookService(
-            new RevenueCatProperties("test-auth", false), profiles, events, Clock.systemUTC());
+            new RevenueCatProperties("test-auth", false),
+            profiles,
+            events,
+            Clock.systemUTC(),
+            mock(com.landit.landitbe.feature.notification.service.NotificationJobService.class));
     for (String type : new String[] {"INITIAL_PURCHASE", "TRANSFER"}) {
       var request =
           new JsonMapper()

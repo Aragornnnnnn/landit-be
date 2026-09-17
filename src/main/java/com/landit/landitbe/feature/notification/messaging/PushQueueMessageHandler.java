@@ -25,6 +25,9 @@ public class PushQueueMessageHandler {
   private static final String SCHEDULED_NOTIFICATION_BATCH = "SCHEDULED_NOTIFICATION_BATCH";
   private static final String MAILBOX_REPLY_TITLE = "문의에 답변이 도착했어요";
 
+  private final com.landit.landitbe.feature.notification.service.NotificationJobProcessingService
+      notificationJobProcessingService;
+
   private final PushReceiptService pushReceiptService;
   private final ScheduledNotificationService scheduledNotificationService;
   private final NotificationDispatchService notificationDispatchService;
@@ -50,6 +53,8 @@ public class PushQueueMessageHandler {
   public void handle(PushQueueMessage message, Runnable visibilityExtender) {
     validateCommon(message);
     switch (message.messageType()) {
+      case PushQueueMessage.NOTIFICATION_JOB ->
+          notificationJobProcessingService.process(java.util.UUID.fromString(message.messageId()));
       case PushQueueMessage.ADMIN_PUSH_CAMPAIGN -> {
         if (message.payload().campaignId() == null) {
           throw new IllegalArgumentException("관리자 캠페인 payload가 올바르지 않습니다.");

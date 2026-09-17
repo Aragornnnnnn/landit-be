@@ -24,6 +24,11 @@ public enum SubscriptionEventType {
   BILLING_ISSUE,
   /** 플랜 변경. */
   PRODUCT_CHANGE,
+  /**
+   * 자동 갱신 없는 일회성 구매. RevenueCat 대시보드에서 프로모션 권한을 직접 부여하면 INITIAL_PURCHASE 대신 이 타입으로 오고, store와
+   * period_type이 모두 PROMOTIONAL이다. 기간이 끝나면 EXPIRATION이 온다.
+   */
+  NON_RENEWING_PURCHASE,
   /** 구독이 다른 앱 계정으로 이전됨. 넘겨받은 계정의 이력에만 남긴다. */
   TRANSFER;
 

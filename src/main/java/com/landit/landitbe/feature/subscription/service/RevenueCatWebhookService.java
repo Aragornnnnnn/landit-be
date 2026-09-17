@@ -45,6 +45,8 @@ public class RevenueCatWebhookService {
   private final UserProfileService userProfileService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final Clock clock;
+  private final com.landit.landitbe.feature.notification.service.NotificationJobService
+      notificationJobService;
 
   /**
    * Authorization 헤더를 검증한 뒤 웹훅 이벤트를 결제 이력으로 저장하고 사용자 구독 상태에 반영한다.
@@ -143,6 +145,8 @@ public class RevenueCatWebhookService {
    *
    * <p>환불은 RevenueCat이 별도 이벤트 대신 cancel_reason이 CUSTOMER_SUPPORT인 CANCELLATION으로 보내므로, 이 경우 해지 예약이
    * 아니라 즉시 종료(EXPIRED)로 처리한다. BILLING_ISSUE와 PRODUCT_CHANGE는 결제 이력으로만 남기고 상태는 바꾸지 않는다.
+   * NON_RENEWING_PURCHASE는 RevenueCat 대시보드에서 프로모션 권한을 부여했을 때 오므로 구매와 같이 ACTIVE로 처리하고, 만료는 다른 구독처럼
+   * EXPIRATION으로 온다.
    *
    * @param event 웹훅 이벤트
    * @return 목표 구독 상태. 구독 상태와 무관한 타입이면 빈 값
@@ -152,7 +156,7 @@ public class RevenueCatWebhookService {
         .flatMap(
             type ->
                 switch (type) {
-                  case INITIAL_PURCHASE, RENEWAL, UNCANCELLATION ->
+                  case INITIAL_PURCHASE, RENEWAL, UNCANCELLATION, NON_RENEWING_PURCHASE ->
                       Optional.of(SubscriptionStatus.ACTIVE);
                   case CANCELLATION ->
                       Optional.of(
@@ -193,6 +197,7 @@ public class RevenueCatWebhookService {
     boolean saved = transfer.moved() != null;
     if (saved) {
       saveTransferEvent(event, toUserId.get(), transfer.moved(), eventAt);
+      notificationJobService.recordTrial(toUserId.get(), event.environment());
     }
     logTransfer(event, fromUserId.get(), toUserId.get(), transfer, saved);
   }
@@ -354,6 +359,9 @@ public class RevenueCatWebhookService {
       RevenueCatWebhookEvent event, SubscriptionStatus targetStatus, Long userId) {
     SubscriptionUpdateCommand command = toCommand(event, targetStatus);
     SubscriptionUpdateResult result = userProfileService.updateSubscription(userId, command);
+    if (result == SubscriptionUpdateResult.APPLIED) {
+      notificationJobService.recordTrial(userId, event.environment());
+    }
     log.info(
         "RevenueCat 웹훅 처리: result={}, userId={}, status={}, periodType={}, productId={}, store={},"
             + " eventId={}, type={}, environment={}",
