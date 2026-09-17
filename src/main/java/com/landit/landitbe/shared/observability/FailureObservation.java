@@ -36,8 +36,18 @@ public final class FailureObservation {
         && cause.getCause() != null) {
       cause = cause.getCause();
     }
-    if (cause != null && REPORTED.putIfAbsent(cause, Boolean.TRUE) != null) {
-      return;
+    if (cause != null) {
+      synchronized (REPORTED) {
+        Set<Throwable> chain = causeChain(cause);
+        for (Throwable element : chain) {
+          if (REPORTED.containsKey(element)) {
+            return;
+          }
+        }
+        for (Throwable element : chain) {
+          REPORTED.put(element, Boolean.TRUE);
+        }
+      }
     }
     record(workflow, stage, reason, "failed", cause);
   }
@@ -80,14 +90,22 @@ public final class FailureObservation {
     if (cause == null) {
       return false;
     }
-    Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-    while (cause != null && seen.add(cause)) {
-      if (REPORTED.containsKey(cause)) {
-        return true;
+    synchronized (REPORTED) {
+      for (Throwable element : causeChain(cause)) {
+        if (REPORTED.containsKey(element)) {
+          return true;
+        }
       }
-      cause = cause.getCause();
     }
     return false;
+  }
+
+  private static Set<Throwable> causeChain(Throwable cause) {
+    Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+    while (cause != null && seen.add(cause)) {
+      cause = cause.getCause();
+    }
+    return seen;
   }
 
   private static void record(
