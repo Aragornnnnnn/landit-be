@@ -280,6 +280,49 @@ class RevenueCatWebhookApiIntegrationTests {
     assertThat(subscriptionStore(userId)).isNull();
   }
 
+  /**
+   * RevenueCat 대시보드에서 프로모션 권한을 부여하면 NON_RENEWING_PURCHASE로 오며, 프리미엄을 켜고 PROMOTIONAL 기간 종류·스토어와 만료
+   * 시각을 저장한다. 기간이 끝나 EXPIRATION이 오면 다른 구독처럼 프리미엄을 끈다.
+   */
+  @Test
+  void activatesPremiumOnNonRenewingPurchaseAndExpiresLikeSubscription() throws Exception {
+    Long userId = createUser("rc-promotional");
+
+    postWebhook(WEBHOOK_SECRET, promotionalGrantEvent(userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionPeriodType(userId)).isEqualTo("PROMOTIONAL");
+    assertThat(subscriptionStore(userId)).isEqualTo("PROMOTIONAL");
+    assertThat(subscriptionProductId(userId)).isEqualTo("rc_promo_premium_monthly");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(EXPIRATION_MS);
+    assertThat(subscriptionEvents(userId))
+        .singleElement()
+        .satisfies(
+            row -> {
+              assertThat(row.get("type")).isEqualTo("NON_RENEWING_PURCHASE");
+              assertThat(row.get("period_type")).isEqualTo("PROMOTIONAL");
+              assertThat(row.get("store")).isEqualTo("PROMOTIONAL");
+              assertThat(row.get("price")).isNull();
+              assertThat(((Timestamp) row.get("expires_at")).getTime()).isEqualTo(EXPIRATION_MS);
+            });
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "EXPIRATION",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 1_000,
+                Map.of("period_type", "PROMOTIONAL", "expiration_reason", "UNSUBSCRIBE")))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("EXPIRED");
+    assertThat(subscriptionPeriodType(userId)).isNull();
+    assertThat(subscriptionStore(userId)).isNull();
+    assertThat(subscriptionExpiresAt(userId)).isNull();
+  }
+
   /** 알 수 없는 store 값은 스토어만 비우고 상태 갱신은 그대로 진행한다. */
   @Test
   void storesNullStoreForUnknownValue() throws Exception {
@@ -672,6 +715,42 @@ class RevenueCatWebhookApiIntegrationTests {
         }
         """;
     return template.formatted(UUID.randomUUID(), from, to, eventTimestampMs);
+  }
+
+  /** RevenueCat 대시보드에서 권한을 부여했을 때 오는 본문. store와 period_type이 PROMOTIONAL이고 가격이 없다. */
+  private static String promotionalGrantEvent(Long userId, long eventTimestampMs) {
+    String template =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "NON_RENEWING_PURCHASE",
+            "app_user_id": "%d",
+            "original_app_user_id": "%d",
+            "aliases": ["%d"],
+            "product_id": "rc_promo_premium_monthly",
+            "entitlement_ids": ["premium"],
+            "period_type": "PROMOTIONAL",
+            "store": "PROMOTIONAL",
+            "environment": "PRODUCTION",
+            "price": null,
+            "price_in_purchased_currency": null,
+            "currency": null,
+            "purchased_at_ms": %d,
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """;
+    return template.formatted(
+        UUID.randomUUID(),
+        userId,
+        userId,
+        userId,
+        eventTimestampMs,
+        eventTimestampMs,
+        EXPIRATION_MS);
   }
 
   private static String event(String type, Long userId, long eventTimestampMs) {
