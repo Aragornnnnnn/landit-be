@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.config.security;
 
-import com.landit.landitbe.feature.session.service.LearningSessionService;
+import com.landit.landitbe.feature.learning.conversation.service.LearningSessionService;
 import com.landit.landitbe.feature.subscription.dto.ExistingLearningRequest;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;

@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.subscription.service;
 
-import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
+import com.landit.landitbe.feature.learning.scenario.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;

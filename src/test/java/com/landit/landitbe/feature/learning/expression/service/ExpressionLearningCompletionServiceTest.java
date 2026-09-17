@@ -21,22 +21,22 @@ import com.landit.landitbe.feature.content.expression.domain.WritingExpression;
 import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
-import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
-import com.landit.landitbe.feature.learning.progress.repository.UserWritingExpressionCompletionRepository;
-import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
+import com.landit.landitbe.feature.learning.conversation.domain.LearningSession;
+import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.learning.conversation.repository.LearningSessionRepository;
+import com.landit.landitbe.feature.learning.expression.progress.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.expression.progress.repository.UserWritingExpressionCompletionRepository;
+import com.landit.landitbe.feature.learning.expression.progress.service.ExpressionCompletionService;
+import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
+import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
+import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
+import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionLearningService;
+import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
-import com.landit.landitbe.feature.session.domain.LearningSession;
-import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
-import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
-import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
-import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
-import com.landit.landitbe.feature.session.freetalk.expression.domain.FreeTalkSessionExpression;
-import com.landit.landitbe.feature.session.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
-import com.landit.landitbe.feature.session.freetalk.expression.service.FreeTalkExpressionLearningService;
-import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.repository.LearningSessionRepository;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -96,8 +96,8 @@ class ExpressionLearningCompletionServiceTest {
             expressionCompletionService,
             new FreeTalkExpressionLearningService(
                 freeTalkSessionRepository,
-                new com.landit.landitbe.feature.session.service.LearningSessionService(
-                    learningSessionRepository),
+                new com.landit.landitbe.feature.learning.conversation.service
+                    .LearningSessionService(learningSessionRepository),
                 sessionExpressionRepository));
     lenient()
         .when(

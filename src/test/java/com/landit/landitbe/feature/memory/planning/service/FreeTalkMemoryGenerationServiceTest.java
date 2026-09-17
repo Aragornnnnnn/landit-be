@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationContextService;
+import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationService;
 import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
 import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
@@ -23,8 +25,6 @@ import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionR
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
-import com.landit.landitbe.feature.session.freetalk.memory.service.FreeTalkMemoryGenerationContextService;
-import com.landit.landitbe.feature.session.freetalk.memory.service.FreeTalkMemoryGenerationService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;

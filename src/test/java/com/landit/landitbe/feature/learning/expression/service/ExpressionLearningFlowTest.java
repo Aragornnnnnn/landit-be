@@ -31,8 +31,8 @@ import com.landit.landitbe.feature.content.expression.recommendation.service.Exp
 import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioService;
-import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
-import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
+import com.landit.landitbe.feature.learning.expression.progress.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.expression.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;

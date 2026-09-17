@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
-import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
+import com.landit.landitbe.feature.learning.scenario.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;

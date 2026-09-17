@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.learning.expression.service;
 
 import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
-import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
+import com.landit.landitbe.feature.learning.expression.progress.service.ExpressionCompletionService;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;

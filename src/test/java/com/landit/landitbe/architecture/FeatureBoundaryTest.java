@@ -110,11 +110,15 @@ class FeatureBoundaryTest {
                       String target = moduleOf(edge.target());
                       return (edge.source().startsWith(ROOT + "shared.") && !target.isEmpty())
                           || (source.equals("content")
-                              && (target.startsWith("learning.")
-                                  || Set.of("session", "subscription").contains(target)))
-                          || (source.equals("memory") && target.equals("session"))
+                              && (target.startsWith("learning.") || target.equals("subscription")))
+                          || (source.equals("learning.conversation")
+                              && target.startsWith("learning.")
+                              && !target.equals("learning.conversation"))
+                          || (source.equals("memory") && target.startsWith("learning."))
                           || (source.equals("subscription")
-                              && Set.of("session", "auth").contains(target));
+                              && (target.equals("auth")
+                                  || (target.startsWith("learning.")
+                                      && !target.equals("learning.scenario.progress"))));
                     })
                 .toList())
         .isEmpty();
@@ -223,11 +227,39 @@ class FeatureBoundaryTest {
       return "";
     }
     String[] parts = name.substring(FEATURE.length()).split("\\.");
-    if (name.startsWith(FEATURE + "learning.scenario.level.")) {
-      return "learning.scenario.level";
+    // learning 내부에서도 데이터 소유와 요청 조율의 경계를 별도로 검사한다.
+    for (String unit :
+        List.of(
+            "learning.scenario.selection",
+            "learning.scenario.access",
+            "learning.scenario.progress",
+            "learning.scenario.level",
+            "learning.expression.progress")) {
+      if (name.startsWith(FEATURE + unit + ".")) {
+        return unit;
+      }
     }
-    // learning의 상태 소유(access/progress/review)와 요청 조율(expression/scenario)은 별도 업무다.
+    // 시나리오 세션·피드백·평가는 동일 실행 업무다. 공통 대화 저장소는 별도 소유다.
     return parts[0].equals("learning") ? parts[0] + "." + parts[1] : parts[0];
+  }
+
+  @Test
+  void learningSubmodulesCannotHidePersistenceAccessOrCycles() {
+    String scenario = FEATURE + "learning.scenario.session.service.StartService";
+    String conversation = FEATURE + "learning.conversation.service.LearningSessionService";
+    String repository = FEATURE + "learning.conversation.repository.LearningSessionRepository";
+    assertThat(moduleOf(scenario)).isNotEqualTo(moduleOf(repository));
+    assertThat(isPersistenceType(repository)).isTrue();
+    assertThat(
+            cycleNodes(
+                List.of(
+                    new Dependency(scenario, conversation),
+                    new Dependency(conversation, scenario))))
+        .containsExactlyInAnyOrder("learning.scenario", "learning.conversation");
+    assertThat(moduleOf(FEATURE + "learning.scenario.progress.service.ScenarioProgressService"))
+        .isNotEqualTo(moduleOf(scenario));
+    assertThat(moduleOf(FEATURE + "learning.expression.progress.service.ExpressionProgressService"))
+        .isNotEqualTo(moduleOf(FEATURE + "learning.expression.service.ExpressionLearningService"));
   }
 
   private static Set<String> cycleNodes(List<Dependency> edges) {
