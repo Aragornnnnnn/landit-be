@@ -37,9 +37,14 @@ management:
   metrics:
     tags:
       service.version: ${APP_VERSION:local}
+    enable:
+      http.server.requests.active: false
+      spring.data.repository.invocations: false
     distribution:
       percentiles-histogram:
-        http.server.requests: true
+        http.server.requests: false
+      slo:
+        http.server.requests: 50ms,100ms,200ms,300ms,500ms,750ms,1s,2s,3s,5s,10s,20s,30s,60s,120s
   otlp:
     metrics:
       export:

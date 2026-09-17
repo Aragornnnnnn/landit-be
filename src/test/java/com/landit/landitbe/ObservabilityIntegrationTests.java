@@ -8,8 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.registry.otlp.OtlpMeterRegistry;
 import io.micrometer.registry.otlp.OtlpMetricsSender;
+import io.opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest;
+import io.opentelemetry.proto.metrics.v1.Metric;
+import java.time.Duration;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Grafana Cloud로 전송할 HTTP 요청과 JVM 메트릭 등록을 검증한다. */
@@ -45,6 +52,10 @@ class ObservabilityIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private WebEndpointsSupplier webEndpointsSupplier;
+
+  @Autowired private CapturingMetricsSender metricsSender;
+
+  @Autowired private OtlpMeterRegistry otlpMeterRegistry;
 
   @Test
   void otlpMeterRegistryIsConfigured() {
@@ -74,6 +85,58 @@ class ObservabilityIntegrationTests {
     assertThat(timer).isNotNull();
     assertThat(timer.count()).isPositive();
     assertThat(timer.totalTime(timer.baseTimeUnit())).isPositive();
+  }
+
+  @Test
+  void exportedHttpHistogramPreservesSlowRequestsWithOnlyConfiguredBuckets() {
+    Timer timer =
+        otlpMeterRegistry.timer(
+            "http.server.requests", "uri", "/metrics-budget-test", "status", "200");
+    timer.record(Duration.ofMillis(100));
+    timer.record(Duration.ofSeconds(121));
+    metricsSender.requests.clear();
+
+    ReflectionTestUtils.invokeMethod(otlpMeterRegistry, "publish");
+
+    var points =
+        metricsSender.requests.stream()
+            .flatMap(request -> request.getResourceMetricsList().stream())
+            .flatMap(resource -> resource.getScopeMetricsList().stream())
+            .flatMap(scope -> scope.getMetricsList().stream())
+            .filter(metric -> metric.getName().equals("http.server.requests"))
+            .map(Metric::getHistogram)
+            .flatMap(histogram -> histogram.getDataPointsList().stream())
+            .filter(
+                point ->
+                    point.getAttributesList().stream()
+                        .anyMatch(
+                            attribute ->
+                                attribute.getKey().equals("uri")
+                                    && attribute
+                                        .getValue()
+                                        .getStringValue()
+                                        .equals("/metrics-budget-test")))
+            .toList();
+
+    assertThat(points).hasSize(1);
+    var point = points.getFirst();
+    assertThat(point.getExplicitBoundsList())
+        .containsExactly(
+            50.0, 100.0, 200.0, 300.0, 500.0, 750.0, 1000.0, 2000.0, 3000.0, 5000.0, 10000.0,
+            20000.0, 30000.0, 60000.0, 120000.0);
+    assertThat(point.getBucketCountsList()).hasSize(16);
+    assertThat(point.getBucketCounts(15)).isEqualTo(1);
+    assertThat(point.getCount()).isEqualTo(2);
+    assertThat(point.getSum()).isEqualTo(121100.0);
+  }
+
+  @Test
+  void unusedRequestAndRepositoryMetersAreNotRegistered() {
+    meterRegistry.more().longTaskTimer("http.server.requests.active").start().stop();
+    meterRegistry.timer("spring.data.repository.invocations").record(Duration.ofMillis(10));
+
+    assertThat(meterRegistry.find("http.server.requests.active").meters()).isEmpty();
+    assertThat(meterRegistry.find("spring.data.repository.invocations").meters()).isEmpty();
   }
 
   @Test
@@ -121,8 +184,18 @@ class ObservabilityIntegrationTests {
   static class OtlpMetricsSenderTestConfiguration {
 
     @Bean
-    OtlpMetricsSender otlpMetricsSender() {
-      return request -> {};
+    CapturingMetricsSender otlpMetricsSender() {
+      return new CapturingMetricsSender();
+    }
+  }
+
+  static class CapturingMetricsSender implements OtlpMetricsSender {
+
+    final List<ExportMetricsServiceRequest> requests = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void send(Request request) throws Exception {
+      requests.add(ExportMetricsServiceRequest.parseFrom(request.getMetricsData()));
     }
   }
 }
