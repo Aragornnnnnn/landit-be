@@ -113,7 +113,8 @@ public class SessionMessageSubmitService {
                 return generatedMessageService.record(
                     submittedContext, generation, feedbackProcessingStatus);
               });
-      recordInnerThoughtAfterMessageGeneration(asyncGenerationRequests);
+      recordInnerThoughtAfterMessageGeneration(
+          submittedContext.submittedMessageId(), asyncGenerationRequests.innerThoughtFuture());
       if (response.progress().completed()) {
         levelAssessmentGenerationService.startIfNeeded(userId, sessionId);
       }
@@ -195,13 +196,12 @@ public class SessionMessageSubmitService {
     }
   }
 
-  private void recordInnerThoughtAfterMessageGeneration(
-      AsyncGenerationRequests asyncGenerationRequests) {
-    if (asyncGenerationRequests.innerThoughtFuture() == null) {
+  void recordInnerThoughtAfterMessageGeneration(
+      long submittedMessageId, CompletableFuture<AiInnerThoughtResult> innerThoughtFuture) {
+    if (innerThoughtFuture == null) {
       return;
     }
-    asyncGenerationRequests
-        .innerThoughtFuture()
+    innerThoughtFuture
         .handleAsync(
             (result, exception) -> {
               if (exception != null) {
@@ -213,8 +213,7 @@ public class SessionMessageSubmitService {
                   conversationMessageService.completeInnerThought(
                       result.messageId(), result.innerThought(), result.innerThoughtType());
                 } else {
-                  conversationMessageService.failInnerThought(
-                      asyncGenerationRequests.submittedMessageId());
+                  conversationMessageService.failInnerThought(submittedMessageId);
                 }
               } catch (RuntimeException persistenceException) {
                 FailureObservation.failed(
@@ -227,6 +226,12 @@ public class SessionMessageSubmitService {
             exception -> {
               FailureObservation.failed(
                   "inner_thought", "dispatch", "executor_unavailable", unwrap(exception));
+              try {
+                conversationMessageService.failInnerThought(submittedMessageId);
+              } catch (RuntimeException persistenceException) {
+                FailureObservation.failed(
+                    "inner_thought", "persistence", "storage_failed", persistenceException);
+              }
               return null;
             });
   }
