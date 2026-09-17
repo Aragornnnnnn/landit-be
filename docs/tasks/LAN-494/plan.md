@@ -1,5 +1,12 @@
 # LAN-494 푸시 복습
 
+## 2026-09-17 학습 패키지 통합 반영
+
+- LAN-488의 content/learning 경계와 LAN-461 → LAN-491 변경을 상속했다. 시나리오 진행·표현 완료·공통 대화의 저장 경계를 포함한 검사도 유지한다.
+- 복습 대상 선정과 문제 조립은 `learning.review.ExpressionReviewService`가 조율한다. 콘텐츠는 `ExpressionQueryService.findLearningMaterial`의 값 계약으로 조회하고 `ExpressionPracticeService`로 문제를 구성한다. 완료 이력에서 고른 표현에 현재 학습 난이도를 다시 적용하지 않는다.
+- 없는 콘텐츠는 Optional로 조회한 뒤 복습 조율에서 구분한다. 문제를 만들 수 없는 표현을 건너뛰는 과정에서 상위 트랜잭션이 rollback-only가 되지 않도록 기존 계약을 보존했다.
+- `./gradlew check` 통과: 총 1,286개, 실패·오류 0개, 환경 조건 생략 9개다. 무효 후보 30개 이후 유효 후보 조회, 문제 없음·부분 문제 구성, 복수 정답·멱등 채점·알림 배치를 포함한다. V110 및 기존 DB 마이그레이션은 변경하지 않았다.
+
 ## 범위와 기준
 
 - 기준 브랜치는 `feat/LAN-491`(PR #191), 작업 브랜치는 `feat/LAN-494`다.

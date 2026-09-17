@@ -3,8 +3,10 @@
 package com.landit.landitbe.feature.learning.review.service;
 
 import com.landit.landitbe.config.learning.ReviewProperties;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningMaterial;
 import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.expression.practice.service.ExpressionPracticeService;
+import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.learning.review.domain.ExpressionReview;
 import com.landit.landitbe.feature.learning.review.dto.ReviewAnswerRequest;
 import com.landit.landitbe.feature.learning.review.dto.ReviewAnswerResponse;
@@ -38,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpressionReviewService {
   private final ExpressionReviewRepository repository;
   private final ExpressionPracticeService practice;
+  private final ExpressionQueryService contentQuery;
   private final UserProfileService profiles;
   private final LearningAccessGrantService access;
   private final ReviewProperties properties;
@@ -198,7 +201,7 @@ public class ExpressionReviewService {
       List<Long> candidates, List<Long> ids, List<ExpressionPracticeResponse> content) {
     for (Long id : candidates) {
       try {
-        content.add(practice.getReviewPracticeExamples(id));
+        content.add(buildReviewPractice(id));
         ids.add(id);
       } catch (ApiException exception) {
         if (exception.getErrorCode() != ErrorCode.RESOURCE_NOT_FOUND) {
@@ -209,6 +212,20 @@ public class ExpressionReviewService {
         break;
       }
     }
+  }
+
+  // 후보 조회에서 완료 이력·언어를 검증했으므로 현재 학습 난이도를 다시 적용하지 않는다.
+  private ExpressionPracticeResponse buildReviewPractice(Long expressionId) {
+    ExpressionLearningMaterial material =
+        contentQuery
+            .findLearningMaterial(expressionId)
+            .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
+    return practice.buildPracticeResponse(
+        expressionId,
+        material.detail().targetExpressionText(),
+        material.detail().baseExpressionMeaningText(),
+        material.detail().usageDescription(),
+        material.practiceExamplesPayload());
   }
 
   private List<ReviewQuestion> assembleQuestions(
