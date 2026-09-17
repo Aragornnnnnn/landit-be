@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.learning.scenario.session.innerthought.client
 import com.landit.landitbe.feature.learning.scenario.session.message.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.feature.learning.scenario.session.message.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -154,12 +155,25 @@ public class SessionMessageSubmitService {
     feedbackFuture.whenComplete(
         (ignored, exception) -> {
           if (exception != null) {
-            log.warn(
-                "AI 메시지별 피드백 요청에 실패했습니다. workflow=message_feedback sessionId={} messageId={}",
-                submittedContext.sessionId(),
-                submittedContext.submittedMessageId(),
-                exception);
-            conversationMessageService.failFeedback(submittedContext.submittedMessageId());
+            if (unwrap(exception) instanceof java.util.concurrent.CancellationException) {
+              FailureObservation.observed(
+                  "message_feedback",
+                  "execution",
+                  "parent_request_cancelled",
+                  "expected_rejection");
+            } else {
+              FailureObservation.failed(
+                  "message_feedback", "execution", "unexpected_worker_failure", unwrap(exception));
+            }
+            try {
+              conversationMessageService.failFeedback(submittedContext.submittedMessageId());
+            } catch (RuntimeException persistenceException) {
+              FailureObservation.failed(
+                  "message_feedback",
+                  "failure_state_persistence",
+                  "storage_failed",
+                  persistenceException);
+            }
           }
         });
     return new AsyncGenerationRequests(
@@ -174,6 +188,8 @@ public class SessionMessageSubmitService {
     try {
       return requestMessageFeedback(submittedContext);
     } catch (RuntimeException exception) {
+      FailureObservation.failed(
+          "message_feedback", "execution", "unexpected_worker_failure", exception);
       // 마지막 발화의 피드백 장애가 세션 완료와 독립 수준 평가를 막지 않게 한다.
       return ProcessingStatus.FAILED;
     }
@@ -184,26 +200,42 @@ public class SessionMessageSubmitService {
     if (asyncGenerationRequests.innerThoughtFuture() == null) {
       return;
     }
-    CompletableFuture<AiInnerThoughtResult> recordingFuture =
-        asyncGenerationRequests
-            .innerThoughtFuture()
-            .whenCompleteAsync(
-                (result, exception) -> {
-                  if (exception == null) {
-                    conversationMessageService.completeInnerThought(
-                        result.messageId(), result.innerThought(), result.innerThoughtType());
-                    return;
-                  }
-                  log.warn("AI 속마음 생성에 실패했습니다. workflow=inner_thought", exception);
+    asyncGenerationRequests
+        .innerThoughtFuture()
+        .handleAsync(
+            (result, exception) -> {
+              if (exception != null) {
+                FailureObservation.failed(
+                    "inner_thought", "generation", "result_missing", unwrap(exception));
+              }
+              try {
+                if (exception == null) {
+                  conversationMessageService.completeInnerThought(
+                      result.messageId(), result.innerThought(), result.innerThoughtType());
+                } else {
                   conversationMessageService.failInnerThought(
                       asyncGenerationRequests.submittedMessageId());
-                },
-                taskExecutor);
-    recordingFuture.exceptionally(
-        exception -> {
-          log.error("AI 속마음 처리 결과를 저장하지 못했습니다. workflow=inner_thought", exception);
-          return null;
-        });
+                }
+              } catch (RuntimeException persistenceException) {
+                FailureObservation.failed(
+                    "inner_thought", "persistence", "storage_failed", persistenceException);
+              }
+              return null;
+            },
+            taskExecutor)
+        .exceptionally(
+            exception -> {
+              FailureObservation.failed(
+                  "inner_thought", "dispatch", "executor_unavailable", unwrap(exception));
+              return null;
+            });
+  }
+
+  private Throwable unwrap(Throwable exception) {
+    return exception instanceof java.util.concurrent.CompletionException
+            && exception.getCause() != null
+        ? exception.getCause()
+        : exception;
   }
 
   private SessionMessageAiGenerator.Request toAiRequest(SubmittedMessageContext submittedContext) {
@@ -218,28 +250,11 @@ public class SessionMessageSubmitService {
 
   private SessionMessageAiGenerator.Generation generateAiMessage(
       SubmittedMessageContext submittedContext) {
-    try {
-      return sessionMessageAiGenerator.generate(toAiRequest(submittedContext));
-    } catch (RuntimeException exception) {
-      log.warn(
-          "AI 메시지 생성에 실패했습니다. workflow=message_generation sessionId={}",
-          submittedContext.sessionId(),
-          exception);
-      throw exception;
-    }
+    return sessionMessageAiGenerator.generate(toAiRequest(submittedContext));
   }
 
   private ProcessingStatus requestMessageFeedback(SubmittedMessageContext submittedContext) {
-    try {
-      return sessionMessageFeedbackRequester.request(submittedContext);
-    } catch (RuntimeException exception) {
-      log.warn(
-          "AI 메시지별 피드백 요청에 실패했습니다. workflow=message_feedback sessionId={} messageId={}",
-          submittedContext.sessionId(),
-          submittedContext.submittedMessageId(),
-          exception);
-      throw exception;
-    }
+    return sessionMessageFeedbackRequester.request(submittedContext);
   }
 
   private void removeSubmittedMessageInTransaction(SubmittedMessageContext submittedContext) {
