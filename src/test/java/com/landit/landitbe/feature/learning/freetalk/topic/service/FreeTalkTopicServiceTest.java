@@ -95,6 +95,7 @@ class FreeTalkTopicServiceTest {
     assertThat(response.topics()).isEmpty();
   }
 
+  /** ID와 표시명만 채운 프리톡 주제 mock을 만든다. */
   private static FreeTalkTopic topic(Long id, String displayName) {
     FreeTalkTopic topic = mock(FreeTalkTopic.class);
     when(topic.getId()).thenReturn(id);

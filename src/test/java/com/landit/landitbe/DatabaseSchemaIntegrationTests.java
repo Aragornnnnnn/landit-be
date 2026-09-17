@@ -373,6 +373,7 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("scenario_session", "daily_scenario_schedule_id");
   }
 
+  /** V27이 만든 프리톡 저장 구조와 초기 주제 5개가 display_order 1~5 자리를 유지하는지 검증한다. */
   @DisplayName("V27 migration은 프리톡 저장 구조와 초기 주제를 추가한다.")
   @Test
   void v27AddsFreeTalkStorageStructureAndTopicSeed() {
@@ -406,6 +407,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
+  /** V108 시드가 기존 5개 뒤로 65개를 이어 붙여 활성 주제 풀이 70개가 되는지 검증한다. */
   @DisplayName("V108 migration은 프리톡 주제 65개를 기존 5개 뒤에 활성 상태로 추가한다.")
   @Test
   void v108AddsSixtyFiveActiveFreeTalkTopicsAfterExistingSeed() {

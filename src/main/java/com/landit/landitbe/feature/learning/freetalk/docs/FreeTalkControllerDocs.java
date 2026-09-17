@@ -25,10 +25,12 @@ import org.springframework.http.ResponseEntity;
 public interface FreeTalkControllerDocs {
 
   /**
-   * 활성 프리톡 추천 주제를 노출 순서대로 조회한다.
+   * 활성 프리톡 추천 주제 중 무작위로 최대 5개를 뽑아 일일 발화 시간과 함께 반환한다.
+   *
+   * <p>주제 구성과 displayOrder(1부터)는 요청마다 달라지며, 활성 주제가 5개 미만이면 있는 만큼만 내려준다.
    *
    * @param principal 인증된 사용자
-   * @return 활성 추천 주제 목록
+   * @return 무작위로 뽑은 추천 주제(최대 5개)와 KST 당일 발화 시간 정보
    */
   @Operation(
       summary = "프리톡 추천 주제 조회",
