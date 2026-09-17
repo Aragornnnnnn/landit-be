@@ -103,24 +103,47 @@ class NotificationJobAdaptersTests {
             client, new EmailProperties("Landit <no-reply@landit.im>", "develop-mail"));
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenReturn(SendEmailResponse.builder().messageId("ses-1").build());
-    assertThat(sender.send("recipient@example.com", "subject", "body").status())
+    assertThat(
+            sender
+                .send("recipient@example.com", "subject", "body", "<img src=\"cid:landit-banner\">")
+                .status())
         .isEqualTo(Status.ACCEPTED);
     var capture = ArgumentCaptor.forClass(SendEmailRequest.class);
     verify(client).sendEmail(capture.capture());
     assertThat(capture.getValue().replyToAddresses()).isEmpty();
     assertThat(capture.getValue().configurationSetName()).isEqualTo("develop-mail");
     assertThat(capture.getValue().fromEmailAddress()).isEqualTo("Landit <no-reply@landit.im>");
+    var content = capture.getValue().content().simple();
+    assertThat(content.body().text().data()).isEqualTo("body");
+    assertThat(content.body().html().data()).contains("cid:landit-banner");
+    assertThat(content.attachments()).hasSize(1);
+    var banner = content.attachments().getFirst();
+    assertThat(banner.contentId()).isEqualTo("landit-banner");
+    assertThat(banner.contentDispositionAsString()).isEqualTo("INLINE");
+    assertThat(banner.contentTransferEncodingAsString()).isEqualTo("BASE64");
+    assertThat(banner.contentType()).isEqualTo("image/png");
+    assertThat(banner.rawContent().asByteArray())
+        .startsWith((byte) 0x89, (byte) 0x50, (byte) 0x4e, (byte) 0x47);
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenThrow(SesV2Exception.builder().statusCode(429).build());
-    assertThat(sender.send("recipient@example.com", "subject", "body").status())
+    assertThat(
+            sender
+                .send("recipient@example.com", "subject", "body", "<img src=\"cid:landit-banner\">")
+                .status())
         .isEqualTo(Status.RETRYABLE);
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenThrow(SesV2Exception.builder().statusCode(400).build());
-    assertThat(sender.send("recipient@example.com", "subject", "body").status())
+    assertThat(
+            sender
+                .send("recipient@example.com", "subject", "body", "<img src=\"cid:landit-banner\">")
+                .status())
         .isEqualTo(Status.FAILED);
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenThrow(SdkClientException.create("connection interrupted"));
-    assertThat(sender.send("recipient@example.com", "subject", "body").status())
+    assertThat(
+            sender
+                .send("recipient@example.com", "subject", "body", "<img src=\"cid:landit-banner\">")
+                .status())
         .isEqualTo(Status.UNKNOWN);
   }
 

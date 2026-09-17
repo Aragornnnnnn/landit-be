@@ -10,7 +10,8 @@ public interface EmailSender {
    * @param recipient 수신 이메일
    * @param subject 제목
    * @param body 일반 텍스트 본문
+   * @param html 이미지와 구독 관리 버튼을 포함한 HTML 본문
    * @return 접수 결과이며 실제 메일함 도착을 보장하지 않는다
    */
-  EmailSendResult send(String recipient, String subject, String body);
+  EmailSendResult send(String recipient, String subject, String body, String html);
 }

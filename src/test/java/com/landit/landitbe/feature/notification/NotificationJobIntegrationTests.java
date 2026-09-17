@@ -30,6 +30,7 @@ import com.landit.landitbe.feature.notification.dto.NotificationJob;
 import com.landit.landitbe.feature.notification.dto.TrialReminderSettings;
 import com.landit.landitbe.feature.notification.messaging.NotificationJobScheduler;
 import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
+import com.landit.landitbe.feature.notification.service.NotificationEmailTemplateService;
 import com.landit.landitbe.feature.notification.service.NotificationJobProcessingService;
 import com.landit.landitbe.feature.notification.service.NotificationJobReservationService;
 import com.landit.landitbe.feature.notification.service.NotificationJobService;
@@ -87,7 +88,14 @@ class NotificationJobIntegrationTests {
     push = mock(NotificationDispatchService.class);
     processor =
         new NotificationJobProcessingService(
-            jobs, profiles, push, sender, policy, clock, validator);
+            jobs,
+            profiles,
+            push,
+            sender,
+            new NotificationEmailTemplateService(),
+            policy,
+            clock,
+            validator);
     jdbc.update(
         """
         INSERT INTO user_profile (id, nickname, email, target_locale, base_locale, current_level,
@@ -171,7 +179,7 @@ class NotificationJobIntegrationTests {
     jobs.recordTrial(USER_ID, "PRODUCTION");
     jobs.recordTrial(USER_ID, "PRODUCTION");
     assertThat(jobs.pendingReservations()).hasSize(2);
-    when(sender.send(anyString(), anyString(), anyString()))
+    when(sender.send(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(new EmailSendResult(Status.ACCEPTED, "ses-1"));
     NotificationJob mail = job("TRIAL_EMAIL");
     processor.process(job("TRIAL_PUSH").id());
@@ -180,7 +188,12 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.find(mail.id()).orElseThrow().providerMessageId()).isEqualTo("ses-1");
     assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().resultCode())
         .isEqualTo("PUSH_PERMISSION_DENIED");
-    verify(sender, times(1)).send(eq("member@example.com"), anyString(), contains("발신 전용"));
+    verify(sender, times(1))
+        .send(
+            eq("member@example.com"),
+            anyString(),
+            contains("발신 전용"),
+            contains("cid:landit-banner"));
     verifyNoInteractions(push);
   }
 
@@ -205,7 +218,7 @@ class NotificationJobIntegrationTests {
   void retryableRejectionRetriesButUnknownResponseNeverAutomaticallyResends() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
     NotificationJob mail = job("TRIAL_EMAIL");
-    when(sender.send(anyString(), anyString(), anyString()))
+    when(sender.send(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(
             new EmailSendResult(Status.RETRYABLE, null), new EmailSendResult(Status.UNKNOWN, null));
     assertThatThrownBy(() -> processor.process(mail.id()))
@@ -214,7 +227,7 @@ class NotificationJobIntegrationTests {
     processor.process(mail.id());
     processor.process(mail.id());
     assertThat(jobs.find(mail.id()).orElseThrow().status()).isEqualTo("UNKNOWN");
-    verify(sender, times(2)).send(anyString(), anyString(), anyString());
+    verify(sender, times(2)).send(anyString(), anyString(), anyString(), anyString());
     assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().status()).isEqualTo("PENDING");
   }
 
@@ -319,10 +332,10 @@ class NotificationJobIntegrationTests {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"recipient\":\"invalid\"}"))
         .andExpect(status().isBadRequest());
-    when(sender.send(anyString(), anyString(), anyString()))
+    when(sender.send(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(new EmailSendResult(Status.ACCEPTED, "test-mail"));
     processor.process(job("TEST_EMAIL").id());
-    verify(sender).send(eq("arbitrary@example.org"), contains("테스트"), anyString());
+    verify(sender).send(eq("arbitrary@example.org"), contains("테스트"), anyString(), anyString());
   }
 
   @Test
@@ -371,7 +384,7 @@ class NotificationJobIntegrationTests {
   void disabledPushDoesNotPreventEmailDelivery() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
     jobs.updateSettings(USER_ID, new TrialReminderSettings(false, true));
-    when(sender.send(anyString(), anyString(), anyString()))
+    when(sender.send(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(new EmailSendResult(Status.ACCEPTED, "email-only"));
     processor.process(job("TRIAL_PUSH").id());
     processor.process(job("TRIAL_EMAIL").id());
@@ -379,7 +392,7 @@ class NotificationJobIntegrationTests {
         .isEqualTo("CHANNEL_DISABLED");
     assertThat(jobs.find(job("TRIAL_EMAIL").id()).orElseThrow().status()).isEqualTo("ACCEPTED");
     verifyNoInteractions(push);
-    verify(sender).send(eq("member@example.com"), anyString(), anyString());
+    verify(sender).send(eq("member@example.com"), anyString(), anyString(), anyString());
   }
 
   @Test

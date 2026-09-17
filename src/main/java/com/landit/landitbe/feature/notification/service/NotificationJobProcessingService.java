@@ -38,6 +38,7 @@ public class NotificationJobProcessingService {
   private final UserProfileService profiles;
   private final NotificationDispatchService push;
   private final EmailSender sender;
+  private final NotificationEmailTemplateService emailTemplate;
   private final TrialReminderProperties policy;
   private final Clock clock;
   private final Validator validator;
@@ -136,12 +137,11 @@ public class NotificationJobProcessingService {
       return;
     }
     String subject = job.trial() ? "[Landit] 무료 체험 종료 예정 안내" : "[Landit] 이메일 발송 테스트";
-    String text =
-        job.trial()
-            ? body(job) + "\n\n구독 관리: " + managementUrl(job)
-            : "Landit 관리자 화면에서 요청한 이메일 발송 테스트입니다.";
-    text += "\n\n이 메일은 발신 전용이며 답장을 확인하지 않습니다.";
-    var result = sender.send(recipient, subject, text);
+    String message = job.trial() ? body(job) : "Landit 관리자 화면에서 요청한 이메일 발송 테스트입니다.";
+    String url = job.trial() ? managementUrl(job) : null;
+    String text = message + (url == null ? "" : "\n\n구독 관리: " + url);
+    text += "\n\n" + NotificationEmailTemplateService.FOOTER;
+    var result = sender.send(recipient, subject, text, emailTemplate.render(subject, message, url));
     if (result.status() == Status.RETRYABLE) {
       throw new RetryablePushNotificationException("이메일 제공자가 일시적으로 접수를 거절했습니다.");
     }
