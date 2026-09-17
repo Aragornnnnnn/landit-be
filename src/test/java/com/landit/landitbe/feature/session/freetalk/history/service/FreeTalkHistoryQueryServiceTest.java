@@ -53,8 +53,10 @@ class FreeTalkHistoryQueryServiceTest {
             new com.landit.landitbe.feature.session.service.LearningSessionService(
                 learningSessionRepository),
             freeTalkSessionRepository,
-            sessionHistoryRepository,
-            sessionHistoryMessageRepository,
+            new com.landit.landitbe.feature.session.history.service.SessionHistoryService(
+                sessionHistoryRepository),
+            new com.landit.landitbe.feature.session.history.service.ConversationMessageService(
+                sessionHistoryMessageRepository),
             sessionExpressionRepository,
             new ExpressionContentService(writingExpressionRepository));
   }

@@ -8,15 +8,15 @@ import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationReques
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
-import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
+import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.Clock;
@@ -34,8 +34,8 @@ public class FreeTalkMemoryGenerationContextService {
 
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final LearningSessionService learningSessionService;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final SessionHistoryService sessionHistoryService;
+  private final ConversationMessageService conversationMessageService;
   private final ConversationMemoryWriteService memoryWriteService;
   private final Clock clock;
 
@@ -63,7 +63,7 @@ public class FreeTalkMemoryGenerationContextService {
       return null;
     }
 
-    SessionHistory history = loadHistory(learningSessionId);
+    SessionHistorySnapshot history = loadHistory(learningSessionId);
     List<ConversationMemoryHistoryMessage> historyMessages = loadHistoryMessages(history.getId());
     freeTalkSession.startMemoryGeneration(LocalDateTime.now(clock));
     return new ConversationMemoryGenerationRequest(
@@ -86,23 +86,21 @@ public class FreeTalkMemoryGenerationContextService {
   }
 
   /** 생성 대상 세션의 단일 이력 컨테이너를 찾아 원본 기준을 고정한다. */
-  private SessionHistory loadHistory(long learningSessionId) {
-    return sessionHistoryRepository
+  private SessionHistorySnapshot loadHistory(long learningSessionId) {
+    return sessionHistoryService
         .findByLearningSessionId(learningSessionId)
         .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   /** 메시지 순서를 보존해 AI가 후보 원본 ID와 관찰 시각을 검증할 수 있게 한다. */
   private List<ConversationMemoryHistoryMessage> loadHistoryMessages(long historyId) {
-    return sessionHistoryMessageRepository
-        .findBySessionHistoryIdOrderByMessageSequenceAsc(historyId)
-        .stream()
+    return conversationMessageService.findAll(historyId).stream()
         .map(this::toHistoryMessage)
         .toList();
   }
 
   /** AI 입력에는 원본 메시지의 식별자·순서·시각이 모두 필요하다. */
-  private ConversationMemoryHistoryMessage toHistoryMessage(SessionHistoryMessage message) {
+  private ConversationMemoryHistoryMessage toHistoryMessage(SessionHistoryMessageSnapshot message) {
     if (message.getId() == null || message.getRole() == null || message.getCreatedAt() == null) {
       throw new IllegalStateException("프리톡 이력 메시지 문맥이 유효하지 않습니다.");
     }

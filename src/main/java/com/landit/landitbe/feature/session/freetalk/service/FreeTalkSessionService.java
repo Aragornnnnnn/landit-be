@@ -8,6 +8,8 @@ import com.landit.landitbe.feature.content.tutor.service.ConversationCharacterSe
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkStartMode;
@@ -19,10 +21,8 @@ import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRe
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.session.freetalk.topic.domain.FreeTalkTopic;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
-import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
+import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -44,8 +44,8 @@ public class FreeTalkSessionService {
   private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final SessionHistoryService sessionHistoryService;
+  private final ConversationMessageService conversationMessageService;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
   private final ConversationCharacterService conversationCharacterService;
 
@@ -89,14 +89,13 @@ public class FreeTalkSessionService {
     if (topic != null) {
       freeTalkSession.assignTitle(topic.getDisplayName());
     }
-    SessionHistory sessionHistory =
-        sessionHistoryRepository.save(
-            SessionHistory.startedFreeTalk(
-                learningSession.getId(),
-                userProfile.id(),
-                userProfile.targetLocale(),
-                userProfile.baseLocale(),
-                startedAt));
+    SessionHistorySnapshot sessionHistory =
+        sessionHistoryService.startFreeTalk(
+            learningSession.getId(),
+            userProfile.id(),
+            userProfile.targetLocale(),
+            userProfile.baseLocale(),
+            startedAt);
     return new StartedFreeTalkSession(
         learningSession.getId(),
         sessionHistory.getId(),
@@ -121,15 +120,14 @@ public class FreeTalkSessionService {
   @Transactional
   public CurrentMessageResponse saveOpening(
       StartedFreeTalkSession startedSession, AiFreeTalkOpeningResult openingResult) {
-    SessionHistoryMessage openingMessage =
-        sessionHistoryMessageRepository.save(
-            SessionHistoryMessage.freeTalkAi(
-                startedSession.sessionHistoryId(),
-                1,
-                1,
-                openingResult.aiMessage(),
-                openingResult.translatedMessage(),
-                openingResult.emotion()));
+    SessionHistoryMessageSnapshot openingMessage =
+        conversationMessageService.recordFreeTalkAi(
+            startedSession.sessionHistoryId(),
+            1,
+            1,
+            openingResult.aiMessage(),
+            openingResult.translatedMessage(),
+            openingResult.emotion());
     return CurrentMessageResponse.from(openingMessage);
   }
 
@@ -140,16 +138,12 @@ public class FreeTalkSessionService {
    */
   @Transactional
   public void deleteStart(long learningSessionId) {
-    sessionHistoryRepository
+    sessionHistoryService
         .findByLearningSessionId(learningSessionId)
         .ifPresent(
             history -> {
-              sessionHistoryMessageRepository.deleteAll(
-                  sessionHistoryMessageRepository.findBySessionHistoryIdOrderByMessageSequenceAsc(
-                      history.getId()));
-              sessionHistoryMessageRepository.flush();
-              sessionHistoryRepository.delete(history);
-              sessionHistoryRepository.flush();
+              conversationMessageService.deleteHistoryMessages(history.getId());
+              sessionHistoryService.deleteStart(history.getId());
             });
     freeTalkSessionRepository
         .findByLearningSessionId(learningSessionId)

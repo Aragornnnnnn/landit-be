@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.assessment.service.SessionLevelAssessmentGenerationService;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.domain.SessionMessageInputType;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.scenario.innerthought.client.ai.AiInnerThoughtResult;
 import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitRequest;
 import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitResponse;
@@ -30,7 +31,7 @@ public class SessionMessageSubmitService {
   private final SubmittedMessageService submittedMessageService;
   private final SessionMessageAiGenerator sessionMessageAiGenerator;
   private final SessionInnerThoughtGenerator sessionInnerThoughtGenerator;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final SessionMessageFeedbackRequester sessionMessageFeedbackRequester;
   private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
   private final GeneratedMessageService generatedMessageService;
@@ -42,7 +43,7 @@ public class SessionMessageSubmitService {
       SubmittedMessageService submittedMessageService,
       SessionMessageAiGenerator sessionMessageAiGenerator,
       SessionInnerThoughtGenerator sessionInnerThoughtGenerator,
-      SessionMessageService sessionMessageService,
+      ConversationMessageService conversationMessageService,
       SessionMessageFeedbackRequester sessionMessageFeedbackRequester,
       SessionLevelAssessmentGenerationService levelAssessmentGenerationService,
       GeneratedMessageService generatedMessageService,
@@ -52,7 +53,7 @@ public class SessionMessageSubmitService {
     this.submittedMessageService = submittedMessageService;
     this.sessionMessageAiGenerator = sessionMessageAiGenerator;
     this.sessionInnerThoughtGenerator = sessionInnerThoughtGenerator;
-    this.sessionMessageService = sessionMessageService;
+    this.conversationMessageService = conversationMessageService;
     this.sessionMessageFeedbackRequester = sessionMessageFeedbackRequester;
     this.levelAssessmentGenerationService = levelAssessmentGenerationService;
     this.generatedMessageService = generatedMessageService;
@@ -158,7 +159,7 @@ public class SessionMessageSubmitService {
                 submittedContext.sessionId(),
                 submittedContext.submittedMessageId(),
                 exception);
-            sessionMessageService.failFeedback(submittedContext.submittedMessageId());
+            conversationMessageService.failFeedback(submittedContext.submittedMessageId());
           }
         });
     return new AsyncGenerationRequests(
@@ -189,12 +190,12 @@ public class SessionMessageSubmitService {
             .whenCompleteAsync(
                 (result, exception) -> {
                   if (exception == null) {
-                    sessionMessageService.completeInnerThought(
+                    conversationMessageService.completeInnerThought(
                         result.messageId(), result.innerThought(), result.innerThoughtType());
                     return;
                   }
                   log.warn("AI 속마음 생성에 실패했습니다. workflow=inner_thought", exception);
-                  sessionMessageService.failInnerThought(
+                  conversationMessageService.failInnerThought(
                       asyncGenerationRequests.submittedMessageId());
                 },
                 taskExecutor);

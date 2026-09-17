@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.profile.learning.service.ProfileLearningServi
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
@@ -21,9 +22,8 @@ import com.landit.landitbe.feature.session.freetalk.expression.domain.Expression
 import com.landit.landitbe.feature.session.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.session.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
 import com.landit.landitbe.feature.session.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.repository.SessionHistoryMessageRepository;
-import com.landit.landitbe.feature.session.history.repository.SessionHistoryRepository;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
+import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -60,8 +60,8 @@ public class FreeTalkExpressionGenerationService {
 
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final LearningSessionService learningSessionService;
-  private final SessionHistoryRepository sessionHistoryRepository;
-  private final SessionHistoryMessageRepository sessionHistoryMessageRepository;
+  private final SessionHistoryService sessionHistoryService;
+  private final ConversationMessageService conversationMessageService;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionRecommendationService expressionRecommendationService;
   private final ExpressionCandidateSelectionService candidateSelectionService;
@@ -206,8 +206,8 @@ public class FreeTalkExpressionGenerationService {
       return null;
     }
 
-    SessionHistory history =
-        sessionHistoryRepository
+    SessionHistorySnapshot history =
+        sessionHistoryService
             .findByLearningSessionId(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.startExpressionGeneration();
@@ -224,9 +224,7 @@ public class FreeTalkExpressionGenerationService {
             profileLearningService
                 .findLearningLevel(learningSession.getUserProfileId())
                 .orElse(null)),
-        sessionHistoryMessageRepository
-            .findBySessionHistoryIdOrderByMessageSequenceAsc(history.getId())
-            .stream()
+        conversationMessageService.findAll(history.getId()).stream()
             .map(
                 message ->
                     new AiConversationHistoryMessage(

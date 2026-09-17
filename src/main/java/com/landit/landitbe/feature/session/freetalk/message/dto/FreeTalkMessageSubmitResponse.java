@@ -4,10 +4,10 @@ package com.landit.landitbe.feature.session.freetalk.message.dto;
 
 import com.landit.landitbe.feature.session.domain.CharacterEmotion;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.session.freetalk.expression.domain.ExpressionGenerationStatus;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -55,7 +55,7 @@ public record FreeTalkMessageSubmitResponse(
      * @param message 변환할 사용자 메시지
      * @return 사용자 발화 응답
      */
-    public static SubmittedMessageResponse from(SessionHistoryMessage message) {
+    public static SubmittedMessageResponse from(SessionHistoryMessageSnapshot message) {
       return new SubmittedMessageResponse(
           message.getId(),
           message.getTurnNumber(),
@@ -72,7 +72,8 @@ public record FreeTalkMessageSubmitResponse(
      * @param message 준비 상태로 재구성할 사용자 메시지
      * @return 속마음 처리가 준비 중인 사용자 발화 응답
      */
-    public static SubmittedMessageResponse replayPreparingFrom(SessionHistoryMessage message) {
+    public static SubmittedMessageResponse replayPreparingFrom(
+        SessionHistoryMessageSnapshot message) {
       return new SubmittedMessageResponse(
           message.getId(),
           message.getTurnNumber(),
@@ -110,7 +111,7 @@ public record FreeTalkMessageSubmitResponse(
      * @param message 변환할 AI 메시지
      * @return AI 후속 메시지 응답
      */
-    public static NextMessageResponse from(SessionHistoryMessage message) {
+    public static NextMessageResponse from(SessionHistoryMessageSnapshot message) {
       return new NextMessageResponse(
           message.getId(),
           message.getTurnNumber(),

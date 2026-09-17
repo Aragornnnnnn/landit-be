@@ -3,12 +3,12 @@
 package com.landit.landitbe.feature.session.scenario.innerthought.service;
 
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.session.exception.SessionException;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.scenario.innerthought.dto.SessionInnerThoughtResponse;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -27,7 +27,7 @@ public class SessionInnerThoughtQueryService {
 
   private final LearningSessionService learningSessionService;
   private final SessionHistoryService sessionHistoryService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
 
   /**
    * 소유한 사용자 메시지의 속마음 처리 상태와 완료 결과를 반환한다.
@@ -42,10 +42,11 @@ public class SessionInnerThoughtQueryService {
   @Transactional
   public SessionInnerThoughtResponse get(long userId, long sessionId, long messageId) {
     learningSessionService.findOwned(userId, sessionId);
-    SessionHistory sessionHistory = sessionHistoryService.requireByLearningSessionId(sessionId);
-    SessionHistoryMessage message = findUserMessage(sessionHistory.getId(), messageId);
+    SessionHistorySnapshot sessionHistory =
+        sessionHistoryService.requireByLearningSessionId(sessionId);
+    SessionHistoryMessageSnapshot message = findUserMessage(sessionHistory.getId(), messageId);
     if (isStalePreparing(message)) {
-      int updated = sessionMessageService.failInnerThought(messageId);
+      int updated = conversationMessageService.failInnerThought(messageId);
       if (updated == 1) {
         return SessionInnerThoughtResponse.failed();
       }
@@ -54,16 +55,16 @@ public class SessionInnerThoughtQueryService {
     return SessionInnerThoughtResponse.from(message);
   }
 
-  private SessionHistoryMessage findUserMessage(long sessionHistoryId, long messageId) {
-    SessionHistoryMessage message =
-        sessionMessageService.requireInHistory(messageId, sessionHistoryId);
+  private SessionHistoryMessageSnapshot findUserMessage(long sessionHistoryId, long messageId) {
+    SessionHistoryMessageSnapshot message =
+        conversationMessageService.requireInHistory(messageId, sessionHistoryId);
     if (message.getRole() != ConversationSpeaker.USER) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     return message;
   }
 
-  private boolean isStalePreparing(SessionHistoryMessage message) {
+  private boolean isStalePreparing(SessionHistoryMessageSnapshot message) {
     return message.getInnerThoughtProcessingStatus() == ProcessingStatus.PREPARING
         && !message
             .getCreatedAt()

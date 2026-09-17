@@ -45,7 +45,7 @@ import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageS
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse.ProgressResponse;
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse.SubmittedMessageResponse;
 import com.landit.landitbe.feature.session.freetalk.topic.client.ai.AiFreeTalkTopic;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -68,7 +68,8 @@ class FreeTalkMessageServiceTest {
   private final FreeTalkSubmittedMessageService submittedMessageService =
       mock(FreeTalkSubmittedMessageService.class);
   private final AiFreeTalkClient aiFreeTalkClient = mock(AiFreeTalkClient.class);
-  private final SessionMessageService sessionMessageService = mock(SessionMessageService.class);
+  private final ConversationMessageService sessionMessageService =
+      mock(ConversationMessageService.class);
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
       mock(FreeTalkExpressionGenerationDispatcher.class);
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService =

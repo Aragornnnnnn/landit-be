@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.session.scenario.message.dto;
 
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -37,9 +37,9 @@ public record SessionMessageSubmitResponse(
    */
   public static SessionMessageSubmitResponse from(
       Long sessionId,
-      SessionHistoryMessage submittedMessage,
+      SessionHistoryMessageSnapshot submittedMessage,
       ProcessingStatus feedbackProcessingStatus,
-      SessionHistoryMessage nextMessage,
+      SessionHistoryMessageSnapshot nextMessage,
       String ttsText,
       String fixedQuestionText,
       String questionAudioUrl,
@@ -89,7 +89,7 @@ public record SessionMessageSubmitResponse(
      * @return 제출된 사용자 메시지 응답
      */
     public static SubmittedMessageResponse from(
-        SessionHistoryMessage message, ProcessingStatus feedbackProcessingStatus) {
+        SessionHistoryMessageSnapshot message, ProcessingStatus feedbackProcessingStatus) {
       return new SubmittedMessageResponse(
           message.getId(),
           message.getTurnNumber(),
@@ -141,7 +141,7 @@ public record SessionMessageSubmitResponse(
      * @return 다음 AI 메시지 응답
      */
     public static NextMessageResponse from(
-        SessionHistoryMessage message,
+        SessionHistoryMessageSnapshot message,
         String ttsText,
         String fixedQuestionText,
         String questionAudioUrl) {
@@ -182,7 +182,7 @@ public record SessionMessageSubmitResponse(
      * @return 세션 진행도 응답
      */
     public static SessionProgressResponse from(
-        SessionHistoryMessage nextMessage, int totalQuestionCount, boolean completed) {
+        SessionHistoryMessageSnapshot nextMessage, int totalQuestionCount, boolean completed) {
       return new SessionProgressResponse(
           nextMessage.getTurnNumber(), 2, totalQuestionCount, completed);
     }

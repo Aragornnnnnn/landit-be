@@ -12,11 +12,11 @@ import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.session.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.scenario.domain.ScenarioSession;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionService;
 import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse;
 import com.landit.landitbe.feature.session.scenario.start.dto.SessionStartResponse.CurrentMessageResponse;
@@ -51,7 +51,7 @@ public class ScenarioSessionStartService {
   private final LearningSessionService learningSessionService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionHistoryService sessionHistoryService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final Clock clock;
   private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
       accessGrants;
@@ -147,7 +147,7 @@ public class ScenarioSessionStartService {
     var history = sessionHistoryService.findByLearningSessionId(sessionId);
     var messages =
         history
-            .map(value -> sessionMessageService.findAll(value.getId()))
+            .map(value -> conversationMessageService.findAll(value.getId()))
             .orElse(java.util.List.of());
     var current =
         messages.stream()
@@ -263,7 +263,7 @@ public class ScenarioSessionStartService {
       LocalDateTime startedAt) {
     assertAiOpeningMessageConfigured(startRow);
 
-    SessionHistoryMessage message =
+    SessionHistoryMessageSnapshot message =
         saveAiOpeningHistoryMessage(learningSessionId, userProfile, startRow, startedAt);
 
     return CurrentMessageResponse.from(message, startRow.openingQuestionAudioUrl());
@@ -277,28 +277,26 @@ public class ScenarioSessionStartService {
   }
 
   /** AI first 시나리오의 세션 히스토리와 첫 AI 메시지를 저장한다. */
-  private SessionHistoryMessage saveAiOpeningHistoryMessage(
+  private SessionHistoryMessageSnapshot saveAiOpeningHistoryMessage(
       Long learningSessionId,
       UserLearningProfile userProfile,
       ScenarioStartContext startRow,
       LocalDateTime startedAt) {
-    SessionHistory sessionHistory =
-        sessionHistoryService.save(
-            SessionHistory.startedScenario(
-                learningSessionId,
-                userProfile.id(),
-                userProfile.targetLocale(),
-                userProfile.baseLocale(),
-                startedAt));
+    SessionHistorySnapshot sessionHistory =
+        sessionHistoryService.startScenario(
+            learningSessionId,
+            userProfile.id(),
+            userProfile.targetLocale(),
+            userProfile.baseLocale(),
+            startedAt);
 
-    SessionHistoryMessage message =
-        sessionMessageService.save(
-            SessionHistoryMessage.aiOpening(
-                sessionHistory.getId(),
-                startRow.aiOpeningMessage(),
-                startRow.aiOpeningMessageTranslation(),
-                startRow.aiOpeningInnerThought(),
-                startRow.aiOpeningInnerThoughtType()));
+    SessionHistoryMessageSnapshot message =
+        conversationMessageService.recordAiOpening(
+            sessionHistory.getId(),
+            startRow.aiOpeningMessage(),
+            startRow.aiOpeningMessageTranslation(),
+            startRow.aiOpeningInnerThought(),
+            startRow.aiOpeningInnerThoughtType());
 
     return message;
   }

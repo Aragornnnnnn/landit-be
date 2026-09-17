@@ -12,6 +12,7 @@ import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContext;
@@ -19,7 +20,6 @@ import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.A
 import com.landit.landitbe.feature.session.scenario.message.feedback.domain.MessageFeedbackWork;
 import com.landit.landitbe.feature.session.scenario.message.feedback.repository.MessageFeedbackWorkRepository;
 import com.landit.landitbe.feature.session.scenario.message.feedback.service.MessageFeedbackWorkService;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -106,7 +106,7 @@ class MessageFeedbackRecoveryWaitTest {
     return new MessageFeedbackWorkService(
         repository,
         mock(AiConversationClient.class),
-        mock(SessionMessageService.class),
+        mock(ConversationMessageService.class),
         new JsonMapper(),
         Clock.systemUTC(),
         new AiClientProperties(

@@ -108,7 +108,7 @@ class ScenarioSessionApiIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired
-  private com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService
+  private com.landit.landitbe.feature.session.history.service.ConversationMessageService
       sessionMessages;
 
   @Autowired private ScenarioSessionMessageQueryRepository scenarioContextRepository;
@@ -797,12 +797,15 @@ class ScenarioSessionApiIntegrationTests {
                     .isEqualTo(1);
               });
           switch (update) {
-            case "RESPONSE" -> staleMessage.recordScenarioResponse("saved-response");
+            case "RESPONSE" -> sessionMessages.recordScenarioResponse(messageId, "saved-response");
             case "CLAIM" ->
-                staleMessage.claimScenarioGeneration(
-                    UUID.randomUUID().toString(), LocalDateTime.now(mutableClock).plusSeconds(30));
+                sessionMessages.claimScenarioGeneration(
+                    messageId,
+                    UUID.randomUUID().toString(),
+                    LocalDateTime.now(mutableClock).plusSeconds(30));
             case "RELEASE" ->
-                staleMessage.releaseScenarioAttempt(staleMessage.getScenarioAttemptToken());
+                sessionMessages.releaseScenarioAttempt(
+                    messageId, staleMessage.getScenarioAttemptToken());
             default -> throw new IllegalArgumentException(update);
           }
         });

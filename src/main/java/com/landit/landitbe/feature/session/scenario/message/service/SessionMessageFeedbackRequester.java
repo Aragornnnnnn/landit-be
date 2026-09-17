@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.scenario.message.service;
 
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContext;
 import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackRequest;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Component;
 class SessionMessageFeedbackRequester {
 
   private final MessageFeedbackWorkService feedbackWorkService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final AiConversationSettings aiConversationSettings;
 
   /** 사용자 메시지의 평가 기준을 구성해 피드백 생성을 요청한다. */
@@ -32,7 +33,7 @@ class SessionMessageFeedbackRequester {
       feedbackWorkService.prepare(toRequest(submittedContext));
     } catch (ApiException exception) {
       // 평가 기준이 빠져도 대화의 다음 질문 생성은 계속한다.
-      sessionMessageService.failFeedback(submittedContext.submittedMessageId());
+      conversationMessageService.failFeedback(submittedContext.submittedMessageId());
     }
   }
 

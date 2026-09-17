@@ -8,16 +8,16 @@ import com.landit.landitbe.feature.content.scenario.service.ScenarioContentServi
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.feature.session.feedback.dto.ExistingSummaryFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiScenarioContext;
 import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackEvaluationContext;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.scenario.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
@@ -37,7 +37,7 @@ public class SessionFeedbackContextService {
 
   private final LearningSessionService learningSessionService;
   private final SessionHistoryService sessionHistoryService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final ScenarioContentService scenarioContentService;
@@ -56,14 +56,14 @@ public class SessionFeedbackContextService {
   public LoadedSessionFeedbackContext load(long userId, long sessionId) {
     LearningSessionSnapshot learningSession =
         learningSessionService.findOwnedCompleted(userId, sessionId);
-    SessionHistory sessionHistory =
+    SessionHistorySnapshot sessionHistory =
         sessionHistoryService
             .findByLearningSessionId(sessionId)
             .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_SERVER_ERROR));
     ScenarioSessionMessageContextProjection scenarioContext =
         scenarioSessionService.requireMessageContext(sessionId);
-    List<SessionHistoryMessage> historyMessages =
-        sessionMessageService.findAll(sessionHistory.getId());
+    List<SessionHistoryMessageSnapshot> historyMessages =
+        conversationMessageService.findAll(sessionHistory.getId());
 
     // 이후 AI 호출과 응답 조립에 필요한 값을 트랜잭션 안에서 모두 읽어 불변 컨텍스트로 넘긴다.
     return new LoadedSessionFeedbackContext(
@@ -81,7 +81,7 @@ public class SessionFeedbackContextService {
 
   /** 세션 전체 히스토리에서 사용자 메시지와 평가 당시 기준 컨텍스트를 순서대로 구성한다. */
   private List<UserMessageContext> userMessages(
-      List<SessionHistoryMessage> historyMessages,
+      List<SessionHistoryMessageSnapshot> historyMessages,
       ScenarioSessionMessageContextProjection scenarioContext) {
     List<AiConversationHistoryMessage> conversationHistory =
         historyMessages.stream()
@@ -96,7 +96,7 @@ public class SessionFeedbackContextService {
             .toList();
     List<UserMessageContext> userMessages = new ArrayList<>();
     for (int index = 0; index < historyMessages.size(); index++) {
-      SessionHistoryMessage message = historyMessages.get(index);
+      SessionHistoryMessageSnapshot message = historyMessages.get(index);
       if (message.getRole() != ConversationSpeaker.USER) {
         continue;
       }

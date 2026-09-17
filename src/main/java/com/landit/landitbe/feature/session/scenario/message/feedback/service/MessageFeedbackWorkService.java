@@ -7,12 +7,12 @@ import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.exception.SessionErrorCode;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackRequest;
 import com.landit.landitbe.feature.session.scenario.message.feedback.client.ai.AiMessageFeedbackResult;
 import com.landit.landitbe.feature.session.scenario.message.feedback.domain.MessageFeedbackWork;
 import com.landit.landitbe.feature.session.scenario.message.feedback.repository.MessageFeedbackWorkRepository;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -43,7 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class MessageFeedbackWorkService {
   private final MessageFeedbackWorkRepository repository;
   private final AiConversationClient client;
-  private final SessionMessageService messages;
+  private final ConversationMessageService messages;
   private final JsonMapper mapper;
   private final Clock clock;
   private final Duration leaseDuration;
@@ -55,7 +55,7 @@ public class MessageFeedbackWorkService {
   public MessageFeedbackWorkService(
       MessageFeedbackWorkRepository repository,
       AiConversationClient client,
-      SessionMessageService messages,
+      ConversationMessageService messages,
       JsonMapper mapper,
       Clock clock,
       AiClientProperties properties,

@@ -7,7 +7,7 @@ import com.landit.landitbe.feature.content.tutor.dto.ConversationCharacterRespon
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.session.domain.SessionType;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -100,7 +100,7 @@ public record SessionStartResponse(
      * @return 현재 메시지 응답
      */
     public static CurrentMessageResponse from(
-        SessionHistoryMessage message, String questionAudioUrl) {
+        SessionHistoryMessageSnapshot message, String questionAudioUrl) {
       return new CurrentMessageResponse(
           message.getId(),
           message.getTurnNumber(),

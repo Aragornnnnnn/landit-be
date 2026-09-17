@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.session.freetalk.message.service;
 
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.session.freetalk.domain.FreeTalkTurnStatus;
@@ -12,7 +13,6 @@ import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageS
 import com.landit.landitbe.feature.session.freetalk.message.dto.FreeTalkMessageSubmitResponse.SubmittedMessageResponse;
 import com.landit.landitbe.feature.session.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.session.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,8 +27,8 @@ class FreeTalkMessageResponseService {
       long learningSessionId,
       FreeTalkSession session,
       FreeTalkTurnStatus turnStatus,
-      SessionHistoryMessage userMessage,
-      SessionHistoryMessage aiMessage,
+      SessionHistoryMessageSnapshot userMessage,
+      SessionHistoryMessageSnapshot aiMessage,
       long userId) {
     DailySpeakingUsage dailyUsage = dailySpeakingUsageService.usage(userId);
     return new FreeTalkMessageSubmitResponse(
@@ -50,8 +50,8 @@ class FreeTalkMessageResponseService {
       long learningSessionId,
       String title,
       FreeTalkTurnStatus turnStatus,
-      SessionHistoryMessage userMessage,
-      SessionHistoryMessage aiMessage,
+      SessionHistoryMessageSnapshot userMessage,
+      SessionHistoryMessageSnapshot aiMessage,
       FreeTalkConversationStatus conversationStatus,
       long accumulatedSpeakingDurationMs,
       long userId,

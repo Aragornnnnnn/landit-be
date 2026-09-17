@@ -5,7 +5,7 @@ package com.landit.landitbe.feature.session.freetalk.dto;
 import com.landit.landitbe.feature.content.tutor.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.session.domain.SessionType;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -87,7 +87,7 @@ public record FreeTalkSessionStartResponse(
      * @param message 변환할 AI 메시지
      * @return 현재 AI 메시지 응답
      */
-    public static CurrentMessageResponse from(SessionHistoryMessage message) {
+    public static CurrentMessageResponse from(SessionHistoryMessageSnapshot message) {
       return new CurrentMessageResponse(
           message.getId(),
           message.getTurnNumber(),

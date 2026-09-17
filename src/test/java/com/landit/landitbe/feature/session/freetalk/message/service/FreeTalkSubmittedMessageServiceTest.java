@@ -72,8 +72,10 @@ class FreeTalkSubmittedMessageServiceTest {
             learningSessionRepository),
         freeTalkSessionRepository,
         freeTalkTopicRepository,
-        sessionHistoryRepository,
-        sessionHistoryMessageRepository,
+        new com.landit.landitbe.feature.session.history.service.SessionHistoryService(
+            sessionHistoryRepository),
+        new com.landit.landitbe.feature.session.history.service.ConversationMessageService(
+            sessionHistoryMessageRepository),
         dailySpeakingUsageService,
         streakService,
         memoryProperties,

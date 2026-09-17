@@ -3,7 +3,7 @@
 package com.landit.landitbe.feature.session.scenario.innerthought.dto;
 
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -37,7 +37,7 @@ public record SessionInnerThoughtResponse(
    * @param message 변환할 사용자 메시지
    * @return 속마음 처리 상태와 완료 결과
    */
-  public static SessionInnerThoughtResponse from(SessionHistoryMessage message) {
+  public static SessionInnerThoughtResponse from(SessionHistoryMessageSnapshot message) {
     ProcessingStatus status = message.getInnerThoughtProcessingStatus();
     if (status == null) {
       return new SessionInnerThoughtResponse(null, null, null);

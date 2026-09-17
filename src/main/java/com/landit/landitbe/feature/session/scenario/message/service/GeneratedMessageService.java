@@ -8,7 +8,8 @@ import com.landit.landitbe.feature.profile.learning.service.ProfileLearningServi
 import com.landit.landitbe.feature.session.assessment.service.SessionLevelAssessmentLaunchService;
 import com.landit.landitbe.feature.session.domain.ProcessingStatus;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.scenario.domain.ScenarioSession;
 import com.landit.landitbe.feature.session.scenario.message.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionService;
@@ -29,7 +30,7 @@ class GeneratedMessageService {
   private final LearningSessionService learningSessionService;
   private final tools.jackson.databind.json.JsonMapper mapper;
   private final ScenarioSessionService scenarioSessionService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final ScenarioAccessService scenarioAccessService;
   private final Clock clock;
   private final StreakService streakService;
@@ -45,17 +46,19 @@ class GeneratedMessageService {
         learningSessionService.findOwnedInProgressForUpdate(
             submittedContext.userId(), submittedContext.sessionId());
     final ScenarioSession scenarioSession = findScenarioSession(submittedContext.sessionId());
-    SessionHistoryMessage submittedMessage = findSubmittedMessage(submittedContext);
+    SessionHistoryMessageSnapshot submittedMessage = findSubmittedMessage(submittedContext);
     assertSubmittedMessageMatches(submittedContext, submittedMessage);
     if (feedbackProcessingStatus == ProcessingStatus.FAILED) {
-      submittedMessage.markFeedbackFailed();
+      submittedMessage = conversationMessageService.markFeedbackFailed(submittedMessage.getId());
     }
 
     if (generation.completed()) {
-      submittedMessage.recordInnerThought(generation.innerThought(), generation.innerThoughtType());
+      submittedMessage =
+          conversationMessageService.recordInnerThought(
+              submittedMessage.getId(), generation.innerThought(), generation.innerThoughtType());
     }
     scenarioSession.updateGoalCompletionStatus(generation.goalCompletionStatus());
-    SessionHistoryMessage nextMessage =
+    SessionHistoryMessageSnapshot nextMessage =
         saveAiMessage(submittedMessage, generation.aiMessage(), generation.translatedMessage());
     if (generation.completed()) {
       LocalDateTime completedAt = LocalDateTime.now(clock);
@@ -80,7 +83,8 @@ class GeneratedMessageService {
             generation.questionAudioUrl(),
             submittedContext.scenarioContext().totalQuestionCount(),
             generation.completed());
-    submittedMessage.recordScenarioResponse(mapper.writeValueAsString(response));
+    conversationMessageService.recordScenarioResponse(
+        submittedMessage.getId(), mapper.writeValueAsString(response));
     return response;
   }
 
@@ -100,12 +104,13 @@ class GeneratedMessageService {
     return scenarioSessionService.requireByLearningSessionId(sessionId);
   }
 
-  private SessionHistoryMessage findSubmittedMessage(SubmittedMessageContext submittedContext) {
-    return sessionMessageService.require(submittedContext.submittedMessageId());
+  private SessionHistoryMessageSnapshot findSubmittedMessage(
+      SubmittedMessageContext submittedContext) {
+    return conversationMessageService.require(submittedContext.submittedMessageId());
   }
 
   private void assertSubmittedMessageMatches(
-      SubmittedMessageContext submittedContext, SessionHistoryMessage submittedMessage) {
+      SubmittedMessageContext submittedContext, SessionHistoryMessageSnapshot submittedMessage) {
     if (!java.util.Objects.equals(
             submittedContext.attemptToken(), submittedMessage.getScenarioAttemptToken())
         || submittedMessage.getScenarioResponsePayload() != null
@@ -116,14 +121,13 @@ class GeneratedMessageService {
     }
   }
 
-  private SessionHistoryMessage saveAiMessage(
-      SessionHistoryMessage submittedMessage, String content, String translatedContent) {
-    return sessionMessageService.save(
-        SessionHistoryMessage.aiGenerated(
-            submittedMessage.getSessionHistoryId(),
-            submittedMessage.getMessageSequence() + 1,
-            submittedMessage.getTurnNumber() + 1,
-            content,
-            translatedContent));
+  private SessionHistoryMessageSnapshot saveAiMessage(
+      SessionHistoryMessageSnapshot submittedMessage, String content, String translatedContent) {
+    return conversationMessageService.recordAiGenerated(
+        submittedMessage.getSessionHistoryId(),
+        submittedMessage.getMessageSequence() + 1,
+        submittedMessage.getTurnNumber() + 1,
+        content,
+        translatedContent);
   }
 }

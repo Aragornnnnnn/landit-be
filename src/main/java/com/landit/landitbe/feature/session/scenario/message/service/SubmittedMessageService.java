@@ -7,8 +7,9 @@ import com.landit.landitbe.feature.content.scenario.service.ScenarioContentServi
 import com.landit.landitbe.feature.session.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.session.domain.SessionMessageInputType;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
-import com.landit.landitbe.feature.session.history.domain.SessionHistoryMessage;
+import com.landit.landitbe.feature.session.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.session.scenario.repository.projection.ScenarioSessionMessageContextProjection;
 import com.landit.landitbe.feature.session.scenario.service.ScenarioSessionService;
@@ -33,7 +34,7 @@ class SubmittedMessageService {
   private final LearningSessionService learningSessionService;
   private final ScenarioSessionService scenarioSessionService;
   private final SessionHistoryService sessionHistoryService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final ScenarioContentService scenarioContentService;
 
   /** 사용자 메시지를 저장하고 AI 요청에 필요한 세션 컨텍스트를 반환한다. */
@@ -47,10 +48,11 @@ class SubmittedMessageService {
         learningSessionService.findOwnedInProgressForUpdate(userId, sessionId);
     ScenarioSessionMessageContextProjection scenarioContext = findScenarioContext(sessionId);
     SessionHistoryLookup sessionHistoryLookup = findOrCreateSessionHistory(learningSession);
-    SessionHistory sessionHistory = sessionHistoryLookup.sessionHistory();
-    List<SessionHistoryMessage> previousMessages = findPreviousMessages(sessionHistory);
+    SessionHistorySnapshot sessionHistory = sessionHistoryLookup.sessionHistory();
+    List<SessionHistoryMessageSnapshot> previousMessages = findPreviousMessages(sessionHistory);
 
-    SessionHistoryMessage pending = previousMessages.isEmpty() ? null : previousMessages.getLast();
+    SessionHistoryMessageSnapshot pending =
+        previousMessages.isEmpty() ? null : previousMessages.getLast();
     if (pending != null && pending.getRole() == ConversationSpeaker.USER) {
       if (pending.getScenarioLeaseUntil() != null
           && java.time.LocalDateTime.now(clock).isBefore(pending.getScenarioLeaseUntil())) {
@@ -61,7 +63,7 @@ class SubmittedMessageService {
           && pending.getClientMessageId() == null
           && (!pending.getContent().equals(content) || pending.getInputType() != inputType)) {
         // 구 FE의 재녹음은 종료된 시도만 교체한다.
-        sessionMessageService.deleteIfExists(pending.getId());
+        conversationMessageService.deleteIfExists(pending.getId());
         pending = null;
       } else {
         requireSameInput(pending, content, inputType, clientMessageId);
@@ -71,13 +73,14 @@ class SubmittedMessageService {
     }
     int submittedTurnNumber =
         pending == null ? submittedTurnNumber(previousMessages) : pending.getTurnNumber();
-    SessionHistoryMessage submittedMessage =
+    SessionHistoryMessageSnapshot submittedMessage =
         pending == null
             ? saveUserMessage(
                 sessionHistory, previousMessages, submittedTurnNumber, content, inputType)
             : pending;
     String attempt =
-        submittedMessage.claimScenarioGeneration(
+        conversationMessageService.claimScenarioGeneration(
+            submittedMessage.getId(),
             clientMessageId,
             java.time.LocalDateTime.now(clock).plus(aiProperties.requestTimeout()).plusSeconds(30));
     List<AiConversationHistoryMessage> conversationHistory =
@@ -108,7 +111,7 @@ class SubmittedMessageService {
     learningSessionService.findOwnedForUpdate(
         submittedContext.userId(), submittedContext.sessionId());
     var pending =
-        sessionMessageService.findAll(submittedContext.sessionHistoryId()).stream()
+        conversationMessageService.findAll(submittedContext.sessionHistoryId()).stream()
             .filter(message -> message.getId().equals(submittedContext.submittedMessageId()))
             .findFirst()
             .orElse(null);
@@ -119,9 +122,10 @@ class SubmittedMessageService {
       return;
     }
     if (pending.getClientMessageId() == null) {
-      sessionMessageService.deleteIfExists(pending.getId());
+      conversationMessageService.deleteIfExists(pending.getId());
     } else {
-      pending.releaseScenarioAttempt(submittedContext.attemptToken());
+      conversationMessageService.releaseScenarioAttempt(
+          pending.getId(), submittedContext.attemptToken());
     }
   }
 
@@ -141,7 +145,7 @@ class SubmittedMessageService {
       return null;
     }
     var stored =
-        sessionMessageService.findAll(history.get().getId()).stream()
+        conversationMessageService.findAll(history.get().getId()).stream()
             .filter(message -> clientMessageId.equals(message.getClientMessageId()))
             .findFirst()
             .orElse(null);
@@ -158,7 +162,7 @@ class SubmittedMessageService {
   }
 
   private void requireSameInput(
-      SessionHistoryMessage stored,
+      SessionHistoryMessageSnapshot stored,
       String content,
       SessionMessageInputType inputType,
       String clientMessageId) {
@@ -174,52 +178,51 @@ class SubmittedMessageService {
   }
 
   private SessionHistoryLookup findOrCreateSessionHistory(LearningSessionSnapshot learningSession) {
-    Optional<SessionHistory> sessionHistory =
+    Optional<SessionHistorySnapshot> sessionHistory =
         sessionHistoryService.findByLearningSessionId(learningSession.getId());
     if (sessionHistory.isPresent()) {
       return new SessionHistoryLookup(sessionHistory.get(), false);
     }
     return new SessionHistoryLookup(
-        sessionHistoryService.save(
-            SessionHistory.startedScenario(
-                learningSession.getId(),
-                learningSession.getUserProfileId(),
-                learningSession.getTargetLocale(),
-                learningSession.getBaseLocale(),
-                learningSession.getStartedAt())),
+        sessionHistoryService.startScenario(
+            learningSession.getId(),
+            learningSession.getUserProfileId(),
+            learningSession.getTargetLocale(),
+            learningSession.getBaseLocale(),
+            learningSession.getStartedAt()),
         true);
   }
 
-  private List<SessionHistoryMessage> findPreviousMessages(SessionHistory sessionHistory) {
-    return sessionMessageService.findAll(sessionHistory.getId());
+  private List<SessionHistoryMessageSnapshot> findPreviousMessages(
+      SessionHistorySnapshot sessionHistory) {
+    return conversationMessageService.findAll(sessionHistory.getId());
   }
 
   /** 기존 히스토리 기준으로 이번 사용자 메시지가 답변할 턴 번호를 계산한다. */
-  private int submittedTurnNumber(List<SessionHistoryMessage> previousMessages) {
+  private int submittedTurnNumber(List<SessionHistoryMessageSnapshot> previousMessages) {
     if (previousMessages.isEmpty()) {
       return 1;
     }
-    SessionHistoryMessage lastMessage = previousMessages.get(previousMessages.size() - 1);
+    SessionHistoryMessageSnapshot lastMessage = previousMessages.get(previousMessages.size() - 1);
     if (lastMessage.getRole() == ConversationSpeaker.USER) {
       throw new ApiException(ErrorCode.CONFLICT, "처리 중인 사용자 메시지가 있습니다.");
     }
     return lastMessage.getTurnNumber();
   }
 
-  private SessionHistoryMessage saveUserMessage(
-      SessionHistory sessionHistory,
-      List<SessionHistoryMessage> previousMessages,
+  private SessionHistoryMessageSnapshot saveUserMessage(
+      SessionHistorySnapshot sessionHistory,
+      List<SessionHistoryMessageSnapshot> previousMessages,
       int submittedTurnNumber,
       String content,
       SessionMessageInputType inputType) {
-    SessionHistoryMessage submittedMessage =
-        sessionMessageService.saveAndFlush(
-            SessionHistoryMessage.user(
-                sessionHistory.getId(),
-                previousMessages.size() + 1,
-                submittedTurnNumber,
-                content,
-                inputType));
+    SessionHistoryMessageSnapshot submittedMessage =
+        conversationMessageService.recordUser(
+            sessionHistory.getId(),
+            previousMessages.size() + 1,
+            submittedTurnNumber,
+            content,
+            inputType);
     return submittedMessage;
   }
 
@@ -244,13 +247,15 @@ class SubmittedMessageService {
   }
 
   private List<AiConversationHistoryMessage> toConversationHistory(
-      List<SessionHistoryMessage> previousMessages, SessionHistoryMessage submittedMessage) {
-    List<SessionHistoryMessage> messages = new ArrayList<>(previousMessages);
+      List<SessionHistoryMessageSnapshot> previousMessages,
+      SessionHistoryMessageSnapshot submittedMessage) {
+    List<SessionHistoryMessageSnapshot> messages = new ArrayList<>(previousMessages);
     messages.add(submittedMessage);
     return messages.stream().map(this::toConversationHistoryMessage).toList();
   }
 
-  private AiConversationHistoryMessage toConversationHistoryMessage(SessionHistoryMessage message) {
+  private AiConversationHistoryMessage toConversationHistoryMessage(
+      SessionHistoryMessageSnapshot message) {
     return new AiConversationHistoryMessage(
         message.getId(),
         message.getTurnNumber(),
@@ -259,5 +264,5 @@ class SubmittedMessageService {
         message.getTranslatedContent());
   }
 
-  private record SessionHistoryLookup(SessionHistory sessionHistory, boolean created) {}
+  private record SessionHistoryLookup(SessionHistorySnapshot sessionHistory, boolean created) {}
 }

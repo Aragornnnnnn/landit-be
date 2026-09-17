@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.session.feedback.service;
 
 import com.landit.landitbe.feature.learning.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.session.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.session.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.client.ai.AiSessionMessageFeedbackResult;
 import com.landit.landitbe.feature.session.feedback.domain.FeedbackType;
@@ -12,9 +13,8 @@ import com.landit.landitbe.feature.session.feedback.domain.SessionHistorySummary
 import com.landit.landitbe.feature.session.feedback.dto.ExistingSummaryFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.LoadedSessionFeedbackContext;
 import com.landit.landitbe.feature.session.feedback.dto.UserMessageContext;
-import com.landit.landitbe.feature.session.history.domain.SessionHistory;
+import com.landit.landitbe.feature.session.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.session.history.service.SessionHistoryService;
-import com.landit.landitbe.feature.session.scenario.message.service.SessionMessageService;
 import com.landit.landitbe.feature.session.service.LearningSessionService;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -34,7 +34,7 @@ class SessionFeedbackCompletionService {
   private final LearningSessionService learningSessionService;
   private final SessionHistoryService sessionHistoryService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
-  private final SessionMessageService sessionMessageService;
+  private final ConversationMessageService conversationMessageService;
   private final ScenarioProgressService scenarioProgressService;
 
   /** 유효한 AI 최종 피드백을 저장하고 세션 결과를 최초 한 번 확정한다. */
@@ -154,7 +154,7 @@ class SessionFeedbackCompletionService {
     if (result.generationFallback()) {
       context
           .userMessages()
-          .forEach(message -> sessionMessageService.failFeedback(message.messageId()));
+          .forEach(message -> conversationMessageService.failFeedback(message.messageId()));
       return;
     }
     List<SessionHistoryMessageFeedback> feedbacks = new java.util.ArrayList<>();
@@ -176,18 +176,21 @@ class SessionFeedbackCompletionService {
               feedback.benchmarkMessage()));
     }
     sessionFeedbackDataService.saveMessageFeedbacks(feedbacks);
-    sessionMessageService.completeFeedback(
+    conversationMessageService.completeFeedback(
         context.userMessages().stream().map(UserMessageContext::messageId).toList());
   }
 
   /** 세션 종료 시각을 기준으로 히스토리의 종료 정보와 사용자 메시지 수를 확정한다. */
   private void completeSessionHistory(
       LoadedSessionFeedbackContext context, LearningSessionSnapshot learningSession) {
-    SessionHistory sessionHistory = sessionHistoryService.require(context.sessionHistoryId());
+    SessionHistorySnapshot sessionHistory =
+        sessionHistoryService.require(context.sessionHistoryId());
     int userMessageCount =
         Math.toIntExact(
-            sessionMessageService.countByRole(sessionHistory.getId(), ConversationSpeaker.USER));
-    sessionHistory.complete(learningSession.getEndedAt(), userMessageCount);
+            conversationMessageService.countByRole(
+                sessionHistory.getId(), ConversationSpeaker.USER));
+    sessionHistoryService.complete(
+        sessionHistory.getId(), learningSession.getEndedAt(), userMessageCount);
   }
 
   /** 신규 최종 피드백 저장 시점에만 시나리오 진행도와 최고 성과를 갱신한다. */
