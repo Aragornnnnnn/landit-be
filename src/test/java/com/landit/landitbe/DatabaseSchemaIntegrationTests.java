@@ -407,10 +407,10 @@ class DatabaseSchemaIntegrationTests {
     assertThat(defaultTutorLabelCount).isEqualTo(1);
   }
 
-  /** V108 시드가 기존 5개 뒤로 65개를 이어 붙여 활성 주제 풀이 70개가 되는지 검증한다. */
-  @DisplayName("V108 migration은 프리톡 주제 65개를 기존 5개 뒤에 활성 상태로 추가한다.")
+  /** V111 시드가 기존 5개 뒤로 65개를 이어 붙여 활성 주제 풀이 70개가 되는지 검증한다. */
+  @DisplayName("V111 migration은 프리톡 주제 65개를 기존 5개 뒤에 활성 상태로 추가한다.")
   @Test
-  void v108AddsSixtyFiveActiveFreeTalkTopicsAfterExistingSeed() {
+  void v111AddsSixtyFiveActiveFreeTalkTopicsAfterExistingSeed() {
     Integer activeCount =
         jdbcTemplate.queryForObject(
             "select count(*) from free_talk_topic where status = 'ACTIVE'", Integer.class);
