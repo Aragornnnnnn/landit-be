@@ -5,10 +5,10 @@ package com.landit.landitbe.feature.learning.expression;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
 import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
-import com.landit.landitbe.feature.content.expression.practice.service.ExpressionPracticeService;
 import com.landit.landitbe.feature.learning.expression.docs.ExpressionControllerDocs;
 import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
 import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningCompletionService;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningContentService;
 import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningQueryService;
 import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningStartService;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -31,7 +31,7 @@ public class ExpressionController implements ExpressionControllerDocs {
 
   private final ExpressionLearningQueryService expressionLearningQueryService;
   private final ExpressionLearningStartService expressionLearningStartService;
-  private final ExpressionPracticeService expressionPracticeService;
+  private final ExpressionLearningContentService expressionPracticeService;
   private final ExpressionLearningCompletionService expressionLearningCompletionService;
 
   /** {@inheritDoc} */

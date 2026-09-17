@@ -4,8 +4,8 @@ package com.landit.landitbe.feature.learning.progress.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.learning.progress.dto.ExpressionProgress;
+import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import java.util.List;

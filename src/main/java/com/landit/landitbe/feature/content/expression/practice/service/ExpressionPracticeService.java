@@ -3,14 +3,9 @@
 package com.landit.landitbe.feature.content.expression.practice.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.landit.landitbe.feature.content.expression.domain.WritingExpression;
-import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSource;
 import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
 import com.landit.landitbe.feature.content.expression.practice.dto.ParsedPracticeSentence;
 import com.landit.landitbe.feature.content.expression.practice.dto.WritingSentenceResponse;
-import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
-import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -20,7 +15,6 @@ import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /** 표현 추가 예문의 검증과 연습·작문 문제 구성을 담당한다. */
 @Slf4j
@@ -66,41 +60,11 @@ public class ExpressionPracticeService {
   private static final String NOT_ENOUGH_PRACTICE_SENTENCE_LOG =
       "추가 예문 조회 실패: 유효한 추가 예문이 {}건뿐입니다. {}건이 필요합니다. expressionId={}";
 
-  private static final String EXPRESSION_NOT_FOUND_LOG =
-      "추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}";
   private static final String NO_VALID_PRACTICE_SENTENCE_LOG =
       "추가 예문 조회 실패: 표현에 유효한 추가 예문이 없습니다. expressionId={}";
   private static final String INVALID_PRACTICE_SENTENCE_EXCLUDED_LOG =
       "추가 예문 파싱 제외: 필수 값이 누락된 예문입니다. expressionId={}, index={}";
   private final Random random = new Random();
-  private final WritingExpressionRepository writingExpressionRepository;
-  private final ScenarioLearningLevelService scenarioLearningLevelService;
-
-  /**
-   * 학습 중인 표현의 추가 예문 목록과 무작위 작문 문제 한 개를 조회한다.
-   *
-   * @param userId 표현을 조회할 사용자 ID
-   * @param expressionId 연습할 표현 ID
-   * @return 추가 예문과 무작위 작문 문제
-   * @throws ApiException 표현이 없거나 접근할 수 없거나 유효한 추가 예문이 없을 때
-   */
-  @Transactional(readOnly = true)
-  public ExpressionPracticeResponse getExtraPracticeExamples(Long userId, Long expressionId) {
-    WritingExpression expression = requireAccessibleExpression(userId, expressionId);
-    return practiceResponse(expression, expressionId);
-  }
-
-  // 표현의 유효한 예문을 학습 응답으로 변환한다.
-  private ExpressionPracticeResponse practiceResponse(
-      WritingExpression expression, Long expressionId) {
-
-    return buildPracticeResponse(
-        expressionId,
-        expression.getTargetExpressionText(),
-        expression.getBaseExpressionMeaningText(),
-        expression.getUsageDescription(),
-        expression.getPracticeExamplesPayload());
-  }
 
   /**
    * 저장 위치와 관계없이 동일한 검증 규칙으로 표현 연습 응답을 만든다.
@@ -144,25 +108,6 @@ public class ExpressionPracticeService {
             .map(ParsedPracticeSentence::sentence)
             .toList(),
         writingSentences(parsedSentences.subList(0, PRACTICE_SENTENCE_COUNT)));
-  }
-
-  // 사용자가 접근할 수 있는 활성 표현을 조회한다.
-  private WritingExpression requireAccessibleExpression(Long userId, Long expressionId) {
-    WritingExpression expression =
-        writingExpressionRepository
-            .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
-            .orElseThrow(
-                () -> {
-                  log.warn(EXPRESSION_NOT_FOUND_LOG, expressionId);
-                  return new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
-                });
-    if (expression.getExpressionSource() == WritingExpressionSource.SCENARIO
-        && !scenarioLearningLevelService
-            .expressionLevel(userId, expression.getScenarioId())
-            .includesExpressionDifficulty(expression.getDifficultyLevel())) {
-      throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND);
-    }
-    return expression;
   }
 
   /**

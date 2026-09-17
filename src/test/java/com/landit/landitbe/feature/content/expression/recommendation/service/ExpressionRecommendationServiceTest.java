@@ -15,7 +15,7 @@ import com.landit.landitbe.feature.content.expression.recommendation.dto.Express
 import com.landit.landitbe.feature.content.expression.recommendation.dto.FreeTalkCandidateSearch;
 import com.landit.landitbe.feature.content.expression.recommendation.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
+import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;

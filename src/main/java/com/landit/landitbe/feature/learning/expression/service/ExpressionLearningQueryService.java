@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.learning.expression.service;
 
 import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import java.util.List;
 import java.util.Set;
@@ -16,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExpressionLearningQueryService {
 
-  private final ExpressionQueryService expressionQueryService;
+  private final ExpressionLearningContentService expressionQueryService;
   private final ExpressionCompletionService expressionCompletionService;
 
   /**

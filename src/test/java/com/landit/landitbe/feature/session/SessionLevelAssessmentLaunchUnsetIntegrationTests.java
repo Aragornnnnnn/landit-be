@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
+import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.session.scenario.client.ai.AiConversationClient;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

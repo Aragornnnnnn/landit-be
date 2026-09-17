@@ -1,10 +1,10 @@
 // 신규 학습은 현재 수준으로, 과거 복습은 최초 완료 수준으로 콘텐츠를 선택한다.
 
-package com.landit.landitbe.feature.content.scenario.service;
+package com.landit.landitbe.feature.learning.scenario.level.service;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.dto.CompletedScenarioLevel;
-import com.landit.landitbe.feature.content.scenario.repository.ScenarioLearningHistoryQueryRepository;
+import com.landit.landitbe.feature.learning.scenario.level.dto.CompletedScenarioLevel;
+import com.landit.landitbe.feature.learning.scenario.level.repository.ScenarioLearningHistoryQueryRepository;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.Locale;
 import java.time.Clock;
@@ -73,13 +73,7 @@ public class ScenarioLearningLevelService {
    */
   private Optional<CompletedScenarioLevel> findFirstCompletedLevel(
       long userId, long scenarioId, Locale targetLocale) {
-    return learningHistoryRepository
-        .findFirstCompletedLevel(userId, scenarioId, targetLocale.name())
-        .map(
-            row ->
-                new CompletedScenarioLevel(
-                    ContentLearningLevel.valueOf(row.getQuestionLevelGroup()),
-                    row.getCurrentLevel(),
-                    row.getEndedAt()));
+    return learningHistoryRepository.findFirstCompletedLevel(
+        userId, scenarioId, targetLocale.name());
   }
 }

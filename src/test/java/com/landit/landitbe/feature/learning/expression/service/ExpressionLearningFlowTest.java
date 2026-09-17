@@ -30,10 +30,10 @@ import com.landit.landitbe.feature.content.expression.recommendation.repository.
 import com.landit.landitbe.feature.content.expression.recommendation.service.ExpressionRecommendationService;
 import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
 import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.content.scenario.service.ScenarioService;
 import com.landit.landitbe.feature.learning.progress.dto.CompletedExpressionIds;
 import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
+import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
@@ -45,7 +45,6 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -78,12 +77,19 @@ class ExpressionLearningFlowTest {
 
   private ExpressionLearningQueryService expressionLearningQueryService;
   private ExpressionLearningStartService expressionLearningStartService;
-  private ExpressionPracticeService expressionPracticeService;
+  private ExpressionLearningContentService expressionPracticeService;
   private ExpressionRecommendationService expressionRecommendationService;
-  @InjectMocks private ExpressionQueryService expressionQueryService;
+  private ExpressionLearningContentService expressionQueryService;
 
   @org.junit.jupiter.api.BeforeEach
   void allowLearningStart() {
+    expressionQueryService =
+        new ExpressionLearningContentService(
+            new ExpressionQueryService(writingExpressionRepository),
+            scenarioService,
+            userProfileService,
+            scenarioLearningLevelService,
+            new ExpressionPracticeService());
     expressionLearningQueryService =
         new ExpressionLearningQueryService(expressionQueryService, expressionCompletionService);
     expressionLearningStartService =
@@ -93,8 +99,7 @@ class ExpressionLearningFlowTest {
             new ExpressionPronunciationQueryService(
                 pronunciationAssetRepository, accentLocaleResolver),
             expressionCompletionService);
-    expressionPracticeService =
-        new ExpressionPracticeService(writingExpressionRepository, scenarioLearningLevelService);
+    expressionPracticeService = expressionQueryService;
     expressionRecommendationService =
         new ExpressionRecommendationService(
             writingExpressionRepository, expressionEmbeddingSearchRepository);

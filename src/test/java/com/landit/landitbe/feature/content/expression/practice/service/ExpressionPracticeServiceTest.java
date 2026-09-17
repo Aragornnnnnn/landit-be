@@ -20,7 +20,7 @@ import com.landit.landitbe.feature.content.expression.practice.dto.PracticeSente
 import com.landit.landitbe.feature.content.expression.practice.dto.WritingSentenceResponse;
 import com.landit.landitbe.feature.content.expression.recommendation.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.feature.content.expression.repository.WritingExpressionRepository;
-import com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService;
+import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,23 @@ class ExpressionPracticeServiceTest {
   @Mock private WritingExpressionRepository writingExpressionRepository;
   @Mock private ExpressionEmbeddingSearchRepository expressionEmbeddingSearchRepository;
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
-  @InjectMocks private ExpressionPracticeService expressionPracticeService;
+  private com.landit.landitbe.feature.learning.expression.service.ExpressionLearningContentService
+      expressionPracticeService;
+
+  @org.junit.jupiter.api.BeforeEach
+  void composeLearningContent() {
+    expressionPracticeService =
+        new com.landit.landitbe.feature.learning.expression.service
+            .ExpressionLearningContentService(
+            new com.landit.landitbe.feature.content.expression.service.ExpressionQueryService(
+                writingExpressionRepository),
+            org.mockito.Mockito.mock(
+                com.landit.landitbe.feature.content.scenario.service.ScenarioService.class),
+            org.mockito.Mockito.mock(
+                com.landit.landitbe.feature.profile.learning.service.ProfileLearningService.class),
+            scenarioLearningLevelService,
+            new ExpressionPracticeService());
+  }
 
   // ===== 추가 예문 조회(getExtraPracticeExamples) 테스트 =====
 
@@ -55,7 +70,11 @@ class ExpressionPracticeServiceTest {
   @Test
   void shouldLogAndThrowWhenExpressionIdNotFound() {
     // given: 로그를 검증하기 위해 서비스 로거에 ListAppender(로그를 리스트에 담아주는 가짜 출력지)를 부착
-    Logger logger = (Logger) LoggerFactory.getLogger(ExpressionPracticeService.class);
+    Logger logger =
+        (Logger)
+            LoggerFactory.getLogger(
+                com.landit.landitbe.feature.content.expression.service.ExpressionQueryService
+                    .class);
     ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
     logAppender.start();
     logger.addAppender(logAppender);

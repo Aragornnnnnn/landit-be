@@ -55,7 +55,8 @@ public class ScenarioSessionStartService {
   private final Clock clock;
   private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
       accessGrants;
-  private final com.landit.landitbe.feature.content.scenario.service.ScenarioLearningLevelService
+  private final com.landit.landitbe.feature.learning.scenario.level.service
+          .ScenarioLearningLevelService
       scenarioLearningLevelService;
 
   /**

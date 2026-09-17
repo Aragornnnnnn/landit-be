@@ -223,6 +223,9 @@ class FeatureBoundaryTest {
       return "";
     }
     String[] parts = name.substring(FEATURE.length()).split("\\.");
+    if (name.startsWith(FEATURE + "learning.scenario.level.")) {
+      return "learning.scenario.level";
+    }
     // learning의 상태 소유(access/progress/review)와 요청 조율(expression/scenario)은 별도 업무다.
     return parts[0].equals("learning") ? parts[0] + "." + parts[1] : parts[0];
   }

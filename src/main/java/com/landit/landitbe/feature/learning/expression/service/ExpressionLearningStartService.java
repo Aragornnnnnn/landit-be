@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.learning.expression.service;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
 import com.landit.landitbe.feature.content.expression.pronunciation.dto.ExpressionAudio;
 import com.landit.landitbe.feature.content.expression.pronunciation.service.ExpressionPronunciationQueryService;
-import com.landit.landitbe.feature.content.expression.service.ExpressionQueryService;
 import com.landit.landitbe.feature.learning.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.subscription.service.LearningAccessGrantService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -18,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExpressionLearningStartService {
 
-  private final ExpressionQueryService expressionQueryService;
+  private final ExpressionLearningContentService expressionQueryService;
   private final LearningAccessGrantService accessGrants;
   private final ExpressionPronunciationQueryService pronunciationQueryService;
   private final ExpressionCompletionService expressionCompletionService;

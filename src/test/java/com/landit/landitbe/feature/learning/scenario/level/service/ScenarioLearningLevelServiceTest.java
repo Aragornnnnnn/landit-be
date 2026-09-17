@@ -1,14 +1,14 @@
 // 승급 후에도 과거 질문과 표현 수준을 보존하고 진단 직후 새 수준을 적용하는지 검증한다.
 
-package com.landit.landitbe.feature.content.scenario.service;
+package com.landit.landitbe.feature.learning.scenario.level.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
-import com.landit.landitbe.feature.content.scenario.repository.ScenarioLearningHistoryQueryRepository;
-import com.landit.landitbe.feature.content.scenario.repository.projection.CompletedScenarioLevelProjection;
+import com.landit.landitbe.feature.learning.scenario.level.dto.CompletedScenarioLevel;
+import com.landit.landitbe.feature.learning.scenario.level.repository.ScenarioLearningHistoryQueryRepository;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningLevelResponse;
 import com.landit.landitbe.feature.profile.learning.dto.UserLocale;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
@@ -32,36 +32,23 @@ class ScenarioLearningLevelServiceTest {
     when(sessions.findFirstCompletedLevel(1L, 2L, "EN"))
         .thenReturn(
             Optional.of(
-                new History(
+                new CompletedScenarioLevel(
                     ContentLearningLevel.LEVEL_1, null, LocalDateTime.now(clock).minusDays(1))));
     assertThat(service.questionLevel(1L, 2L)).isEqualTo(ContentLearningLevel.LEVEL_1);
     assertThat(service.expressionLevel(1L, 2L)).isEqualTo(ContentLearningLevel.LEVEL_1);
     when(sessions.findFirstCompletedLevel(1L, 1L, "EN"))
         .thenReturn(
             Optional.of(
-                new History(
+                new CompletedScenarioLevel(
                     ContentLearningLevel.DIAGNOSTIC, 2, LocalDateTime.now(clock).minusDays(1))));
     assertThat(service.questionLevel(1L, 1L)).isEqualTo(ContentLearningLevel.DIAGNOSTIC);
     assertThat(service.expressionLevel(1L, 1L)).isEqualTo(ContentLearningLevel.LEVEL_2_TO_3);
     when(sessions.findFirstCompletedLevel(1L, 1L, "EN"))
         .thenReturn(
-            Optional.of(new History(ContentLearningLevel.DIAGNOSTIC, 5, LocalDateTime.now(clock))));
+            Optional.of(
+                new CompletedScenarioLevel(
+                    ContentLearningLevel.DIAGNOSTIC, 5, LocalDateTime.now(clock))));
     assertThat(service.expressionLevel(1L, 1L)).isEqualTo(ContentLearningLevel.LEVEL_4_TO_5);
     assertThat(service.questionLevel(1L, 3L)).isEqualTo(ContentLearningLevel.LEVEL_4_TO_5);
-  }
-
-  private record History(ContentLearningLevel group, Integer level, LocalDateTime endedAt)
-      implements CompletedScenarioLevelProjection {
-    public String getQuestionLevelGroup() {
-      return group.name();
-    }
-
-    public Integer getCurrentLevel() {
-      return level;
-    }
-
-    public LocalDateTime getEndedAt() {
-      return endedAt;
-    }
   }
 }

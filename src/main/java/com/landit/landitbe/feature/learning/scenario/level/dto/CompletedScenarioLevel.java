@@ -1,6 +1,6 @@
 // 최초 완료한 시나리오의 복습 콘텐츠 수준을 전달한다.
 
-package com.landit.landitbe.feature.content.scenario.dto;
+package com.landit.landitbe.feature.learning.scenario.level.dto;
 
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import java.time.LocalDateTime;
