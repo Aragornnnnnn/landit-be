@@ -102,6 +102,7 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.subscriptionStatus").value("NONE"))
         .andExpect(jsonPath("$.data.premium").value(false))
+        .andExpect(jsonPath("$.data.isTrial").value(false))
         .andExpect(jsonPath("$.data.periodType").isEmpty())
         .andExpect(jsonPath("$.data.expiresAt").isEmpty())
         .andExpect(jsonPath("$.data.conversationCompletedSinceLaunch").value(false))
@@ -109,7 +110,7 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.data.store").isEmpty());
   }
 
-  /** 웹훅으로 무료 체험 구매가 반영되면 ACTIVE 상태, TRIAL 기간 종류, 만료 시각이 조회된다. */
+  /** 웹훅으로 무료 체험 구매가 반영되면 ACTIVE 상태, 체험 중(isTrial), TRIAL 기간 종류, 만료 시각이 조회된다. */
   @Test
   void returnsActiveSubscriptionAfterWebhookPurchase() throws Exception {
     String userKey = "subscription-active";
@@ -141,10 +142,54 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.subscriptionStatus").value("ACTIVE"))
         .andExpect(jsonPath("$.data.premium").value(true))
+        .andExpect(jsonPath("$.data.isTrial").value(true))
         .andExpect(jsonPath("$.data.periodType").value("TRIAL"))
         .andExpect(jsonPath("$.data.expiresAt").isNotEmpty())
         .andExpect(jsonPath("$.data.productId").value("com.saynow.app.premium.yearly"))
         .andExpect(jsonPath("$.data.store").value("PLAY_STORE"));
+  }
+
+  /**
+   * 대시보드에서 부여한 프로모션 권한(NON_RENEWING_PURCHASE)은 프리미엄이 켜지지만 무료 체험이 아니므로 isTrial은 false이고 periodType은
+   * PROMOTIONAL로 조회된다. 앱은 이 값으로 체험 종료 결제 경고를 보내지 않는다.
+   */
+  @Test
+  void returnsPromotionalSubscriptionAsPremiumButNotTrial() throws Exception {
+    String userKey = "subscription-promotional";
+    String accessToken = login(userKey);
+    Long userId = userIdOf(userKey);
+    String body =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "NON_RENEWING_PURCHASE",
+            "app_user_id": "%d",
+            "product_id": "rc_promo_premium_monthly",
+            "period_type": "PROMOTIONAL",
+            "store": "PROMOTIONAL",
+            "environment": "PRODUCTION",
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """
+            .formatted(UUID.randomUUID(), userId, EVENT_TIMESTAMP_MS, EXPIRATION_MS);
+    postWebhook(body);
+
+    mockMvc
+        .perform(
+            get("/api/v1/me/subscription")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.subscriptionStatus").value("ACTIVE"))
+        .andExpect(jsonPath("$.data.premium").value(true))
+        .andExpect(jsonPath("$.data.isTrial").value(false))
+        .andExpect(jsonPath("$.data.periodType").value("PROMOTIONAL"))
+        .andExpect(jsonPath("$.data.expiresAt").isNotEmpty())
+        .andExpect(jsonPath("$.data.productId").value("rc_promo_premium_monthly"))
+        .andExpect(jsonPath("$.data.store").value("PROMOTIONAL"));
   }
 
   /** 결제 이력은 발생 시각 내림차순으로 내려오고, 결제 없는 이벤트의 price는 0이다. */
@@ -349,6 +394,11 @@ class UserSubscriptionApiIntegrationTests {
                     "$.components.schemas.UserSubscriptionResponse.properties"
                         + ".conversationCompletedSinceLaunch")
                 .exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.isTrial").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.trial")
+                .doesNotExist())
         .andExpect(
             jsonPath("$.components.schemas.UserSubscriptionResponse.properties.productId").exists())
         .andExpect(
