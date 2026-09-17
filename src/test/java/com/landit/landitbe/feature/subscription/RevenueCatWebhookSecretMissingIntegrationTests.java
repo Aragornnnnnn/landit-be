@@ -42,7 +42,7 @@ class RevenueCatWebhookSecretMissingIntegrationTests {
                     """
                     {"api_version":"1.0","event":{"id":"e1","type":"INITIAL_PURCHASE","app_user_id":"1"}}
                     """))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.error.code").value("WEBHOOK_UNAUTHORIZED"));
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"));
   }
 }
