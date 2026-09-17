@@ -60,8 +60,7 @@ class Lan474IntegrationBoundaryTest {
             subscriptionProfiles,
             events,
             Clock.systemUTC(),
-            mock(
-                com.landit.landitbe.feature.notification.job.service.NotificationJobService.class));
+            mock(org.springframework.context.ApplicationEventPublisher.class));
     for (String type : new String[] {"INITIAL_PURCHASE", "TRANSFER"}) {
       var request =
           new JsonMapper()

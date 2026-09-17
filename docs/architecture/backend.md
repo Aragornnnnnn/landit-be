@@ -229,7 +229,7 @@ config -> feature/shared
 - 수준 평가에서 사용자 상태는 profile의 잠금 snapshot으로 읽고, 같은 상위 트랜잭션 안에서 profile Service가 적용합니다. 점수 계산과 평가 이력은 session.assessment가 소유합니다.
 - subscription은 무료 예약·표현 학습 시도를 값 record로 반환합니다. `ExistingLearningRequest.startedAt`은 session이 사용자·유형을 확인한 값만 전달합니다. 이미 발급된 권한이 있으면 그 권한을 우선하며, 없을 때만 도입 전 시작 시각과 24시간 유예 조건을 확인합니다.
 - 체험 알림의 예약·선점·상태 저장은 `notification.job`, 이메일 전송·템플릿·수신 주소 검증은 `notification.email`이 소유합니다. 관리자 HTTP·요청 DTO·테스트 발송 접수·설정 변경은 `notification.job.admin`에 둡니다. 일반 발송은 관리자 요청 DTO를 참조하지 않습니다.
-- 알림에 필요한 활성 사용자 구독·연락처는 `ProfileSubscriptionService`의 `SubscriptionNotificationTarget` 값으로 조회합니다. 구독 웹훅과 체험 예약의 같은 트랜잭션을 유지하며 알림에서 profile 저장소를 직접 참조하지 않습니다.
+- 알림에 필요한 활성 사용자 구독·연락처는 `ProfileSubscriptionService`의 `SubscriptionNotificationTarget` 값으로 조회합니다. 구독은 `SubscriptionChangedEvent`를 발행하고 `SubscriptionTrialReminderService`가 동기 처리합니다. 구독 웹훅과 체험 예약의 같은 트랜잭션을 유지하며 알림에서 profile 저장소를 직접 참조하지 않습니다. 비동기 처리나 커밋 이후 처리로 변경하지 않습니다.
 - 시나리오 상세 피드백 공개 판단은 `session.feedback.ScenarioFeedbackAccessService`가 조율합니다. subscription의 공개 정책·프리미엄 여부·`FreeScenarioAccess`와 session의 소유권·최초 완료 이력을 조합하며 subscription은 session을 역참조하지 않습니다. 피드백 생성·저장은 유지하고 응답에서 메시지별 상세 피드백만 숨깁니다.
 - `config.security.PremiumAccessFilter`가 HTTP 경로별 세션 소유권과 구독 정책을 조율합니다. 기능 간 역참조를 보안 필터에 숨기지 않고 애플리케이션 조립 위치에서 명시합니다.
 - 프리톡 메시지는 예약·확정·보상, 완료 요청 재전송 복원, 응답 조립으로 나눕니다. 같은 패키지의 잠금 helper를 공유하고 학습 세션 → 프리톡 잠금 및 기존 외부 트랜잭션을 유지합니다.

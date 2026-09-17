@@ -162,3 +162,6 @@ MSA/Gradle 멀티모듈/전면 Facade/불필요한 인터페이스는 도입하�
 - `./gradlew spotlessApply check` 통과: 총 1,243개, 성공 1,237개, 실패·오류 0개, 환경 조건 생략 6개. 기능 경계와 새 알림·관리자 HTTP·구독·지표 회귀 테스트를 포함한다.
 - build.gradle과 src/main/resources 전체가 최신 develop과 동일하다. 배포된 체험 알림 V105~V107과 원격에서 이미 조정된 후속 V108·V109·V110을 보존한다. 운영 DB·SES·EventBridge 실호출·서버 배포 검증은 수행하지 않았다.
 - 시작 시점의 네 원격 HEAD를 `backup/LAN-{488,461,491,494}-before-develop-20260917`에 보존했다. 후속 PR은 각 직전 브랜치 위로 rebase한다. 이번 검증은 최종 브랜치 기준이며 중간 커밋 전체의 재컴파일은 수행하지 않았다.
+
+- 후속 LAN-494 전체 검증에서 `subscription → notification → learning.review → subscription` 순환 의존을 발견했다. 구독이 `SubscriptionChangedEvent`를 발행하고 알림의 `SubscriptionTrialReminderService`가 동기 수신하도록 변경했다. 발행 위치는 기존 구독 갱신·이전 성공 분기와 같고 알림 예약도 기존 트랜잭션에 참여한다.
+- 웹훅 재전송 시 예약 2건만 유지하는 기존 통합 테스트에 트랜잭션 종료·롤백 후 구독 이력과 예약이 함께 사라지는 검증을 추가했다. 후속 브랜치에도 수정한 기반을 다시 반영한다.

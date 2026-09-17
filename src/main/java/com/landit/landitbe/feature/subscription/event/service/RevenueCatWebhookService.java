@@ -16,6 +16,7 @@ import com.landit.landitbe.feature.subscription.event.domain.SubscriptionEvent;
 import com.landit.landitbe.feature.subscription.event.domain.SubscriptionEventType;
 import com.landit.landitbe.feature.subscription.event.dto.RevenueCatWebhookEvent;
 import com.landit.landitbe.feature.subscription.event.dto.RevenueCatWebhookRequest;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionChangedEvent;
 import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionException;
@@ -30,6 +31,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,8 +49,7 @@ public class RevenueCatWebhookService {
   private final ProfileSubscriptionService profileSubscriptionService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final Clock clock;
-  private final com.landit.landitbe.feature.notification.job.service.NotificationJobService
-      notificationJobService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Authorization 헤더를 검증한 뒤 웹훅 이벤트를 결제 이력으로 저장하고 사용자 구독 상태에 반영한다.
@@ -199,7 +200,8 @@ public class RevenueCatWebhookService {
     boolean saved = transfer.moved() != null;
     if (saved) {
       saveTransferEvent(event, toUserId.get(), transfer.moved(), eventAt);
-      notificationJobService.recordTrial(toUserId.get(), event.environment());
+      eventPublisher.publishEvent(
+          new SubscriptionChangedEvent(toUserId.get(), event.environment()));
     }
     logTransfer(event, fromUserId.get(), toUserId.get(), transfer, saved);
   }
@@ -363,7 +365,7 @@ public class RevenueCatWebhookService {
     SubscriptionUpdateResult result =
         profileSubscriptionService.updateSubscription(userId, command);
     if (result == SubscriptionUpdateResult.APPLIED) {
-      notificationJobService.recordTrial(userId, event.environment());
+      eventPublisher.publishEvent(new SubscriptionChangedEvent(userId, event.environment()));
     }
     log.info(
         "RevenueCat 웹훅 처리: result={}, userId={}, status={}, periodType={}, productId={}, store={},"

@@ -52,6 +52,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -411,7 +412,7 @@ class NotificationJobIntegrationTests {
   }
 
   @Test
-  void webhookCommitsSubscriptionAndTwoReservationsAtomically() throws Exception {
+  void webhookKeepsSubscriptionAndReservationsInTheSameTransaction() throws Exception {
     long expiry = NOW.plusSeconds(7 * 86400).toEpochMilli();
     String body =
         """
@@ -431,6 +432,20 @@ class NotificationJobIntegrationTests {
     }
     assertThat(jobs.pendingReservations()).hasSize(2);
     assertThat(job("TRIAL_EMAIL").scheduledAt()).isEqualTo(NOW.plusSeconds(6 * 86400));
+    TestTransaction.flagForRollback();
+    TestTransaction.end();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notification_job WHERE user_profile_id = ?",
+                Long.class,
+                USER_ID))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM subscription_event WHERE event_id = ?",
+                Long.class,
+                "trial-webhook-test"))
+        .isZero();
   }
 
   private NotificationJob job(String kind) {
