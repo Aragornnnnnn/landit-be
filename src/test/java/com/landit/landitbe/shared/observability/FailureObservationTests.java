@@ -107,6 +107,21 @@ class FailureObservationTests {
   }
 
   @Test
+  void wrapperAndCauseShareOneFailureEventInEitherReportingOrder() {
+    RuntimeException firstCause = new RuntimeException("secret-first");
+    RuntimeException firstWrapper = new RuntimeException("secret-wrapper", firstCause);
+    FailureObservation.failed("memory", "persistence", "storage_failed", firstCause);
+    FailureObservation.failed("memory", "persistence", "storage_failed", firstWrapper);
+
+    RuntimeException secondCause = new RuntimeException("secret-second");
+    RuntimeException secondWrapper = new RuntimeException("secret-wrapper", secondCause);
+    FailureObservation.failed("memory", "persistence", "storage_failed", secondWrapper);
+    FailureObservation.failed("memory", "persistence", "storage_failed", secondCause);
+
+    assertThat(events).hasSize(2);
+  }
+
+  @Test
   void automaticSdkErrorsAreSanitizedWithoutSuppressingClientExceptionClasses() throws Exception {
     SentryEvent raw = new SentryEvent(new IllegalArgumentException("secret-request"));
     Request request = new Request();
