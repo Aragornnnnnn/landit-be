@@ -72,20 +72,22 @@ com.landit.landitbe
 │   │   ├── expression       # pronunciation / practice / recommendation
 │   │   └── tutor
 │   ├── learning
-│   │   ├── scenario         # 사용자별 목록 / 일별 선택 / 달력
-│   │   ├── expression       # 표현 목록 / 시작 / 완료 조율
-│   │   ├── progress         # 누적 학습 진행과 완료 이력
-│   │   ├── access           # 시나리오 복습 권한
-│   │   └── review           # 복습 문항과 결과
-│   ├── session
-│   │   ├── scenario         # start / message / innerthought
+│   │   ├── scenario
+│   │   │   ├── selection   # 사용자별 목록 / 오늘 시나리오 / 달력
+│   │   │   ├── access      # 복습 접근 상태
+│   │   │   ├── progress    # 시나리오 진행·완료 이력
+│   │   │   ├── level       # 사용자별 콘텐츠 수준 결정 / 과거 수준 조회
+│   │   │   ├── session     # start / message / innerthought / admin
+│   │   │   ├── feedback    # 최종 피드백
+│   │   │   └── assessment  # 수준 평가
 │   │   ├── freetalk         # message / topic / usage / innerthought
 │   │   │   ├── expression
 │   │   │   ├── memory
 │   │   │   └── history
-│   │   ├── assessment
-│   │   ├── feedback
-│   │   └── history
+│   │   ├── expression      # 표현 목록 / 시작 / 완료 조율
+│   │   │   └── progress    # 표현 완료 이력 / 진도 집계
+│   │   ├── conversation    # 공통 세션 상태 / 소유권 / history
+│   │   └── review          # 복습 문항과 결과
 │   ├── notification
 │   │   ├── token
 │   │   ├── delivery
@@ -103,24 +105,43 @@ com.landit.landitbe
 
 각 업무 패키지에는 Controller와 필요한 `service`, `repository`, `domain`, `dto`,
 `docs`, `client`, `exception`을 둡니다. 같은 업무의 변경 파일을 함께 찾을 수 있게 합니다.
-`session` 내부의 하위 패키지는 분류 단위이며 각각 독립 배포 모듈이라는 뜻은 아닙니다.
-`learning`은 업무를 묶는 상위 폴더입니다. 순환 검사의 업무 단위는 `learning.expression`,
-`learning.scenario`, `learning.progress`, `learning.access`, `learning.review`로 구분합니다.
-나머지 기능은 `content`, `session`, `profile` 등 feature 바로 아래 패키지를 업무 단위로 검사합니다.
+`learning`은 학습 실행과 결과를 묶는 상위 폴더이며 독립 배포를 보장하지 않습니다.
+시나리오의 선택·접근·진도·수준 결정은 각각 별도 경계입니다. 시나리오 세션·피드백·평가는
+현재 하나의 실행 업무로 검사합니다. 공통 대화 저장소, 프리톡, 표현 완료 이력, 표현 조율,
+복습은 서로 다른 경계입니다. 나머지 기능은 `content`, `profile` 등 feature 바로 아래
+패키지를 업무 단위로 검사합니다. 같은 learning 폴더에 있어도 타 업무 Entity·Repository
+직접 접근과 순환은 금지합니다.
 
 | 업무 단위 | 소유 책임과 의존 방향 |
 | --- | --- |
-| `content` | 콘텐츠·추천 후보·연습·음성 조회. learning/session/subscription Service를 참조하지 않습니다. |
-| `learning.access` | 접근 상태. session 또는 학습 조율을 참조하지 않습니다. |
-| `learning.progress` | 진행·완료 이력과 표현별 진도 집계. content/profile을 조회합니다. |
+| `content` | 콘텐츠 정의·추천 후보·연습·음성 조회. 언어와 수준을 받아 콘텐츠를 제공하며 learning/subscription을 참조하지 않습니다. |
+| `learning.scenario.access` | 복습 접근 상태. 학습 실행이나 선택을 참조하지 않습니다. |
+| `learning.scenario.progress` | 시나리오 시작·완료 상태. 구독은 이 업무의 공개 진행 조회만 사용합니다. |
+| `learning.scenario.level` | 개인별 콘텐츠 수준 결정과 과거 최초 완료 수준 조회. content/profile의 값 계약을 사용합니다. |
+| `learning.expression.progress` | 표현 완료 이력과 진도 집계. content/profile/scenario.level을 조회합니다. |
 | `learning.review` | 복습 문항과 채점 값 계약. 학습 조율을 참조하지 않습니다. |
-| `learning.scenario` | 개인별 시나리오 목록·일별 선택·달력. content와 access/progress를 사용합니다. |
-| `learning.expression` | 표현 목록·시작·완료. content, progress, subscription, session을 조율합니다. |
-| `session` | 대화 상태와 소유권. scenario/access/progress를 사용하되 learning.expression을 참조하지 않습니다. |
-| `subscription` | 시작 권한·구독 정책. 검증된 시작 시각을 값으로 받고 session/auth를 참조하지 않습니다. |
+| `learning.scenario.selection` | 개인별 시나리오 목록·일별 선택·달력. content와 접근·진도·수준 값을 사용합니다. |
+| `learning.scenario`의 실행 영역 | 시나리오 시작·메시지·피드백·평가. content, conversation, 접근·진도·수준, 구독·프로필을 조율합니다. |
+| `learning.freetalk` | 프리톡 대화·추천 표현·기억 생성. 공통 대화 상태는 conversation Service로 변경합니다. |
+| `learning.expression` | 표현 목록·시작·완료. 콘텐츠, 수준, 표현 진도, 구독, 프리톡을 조율합니다. |
+| `learning.conversation` | 공통 세션·이력·메시지의 저장과 소유권. 다른 learning 업무를 참조하지 않습니다. |
+| `subscription` | 시작 권한·구독 정책. 검증된 시작 시각을 값으로 받고 학습 실행과 auth를 참조하지 않습니다. |
 
-따라서 상위 폴더만 합치면 learning과 session 양쪽 참조가 보이지만, 실제 상태 소유와 조율
-업무 사이에는 순환을 허용하지 않습니다. 이를 독립 배포가 가능한 물리 모듈로 오해하지 않습니다.
+콘텐츠 정의와 학습 실행은 수명과 변경 이유가 달라 분리합니다. 반면 사용자가 시나리오를
+선택하고 대화한 뒤 피드백을 받는 흐름은 learning.scenario 아래에서 찾을 수 있습니다.
+폴더 이동과 함께 저장 책임을 분리했으며, 독립 배포에 필요한 DB·통신 분리는 후속 작업입니다.
+
+| 변경 전 | 변경 후 | 실제 책임의 변화 |
+| --- | --- | --- |
+| learning.scenario와 session.scenario/feedback/assessment | learning.scenario의 selection/session/feedback/assessment | 하나의 시나리오 학습 흐름 아래에 모읍니다. |
+| learning.progress의 여러 완료 상태 | scenario.progress와 expression.progress | 각각의 Entity·Repository·Service가 자기 진행 이력만 변경합니다. |
+| content에서 사용자별 수준 선택 | learning.scenario.level과 learning.expression | content는 요청자의 학습 이력을 판단하지 않습니다. |
+| 시나리오·프리톡이 공통 세션/메시지 Entity를 직접 변경 | conversation Service와 snapshot record | 원본 Entity를 노출하지 않고 ID 기반 상태 변경을 제공합니다. |
+
+Entity는 콘텐츠 정의가 `content.*.domain`, 시나리오 실행이 `learning.scenario.session.domain`,
+프리톡 실행이 `learning.freetalk.domain`, 공통 세션이 `learning.conversation.domain`,
+공통 이력·메시지가 `learning.conversation.history.domain`에 있습니다. 진행 Entity는
+각각 `learning.scenario.progress.domain`, `learning.expression.progress.domain`이 소유합니다.
 
 ## 큰 패키지를 나누는 기준
 
@@ -128,14 +149,14 @@ com.landit.landitbe
 
 | 찾으려는 코드 | 위치 |
 | --- | --- |
-| 시나리오 시작·재개 | `session.scenario.start` |
-| 시나리오 발화 접수·AI 생성·저장 | `session.scenario.message` |
-| 메시지 피드백 작업·복구 | `session.scenario.message.feedback` |
-| 프리톡 대화·표현 추천 AI 계약 | 각각 `session.freetalk.message.client.ai`, `session.freetalk.expression.client.ai` |
+| 시나리오 시작·재개 | `learning.scenario.session.start` |
+| 시나리오 발화 접수·AI 생성·저장 | `learning.scenario.session.message` |
+| 메시지 피드백 작업·복구 | `learning.scenario.session.message.feedback` |
+| 프리톡 대화·표현 추천 AI 계약 | 각각 `learning.freetalk.message.client.ai`, `learning.freetalk.expression.client.ai` |
 | 표현 발음 자산·발음 평가 | `content.expression.pronunciation` |
 | 연습 예문·표현 추천 검색 | `content.expression.practice`, `content.expression.recommendation` |
 | 시나리오 질문·일별 콘텐츠 조회 | `content.scenario.question`, `content.scenario.schedule` |
-| 사용자별 시나리오 선택·목록·달력 | `learning.scenario` |
+| 사용자별 시나리오 선택·목록·달력 | `learning.scenario.selection` |
 | 프로필 인증·학습·설정·구독 처리 | `profile.authentication`, `profile.learning`, `profile.preference`, `profile.subscription` |
 | 우편함 문의·답장 / 편지 발행·조회 | `mailbox.feedback`, `mailbox.letter` |
 | 기억 후보 판정·검색 | `memory.planning`, `memory.retrieval` |
@@ -144,7 +165,7 @@ com.landit.landitbe
 
 HTTP Controller가 여러 하위 업무를 조율하면 공통 상위 패키지에 유지합니다. 예를 들어 `UserProfileController`는 학습·설정 Service를 호출합니다. `UserProfileService`는 공통 소유권·활성 여부·관리자 조회를 맡고, 인증·학습·설정·구독 Service가 해당 업무의 조회·변경 로직을 소유합니다. 같은 profile Repository를 공유하며 단순 위임 Service를 추가하지 않습니다.
 
-시나리오 메시지 처리와 기억 후보 판정의 package-private helper는 각각 구현 Service와 같은 패키지에 둡니다. 패키지 이동을 위해 공개 범위를 넓히지 않습니다. 여러 대화 유형이 사용하는 `session.domain`의 상태·종료·입력 타입과 기능 독립적인 `shared.domain`은 공통 위치를 유지합니다.
+시나리오 메시지 처리와 기억 후보 판정의 package-private helper는 각각 구현 Service와 같은 패키지에 둡니다. 패키지 이동을 위해 공개 범위를 넓히지 않습니다. 여러 대화 유형이 사용하는 `learning.conversation.domain`의 상태·종료·입력 타입과 기능 독립적인 `shared.domain`은 공통 위치를 유지합니다.
 
 ## 관리자 기능 위치
 
@@ -156,7 +177,7 @@ HTTP Controller가 여러 하위 업무를 조율하면 공통 상위 패키지�
 | 여러 업무를 조합하는 사용자 조회·공통 관리자 인가 | `feature.admin` |
 | 시나리오 콘텐츠 관리 | `content.scenario.admin` |
 | 발음 자산 임포트·검사 | `content.expression.pronunciation.admin` |
-| 시나리오 테스트 HTTP 진입점 | `session.scenario.admin` |
+| 시나리오 테스트 HTTP 진입점 | `learning.scenario.session.admin` |
 | 우편함 관리 | `mailbox.admin` 아래 `letter`, `feedback` |
 | 푸시 캠페인 관리 | `notification.campaign.admin` |
 | 앱 버전·NPS·이미지 업로드 관리 | 각각 `app.admin`, `nps.admin`, `contentimage.admin` |
@@ -168,7 +189,7 @@ Repository·Entity·Repository projection과 공통 도메인 값은 원래 업�
 캠페인 SQS 처리·스케줄러·외부 클라이언트는 `notification.campaign`의 기존 역할 패키지를 유지합니다.
 감사 기록은 여러 관리자 기능이 사용하는 `audit` 업무입니다.
 
-시나리오 테스트 시작의 `AdminScenarioSessionStartService`는 `scenario.start.service`에 유지합니다.
+시나리오 테스트 시작의 `AdminScenarioSessionStartService`는 `learning.scenario.session.start.service`에 유지합니다.
 일반 시작 Service의 package-private 진행 제한 우회 메서드와 함께 있어야 하므로 위치를 위한 공개 범위 확대를 하지 않습니다.
 관리자 Controller와 해당 Service의 `@Profile("develop")`, 비공개 우회 메서드 검증을 유지합니다.
 `FeatureBoundaryTest`는 관리자 HTTP 진입점의 패키지와 일반 Controller의 관리자 계약 참조를 검사합니다.
@@ -221,16 +242,16 @@ config -> feature/shared
 
 - 콘텐츠는 표현 본문·난이도·활성 상태·시나리오 시작 콘텐츠를 제공합니다.
 - 표현 시작은 `learning.expression`에서 콘텐츠 검증 → 권한 발급 → 음성 조회 → 완료 상태 조립을 같은 트랜잭션으로 수행합니다. 완료는 콘텐츠 잠금, 세션 표현 완료, 누적 진행 저장을 조율합니다.
-- `session`이 세션 소유권과 완료 상태를 검증하고 세션 Entity를 변경합니다.
-- `session → memory`로 기억 생성을 요청합니다. `memory`는 session 타입이나 Repository를 참조하지 않습니다.
+- `learning.conversation`이 공통 세션 소유권·상태를 조회하고 Entity를 변경합니다. 시나리오와 프리톡은 snapshot record를 받고 ID로 상태 변경을 요청합니다. 변경 메서드는 기존 호출 트랜잭션을 필수로 사용해 기존 잠금 순서와 원자성을 보존합니다. 메시지의 JSON 값도 복사해서 전달하며 반환값을 수정해 원본을 바꿀 수 없습니다.
+- `learning.freetalk → memory`로 기억 생성을 요청합니다. `memory`는 learning 타입이나 Repository를 참조하지 않습니다.
 - 기억 추출·판정은 트랜잭션 밖에서 수행하고, `persistAndComplete`의 외부 프록시 트랜잭션에서
   사용자 잠금 → 기억 snapshot 재검증·저장 → 세션 잠금·READY 전환을 수행합니다.
 - 프로필 조회는 `UserLearningProfile` 등 불변 값을 제공합니다. 잠금 조회는 호출 트랜잭션 종료까지 잠금을 유지합니다.
-- 수준 평가에서 사용자 상태는 profile의 잠금 snapshot으로 읽고, 같은 상위 트랜잭션 안에서 profile Service가 적용합니다. 점수 계산과 평가 이력은 session.assessment가 소유합니다.
-- subscription은 무료 예약·표현 학습 시도를 값 record로 반환합니다. `ExistingLearningRequest.startedAt`은 session이 사용자·유형을 확인한 값만 전달합니다. 이미 발급된 권한이 있으면 그 권한을 우선하며, 없을 때만 도입 전 시작 시각과 24시간 유예 조건을 확인합니다.
+- 수준 평가에서 사용자 상태는 profile의 잠금 snapshot으로 읽고, 같은 상위 트랜잭션 안에서 profile Service가 적용합니다. 점수 계산과 평가 이력은 learning.scenario.assessment가 소유합니다.
+- subscription은 무료 예약·표현 학습 시도를 값 record로 반환합니다. `ExistingLearningRequest.startedAt`은 학습 실행 업무가 사용자·유형을 확인한 값만 전달합니다. 이미 발급된 권한이 있으면 그 권한을 우선하며, 없을 때만 도입 전 시작 시각과 24시간 유예 조건을 확인합니다.
 - 체험 알림의 예약·선점·상태 저장은 `notification.job`, 이메일 전송·템플릿·수신 주소 검증은 `notification.email`이 소유합니다. 관리자 HTTP·요청 DTO·테스트 발송 접수·설정 변경은 `notification.job.admin`에 둡니다. 일반 발송은 관리자 요청 DTO를 참조하지 않습니다.
 - 알림에 필요한 활성 사용자 구독·연락처는 `ProfileSubscriptionService`의 `SubscriptionNotificationTarget` 값으로 조회합니다. 구독은 `SubscriptionChangedEvent`를 발행하고 `SubscriptionTrialReminderService`가 동기 처리합니다. 구독 웹훅과 체험 예약의 같은 트랜잭션을 유지하며 알림에서 profile 저장소를 직접 참조하지 않습니다. 비동기 처리나 커밋 이후 처리로 변경하지 않습니다.
-- 시나리오 상세 피드백 공개 판단은 `session.feedback.ScenarioFeedbackAccessService`가 조율합니다. subscription의 공개 정책·프리미엄 여부·`FreeScenarioAccess`와 session의 소유권·최초 완료 이력을 조합하며 subscription은 session을 역참조하지 않습니다. 피드백 생성·저장은 유지하고 응답에서 메시지별 상세 피드백만 숨깁니다.
+- 시나리오 상세 피드백 공개 판단은 `learning.scenario.feedback.ScenarioFeedbackAccessService`가 조율합니다. subscription의 공개 정책·프리미엄 여부·`FreeScenarioAccess`와 conversation의 소유권·최초 완료 이력을 조합하며 subscription은 학습 실행 업무를 역참조하지 않습니다. 피드백 생성·저장은 유지하고 응답에서 메시지별 상세 피드백만 숨깁니다.
 - `config.security.PremiumAccessFilter`가 HTTP 경로별 세션 소유권과 구독 정책을 조율합니다. 기능 간 역참조를 보안 필터에 숨기지 않고 애플리케이션 조립 위치에서 명시합니다.
 - 프리톡 메시지는 예약·확정·보상, 완료 요청 재전송 복원, 응답 조립으로 나눕니다. 같은 패키지의 잠금 helper를 공유하고 학습 세션 → 프리톡 잠금 및 기존 외부 트랜잭션을 유지합니다.
 - 인증 사용자 식별 정보는 `shared.security.AuthUserPrincipal`, 기능 간 감사 기록은 `audit`가 소유합니다.
@@ -240,25 +261,27 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | 조회 경계 | 남아 있는 결합과 이유 |
 | --- | --- |
 | content의 시나리오/표현 조회 Repository | 사용자 언어·학습 진행을 함께 조회하는 JPQL/SQL. 기존 정렬·필터와 일괄 조회를 유지합니다. |
-| content.scenario의 ScenarioLearningHistoryQueryRepository | 최초 완료한 세션·수준 평가를 읽어 과거 복습 콘텐츠 수준을 보존합니다. 기존 SQL을 유지합니다. |
-| session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 session이 소유합니다. |
-| learning.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 session/content를 JOIN합니다. |
+| learning.scenario.level의 ScenarioLearningHistoryQueryRepository | 최초 완료한 세션·수준 평가를 읽어 과거 복습 콘텐츠 수준을 보존합니다. 기존 SQL을 유지합니다. |
+| learning.scenario.session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 시나리오 실행 업무가 소유합니다. |
+| learning.scenario.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 대화/콘텐츠 테이블을 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
 | memory의 검색/원본 계보 저장 | 공유 DB의 기억 원본 메시지·세션 FK 관계를 유지합니다. |
+
+공통 메시지 테이블에는 시나리오 생성 선점·응답과 프리톡 처리 결과 칼럼이 남습니다. `FreeTalkTurnStatus`는 저장·응답에 사용하는 값 계약으로 conversation에 두며 종료 판단 로직은 freetalk에 둡니다. 이를 옮겼다고 테이블이 독립된 것은 아닙니다.
 
 이 예외는 공유 DB 조회 결합의 목록이며 MSA 분리 완료를 뜻하지 않습니다.
 새로운 교차 조회는 이 목록과 소유 경계를 함께 검토합니다.
 `FeatureBoundaryTest`는 JDK `jdeps`로 컴파일된 클래스의 필드·호출·상속·시그니처 의존을 읽습니다.
 FQCN을 직접 쓰더라도 타 업무 Repository/Entity 접근, Controller의 같은 업무 저장소 접근,
 금지된 역참조와 위 업무 단위 간 순환을 검출합니다. Service의 공개 내부 record 및 memory AI
-구현체의 소유 위치도 검사합니다. FQCN 필드로 순환하는 작은 fixture를 컴파일해 검사 자체를 검증합니다.
+구현체의 소유 위치도 검사합니다. FQCN 필드로 순환하는 작은 fixture를 컴파일해 검사 자체를 검증합니다. learning 내부에서도 conversation과 시나리오 실행의 순환을 검출하고, 시나리오 진행 및 표현 완료를 조율 코드와 별도 소유로 분류하는지 확인합니다.
 SQL 문자열, reflection으로 생성되는 참조, 모든 런타임 Bean 연결을 보장하지는 않으므로
 JOIN은 별도로 리뷰하고 실제 Bean 연결은 Spring 통합 테스트로 확인합니다.
 
 ## 오류 소유권
 
 인증 오류는 `auth.exception.AuthErrorCode`, 콘텐츠 오류는 `content.exception.ContentErrorCode`,
-세션·피드백 오류는 `session.exception.SessionErrorCode`, 앱 버전 정책 오류는 `app.exception.AppErrorCode`가 소유합니다.
+세션·피드백 오류는 `learning.conversation.exception.SessionErrorCode`, 앱 버전 정책 오류는 `app.exception.AppErrorCode`가 소유합니다.
 알림 오류는 `notification.exception.NotificationErrorCode`가 소유합니다.
 프로필의 기존 `UserProfileErrorCode`와 구독의 `SubscriptionErrorCode` 및 기능 예외 체계도 유지합니다.
 공통 `ErrorCode`에는 요청 검증·권한·서버 오류와 여러 기능에서 사용하는 AI 통신 오류만 둡니다.
