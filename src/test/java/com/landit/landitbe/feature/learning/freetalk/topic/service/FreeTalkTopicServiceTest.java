@@ -49,6 +49,7 @@ class FreeTalkTopicServiceTest {
   }
 
   /** 활성 주제가 5개를 넘으면 중복 없이 5개만 뽑고 노출 순서를 1~5로 다시 매긴다. */
+  @DisplayName("활성 주제가 5개를 넘으면 중복 없이 5개만 뽑고 노출 순서를 1~5로 다시 매긴다.")
   @Test
   void picksAtMostFiveTopicsWithSequentialDisplayOrder() {
     List<FreeTalkTopic> topics =
@@ -67,6 +68,7 @@ class FreeTalkTopicServiceTest {
   }
 
   /** 활성 주제가 5개보다 적으면 있는 만큼 전부 반환하고 순서를 1부터 매긴다. */
+  @DisplayName("활성 주제가 5개보다 적으면 있는 만큼 전부 반환하고 순서를 1부터 매긴다.")
   @Test
   void returnsAllTopicsWhenFewerThanFive() {
     List<FreeTalkTopic> topics = List.of(topic(1L, "a"), topic(2L, "b"), topic(3L, "c"));

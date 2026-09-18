@@ -188,6 +188,7 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   /** 활성 주제가 5개를 넘으면 그중 5개만 뽑아 내려준다. */
+  @DisplayName("활성 주제가 5개를 넘으면 그중 5개만 뽑아 내려준다.")
   @Test
   void listTopicsReturnsAtMostFiveTopics() throws Exception {
     for (int index = 1; index <= 7; index++) {
