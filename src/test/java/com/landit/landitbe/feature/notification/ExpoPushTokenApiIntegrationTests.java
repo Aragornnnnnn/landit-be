@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.notification;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.putJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -105,18 +105,17 @@ class ExpoPushTokenApiIntegrationTests {
 
     mockMvc
         .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":false
-                    }
-                    """
-                        .formatted(expoPushToken)))
+            putJsonWithToken(
+                "/api/v1/me/expo-push-token",
+                otherAccessToken,
+                """
+                {
+                  "platform":"IOS",
+                  "expoPushToken":"%s",
+                  "enabled":false
+                }
+                """
+                    .formatted(expoPushToken)))
         .andExpect(status().isOk());
 
     assertTokenStatus(expoPushToken, "ACTIVE");
@@ -150,18 +149,17 @@ class ExpoPushTokenApiIntegrationTests {
 
     mockMvc
         .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":true
-                    }
-                    """
-                        .formatted(nativePushToken)))
+            putJsonWithToken(
+                "/api/v1/me/expo-push-token",
+                accessToken,
+                """
+                {
+                  "platform":"IOS",
+                  "expoPushToken":"%s",
+                  "enabled":true
+                }
+                """
+                    .formatted(nativePushToken)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
 
@@ -257,12 +255,11 @@ class ExpoPushTokenApiIntegrationTests {
       throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        new ExpoPushTokenUpdateRequest(platform, expoPushToken, enabled))))
+            putJsonWithToken(
+                "/api/v1/me/expo-push-token",
+                accessToken,
+                objectMapper.writeValueAsString(
+                    new ExpoPushTokenUpdateRequest(platform, expoPushToken, enabled))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
   }

@@ -98,9 +98,9 @@ class NotificationJobAdaptersTests {
     verifyNoInteractions(scheduler);
   }
 
-  @DisplayName("SES는 설정된 발신자를 사용하고 명시적인 호출 제한만 재시도한다.")
+  @DisplayName("SES 요청은 설정된 발신자와 본문 및 인라인 배너를 전달한다.")
   @Test
-  void sesUsesConfiguredSenderAndOnlyExplicitThrottlingIsRetryable() {
+  void sesUsesConfiguredSenderAndInlineBanner() {
     SesV2Client client = mock(SesV2Client.class);
     SesEmailSender sender =
         new SesEmailSender(
@@ -128,6 +128,15 @@ class NotificationJobAdaptersTests {
     assertThat(banner.contentType()).isEqualTo("image/png");
     assertThat(banner.rawContent().asByteArray())
         .startsWith((byte) 0x89, (byte) 0x50, (byte) 0x4e, (byte) 0x47);
+  }
+
+  @DisplayName("SES의 명시적인 요청 제한 오류는 재시도한다.")
+  @Test
+  void sesRetriesExplicitThrottling() {
+    SesV2Client client = mock(SesV2Client.class);
+    SesEmailSender sender =
+        new SesEmailSender(
+            client, new EmailProperties("Landit <no-reply@landit.im>", "develop-mail"));
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenThrow(SesV2Exception.builder().statusCode(429).build());
     assertThat(
@@ -135,6 +144,15 @@ class NotificationJobAdaptersTests {
                 .send("recipient@example.com", "subject", "body", "<img src=\"cid:landit-banner\">")
                 .status())
         .isEqualTo(Status.RETRYABLE);
+  }
+
+  @DisplayName("SES의 잘못된 요청 오류는 실패로 확정한다.")
+  @Test
+  void sesRejectsInvalidRequest() {
+    SesV2Client client = mock(SesV2Client.class);
+    SesEmailSender sender =
+        new SesEmailSender(
+            client, new EmailProperties("Landit <no-reply@landit.im>", "develop-mail"));
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenThrow(SesV2Exception.builder().statusCode(400).build());
     assertThat(
@@ -142,6 +160,15 @@ class NotificationJobAdaptersTests {
                 .send("recipient@example.com", "subject", "body", "<img src=\"cid:landit-banner\">")
                 .status())
         .isEqualTo(Status.FAILED);
+  }
+
+  @DisplayName("SES 통신 중단은 전송 여부를 확정하지 않는다.")
+  @Test
+  void sesLeavesTransportFailureUnknown() {
+    SesV2Client client = mock(SesV2Client.class);
+    SesEmailSender sender =
+        new SesEmailSender(
+            client, new EmailProperties("Landit <no-reply@landit.im>", "develop-mail"));
     when(client.sendEmail(any(SendEmailRequest.class)))
         .thenThrow(SdkClientException.create("connection interrupted"));
     assertThat(

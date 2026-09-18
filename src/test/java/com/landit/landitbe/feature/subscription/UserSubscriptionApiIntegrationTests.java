@@ -203,38 +203,7 @@ class UserSubscriptionApiIntegrationTests {
     String userKey = "subscription-events";
     final String accessToken = login(userKey);
     Long userId = userIdOf(userKey);
-    String renewalId = UUID.randomUUID().toString();
-    postWebhook(
-        webhookEvent(
-            UUID.randomUUID().toString(),
-            "INITIAL_PURCHASE",
-            userId,
-            EVENT_TIMESTAMP_MS,
-            """
-            "period_type": "TRIAL", "price": 0, "price_in_purchased_currency": 0, "currency": "KRW",
-            "purchased_at_ms": %d,
-            """
-                .formatted(EVENT_TIMESTAMP_MS)));
-    postWebhook(
-        webhookEvent(
-            renewalId,
-            "RENEWAL",
-            userId,
-            EVENT_TIMESTAMP_MS + 2_000,
-            """
-            "period_type": "NORMAL", "price": 39.5, "price_in_purchased_currency": 58500.0,
-            "currency": "KRW", "purchased_at_ms": %d,
-            """
-                .formatted(EVENT_TIMESTAMP_MS + 2_000)));
-    postWebhook(
-        webhookEvent(
-            UUID.randomUUID().toString(),
-            "CANCELLATION",
-            userId,
-            EVENT_TIMESTAMP_MS + 1_000,
-            """
-            "cancel_reason": "UNSUBSCRIBE",
-            """));
+    String renewalId = postOutOfOrderSubscriptionEvents(userId);
 
     mockMvc
         .perform(
@@ -501,5 +470,42 @@ class UserSubscriptionApiIntegrationTests {
             .andReturn();
     JsonNode body = objectMapper.readTree(result.getResponse().getContentAsByteArray());
     return body.get("data").get("accessToken").asText();
+  }
+
+  private String postOutOfOrderSubscriptionEvents(Long userId) throws Exception {
+    String renewalId = UUID.randomUUID().toString();
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "INITIAL_PURCHASE",
+            userId,
+            EVENT_TIMESTAMP_MS,
+            """
+            "period_type": "TRIAL", "price": 0, "price_in_purchased_currency": 0, "currency": "KRW",
+            "purchased_at_ms": %d,
+            """
+                .formatted(EVENT_TIMESTAMP_MS)));
+    postWebhook(
+        webhookEvent(
+            renewalId,
+            "RENEWAL",
+            userId,
+            EVENT_TIMESTAMP_MS + 2_000,
+            """
+            "period_type": "NORMAL", "price": 39.5, "price_in_purchased_currency": 58500.0,
+            "currency": "KRW", "purchased_at_ms": %d,
+            """
+                .formatted(EVENT_TIMESTAMP_MS + 2_000)));
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "CANCELLATION",
+            userId,
+            EVENT_TIMESTAMP_MS + 1_000,
+            """
+            "cancel_reason": "UNSUBSCRIBE",
+            """));
+
+    return renewalId;
   }
 }

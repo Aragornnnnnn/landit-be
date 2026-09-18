@@ -83,24 +83,11 @@ class ScheduledNotificationServiceTest {
   }
 
   /** 500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 SQS 재발행 없이 상태를 저장한다. */
-  @DisplayName("500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 SQS 재발행 없이 상태를 저장한다.")
+  @DisplayName("정기 알림은 500명씩 조회하고 두 페이지의 발송과 상태 저장을 완료한다.")
   @Test
-  void processesUsersInFiveHundredSizeKeysetPagesWithoutPublishingPushSendMessages(
-      CapturedOutput output) {
-    NotificationTargetPage firstPage = page(1L, 500);
-    NotificationTargetPage secondPage = page(501L, 1);
+  void processesUsersInFiveHundredSizeKeysetPagesWithoutPublishingPushSendMessages() {
     LocalDate scheduledDate = LocalDate.of(2026, 7, 26);
-    when(notificationTargetPageQueryService.loadPage(0L, 500, scheduledDate)).thenReturn(firstPage);
-    when(notificationTargetPageQueryService.loadPage(500L, 500, scheduledDate))
-        .thenReturn(secondPage);
-    when(notificationTargetPageQueryService.loadPage(501L, 500, scheduledDate))
-        .thenReturn(new NotificationTargetPage(List.of(), Map.of(), List.of()));
-    when(userNotificationStateRepository.findAllByUserProfileIdIn(any())).thenReturn(List.of());
-    when(notificationTargetSelectionService.select(any(), any(LocalDate.class)))
-        .thenReturn(
-            Optional.of(
-                new SelectedNotificationTarget(
-                    NotificationType.DAILY_SCENARIO_REMINDER, 11L, null)));
+    stubNotificationPages(scheduledDate);
     AtomicInteger visibilityExtensionCount = new AtomicInteger();
 
     scheduledNotificationService.process(
@@ -118,6 +105,20 @@ class ScheduledNotificationServiceTest {
     verify(notificationTargetSelectionService, times(501)).select(any(), eq(scheduledDate));
     verify(notificationTargetPageQueryService, times(3))
         .loadPage(any(Long.class), eq(500), eq(scheduledDate));
+  }
+
+  @DisplayName("정기 알림은 페이지별 처리 지표와 배치 완료 로그를 기록한다.")
+  @Test
+  void recordsPageMetricsAndBatchCompletionLogs(CapturedOutput output) {
+    LocalDate scheduledDate = LocalDate.of(2026, 7, 26);
+    stubNotificationPages(scheduledDate);
+    AtomicInteger visibilityExtensionCount = new AtomicInteger();
+
+    scheduledNotificationService.process(
+        "scheduled-message-1",
+        Instant.parse("2026-07-26T11:00:00Z"),
+        visibilityExtensionCount::incrementAndGet);
+
     assertThat(meterCount("landit.notification.scheduled.users", "stage", "scanned"))
         .isEqualTo(501.0);
     assertThat(meterCount("landit.notification.scheduled.users", "stage", "sendable"))
@@ -225,5 +226,21 @@ class ScheduledNotificationServiceTest {
   /** 지정한 태그를 가진 Counter 값을 반환한다. */
   private double meterCount(String name, String tagKey, String tagValue) {
     return meterRegistry.find(name).tag(tagKey, tagValue).counter().count();
+  }
+
+  private void stubNotificationPages(LocalDate scheduledDate) {
+    NotificationTargetPage firstPage = page(1L, 500);
+    NotificationTargetPage secondPage = page(501L, 1);
+    when(notificationTargetPageQueryService.loadPage(0L, 500, scheduledDate)).thenReturn(firstPage);
+    when(notificationTargetPageQueryService.loadPage(500L, 500, scheduledDate))
+        .thenReturn(secondPage);
+    when(notificationTargetPageQueryService.loadPage(501L, 500, scheduledDate))
+        .thenReturn(new NotificationTargetPage(List.of(), Map.of(), List.of()));
+    when(userNotificationStateRepository.findAllByUserProfileIdIn(any())).thenReturn(List.of());
+    when(notificationTargetSelectionService.select(any(), any(LocalDate.class)))
+        .thenReturn(
+            Optional.of(
+                new SelectedNotificationTarget(
+                    NotificationType.DAILY_SCENARIO_REMINDER, 11L, null)));
   }
 }

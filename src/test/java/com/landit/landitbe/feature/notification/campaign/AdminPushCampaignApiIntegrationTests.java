@@ -26,19 +26,12 @@ class AdminPushCampaignApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-  @DisplayName("관리자는 캠페인을 필터링해 페이지로 조회하며 조회 인자를 검증한다.")
+  @DisplayName("캠페인 목록의 기본 페이지와 페이지 정보를 반환한다.")
   @Test
   @org.springframework.transaction.annotation.Transactional
-  void exposesFilteredCampaignPageToAdminsAndValidatesQueryParameters() throws Exception {
-    final long adminId = 99462071L;
-    jdbc.update(
-        """
-        insert into user_profile(id,nickname,target_locale,base_locale,current_level,
-          push_permission_status,status,role,created_at,updated_at)
-        values (?,'schedule-list','EN','KR',1,'NOT_DETERMINED','ACTIVE','ADMIN',
-          CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-        """,
-        adminId);
+  void returnsDefaultCampaignPage() throws Exception {
+    long adminId = insertCampaignAdmin();
+
     mockMvc
         .perform(get("/api/v1/admin/push-campaigns").with(user(new AuthUserPrincipal(adminId))))
         .andExpect(status().isOk())
@@ -48,6 +41,14 @@ class AdminPushCampaignApiIntegrationTests {
         .andExpect(jsonPath("$.data.totalCount").isNumber())
         .andExpect(jsonPath("$.data.totalPages").isNumber())
         .andExpect(jsonPath("$.data.hasNext").isBoolean());
+  }
+
+  @DisplayName("예약 여부와 상태로 캠페인 목록을 조회한다.")
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void acceptsScheduledCampaignFilter() throws Exception {
+    long adminId = insertCampaignAdmin();
+
     mockMvc
         .perform(
             get("/api/v1/admin/push-campaigns")
@@ -56,6 +57,14 @@ class AdminPushCampaignApiIntegrationTests {
                 .with(user(new AuthUserPrincipal(adminId))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items").isArray());
+  }
+
+  @DisplayName("잘못된 캠페인 조회 인자를 거부하고 이후 정상 요청은 처리한다.")
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void rejectsInvalidCampaignQueryAndAcceptsFollowingValidQuery() throws Exception {
+    long adminId = insertCampaignAdmin();
+
     mockMvc
         .perform(
             get("/api/v1/admin/push-campaigns")
@@ -100,9 +109,9 @@ class AdminPushCampaignApiIntegrationTests {
     }
   }
 
-  @DisplayName("관리자 캠페인 API에 인증을 요구하고 OpenAPI 계약을 제공한다.")
+  @DisplayName("캠페인 목록과 대상 조회 및 예약 변경에는 인증이 필요하다.")
   @Test
-  void requiresAuthenticationAndPublishesOpenApiContract() throws Exception {
+  void requiresCampaignAuthentication() throws Exception {
     mockMvc.perform(get("/api/v1/admin/push-campaigns")).andExpect(status().isUnauthorized());
     for (String path :
         java.util.List.of(
@@ -114,6 +123,11 @@ class AdminPushCampaignApiIntegrationTests {
           .andExpect(status().isUnauthorized());
     }
     mockMvc.perform(get("/api/v1/admin/push-campaigns")).andExpect(status().isUnauthorized());
+  }
+
+  @DisplayName("캠페인 관리의 경로와 요청 및 응답 계약을 OpenAPI에 노출한다.")
+  @Test
+  void publishesCampaignOpenApiContract() throws Exception {
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
@@ -152,5 +166,18 @@ class AdminPushCampaignApiIntegrationTests {
         .andExpect(
             jsonPath("$.paths['/api/v1/admin/push-campaigns/{campaignId}/send'].post.summary")
                 .exists());
+  }
+
+  private long insertCampaignAdmin() {
+    final long adminId = 99462071L;
+    jdbc.update(
+        """
+        insert into user_profile(id,nickname,target_locale,base_locale,current_level,
+          push_permission_status,status,role,created_at,updated_at)
+        values (?,'schedule-list','EN','KR',1,'NOT_DETERMINED','ACTIVE','ADMIN',
+          CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+        """,
+        adminId);
+    return adminId;
   }
 }
