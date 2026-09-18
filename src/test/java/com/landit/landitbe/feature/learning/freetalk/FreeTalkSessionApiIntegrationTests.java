@@ -2,11 +2,12 @@
 
 package com.landit.landitbe.feature.learning.freetalk;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.postJsonWithToken;
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.putJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -194,9 +195,59 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
-  @DisplayName("AI 선발화 시작 시 튜터 캐릭터 문맥 없이 첫 대화를 생성하고 저장한다.")
+  @DisplayName("AI 선발화 시작은 주제와 캐릭터 및 첫 메시지를 반환한다.")
   @Test
-  void startAiFirstSessionPersistsOpeningWithoutTutorCharacterContext() throws Exception {
+  void startAiFirstSessionReturnsTopicCharacterAndOpening() throws Exception {
+    seedTopic(1101, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
+    JsonNode loginBody = login("free-talk-ai-first@example.com");
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"topicId\":1101,\"characterId\":\"chloe\"}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
+        .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
+        .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
+        .andExpect(jsonPath("$.data.title").value("주말 계획"))
+        .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(7200000))
+        .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
+        .andExpect(jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
+        .andExpect(jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
+        .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
+        .andExpect(jsonPath("$.data.currentMessage.emotion").value("HAPPY"))
+        .andReturn();
+  }
+
+  @DisplayName("AI 선발화 시작은 선택한 주제와 캐릭터 ID를 트랜잭션 밖에서 AI에 전달한다.")
+  @Test
+  void startAiFirstSessionSendsTopicToAiOutsideTransaction() throws Exception {
+    seedTopic(1101, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
+    JsonNode loginBody = login("free-talk-ai-first@example.com");
+    String accessToken = loginBody.get("data").get("accessToken").asText();
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"AI_FIRST\",\"topicId\":1101,\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId = responseData(result).path("sessionId").asLong();
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().sessionId()).isEqualTo(sessionId);
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().characterId()).isEqualTo("chloe");
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().topic().topicId()).isEqualTo(1101);
+    assertThat(fakeAiFreeTalkClient.openingTransactionActive()).isFalse();
+  }
+
+  @DisplayName("AI 선발화 시작은 소유자와 캐릭터 및 첫 메시지를 저장한다.")
+  @Test
+  void startAiFirstSessionPersistsOwnerCharacterAndOpening() throws Exception {
     seedTopic(1101, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
     JsonNode loginBody = login("free-talk-ai-first@example.com");
     long userId = loginBody.get("data").get("user").get("userId").asLong();
@@ -205,36 +256,13 @@ class FreeTalkSessionApiIntegrationTests {
     MvcResult result =
         mockMvc
             .perform(
-                post("/api/v1/free-talk/sessions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        "{\"startMode\":\"AI_FIRST\",\"topicId\":1101,\"characterId\":\"chloe\"}"))
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"AI_FIRST\",\"topicId\":1101,\"characterId\":\"chloe\"}"))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.sessionType").value("FREE_TALK"))
-            .andExpect(jsonPath("$.data.startMode").value("AI_FIRST"))
-            .andExpect(jsonPath("$.data.character.characterId").value("chloe"))
-            .andExpect(jsonPath("$.data.title").value("주말 계획"))
-            .andExpect(jsonPath("$.data.speakingTimeLimitMs").value(7200000))
-            .andExpect(jsonPath("$.data.character.ttsVoice.provider").value("OPENROUTER"))
-            .andExpect(
-                jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-luna-en"))
-            .andExpect(
-                jsonPath("$.data.currentMessage.content").value("What are your weekend plans?"))
-            .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
-            .andExpect(jsonPath("$.data.currentMessage.emotion").value("HAPPY"))
             .andReturn();
-
-    long sessionId =
-        objectMapper
-            .readTree(result.getResponse().getContentAsByteArray())
-            .get("data")
-            .get("sessionId")
-            .asLong();
-    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().sessionId()).isEqualTo(sessionId);
-    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().characterId()).isEqualTo("chloe");
-    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().topic().topicId()).isEqualTo(1101);
-    assertThat(fakeAiFreeTalkClient.openingTransactionActive()).isFalse();
+    long sessionId = responseData(result).path("sessionId").asLong();
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT session_type FROM learning_session WHERE id = ?", String.class, sessionId))
@@ -271,10 +299,10 @@ class FreeTalkSessionApiIntegrationTests {
     MvcResult result =
         mockMvc
             .perform(
-                post("/api/v1/free-talk/sessions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"marco\"}"))
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"USER_FIRST\",\"characterId\":\"marco\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.startMode").value("USER_FIRST"))
             .andExpect(jsonPath("$.data.character.characterId").value("marco"))
@@ -313,10 +341,10 @@ class FreeTalkSessionApiIntegrationTests {
     MvcResult startResult =
         mockMvc
             .perform(
-                post("/api/v1/free-talk/sessions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"teddy\"}"))
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"USER_FIRST\",\"characterId\":\"teddy\"}"))
             .andExpect(status().isCreated())
             .andExpect(
                 jsonPath("$.data.character.ttsVoice.providerVoiceId").value("aura-2-draco-en"))
@@ -352,19 +380,18 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/free-talk/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"characterId\":\"chloe\"}"))
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"characterId\":\"chloe\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     mockMvc
         .perform(
-            post("/api/v1/free-talk/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"startMode\":\"USER_FIRST\",\"topicId\":1201,\"characterId\":\"chloe\"}"))
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"USER_FIRST\",\"topicId\":1201,\"characterId\":\"chloe\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
@@ -380,11 +407,7 @@ class FreeTalkSessionApiIntegrationTests {
             "{\"startMode\":\"USER_FIRST\"}",
             "{\"startMode\":\"USER_FIRST\",\"characterId\":\"unknown\"}")) {
       mockMvc
-          .perform(
-              post("/api/v1/free-talk/sessions")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(content))
+          .perform(postJsonWithToken("/api/v1/free-talk/sessions", accessToken, content))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
@@ -411,11 +434,7 @@ class FreeTalkSessionApiIntegrationTests {
             "{\"startMode\":\"USER_FIRST\",\"characterId\":\"\"}",
             "{\"startMode\":\"USER_FIRST\",\"characterId\":\"unknown\"}")) {
       mockMvc
-          .perform(
-              post("/api/v1/free-talk/sessions")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(content))
+          .perform(postJsonWithToken("/api/v1/free-talk/sessions", accessToken, content))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
@@ -430,18 +449,18 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/free-talk/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1251,\"characterId\":\"chloe\"}"))
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"topicId\":1251,\"characterId\":\"chloe\"}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
     mockMvc
         .perform(
-            post("/api/v1/free-talk/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1252,\"characterId\":\"chloe\"}"))
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"topicId\":1252,\"characterId\":\"chloe\"}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
@@ -456,10 +475,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/free-talk/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1301,\"characterId\":\"chloe\"}"))
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"topicId\":1301,\"characterId\":\"chloe\"}"))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
 
@@ -476,19 +495,11 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(requestCount()).isEqualTo(1);
   }
 
-  @DisplayName("OpenAPI 문서에 프리톡 API 계약을 명시한다.")
+  @DisplayName("OpenAPI는 프리톡 주제와 시작 요청의 인증 및 응답을 명시한다.")
   @Test
-  void openApiDocumentsFreeTalkContracts() throws Exception {
+  void openApiDocumentsFreeTalkStart() throws Exception {
     String topicsPath = "$.paths['/api/v1/free-talk/topics'].get";
     String sessionsPath = "$.paths['/api/v1/free-talk/sessions'].post";
-    String messagesPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}/messages'].post";
-    String exitDecisionPath =
-        "$.paths['/api/v1/free-talk/sessions/{sessionId}/exit-decision'].post";
-    String pastSessionsPath = "$.paths['/api/v1/free-talk/sessions'].get";
-    String pastSessionDetailPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}'].get";
-    String innerThoughtProcessingStatusPath =
-        "$.components.schemas.SessionInnerThoughtResponse.properties.processingStatus";
-
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
@@ -511,11 +522,35 @@ class FreeTalkSessionApiIntegrationTests {
             jsonPath(
                     "$.components.schemas.FreeTalkSessionStartRequest.properties"
                         + ".characterId.enum.length()")
-                .value(3))
+                .value(3));
+  }
+
+  @DisplayName("OpenAPI는 프리톡 메시지와 종료 선택에 필요한 인증을 명시한다.")
+  @Test
+  void openApiDocumentsFreeTalkTurnAndExit() throws Exception {
+    String messagesPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}/messages'].post";
+    String exitDecisionPath =
+        "$.paths['/api/v1/free-talk/sessions/{sessionId}/exit-decision'].post";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
         .andExpect(jsonPath(messagesPath + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(messagesPath + ".responses['401'].description").value("인증 실패"))
         .andExpect(jsonPath(exitDecisionPath + ".security[0].bearerAuth").exists())
-        .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"))
+        .andExpect(jsonPath(exitDecisionPath + ".responses['401'].description").value("인증 실패"));
+  }
+
+  @DisplayName("OpenAPI는 프리톡 이력 조회 오류와 속마음 처리 상태를 명시한다.")
+  @Test
+  void openApiDocumentsFreeTalkHistoryAndInnerThought() throws Exception {
+    String pastSessionsPath = "$.paths['/api/v1/free-talk/sessions'].get";
+    String pastSessionDetailPath = "$.paths['/api/v1/free-talk/sessions/{sessionId}'].get";
+    String innerThoughtProcessingStatusPath =
+        "$.components.schemas.SessionInnerThoughtResponse.properties.processingStatus";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
         .andExpect(
             jsonPath(pastSessionsPath + ".responses['400'].description").value("페이지 번호 또는 크기 오류"))
         .andExpect(jsonPath(pastSessionsPath + ".responses['401'].description").value("인증 실패"))
@@ -540,11 +575,7 @@ class FreeTalkSessionApiIntegrationTests {
 
     MvcResult firstResult =
         mockMvc
-            .perform(
-                post(messagePath(sessionId))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(request))
+            .perform(postJsonWithToken(messagePath(sessionId), accessToken, request))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value(nullValue()))
             .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
@@ -561,31 +592,17 @@ class FreeTalkSessionApiIntegrationTests {
 
     MvcResult replayedResult =
         mockMvc
-            .perform(
-                post(messagePath(sessionId))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(request))
+            .perform(postJsonWithToken(messagePath(sessionId), accessToken, request))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
             .andReturn();
 
-    assertThat(
-            objectMapper
-                .readTree(firstResult.getResponse().getContentAsByteArray())
-                .at("/data/submittedMessage/messageId"))
-        .isEqualTo(
-            objectMapper
-                .readTree(replayedResult.getResponse().getContentAsByteArray())
-                .at("/data/submittedMessage/messageId"));
-    assertThat(
-            objectMapper
-                .readTree(firstResult.getResponse().getContentAsByteArray())
-                .at("/data/nextMessage/messageId"))
-        .isEqualTo(
-            objectMapper
-                .readTree(replayedResult.getResponse().getContentAsByteArray())
-                .at("/data/nextMessage/messageId"));
+    JsonNode firstData = responseData(firstResult);
+    JsonNode replayedData = responseData(replayedResult);
+    assertThat(replayedData.at("/submittedMessage/messageId"))
+        .isEqualTo(firstData.at("/submittedMessage/messageId"));
+    assertThat(replayedData.at("/nextMessage/messageId"))
+        .isEqualTo(firstData.at("/nextMessage/messageId"));
 
     assertThat(fakeAiFreeTalkClient.turnTransactionActive()).isFalse();
     assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
@@ -607,11 +624,7 @@ class FreeTalkSessionApiIntegrationTests {
         messageRequest(UUID.randomUUID().toString(), "I should go now.", 1200, false);
     MvcResult detected =
         mockMvc
-            .perform(
-                post(messagePath(sessionId))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(exitRequest))
+            .perform(postJsonWithToken(messagePath(sessionId), accessToken, exitRequest))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
             .andExpect(jsonPath("$.data.nextMessage").value(nullValue()))
@@ -628,42 +641,28 @@ class FreeTalkSessionApiIntegrationTests {
         "{\"submittedMessageId\":%d,\"decision\":\"CONTINUE\"}".formatted(submittedMessageId);
 
     mockMvc
-        .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(decisionRequest))
+        .perform(postJsonWithToken(exitDecisionPath(sessionId), accessToken, decisionRequest))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"));
     mockMvc
-        .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(decisionRequest))
+        .perform(postJsonWithToken(exitDecisionPath(sessionId), accessToken, decisionRequest))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("IN_PROGRESS"));
 
     mockMvc
-        .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(exitRequest))
+        .perform(postJsonWithToken(messagePath(sessionId), accessToken, exitRequest))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
         .andExpect(jsonPath("$.data.nextMessage.role").value("AI"));
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.error.code").value("CONFLICT"));
   }
@@ -681,12 +680,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.title").value("Chloe와의 대화"))
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
@@ -703,12 +700,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
@@ -723,12 +718,10 @@ class FreeTalkSessionApiIntegrationTests {
     MvcResult startResult =
         mockMvc
             .perform(
-                post("/api/v1/free-talk/sessions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        "{\"startMode\":\"AI_FIRST\",\"topicId\":1151,"
-                            + "\"characterId\":\"chloe\"}"))
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"AI_FIRST\",\"topicId\":1151," + "\"characterId\":\"chloe\"}"))
             .andExpect(status().isCreated())
             .andReturn();
     long sessionId =
@@ -739,12 +732,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    messageRequest(
-                        UUID.randomUUID().toString(), "One last thing.", 7200000, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "One last thing.", 7200000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.title").value("주말 계획"))
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
@@ -783,11 +774,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    messageRequest(clientMessageId, "I went hiking with friends.", 1200, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(clientMessageId, "I went hiking with friends.", 1200, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
         .andExpect(jsonPath("$.data.submittedMessage.messageSequence").value(1))
@@ -812,12 +802,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(exitSessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(exitSessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.sessionStatus").value("COMPLETED"));
@@ -828,11 +816,10 @@ class FreeTalkSessionApiIntegrationTests {
     long timeLimitSessionId = startUserFirstSession(accessToken);
     mockMvc
         .perform(
-            post(messagePath(timeLimitSessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 7200000, true)))
+            postJsonWithToken(
+                messagePath(timeLimitSessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "One last thing.", 7200000, true)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.progress.accumulatedSpeakingDurationMs").value(7200000));
@@ -854,12 +841,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
 
@@ -880,12 +865,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
 
@@ -904,19 +887,17 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"submittedMessageId\":%d,\"decision\":\"END\"}"
-                        .formatted(submittedMessageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(submittedMessageId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
 
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
   }
 
-  @DisplayName("공개 프리톡 표현의 학습 콘텐츠를 반환한다.")
+  @DisplayName("프리톡 표현 학습 시작은 대표 문장과 단어 및 이미지 정보를 반환한다.")
   @Test
   void returnsPublicFreeTalkExpressionLearningContent() throws Exception {
     JsonNode loginBody = login("free-talk-learning-content@example.com");
@@ -932,6 +913,15 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.targetExpressionText").value("hit it off"))
         .andExpect(jsonPath("$.data.representativeSentenceWords.length()").value(6))
         .andExpect(jsonPath("$.data.representativeImageUrl").value(nullValue()));
+  }
+
+  @DisplayName("프리톡 표현 연습은 두 언어의 작문 문제와 조립 가능한 단어 선택지를 반환한다.")
+  @Test
+  void returnsFreeTalkPracticeQuestionsForBothLanguages() throws Exception {
+    JsonNode loginBody = login("free-talk-learning-content@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long learningSessionId = startUserFirstSession(accessToken);
+    FreeTalkExpressionLink link = seedNewExpressionForCompletedSession(learningSessionId);
 
     MvcResult practiceResult =
         mockMvc
@@ -980,38 +970,16 @@ class FreeTalkSessionApiIntegrationTests {
 
     finishExpression(accessToken, link);
 
-    Object firstSessionCompletedAt =
-        jdbcTemplate.queryForObject(
-            "SELECT completed_at FROM free_talk_session_expression "
-                + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
-            Object.class,
-            link.freeTalkSessionId(),
-            link.expressionId());
+    Object firstSessionCompletedAt = expressionSessionCompletedAt(link);
     assertThat(firstSessionCompletedAt).isNotNull();
 
-    Object firstCompletedAt =
-        jdbcTemplate.queryForObject(
-            "SELECT completed_at FROM user_writing_expression_completion "
-                + "WHERE writing_expression_id = ?",
-            Object.class,
-            link.expressionId());
+    Object firstCompletedAt = expressionCompletedAt(link);
 
     finishExpression(accessToken, link);
 
-    Object repeatedSessionCompletedAt =
-        jdbcTemplate.queryForObject(
-            "SELECT completed_at FROM free_talk_session_expression "
-                + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
-            Object.class,
-            link.freeTalkSessionId(),
-            link.expressionId());
+    Object repeatedSessionCompletedAt = expressionSessionCompletedAt(link);
 
-    Object repeatedCompletedAt =
-        jdbcTemplate.queryForObject(
-            "SELECT completed_at FROM user_writing_expression_completion "
-                + "WHERE writing_expression_id = ?",
-            Object.class,
-            link.expressionId());
+    Object repeatedCompletedAt = expressionCompletedAt(link);
     assertThat(repeatedCompletedAt).isEqualTo(firstCompletedAt);
     assertThat(repeatedSessionCompletedAt).isEqualTo(firstSessionCompletedAt);
 
@@ -1085,28 +1053,20 @@ class FreeTalkSessionApiIntegrationTests {
     String request = messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false);
 
     mockMvc
-        .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+        .perform(postJsonWithToken(messagePath(sessionId), otherToken, request))
         .andExpect(status().isForbidden());
     mockMvc
-        .perform(
-            post(messagePath(999999L))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+        .perform(postJsonWithToken(messagePath(999999L), ownerToken, request))
         .andExpect(status().isNotFound());
 
     fakeAiFreeTalkClient.detectExitIntent();
     submitForExit(ownerToken, sessionId);
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + ownerToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(messageRequest(UUID.randomUUID().toString(), "Again.", 0, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                ownerToken,
+                messageRequest(UUID.randomUUID().toString(), "Again.", 0, false)))
         .andExpect(status().isConflict());
   }
 
@@ -1121,11 +1081,7 @@ class FreeTalkSessionApiIntegrationTests {
     fakeAiFreeTalkClient.failTurn();
 
     mockMvc
-        .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+        .perform(postJsonWithToken(messagePath(sessionId), accessToken, request))
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.error.code").value("AI_GENERATION_FAILED"));
 
@@ -1147,24 +1103,14 @@ class FreeTalkSessionApiIntegrationTests {
                 String.class,
                 sessionId))
         .isNull();
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
-        .isZero();
+    assertThat(dailySpeakingUsage()).isZero();
 
     fakeAiFreeTalkClient.reset();
     mockMvc
-        .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+        .perform(postJsonWithToken(messagePath(sessionId), accessToken, request))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
-    assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
-        .isEqualTo(700L);
+    assertThat(dailySpeakingUsage()).isEqualTo(700L);
   }
 
   @DisplayName("첫 메시지가 AI를 호출 중이면 다른 메시지 요청을 거부한다.")
@@ -1185,10 +1131,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(messageRequest(UUID.randomUUID().toString(), "Second.", 0, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "Second.", 0, false)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.error.code").value("CONFLICT"));
 
@@ -1210,10 +1156,10 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(requestCount()).isEqualTo(1000);
     mockMvc
         .perform(
-            post(messagePath(secondSession))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(messageRequest(UUID.randomUUID().toString(), "Again.", 0, false)))
+            postJsonWithToken(
+                messagePath(secondSession),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "Again.", 0, false)))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.error.code").value("FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED"));
     assertThat(performMessageStatus(accessToken, firstSession, request)).isEqualTo(200);
@@ -1236,10 +1182,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/free-talk/sessions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"startMode\":\"AI_FIRST\",\"topicId\":1801,\"characterId\":\"chloe\"}"))
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"topicId\":1801,\"characterId\":\"chloe\"}"))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.error.code").value("FREE_TALK_DAILY_REQUEST_LIMIT_EXCEEDED"));
 
@@ -1297,10 +1243,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "Hello.", 0, false)))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.error.code").value("FREE_TALK_REQUEST_RATE_LIMIT_EXCEEDED"));
     assertThat(fakeAiFreeTalkClient.turnCallCount()).isZero();
@@ -1318,10 +1264,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(exitDecisionPath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(messageId)))
+            postJsonWithToken(
+                exitDecisionPath(sessionId),
+                accessToken,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(messageId)))
         .andExpect(status().isTooManyRequests());
 
     assertThat(
@@ -1388,21 +1334,19 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    messageRequest(UUID.randomUUID().toString(), "Almost done.", 7199000, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "Almost done.", 7199000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"));
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    messageRequest(UUID.randomUUID().toString(), "One last thing.", 3000, false)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "One last thing.", 3000, false)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.title").value("Weekend Hiking"))
@@ -1425,10 +1369,10 @@ class FreeTalkSessionApiIntegrationTests {
 
     mockMvc
         .perform(
-            post(messagePath(sessionId))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(messageRequest(UUID.randomUUID().toString(), "Keep talking.", 1000, true)))
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(UUID.randomUUID().toString(), "Keep talking.", 1000, true)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.turnStatus").value("CONTINUE"))
         .andExpect(jsonPath("$.data.progress.remainingSpeakingTimeMs").value(7199000));
@@ -1438,10 +1382,10 @@ class FreeTalkSessionApiIntegrationTests {
     MvcResult result =
         mockMvc
             .perform(
-                post("/api/v1/free-talk/sessions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
             .andExpect(status().isCreated())
             .andReturn();
     return objectMapper
@@ -1454,12 +1398,10 @@ class FreeTalkSessionApiIntegrationTests {
     MvcResult result =
         mockMvc
             .perform(
-                post(messagePath(sessionId))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        messageRequest(
-                            UUID.randomUUID().toString(), "I have to leave.", 1200, false)))
+                postJsonWithToken(
+                    messagePath(sessionId),
+                    accessToken,
+                    messageRequest(UUID.randomUUID().toString(), "I have to leave.", 1200, false)))
             .andExpect(status().isOk())
             .andReturn();
     return objectMapper
@@ -1471,11 +1413,7 @@ class FreeTalkSessionApiIntegrationTests {
   private int performMessageStatus(String accessToken, long sessionId, String request) {
     try {
       return mockMvc
-          .perform(
-              post(messagePath(sessionId))
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(request))
+          .perform(postJsonWithToken(messagePath(sessionId), accessToken, request))
           .andReturn()
           .getResponse()
           .getStatus();
@@ -1586,10 +1524,11 @@ class FreeTalkSessionApiIntegrationTests {
   private void finishExpression(String accessToken, FreeTalkExpressionLink link) throws Exception {
     mockMvc
         .perform(
-            post("/api/v1/expressions/{expressionId}/learning-finish", link.expressionId())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId())))
+            postJsonWithToken(
+                "/api/v1/expressions/{expressionId}/learning-finish",
+                accessToken,
+                "{\"freeTalkSessionId\":%d}".formatted(link.learningSessionId()),
+                link.expressionId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isEmpty());
   }
@@ -1726,10 +1665,10 @@ class FreeTalkSessionApiIntegrationTests {
   private void updateLearningLevel(String accessToken, int learningLevel) throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/me/learning-level")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"learningLevel\":%d}".formatted(learningLevel)))
+            putJsonWithToken(
+                "/api/v1/me/learning-level",
+                accessToken,
+                "{\"learningLevel\":%d}".formatted(learningLevel)))
         .andExpect(status().isOk());
   }
 
@@ -1964,5 +1903,31 @@ class FreeTalkSessionApiIntegrationTests {
     int turnCallCount() {
       return turnCallCount.get();
     }
+  }
+
+  private JsonNode responseData(MvcResult result) throws Exception {
+    return objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
+  }
+
+  private Object expressionSessionCompletedAt(FreeTalkExpressionLink link) {
+    return jdbcTemplate.queryForObject(
+        "SELECT completed_at FROM free_talk_session_expression "
+            + "WHERE free_talk_session_id = ? AND writing_expression_id = ?",
+        Object.class,
+        link.freeTalkSessionId(),
+        link.expressionId());
+  }
+
+  private Object expressionCompletedAt(FreeTalkExpressionLink link) {
+    return jdbcTemplate.queryForObject(
+        "SELECT completed_at FROM user_writing_expression_completion "
+            + "WHERE writing_expression_id = ?",
+        Object.class,
+        link.expressionId());
+  }
+
+  private long dailySpeakingUsage() {
+    return jdbcTemplate.queryForObject(
+        "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class);
   }
 }

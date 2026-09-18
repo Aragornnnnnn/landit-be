@@ -19,7 +19,6 @@ import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnRequest;
-import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
@@ -61,9 +60,9 @@ class RemoteAiFreeTalkClientTest {
     server.stop(0);
   }
 
-  @DisplayName("프리톡 AI API별 계약을 전송하고 성공 응답을 변환한다.")
+  @DisplayName("프리톡 시작 요청의 주제와 이름 제외 계약을 전송하고 감정을 변환한다.")
   @Test
-  void postsEachFreeTalkContractAndMapsSuccessfulResponses() throws Exception {
+  void postsOpeningContractAndMapsResponse() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(
         "/api/v1/free-talk/opening",
@@ -79,6 +78,19 @@ class RemoteAiFreeTalkClientTest {
               "error": null
             }
         """);
+
+    AiFreeTalkOpeningResult opening = remoteClient().generateOpening(openingRequest());
+
+    assertThat(requests.get("/api/v1/free-talk/opening").get("topic").get("topicId").asLong())
+        .isEqualTo(2L);
+    assertThat(requests.get("/api/v1/free-talk/opening").has("partnerDisplayName")).isFalse();
+    assertThat(opening.emotion()).isEqualTo(CharacterEmotion.HAPPY);
+  }
+
+  @DisplayName("프리톡 발화 요청은 응답 모드를 포함하고 파트너 이름을 제외한다.")
+  @Test
+  void postsTurnContractAndMapsResponse() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(
         "/api/v1/free-talk/turn",
         requests,
@@ -97,12 +109,35 @@ class RemoteAiFreeTalkClientTest {
               "error": null
             }
         """);
+
+    remoteClient().generateTurn(turnRequest());
+
+    assertThat(requests.get("/api/v1/free-talk/turn").get("responseMode").asString())
+        .isEqualTo("NORMAL");
+    assertThat(requests.get("/api/v1/free-talk/turn").has("partnerDisplayName")).isFalse();
+  }
+
+  @DisplayName("프리톡 속마음 응답의 평가 유형을 변환한다.")
+  @Test
+  void postsInnerThoughtContractAndMapsResponse() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(
         "/api/v1/free-talk/inner-thought",
         requests,
         """
             {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD"},"error":null}
         """);
+
+    AiFreeTalkInnerThoughtResult innerThought =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
+  }
+
+  @DisplayName("프리톡 종료 요청에 종료 사유와 제목 생성 조건을 보내고 응답을 변환한다.")
+  @Test
+  void postsClosingContractAndMapsResponse() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(
         "/api/v1/free-talk/closing",
         requests,
@@ -120,26 +155,14 @@ class RemoteAiFreeTalkClientTest {
               "error": null
             }
         """);
-    RemoteAiFreeTalkClient client = remoteClient();
 
-    AiFreeTalkOpeningResult opening = client.generateOpening(openingRequest());
-    AiFreeTalkTurnResult turn = client.generateTurn(turnRequest());
-    AiFreeTalkInnerThoughtResult innerThought = client.generateInnerThought(innerThoughtRequest());
-    AiFreeTalkClosingResult closing = client.generateClosing(closingRequest());
+    AiFreeTalkClosingResult closing = remoteClient().generateClosing(closingRequest());
 
-    assertThat(requests.get("/api/v1/free-talk/opening").get("topic").get("topicId").asLong())
-        .isEqualTo(2L);
-    assertThat(requests.get("/api/v1/free-talk/turn").get("responseMode").asString())
-        .isEqualTo("NORMAL");
-    assertThat(requests.get("/api/v1/free-talk/opening").has("partnerDisplayName")).isFalse();
-    assertThat(requests.get("/api/v1/free-talk/turn").has("partnerDisplayName")).isFalse();
     assertThat(requests.get("/api/v1/free-talk/closing").has("partnerDisplayName")).isFalse();
     assertThat(requests.get("/api/v1/free-talk/closing").get("closingReason").asString())
         .isEqualTo("USER_CONFIRMED");
     assertThat(requests.get("/api/v1/free-talk/closing").get("titleGenerationRequired").asBoolean())
         .isTrue();
-    assertThat(opening.emotion()).isEqualTo(CharacterEmotion.HAPPY);
-    assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
     assertThat(closing.inferredTitle()).isEqualTo("Weekend Hiking");
     assertThat(closing.translatedMessage()).isEqualTo("이야기해서 좋았어.");
   }
@@ -294,9 +317,9 @@ class RemoteAiFreeTalkClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
-  @DisplayName("프리톡 대화 응답에서 감정 값이 null인 경우를 허용한다.")
+  @DisplayName("프리톡 시작 응답은 감정 값이 null이어도 허용한다.")
   @Test
-  void acceptsNullEmotionForConversationResponses() throws Exception {
+  void acceptsNullEmotionForOpening() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/opening",
         new ConcurrentHashMap<>(),
@@ -311,6 +334,13 @@ class RemoteAiFreeTalkClientTest {
               "error": null
             }
         """);
+
+    assertThat(remoteClient().generateOpening(openingRequest()).emotion()).isNull();
+  }
+
+  @DisplayName("프리톡 발화 응답은 감정 값이 null이어도 허용한다.")
+  @Test
+  void acceptsNullEmotionForTurn() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/turn",
         new ConcurrentHashMap<>(),
@@ -327,6 +357,13 @@ class RemoteAiFreeTalkClientTest {
               "error": null
             }
         """);
+
+    assertThat(remoteClient().generateTurn(turnRequest()).emotion()).isNull();
+  }
+
+  @DisplayName("프리톡 종료 응답은 감정 값이 null이어도 허용한다.")
+  @Test
+  void acceptsNullEmotionForClosing() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/closing",
         new ConcurrentHashMap<>(),
@@ -342,8 +379,6 @@ class RemoteAiFreeTalkClientTest {
             }
         """);
 
-    assertThat(remoteClient().generateOpening(openingRequest()).emotion()).isNull();
-    assertThat(remoteClient().generateTurn(turnRequest()).emotion()).isNull();
     assertThat(remoteClient().generateClosing(closingRequest()).emotion()).isNull();
   }
 
