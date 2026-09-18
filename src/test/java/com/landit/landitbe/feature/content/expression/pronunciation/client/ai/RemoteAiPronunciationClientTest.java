@@ -47,35 +47,7 @@ class RemoteAiPronunciationClientTest {
   @DisplayName("발음 분석 요청을 전송하고 단어별 판정을 응답으로 변환한다.")
   @Test
   void analyzePostsRequestAndMapsWordJudgements() throws Exception {
-    AtomicReference<String> requestBody = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/pronunciation/analyze",
-        exchange -> {
-          requestBody.set(
-              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          byte[] responseBody =
-              """
-                    {
-                      "success": true,
-                      "data": {
-                        "words": [
-                          {"order": 1, "word": "There's", "status": "CORRECT",
-                           "startMs": 120, "endMs": 480},
-                          {"order": 2, "word": "nothing", "status": "PHONEME_ERROR",
-                           "startMs": 500, "endMs": 940, "userDisplay": "nuh·ssing",
-                           "errorTargetSpan": "th", "errorUserSpan": "ss"},
-                          {"order": 3, "word": "hiking", "status": "STRESS_ERROR",
-                           "startMs": 1000, "endMs": 1400, "userStressIndex": 1}
-                        ]
-                      },
-                      "error": null
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(200, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+    AtomicReference<String> requestBody = stubWordJudgements();
 
     List<AiPronunciationJudgedWord> judgedWordList = remoteClient().analyze(analysisRequest());
 
@@ -194,5 +166,39 @@ class RemoteAiPronunciationClientTest {
                 new AiPronunciationAnalysisRequest.AccentContrast(
                     "sounds like 「nuh·thing」", "sounds like 「nah·ssing」", "PHONEME")),
             new AiPronunciationAnalysisRequest.Word(3, "hiking", null)));
+  }
+
+  private AtomicReference<String> stubWordJudgements() {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/pronunciation/analyze",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] responseBody =
+              """
+                    {
+                      "success": true,
+                      "data": {
+                        "words": [
+                          {"order": 1, "word": "There's", "status": "CORRECT",
+                           "startMs": 120, "endMs": 480},
+                          {"order": 2, "word": "nothing", "status": "PHONEME_ERROR",
+                           "startMs": 500, "endMs": 940, "userDisplay": "nuh·ssing",
+                           "errorTargetSpan": "th", "errorUserSpan": "ss"},
+                          {"order": 3, "word": "hiking", "status": "STRESS_ERROR",
+                           "startMs": 1000, "endMs": 1400, "userStressIndex": 1}
+                        ]
+                      },
+                      "error": null
+                    }
+              """
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, responseBody.length);
+          exchange.getResponseBody().write(responseBody);
+          exchange.close();
+        });
+
+    return requestBody;
   }
 }

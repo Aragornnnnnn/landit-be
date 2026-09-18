@@ -64,7 +64,7 @@ class ExpressionPracticeApiIntegrationTests {
   }
 
   /** 정상 호출 시 표현 정보와 예문 2개, 언어별 작문 문제 2개를 반환한다. */
-  @DisplayName("예문 2개와 언어별 작문 문제 2개를 반환하고 원문 및 단어 칩 정보를 보존한다.")
+  @DisplayName("표현 연습은 표현 정보와 이미지 및 순서가 고정된 예문과 작문 문제를 반환한다.")
   @Test
   void practiceReturnsExamplesAndWritingSentence() throws Exception {
     // given: payload에 예문 4개를 가진 표현이 DB에 존재하고, 로그인한 상태
@@ -92,9 +92,21 @@ class ExpressionPracticeApiIntegrationTests {
                     .value("https://cdn.example.com/practice/2.png"))
             .andReturn();
 
-    // then: writingSentence는 랜덤이라 특정 값 고정 검증이 불가능하므로,
-    //       "예문 4개 중 서로 다른 2개에서 만들어졌는지"와 출제 언어 배정을 검증한다
     JsonNode data = objectMapper.readTree(result.getResponse().getContentAsByteArray()).get("data");
+    List<String> practiceTexts = new ArrayList<>();
+    data.get("practiceSentence")
+        .forEach(node -> practiceTexts.add(node.get("sentenceText").asText()));
+    List<String> pickedTexts = new ArrayList<>();
+    data.get("writingSentence")
+        .forEach(node -> pickedTexts.add(node.get("writingSentenceText").asText()));
+    assertThat(practiceTexts).containsExactly("practice-sentence-2", "practice-sentence-3");
+    assertThat(pickedTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
+  }
+
+  @DisplayName("작문 문제는 선택된 예문의 해석과 질문 및 언어별 단어 칩을 보존한다.")
+  @Test
+  void practiceMapsQuestionsAndWordChoicesForBothLanguages() throws Exception {
+    JsonNode data = getPracticeData();
     JsonNode writingSentences = data.get("writingSentence");
     List<String> seededSentenceTexts =
         List.of(
@@ -119,43 +131,11 @@ class ExpressionPracticeApiIntegrationTests {
       assertThat(writingSentence.get("writingQuestionTranslation").asText())
           .isEqualTo("질문해석-" + index);
 
-      // 단어 칩 배열은 출제 언어에 맞는 쪽이 payload 값 그대로(순서 포함) 내려온다
-      String[] words =
-          objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class);
-      String[] choices =
-          objectMapper.convertValue(
-              writingSentence.get("writingSentenceWordChoices"), String[].class);
-      if ("EN".equals(writingSentence.get("quizLanguage").asText())) {
-        assertThat(words).containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
-        assertThat(choices)
-            .containsExactly(
-                "chip-" + index + "-b",
-                "noise-" + index + "-1",
-                "chip-" + index + "-a",
-                "noise-" + index + "-2",
-                "noise-" + index + "-3");
-      } else {
-        assertThat(words).containsExactly("조각-" + index + "-가", "조각-" + index + "-나");
-        assertThat(choices)
-            .containsExactly(
-                "조각-" + index + "-나",
-                "오답-" + index + "-1",
-                "조각-" + index + "-가",
-                "오답-" + index + "-2",
-                "오답-" + index + "-3");
-      }
+      assertWordChoicesMatchQuizLanguage(writingSentence, index);
     }
 
-    // 작문 문제 2건은 서로 다른 예문이며 출제 언어가 영어와 한국어 하나씩이다
     assertThat(pickedTexts).doesNotHaveDuplicates();
     assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
-
-    // 분배는 payload 순서로 고정이다. 뒤 2건이 예문, 앞 2건이 작문 문제다.
-    List<String> practiceTexts = new ArrayList<>();
-    data.get("practiceSentence")
-        .forEach(node -> practiceTexts.add(node.get("sentenceText").asText()));
-    assertThat(practiceTexts).containsExactly("practice-sentence-2", "practice-sentence-3");
-    assertThat(pickedTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
   }
 
   @DisplayName("사용자 학습 수준보다 어려운 표현의 연습 조회를 거부한다.")
@@ -229,61 +209,7 @@ class ExpressionPracticeApiIntegrationTests {
   @Test
   void practiceExcludesInvalidSentences() throws Exception {
     // given: 정상 예문 4개 + sentenceText가 없는 불량 예문 1개가 섞인 payload로 시딩
-    String payloadWithInvalidSentence =
-        """
-                [
-                  {
-                    "sentenceText": "valid-sentence-0",
-                    "highlightingPart": "valid-0",
-                    "sentenceTranslation": "정상 예문 0",
-                    "practiceQuestion": "question-0?",
-                    "practiceQuestionTranslation": "질문 0?",
-                    "sentenceWords": ["valid", "sentence", "0"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "0"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "0", "오답-3"]
-                  },
-                  {
-                    "sentenceText": "valid-sentence-1",
-                    "highlightingPart": "valid-1",
-                    "sentenceTranslation": "정상 예문 1",
-                    "practiceQuestion": "question-1?",
-                    "practiceQuestionTranslation": "질문 1?",
-                    "sentenceWords": ["valid", "sentence", "1"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "1"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
-                  },
-                  {
-                    "sentenceText": "valid-sentence-2",
-                    "highlightingPart": "valid-2",
-                    "sentenceTranslation": "정상 예문 2",
-                    "practiceQuestion": "question-2?",
-                    "practiceQuestionTranslation": "질문 2?",
-                    "sentenceWords": ["valid", "sentence", "2"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "2"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
-                  },
-                  {
-                    "sentenceText": "valid-sentence-3",
-                    "highlightingPart": "valid-3",
-                    "sentenceTranslation": "정상 예문 3",
-                    "practiceQuestion": "question-3?",
-                    "practiceQuestionTranslation": "질문 3?",
-                    "sentenceWords": ["valid", "sentence", "3"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "3"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3", "오답-3"]
-                  },
-                  {
-                    "highlightingPart": "invalid",
-                    "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
-                    "practiceQuestion": "invalid?",
-                    "practiceQuestionTranslation": "불량?"
-                  }
-                ]
-        """;
+    String payloadWithInvalidSentence = fourValidExamplesAndOneWithoutSentenceText();
     Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payloadWithInvalidSentence);
     String accessToken =
         login("google-practice-4", "practice4@example.com", "Practice User4", "practice-nonce-4");
@@ -318,50 +244,7 @@ class ExpressionPracticeApiIntegrationTests {
   @Test
   void practiceRejectsExpressionWithTooFewValidSentences() throws Exception {
     // given: 정상 예문 3개 + sentenceText가 없는 불량 예문 1개
-    String payload =
-        """
-        [
-          {
-            "sentenceText": "valid-sentence-0",
-            "highlightingPart": "valid-0",
-            "sentenceTranslation": "정상 예문 0",
-            "practiceQuestion": "question-0?",
-            "practiceQuestionTranslation": "질문 0?",
-            "sentenceWords": ["valid", "sentence", "0"],
-            "sentenceWordChoices": ["sentence", "noise-1", "valid", "0"],
-            "sentenceTranslateWords": ["정상", "예문", "0"],
-            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "0"]
-          },
-          {
-            "sentenceText": "valid-sentence-1",
-            "highlightingPart": "valid-1",
-            "sentenceTranslation": "정상 예문 1",
-            "practiceQuestion": "question-1?",
-            "practiceQuestionTranslation": "질문 1?",
-            "sentenceWords": ["valid", "sentence", "1"],
-            "sentenceWordChoices": ["sentence", "noise-1", "valid", "1"],
-            "sentenceTranslateWords": ["정상", "예문", "1"],
-            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "1"]
-          },
-          {
-            "sentenceText": "valid-sentence-2",
-            "highlightingPart": "valid-2",
-            "sentenceTranslation": "정상 예문 2",
-            "practiceQuestion": "question-2?",
-            "practiceQuestionTranslation": "질문 2?",
-            "sentenceWords": ["valid", "sentence", "2"],
-            "sentenceWordChoices": ["sentence", "noise-1", "valid", "2"],
-            "sentenceTranslateWords": ["정상", "예문", "2"],
-            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "2"]
-          },
-          {
-            "highlightingPart": "invalid",
-            "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
-            "practiceQuestion": "invalid?",
-            "practiceQuestionTranslation": "불량?"
-          }
-        ]
-        """;
+    String payload = threeValidExamplesAndOneWithoutSentenceText();
     Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload);
     String accessToken =
         login("google-practice-5", "practice5@example.com", "Practice User5", "practice-nonce-5");
@@ -521,5 +404,158 @@ class ExpressionPracticeApiIntegrationTests {
     // 이 클래스는 고급 표현 fixture를 검증하므로 기본 수준과 무관하게 고급 수준을 선택한다.
     jdbcTemplate.update("UPDATE user_profile SET learning_level=5 WHERE email=?", email);
     return body.get("data").get("accessToken").asText();
+  }
+
+  private String fourValidExamplesAndOneWithoutSentenceText() {
+    String examples =
+        """
+                [
+                  {
+                    "sentenceText": "valid-sentence-0",
+                    "highlightingPart": "valid-0",
+                    "sentenceTranslation": "정상 예문 0",
+                    "practiceQuestion": "question-0?",
+                    "practiceQuestionTranslation": "질문 0?",
+                    "sentenceWords": ["valid", "sentence", "0"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "0", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "0"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "0", "오답-3"]
+                  },
+                  {
+                    "sentenceText": "valid-sentence-1",
+                    "highlightingPart": "valid-1",
+                    "sentenceTranslation": "정상 예문 1",
+                    "practiceQuestion": "question-1?",
+                    "practiceQuestionTranslation": "질문 1?",
+                    "sentenceWords": ["valid", "sentence", "1"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "1"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
+                  },
+                  {
+                    "sentenceText": "valid-sentence-2",
+                    "highlightingPart": "valid-2",
+                    "sentenceTranslation": "정상 예문 2",
+                    "practiceQuestion": "question-2?",
+                    "practiceQuestionTranslation": "질문 2?",
+                    "sentenceWords": ["valid", "sentence", "2"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "2"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
+                  },
+                  {
+                    "sentenceText": "valid-sentence-3",
+                    "highlightingPart": "valid-3",
+                    "sentenceTranslation": "정상 예문 3",
+                    "practiceQuestion": "question-3?",
+                    "practiceQuestionTranslation": "질문 3?",
+                    "sentenceWords": ["valid", "sentence", "3"],
+                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"],
+                    "sentenceTranslateWords": ["정상", "예문", "3"],
+                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3", "오답-3"]
+                  },
+                  {
+                    "highlightingPart": "invalid",
+                    "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
+                    "practiceQuestion": "invalid?",
+                    "practiceQuestionTranslation": "불량?"
+                  }
+                ]
+        """;
+    return examples;
+  }
+
+  private String threeValidExamplesAndOneWithoutSentenceText() {
+    String examples =
+        """
+        [
+          {
+            "sentenceText": "valid-sentence-0",
+            "highlightingPart": "valid-0",
+            "sentenceTranslation": "정상 예문 0",
+            "practiceQuestion": "question-0?",
+            "practiceQuestionTranslation": "질문 0?",
+            "sentenceWords": ["valid", "sentence", "0"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "0"],
+            "sentenceTranslateWords": ["정상", "예문", "0"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "0"]
+          },
+          {
+            "sentenceText": "valid-sentence-1",
+            "highlightingPart": "valid-1",
+            "sentenceTranslation": "정상 예문 1",
+            "practiceQuestion": "question-1?",
+            "practiceQuestionTranslation": "질문 1?",
+            "sentenceWords": ["valid", "sentence", "1"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "1"],
+            "sentenceTranslateWords": ["정상", "예문", "1"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "1"]
+          },
+          {
+            "sentenceText": "valid-sentence-2",
+            "highlightingPart": "valid-2",
+            "sentenceTranslation": "정상 예문 2",
+            "practiceQuestion": "question-2?",
+            "practiceQuestionTranslation": "질문 2?",
+            "sentenceWords": ["valid", "sentence", "2"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "2"],
+            "sentenceTranslateWords": ["정상", "예문", "2"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "2"]
+          },
+          {
+            "highlightingPart": "invalid",
+            "sentenceTranslation": "sentenceText 키가 없는 불량 예문",
+            "practiceQuestion": "invalid?",
+            "practiceQuestionTranslation": "불량?"
+          }
+        ]
+        """;
+    return examples;
+  }
+
+  private void assertWordChoicesMatchQuizLanguage(JsonNode writingSentence, String index) {
+    // 단어 칩 배열은 출제 언어에 맞는 쪽이 payload 값 그대로(순서 포함) 내려온다
+    String[] words =
+        objectMapper.convertValue(writingSentence.get("writingSentenceWords"), String[].class);
+    String[] choices =
+        objectMapper.convertValue(
+            writingSentence.get("writingSentenceWordChoices"), String[].class);
+    if ("EN".equals(writingSentence.get("quizLanguage").asText())) {
+      assertThat(words).containsExactly("chip-" + index + "-a", "chip-" + index + "-b");
+      assertThat(choices)
+          .containsExactly(
+              "chip-" + index + "-b",
+              "noise-" + index + "-1",
+              "chip-" + index + "-a",
+              "noise-" + index + "-2",
+              "noise-" + index + "-3");
+    } else {
+      assertThat(words).containsExactly("조각-" + index + "-가", "조각-" + index + "-나");
+      assertThat(choices)
+          .containsExactly(
+              "조각-" + index + "-나",
+              "오답-" + index + "-1",
+              "조각-" + index + "-가",
+              "오답-" + index + "-2",
+              "오답-" + index + "-3");
+    }
+  }
+
+  private JsonNode getPracticeData() throws Exception {
+    Long expressionId = seedExpressionWithPracticeExamples();
+    String token =
+        login(
+            "google-practice-mapping",
+            "practice-mapping@example.com",
+            "Practice Mapping",
+            "practice-mapping-nonce");
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
   }
 }

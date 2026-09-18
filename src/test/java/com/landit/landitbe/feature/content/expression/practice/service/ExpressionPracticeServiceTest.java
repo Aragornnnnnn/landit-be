@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,9 @@ import org.slf4j.LoggerFactory;
 /** 표현 업무의 조회 계약을 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class ExpressionPracticeServiceTest {
+
+  private Logger capturedLogger;
+  private ListAppender<ILoggingEvent> capturedLogs;
 
   private static final Long USER_ID = 1L;
   private static final Long SCENARIO_ID = 999L;
@@ -72,14 +76,9 @@ class ExpressionPracticeServiceTest {
   @Test
   void shouldLogAndThrowWhenExpressionIdNotFound() {
     // given: 로그를 검증하기 위해 서비스 로거에 ListAppender(로그를 리스트에 담아주는 가짜 출력지)를 부착
-    Logger logger =
-        (Logger)
-            LoggerFactory.getLogger(
-                com.landit.landitbe.feature.content.expression.service.ExpressionQueryService
-                    .class);
-    ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
-    logAppender.start();
-    logger.addAppender(logAppender);
+    ListAppender<ILoggingEvent> logAppender =
+        captureLogs(
+            com.landit.landitbe.feature.content.expression.service.ExpressionQueryService.class);
 
     // given: DB에 해당 표현이 없는 상황
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
@@ -99,8 +98,6 @@ class ExpressionPracticeServiceTest {
               assertThat(event.getLevel()).isEqualTo(Level.WARN);
               assertThat(event.getFormattedMessage()).contains(String.valueOf(EXPRESSION_ID));
             });
-
-    logger.detachAppender(logAppender);
   }
 
   /** 적절한 표현 ID로 조회하면 표현 정보 + 눈으로 익히는 예문 2개 + 작문 문제 2개가 담긴 응답을 반환한다. */
@@ -256,84 +253,12 @@ class ExpressionPracticeServiceTest {
   @Test
   void shouldExcludeInvalidExamplesAndLogWarning() {
     // given: 로그 검증용 ListAppender 부착
-    Logger logger = (Logger) LoggerFactory.getLogger(ExpressionPracticeService.class);
-    ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
-    logAppender.start();
-    logger.addAppender(logAppender);
+    ListAppender<ILoggingEvent> logAppender = captureLogs(ExpressionPracticeService.class);
 
     // given: 정상 4개 + 불량 3개(sentenceText 키 누락 / practiceQuestion 빈 문자열 / sentenceTranslation null)가
     // 섞인 payload. 정상 예문이 4개는 있어야 응답이 성립하므로 3, 4번을 함께 넣는다.
     WritingExpression expression =
-        makeWritingExpressionMockWithInfo(
-            toJson(
-                """
-                [
-                  {
-                    "sentenceText": "valid sentence 1",
-                    "highlightingPart": "valid-1",
-                    "sentenceTranslation": "정상 예문 1",
-                    "practiceQuestion": "question-1?",
-                    "practiceQuestionTranslation": "질문 1?",
-                    "sentenceWords": ["valid", "sentence", "1"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "1"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
-                  },
-                  {
-                    "highlightingPart": "missing-text",
-                    "sentenceTranslation": "sentenceText 키가 없음",
-                    "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?"
-                  },
-                  {
-                    "sentenceText": "blank question sentence",
-                    "highlightingPart": "blank-question",
-                    "sentenceTranslation": "practiceQuestion이 빈 문자열",
-                    "practiceQuestion": "",
-                    "practiceQuestionTranslation": "질문?"
-                  },
-                  {
-                    "sentenceText": "null translation sentence",
-                    "highlightingPart": "null-translation",
-                    "sentenceTranslation": null,
-                    "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?"
-                  },
-                  {
-                    "sentenceText": "valid sentence 2",
-                    "highlightingPart": "valid-2",
-                    "sentenceTranslation": "정상 예문 2",
-                    "practiceQuestion": "question-2?",
-                    "practiceQuestionTranslation": "질문 2?",
-                    "sentenceWords": ["valid", "sentence", "2"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "2"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
-                  },
-                  {
-                    "sentenceText": "valid sentence 3",
-                    "highlightingPart": "valid-3",
-                    "sentenceTranslation": "정상 예문 3",
-                    "practiceQuestion": "question-3?",
-                    "practiceQuestionTranslation": "질문 3?",
-                    "sentenceWords": ["valid", "sentence", "3"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "3"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3", "오답-3"]
-                  },
-                  {
-                    "sentenceText": "valid sentence 4",
-                    "highlightingPart": "valid-4",
-                    "sentenceTranslation": "정상 예문 4",
-                    "practiceQuestion": "question-4?",
-                    "practiceQuestionTranslation": "질문 4?",
-                    "sentenceWords": ["valid", "sentence", "4"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "4", "noise-3"],
-                    "sentenceTranslateWords": ["정상", "예문", "4"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "4", "오답-3"]
-                  }
-                ]
-                """));
+        makeWritingExpressionMockWithInfo(examplesWithMissingTextBlankQuestionAndNullTranslation());
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
 
@@ -358,8 +283,6 @@ class ExpressionPracticeServiceTest {
               assertThat(event.getLevel()).isEqualTo(Level.WARN);
               assertThat(event.getFormattedMessage()).contains(String.valueOf(EXPRESSION_ID));
             });
-
-    logger.detachAppender(logAppender);
   }
 
   /**
@@ -417,99 +340,12 @@ class ExpressionPracticeServiceTest {
   @Test
   void shouldExcludeExamplesWithInvalidWordArrays() {
     // given: 로그 검증용 ListAppender 부착
-    Logger logger = (Logger) LoggerFactory.getLogger(ExpressionPracticeService.class);
-    ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
-    logAppender.start();
-    logger.addAppender(logAppender);
+    ListAppender<ILoggingEvent> logAppender = captureLogs(ExpressionPracticeService.class);
 
     // given: 정상 4개 + 불량 4개(sentenceWords 누락 / sentenceWordChoices 빈 배열 / sentenceWords에 blank 원소
     // / 한국어 배열 누락). 정상 예문이 4개는 있어야 응답이 성립한다.
     WritingExpression expression =
-        makeWritingExpressionMockWithInfo(
-            toJson(
-                """
-                [
-                  {
-                    "sentenceText": "valid sentence 1",
-                    "highlightingPart": "valid-1",
-                    "sentenceTranslation": "정상 예문 1",
-                    "practiceQuestion": "question-1?",
-                    "practiceQuestionTranslation": "질문 1?",
-                    "sentenceWords": ["valid", "sentence", "1"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1"],
-                    "sentenceTranslateWords": ["정상", "예문", "1"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1"]
-                  },
-                  {
-                    "sentenceText": "valid sentence 2",
-                    "highlightingPart": "valid-2",
-                    "sentenceTranslation": "정상 예문 2",
-                    "practiceQuestion": "question-2?",
-                    "practiceQuestionTranslation": "질문 2?",
-                    "sentenceWords": ["valid", "sentence", "2"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2"],
-                    "sentenceTranslateWords": ["정상", "예문", "2"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2"]
-                  },
-                  {
-                    "sentenceText": "valid sentence 3",
-                    "highlightingPart": "valid-3",
-                    "sentenceTranslation": "정상 예문 3",
-                    "practiceQuestion": "question-3?",
-                    "practiceQuestionTranslation": "질문 3?",
-                    "sentenceWords": ["valid", "sentence", "3"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3"],
-                    "sentenceTranslateWords": ["정상", "예문", "3"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3"]
-                  },
-                  {
-                    "sentenceText": "valid sentence 4",
-                    "highlightingPart": "valid-4",
-                    "sentenceTranslation": "정상 예문 4",
-                    "practiceQuestion": "question-4?",
-                    "practiceQuestionTranslation": "질문 4?",
-                    "sentenceWords": ["valid", "sentence", "4"],
-                    "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "4"],
-                    "sentenceTranslateWords": ["정상", "예문", "4"],
-                    "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "4"]
-                  },
-                  {
-                    "sentenceText": "missing words sentence",
-                    "highlightingPart": "missing-words",
-                    "sentenceTranslation": "sentenceWords 키가 없음",
-                    "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?",
-                    "sentenceWordChoices": ["sentence", "noise-1"]
-                  },
-                  {
-                    "sentenceText": "empty choices sentence",
-                    "highlightingPart": "empty-choices",
-                    "sentenceTranslation": "sentenceWordChoices가 빈 배열",
-                    "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?",
-                    "sentenceWords": ["empty", "choices"],
-                    "sentenceWordChoices": []
-                  },
-                  {
-                    "sentenceText": "blank word sentence",
-                    "highlightingPart": "blank-word",
-                    "sentenceTranslation": "sentenceWords에 blank 원소",
-                    "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?",
-                    "sentenceWords": ["blank", ""],
-                    "sentenceWordChoices": ["blank", "noise-1", "word"]
-                  },
-                  {
-                    "sentenceText": "missing translate words sentence",
-                    "highlightingPart": "missing-translate",
-                    "sentenceTranslation": "한국어 단어 배열이 없음",
-                    "practiceQuestion": "question?",
-                    "practiceQuestionTranslation": "질문?",
-                    "sentenceWords": ["missing", "translate"],
-                    "sentenceWordChoices": ["translate", "noise-1", "missing"]
-                  }
-                ]
-                """));
+        makeWritingExpressionMockWithInfo(examplesWithMissingEmptyAndBlankWordArrays());
     when(writingExpressionRepository.findByIdAndStatus(EXPRESSION_ID, ActiveStatus.ACTIVE))
         .thenReturn(Optional.of(expression));
 
@@ -534,8 +370,6 @@ class ExpressionPracticeServiceTest {
               assertThat(event.getLevel()).isEqualTo(Level.WARN);
               assertThat(event.getFormattedMessage()).contains(String.valueOf(EXPRESSION_ID));
             });
-
-    logger.detachAppender(logAppender);
   }
 
   /** 모든 예문이 불량이면(제외 후 0개) 작문 문제를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
@@ -625,6 +459,181 @@ class ExpressionPracticeServiceTest {
       return new ObjectMapper().readTree(json);
     } catch (JsonProcessingException exception) {
       throw new IllegalArgumentException("테스트 JSON이 잘못됐습니다: " + json, exception);
+    }
+  }
+
+  private JsonNode examplesWithMissingTextBlankQuestionAndNullTranslation() {
+    return toJson(
+        """
+        [
+          {
+            "sentenceText": "valid sentence 1",
+            "highlightingPart": "valid-1",
+            "sentenceTranslation": "정상 예문 1",
+            "practiceQuestion": "question-1?",
+            "practiceQuestionTranslation": "질문 1?",
+            "sentenceWords": ["valid", "sentence", "1"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1", "noise-3"],
+            "sentenceTranslateWords": ["정상", "예문", "1"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1", "오답-3"]
+          },
+          {
+            "highlightingPart": "missing-text",
+            "sentenceTranslation": "sentenceText 키가 없음",
+            "practiceQuestion": "question?",
+            "practiceQuestionTranslation": "질문?"
+          },
+          {
+            "sentenceText": "blank question sentence",
+            "highlightingPart": "blank-question",
+            "sentenceTranslation": "practiceQuestion이 빈 문자열",
+            "practiceQuestion": "",
+            "practiceQuestionTranslation": "질문?"
+          },
+          {
+            "sentenceText": "null translation sentence",
+            "highlightingPart": "null-translation",
+            "sentenceTranslation": null,
+            "practiceQuestion": "question?",
+            "practiceQuestionTranslation": "질문?"
+          },
+          {
+            "sentenceText": "valid sentence 2",
+            "highlightingPart": "valid-2",
+            "sentenceTranslation": "정상 예문 2",
+            "practiceQuestion": "question-2?",
+            "practiceQuestionTranslation": "질문 2?",
+            "sentenceWords": ["valid", "sentence", "2"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2", "noise-3"],
+            "sentenceTranslateWords": ["정상", "예문", "2"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2", "오답-3"]
+          },
+          {
+            "sentenceText": "valid sentence 3",
+            "highlightingPart": "valid-3",
+            "sentenceTranslation": "정상 예문 3",
+            "practiceQuestion": "question-3?",
+            "practiceQuestionTranslation": "질문 3?",
+            "sentenceWords": ["valid", "sentence", "3"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3", "noise-3"],
+            "sentenceTranslateWords": ["정상", "예문", "3"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3", "오답-3"]
+          },
+          {
+            "sentenceText": "valid sentence 4",
+            "highlightingPart": "valid-4",
+            "sentenceTranslation": "정상 예문 4",
+            "practiceQuestion": "question-4?",
+            "practiceQuestionTranslation": "질문 4?",
+            "sentenceWords": ["valid", "sentence", "4"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "4", "noise-3"],
+            "sentenceTranslateWords": ["정상", "예문", "4"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "4", "오답-3"]
+          }
+        ]
+        """);
+  }
+
+  private JsonNode examplesWithMissingEmptyAndBlankWordArrays() {
+    return toJson(
+        """
+        [
+          {
+            "sentenceText": "valid sentence 1",
+            "highlightingPart": "valid-1",
+            "sentenceTranslation": "정상 예문 1",
+            "practiceQuestion": "question-1?",
+            "practiceQuestionTranslation": "질문 1?",
+            "sentenceWords": ["valid", "sentence", "1"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "1"],
+            "sentenceTranslateWords": ["정상", "예문", "1"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "1"]
+          },
+          {
+            "sentenceText": "valid sentence 2",
+            "highlightingPart": "valid-2",
+            "sentenceTranslation": "정상 예문 2",
+            "practiceQuestion": "question-2?",
+            "practiceQuestionTranslation": "질문 2?",
+            "sentenceWords": ["valid", "sentence", "2"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "2"],
+            "sentenceTranslateWords": ["정상", "예문", "2"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "2"]
+          },
+          {
+            "sentenceText": "valid sentence 3",
+            "highlightingPart": "valid-3",
+            "sentenceTranslation": "정상 예문 3",
+            "practiceQuestion": "question-3?",
+            "practiceQuestionTranslation": "질문 3?",
+            "sentenceWords": ["valid", "sentence", "3"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "3"],
+            "sentenceTranslateWords": ["정상", "예문", "3"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "3"]
+          },
+          {
+            "sentenceText": "valid sentence 4",
+            "highlightingPart": "valid-4",
+            "sentenceTranslation": "정상 예문 4",
+            "practiceQuestion": "question-4?",
+            "practiceQuestionTranslation": "질문 4?",
+            "sentenceWords": ["valid", "sentence", "4"],
+            "sentenceWordChoices": ["sentence", "noise-1", "valid", "noise-2", "4"],
+            "sentenceTranslateWords": ["정상", "예문", "4"],
+            "sentenceTranslateWordChoices": ["예문", "오답-1", "정상", "오답-2", "4"]
+          },
+          {
+            "sentenceText": "missing words sentence",
+            "highlightingPart": "missing-words",
+            "sentenceTranslation": "sentenceWords 키가 없음",
+            "practiceQuestion": "question?",
+            "practiceQuestionTranslation": "질문?",
+            "sentenceWordChoices": ["sentence", "noise-1"]
+          },
+          {
+            "sentenceText": "empty choices sentence",
+            "highlightingPart": "empty-choices",
+            "sentenceTranslation": "sentenceWordChoices가 빈 배열",
+            "practiceQuestion": "question?",
+            "practiceQuestionTranslation": "질문?",
+            "sentenceWords": ["empty", "choices"],
+            "sentenceWordChoices": []
+          },
+          {
+            "sentenceText": "blank word sentence",
+            "highlightingPart": "blank-word",
+            "sentenceTranslation": "sentenceWords에 blank 원소",
+            "practiceQuestion": "question?",
+            "practiceQuestionTranslation": "질문?",
+            "sentenceWords": ["blank", ""],
+            "sentenceWordChoices": ["blank", "noise-1", "word"]
+          },
+          {
+            "sentenceText": "missing translate words sentence",
+            "highlightingPart": "missing-translate",
+            "sentenceTranslation": "한국어 단어 배열이 없음",
+            "practiceQuestion": "question?",
+            "practiceQuestionTranslation": "질문?",
+            "sentenceWords": ["missing", "translate"],
+            "sentenceWordChoices": ["translate", "noise-1", "missing"]
+          }
+        ]
+        """);
+  }
+
+  private ListAppender<ILoggingEvent> captureLogs(Class<?> loggerType) {
+    capturedLogger = (Logger) LoggerFactory.getLogger(loggerType);
+    capturedLogs = new ListAppender<>();
+    capturedLogs.start();
+    capturedLogger.addAppender(capturedLogs);
+    return capturedLogs;
+  }
+
+  @AfterEach
+  void detachCapturedLogs() {
+    if (capturedLogger != null) {
+      capturedLogger.detachAppender(capturedLogs);
+      capturedLogs.stop();
     }
   }
 }

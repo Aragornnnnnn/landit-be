@@ -307,9 +307,9 @@ class ScenarioListApiIntegrationTests {
                 .value("인증 실패"));
   }
 
-  @DisplayName("시나리오를 순서대로 반환하며 접근 상태와 첫 대화 미리보기를 제공한다.")
+  @DisplayName("시나리오 목록은 정렬된 카테고리와 콘텐츠 정보를 반환한다.")
   @Test
-  void scenariosReturnOrderedAccessStatusAndOpeningPreview() throws Exception {
+  void scenariosReturnOrderedMetadata() throws Exception {
     JsonNode loginResponseBody = login();
     long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
     final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
@@ -339,7 +339,23 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].firstSpeaker").value("AI"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].thumbnailUrl")
-                .value("https://cdn.landit.com/ai.png"))
+                .value("https://cdn.landit.com/ai.png"));
+  }
+
+  @DisplayName("시나리오 목록은 완료 여부와 시나리오 및 카테고리 잠금 상태를 반환한다.")
+  @Test
+  void scenariosReturnCompletionAndLockStatus() throws Exception {
+    JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(userId);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
+    insertScenarioAccess(userId, 202);
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].availabilityStatus").value("CLEARED"))
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].completed").value(true))
@@ -347,6 +363,40 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].lockReason").value(nullValue()))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
+        .andExpect(
+            jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].firstSpeaker").value("USER"))
+        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[1].categoryId").value(100))
+        .andExpect(jsonPath("$.data.categories[1].scenarios[0].locked").value(true))
+        .andExpect(jsonPath("$.data.categories[1].scenarios[0].lockReason").isNotEmpty())
+        .andExpect(jsonPath("$.data.categories[1].scenarios[0].openingPreview").value(nullValue()))
+        .andExpect(jsonPath("$.data.categories[2].categoryId").value(102))
+        .andExpect(jsonPath("$.data.categories[2].categoryLocked").value(true))
+        .andExpect(jsonPath("$.data.categories[2].categoryLockReason").isNotEmpty())
+        .andExpect(jsonPath("$.data.categories[2].scenarios[0].locked").value(true))
+        .andExpect(jsonPath("$.data.categories[2].scenarios[0].openingPreview").value(nullValue()));
+  }
+
+  @DisplayName("접근 가능한 시나리오의 첫 질문과 속마음 및 캐릭터 음성을 미리보기로 반환한다.")
+  @Test
+  void scenariosReturnOpeningPreviewForAccessibleContent() throws Exception {
+    JsonNode loginResponseBody = login();
+    long userId = loginResponseBody.get("data").get("user").get("userId").asLong();
+    final String accessToken = loginResponseBody.get("data").get("accessToken").asText();
+    seedScenarioListData(userId);
+    jdbcTemplate.update("UPDATE user_profile SET learning_level = 1 WHERE id = ?", userId);
+    insertScenarioAccess(userId, 202);
+
+    mockMvc
+        .perform(
+            get("/api/v1/scenarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.aiOpeningMessage")
                 .value("What food do you like?"))
@@ -378,25 +428,7 @@ class ScenarioListApiIntegrationTests {
                 .value("aura-2-luna-en"))
         .andExpect(
             jsonPath("$.data.categories[0].scenarios[0].openingPreview.character.ttsVoice.gender")
-                .value("FEMALE"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].scenarioId").value(201))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].starRating").value(nullValue()))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].availabilityStatus").value("LOCKED"))
-        .andExpect(
-            jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value(nullValue()))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].completed").value(false))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].locked").value(true))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].firstSpeaker").value("USER"))
-        .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()))
-        .andExpect(jsonPath("$.data.categories[1].categoryId").value(100))
-        .andExpect(jsonPath("$.data.categories[1].scenarios[0].locked").value(true))
-        .andExpect(jsonPath("$.data.categories[1].scenarios[0].lockReason").isNotEmpty())
-        .andExpect(jsonPath("$.data.categories[1].scenarios[0].openingPreview").value(nullValue()))
-        .andExpect(jsonPath("$.data.categories[2].categoryId").value(102))
-        .andExpect(jsonPath("$.data.categories[2].categoryLocked").value(true))
-        .andExpect(jsonPath("$.data.categories[2].categoryLockReason").isNotEmpty())
-        .andExpect(jsonPath("$.data.categories[2].scenarios[0].locked").value(true))
-        .andExpect(jsonPath("$.data.categories[2].scenarios[0].openingPreview").value(nullValue()));
+                .value("FEMALE"));
   }
 
   @DisplayName("시나리오 완료 다음 날에는 다음 시나리오를 제공한다.")
