@@ -266,29 +266,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("메시지 피드백 계약을 전송하고 준비 중 응답을 변환한다.")
   @Test
   void requestMessageFeedbackPostsContractAndMapsPreparingResponse() throws Exception {
-    AtomicReference<String> requestBody = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/conversation/message-feedback",
-        exchange -> {
-          requestBody.set(
-              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          byte[] responseBody =
-              """
-                    {
-                      "success": true,
-                      "data": {
-                        "sessionId": 100,
-                        "messageId": 200,
-                        "feedbackStatus": "PREPARING"
-                      },
-                      "error": null
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(202, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+    AtomicReference<String> requestBody = stubMessageFeedbackAccepted(100L, 200L);
 
     RemoteAiConversationClient client = remoteClient();
 
@@ -333,30 +311,14 @@ class RemoteAiConversationClientTest {
   @Test
   void requestMessageFeedbackSerializesAndDeserializesWithJackson3JsonMapper() throws Exception {
     JsonMapper jsonMapper = JsonMapper.builder().build();
-    AtomicReference<String> requestBody = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/conversation/message-feedback",
-        exchange -> {
-          requestBody.set(
-              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          byte[] responseBody =
-              """
-                    {
-                      "success": true,
-                      "data": {
-                        "sessionId": 100,
-                        "messageId": 200,
-                        "feedbackStatus": "PREPARING",
-                        "ignoredField": "ignored"
-                      },
-                      "error": null
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(202, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+    AtomicReference<String> requestBody =
+        stubFeedbackResponse(
+            "/api/v1/conversation/message-feedback",
+            202,
+            """
+            {"success":true,"data":{"sessionId":100,"messageId":200,
+              "feedbackStatus":"PREPARING","ignoredField":"ignored"},"error":null}
+            """);
 
     AiMessageFeedbackResult result =
         remoteClient(jsonMapper).requestMessageFeedback(aiMessageFeedbackRequest());
@@ -371,29 +333,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("메시지 피드백 요청에 시나리오 시작 지침 문맥을 전송한다.")
   @Test
   void requestMessageFeedbackPostsScenarioOpeningInstructionContext() throws Exception {
-    AtomicReference<String> requestBody = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/conversation/message-feedback",
-        exchange -> {
-          requestBody.set(
-              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          byte[] responseBody =
-              """
-                    {
-                      "success": true,
-                      "data": {
-                        "sessionId": 101,
-                        "messageId": 201,
-                        "feedbackStatus": "PREPARING"
-                      },
-                      "error": null
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(202, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+    AtomicReference<String> requestBody = stubMessageFeedbackAccepted(101L, 201L);
 
     RemoteAiConversationClient client = remoteClient();
 
@@ -431,23 +371,7 @@ class RemoteAiConversationClientTest {
   void requestMessageFeedbackPreservesAiResponseInvalidError() {
     server.createContext(
         "/api/v1/conversation/message-feedback",
-        exchange -> {
-          byte[] responseBody =
-              """
-                    {
-                      "success": false,
-                      "data": null,
-                      "error": {
-                        "code": "AI_RESPONSE_INVALID",
-                        "message": "AI 응답 형식이 올바르지 않습니다."
-                      }
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(502, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+        exchange -> writeErrorResponse(exchange, 502, "AI_RESPONSE_INVALID"));
 
     RemoteAiConversationClient client = remoteClient();
 
@@ -463,23 +387,7 @@ class RemoteAiConversationClientTest {
   void requestMessageFeedbackMapsOtherErrorResponseToGenerationFailed() {
     server.createContext(
         "/api/v1/conversation/message-feedback",
-        exchange -> {
-          byte[] responseBody =
-              """
-                    {
-                      "success": false,
-                      "data": null,
-                      "error": {
-                        "code": "AI_GENERATION_FAILED",
-                        "message": "AI 응답 생성에 실패했습니다."
-                      }
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(503, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+        exchange -> writeErrorResponse(exchange, 503, "AI_GENERATION_FAILED"));
 
     RemoteAiConversationClient client = remoteClient();
 
@@ -504,21 +412,12 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
   }
 
-  @DisplayName("최종 피드백 계약을 AI에 전송하고 응답을 변환한다.")
+  @DisplayName("최종 피드백 요청에는 세션과 사용자 메시지 ID를 보내고 수준 평가 입력은 제외한다.")
   @Test
-  void generateSessionFeedbackPostsContractAndMapsResponse() throws Exception {
-    AtomicReference<String> requestBody = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/conversation/session-feedback",
-        exchange -> {
-          requestBody.set(
-              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          writeSessionFeedbackSuccessResponse(exchange);
-        });
+  void generateSessionFeedbackPostsContract() throws Exception {
+    AtomicReference<String> requestBody = stubSessionFeedbackSuccess();
 
-    RemoteAiConversationClient client = remoteClient();
-
-    AiSessionFeedbackResult result = client.generateSessionFeedback(aiSessionFeedbackRequest());
+    remoteClient().generateSessionFeedback(aiSessionFeedbackRequest());
 
     JsonNode request = jsonMapper.readTree(requestBody.get());
     assertThat(request.get("sessionId").asLong()).isEqualTo(100L);
@@ -528,6 +427,16 @@ class RemoteAiConversationClientTest {
         .extracting(JsonNode::asLong)
         .containsExactly(200L, 201L);
     assertThat(request.has("assessmentMessages")).isFalse();
+  }
+
+  @DisplayName("최종 피드백 응답의 요약 점수와 수준 평가를 변환한다.")
+  @Test
+  void generateSessionFeedbackMapsSummaryAndLevelAssessment() {
+    stubSessionFeedbackSuccess();
+
+    AiSessionFeedbackResult result =
+        remoteClient().generateSessionFeedback(aiSessionFeedbackRequest());
+
     assertThat(result.sessionId()).isEqualTo(100L);
     assertThat(result.nativeScore()).isEqualTo(75);
     assertThat(result.starRating()).isEqualByComparingTo(new BigDecimal("2.5"));
@@ -536,6 +445,16 @@ class RemoteAiConversationClientTest {
     assertThat(result.levelAssessment().core().messages()).hasSize(2);
     assertThat(result.levelAssessment().core().messages().getFirst().domains().grammar().level())
         .isEqualTo(4);
+  }
+
+  @DisplayName("최종 피드백 응답의 메시지별 칭찬과 교정 내용을 변환한다.")
+  @Test
+  void generateSessionFeedbackMapsMessageFeedbacks() {
+    stubSessionFeedbackSuccess();
+
+    AiSessionFeedbackResult result =
+        remoteClient().generateSessionFeedback(aiSessionFeedbackRequest());
+
     assertThat(result.messageFeedbacks())
         .containsExactly(
             new AiSessionMessageFeedbackResult(
@@ -588,13 +507,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("완료된 메시지 피드백을 전달하면서 기존 요청 필드를 유지한다.")
   @Test
   void hotfixForwardsCompletedFeedbacksWithoutChangingLegacyFields() throws Exception {
-    AtomicReference<String> body = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/conversation/session-feedback",
-        exchange -> {
-          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          writeSessionFeedbackSuccessResponse(exchange);
-        });
+    AtomicReference<String> body = stubSessionFeedbackSuccess();
     AiSessionFeedbackRequest legacy = aiSessionFeedbackRequest();
     JsonNode snapshot = jsonMapper.readTree("{\"schemaVersion\":1,\"sessionId\":100}");
     remoteClient()
@@ -741,6 +654,44 @@ class RemoteAiConversationClientTest {
             exception ->
                 assertThat(exception.getErrorCode())
                     .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
+  }
+
+  private AtomicReference<String> stubMessageFeedbackAccepted(long sessionId, long messageId) {
+    return stubFeedbackResponse(
+        "/api/v1/conversation/message-feedback",
+        202,
+        """
+        {"success":true,"data":{"sessionId":%d,"messageId":%d,
+          "feedbackStatus":"PREPARING"},"error":null}
+        """
+            .formatted(sessionId, messageId));
+  }
+
+  private AtomicReference<String> stubFeedbackResponse(String path, int status, String body) {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        path,
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] response = body.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(status, response.length);
+          exchange.getResponseBody().write(response);
+          exchange.close();
+        });
+    return requestBody;
+  }
+
+  private AtomicReference<String> stubSessionFeedbackSuccess() {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/session-feedback",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          writeSessionFeedbackSuccessResponse(exchange);
+        });
+    return requestBody;
   }
 
   private AiMessageFeedbackRequest aiMessageFeedbackRequest() {
