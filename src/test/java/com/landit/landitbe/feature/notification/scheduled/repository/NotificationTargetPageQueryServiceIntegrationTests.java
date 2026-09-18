@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.notification.scheduled.dto.NotificationTarget
 import com.landit.landitbe.feature.notification.scheduled.dto.NotificationTargetSelectionInput;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +35,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   @Autowired private NotificationTargetQueryRepository queryService;
 
   /** 오늘 완료한 시나리오와 시나리오 출처 표현 완료만 반영하고 날짜별 사용량을 조립한다. */
+  @DisplayName("오늘 완료한 시나리오와 시나리오 출처 표현 완료만 반영하고 날짜별 사용량을 조립한다.")
   @Test
   void loadsCompletedDailyScenarioAndScenarioExpressionProgress() {
     seedUser();
@@ -73,6 +75,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   }
 
   /** 닉네임, 날짜별 활동과 저장된 스트릭 요약을 예약 날짜 기준으로 조립한다. */
+  @DisplayName("닉네임, 날짜별 활동과 저장된 스트릭 요약을 예약 날짜 기준으로 조립한다.")
   @Test
   void loadsActivityAndStreakFieldsForScheduledDate() {
     seedUser();
@@ -102,6 +105,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
     assertThat(input.missedDayCount()).isEqualTo(1);
   }
 
+  @DisplayName("기존 사용자의 학습 수준이 null이면 표현 조회에 기본 수준 3을 적용한다.")
   @Test
   void legacyNullLearningLevelUsesDefaultThreeForExpressions() {
     seedUser();
@@ -118,6 +122,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
         .containsExactly(intermediateExpressionId);
   }
 
+  @DisplayName("학습 수준 2의 알림 대상은 난이도 2~3 표현만 포함한다.")
   @Test
   void learningLevelTwoIncludesOnlyLevelTwoToThreeExpressions() {
     seedUser();
@@ -137,6 +142,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   }
 
   /** 오늘 완료 이력이 없으면 기존 접근 상태에서 첫 미완료 시나리오를 오늘 배정으로 계산한다. */
+  @DisplayName("오늘 완료 이력이 없으면 기존 접근 상태에서 첫 미완료 시나리오를 오늘 배정으로 계산한다.")
   @Test
   void loadsFirstUnclearedScenarioAsTodaysAssignment() {
     seedUser();
@@ -153,6 +159,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   }
 
   /** ACTIVE 상태의 UserPushToken이 있는 사용자만 발송 가능 대상으로 조회한다. */
+  @DisplayName("ACTIVE 상태의 UserPushToken이 있는 사용자만 발송 가능 대상으로 조회한다.")
   @Test
   void loadsOnlyUsersWithActiveUserPushTokens() {
     seedUser();
@@ -167,6 +174,7 @@ class NotificationTargetPageQueryServiceIntegrationTests {
   }
 
   /** 최신 프리톡 사용자별 조회를 위한 인덱스를 Flyway로 생성한다. */
+  @DisplayName("최신 프리톡 사용자별 조회를 위한 인덱스를 Flyway로 생성한다.")
   @Test
   void createsLatestFreeTalkLookupIndex() {
     Integer indexCount =

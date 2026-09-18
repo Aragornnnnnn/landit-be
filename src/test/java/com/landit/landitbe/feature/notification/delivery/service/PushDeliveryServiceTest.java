@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -54,6 +55,7 @@ class PushDeliveryServiceTest {
   }
 
   /** 발송 직전에 설치가 비활성화되면 발송 이력을 만들지 않는다. */
+  @DisplayName("발송 직전에 설치가 비활성화되면 발송 이력을 만들지 않는다.")
   @Test
   void skipsTokenThatIsNoLongerSendable() {
     when(userPushTokenDeliveryService.findLockedSendableDeliveryTarget(USER_PUSH_TOKEN_ID, USER_ID))
@@ -64,6 +66,7 @@ class PushDeliveryServiceTest {
   }
 
   /** Push Delivery Service는 User Push Token Repository를 직접 소유하지 않는다. */
+  @DisplayName("Push Delivery Service는 User Push Token Repository를 직접 소유하지 않는다.")
   @Test
   void doesNotOwnUserPushTokenRepository() {
     assertThat(PushDeliveryService.class.getDeclaredFields())
@@ -72,6 +75,7 @@ class PushDeliveryServiceTest {
   }
 
   /** DeviceNotRegistered Ticket 오류를 기록하고 해당 설치 Token을 무효화한다. */
+  @DisplayName("DeviceNotRegistered Ticket 오류를 기록하고 해당 설치 Token을 무효화한다.")
   @Test
   void revokesTokenForRejectedTicket() {
     PushDelivery delivery = mock(PushDelivery.class);
@@ -88,6 +92,7 @@ class PushDeliveryServiceTest {
   }
 
   /** Ticket 접수 상태의 발송 이력만 Receipt 조회 대상으로 반환한다. */
+  @DisplayName("Ticket 접수 상태의 발송 이력만 Receipt 조회 대상으로 반환한다.")
   @Test
   void findsAcceptedDeliveryForReceiptCheck() {
     PushDelivery delivery = mock(PushDelivery.class);
@@ -101,6 +106,7 @@ class PushDeliveryServiceTest {
   }
 
   /** Ticket 접수 이력의 ID를 중복 방지 키 접두어로 조회한다. */
+  @DisplayName("Ticket 접수 이력의 ID를 중복 방지 키 접두어로 조회한다.")
   @Test
   void findsAcceptedDeliveryIdsByDeduplicationKeyPrefix() {
     String deduplicationKeyPrefix = "review-reminder:2026-07-24:";
@@ -113,6 +119,7 @@ class PushDeliveryServiceTest {
   }
 
   /** Ticket 접수 이력이 없으면 Receipt 재예약 대상도 비어 있다. */
+  @DisplayName("Ticket 접수 이력이 없으면 Receipt 재예약 대상도 비어 있다.")
   @Test
   void returnsNoAcceptedDeliveryIdsWhenRepositoryFindsNone() {
     String deduplicationKeyPrefix = "review-reminder:2026-07-24:";
@@ -124,6 +131,7 @@ class PushDeliveryServiceTest {
   }
 
   /** Receipt 성공을 발송 완료 상태로 기록한다. */
+  @DisplayName("Receipt 성공을 발송 완료 상태로 기록한다.")
   @Test
   void recordsDeliveredReceipt() {
     PushDelivery delivery = mock(PushDelivery.class);

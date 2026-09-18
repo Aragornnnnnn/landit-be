@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.DriverManager;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,6 +14,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 
 class Lan438AssessmentMetadataMigrationTests {
+  @DisplayName("수정되지 않은 객실 열쇠 문제의 선택지만 다듬고 나머지 콘텐츠를 보존한다.")
   @Test
   void refinesOnlyUneditedRoomKeyChoicesAndPreservesContent() throws Exception {
     try (var connection =
@@ -93,6 +95,7 @@ class Lan438AssessmentMetadataMigrationTests {
     }
   }
 
+  @DisplayName("질문 콘텐츠를 바꾸지 않고 의미 평가 요건을 등록한다.")
   @Test
   void registersSemanticRequirementsWithoutChangingQuestionContent() throws Exception {
     try (var connection =

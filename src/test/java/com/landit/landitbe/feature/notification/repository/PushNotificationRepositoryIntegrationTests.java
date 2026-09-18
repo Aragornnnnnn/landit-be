@@ -16,6 +16,7 @@ import com.landit.landitbe.shared.domain.AppPlatform;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +44,7 @@ class PushNotificationRepositoryIntegrationTests {
   @Autowired private PushDeliveryRepository pushDeliveryRepository;
 
   /** 사용자에게 속한 활성 Token만 발송 대상으로 조회한다. */
+  @DisplayName("사용자에게 속한 활성 Token만 발송 대상으로 조회한다.")
   @Test
   void findsOnlyActiveTokens() {
     seedUser();
@@ -59,6 +61,7 @@ class PushNotificationRepositoryIntegrationTests {
   }
 
   /** 같은 중복 방지 키를 가진 발송 이력은 한 건만 저장한다. */
+  @DisplayName("같은 중복 방지 키를 가진 발송 이력은 한 건만 저장한다.")
   @Test
   void rejectsDuplicateDeliveryKey() {
     seedUser();
@@ -73,6 +76,7 @@ class PushNotificationRepositoryIntegrationTests {
   }
 
   /** 저장된 발송 이력은 해당 발송에 사용한 Expo Token 원문을 보존한다. */
+  @DisplayName("저장된 발송 이력은 해당 발송에 사용한 Expo Token 원문을 보존한다.")
   @Test
   void retainsSentExpoPushTokenAfterPersistence() {
     seedUser();
@@ -90,6 +94,7 @@ class PushNotificationRepositoryIntegrationTests {
   }
 
   /** 기준 날짜의 Ticket 접수 이력만 Receipt 재예약 대상으로 식별자 순서로 조회한다. */
+  @DisplayName("기준 날짜의 Ticket 접수 이력만 Receipt 재예약 대상으로 식별자 순서로 조회한다.")
   @Test
   void findsAcceptedDeliveryIdsByReviewReminderDatePrefix() {
     seedUser();

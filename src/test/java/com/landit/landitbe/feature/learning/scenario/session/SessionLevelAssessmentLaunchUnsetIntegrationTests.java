@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.learning.scenario.level.service.ScenarioLearningLevelService;
 import com.landit.landitbe.feature.learning.scenario.session.client.ai.AiConversationClient;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +54,7 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
 
   private final ObjectMapper mapper = new ObjectMapper();
 
+  @DisplayName("수준 평가 도입 시각이 없으면 평가 없이 시나리오와 피드백을 완료하며 소유권은 검사한다.")
   @Test
   void completesScenarioAndFeedbackWithoutAssessmentAndKeepsOwnershipChecks() throws Exception {
     seedDiagnosticScenario();
@@ -153,6 +155,7 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
         .andExpect(status().isNotFound());
   }
 
+  @DisplayName("OpenAPI 문서에 수준 평가 응답의 data가 null일 수 있음을 명시한다.")
   @Test
   void documentsNullableAssessmentData() throws Exception {
     mockMvc

@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +36,7 @@ class ScenarioAccessServiceIntegrationTests {
 
   @Autowired private ScenarioAccessService scenarioAccessService;
 
+  @DisplayName("같은 시나리오를 반복 완료해도 접근 권한은 한 번만 부여한다.")
   @Test
   void grantsAccessOnceWhenSameScenarioIsCompletedRepeatedly() {
     seedUserProfile(USER_ID);
@@ -51,6 +53,7 @@ class ScenarioAccessServiceIntegrationTests {
     assertThat(grantedAt()).isEqualTo(GRANTED_AT);
   }
 
+  @DisplayName("동시 트랜잭션에서도 시나리오 접근 권한을 멱등하게 부여한다.")
   @Test
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void grantsAccessIdempotentlyInConcurrentTransactions() throws Exception {

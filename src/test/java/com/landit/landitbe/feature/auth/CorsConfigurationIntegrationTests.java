@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,6 +26,7 @@ class CorsConfigurationIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
 
+  @DisplayName("인증 API의 CORS 사전 요청에 허용 출처와 기본 설정을 적용한다.")
   @Test
   void preflightForAuthenticatedApiUsesConfiguredOriginAndCodeDefaults() throws Exception {
     mockMvc
@@ -44,6 +46,7 @@ class CorsConfigurationIntegrationTests {
                 .string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")));
   }
 
+  @DisplayName("설정된 웹 출처의 관리자 이메일 사전 요청에서 Idempotency-Key를 허용한다.")
   @Test
   void adminEmailPreflightAllowsIdempotencyKeyFromConfiguredWebOrigin() throws Exception {
     mockMvc

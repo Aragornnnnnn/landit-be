@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -46,6 +47,7 @@ class NotificationJobAdaptersTests {
   private final SchedulerClient scheduler = mock(SchedulerClient.class);
   private final SqsAsyncClient sqs = mock(SqsAsyncClient.class);
 
+  @DisplayName("작업 ID만 담아 UTC 일회성 예약을 생성하고 기존 예약의 충돌을 검증한다.")
   @Test
   void schedulesUtcOneTimeJobWithOnlyIdAndVerifiesConflictingReservation() {
     var adapter = schedulerAdapter();
@@ -81,6 +83,7 @@ class NotificationJobAdaptersTests {
     assertThatThrownBy(() -> adapter.schedule(job)).isInstanceOf(IllegalStateException.class);
   }
 
+  @DisplayName("즉시 테스트는 과거 시각을 예약하지 않고 큐로 전송한다.")
   @Test
   void immediateTestUsesQueueInsteadOfCreatingPastSchedule() {
     when(sqs.sendMessage(any(SendMessageRequest.class)))
@@ -95,6 +98,7 @@ class NotificationJobAdaptersTests {
     verifyNoInteractions(scheduler);
   }
 
+  @DisplayName("SES는 설정된 발신자를 사용하고 명시적인 호출 제한만 재시도한다.")
   @Test
   void sesUsesConfiguredSenderAndOnlyExplicitThrottlingIsRetryable() {
     SesV2Client client = mock(SesV2Client.class);

@@ -16,12 +16,14 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import io.awspring.cloud.sqs.listener.Visibility;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** Push SQS Listener의 위임, 동시성, 성공 시 삭제 계약을 검증한다. */
 class PushNotificationConsumerTest {
 
   /** 수신한 Push Queue 메시지를 Handler에 그대로 위임한다. */
+  @DisplayName("수신한 Push Queue 메시지를 Handler에 그대로 위임한다.")
   @Test
   void delegatesMessageToHandler() {
     PushQueueMessageHandler handler = org.mockito.Mockito.mock(PushQueueMessageHandler.class);
@@ -40,6 +42,7 @@ class PushNotificationConsumerTest {
   }
 
   /** Handler가 visibility 연장 작업을 실행하면 현재 메시지의 visibility를 300초로 연장한다. */
+  @DisplayName("Handler가 visibility 연장 작업을 실행하면 현재 메시지의 visibility를 300초로 연장한다.")
   @Test
   void extendsVisibilityWhenHandlerRunsVisibilityExtender() {
     PushQueueMessageHandler handler = org.mockito.Mockito.mock(PushQueueMessageHandler.class);
@@ -66,6 +69,7 @@ class PushNotificationConsumerTest {
   }
 
   /** Listener는 Push Queue URL, 동시성 2, ON_SUCCESS acknowledgement를 사용한다. */
+  @DisplayName("Listener는 Push Queue URL, 동시성 2, ON_SUCCESS acknowledgement를 사용한다.")
   @Test
   void configuresListenerConcurrencyAndAcknowledgement() throws Exception {
     Method consumeMethod =

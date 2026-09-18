@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +44,7 @@ class UserLearningLevelApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 인증된 사용자가 선택한 학습 수준을 저장한다. */
+  @DisplayName("인증된 사용자가 선택한 학습 수준을 저장한다.")
   @Test
   void storesAuthenticatedUsersLearningLevel() throws Exception {
     String userKey = "learning-level-owner";
@@ -54,6 +56,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 같은 사용자가 학습 수준을 다시 설정하면 기존 값을 덮어쓴다. */
+  @DisplayName("같은 사용자가 학습 수준을 다시 설정하면 기존 값을 덮어쓴다.")
   @Test
   void overwritesExistingLearningLevel() throws Exception {
     String userKey = "learning-level-overwrite";
@@ -66,6 +69,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 학습 수준의 최솟값과 최댓값을 저장할 수 있다. */
+  @DisplayName("학습 수준의 최솟값과 최댓값을 저장할 수 있다.")
   @Test
   void storesMinimumAndMaximumLearningLevels() throws Exception {
     String minimumUserKey = "learning-level-minimum";
@@ -79,6 +83,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 한 사용자의 학습 수준 변경은 다른 사용자의 값을 변경하지 않는다. */
+  @DisplayName("한 사용자의 학습 수준 변경은 다른 사용자의 값을 변경하지 않는다.")
   @Test
   void doesNotChangeAnotherUsersLearningLevel() throws Exception {
     String ownerKey = "learning-level-isolated-owner";
@@ -94,6 +99,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 인증된 사용자의 현재 학습 수준을 조회한다. */
+  @DisplayName("인증된 사용자의 현재 학습 수준을 조회한다.")
   @Test
   void getsAuthenticatedUsersLearningLevel() throws Exception {
     String accessToken = login("learning-level-get");
@@ -109,6 +115,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 학습 수준을 선택하지 않은 신규 사용자는 저장된 기본 수준 3을 조회한다. */
+  @DisplayName("학습 수준을 선택하지 않은 신규 사용자는 저장된 기본 수준 3을 조회한다.")
   @Test
   void returnsDefaultThreeWhenLearningLevelIsNotSelected() throws Exception {
     String accessToken = login("learning-level-get-null");
@@ -123,6 +130,7 @@ class UserLearningLevelApiIntegrationTests {
     assertThat(learningLevel("learning-level-get-null")).isEqualTo(3);
   }
 
+  @DisplayName("마이그레이션 이후 기존 코드가 수준을 null로 저장해도 기본 수준 3으로 조회한다.")
   @Test
   void legacyWriterNullAfterMigrationIsStillReadAsDefaultThree() throws Exception {
     String accessToken = login("learning-level-legacy-null");
@@ -138,12 +146,14 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 인증되지 않은 사용자는 학습 수준을 조회할 수 없다. */
+  @DisplayName("인증되지 않은 사용자는 학습 수준을 조회할 수 없다.")
   @Test
   void rejectsUnauthenticatedLearningLevelQuery() throws Exception {
     mockMvc.perform(get("/api/v1/me/learning-level")).andExpect(status().isUnauthorized());
   }
 
   /** 학습 수준이 없거나 1부터 5까지의 범위를 벗어나면 요청을 거절한다. */
+  @DisplayName("학습 수준이 없거나 1부터 5까지의 범위를 벗어나면 요청을 거절한다.")
   @Test
   void rejectsMissingOrOutOfRangeLearningLevel() throws Exception {
     String accessToken = login("learning-level-invalid");
@@ -161,6 +171,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** 인증되지 않은 사용자는 학습 수준을 변경할 수 없다. */
+  @DisplayName("인증되지 않은 사용자는 학습 수준을 변경할 수 없다.")
   @Test
   void rejectsUnauthenticatedLearningLevelUpdate() throws Exception {
     mockMvc
@@ -172,6 +183,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** OpenAPI 문서에 학습 수준 변경의 성공과 실패 응답을 공개한다. */
+  @DisplayName("OpenAPI 문서에 학습 수준 변경의 성공과 실패 응답을 공개한다.")
   @Test
   void openApiDocsDescribeLearningLevelUpdate() throws Exception {
     mockMvc
@@ -183,6 +195,7 @@ class UserLearningLevelApiIntegrationTests {
   }
 
   /** OpenAPI 문서에 학습 수준 조회의 성공과 인증 실패 응답을 공개한다. */
+  @DisplayName("OpenAPI 문서에 학습 수준 조회의 성공과 인증 실패 응답을 공개한다.")
   @Test
   void openApiDocsDescribeLearningLevelQuery() throws Exception {
     mockMvc

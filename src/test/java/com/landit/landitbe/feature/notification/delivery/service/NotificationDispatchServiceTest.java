@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -72,6 +73,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 사용자의 발송 가능한 Token별 Ticket을 기록하고 Receipt 확인을 예약한다. */
+  @DisplayName("사용자의 발송 가능한 Token별 Ticket을 기록하고 Receipt 확인을 예약한다.")
   @Test
   void sendsNotificationAndSchedulesReceiptCheck() {
     when(userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(List.of(1L)))
@@ -113,6 +115,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 같은 사용자의 과거 알림은 제외하고 현재 이벤트의 접수 Ticket만 Receipt를 다시 예약한다. */
+  @DisplayName("같은 사용자의 과거 알림은 제외하고 현재 이벤트의 접수 Ticket만 Receipt를 다시 예약한다.")
   @Test
   void reschedulesOnlyCurrentEventAcceptedReceiptWithoutResendingExpo() {
     when(pushDeliveryService.findAcceptedDeliveryIdsForEvents(List.of("push:event-1:")))
@@ -128,6 +131,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 일시적인 Expo 오류는 발송 이력을 재시도 가능하게 표시하고 예외를 전파한다. */
+  @DisplayName("일시적인 Expo 오류는 발송 이력을 재시도 가능하게 표시하고 예외를 전파한다.")
   @Test
   void marksDeliveryRetryableAndPropagatesTemporaryFailure() {
     RetryablePushNotificationException failure =
@@ -150,6 +154,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** Expo 수신 여부를 확정할 수 없는 오류는 재전달하지 않고 발송 이력을 종료한다. */
+  @DisplayName("Expo 수신 여부를 확정할 수 없는 오류는 재전달하지 않고 발송 이력을 종료한다.")
   @Test
   void marksDeliveryFailedWithoutRetryingUnconfirmedExpoFailure() {
     PushNotificationException failure =
@@ -168,6 +173,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** Expo Ticket 결과 수가 요청 수와 다르면 발송 이력을 종료하고 메시지를 확인 처리한다. */
+  @DisplayName("Expo Ticket 결과 수가 요청 수와 다르면 발송 이력을 종료하고 메시지를 확인 처리한다.")
   @Test
   void marksDeliveryFailedWithoutRetryingTicketResultCountMismatch() {
     when(userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(List.of(1L)))
@@ -184,6 +190,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 발송 가능한 Token이 없으면 Expo를 호출하지 않는다. */
+  @DisplayName("발송 가능한 Token이 없으면 Expo를 호출하지 않는다.")
   @Test
   void skipsUserWithoutSendableDevice() {
     when(userPushTokenDeliveryService.findSendableTokenIdsByUserProfileIds(List.of(1L)))
@@ -196,6 +203,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 100건을 초과하는 Token은 Expo 요청 최대 크기에 맞춰 나누어 전송한다. */
+  @DisplayName("100건을 초과하는 Token은 Expo 요청 최대 크기에 맞춰 나누어 전송한다.")
   @Test
   void splitsPreparedDeliveriesAtExpoBatchLimit() {
     List<Long> userPushTokenIds = LongStream.rangeClosed(1, 101).boxed().toList();
@@ -232,6 +240,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 재처리에서 각 DB 묶음의 발송 대상이 적어도 하나의 Expo 요청으로 합친다. */
+  @DisplayName("재처리에서 각 DB 묶음의 발송 대상이 적어도 하나의 Expo 요청으로 합친다.")
   @Test
   void combinesSparsePreparedDeliveriesAcrossDatabaseBatches() {
     List<Long> tokenIds = LongStream.rangeClosed(1, 500).boxed().toList();
@@ -248,6 +257,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** DB 묶음 경계를 넘어 합쳐도 전송 순서·최대 크기·마지막 잔여분을 유지한다. */
+  @DisplayName("DB 묶음 경계를 넘어 합쳐도 전송 순서·최대 크기·마지막 잔여분을 유지한다.")
   @Test
   void fillsExpoBatchAndFlushesRemainderWithoutDroppingPreparedDeliveries() {
     List<Long> tokenIds = LongStream.rangeClosed(1, 300).boxed().toList();
@@ -275,6 +285,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** Receipt 예약 실패 시 이미 접수한 100건은 유지하고 미전송 잔여분만 복구한다. */
+  @DisplayName("Receipt 예약 실패 시 이미 접수한 100건은 유지하고 미전송 잔여분만 복구한다.")
   @Test
   void recoversOnlyUnsentOverflowAfterPublishingFullBatchFails() {
     List<Long> tokenIds = LongStream.rangeClosed(1, 300).boxed().toList();
@@ -305,6 +316,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 다음 DB 선점이 실패하면 이미 버퍼에 담긴 미전송 이력을 재시도 가능하게 복구한다. */
+  @DisplayName("다음 DB 선점이 실패하면 이미 버퍼에 담긴 미전송 이력을 재시도 가능하게 복구한다.")
   @Test
   void makesUnsentBufferedDeliveriesRetryableWhenNextPreparationFails() {
     stubSelectivePreparation(LongStream.rangeClosed(1, 200).boxed().toList(), id -> id <= 75);
@@ -323,6 +335,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 복구 중 오류가 나도 나머지 이력을 복구하고 처음 발생한 예외를 유지한다. */
+  @DisplayName("복구 중 오류가 나도 나머지 이력을 복구하고 처음 발생한 예외를 유지한다.")
   @Test
   void retainsPreparationFailureAndAttemptsRemainingRecovery() {
     stubSelectivePreparation(LongStream.rangeClosed(1, 102).boxed().toList(), id -> id <= 2);
@@ -342,6 +355,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 전송 버퍼에 한 자리만 남아도 DB 후보 조회가 한 건씩 쪼개지지 않는다. */
+  @DisplayName("전송 버퍼에 한 자리만 남아도 DB 후보 조회가 한 건씩 쪼개지지 않는다.")
   @Test
   void keepsDatabaseBatchesFullWhenExpoBufferHasOneRemainingSlot() {
     stubSelectivePreparation(
@@ -355,6 +369,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 마지막 DB 묶음을 합쳐 100건을 넘겨도 전송 한도를 유지하며 모두 비운다. */
+  @DisplayName("마지막 DB 묶음을 합쳐 100건을 넘겨도 전송 한도를 유지하며 모두 비운다.")
   @Test
   void splitsFinalCombinedRemainderAtExpoLimit() {
     stubSelectivePreparation(LongStream.rangeClosed(1, 199).boxed().toList(), id -> id != 100);
@@ -397,6 +412,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** Receipt 예약이 실패해도 같은 Expo 응답의 모든 Ticket 결과를 먼저 기록한다. */
+  @DisplayName("Receipt 예약이 실패해도 같은 Expo 응답의 모든 Ticket 결과를 먼저 기록한다.")
   @Test
   void recordsAllTicketResultsBeforeSchedulingReceipts() {
     PreparedPushDelivery secondDelivery =
@@ -424,6 +440,7 @@ class NotificationDispatchServiceTest {
   }
 
   /** 같은 페이지의 여러 사용자 Token을 모아 하나의 Expo 요청으로 전송한다. */
+  @DisplayName("같은 페이지의 여러 사용자 Token을 모아 하나의 Expo 요청으로 전송한다.")
   @Test
   void batchesPreparedDeliveriesAcrossUsers() {
     PreparedPushDelivery secondDelivery =

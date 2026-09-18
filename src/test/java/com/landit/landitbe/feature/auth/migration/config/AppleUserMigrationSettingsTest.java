@@ -9,10 +9,12 @@ import com.landit.landitbe.feature.auth.migration.domain.AppleUserMigrationPhase
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AppleUserMigrationSettingsTest {
 
+  @DisplayName("Apple 이전 준비 단계에는 수신 팀 ID가 필요하다.")
   @Test
   void prepareRequiresRecipientTeamId() {
     Map<String, String> environment = validEnvironment("PREPARE");
@@ -23,6 +25,7 @@ class AppleUserMigrationSettingsTest {
         .hasMessage("APPLE_MIGRATION_TARGET_TEAM_ID is required");
   }
 
+  @DisplayName("Apple 이전 완료 단계에는 수신 팀 ID가 필요하지 않다.")
   @Test
   void completeDoesNotRequireRecipientTeamId() {
     Map<String, String> environment = validEnvironment("COMPLETE");
@@ -35,6 +38,7 @@ class AppleUserMigrationSettingsTest {
     assertThat(settings.apiBaseUri()).isEqualTo(URI.create("https://appleid.apple.com"));
   }
 
+  @DisplayName("Apple 이전 계약 테스트에서 API 기본 URI를 교체할 수 있다.")
   @Test
   void customApiBaseUriCanBeInjectedForContractTests() {
     Map<String, String> environment = validEnvironment("PREPARE");
@@ -44,6 +48,7 @@ class AppleUserMigrationSettingsTest {
         .isEqualTo(URI.create("http://127.0.0.1:9999"));
   }
 
+  @DisplayName("Apple 시크릿 누락 오류는 다른 설정값을 노출하지 않는다.")
   @Test
   void missingSecretErrorDoesNotExposeAnotherConfiguredValue() {
     Map<String, String> environment = validEnvironment("PREPARE");
@@ -56,6 +61,7 @@ class AppleUserMigrationSettingsTest {
         .doesNotContain("super-secret-client-jwt");
   }
 
+  @DisplayName("알 수 없는 Apple 이전 단계를 거부하며 자격 증명을 노출하지 않는다.")
   @Test
   void rejectsUnknownPhaseWithoutEchoingCredentials() {
     Map<String, String> environment = validEnvironment("DELETE");

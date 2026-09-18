@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +44,7 @@ class NpsApiIntegrationTests {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  @DisplayName("인증한 사용자의 NPS 점수와 의견을 저장한다.")
   @Test
   void submitNpsStoresAuthenticatedUsersScoreAndOpinion() throws Exception {
     String email = "nps-normal@example.com";
@@ -73,6 +75,7 @@ class NpsApiIntegrationTests {
             });
   }
 
+  @DisplayName("누락되거나 빈 문자열 또는 공백인 NPS 의견은 null로 저장한다.")
   @Test
   void submitNpsStoresMissingEmptyAndBlankOpinionsAsNull() throws Exception {
     String email = "nps-blank@example.com";
@@ -88,6 +91,7 @@ class NpsApiIntegrationTests {
         .allSatisfy(response -> assertThat(response.get("opinion_text")).isNull());
   }
 
+  @DisplayName("NPS를 반복 제출해도 각 응답을 별도로 저장한다.")
   @Test
   void submitNpsStoresEveryRepeatedSubmissionSeparately() throws Exception {
     String email = "nps-repeat@example.com";
@@ -106,6 +110,7 @@ class NpsApiIntegrationTests {
             });
   }
 
+  @DisplayName("NPS 점수의 최솟값과 최댓값을 허용한다.")
   @Test
   void submitNpsAcceptsMinimumAndMaximumScores() throws Exception {
     String email = "nps-boundary@example.com";
@@ -119,6 +124,7 @@ class NpsApiIntegrationTests {
         .containsExactlyInAnyOrder(1, 5);
   }
 
+  @DisplayName("NPS 점수가 없거나 허용 범위를 벗어나면 거부한다.")
   @Test
   void submitNpsRejectsMissingOrOutOfRangeScore() throws Exception {
     String accessToken =
@@ -133,6 +139,7 @@ class NpsApiIntegrationTests {
     }
   }
 
+  @DisplayName("access token이 없는 NPS 제출을 거부한다.")
   @Test
   void submitNpsRejectsRequestWithoutAccessToken() throws Exception {
     mockMvc
@@ -141,6 +148,7 @@ class NpsApiIntegrationTests {
         .andExpect(status().isUnauthorized());
   }
 
+  @DisplayName("OpenAPI 문서에 NPS 제출 계약을 명시한다.")
   @Test
   void openApiDocsDescribeNpsSubmission() throws Exception {
     mockMvc

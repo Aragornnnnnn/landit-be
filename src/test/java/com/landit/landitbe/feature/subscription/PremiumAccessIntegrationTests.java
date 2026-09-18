@@ -15,6 +15,7 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -94,6 +95,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 비프리미엄 사용자는 대화 완료 전이라도 프리톡 시작·표현 학습·발음 평가를 쓸 수 없다. */
+  @DisplayName("비프리미엄 사용자는 대화 완료 전이라도 프리톡 시작·표현 학습·발음 평가를 쓸 수 없다.")
   @Test
   void blocksPremiumOnlyFeaturesForNonPremium() throws Exception {
     String accessToken = login("premium-gate-basic");
@@ -121,6 +123,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 경로를 퍼센트 인코딩해도 컨트롤러 매핑과 같은 디코딩 기준으로 게이트에 걸린다. 매트릭스 변수(;)는 Spring Security 방화벽이 400으로 거절한다. */
+  @DisplayName("경로를 퍼센트 인코딩해도 컨트롤러 매핑과 같은 디코딩 기준으로 게이트에 걸린다.")
   @Test
   void blocksEncodedAndMatrixVariantsOfGatedPaths() throws Exception {
     String accessToken = login("premium-gate-encoded");
@@ -139,6 +142,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 비프리미엄 사용자도 대화 완료 전에는 시나리오 세션 시작·메시지 전송과 조회 API가 게이트를 통과한다. */
+  @DisplayName("비프리미엄 사용자도 대화 완료 전에는 시나리오 세션 시작·메시지 전송과 조회 API가 게이트를 통과한다.")
   @Test
   void allowsScenarioConversationScopeBeforeCompletion() throws Exception {
     String accessToken = login("premium-gate-free");
@@ -155,6 +159,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 도입 이후 대화를 완료한 비프리미엄 사용자도 새 세션 시작·메시지 전송·속마음 조회가 게이트를 통과한다. */
+  @DisplayName("도입 이후 대화를 완료한 비프리미엄 사용자도 새 세션 시작·메시지 전송·속마음 조회가 게이트를 통과한다.")
   @Test
   void allowsNewConversationAfterCompletionForNonPremium() throws Exception {
     String userKey = "premium-gate-completed";
@@ -172,6 +177,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 대화를 완료한 비프리미엄 사용자도 완료한 세션의 결과 보기와 마이페이지·스트릭·메일함은 쓸 수 있다. */
+  @DisplayName("대화를 완료한 비프리미엄 사용자도 완료한 세션의 결과 보기와 마이페이지·스트릭·메일함은 쓸 수 있다.")
   @Test
   void allowsResultsAndMyPageAfterCompletionForNonPremium() throws Exception {
     String userKey = "premium-gate-results";
@@ -189,6 +195,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 프리미엄 사용자는 대화를 완료했어도 모든 유료 기능 게이트를 통과한다. */
+  @DisplayName("프리미엄 사용자는 대화를 완료했어도 모든 유료 기능 게이트를 통과한다.")
   @Test
   void allowsEverythingForPremiumUser() throws Exception {
     String userKey = "premium-gate-paid";
@@ -208,6 +215,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다. */
+  @DisplayName("인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다.")
   @Test
   void rejectsUnauthenticatedWithUnauthorizedNotForbidden() throws Exception {
     mockMvc
@@ -219,6 +227,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** OpenAPI 문서에 게이트 대상 API의 403 응답과 피드백 응답의 상세 피드백 잠금 필드가 기술된다. */
+  @DisplayName("OpenAPI 문서에 게이트 대상 API의 403 응답과 피드백 응답의 상세 피드백 잠금 필드가 기술된다.")
   @Test
   void openApiDocsDescribePremiumRequired() throws Exception {
     mockMvc

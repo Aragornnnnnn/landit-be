@@ -4,11 +4,13 @@ package com.landit.landitbe.feature.notification.email.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class NotificationEmailTemplateServiceTests {
   private final NotificationEmailTemplateService template = new NotificationEmailTemplateService();
 
+  @DisplayName("이메일 문구를 이스케이프하면서 스토어 링크와 배너는 유지한다.")
   @Test
   void escapesTextAndKeepsStoreLinkAndBanner() {
     String html =
@@ -27,6 +29,7 @@ class NotificationEmailTemplateServiceTests {
         .doesNotContain("<script>");
   }
 
+  @DisplayName("관리자 테스트 이메일에는 구독 버튼을 빼고 하단 안내를 유지한다.")
   @Test
   void adminTestOmitsSubscriptionButtonButKeepsFooter() {
     assertThat(template.render("테스트", "테스트 본문", null))

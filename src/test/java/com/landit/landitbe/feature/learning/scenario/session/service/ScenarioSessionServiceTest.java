@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.learning.scenario.session.repository.Scenario
 import com.landit.landitbe.feature.learning.scenario.session.repository.ScenarioSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** ScenarioSessionService의 조회 실패 변환과 저장 위임을 단위 테스트한다. */
@@ -30,6 +31,7 @@ class ScenarioSessionServiceTest {
           scenarioSessionRepository, startQueryRepository, messageQueryRepository);
 
   /** 사용자 언어에 맞는 시작 Projection을 반환한다. */
+  @DisplayName("사용자 언어에 맞는 시작 Projection을 반환한다.")
   @Test
   void returnsStartProjection() {
     ScenarioStartContext projection = mock(ScenarioStartContext.class);
@@ -41,6 +43,7 @@ class ScenarioSessionServiceTest {
   }
 
   /** 시작 Projection이 없으면 시나리오 없음 오류로 변환한다. */
+  @DisplayName("시작 Projection이 없으면 시나리오 없음 오류로 변환한다.")
   @Test
   void rejectsMissingStartProjection() {
     when(startQueryRepository.findStartContext(1L, 2L, ContentLearningLevel.LEVEL_4_TO_5))

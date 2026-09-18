@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +43,7 @@ class AccentLocaleApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 인증된 사용자는 지원 억양 목록을 정해진 순서로 조회한다. */
+  @DisplayName("인증된 사용자는 지원 억양 목록을 정해진 순서로 조회한다.")
   @Test
   void listsSupportedAccentLocales() throws Exception {
     String accessToken = login("accent-list");
@@ -61,6 +63,7 @@ class AccentLocaleApiIntegrationTests {
   }
 
   /** 신규 사용자는 현재 억양이 미국 영어로 조회된다. */
+  @DisplayName("신규 사용자는 현재 억양이 미국 영어로 조회된다.")
   @Test
   void returnsDefaultAccentLocaleForNewUser() throws Exception {
     String accessToken = login("accent-default");
@@ -75,6 +78,7 @@ class AccentLocaleApiIntegrationTests {
   }
 
   /** 인증된 사용자가 선택한 억양을 저장하고 현재값으로 조회한다. */
+  @DisplayName("인증된 사용자가 선택한 억양을 저장하고 현재값으로 조회한다.")
   @Test
   void storesAndReadsSelectedAccentLocale() throws Exception {
     String userKey = "accent-owner";
@@ -106,6 +110,7 @@ class AccentLocaleApiIntegrationTests {
   }
 
   /** 억양이 없거나 지원하지 않는 값이면 요청을 거절한다. */
+  @DisplayName("억양이 없거나 지원하지 않는 값이면 요청을 거절한다.")
   @Test
   void rejectsMissingOrUnsupportedAccentLocale() throws Exception {
     String accessToken = login("accent-invalid");
@@ -123,6 +128,7 @@ class AccentLocaleApiIntegrationTests {
   }
 
   /** 인증되지 않은 사용자는 억양 목록과 현재값을 조회하거나 저장할 수 없다. */
+  @DisplayName("인증되지 않은 사용자는 억양 목록과 현재값을 조회하거나 저장할 수 없다.")
   @Test
   void rejectsUnauthenticatedAccentLocaleRequests() throws Exception {
     mockMvc.perform(get("/api/v1/accent-locales")).andExpect(status().isUnauthorized());
@@ -136,6 +142,7 @@ class AccentLocaleApiIntegrationTests {
   }
 
   /** OpenAPI 문서에 억양 목록·현재값 조회·변경 API를 공개한다. */
+  @DisplayName("OpenAPI 문서에 억양 목록·현재값 조회·변경 API를 공개한다.")
   @Test
   void openApiDocsDescribeAccentLocaleApis() throws Exception {
     mockMvc

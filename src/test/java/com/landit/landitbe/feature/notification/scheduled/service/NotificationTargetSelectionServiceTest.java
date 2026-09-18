@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.scheduled.dto.ExpressionNotificationCandidate;
 import com.landit.landitbe.feature.notification.scheduled.dto.NotificationTargetSelectionInput;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 오늘의 학습 상태에 따라 사용자별 하루 한 건의 예약 알림을 선정하는 규칙을 검증한다. */
@@ -17,6 +18,7 @@ class NotificationTargetSelectionServiceTest {
       new NotificationTargetSelectionService();
 
   /** 오늘 배정된 시나리오가 미완료면 다른 상태보다 시나리오 알림을 우선한다. */
+  @DisplayName("오늘 배정된 시나리오가 미완료면 다른 상태보다 시나리오 알림을 우선한다.")
   @Test
   void selectsDailyScenarioReminderWhenTodaysScenarioIsIncomplete() {
     NotificationTargetSelectionInput input =
@@ -30,6 +32,7 @@ class NotificationTargetSelectionServiceTest {
   }
 
   /** 오늘 시나리오를 완료했으면 같은 시나리오의 첫 미완료 표현을 선택한다. */
+  @DisplayName("오늘 시나리오를 완료했으면 같은 시나리오의 첫 미완료 표현을 선택한다.")
   @Test
   void selectsIncompleteExpressionFromTodaysCompletedScenario() {
     NotificationTargetSelectionInput input =
@@ -50,6 +53,7 @@ class NotificationTargetSelectionServiceTest {
   }
 
   /** 오늘 시나리오의 표현을 모두 완료했고 스몰톡을 쓰지 않았으면 스몰톡 알림을 선택한다. */
+  @DisplayName("오늘 시나리오의 표현을 모두 완료했고 스몰톡을 쓰지 않았으면 스몰톡 알림을 선택한다.")
   @Test
   void selectsSmallTalkReminderWhenLearningIsCompleteAndSmallTalkIsUnused() {
     NotificationTargetSelectionInput input =
@@ -63,6 +67,7 @@ class NotificationTargetSelectionServiceTest {
   }
 
   /** 스몰톡을 일부라도 사용했으면 스몰톡 알림을 보내지 않는다. */
+  @DisplayName("스몰톡을 일부라도 사용했으면 스몰톡 알림을 보내지 않는다.")
   @Test
   void doesNotSelectSmallTalkReminderAfterAnyUsage() {
     NotificationTargetSelectionInput input = input(10L, true, 1L, List.of());
@@ -71,6 +76,7 @@ class NotificationTargetSelectionServiceTest {
   }
 
   /** 콘텐츠를 전부 완료한 이론적 상태에서도 스몰톡을 이미 썼으면 알림을 보내지 않는다. */
+  @DisplayName("콘텐츠를 전부 완료한 이론적 상태에서도 스몰톡을 이미 썼으면 알림을 보내지 않는다.")
   @Test
   void doesNotSelectReminderAfterSmallTalkLimitIsExhausted() {
     NotificationTargetSelectionInput input = input(10L, true, 60_000L, List.of());
@@ -79,6 +85,7 @@ class NotificationTargetSelectionServiceTest {
   }
 
   /** 오늘의 시나리오를 결정할 수 없으면 다른 유형으로 추론하지 않는다. */
+  @DisplayName("오늘의 시나리오를 결정할 수 없으면 다른 유형으로 추론하지 않는다.")
   @Test
   void doesNotSelectFallbackWhenDailyScenarioIsUnavailable() {
     NotificationTargetSelectionInput input = input(null, false, 0L, List.of());

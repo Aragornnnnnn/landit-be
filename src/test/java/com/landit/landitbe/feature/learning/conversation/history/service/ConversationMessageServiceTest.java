@@ -16,6 +16,7 @@ import com.landit.landitbe.feature.learning.conversation.history.domain.SessionH
 import com.landit.landitbe.feature.learning.conversation.history.repository.SessionHistoryMessageRepository;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** ConversationMessageService의 메시지 조회와 상태 변경 위임을 단위 테스트한다. */
@@ -26,6 +27,7 @@ class ConversationMessageServiceTest {
   private final ConversationMessageService service = new ConversationMessageService(repository);
 
   /** 메시지 조회 결과는 영속 엔티티와 분리된 값을 반환한다. */
+  @DisplayName("메시지 조회 결과는 영속 엔티티와 분리된 값을 반환한다.")
   @Test
   void returnsMessageById() {
     SessionHistoryMessage message = mock(SessionHistoryMessage.class);
@@ -41,6 +43,7 @@ class ConversationMessageServiceTest {
   }
 
   /** 세션 히스토리에 속하지 않은 메시지는 세션 기능 예외로 변환한다. */
+  @DisplayName("세션 히스토리에 속하지 않은 메시지는 세션 기능 예외로 변환한다.")
   @Test
   void rejectsMessageOutsideSessionHistory() {
     when(repository.findByIdAndSessionHistoryId(3L, 7L)).thenReturn(Optional.empty());
@@ -52,6 +55,7 @@ class ConversationMessageServiceTest {
   }
 
   /** 속마음 완료 상태 변경에 고정된 상태 조건을 전달한다. */
+  @DisplayName("속마음 완료 상태 변경에 고정된 상태 조건을 전달한다.")
   @Test
   void completesInnerThoughtOnlyWhilePreparing() {
     service.completeInnerThought(3L, "thought", InnerThoughtType.GOOD);

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +77,7 @@ class AdminMailboxApiIntegrationTests {
     jdbcTemplate.update("delete from mailbox_feedback");
   }
 
+  @DisplayName("관리자는 공지 편지의 초안을 생성할 수 있다.")
   @Test
   void adminCanCreateDraftNotice() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-create");
@@ -101,6 +103,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.contentBlocks[0].text").value("공지 본문"));
   }
 
+  @DisplayName("관리자는 이미지 콘텐츠 블록을 생성하고 수정할 수 있다.")
   @Test
   void adminCanCreateAndUpdateImageContentBlock() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-image-block");
@@ -156,6 +159,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].contentBlocks[0].altText").value("수정된 대체 텍스트"));
   }
 
+  @DisplayName("관리자는 편지를 수정하고 게시하거나 게시를 취소할 수 있다.")
   @Test
   void adminCanUpdatePublishAndUnpublishLetter() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-publish");
@@ -186,6 +190,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.pinned").value(false));
   }
 
+  @DisplayName("허용하지 않는 편지 상태 변경을 거부한다.")
   @Test
   void adminRejectsInvalidLetterStateChanges() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-invalid-state");
@@ -210,6 +215,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("편지 수정 응답에 DB에 저장된 수정 시각을 반환한다.")
   @Test
   void adminLetterUpdateReturnsPersistedUpdatedAt() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-updated-at");
@@ -236,6 +242,7 @@ class AdminMailboxApiIntegrationTests {
     assertThat(responseUpdatedAt).isEqualTo(persistedUpdatedAt).isAfter(oldUpdatedAt);
   }
 
+  @DisplayName("편지 콘텐츠 수정 시 변경한 필드를 감사 로그에 기록한다.")
   @Test
   void adminLetterContentUpdateRecordsChangedFields() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-audit-fields");
@@ -263,6 +270,7 @@ class AdminMailboxApiIntegrationTests {
     assertThat(auditLog.get("AFTER_VALUE")).asString().contains("changedFields=title");
   }
 
+  @DisplayName("관리자 편지 목록을 게시 상태와 고정 여부로 필터링한다.")
   @Test
   void adminLetterListFiltersByPublicationStatusAndPinned() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-letter-list");
@@ -289,6 +297,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].title").value("게시된 고정 공지"));
   }
 
+  @DisplayName("관리자 편지 목록에서 답장을 제외한다.")
   @Test
   void adminLetterListExcludesReplies() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-letter-reply-filter");
@@ -306,6 +315,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].type").value("NOTICE"));
   }
 
+  @DisplayName("관리자 편지 목록의 답장 유형 필터를 거부한다.")
   @Test
   void adminLetterListRejectsReplyType() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-type-filter");
@@ -319,6 +329,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("편지 생성 시 유형과 콘텐츠 블록을 검증한다.")
   @Test
   void adminLetterCreationValidatesTypeAndContentBlocks() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-letter-validation");
@@ -345,6 +356,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
+  @DisplayName("관리자는 사용자 의견을 검색 및 필터링하고 페이지로 조회할 수 있다.")
   @Test
   void adminCanSearchFilterAndPaginateFeedbacks() throws Exception {
     final String adminToken = loginAsAdmin("mailbox-admin-search");
@@ -371,6 +383,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.totalPages").value(2));
   }
 
+  @DisplayName("검색어가 없어도 관리자 사용자 의견 목록을 조회한다.")
   @Test
   void adminCanListFeedbacksWithoutKeyword() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-empty-feedback-search");
@@ -386,6 +399,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].content").value("검색어 없는 문의"));
   }
 
+  @DisplayName("미답변 사용자 의견의 관리자 상세 조회는 의견과 null 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsFeedbackAndNullReplyWhenUnanswered() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-unanswered");
@@ -409,6 +423,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply").value(nullValue()));
   }
 
+  @DisplayName("대표 사용자 의견의 관리자 상세 조회는 최신 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsLatestReplyForRepresentativeFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-latest");
@@ -436,6 +451,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply.sentAt").isNotEmpty());
   }
 
+  @DisplayName("일괄 답변의 비대표 사용자 의견을 조회해도 대표 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsRepresentativeReplyForBatchNonRepresentativeFeedback()
       throws Exception {
@@ -465,6 +481,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply.title").value("일괄 답장"));
   }
 
+  @DisplayName("존재하지 않는 사용자 의견의 관리자 상세 조회는 404를 반환한다.")
   @Test
   void adminFeedbackDetailReturnsNotFoundForMissingFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-missing");
@@ -477,6 +494,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
 
+  @DisplayName("사용자 의견 검색에 종료 날짜가 없으면 해당 조건을 생략한다.")
   @Test
   void adminFeedbackSearchOmitsMissingCreatedToCondition() throws Exception {
     String adminToken = loginAsAdmin("mailbox-feedback-created-from-only");
@@ -492,6 +510,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items.length()").value(0));
   }
 
+  @DisplayName("사용자 의견 검색에 시작 날짜가 없으면 해당 조건을 생략한다.")
   @Test
   void adminFeedbackSearchOmitsMissingCreatedFromCondition() throws Exception {
     String adminToken = loginAsAdmin("mailbox-feedback-created-to-only");
@@ -507,6 +526,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items.length()").value(0));
   }
 
+  @DisplayName("검색어가 공백이어도 관리자 사용자 의견 목록을 조회한다.")
   @Test
   void adminCanListFeedbacksWithBlankKeyword() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-blank-feedback-search");
@@ -523,6 +543,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].content").value("빈 검색어 문의"));
   }
 
+  @DisplayName("사용자 의견 검색의 LIKE 와일드카드를 일반 문자로 취급한다.")
   @Test
   void adminFeedbackSearchTreatsLikeWildcardsAsText() throws Exception {
     final String adminToken = loginAsAdmin("mailbox-admin-literal-search");
@@ -535,6 +556,7 @@ class AdminMailboxApiIntegrationTests {
     assertFeedbackSearchResult(adminToken, "_", "설정_key 문의");
   }
 
+  @DisplayName("사용자별 답장 하나를 보내고 대기 중인 사용자 의견들을 완료 처리한다.")
   @Test
   void adminSendsOneReplyPerUserAndCompletesPendingFeedbacks() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply");
@@ -557,6 +579,7 @@ class AdminMailboxApiIntegrationTests {
     assertReplyStoredAndAudited(replyId, 2);
   }
 
+  @DisplayName("답장 트랜잭션이 커밋된 후에만 푸시 이벤트를 발행한다.")
   @Test
   void publishesPushOnlyAfterCommittedReply() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-notification");
@@ -593,6 +616,7 @@ class AdminMailboxApiIntegrationTests {
     assertThat(message.get("payload").get("replyTitle").asText()).isEqualTo("답변 제목");
   }
 
+  @DisplayName("푸시 큐 발행이 실패해도 이미 커밋된 답장을 유지한다.")
   @Test
   void preservesCommittedReplyWhenPushQueuePublicationFails() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-push-failure");
@@ -608,6 +632,7 @@ class AdminMailboxApiIntegrationTests {
     verify(sqsAsyncClient).sendMessage(any(SendMessageRequest.class));
   }
 
+  @DisplayName("이미 완료된 사용자 의견과 답장의 연결을 보존한다.")
   @Test
   void adminPreservesExistingCompletedFeedbackRelation() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-completed-relation");
@@ -625,6 +650,7 @@ class AdminMailboxApiIntegrationTests {
     assertCompletedFeedback(completedFeedbackId, representativeId);
   }
 
+  @DisplayName("비대표 사용자 의견의 관리자 상세 조회는 최신 추가 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsLatestAdditionalReplyForNonRepresentativeFeedback()
       throws Exception {
@@ -656,6 +682,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply.title").value("비대표 추가 답변"));
   }
 
+  @DisplayName("사용자에게는 대표 의견에만 답장을 표시한다.")
   @Test
   void userSeesReplyOnlyOnRepresentativeFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-visible-reply");
@@ -689,6 +716,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.replies.length()").value(0));
   }
 
+  @DisplayName("관리자는 이미 완료한 사용자 의견에도 추가 답장을 보낼 수 있다.")
   @Test
   void adminCanSendAdditionalReplyToCompletedFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-additional-reply");
@@ -704,6 +732,7 @@ class AdminMailboxApiIntegrationTests {
         .isEqualTo(2);
   }
 
+  @DisplayName("DB 컬럼 제한보다 긴 답장 제목을 거부한다.")
   @Test
   void adminReplyRejectsTitleLongerThanColumnLimit() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-long-reply-title");
@@ -725,6 +754,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
+  @DisplayName("일괄 답변 대상 중 하나라도 없으면 전체 답변을 롤백한다.")
   @Test
   void adminBatchReplyRollsBackWhenAnyFeedbackIsMissing() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-rollback");
@@ -751,6 +781,7 @@ class AdminMailboxApiIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("OpenAPI 문서에서 관리자 편지의 콘텐츠 블록을 배열로 정의한다.")
   @Test
   void documentsAdminMailboxContentBlocksAsArray() throws Exception {
     String schemas = "$.components.schemas.";
@@ -768,6 +799,7 @@ class AdminMailboxApiIntegrationTests {
                 .value("array"));
   }
 
+  @DisplayName("OpenAPI 문서에서 사용자 의견의 답장을 nullable 객체로 정의한다.")
   @Test
   void documentsAdminFeedbackDetailReplyAsNullableObject() throws Exception {
     String schemas = "$.components.schemas.";

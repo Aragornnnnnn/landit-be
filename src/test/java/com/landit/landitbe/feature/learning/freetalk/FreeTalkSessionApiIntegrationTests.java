@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -151,6 +152,7 @@ class FreeTalkSessionApiIntegrationTests {
     throw new IllegalStateException("프리톡 표현 생성이 제한 시간 안에 종료되지 않았습니다.");
   }
 
+  @DisplayName("활성 프리톡 주제만 노출 순서대로 반환한다.")
   @Test
   void listTopicsReturnsOnlyActiveTopicsInDisplayOrder() throws Exception {
     seedTopic(1002, "두 번째", "두 번째 설명", 2, "ACTIVE");
@@ -174,6 +176,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.topics[1].topicId").value(1002));
   }
 
+  @DisplayName("인증 없는 프리톡 주제 조회와 세션 요청은 표준 오류로 거부한다.")
   @Test
   void rejectsUnauthenticatedTopicAndSessionRequestsWithStandardError() throws Exception {
     mockMvc
@@ -191,6 +194,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("AI 선발화 시작 시 튜터 캐릭터 문맥 없이 첫 대화를 생성하고 저장한다.")
   @Test
   void startAiFirstSessionPersistsOpeningWithoutTutorCharacterContext() throws Exception {
     seedTopic(1101, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
@@ -258,6 +262,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo("chloe");
   }
 
+  @DisplayName("사용자 선발화 시작 시 AI를 호출하지 않고 빈 대화 이력을 생성한다.")
   @Test
   void startUserFirstSessionDoesNotCallAiAndCreatesEmptyHistory() throws Exception {
     JsonNode loginBody = login("free-talk-user-first@example.com");
@@ -300,6 +305,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("완료한 프리톡 목록과 상세 응답에 저장된 캐릭터 ID를 포함한다.")
   @Test
   void completedSessionListAndDetailIncludeStoredCharacterId() throws Exception {
     JsonNode loginBody = login("free-talk-character-history@example.com");
@@ -337,6 +343,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.characterId").value("teddy"));
   }
 
+  @DisplayName("프리톡 시작 방식과 주제의 잘못된 조합을 거부한다.")
   @Test
   void rejectsInvalidStartModeAndTopicCombinations() throws Exception {
     seedTopic(1201, "오늘", "오늘의 일을 묻는다.", 1, "ACTIVE");
@@ -362,6 +369,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("캐릭터 ID가 없거나 지원하지 않는 값이면 프리톡 시작을 거부한다.")
   @Test
   void rejectsMissingAndUnsupportedCharacterId() throws Exception {
     String accessToken =
@@ -382,6 +390,7 @@ class FreeTalkSessionApiIntegrationTests {
     }
   }
 
+  @DisplayName("일일 발화 제한보다 먼저 잘못된 캐릭터 ID를 검증한다.")
   @Test
   void rejectsInvalidCharacterIdBeforeDailySpeakingLimit() throws Exception {
     JsonNode loginBody = login("free-talk-invalid-character-limit@example.com");
@@ -412,6 +421,7 @@ class FreeTalkSessionApiIntegrationTests {
     }
   }
 
+  @DisplayName("AI 선발화의 주제가 없거나 비활성이면 시작을 거부한다.")
   @Test
   void rejectsInactiveAndMissingAiFirstTopics() throws Exception {
     seedTopic(1251, "비활성", "노출하지 않는 주제다.", 1, "INACTIVE");
@@ -436,6 +446,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
 
+  @DisplayName("AI 첫 대화 생성이 실패하면 생성했던 모든 프리톡 데이터를 롤백한다.")
   @Test
   void removesEveryCreatedRecordWhenAiOpeningFails() throws Exception {
     seedTopic(1301, "영화", "최근 본 영화를 묻는다.", 1, "ACTIVE");
@@ -465,6 +476,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(requestCount()).isEqualTo(1);
   }
 
+  @DisplayName("OpenAPI 문서에 프리톡 API 계약을 명시한다.")
   @Test
   void openApiDocumentsFreeTalkContracts() throws Exception {
     String topicsPath = "$.paths['/api/v1/free-talk/topics'].get";
@@ -517,6 +529,7 @@ class FreeTalkSessionApiIntegrationTests {
                 .value("속마음 처리 상태. 종료 의사 감지 뒤 속마음 생성을 시작하지 않은 경우 null"));
   }
 
+  @DisplayName("같은 clientMessageId를 다시 보내면 저장된 완료 응답을 반환한다.")
   @Test
   void replaysCompletedTurnForDuplicateClientMessageId() throws Exception {
     String accessToken =
@@ -583,6 +596,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo(2);
   }
 
+  @DisplayName("종료 의도를 감지하면 사용자 메시지만 저장하고 반복한 종료 결정은 재사용한다.")
   @Test
   void exitDetectionStoresOnlyTheUserMessageAndReplaysRepeatedDecision() throws Exception {
     String accessToken =
@@ -654,6 +668,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("CONFLICT"));
   }
 
+  @DisplayName("사용자 선발화 세션의 생성 제목이 없으면 종료 시 캐릭터 기본 제목을 사용한다.")
   @Test
   void assignsCharacterFallbackTitleWhenUserFirstSessionEndsWithoutGeneratedTitle()
       throws Exception {
@@ -677,6 +692,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
   }
 
+  @DisplayName("사용자 선발화 세션 종료 시 AI가 생성한 영어 제목을 사용한다.")
   @Test
   void assignsGeneratedEnglishTitleWhenUserFirstSessionEnds() throws Exception {
     String accessToken =
@@ -698,6 +714,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
   }
 
+  @DisplayName("AI 선발화 세션 종료 시 추천 주제의 제목을 유지한다.")
   @Test
   void preservesRecommendedTopicTitleWhenAiFirstSessionEnds() throws Exception {
     seedTopic(1151, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
@@ -733,6 +750,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
   }
 
+  @DisplayName("같은 clientMessageId로 재요청하면 만료된 메시지 선점을 이어서 처리한다.")
   @Test
   void resumesExpiredMessageReservationForTheSameClientMessageId() throws Exception {
     String accessToken =
@@ -782,6 +800,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo(2);
   }
 
+  @DisplayName("종료 결정 시 연속 학습을 기록하고 같은 날 시간 제한을 중복 반영하지 않는다.")
   @Test
   void endDecisionRecordsStreakWithoutDuplicatingTheSameDayTimeLimit() throws Exception {
     seedEmbeddedCandidateExpression();
@@ -821,6 +840,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertCurrentStreak(accessToken, 1, true);
   }
 
+  @DisplayName("학습자 난이도보다 높은 표현 후보를 제외한다.")
   @Test
   void excludesCandidatesAboveLearnerDifficultyLevel() throws Exception {
     // 난이도 4 표현만 심어두면 학습 수준 2(상한 3) 사용자에게는 후보가 남지 않아 실패로 전환된다.
@@ -846,6 +866,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
   }
 
+  @DisplayName("학습자 난이도 범위에 있는 표현 후보를 유지한다.")
   @Test
   void keepsCandidatesWithinLearnerDifficultyLevel() throws Exception {
     // 같은 난이도 4 표현이라도 학습 수준 4(상한 5) 사용자에게는 후보로 남는다.
@@ -871,6 +892,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
   }
 
+  @DisplayName("임베딩된 표현 후보가 없으면 표현 생성에 실패한다.")
   @Test
   void failsExpressionGenerationWhenNoEmbeddedCandidateExists() throws Exception {
     // 임베딩이 있는 공용 후보를 심지 않으면 유사도 검색이 빈손이 되어 실패로 전환된다.
@@ -894,6 +916,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("FAILED");
   }
 
+  @DisplayName("공개 프리톡 표현의 학습 콘텐츠를 반환한다.")
   @Test
   void returnsPublicFreeTalkExpressionLearningContent() throws Exception {
     JsonNode loginBody = login("free-talk-learning-content@example.com");
@@ -947,6 +970,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
   }
 
+  @DisplayName("사용자 프리톡 표현의 완료를 멱등하게 처리한다.")
   @Test
   void completesPrivateFreeTalkExpressionIdempotently() throws Exception {
     JsonNode loginBody = login("free-talk-learning-finish@example.com");
@@ -1003,6 +1027,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo(1);
   }
 
+  @DisplayName("같은 표현의 반복 완료도 프리톡 세션별로 구분한다.")
   @Test
   void keepsRepeatedExpressionCompletionSeparateForEachFreeTalkSession() throws Exception {
     JsonNode loginBody = login("free-talk-repeated-expression@example.com");
@@ -1049,6 +1074,7 @@ class FreeTalkSessionApiIntegrationTests {
             jsonPath("$.data.expressions[0].lastRecommendedAt").value("2026-07-27T10:00:00"));
   }
 
+  @DisplayName("다른 사용자 소유이거나 없거나 종료 결정 대기 중인 세션의 메시지를 거부한다.")
   @Test
   void rejectsForeignMissingCompletedAndAwaitingSessions() throws Exception {
     JsonNode ownerLogin = login("free-talk-owner@example.com");
@@ -1084,6 +1110,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isConflict());
   }
 
+  @DisplayName("AI 발화 생성이 실패하면 일일 발화 사용량을 돌려준다.")
   @Test
   void refundsDailyUsageWhenAiTurnFails() throws Exception {
     String accessToken =
@@ -1140,6 +1167,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo(700L);
   }
 
+  @DisplayName("첫 메시지가 AI를 호출 중이면 다른 메시지 요청을 거부한다.")
   @Test
   void rejectsAnotherMessageWhileTheFirstMessageIsCallingAi() throws Exception {
     String accessToken =
@@ -1169,6 +1197,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(requestCount()).isEqualTo(2);
   }
 
+  @DisplayName("세션 간 일일 제한을 공유하며 한도에 도달해도 저장된 응답은 재사용한다.")
   @Test
   void sharesDailyLimitAcrossSessionsAndReplaysSavedResponseAtLimit() throws Exception {
     String accessToken = login("request-limit@example.com").at("/data/accessToken").asText();
@@ -1196,6 +1225,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("일일 요청 한도를 소진하면 첫 대화 생성 전에 새 AI 선발화 세션을 거부한다.")
   @Test
   void rejectsNewAiFirstSessionBeforeOpeningWhenDailyRequestLimitIsUsed() throws Exception {
     String accessToken =
@@ -1219,6 +1249,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo(1);
   }
 
+  @DisplayName("마지막 일일 요청 한도에서 서로 다른 세션의 동시 요청을 직렬화한다.")
   @Test
   void serializesConcurrentRequestsFromDifferentSessionsAtLastDailySlot() throws Exception {
     String accessToken =
@@ -1238,6 +1269,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
   }
 
+  @DisplayName("AI 호출이 실패해도 일일 요청 횟수는 소비한 상태로 유지한다.")
   @Test
   void keepsFailedAiAttemptInDailyRequestBudget() throws Exception {
     String accessToken = login("failed-request-limit@example.com").at("/data/accessToken").asText();
@@ -1256,6 +1288,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(1);
   }
 
+  @DisplayName("분당 요청 한도를 초과하면 AI 호출 전에 거부한다.")
   @Test
   void rejectsMinuteBurstBeforeAiCall() throws Exception {
     String accessToken = login("minute-limit@example.com").at("/data/accessToken").asText();
@@ -1274,6 +1307,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(requestCount()).isEqualTo(1);
   }
 
+  @DisplayName("요청 한도를 넘겨도 대기 중인 종료 결정 상태를 보존한다.")
   @Test
   void preservesPendingExitDecisionWhenRequestLimitIsExceeded() throws Exception {
     String accessToken = login("decision-limit@example.com").at("/data/accessToken").asText();
@@ -1300,6 +1334,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(requestCount()).isEqualTo(1000);
   }
 
+  @DisplayName("요청 한도를 넘으면 표현 생성 재시도 상태 변경을 롤백한다.")
   @Test
   void rollsBackExpressionRetryStateWhenRequestLimitIsExceeded() throws Exception {
     String accessToken = login("expression-limit@example.com").at("/data/accessToken").asText();
@@ -1343,6 +1378,7 @@ class FreeTalkSessionApiIntegrationTests {
         "SELECT request_count FROM free_talk_daily_speaking_usage", Integer.class);
   }
 
+  @DisplayName("마지막 발화로 일일 발화 시간 한도를 넘으면 세션을 완료한다.")
   @Test
   void completesAfterLastUtteranceCrossesDailySpeakingLimit() throws Exception {
     seedEmbeddedCandidateExpression();
@@ -1380,6 +1416,7 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
   }
 
+  @DisplayName("발화 시간이 남아 있으면 클라이언트의 시간 초과 신호를 무시한다.")
   @Test
   void ignoresClientTimeLimitSignalWhileDailySpeakingTimeRemains() throws Exception {
     String accessToken =

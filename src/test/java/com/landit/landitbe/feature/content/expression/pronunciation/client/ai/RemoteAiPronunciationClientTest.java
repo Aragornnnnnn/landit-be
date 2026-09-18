@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -43,6 +44,7 @@ class RemoteAiPronunciationClientTest {
     server.stop(0);
   }
 
+  @DisplayName("발음 분석 요청을 전송하고 단어별 판정을 응답으로 변환한다.")
   @Test
   void analyzePostsRequestAndMapsWordJudgements() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -98,6 +100,7 @@ class RemoteAiPronunciationClientTest {
     assertThat(judgedWordList.get(2).userStressIndex()).isEqualTo(1);
   }
 
+  @DisplayName("AI 서버 오류를 발음 분석 실패로 변환한다.")
   @Test
   void analyzeMapsServerErrorToPronunciationAnalysisFailed() {
     server.createContext(
@@ -118,6 +121,7 @@ class RemoteAiPronunciationClientTest {
         .isEqualTo(ContentErrorCode.PRONUNCIATION_ANALYSIS_FAILED);
   }
 
+  @DisplayName("AI가 반환한 잘못된 응답 오류 코드를 그대로 전달한다.")
   @Test
   void analyzePropagatesUpstreamInvalidResponseCode() {
     server.createContext(
@@ -137,6 +141,7 @@ class RemoteAiPronunciationClientTest {
         .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("발음 분석 성공 응답의 본문이 잘못되면 응답 형식 오류로 처리한다.")
   @Test
   void analyzeMapsMalformedSuccessBodyToInvalidResponse() {
     server.createContext(
@@ -154,6 +159,7 @@ class RemoteAiPronunciationClientTest {
         .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("발음 분석 요청의 toString에 Base64 음성을 노출하지 않는다.")
   @Test
   void requestToStringDoesNotContainAudioBase64() {
     // base64 오디오가 로그에 통째로 찍히는 사고를 toString 레벨에서 막는다.

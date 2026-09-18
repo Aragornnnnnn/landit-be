@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -25,6 +26,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 class S3ContentImageUploadClientTests {
 
   /** S3 PUT URL에 객체 중복 방지와 응답에 안내할 필수 헤더를 모두 서명한다. */
+  @DisplayName("S3 PUT URL에 객체 중복 방지와 응답에 안내할 필수 헤더를 모두 서명한다.")
   @Test
   void presignsPutWithRequiredHeadersAndExpiration() {
     ContentImageProperties properties =
@@ -52,6 +54,7 @@ class S3ContentImageUploadClientTests {
   }
 
   /** 응답에서 요구하는 헤더 값과 같은 값으로 S3 PUT 요청을 서명한다. */
+  @DisplayName("응답에서 요구하는 헤더 값과 같은 값으로 S3 PUT 요청을 서명한다.")
   @Test
   void appliesRequiredHeaderValuesToPutRequest() throws Exception {
     S3Presigner presigner = mock(S3Presigner.class);

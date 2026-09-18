@@ -5,6 +5,7 @@ package com.landit.landitbe;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.env.YamlPropertySourceLoader;
@@ -16,6 +17,7 @@ class DatabaseProfileConfigurationTests {
 
   private final YamlPropertySourceLoader yamlLoader = new YamlPropertySourceLoader();
 
+  @DisplayName("DB 프로필은 접속 설정을 환경 변수에서 읽는다.")
   @ParameterizedTest
   @ValueSource(strings = {"local", "develop", "prod"})
   void databaseProfilesReadConnectionSettingsFromEnvironment(String profile) throws IOException {

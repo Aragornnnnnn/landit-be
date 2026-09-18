@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -57,6 +58,7 @@ class RemoteAiConversationClientTest {
     server.stop(0);
   }
 
+  @DisplayName("수준 평가 요청에는 최종 피드백이 소유한 필드를 보내지 않는다.")
   @Test
   void levelAssessmentDoesNotSendFieldsOwnedBySessionFeedback() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -91,6 +93,7 @@ class RemoteAiConversationClientTest {
     }
   }
 
+  @DisplayName("속마음 생성에 대화 문맥을 전송하고 응답을 변환한다.")
   @Test
   void generateInnerThoughtPostsConversationContextAndMapsResponse() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -153,6 +156,7 @@ class RemoteAiConversationClientTest {
                 100L, 200L, "사용자가 이유를 덧붙여 답변했으니 관심을 표현하면 좋겠다.", InnerThoughtType.GOOD));
   }
 
+  @DisplayName("필수 필드가 없는 속마음 생성 응답을 거부한다.")
   @Test
   void generateInnerThoughtRejectsResponseMissingRequiredFields() {
     server.createContext(
@@ -183,6 +187,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
+  @DisplayName("속마음 생성의 AI 응답 형식 오류를 그대로 유지한다.")
   @Test
   void generateInnerThoughtPreservesAiResponseInvalidError() {
     server.createContext(
@@ -196,6 +201,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
+  @DisplayName("속마음 요청의 입출력 오류를 생성 실패로 변환한다.")
   @Test
   void generateInnerThoughtMapsIoFailureToGenerationFailed() {
     RemoteAiConversationClient client = remoteClient();
@@ -208,6 +214,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
   }
 
+  @DisplayName("다음 메시지 생성 응답의 수신 확인 정보를 변환한다.")
   @Test
   void generateNextMessageMapsAcknowledgementResponse() throws Exception {
     server.createContext(
@@ -256,6 +263,7 @@ class RemoteAiConversationClientTest {
     assertThat(result.goalCompletionStatus()).isEqualTo(GoalCompletionStatus.PARTIAL);
   }
 
+  @DisplayName("메시지 피드백 계약을 전송하고 준비 중 응답을 변환한다.")
   @Test
   void requestMessageFeedbackPostsContractAndMapsPreparingResponse() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -321,6 +329,7 @@ class RemoteAiConversationClientTest {
         .isEqualTo(new AiMessageFeedbackResult(100L, 200L, ProcessingStatus.PREPARING));
   }
 
+  @DisplayName("Jackson 3 JsonMapper로 메시지 피드백 요청과 응답을 직렬화 및 역직렬화한다.")
   @Test
   void requestMessageFeedbackSerializesAndDeserializesWithJackson3JsonMapper() throws Exception {
     JsonMapper jsonMapper = JsonMapper.builder().build();
@@ -359,6 +368,7 @@ class RemoteAiConversationClientTest {
         .isEqualTo(new AiMessageFeedbackResult(100L, 200L, ProcessingStatus.PREPARING));
   }
 
+  @DisplayName("메시지 피드백 요청에 시나리오 시작 지침 문맥을 전송한다.")
   @Test
   void requestMessageFeedbackPostsScenarioOpeningInstructionContext() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -416,6 +426,7 @@ class RemoteAiConversationClientTest {
     assertThat(request.get("userMessage").asString()).isEqualTo("Can I get an iced americano?");
   }
 
+  @DisplayName("메시지 피드백의 AI 응답 형식 오류를 그대로 유지한다.")
   @Test
   void requestMessageFeedbackPreservesAiResponseInvalidError() {
     server.createContext(
@@ -447,6 +458,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
+  @DisplayName("메시지 피드백의 기타 AI 오류 응답은 생성 실패로 변환한다.")
   @Test
   void requestMessageFeedbackMapsOtherErrorResponseToGenerationFailed() {
     server.createContext(
@@ -478,6 +490,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
   }
 
+  @DisplayName("메시지 피드백 요청의 미준비 오류를 생성 실패로 변환한다.")
   @Test
   void requestMessageFeedbackMapsMessageFeedbackNotReadyToGenerationFailed() {
     server.createContext(
@@ -491,6 +504,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
   }
 
+  @DisplayName("최종 피드백 계약을 AI에 전송하고 응답을 변환한다.")
   @Test
   void generateSessionFeedbackPostsContractAndMapsResponse() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -544,6 +558,7 @@ class RemoteAiConversationClientTest {
                 "I went to the cafe yesterday."));
   }
 
+  @DisplayName("수준 평가 계약은 최종 피드백 필드를 포함하지 않는다.")
   @Test
   void levelAssessmentDoesNotReceiveFinalFeedbackFields() throws Exception {
     AtomicReference<String> body = new AtomicReference<>();
@@ -570,6 +585,7 @@ class RemoteAiConversationClientTest {
     assertThat(sent.has("completedFeedbacks")).isFalse();
   }
 
+  @DisplayName("완료된 메시지 피드백을 전달하면서 기존 요청 필드를 유지한다.")
   @Test
   void hotfixForwardsCompletedFeedbacksWithoutChangingLegacyFields() throws Exception {
     AtomicReference<String> body = new AtomicReference<>();
@@ -595,6 +611,7 @@ class RemoteAiConversationClientTest {
     assertThat(sent.has("assessmentMessages")).isFalse();
   }
 
+  @DisplayName("최종 피드백 재시도에는 전체 제한 중 남은 대기 시간만 사용한다.")
   @Test
   void hotfixUsesRemainingTimeoutForFinalFeedbackRetry() {
     server.createContext(
@@ -620,6 +637,7 @@ class RemoteAiConversationClientTest {
                     .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
+  @DisplayName("최종 피드백 요청에는 더 긴 전용 제한 시간을 적용한다.")
   @Test
   void generateSessionFeedbackUsesLongerDedicatedRequestTimeout() {
     server.createContext(
@@ -641,6 +659,7 @@ class RemoteAiConversationClientTest {
     assertThat(result.sessionId()).isEqualTo(100L);
   }
 
+  @DisplayName("최종 피드백 전용 제한 시간을 초과하면 생성 실패로 변환한다.")
   @Test
   void generateSessionFeedbackMapsDedicatedRequestTimeoutToFeedbackGenerationFailed() {
     server.createContext(
@@ -666,6 +685,7 @@ class RemoteAiConversationClientTest {
                     .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
+  @DisplayName("최종 피드백 요청에서 메시지 피드백 미준비 오류는 피드백 미준비로 변환한다.")
   @Test
   void generateSessionFeedbackMapsMessageFeedbackNotReadyToFeedbackNotReady() {
     server.createContext(
@@ -680,6 +700,7 @@ class RemoteAiConversationClientTest {
                     .isEqualTo(SessionErrorCode.FEEDBACK_NOT_READY));
   }
 
+  @DisplayName("최종 피드백의 AI 응답 형식 오류를 그대로 유지한다.")
   @Test
   void generateSessionFeedbackPreservesAiResponseInvalidError() {
     server.createContext(
@@ -693,6 +714,7 @@ class RemoteAiConversationClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
+  @DisplayName("최종 피드백의 기타 AI 오류 응답은 피드백 생성 실패로 변환한다.")
   @Test
   void generateSessionFeedbackMapsOtherErrorResponseToFeedbackGenerationFailed() {
     server.createContext(
@@ -707,6 +729,7 @@ class RemoteAiConversationClientTest {
                     .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED));
   }
 
+  @DisplayName("최종 피드백 요청의 입출력 오류를 피드백 생성 실패로 변환한다.")
   @Test
   void generateSessionFeedbackMapsIoFailureToFeedbackGenerationFailed() {
     RemoteAiConversationClient client = remoteClient();

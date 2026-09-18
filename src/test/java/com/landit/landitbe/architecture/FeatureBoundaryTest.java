@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -51,6 +52,7 @@ class FeatureBoundaryTest {
     }
   }
 
+  @DisplayName("각 업무 모듈은 자신의 Repository와 Entity를 소유한다.")
   @Test
   void businessModulesOwnTheirRepositoriesAndEntities() {
     List<Dependency> violations =
@@ -63,6 +65,7 @@ class FeatureBoundaryTest {
     assertThat(violations).isEmpty();
   }
 
+  @DisplayName("Controller는 같은 업무의 저장소와 Entity에도 직접 접근하지 않는다.")
   @Test
   void controllersDoNotAccessEvenTheirOwnPersistenceTypes() {
     assertThat(
@@ -73,6 +76,7 @@ class FeatureBoundaryTest {
         .isEmpty();
   }
 
+  @DisplayName("관리자 HTTP 진입점은 admin 패키지에 둔다.")
   @Test
   void administrativeHttpEntrypointsStayInAdminPackages() {
     for (Class<?> type : types) {
@@ -89,6 +93,7 @@ class FeatureBoundaryTest {
     }
   }
 
+  @DisplayName("사용자 Controller는 관리자 전용 계약에 의존하지 않는다.")
   @Test
   void userControllersDoNotDependOnAdministrativeContracts() {
     assertThat(
@@ -100,6 +105,7 @@ class FeatureBoundaryTest {
         .isEmpty();
   }
 
+  @DisplayName("인프라와 콘텐츠 카탈로그는 정해진 의존 방향을 지킨다.")
   @Test
   void infrastructureAndCatalogRespectExplicitDependencyDirections() {
     assertThat(
@@ -124,11 +130,13 @@ class FeatureBoundaryTest {
         .isEmpty();
   }
 
+  @DisplayName("업무 모듈 사이에 순환 의존이 없다.")
   @Test
   void businessModuleDependenciesHaveNoCycles() {
     assertThat(cycleNodes(dependencies)).isEmpty();
   }
 
+  @DisplayName("Service 내부에 공개 record 타입을 선언하지 않는다.")
   @Test
   void servicesExposeRecordsFromValuePackages() {
     List<String> violations = new ArrayList<>();
@@ -145,6 +153,7 @@ class FeatureBoundaryTest {
     assertThat(violations).isEmpty();
   }
 
+  @DisplayName("기억 업무는 자신의 AI 구현체를 직접 소유한다.")
   @Test
   void memoryOwnsAllItsAiImplementations() {
     Class<?> port = com.landit.landitbe.feature.memory.client.ai.AiMemoryClient.class;
@@ -155,6 +164,7 @@ class FeatureBoundaryTest {
         .allSatisfy(type -> assertThat(type.getName()).startsWith(FEATURE + "memory."));
   }
 
+  @DisplayName("컴파일된 타입 검사로 전체 경로를 쓴 필드와 순환 의존도 감지한다.")
   @Test
   void compiledAnalysisIncludesFullyQualifiedFieldsAndDetectsCycles(@TempDir Path directory)
       throws Exception {
@@ -243,6 +253,7 @@ class FeatureBoundaryTest {
     return parts[0].equals("learning") ? parts[0] + "." + parts[1] : parts[0];
   }
 
+  @DisplayName("학습 하위 업무의 저장소 침범과 순환 의존도 경계 검사에서 감지한다.")
   @Test
   void learningSubmodulesCannotHidePersistenceAccessOrCycles() {
     String scenario = FEATURE + "learning.scenario.session.service.StartService";

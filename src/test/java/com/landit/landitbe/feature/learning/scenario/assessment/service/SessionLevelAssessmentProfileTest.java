@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -33,6 +34,7 @@ class SessionLevelAssessmentProfileTest {
   private static final Clock CLOCK =
       Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneId.of("Asia/Seoul"));
 
+  @DisplayName("학습 수준과 무관한 프로필 변경 후에도 첫 수준 평가를 적용한다.")
   @Test
   void unrelatedProfileChangeStillInitializesLevel() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
@@ -45,6 +47,7 @@ class SessionLevelAssessmentProfileTest {
     assertThat(profile.getLearningLevelUpdatedAt()).isEqualTo(LocalDateTime.now(CLOCK));
   }
 
+  @DisplayName("사용자가 수준을 수동 변경했다면 그보다 오래된 평가는 적용하지 않는다.")
   @Test
   void manualLevelChangeRejectsEarlierAssessment() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
@@ -56,6 +59,7 @@ class SessionLevelAssessmentProfileTest {
     assertThat(profile.getPromotionStreak()).isZero();
   }
 
+  @DisplayName("첫 평가로 선택 수준을 대체하고 변경 전후 수준을 모두 기록한다.")
   @Test
   void replacesPreviouslySelectedLevelAndRecordsBothValues() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
@@ -70,6 +74,7 @@ class SessionLevelAssessmentProfileTest {
     assertThat(profile.getPromotionStreak()).isZero();
   }
 
+  @DisplayName("최신 세션이 아니면 프로필은 유지하고 해당 세션의 평가만 저장한다.")
   @Test
   void nonLatestSessionPreservesProfileButKeepsItsAssessment() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
@@ -80,6 +85,7 @@ class SessionLevelAssessmentProfileTest {
     assertThat(profile.getLearningLevel()).isEqualTo(4);
   }
 
+  @DisplayName("초기화된 학습 수준은 이후 평가로 낮추지 않는다.")
   @Test
   void initializedLevelDoesNotDecreaseOnLaterAssessment() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);
@@ -90,6 +96,7 @@ class SessionLevelAssessmentProfileTest {
     assertThat(profile.getLearningLevel()).isEqualTo(4);
   }
 
+  @DisplayName("초기화된 수준을 수동으로 낮춰도 승급에는 연속 신호 2회가 필요하다.")
   @Test
   void manuallyLoweredInitializedLevelStillRequiresTwoPromotionSignals() {
     UserProfile profile = new UserProfile("test@example.com", "test", 1L);

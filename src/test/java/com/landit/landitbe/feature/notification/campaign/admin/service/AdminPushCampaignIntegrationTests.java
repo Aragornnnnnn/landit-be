@@ -35,6 +35,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -101,6 +102,7 @@ class AdminPushCampaignIntegrationTests {
     processor = new AdminPushProcessingService(repository, deliveries, dispatch, queue, campaigns);
   }
 
+  @DisplayName("캠페인 50개를 쿼리 4회로 조회하면서 상세 정보를 보존한다.")
   @Test
   void listsFiftyCampaignsWithFourQueriesAndPreservesDetails() throws Exception {
     token(USER, "batch-list");
@@ -144,6 +146,7 @@ class AdminPushCampaignIntegrationTests {
     verify(source, times(4)).getConnection();
   }
 
+  @DisplayName("선정한 사용자가 모두 제외되면 캠페인 대상 수 0을 유지한다.")
   @Test
   void preservesZeroAudienceWhenEverySelectedUserIsExcluded() {
     var request =
@@ -163,6 +166,7 @@ class AdminPushCampaignIntegrationTests {
     assertThat(campaigns.detail(id).targetTokenCount()).isZero();
   }
 
+  @DisplayName("캠페인 하나에 사용자 1,000명 넘게 지정할 수 있다.")
   @Test
   void supportsMoreThanOneThousandSelectedUsersInOneCampaign() {
     var ids = java.util.stream.LongStream.rangeClosed(996000, 997000).boxed().toList();
@@ -177,6 +181,7 @@ class AdminPushCampaignIntegrationTests {
     assertThat(campaigns.detail(id).targetTokenCount()).isEqualTo(2);
   }
 
+  @DisplayName("캠페인을 예약과 상태로 필터링하며 페이지 전체 건수를 반환한다.")
   @Test
   void filtersCampaignsByReservationAndStatusWithPageTotals() {
     List<String> statuses =
@@ -236,6 +241,7 @@ class AdminPushCampaignIntegrationTests {
     }
   }
 
+  @DisplayName("캠페인이 없으면 빈 목록을 반환하고 잘못된 필터는 거부한다.")
   @Test
   void handlesEmptyCampaignListAndRejectsInvalidFilters() {
     var page = campaigns.list(true, null, 0, 20);
@@ -251,6 +257,7 @@ class AdminPushCampaignIntegrationTests {
     assertThatThrownBy(() -> campaigns.list(true, null, 0, 51)).isInstanceOf(ApiException.class);
   }
 
+  @DisplayName("발송 시 SQL 대상을 조회하고 수동 선택과 제외 대상을 함께 적용한다.")
   @Test
   void resolvesSqlAtDispatchAndCombinesManualSelectionAndExclusions() {
     token(USER, "sql");
@@ -286,6 +293,7 @@ class AdminPushCampaignIntegrationTests {
     verify(sql, times(2)).query(query);
   }
 
+  @DisplayName("예약 등록을 재시도하며 예약 시각 전 발송과 변경된 시각의 요청을 거부한다.")
   @Test
   void retriesScheduleRegistrationAndRejectsEarlyDeliveryAndChangedTime() {
     token(USER, "scheduled");
@@ -318,6 +326,7 @@ class AdminPushCampaignIntegrationTests {
     assertThatThrownBy(() -> campaigns.cancelSchedule(id, ADMIN)).isInstanceOf(ApiException.class);
   }
 
+  @DisplayName("큐 메시지가 도착해도 취소된 예약은 발송하지 않는다.")
   @Test
   void ignoresCancelledScheduleEvenWhenQueuedMessageArrives() {
     token(USER, "cancelled");
@@ -332,6 +341,7 @@ class AdminPushCampaignIntegrationTests {
     org.mockito.Mockito.verifyNoInteractions(sender);
   }
 
+  @DisplayName("예약 SQL은 최신 조회 결과를 사용하며 빈 결과를 전체 사용자로 확대하지 않는다.")
   @Test
   void scheduledSqlUsesLatestResultsAndNeverFallsBackToAllWhenEmpty() {
     token(USER, "answered-later");
@@ -368,6 +378,7 @@ class AdminPushCampaignIntegrationTests {
     org.mockito.Mockito.verifyNoInteractions(sender);
   }
 
+  @DisplayName("대상 확정 전 취소가 발생하면 SQL 조회 후에도 발송을 중단한다.")
   @Test
   void cancellationWinsAgainstSqlResolutionBeforeSnapshot() {
     token(USER, "cancel-race");
@@ -406,6 +417,7 @@ class AdminPushCampaignIntegrationTests {
     org.mockito.Mockito.verifyNoInteractions(sender);
   }
 
+  @DisplayName("선택한 활성 사용자에게만 발송하고 관리자 테스트 발송은 독립적으로 처리한다.")
   @Test
   void sendsOnlySelectedActiveUsersAndKeepsAdminTestIndependent() {
     final long selectedToken = token(USER, "selected-1");
@@ -441,6 +453,7 @@ class AdminPushCampaignIntegrationTests {
     verify(sender, times(2)).send(anyList());
   }
 
+  @DisplayName("동일한 선택 대상 생성은 중복 처리하지 않고 대상 변경이나 사용자 누락은 거부한다.")
   @Test
   void deduplicatesSelectedCreationAndRejectsChangedAudienceOrMissingUsers() {
     UUID id = campaigns.create(ADMIN, "selection-key", selected(List.of(USER, ADMIN))).id();
@@ -463,6 +476,7 @@ class AdminPushCampaignIntegrationTests {
     return new AdminPushCampaignRequest("공지", "내용", "/home", AdminPushAudienceType.SELECTED, ids);
   }
 
+  @DisplayName("선택 대상 저장이 실패하면 캠페인과 사용자 목록을 함께 롤백한다.")
   @Test
   void rollsBackCampaignAndUsersWhenSelectionInsertFails() {
     UUID id = UUID.randomUUID();
@@ -490,6 +504,7 @@ class AdminPushCampaignIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("확정한 대상을 묶음으로 발송하고 중복 작업은 무시한다.")
   @Test
   void sendsFrozenAudienceInBatchesAndIgnoresDuplicateWork() {
     for (int index = 0; index < 101; index++) {
@@ -514,6 +529,7 @@ class AdminPushCampaignIntegrationTests {
         .isEqualTo(101);
   }
 
+  @DisplayName("확정 후 비활성화된 대상은 제외하고 뒤늦게 등록된 토큰은 포함하지 않는다.")
   @Test
   void excludesDeactivatedSnapshotTargetsAndDoesNotIncludeLateTokens() {
     long previouslyRevoked = token(USER, "previously-revoked");
@@ -535,6 +551,7 @@ class AdminPushCampaignIntegrationTests {
         .isEqualTo(active);
   }
 
+  @DisplayName("대상 확정 후 소유자가 바뀐 토큰에는 발송하지 않는다.")
   @Test
   void excludesTokenWhoseOwnerChangedAfterAudienceCapture() {
     long moved = token(USER, "moved");
@@ -548,6 +565,7 @@ class AdminPushCampaignIntegrationTests {
     assertThat(jdbc.queryForObject("select count(*) from push_delivery", Long.class)).isZero();
   }
 
+  @DisplayName("수신 확인 예약만 재시도하고 Expo 발송은 반복하지 않는다.")
   @Test
   void retriesReceiptSchedulingWithoutSendingExpoAgain() {
     token(USER, "receipt-retry-1");
@@ -572,6 +590,7 @@ class AdminPushCampaignIntegrationTests {
   }
 
   /** 정기 푸시와 달리 관리자 공지의 일시적 Expo 오류도 종료해 재발송하지 않는다. */
+  @DisplayName("정기 푸시와 달리 관리자 공지의 일시적 Expo 오류도 종료해 재발송하지 않는다.")
   @Test
   void terminatesAdminRequestFailureWithoutResendingAfterBatchIntegration() {
     token(USER, "request-failure-1");
@@ -594,6 +613,7 @@ class AdminPushCampaignIntegrationTests {
     assertThat(campaigns.detail(id).failedCount()).isEqualTo(2);
   }
 
+  @DisplayName("다른 소비자의 처리가 끝나기 전에 다음 대상 페이지로 넘어가지 않는다.")
   @Test
   void waitsForAnotherConsumerBeforeAdvancingThePage() {
     long tokenId = token(USER, "concurrent");
@@ -621,6 +641,7 @@ class AdminPushCampaignIntegrationTests {
     assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
   }
 
+  @DisplayName("테스트와 전체 발송의 키를 구분하며 학습 상태를 변경하지 않는다.")
   @Test
   void testAndBroadcastUseSeparateKeysAndLeaveLearningStateUntouched() {
     token(ADMIN, "admin");

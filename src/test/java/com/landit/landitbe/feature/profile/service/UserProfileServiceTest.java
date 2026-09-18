@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.profile.learning.service.ProfileLearningServi
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,6 +42,7 @@ class UserProfileServiceTest {
   @InjectMocks private UserProfileService userProfileService;
 
   /** 활성 프로필 조회가 Repository 결과를 그대로 반환하는지 검증한다. */
+  @DisplayName("활성 프로필 조회는 Repository가 반환한 프로필을 그대로 반환한다.")
   @Test
   void requireActiveReturnsActiveProfile() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -52,6 +54,7 @@ class UserProfileServiceTest {
   }
 
   /** 활성 사용자의 학습 locale(target/base)을 프로필에서 그대로 반환하는지 검증한다. */
+  @DisplayName("활성 사용자의 학습 locale(target/base)을 프로필에서 그대로 반환하는지 검증한다.")
   @Test
   void shouldReturnLocaleForActiveUser() {
     // given: 프로필에 en/ko locale이 저장된 활성 사용자
@@ -70,6 +73,7 @@ class UserProfileServiceTest {
   }
 
   /** 활성 사용자가 아니면(미존재/탈퇴) INVALID_TOKEN 예외를 던지는지 검증한다. (토큰 관련 오류는 INVALID_TOKEN으로 통일) */
+  @DisplayName("존재하지 않거나 탈퇴한 프로필은 INVALID_TOKEN 오류로 거부한다.")
   @Test
   void shouldThrowInvalidTokenForInactiveUser() {
     // given: 해당 ID의 활성 사용자가 없음
@@ -84,6 +88,7 @@ class UserProfileServiceTest {
   }
 
   /** 인증 기능의 조회 계약은 활성 프로필을 쓰기 잠금으로 조회한다. */
+  @DisplayName("인증 기능의 조회 계약은 활성 프로필을 쓰기 잠금으로 조회한다.")
   @Test
   void findsAuthenticationProfileWithWriteLock() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -102,6 +107,7 @@ class UserProfileServiceTest {
   }
 
   /** 인증 기능에는 Profile 엔티티 대신 쓰기 잠금으로 갱신된 인증용 record를 반환한다. */
+  @DisplayName("인증 기능에는 Profile 엔티티 대신 쓰기 잠금으로 갱신된 인증용 record를 반환한다.")
   @Test
   void updatesAuthenticationProfileAsRecord() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -131,6 +137,7 @@ class UserProfileServiceTest {
   }
 
   /** 인증 프로필 변환은 프로필의 null 역할과 상태를 임의의 기본값으로 바꾸지 않는다. */
+  @DisplayName("인증 프로필 변환은 프로필의 null 역할과 상태를 임의의 기본값으로 바꾸지 않는다.")
   @Test
   void keepsAuthenticationProfileValuesWithoutFallback() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -145,6 +152,7 @@ class UserProfileServiceTest {
   }
 
   /** 비활성 사용자는 인증 기능용 갱신 계약에서 빈 결과로 반환한다. */
+  @DisplayName("비활성 사용자는 인증 기능용 갱신 계약에서 빈 결과로 반환한다.")
   @Test
   void returnsEmptyWhenUpdatingInactiveAuthenticationProfile() {
     when(userProfileRepository.findActiveByIdForUpdate(USER_ID)).thenReturn(Optional.empty());
@@ -156,6 +164,7 @@ class UserProfileServiceTest {
   }
 
   /** 다른 기능에는 닉네임 문자열 대신 프로필 공개 계약을 반환한다. */
+  @DisplayName("다른 기능에는 닉네임 문자열 대신 프로필 공개 계약을 반환한다.")
   @Test
   void findsNicknameAsPublicRecord() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -167,6 +176,7 @@ class UserProfileServiceTest {
   }
 
   /** 탈퇴 처리는 활성 프로필을 쓰기 잠금으로 조회해 상태를 변경한다. */
+  @DisplayName("탈퇴 처리는 활성 프로필을 쓰기 잠금으로 조회해 상태를 변경한다.")
   @Test
   void withdrawsAuthenticationProfileWithWriteLock() {
     UserProfile userProfile = mock(UserProfile.class);

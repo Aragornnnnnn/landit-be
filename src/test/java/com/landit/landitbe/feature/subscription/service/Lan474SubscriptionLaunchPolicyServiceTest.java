@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** DB 공개 정책 없이 기존 환경변수 전환 계약을 유지한다. */
@@ -17,6 +18,7 @@ class Lan474SubscriptionLaunchPolicyServiceTest {
       Clock.fixed(Instant.parse("2026-09-11T03:00:00Z"), ZoneId.of("Asia/Seoul"));
 
   /** 미설정 선배포와 오픈 시각을 비운 롤백은 모든 계정의 잠금을 해제한다. */
+  @DisplayName("미설정 선배포와 오픈 시각을 비운 롤백은 모든 계정의 잠금을 해제한다.")
   @Test
   void blankLaunchSettingDisablesRestrictionsBeforeReleaseAndOnRollback() {
     var enabled = service("2026-09-11T02:00:00Z");
@@ -31,6 +33,7 @@ class Lan474SubscriptionLaunchPolicyServiceTest {
   }
 
   /** 시각의 시간대를 변환하고 정확한 경계부터 활성화한다. */
+  @DisplayName("시각의 시간대를 변환하고 정확한 경계부터 활성화한다.")
   @Test
   void launchUsesTheSameInstantAndWaitsForItsBoundary() {
     var future = service("2026-09-11T03:00:01Z");

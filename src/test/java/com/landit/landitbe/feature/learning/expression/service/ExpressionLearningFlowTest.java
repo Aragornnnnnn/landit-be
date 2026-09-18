@@ -43,6 +43,7 @@ import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -113,6 +114,7 @@ class ExpressionLearningFlowTest {
                 "test-attempt", java.time.LocalDateTime.of(2026, 9, 12, 12, 0)));
   }
 
+  @DisplayName("미완료 표현 중 순서가 가장 빠른 항목만 해금한다.")
   @Test
   void shouldUnlockOnlyEarliestIncompleteExpression() {
     givenExpressions(expression(101L, 1), expression(102L, 2), expression(103L, 3));
@@ -133,6 +135,7 @@ class ExpressionLearningFlowTest {
     assertThat(responses.get(2).locked()).isTrue();
   }
 
+  @DisplayName("표현을 모두 완료했다면 모든 표현의 해금 상태를 유지한다.")
   @Test
   void shouldKeepAllExpressionsUnlockedWhenAllCompleted() {
     givenExpressions(expression(101L, 1), expression(102L, 2), expression(103L, 3));
@@ -149,6 +152,7 @@ class ExpressionLearningFlowTest {
             });
   }
 
+  @DisplayName("완료한 표현이 없으면 첫 표현만 해금한다.")
   @Test
   void shouldUnlockOnlyEarliestExpressionWhenNoneCompleted() {
     givenExpressions(expression(101L, 1), expression(102L, 2), expression(103L, 3));
@@ -163,6 +167,7 @@ class ExpressionLearningFlowTest {
     assertThat(responses).allSatisfy(response -> assertThat(response.completed()).isFalse());
   }
 
+  @DisplayName("시나리오가 없으면 조회 오류를 호출자에게 전달한다.")
   @Test
   void shouldPropagateWhenScenarioNotFound() {
     doThrow(new ApiException(ContentErrorCode.SCENARIO_NOT_FOUND))
@@ -178,6 +183,7 @@ class ExpressionLearningFlowTest {
   }
 
   /** 표현 목록은 사용자 프로필의 locale(target/base) 기준으로 조회되는지 검증한다. (LAN-59 리뷰 반영) */
+  @DisplayName("표현 목록을 사용자 프로필의 학습 언어와 기준 언어로 조회한다.")
   @Test
   void shouldFindExpressionsByUserLocale() {
     givenExpressions(expression(101L, 1));
@@ -190,6 +196,7 @@ class ExpressionLearningFlowTest {
         .findScenarioExpressions(SCENARIO_ID, Locale.EN, Locale.KR, 2, 3, ActiveStatus.ACTIVE);
   }
 
+  @DisplayName("사용자 난이도보다 높은 시나리오 표현의 조회를 거부한다.")
   @Test
   void shouldRejectScenarioExpressionAboveUserDifficulty() {
     WritingExpression expression = mock(WritingExpression.class);
@@ -207,6 +214,7 @@ class ExpressionLearningFlowTest {
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
   }
 
+  @DisplayName("사용자 난이도 그룹보다 낮은 시나리오 표현의 조회를 거부한다.")
   @Test
   void shouldRejectScenarioExpressionBelowUserDifficultyGroup() {
     WritingExpression expression = mock(WritingExpression.class);
@@ -224,6 +232,7 @@ class ExpressionLearningFlowTest {
         .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
   }
 
+  @DisplayName("사용자가 학습할 수 있는 최대 난이도의 시나리오 표현을 반환한다.")
   @Test
   void shouldReturnScenarioExpressionAtUserMaximumDifficulty() {
     WritingExpression expression = learningExpression();
@@ -241,6 +250,7 @@ class ExpressionLearningFlowTest {
     assertThat(response.expressionId()).isEqualTo(EXPRESSION_ID);
   }
 
+  @DisplayName("표현이 존재하면 학습 시작에 필요한 상세 정보를 반환한다.")
   @Test
   void shouldReturnLearningStartDetailsWhenExpressionFound() {
     // given: DB에 학습하려는 표현 데이터가 있는 상황 가정
@@ -278,6 +288,7 @@ class ExpressionLearningFlowTest {
         .isEqualTo("https://cdn.example.com/images/101.png");
   }
 
+  @DisplayName("사용자별 표현 조회에서도 공개 표현을 허용한다.")
   @Test
   void shouldAllowPublicExpressionForUserSpecificQueries() {
     WritingExpression expression = learningExpression();
@@ -296,6 +307,7 @@ class ExpressionLearningFlowTest {
     assertThat(practiceResponse.writingSentence()).hasSize(2);
   }
 
+  @DisplayName("학습할 표현이 없으면 예외를 발생시킨다.")
   @Test
   void shouldThrowWhenExpressionNotFound() {
     // given: DB에 해당 표현 데이터가 없는 상황 가정

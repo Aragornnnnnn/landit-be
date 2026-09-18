@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,6 +26,7 @@ class AdminPushCampaignApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+  @DisplayName("관리자는 캠페인을 필터링해 페이지로 조회하며 조회 인자를 검증한다.")
   @Test
   @org.springframework.transaction.annotation.Transactional
   void exposesFilteredCampaignPageToAdminsAndValidatesQueryParameters() throws Exception {
@@ -78,6 +80,7 @@ class AdminPushCampaignApiIntegrationTests {
         .andExpect(jsonPath("$.data.items").isArray());
   }
 
+  @DisplayName("관리자가 아닌 인증 사용자의 캠페인 조회와 예약을 거부한다.")
   @Test
   void rejectsAuthenticatedNonAdminForQueryAndSchedule() throws Exception {
     mockMvc
@@ -97,6 +100,7 @@ class AdminPushCampaignApiIntegrationTests {
     }
   }
 
+  @DisplayName("관리자 캠페인 API에 인증을 요구하고 OpenAPI 계약을 제공한다.")
   @Test
   void requiresAuthenticationAndPublishesOpenApiContract() throws Exception {
     mockMvc.perform(get("/api/v1/admin/push-campaigns")).andExpect(status().isUnauthorized());

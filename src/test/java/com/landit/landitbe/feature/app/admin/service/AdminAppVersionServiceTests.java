@@ -14,6 +14,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -32,6 +33,7 @@ class AdminAppVersionServiceTests {
   @Mock private AppVersion appVersion;
 
   /** 정책 수정은 감사 기록의 이전 값을 만들기 전에 비관적 잠금을 획득한다. */
+  @DisplayName("정책 수정은 감사 기록의 이전 값을 만들기 전에 비관적 잠금을 획득한다.")
   @Test
   void updateLoadsPolicyWithWriteLockBeforeRecordingAuditSnapshot() {
     when(appVersionRepository.findByPlatformForUpdate(AppPlatform.IOS))

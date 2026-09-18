@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -40,6 +41,7 @@ class UserSubscriptionServiceTest {
   private final LearningAccessGrantService grants = mock(LearningAccessGrantService.class);
 
   /** 미설정 또는 미래 도입 시각이면 구독과 완료 이력을 조회하지 않고 모든 유료 기능 게이트를 연다. */
+  @DisplayName("미설정 또는 미래 도입 시각이면 구독과 완료 이력을 조회하지 않고 모든 유료 기능 게이트를 연다.")
   @ParameterizedTest
   @ValueSource(strings = {"", LAUNCHED_AT})
   void allowsEverythingBeforeLaunch(String launchedAt) {
@@ -54,6 +56,7 @@ class UserSubscriptionServiceTest {
   }
 
   /** 도입 시각과 같거나 이후이면 시간대 표기와 관계없이 프리미엄 전용 제한을 적용하고, 시나리오 대화는 완료 이력과 무관하게 열어 둔다. */
+  @DisplayName("도입 시각과 같거나 이후이면 시간대 표기와 관계없이 프리미엄 전용 제한을 적용하고, 시나리오 대화는 완료 이력과 무관하게 열어 둔다.")
   @ParameterizedTest
   @CsvSource({
     "2026-09-13T14:44:00+09:00, 0",
@@ -81,6 +84,7 @@ class UserSubscriptionServiceTest {
   }
 
   /** 같은 서비스 인스턴스도 다음 요청의 시각이 도입 시각에 도달하면 제한을 시작한다. */
+  @DisplayName("같은 서비스 인스턴스도 다음 요청의 시각이 도입 시각에 도달하면 제한을 시작한다.")
   @Test
   void activatesWithoutRestartWhenClockReachesLaunch() {
     Clock clock = mock(Clock.class);
@@ -95,6 +99,7 @@ class UserSubscriptionServiceTest {
   }
 
   /** 도입 전 구독 조회는 실제 구독 여부를 보존하고 완료 이력을 조회하지 않는다. */
+  @DisplayName("도입 전 구독 조회는 실제 구독 여부를 보존하고 완료 이력을 조회하지 않는다.")
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void preservesSubscriptionAndSkipsCompletionBeforeLaunch(boolean premium) {

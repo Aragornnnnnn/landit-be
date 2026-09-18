@@ -38,6 +38,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 프리톡 처리 예약의 잠금 소유권 검증을 확인한다. */
@@ -88,6 +89,7 @@ class FreeTalkSubmittedMessageServiceTest {
   private final SessionHistory history = mock(SessionHistory.class);
   private final SessionHistoryMessage userMessage = mock(SessionHistoryMessage.class);
 
+  @DisplayName("시간 제한 종료 시 기억 저장이 꺼져 있으면 기억 생성 작업을 준비하지 않는다.")
   @Test
   void doesNotPrepareMemoryGenerationWhenWriteIsDisabledForTimeLimitCompletion() {
     stubSuccessfulFinalization("old-owner");
@@ -99,6 +101,7 @@ class FreeTalkSubmittedMessageServiceTest {
     assertThat(session.getMemoryGenerationStatus()).isNull();
   }
 
+  @DisplayName("시간 제한 종료 시 기억 저장이 켜져 있으면 기억 생성 작업을 준비한다.")
   @Test
   void preparesMemoryGenerationWhenWriteIsEnabledForTimeLimitCompletion() {
     stubSuccessfulFinalization("old-owner");
@@ -113,6 +116,7 @@ class FreeTalkSubmittedMessageServiceTest {
                 .PREPARING);
   }
 
+  @DisplayName("발화 확정 응답에 설정된 발화 시간 제한을 반환한다.")
   @Test
   void returnsConfiguredSpeakingTimeLimitAfterFinalization() {
     stubSuccessfulFinalization("old-owner");
@@ -124,6 +128,7 @@ class FreeTalkSubmittedMessageServiceTest {
     assertThat(response.progress().speakingTimeLimitMs()).isEqualTo(9_999_999L);
   }
 
+  @DisplayName("사용자 확인으로 종료해도 기억 저장이 꺼져 있으면 생성 작업을 준비하지 않는다.")
   @Test
   void doesNotPrepareMemoryGenerationWhenWriteIsDisabledForUserConfirmedCompletion() {
     stubSuccessfulFinalization("decision-7");
@@ -134,6 +139,7 @@ class FreeTalkSubmittedMessageServiceTest {
     assertThat(session.getMemoryGenerationStatus()).isNull();
   }
 
+  @DisplayName("사용자 확인으로 종료하면 활성화된 기억 생성 작업을 준비한다.")
   @Test
   void preparesMemoryGenerationWhenWriteIsEnabledForUserConfirmedCompletion() {
     stubSuccessfulFinalization("decision-7");
@@ -203,30 +209,35 @@ class FreeTalkSubmittedMessageServiceTest {
     when(freeTalkSession.getProcessingClientMessageId()).thenReturn("new-owner");
   }
 
+  @DisplayName("다른 요청이 처리 잠금을 소유하면 발화 확정을 거부한다.")
   @Test
   void rejectsTurnFinalizationWhenAnotherRequestOwnsProcessingLock() {
     assertConflict(() -> service.finalizeTurn(messageReservation(), null));
     verify(freeTalkSession, never()).clearProcessing();
   }
 
+  @DisplayName("다른 요청이 처리 잠금을 소유하면 시간 제한 종료 확정을 거부한다.")
   @Test
   void rejectsTimeLimitFinalizationWhenAnotherRequestOwnsProcessingLock() {
     assertConflict(() -> service.finalizeTimeLimit(messageReservation(), null));
     verify(freeTalkSession, never()).clearProcessing();
   }
 
+  @DisplayName("다른 요청이 처리 잠금을 소유하면 대화 계속 결정을 확정하지 않는다.")
   @Test
   void rejectsContinueFinalizationWhenAnotherRequestOwnsProcessingLock() {
     assertConflict(() -> service.finalizeContinue(decisionReservation(), null));
     verify(freeTalkSession, never()).clearProcessing();
   }
 
+  @DisplayName("다른 요청이 처리 잠금을 소유하면 대화 종료 결정을 확정하지 않는다.")
   @Test
   void rejectsEndFinalizationWhenAnotherRequestOwnsProcessingLock() {
     assertConflict(() -> service.finalizeEnd(decisionReservation(), null));
     verify(freeTalkSession, never()).clearProcessing();
   }
 
+  @DisplayName("실패 보상 처리에서 다른 종료 결정의 처리 잠금을 해제하지 않는다.")
   @Test
   void doesNotClearAnotherDecisionProcessingLockDuringCompensation() {
     service.compensateDecision(decisionReservation());

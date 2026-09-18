@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,6 +67,7 @@ class MailboxApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM mailbox_feedback");
   }
 
+  @DisplayName("사용자 의견을 제출하면 대기 상태로 저장한다.")
   @Test
   void submitFeedbackStoresPendingFeedback() throws Exception {
     TestUser user = login("submit");
@@ -91,6 +93,7 @@ class MailboxApiIntegrationTests {
             });
   }
 
+  @DisplayName("사용자 의견 제출 시 요청 값과 인증을 검증한다.")
   @Test
   void submitFeedbackValidatesPayloadAndAuthentication() throws Exception {
     TestUser user = login("invalid");
@@ -114,6 +117,7 @@ class MailboxApiIntegrationTests {
         .andExpect(status().isUnauthorized());
   }
 
+  @DisplayName("보낸 사용자 의견은 최신순 커서 페이지로 조회한다.")
   @Test
   void sentFeedbacksUseNewestFirstCursorPagination() throws Exception {
     TestUser user = login("sent");
@@ -147,6 +151,7 @@ class MailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
+  @DisplayName("보낸 사용자 의견 상세는 소유자만 조회하며 답장을 포함한다.")
   @Test
   void sentFeedbackDetailIsLimitedToOwnerAndIncludesReplies() throws Exception {
     TestUser owner = login("owner");
@@ -174,6 +179,7 @@ class MailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
 
+  @DisplayName("OpenAPI 문서에 편지함 사용자 API를 모두 명시한다.")
   @Test
   void mailboxOpenApiDescribesAllUserEndpoints() throws Exception {
     mockMvc
@@ -201,6 +207,7 @@ class MailboxApiIntegrationTests {
                 .exists());
   }
 
+  @DisplayName("받은 편지함에는 게시된 전체 공지와 개인 대상 편지를 함께 반환한다.")
   @Test
   void receivedMailboxCombinesPublishedGlobalAndTargetedLetters() throws Exception {
     saveNotice("고정 공지", "공지 미리보기", true, 10);
@@ -227,6 +234,7 @@ class MailboxApiIntegrationTests {
         .andExpect(status().isNotFound());
   }
 
+  @DisplayName("가입 전 게시한 전체 공지도 보이지만 읽지 않은 편지 수에는 포함하지 않는다.")
   @Test
   void globalLettersPublishedBeforeSignupAreVisibleButNotUnread() throws Exception {
     TestUser user = login("signup-boundary");
@@ -250,6 +258,7 @@ class MailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.unreadCount").value(1));
   }
 
+  @DisplayName("받은 편지함은 커서로 조회하고 페이지 값을 검증한다.")
   @Test
   void receivedMailboxUsesCursorAndValidatesPageValues() throws Exception {
     saveNotice("고정 공지", "고정", true, 1);
@@ -297,6 +306,7 @@ class MailboxApiIntegrationTests {
     }
   }
 
+  @DisplayName("받은 공지 상세의 콘텐츠 블록을 JSON 값으로 직렬화한다.")
   @Test
   void receivedNoticeDetailSerializesContentBlocksAsJsonValues() throws Exception {
     TestUser user = login("content-blocks");
@@ -308,6 +318,7 @@ class MailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.contentBlocks[0].text").value("실제 공지 본문"));
   }
 
+  @DisplayName("편지 상세 조회는 읽음 처리를 멱등하게 수행하고 미확인 수를 갱신한다.")
   @Test
   void receivedDetailMarksLettersReadIdempotentlyAndUpdatesUnreadCount() throws Exception {
     TestUser user = login("read");
@@ -344,6 +355,7 @@ class MailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.unreadCount").value(1));
   }
 
+  @DisplayName("동시에 답장을 읽어도 최초 읽은 시각을 보존한다.")
   @Test
   void concurrentReplyReadsPreserveInitialReadTime() throws Exception {
     TestUser user = login("concurrent-read");

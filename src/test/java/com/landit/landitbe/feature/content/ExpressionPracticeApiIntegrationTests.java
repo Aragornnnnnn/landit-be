@@ -15,6 +15,7 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -47,6 +48,7 @@ class ExpressionPracticeApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
+  @DisplayName("토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다.")
   @Test
   void practiceRejectsMissingAccessToken() throws Exception {
     // given: 조회 대상 표현이 DB에 존재
@@ -61,7 +63,8 @@ class ExpressionPracticeApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
-  /** 정상 호출 시 표현 정보 + 예문 4개 + 작문 문제(예문 중 하나)가 응답에 담기는지 검증한다. */
+  /** 정상 호출 시 표현 정보와 예문 2개, 언어별 작문 문제 2개를 반환한다. */
+  @DisplayName("예문 2개와 언어별 작문 문제 2개를 반환하고 원문 및 단어 칩 정보를 보존한다.")
   @Test
   void practiceReturnsExamplesAndWritingSentence() throws Exception {
     // given: payload에 예문 4개를 가진 표현이 DB에 존재하고, 로그인한 상태
@@ -155,6 +158,7 @@ class ExpressionPracticeApiIntegrationTests {
     assertThat(pickedTexts).containsExactly("practice-sentence-0", "practice-sentence-1");
   }
 
+  @DisplayName("사용자 학습 수준보다 어려운 표현의 연습 조회를 거부한다.")
   @Test
   void practiceRejectsExpressionAboveLearningLevel() throws Exception {
     Long expressionId = seedExpressionWithPracticeExamples();
@@ -182,6 +186,7 @@ class ExpressionPracticeApiIntegrationTests {
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
+  @DisplayName("존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다.")
   @Test
   void practiceRejectsUnknownExpression() throws Exception {
     // given: 로그인만 하고, 표현은 심지 않은 상태
@@ -200,6 +205,7 @@ class ExpressionPracticeApiIntegrationTests {
   }
 
   /** INACTIVE(내려간) 표현은 존재하지 않는 것처럼 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
+  @DisplayName("INACTIVE(내려간) 표현은 존재하지 않는 것처럼 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다.")
   @Test
   void practiceRejectsInactiveExpression() throws Exception {
     // given: INACTIVE 상태로 심어진 표현 (payload에 예문 4개가 있어도 노출되면 안 됨)
@@ -219,6 +225,7 @@ class ExpressionPracticeApiIntegrationTests {
   }
 
   /** 필수 키가 빠진 불량 예문은 응답에서 제외되고 정상 예문만 반환되는지 검증한다. (빈 예문 카드 노출 방지) */
+  @DisplayName("필수 키가 빠진 불량 예문은 응답에서 제외되고 정상 예문만 반환되는지 검증한다.")
   @Test
   void practiceExcludesInvalidSentences() throws Exception {
     // given: 정상 예문 4개 + sentenceText가 없는 불량 예문 1개가 섞인 payload로 시딩
@@ -307,6 +314,7 @@ class ExpressionPracticeApiIntegrationTests {
    * <p>정상 3건과 불량 1건을 심으면, 제외가 동작할 때만 유효 예문이 3건이 되어 404가 된다. 제외가 깨지면 4건이 되어 200이 나오므로 무작위 분배와 무관하게
    * 결정적으로 판별된다.
    */
+  @DisplayName("불량 예문을 제외한 유효 예문이 4개 미만이면 연습 조회에 404를 반환한다.")
   @Test
   void practiceRejectsExpressionWithTooFewValidSentences() throws Exception {
     // given: 정상 예문 3개 + sentenceText가 없는 불량 예문 1개

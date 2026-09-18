@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 프리톡 일일 발화 사용량 예약의 한도와 날짜 분리를 검증한다. */
@@ -48,6 +49,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 59초 사용 뒤 3초 발화는 전체를 예약하고 남은 시간을 0으로 제한한다. */
+  @DisplayName("59초 사용 뒤 3초 발화는 전체를 예약하고 남은 시간을 0으로 제한한다.")
   @Test
   void reservesEntireUtteranceThatStartsBeforeDailyLimit() {
     LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
@@ -62,6 +64,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 이미 60초를 사용한 날에는 새 발화를 예약하지 않는다. */
+  @DisplayName("이미 60초를 사용한 날에는 새 발화를 예약하지 않는다.")
   @Test
   void rejectsUtteranceWhenDailyLimitIsAlreadyUsed() {
     LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
@@ -76,6 +79,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 누적 시간이 long 범위를 넘는 발화는 사용량을 음수로 되감지 않고 거절한다. */
+  @DisplayName("누적 시간이 long 범위를 넘는 발화는 사용량을 음수로 되감지 않고 거절한다.")
   @Test
   void rejectsUtteranceThatOverflowsDailyUsage() {
     FreeTalkDailySpeakingUsage usage =
@@ -87,6 +91,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 전날 사용량과 분리해 KST 당일 사용량만 예약한다. */
+  @DisplayName("전날 사용량과 분리해 KST 당일 사용량만 예약한다.")
   @Test
   void reservesOnlyCurrentKoreaDateUsage() {
     LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
@@ -104,6 +109,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 같은 사용자의 첫 일일 행 생성도 사용자 잠금 안에서 직렬화한다. */
+  @DisplayName("같은 사용자의 첫 일일 행 생성도 사용자 잠금 안에서 직렬화한다.")
   @Test
   void locksUserBeforeCreatingFirstDailyUsage() {
     when(repository.findByUserProfileIdAndUsageDateForUpdate(eq(1L), any(LocalDate.class)))
@@ -117,6 +123,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** AI 호출에 실패하면 같은 날짜에 예약한 발화 시간을 환불한다. */
+  @DisplayName("AI 호출에 실패하면 같은 날짜에 예약한 발화 시간을 환불한다.")
   @Test
   void releasesReservedUsage() {
     LocalDate usageDate = LocalDate.now(CLOCK.withZone(KOREA_ZONE_ID));
@@ -130,6 +137,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 아직 발화 이력이 없으면 하루 전체 시간을 남은 시간으로 반환한다. */
+  @DisplayName("아직 발화 이력이 없으면 하루 전체 시간을 남은 시간으로 반환한다.")
   @Test
   void returnsEntireDailyLimitWhenUsageDoesNotExist() {
     when(repository.findByIdUserProfileIdAndIdUsageDate(eq(1L), any(LocalDate.class)))
@@ -139,6 +147,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
   }
 
   /** 환경 설정의 제한시간을 사용량 계산과 공개 응답에 함께 사용한다. */
+  @DisplayName("환경 설정의 제한시간을 사용량 계산과 공개 응답에 함께 사용한다.")
   @Test
   void usesConfiguredSpeakingTimeLimit() {
     when(repository.findByIdUserProfileIdAndIdUsageDate(eq(1L), any(LocalDate.class)))
@@ -149,6 +158,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
     assertThat(configuredService.speakingTimeLimitMs()).isEqualTo(9_999_999L);
   }
 
+  @DisplayName("일일 한도에 도달하면 길이 0인 요청도 사용량 변경 없이 거부한다.")
   @Test
   void rejectsZeroDurationRequestsAtDailyLimitWithoutMutatingUsage() {
     FreeTalkDailySpeakingUsage usage = requestUsage();
@@ -165,6 +175,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
     assertThat(usage.getUsedSpeakingDurationMs()).isZero();
   }
 
+  @DisplayName("세션 시작과 길이 0인 메시지도 분당 요청 한도를 공유한다.")
   @Test
   void sharesMinuteLimitBetweenStartsAndZeroDurationMessages() {
     FreeTalkDailySpeakingUsage usage = requestUsage();
@@ -181,6 +192,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
     assertThat(usage.getMinuteRequestCount()).isEqualTo(20);
   }
 
+  @DisplayName("분 경계에서 분당 횟수만 초기화하고 일일 횟수는 유지한다.")
   @Test
   void resetsMinuteWindowAtBoundaryWithoutResettingDailyCount() {
     FreeTalkDailySpeakingUsage usage = requestUsage();
@@ -195,6 +207,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
     assertThat(usage.getRequestMinute()).isEqualTo(LocalDateTime.of(2026, 9, 11, 9, 0));
   }
 
+  @DisplayName("실패한 AI 발화의 사용량을 돌려줘도 요청 횟수는 유지한다.")
   @Test
   void keepsRequestCountsWhenFailedAiUtteranceIsReleased() {
     FreeTalkDailySpeakingUsage usage = requestUsage();
@@ -207,6 +220,7 @@ class FreeTalkDailySpeakingUsageServiceTest {
     assertThat(usage.getMinuteRequestCount()).isEqualTo(1);
   }
 
+  @DisplayName("UTC 시계를 사용해도 한국 자정에 새 일일 요청 한도를 시작한다.")
   @Test
   void startsNewDailyRequestBudgetAtKoreaMidnightEvenWithUtcClock() {
     LocalDate yesterday = LocalDate.of(2026, 9, 11);

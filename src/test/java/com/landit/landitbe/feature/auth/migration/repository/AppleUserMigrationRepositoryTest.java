@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AppleUserMigrationRepositoryTest {
@@ -44,6 +45,7 @@ class AppleUserMigrationRepositoryTest {
     databaseKeeper.close();
   }
 
+  @DisplayName("활성 Apple 계정만 이전 대기 대상으로 초기화한다.")
   @Test
   void initializePendingTargetsOnlyActiveAppleIdentities() throws Exception {
     insertIdentity(1L, "APPLE", "old-apple-sub", "apple@example.com", "ACTIVE");
@@ -58,6 +60,7 @@ class AppleUserMigrationRepositoryTest {
     assertThat(repository.initializePending()).isZero();
   }
 
+  @DisplayName("Apple 이전 마이그레이션을 반복 적용할 수 있다.")
   @Test
   void migrationCanBeAppliedRepeatedly() throws Exception {
     applyMigration();
@@ -66,6 +69,7 @@ class AppleUserMigrationRepositoryTest {
         .isEqualTo(new AppleUserMigrationSummary(0, 0, 0, 0));
   }
 
+  @DisplayName("준비 및 실패한 이전 작업은 재시도 가능한 단계에서만 조회한다.")
   @Test
   void preparedAndFailedRowsAreSelectedOnlyForTheirRetryablePhase() throws Exception {
     insertIdentity(1L, "APPLE", "old-sub-1", null, "ACTIVE");
@@ -86,6 +90,7 @@ class AppleUserMigrationRepositoryTest {
         .containsExactly("transfer-sub-1");
   }
 
+  @DisplayName("Apple 이전 완료 시 프로필을 유지하고 동일 계정의 식별 정보를 원자적으로 갱신한다.")
   @Test
   void completeKeepsUserProfileAndUpdatesTheSameIdentityAtomically() throws Exception {
     insertIdentity(7L, "APPLE", "old-apple-sub", "old@privaterelay.appleid.com", "ACTIVE");
@@ -104,6 +109,7 @@ class AppleUserMigrationRepositoryTest {
     assertThat(repository.findCandidates(AppleUserMigrationPhase.COMPLETE)).isEmpty();
   }
 
+  @DisplayName("Apple이 릴레이 이메일을 반환하지 않으면 기존 이메일을 유지한다.")
   @Test
   void completePreservesExistingEmailWhenAppleDoesNotReturnPrivateRelayEmail() throws Exception {
     insertIdentity(7L, "APPLE", "old-apple-sub", "person@example.com", "ACTIVE");
@@ -118,6 +124,7 @@ class AppleUserMigrationRepositoryTest {
         .isEqualTo("person@example.com");
   }
 
+  @DisplayName("수신 팀의 sub가 중복되면 양쪽 계정 모두 덮어쓰지 않는다.")
   @Test
   void duplicateRecipientSubDoesNotOverwriteEitherIdentity() throws Exception {
     insertIdentity(7L, "APPLE", "old-apple-sub", null, "ACTIVE");
@@ -140,6 +147,7 @@ class AppleUserMigrationRepositoryTest {
     assertThat(readMigrationStatus(candidate.migrationId())).isEqualTo("PREPARED");
   }
 
+  @DisplayName("비활성 Apple 계정은 이전 완료 상태로 바꾸지 않는다.")
   @Test
   void inactiveIdentityDoesNotBecomeCompleted() throws Exception {
     insertIdentity(7L, "APPLE", "old-apple-sub", null, "ACTIVE");
@@ -159,6 +167,7 @@ class AppleUserMigrationRepositoryTest {
     assertThat(readMigrationStatus(candidate.migrationId())).isEqualTo("PREPARED");
   }
 
+  @DisplayName("Apple 이전 결과는 단계별 성공과 실패 수를 집계한다.")
   @Test
   void summarizeUsesPhaseSpecificSuccessAndFailureCounts() throws Exception {
     insertIdentity(1L, "APPLE", "old-sub-1", null, "ACTIVE");

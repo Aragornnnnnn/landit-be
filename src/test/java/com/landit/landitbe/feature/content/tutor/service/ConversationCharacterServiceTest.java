@@ -17,6 +17,7 @@ import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 공용 캐릭터의 기능 간 TTS 조회 계약을 단위 검증한다. */
@@ -29,6 +30,7 @@ class ConversationCharacterServiceTest {
       new ConversationCharacterService(characterRepository, ttsVoiceRepository);
 
   /** 캐릭터에 연결된 활성 음성을 공개 응답 record로 변환한다. */
+  @DisplayName("캐릭터에 연결된 활성 음성을 공개 응답 record로 변환한다.")
   @Test
   void returnsActiveTtsVoiceForCharacter() {
     ConversationCharacter character = mock(ConversationCharacter.class);
@@ -49,6 +51,7 @@ class ConversationCharacterServiceTest {
   }
 
   /** 등록된 활성 캐릭터가 없으면 리소스 없음 오류를 반환한다. */
+  @DisplayName("등록된 활성 캐릭터가 없으면 리소스 없음 오류를 반환한다.")
   @Test
   void rejectsMissingActiveCharacter() {
     when(characterRepository.findByCharacterIdAndStatus("unknown", ActiveStatus.ACTIVE))

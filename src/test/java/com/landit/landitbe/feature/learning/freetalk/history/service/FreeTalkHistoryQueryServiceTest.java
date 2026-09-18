@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -62,6 +63,7 @@ class FreeTalkHistoryQueryServiceTest {
   }
 
   /** 기존 표현이 비활성화돼도 과거 프리톡 상세의 스냅샷은 조회한다. */
+  @DisplayName("기존 표현이 비활성화돼도 과거 프리톡 상세의 스냅샷은 조회한다.")
   @Test
   void returnsExistingExpressionInHistoryAfterItBecomesInactive() {
     LearningSession learningSession = completedLearningSessionForDetail();
@@ -100,6 +102,7 @@ class FreeTalkHistoryQueryServiceTest {
   }
 
   /** 이전 프리톡에서 추천한 표현은 현재 세션에서 미완료로 시작하고 추천 시각을 반환한다. */
+  @DisplayName("이전 프리톡에서 추천한 표현은 현재 세션에서 미완료로 시작하고 추천 시각을 반환한다.")
   @Test
   void returnsPreviousRecommendationTimeWithoutReusingCompletionState() {
     LearningSession learningSession = completedLearningSessionForDetail();
@@ -143,6 +146,7 @@ class FreeTalkHistoryQueryServiceTest {
   }
 
   /** 목록 조회는 페이지의 세션과 표현을 일괄 조회한다. */
+  @DisplayName("목록 조회는 페이지의 세션과 표현을 일괄 조회한다.")
   @Test
   void loadsSessionListLearningSessionsAndExpressionsInBatches() {
     FreeTalkSession firstSession = listedFreeTalkSession(100L, 10L);

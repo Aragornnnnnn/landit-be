@@ -19,12 +19,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import tools.jackson.databind.json.JsonMapper;
 
 @EnabledIfEnvironmentVariable(named = "LAN474_AI_URL", matches = ".+")
 class AiDeploymentCompatibilityIntegrationTest {
+  @DisplayName("실제 AI 서버가 피드백 계약과 캐시 복구 요청을 수용한다.")
   @Test
   void actualAiAcceptsTheHotfixContractAndCacheRecovery() throws Exception {
     String baseUrl = System.getenv("LAN474_AI_URL");

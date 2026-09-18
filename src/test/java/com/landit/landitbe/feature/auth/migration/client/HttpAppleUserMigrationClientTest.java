@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class HttpAppleUserMigrationClientTest {
@@ -54,6 +55,7 @@ class HttpAppleUserMigrationClientTest {
     server.stop(0);
   }
 
+  @DisplayName("Apple 사용자 이전 토큰은 client_credentials와 이전 scope로 요청한다.")
   @Test
   void requestsMigrationTokenWithClientCredentialsScope() {
     respond(
@@ -77,6 +79,7 @@ class HttpAppleUserMigrationClientTest {
                 "client-secret"));
   }
 
+  @DisplayName("기존 Apple sub와 수신 팀 ID로 이전 식별자를 발급한다.")
   @Test
   void createsTransferIdentifierWithOldSubAndRecipientTeam() {
     respond(200, "{\"transfer_sub\":\"transfer-sub\"}");
@@ -99,6 +102,7 @@ class HttpAppleUserMigrationClientTest {
                 "client-secret"));
   }
 
+  @DisplayName("Apple 이전 식별자를 수신 팀의 사용자 정보로 교환한다.")
   @Test
   void exchangesTransferIdentifierForRecipientUser() {
     respond(
@@ -123,6 +127,7 @@ class HttpAppleUserMigrationClientTest {
                 "client-secret"));
   }
 
+  @DisplayName("Apple 이전 응답에 비공개 릴레이 이메일이 없어도 허용한다.")
   @Test
   void acceptsRecipientResponseWithoutPrivateRelayEmail() {
     respond(200, "{\"sub\":\"new-sub\",\"is_private_email\":false}");
@@ -131,6 +136,7 @@ class HttpAppleUserMigrationClientTest {
         .isEqualTo(new AppleRecipientUser("new-sub", null));
   }
 
+  @DisplayName("Apple 성공 응답에 필수 식별자가 없으면 거부한다.")
   @Test
   void rejectsSuccessfulResponseWhenRequiredIdentifierIsMissing() {
     respond(200, "{\"email\":\"private@privaterelay.appleid.com\"}");
@@ -141,6 +147,7 @@ class HttpAppleUserMigrationClientTest {
         .isEqualTo("APPLE_RESPONSE_INVALID");
   }
 
+  @DisplayName("Apple HTTP 오류에 응답 본문과 자격 증명을 노출하지 않는다.")
   @Test
   void sanitizesAppleHttpErrorsWithoutResponseOrCredentials() {
     respond(400, "{\"error\":\"invalid_client_secret client-secret transfer-sub\"}");

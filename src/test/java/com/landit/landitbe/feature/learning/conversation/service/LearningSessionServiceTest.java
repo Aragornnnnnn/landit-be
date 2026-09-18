@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.learning.conversation.exception.SessionExcept
 import com.landit.landitbe.feature.learning.conversation.repository.LearningSessionRepository;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** LearningSessionService의 소유권과 진행 상태 검증을 단위 테스트한다. */
@@ -24,6 +25,7 @@ class LearningSessionServiceTest {
   private final LearningSessionService service = new LearningSessionService(repository);
 
   /** 잠금 조회 결과는 이후 영속 상태 변경과 분리된 값으로 반환한다. */
+  @DisplayName("잠금 조회 결과는 이후 영속 상태 변경과 분리된 값으로 반환한다.")
   @Test
   void returnsOwnedInProgressSessionForUpdate() {
     LearningSession session =
@@ -44,6 +46,7 @@ class LearningSessionServiceTest {
   }
 
   /** 존재하지만 다른 사용자의 세션이면 권한 오류로 변환한다. */
+  @DisplayName("존재하지만 다른 사용자의 세션이면 권한 오류로 변환한다.")
   @Test
   void rejectsSessionOwnedByAnotherUser() {
     when(repository.findByIdAndUserProfileId(10L, 1L)).thenReturn(Optional.empty());
@@ -56,6 +59,7 @@ class LearningSessionServiceTest {
   }
 
   /** 사용자 세션 종료도 메시지 저장과 같은 잠금을 사용해 상태 변경을 직렬화한다. */
+  @DisplayName("사용자 세션 종료도 메시지 저장과 같은 잠금을 사용해 상태 변경을 직렬화한다.")
   @Test
   void endsSessionWithLockedLookup() {
     LearningSession session = mock(LearningSession.class);

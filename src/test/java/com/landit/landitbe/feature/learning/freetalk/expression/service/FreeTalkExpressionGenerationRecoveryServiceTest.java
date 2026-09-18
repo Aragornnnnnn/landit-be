@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,6 +31,7 @@ class FreeTalkExpressionGenerationRecoveryServiceTest {
   private final FreeTalkExpressionGenerationService generator =
       mock(FreeTalkExpressionGenerationService.class);
 
+  @DisplayName("다른 인스턴스가 진행 중인 표현 생성 작업을 침범하지 않는다.")
   @Test
   void preservesAnotherInstancesLiveGeneration() {
     var session = session();
@@ -41,6 +43,7 @@ class FreeTalkExpressionGenerationRecoveryServiceTest {
     verify(generator, never()).generate(10L);
   }
 
+  @DisplayName("대기 및 만료된 표현 생성 작업을 재개하되 3회 시도 후에는 중단한다.")
   @Test
   void resumesQueuedAndExpiredWorkButStopsAfterThreeAttempts() {
     var session = session();

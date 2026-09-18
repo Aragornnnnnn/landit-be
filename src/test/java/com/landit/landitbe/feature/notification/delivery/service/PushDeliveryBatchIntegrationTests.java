@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.LongStream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -86,6 +87,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 동일 500토큰의 기존 경로와 새 dispatch 경로에서 실제 SQL·쓰기 커밋 수를 비교한다. */
+  @DisplayName("동일 500토큰의 기존 경로와 새 dispatch 경로에서 실제 SQL·쓰기 커밋 수를 비교한다.")
   @Test
   void reducesFiveHundredTokenSqlFrom3501To32() {
     List<UserPushToken> seeded = seed(500);
@@ -118,6 +120,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 새 행의 키·문구 스냅샷을 보존하고 Ticket 결과를 응답 순서로 연결한다. */
+  @DisplayName("새 행의 키·문구 스냅샷을 보존하고 Ticket 결과를 응답 순서로 연결한다.")
   @Test
   void mapsGeneratedKeysAndTicketResultsWithoutDependingOnLockOrder() {
     List<UserPushToken> seeded = seed(3);
@@ -162,6 +165,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 소유자 변경·해제 Token은 제외하고 재시도 표식은 한 번만 소비한다. */
+  @DisplayName("소유자 변경·해제 Token은 제외하고 재시도 표식은 한 번만 소비한다.")
   @Test
   void preservesOwnerRevocationAndRetryGuards() {
     List<UserPushToken> seeded = seed(3);
@@ -185,6 +189,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 묶음 중 잘못된 Ticket이 있으면 앞선 전이도 롤백한다. */
+  @DisplayName("묶음 중 잘못된 Ticket이 있으면 앞선 전이도 롤백한다.")
   @Test
   void rollsBackWholeTicketBatchOnInvalidResult() {
     List<Long> ids =
@@ -203,6 +208,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 사용자 두 명의 발송 선점 중 한 행이 실패하면 INSERT 전체가 롤백된다. */
+  @DisplayName("사용자 두 명의 발송 선점 중 한 행이 실패하면 INSERT 전체가 롤백된다.")
   @Test
   void rollsBackWholeInsertBatch() {
     List<UserPushToken> seeded = seed(2);
@@ -222,6 +228,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** JDBC 저장도 외부 Spring 트랜잭션의 롤백에 함께 참여한다. */
+  @DisplayName("JDBC 저장도 외부 Spring 트랜잭션의 롤백에 함께 참여한다.")
   @Test
   void rollsBackJdbcInsertAndUpdateWithEnclosingTransaction() {
     UserPushToken token = seed(1).getFirst();
@@ -243,6 +250,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** Receipt 예약 실패 뒤 Token이 해제돼도 접수 이력으로 복구하며 Expo에 다시 보내지 않는다. */
+  @DisplayName("Receipt 예약 실패 뒤 Token이 해제돼도 접수 이력으로 복구하며 Expo에 다시 보내지 않는다.")
   @Test
   void recoversAcceptedReceiptsAfterPublisherFailureWithoutResending() {
     List<UserPushToken> seeded = seed(2);
@@ -268,6 +276,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 접두어 안의 %, _를 패턴으로 해석하거나 다른 이벤트로 확대하지 않는다. */
+  @DisplayName("접두어 안의 %, _를 패턴으로 해석하거나 다른 이벤트로 확대하지 않는다.")
   @Test
   void matchesEventPrefixesLiterally() {
     UserPushToken token = seed(1).getFirst();
@@ -280,6 +289,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 같은 Token을 포함한 역순 신규 묶음은 이력을 한 번만 선점하고 교착되지 않는다. */
+  @DisplayName("같은 Token을 포함한 역순 신규 묶음은 이력을 한 번만 선점하고 교착되지 않는다.")
   @Test
   void claimsOverlappingNewBatchesOnlyOnce() throws Exception {
     List<PreparePushDeliveryCommand> commands =
@@ -308,6 +318,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 재시도 묶음이 잠금을 보유하면 기존 단건 경로도 기다리고 표식을 중복 소비하지 않는다. */
+  @DisplayName("재시도 묶음이 잠금을 보유하면 기존 단건 경로도 기다리고 표식을 중복 소비하지 않는다.")
   @Test
   void serializesBatchRetryWithLegacySinglePrepare() throws Exception {
     PreparePushDeliveryCommand command = command(seed(1).getFirst(), "event");
@@ -361,6 +372,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** Token 이전 트랜잭션이 먼저 잠갔다면 묶음 선점은 커밋된 새 소유자를 보고 제외한다. */
+  @DisplayName("Token 이전 트랜잭션이 먼저 잠갔다면 묶음 선점은 커밋된 새 소유자를 보고 제외한다.")
   @Test
   void waitsForTokenOwnershipChangeBeforePreparing() throws Exception {
     UserPushToken token = seed(1).getFirst();
@@ -371,6 +383,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** Receipt의 토큰 무효화와 신규 묶음 선점이 겹쳐도 무효 토큰을 다시 선점하지 않는다. */
+  @DisplayName("Receipt의 토큰 무효화와 신규 묶음 선점이 겹쳐도 무효 토큰을 다시 선점하지 않는다.")
   @Test
   void waitsForInvalidTokenReceiptBeforePreparingNewEvent() throws Exception {
     UserPushToken token = seed(1).getFirst();
@@ -423,6 +436,7 @@ class PushDeliveryBatchIntegrationTests {
   }
 
   /** 빈 입력은 SQL 없이 반환하고 제한 초과 입력은 DB에 접근하기 전에 거부한다. */
+  @DisplayName("빈 입력은 SQL 없이 반환하고 제한 초과 입력은 DB에 접근하기 전에 거부한다.")
   @Test
   void validatesBatchBoundaries() {
     final UserPushToken token = seed(1).getFirst();

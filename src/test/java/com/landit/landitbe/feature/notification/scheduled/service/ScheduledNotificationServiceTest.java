@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -82,6 +83,7 @@ class ScheduledNotificationServiceTest {
   }
 
   /** 500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 SQS 재발행 없이 상태를 저장한다. */
+  @DisplayName("500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 SQS 재발행 없이 상태를 저장한다.")
   @Test
   void processesUsersInFiveHundredSizeKeysetPagesWithoutPublishingPushSendMessages(
       CapturedOutput output) {
@@ -141,6 +143,7 @@ class ScheduledNotificationServiceTest {
   }
 
   /** 같은 날짜의 재처리에서 선정 유형이 바뀌어도 사용자 일일 이벤트 ID는 유지한다. */
+  @DisplayName("같은 날짜의 재처리에서 선정 유형이 바뀌어도 사용자 일일 이벤트 ID는 유지한다.")
   @Test
   @SuppressWarnings("unchecked")
   void keepsDailyEventIdWhenSelectedNotificationTypeChangesOnRetry() {
@@ -176,6 +179,7 @@ class ScheduledNotificationServiceTest {
   }
 
   /** 페이지 조회 실패 시 배치 실패 단계와 실행 시도를 남기고 예외를 유지한다. */
+  @DisplayName("페이지 조회 실패 시 배치 실패 단계와 실행 시도를 남기고 예외를 유지한다.")
   @Test
   void recordsFailedBatchWithoutSwallowingFailure(CapturedOutput output) {
     LocalDate scheduledDate = LocalDate.of(2026, 7, 26);

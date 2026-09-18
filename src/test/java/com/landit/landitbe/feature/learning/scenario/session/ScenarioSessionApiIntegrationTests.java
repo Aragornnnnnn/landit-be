@@ -61,6 +61,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -198,6 +199,7 @@ class ScenarioSessionApiIntegrationTests {
     throw new AssertionError("이전 테스트의 수준 평가가 제한 시간 내 완료되지 않았습니다.");
   }
 
+  @DisplayName("모든 학습 수준에서 진단 시나리오는 공통 질문 4개를 사용한다.")
   @ParameterizedTest
   @NullSource
   @ValueSource(ints = {1, 2, 3, 4, 5})
@@ -320,6 +322,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.progress.totalQuestionCount").value(3));
   }
 
+  @DisplayName("AI 선발화 시나리오 시작 시 세션과 진도 및 첫 메시지를 저장하고 응답한다.")
   @Test
   void startAiFirstScenarioCreatesSessionProgressOpeningMessageAndResponse() throws Exception {
     JsonNode loginBody = login("ai-first@example.com");
@@ -398,6 +401,7 @@ class ScenarioSessionApiIntegrationTests {
     assertHistoryMessage(sessionId, "AI", "What food do you like? Why do you like it?");
   }
 
+  @DisplayName("OpenAPI 문서에 시나리오 세션 시작과 종료 계약을 명시한다.")
   @Test
   void openApiDocumentsScenarioSessionStartAndEndContracts() throws Exception {
     String scenarioSessionPath = "$.paths['/api/v1/scenarios/{scenarioId}/sessions'].post";
@@ -428,6 +432,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionEndPath + ".responses['409'].description").value("이미 완료됨"));
   }
 
+  @DisplayName("OpenAPI 문서에서 고정 질문 본문이 null일 수 있음을 명시한다.")
   @Test
   void openApiDocumentsFixedQuestionTextAsNullable() throws Exception {
     String fixedQuestionTextSchema =
@@ -440,6 +445,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(fixedQuestionTextSchema + ".type[1]").value("null"));
   }
 
+  @DisplayName("AI 선발화 시나리오의 첫 고정 질문이 없으면 500을 반환한다.")
   @Test
   void startAiFirstScenarioWithoutFirstFixedQuestionReturnsInternalServerError() throws Exception {
     JsonNode loginBody = login("ai-first-without-question@example.com");
@@ -471,6 +477,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INTERNAL_SERVER_ERROR"));
   }
 
+  @DisplayName("사용자 메시지를 저장하고 다음 AI 메시지와 진행 상태를 반환한다.")
   @Test
   void submitMessageSavesUserMessageGeneratesNextAiMessageAndReturnsProgress() throws Exception {
     JsonNode loginBody = login("message-submit@example.com");
@@ -633,6 +640,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(awaitInnerThoughtStatus(submittedMessageId, "COMPLETED")).isTrue();
   }
 
+  @DisplayName("종료 메시지의 완료된 속마음을 조회한다.")
   @Test
   void getInnerThoughtReturnsCompletedClosingMessageInnerThought() throws Exception {
     StartedSession startedSession =
@@ -673,6 +681,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(fakeAiConversationClient.lastInnerThoughtRequest()).isNull();
   }
 
+  @DisplayName("속마음 생성에 실패해도 다음 대화 메시지를 유지한다.")
   @Test
   void submitMessageKeepsNextMessageWhenInnerThoughtGenerationFails() throws Exception {
     StartedSession startedSession =
@@ -734,6 +743,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.innerThoughtType").value(nullValue()));
   }
 
+  @DisplayName("AI가 메시지 피드백 실패를 알리면 피드백을 실패 상태로 저장한다.")
   @Test
   void submitMessageMarksMessageFeedbackFailedWhenAiReportsFailed() throws Exception {
     StartedSession startedSession =
@@ -767,6 +777,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(awaitMessageFeedbackStatus(messageId, "FAILED")).isTrue();
   }
 
+  @DisplayName("시나리오 시도 갱신은 동시에 저장한 피드백과 속마음을 보존한다.")
   @ParameterizedTest
   @ValueSource(strings = {"RESPONSE", "CLAIM", "RELEASE"})
   void scenarioAttemptUpdatesPreserveConcurrentFeedbackAndInnerThought(String update)
@@ -828,6 +839,7 @@ class ScenarioSessionApiIntegrationTests {
     }
   }
 
+  @DisplayName("속마음 응답의 메시지 ID가 다르면 실패로 처리한다.")
   @Test
   void submitMessageMarksInnerThoughtFailedWhenResponseMessageIdDiffers() throws Exception {
     StartedSession startedSession =
@@ -861,6 +873,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(awaitInnerThoughtStatus(messageId, "FAILED")).isTrue();
   }
 
+  @DisplayName("만료 처리와 늦은 속마음 완료가 경합해도 확정된 실패 상태를 유지한다.")
   @Test
   void getInnerThoughtKeepsFailedWhenStaleTimeoutRacesWithLateCompletion() throws Exception {
     StartedSession startedSession =
@@ -919,6 +932,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(awaitInnerThoughtStatus(messageId, "FAILED")).isTrue();
   }
 
+  @DisplayName("다른 사용자의 메시지와 존재하지 않는 메시지의 속마음 조회를 거부한다.")
   @Test
   void getInnerThoughtRejectsOtherUserAndMissingMessage() throws Exception {
     StartedSession startedSession =
@@ -943,6 +957,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
 
+  @DisplayName("속마음 조회에는 인증이 필요하다.")
   @Test
   void getInnerThoughtRequiresAuthentication() throws Exception {
     mockMvc
@@ -951,6 +966,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("오래된 준비 중 속마음은 조회 시 실패로 전환한다.")
   @Test
   void getInnerThoughtMarksStalePreparingResultAsFailed() throws Exception {
     StartedSession startedSession =
@@ -1000,6 +1016,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.innerThoughtType").value(nullValue()));
   }
 
+  @DisplayName("사용자 선발화의 첫 메시지는 시작 지침을 쓰고 이후에는 직전 AI 메시지를 사용한다.")
   @Test
   void submitUserFirstMessagesUseOpeningInstructionThenPrecedingAiMessage() throws Exception {
     JsonNode loginBody = login("user-first-submit@example.com");
@@ -1097,6 +1114,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo("A medium size, please.");
   }
 
+  @DisplayName("사용자 선발화 시나리오의 고정 질문을 연속된 순서로 모두 읽는다.")
   @Test
   void userFirstScenarioReadsAllFixedQuestionsInContinuousOrder() throws Exception {
     JsonNode loginBody = login("user-first-continuous-order@example.com");
@@ -1139,6 +1157,7 @@ class ScenarioSessionApiIntegrationTests {
     assertLearningSession(sessionId, userId, "COMPLETED", "SYSTEM", "MAX_TURNS_REACHED");
   }
 
+  @DisplayName("세션 도중 수준이 바뀌어도 시작할 때의 질문 수준 그룹을 유지한다.")
   @Test
   void scenarioSessionKeepsQuestionLevelGroupFromStart() throws Exception {
     JsonNode loginBody = login("question-level-snapshot@example.com");
@@ -1193,6 +1212,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo("LEVEL_1");
   }
 
+  @DisplayName("마지막 발화 피드백이 실패해도 세션을 완료하고 수준 평가를 수행한다.")
   @Test
   void lastTurnFeedbackFailureStillCompletesAndAssessesSession() throws Exception {
     fakeAiConversationClient.failMessageFeedbackRequest();
@@ -1220,6 +1240,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.levelAssessment.source").value("FALLBACK"));
   }
 
+  @DisplayName("사용자 첫 메시지 처리에는 저장해 둔 시작 지침을 사용한다.")
   @Test
   void userFirstMessageUsesOpeningInstructionSnapshot() throws Exception {
     JsonNode loginBody = login("user-first-opening-snapshot@example.com");
@@ -1265,6 +1286,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo("수정 전 시작 안내입니다.");
   }
 
+  @DisplayName("사용자 선발화의 시작 지침이 없어도 다음 메시지를 반환한다.")
   @Test
   void submitUserFirstMessageWithoutOpeningInstructionStillReturnsNextMessage() throws Exception {
     JsonNode loginBody = login("user-first-missing-instruction@example.com");
@@ -1302,6 +1324,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(status().isOk());
   }
 
+  @DisplayName("AI 선발화의 직전 AI 메시지가 없어도 다음 메시지를 반환한다.")
   @Test
   void submitAiFirstMessageWithoutPrecedingAiMessageStillReturnsNextMessage() throws Exception {
     JsonNode loginBody = login("ai-first-missing-message@example.com");
@@ -1361,6 +1384,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(messageCount).isEqualTo(2);
   }
 
+  @DisplayName("다음 질문이 없으면 종료 메시지와 함께 세션을 완료한다.")
   @Test
   void submitMessageCompletesSessionWithClosingMessageWhenNextQuestionDoesNotExist()
       throws Exception {
@@ -1431,6 +1455,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(hasScenarioAccess(userId, 2102)).isTrue();
   }
 
+  @DisplayName("시나리오를 완료하면 오늘을 연속 학습 활동일로 기록한다.")
   @Test
   void completingScenarioRecordsTodayAsStreakActivity() throws Exception {
     LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
@@ -1448,6 +1473,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.activeDates[0]").value(today.toString()));
   }
 
+  @DisplayName("자정 전에 시작한 일일 시나리오를 자정 후 완료해도 접근 권한을 부여한다.")
   @Test
   void dailyScenarioStartedBeforeMidnightGrantsAccessWhenCompletedAfterMidnight() throws Exception {
     mutableClock.setInstant(Instant.parse("2026-07-28T14:59:59Z"));
@@ -1478,6 +1504,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(hasScenarioAccess(userId, 2123)).isTrue();
   }
 
+  @DisplayName("진단 세션을 조회해도 기존 세션의 질문 수를 변경하지 않는다.")
   @Test
   void hotfixReadsDiagnosticSessionWithoutChangingLegacyQuestionCount() throws Exception {
     StartedSession session = startFirstScenarioForCompatibility();
@@ -1492,6 +1519,7 @@ class ScenarioSessionApiIntegrationTests {
     }
   }
 
+  @DisplayName("후속 마이그레이션 이후에도 기존 첫 시나리오의 질문 3개를 유지한다.")
   @Test
   void hotfixKeepsLegacyFirstScenarioAtThreeQuestionsAfterFutureMigration() throws Exception {
     StartedSession session = startFirstScenarioForCompatibility();
@@ -1513,6 +1541,7 @@ class ScenarioSessionApiIntegrationTests {
     }
   }
 
+  @DisplayName("기존 메시지 피드백을 동일한 HTTP 요청 안에서 복구한다.")
   @Test
   void hotfixRecoversLegacyFeedbackInTheSameHttpRequest() throws Exception {
     StartedSession session = startCompletedAiFirstSession("legacy-recovery@example.com");
@@ -1529,6 +1558,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo(1);
   }
 
+  @DisplayName("AI 캐시가 사라져도 저장된 메시지 피드백을 사용한다.")
   @Test
   void hotfixUsesDurableFeedbackAfterAiCacheIsLost() throws Exception {
     fakeAiConversationClient.returnCompletedFeedback = true;
@@ -1545,6 +1575,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo(1);
   }
 
+  @DisplayName("새 AI가 유실된 피드백을 복구하면 기존 작업 데이터를 갱신한다.")
   @Test
   void hotfixUpgradesLegacyWorkWhenNewAiRecoversLostFeedback() throws Exception {
     StartedSession session = startCompletedAiFirstSession("upgrade-feedback@example.com");
@@ -1556,6 +1587,7 @@ class ScenarioSessionApiIntegrationTests {
         .hasSize(1);
   }
 
+  @DisplayName("동시 피드백 복구는 한 요청만 선점하고 만료된 선점은 다시 복구한다.")
   @Test
   void hotfixClaimsConcurrentRecoveryOnlyOnceAndRecoversExpiredLease() throws Exception {
     StartedSession session = startCompletedAiFirstSession("concurrent-recovery@example.com");
@@ -1593,6 +1625,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
   }
 
+  @DisplayName("늦은 피드백 저장과 메시지 삭제가 경합해도 교착되지 않는다.")
   @Test
   void hotfixLateFeedbackDoesNotDeadlockWithMessageDeletion() throws Exception {
     startCompletedAiFirstSession("delete-during-feedback@example.com");
@@ -1636,6 +1669,7 @@ class ScenarioSessionApiIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("저장된 스냅샷을 무시하는 기존 AI에는 필요한 문맥을 다시 전달한다.")
   @Test
   void hotfixWarmsLegacyAiWhenItIgnoresSavedSnapshots() throws Exception {
     fakeAiConversationClient.returnCompletedFeedback = true;
@@ -1713,6 +1747,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.messageFeedbacks[0].feedbackType").value("GOOD"));
   }
 
+  @DisplayName("최종 피드백을 최초 생성한 뒤 재조회하면 재생성 없이 저장된 결과를 반환한다.")
   @Test
   void getSessionFeedbackCreatesResultAndReturnsExistingResultWithoutRegeneration()
       throws Exception {
@@ -1840,6 +1875,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(progress.get("COMPLETED_COUNT")).isEqualTo(1);
   }
 
+  @DisplayName("AI 선발화의 첫 답변 피드백에는 첫 질문 메타데이터를 사용한다.")
   @Test
   void getSessionFeedbackUsesOpeningQuestionMetadataForAiFirstAnswer() throws Exception {
     StartedSession startedSession =
@@ -1871,6 +1907,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 임대 교체 뒤 늦게 도착한 이전 응답이 최신 평가를 덮어쓰지 못한다. */
+  @DisplayName("임대 교체 뒤 늦게 도착한 이전 응답이 최신 평가를 덮어쓰지 못한다.")
   @Test
   void lan474ClaimsExpiredFeedbackAndRejectsTheOldAttempt() throws Exception {
     var session = startCompletedAiFirstSession("feedback-lease@example.com");
@@ -1915,6 +1952,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** AI 엔드포인트가 반환한 실제 계약을 저장하고 캐시 없이 최종 요청에 재사용한다. */
+  @DisplayName("AI 엔드포인트가 반환한 실제 계약을 저장하고 캐시 없이 최종 요청에 재사용한다.")
   @Test
   void lan474PersistsCompletedFeedbackAndSuppliesTheFinalRequest() throws Exception {
     fakeAiConversationClient.durableMessageFeedback = true;
@@ -1939,6 +1977,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(snapshots.getFirst().toString()).isEqualTo(payload);
   }
 
+  @DisplayName("최종 AI 피드백 생성 실패 시 빈 결과를 저장하지 않고 재시도를 허용한다.")
   @Test
   void getSessionFeedbackRetriesFinalAiFailureWithoutPersistingEmptyResult() throws Exception {
     StartedSession startedSession =
@@ -1965,6 +2004,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo(1);
   }
 
+  @DisplayName("상세 피드백이 완료되면 원본 메시지도 완료 상태로 반영한다.")
   @Test
   void getSessionFeedbackCompletesSourceMessageWhenDetailedFeedbackIsCompleted() throws Exception {
     StartedSession startedSession =
@@ -1984,6 +2024,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(statuses.get("SOURCE_MESSAGE_STATUS")).isEqualTo("COMPLETED");
   }
 
+  @DisplayName("AI 별점이 서버 점수 구간과 달라도 유효한 AI 별점을 저장한다.")
   @Test
   void getSessionFeedbackStoresAiStarRatingWhenItDiffersFromNativeScoreBand() throws Exception {
     StartedSession startedSession =
@@ -2005,6 +2046,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualByComparingTo("2.5");
   }
 
+  @DisplayName("지원하지 않는 AI 별점은 최종 피드백을 저장하지 않고 거부한다.")
   @Test
   void getSessionFeedbackRejectsUnsupportedAiStarRatingWithoutSaving() throws Exception {
     StartedSession startedSession =
@@ -2027,6 +2069,7 @@ class ScenarioSessionApiIntegrationTests {
         .isEqualTo(1);
   }
 
+  @DisplayName("사용자 선발화 최종 피드백에 시작 지침과 모든 사용자 메시지를 포함한다.")
   @Test
   void getSessionFeedbackIncludesUserFirstOpeningInstructionAndAllUserMessages() throws Exception {
     JsonNode loginBody = login("session-feedback-user-first@example.com");
@@ -2124,6 +2167,7 @@ class ScenarioSessionApiIntegrationTests {
             });
   }
 
+  @DisplayName("첫 평가로 선택 수준을 대체한 뒤에는 연속 승급 조건을 적용한다.")
   @ParameterizedTest
   @ValueSource(ints = {1, 4, 3})
   void firstAssessmentReplacesSelectedLevelThenUsesConsecutivePromotion(int selectedLevel)
@@ -2171,6 +2215,7 @@ class ScenarioSessionApiIntegrationTests {
     assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 1), 4, 0, "UNCHANGED");
   }
 
+  @DisplayName("저장된 평가 이력으로 다음 평가의 최초 초기화 여부를 결정한다.")
   @ParameterizedTest
   @CsvSource({
     "text-level-v1.1, UNCHANGED, MODEL, true, false",
@@ -2210,6 +2255,7 @@ class ScenarioSessionApiIntegrationTests {
         nextSessionId, initialized ? 3 : 1, 0, initialized ? "UNCHANGED" : "INITIALIZED");
   }
 
+  @DisplayName("도입 전 이력은 최초 초기화 기회를 소모하지 않고 과거 평가도 재시작하지 않는다.")
   @Test
   void preLaunchHistoryDoesNotConsumeFirstInitializationOrRestartOldAssessment() throws Exception {
     JsonNode user = login("pre-launch-assessment@example.com").path("data");
@@ -2286,6 +2332,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("PROMOTION_STREAK", streak);
   }
 
+  @DisplayName("부분 평가는 저장과 재시도 후에도 보존하되 프로필 수준은 초기화하지 않는다.")
   @Test
   void partialAssessmentSurvivesStorageAndRetryWithoutInitializingProfile() throws Exception {
     JsonNode loginBody = login("partial-assessment@example.com");
@@ -2353,6 +2400,7 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("PROMOTION_STREAK", 0);
   }
 
+  @DisplayName("진행 중인 세션의 최종 피드백 조회를 거부한다.")
   @Test
   void getSessionFeedbackRejectsInProgressSession() throws Exception {
     JsonNode loginBody = login("session-feedback-in-progress@example.com");
@@ -2384,6 +2432,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(fakeAiConversationClient.sessionFeedbackCallCount()).isZero();
   }
 
+  @DisplayName("최종 피드백 조회에는 인증이 필요하다.")
   @Test
   void getSessionFeedbackRequiresAuthentication() throws Exception {
     mockMvc
@@ -2392,6 +2441,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("AI가 목표 달성을 알려도 다음 질문이 남아 있으면 대화를 계속한다.")
   @Test
   void submitMessageContinuesWhenAiReportsGoalCompletedButNextQuestionExists() throws Exception {
     fakeAiConversationClient.completeGoalOnNextMessage();
@@ -2461,6 +2511,7 @@ class ScenarioSessionApiIntegrationTests {
             "Oh, you like spicy pizza. Do you want me to stop now?");
   }
 
+  @DisplayName("다른 사용자의 시나리오 세션에는 메시지를 보낼 수 없다.")
   @Test
   void submitMessageRejectsOtherUserSession() throws Exception {
     JsonNode ownerLoginBody = login("message-owner@example.com");
@@ -2491,6 +2542,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
   }
 
+  @DisplayName("시나리오 메시지 전송에는 인증이 필요하다.")
   @Test
   void submitMessageRequiresAuthentication() throws Exception {
     mockMvc
@@ -2508,6 +2560,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("존재하지 않는 시나리오 세션의 메시지를 거부한다.")
   @Test
   void submitMessageRejectsMissingSession() throws Exception {
     JsonNode loginBody = login("message-missing@example.com");
@@ -2530,6 +2583,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
   }
 
+  @DisplayName("완료된 시나리오 세션의 새 메시지를 거부한다.")
   @Test
   void submitMessageRejectsCompletedSession() throws Exception {
     StartedSession startedSession =
@@ -2562,6 +2616,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("SESSION_ALREADY_COMPLETED"));
   }
 
+  @DisplayName("내용이 빈 시나리오 메시지를 거부한다.")
   @Test
   void submitMessageRejectsBlankMessage() throws Exception {
     StartedSession startedSession =
@@ -2583,6 +2638,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("AI 실패 후 기존 클라이언트가 새 입력을 기록할 수 있다.")
   @Test
   void submitMessageAllowsLegacyClientToRecordNewInputAfterAiFailure() throws Exception {
     fakeAiConversationClient.blockInnerThoughtGeneration();
@@ -2654,6 +2710,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(userMessageIds(sessionId)).hasSize(1);
   }
 
+  @DisplayName("메시지 피드백 요청이 실패해도 다음 대화 메시지를 유지한다.")
   @Test
   void submitMessageKeepsNextMessageWhenMessageFeedbackRequestFails() throws Exception {
     fakeAiConversationClient.failMessageFeedbackRequest();
@@ -2719,6 +2776,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(messageCount).isEqualTo(3);
   }
 
+  @DisplayName("메시지 피드백 상태가 잘못되어도 다음 대화 메시지를 유지한다.")
   @Test
   void submitMessageKeepsNextMessageWhenMessageFeedbackStatusIsInvalid() throws Exception {
     fakeAiConversationClient.returnMessageFeedbackStatus(ProcessingStatus.COMPLETED);
@@ -2769,6 +2827,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(messageCount).isEqualTo(3);
   }
 
+  @DisplayName("피드백 응답의 메시지 ID가 달라도 다음 대화 메시지를 유지한다.")
   @Test
   void submitMessageKeepsNextMessageWhenMessageFeedbackResponseMessageIdDiffers() throws Exception {
     fakeAiConversationClient.returnMessageFeedbackForMessageId(9999L);
@@ -2819,6 +2878,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(messageCount).isEqualTo(3);
   }
 
+  @DisplayName("피드백 응답의 세션 ID가 달라도 다음 대화 메시지를 유지한다.")
   @Test
   void submitMessageKeepsNextMessageWhenMessageFeedbackResponseSessionIdDiffers() throws Exception {
     fakeAiConversationClient.returnMessageFeedbackForSessionId(9999L);
@@ -2869,6 +2929,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(messageCount).isEqualTo(3);
   }
 
+  @DisplayName("사용자 선발화 시작 시 AI 첫 메시지 없이 시작 지침을 반환한다.")
   @Test
   void startUserFirstScenarioReturnsInstructionWithoutOpeningMessage() throws Exception {
     JsonNode loginBody = login("user-first@example.com");
@@ -2934,6 +2995,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(messageCount).isZero();
   }
 
+  @DisplayName("시나리오 시작 시 TTS 음성이 비활성이면 null을 반환한다.")
   @Test
   void startScenarioReturnsNullTtsVoiceWhenVoiceIsInactive() throws Exception {
     JsonNode loginBody = login("inactive-tts@example.com");
@@ -2963,6 +3025,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.character.ttsVoice").value(nullValue()));
   }
 
+  @DisplayName("같은 사용자의 동시 시나리오 시작에서 진도 생성 충돌을 처리한다.")
   @Test
   void startScenarioHandlesConcurrentProgressCreationForSameUser() throws Exception {
     JsonNode loginBody = login("concurrent-start@example.com");
@@ -3015,6 +3078,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(progressCount).isEqualTo(1);
   }
 
+  @DisplayName("시나리오 시작에는 인증이 필요하다.")
   @Test
   void startScenarioRequiresAuthentication() throws Exception {
     mockMvc
@@ -3023,6 +3087,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("존재하지 않는 시나리오의 시작을 거부한다.")
   @Test
   void startScenarioRejectsMissingScenario() throws Exception {
     JsonNode loginBody = login("missing-scenario@example.com");
@@ -3037,6 +3102,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("SCENARIO_NOT_FOUND"));
   }
 
+  @DisplayName("비활성 카테고리의 시나리오 시작을 거부한다.")
   @Test
   void startScenarioRejectsInactiveCategory() throws Exception {
     JsonNode loginBody = login("locked-category@example.com");
@@ -3056,6 +3122,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("CATEGORY_LOCKED"));
   }
 
+  @DisplayName("현재 순서보다 뒤에 있는 시나리오의 시작을 거부한다.")
   @Test
   void startScenarioRejectsScenarioAfterTheCurrentScenario() throws Exception {
     JsonNode loginBody = login("locked-scenario@example.com");
@@ -3078,6 +3145,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
   }
 
+  @DisplayName("오늘 시나리오도 완료한 시나리오도 아니면 시작을 거부한다.")
   @Test
   void startScenarioRejectsScenarioThatIsNotTodayOrCleared() throws Exception {
     JsonNode loginBody = login("not-today@example.com");
@@ -3099,6 +3167,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.message").value("DAILY_SCENARIO_NOT_AVAILABLE"));
   }
 
+  @DisplayName("아직 열지 않은 현재 시나리오는 다음 날에도 시작할 수 있다.")
   @Test
   void startUnopenedCurrentScenarioRemainsAvailableOnTheNextDay() throws Exception {
     JsonNode loginBody = login("previous-day-at-midnight@example.com");
@@ -3127,6 +3196,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(status().isCreated());
   }
 
+  @DisplayName("접근 권한을 획득한 시나리오는 다시 대화할 수 있다.")
   @Test
   void startGrantedScenarioAllowsReplay() throws Exception {
     JsonNode loginBody = login("granted-scenario@example.com");
@@ -3166,6 +3236,7 @@ class ScenarioSessionApiIntegrationTests {
     assertScenarioSession(sessionId, 3015);
   }
 
+  @DisplayName("소유한 진행 중 세션을 종료하면 중단 상태로 변경한다.")
   @Test
   void endSessionInterruptsOwnedInProgressSession() throws Exception {
     StartedSession startedSession =
@@ -3191,6 +3262,7 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(hasScenarioAccess(startedSession.userId(), 2006)).isFalse();
   }
 
+  @DisplayName("다른 사용자의 세션 종료를 거부한다.")
   @Test
   void endSessionRejectsOtherUserSession() throws Exception {
     StartedSession ownerSession = startUserFirstSession("owner@example.com", 1006, 2007, 3007);
@@ -3206,6 +3278,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
   }
 
+  @DisplayName("존재하지 않는 세션의 종료를 거부한다.")
   @Test
   void endSessionRejectsMissingSession() throws Exception {
     JsonNode loginBody = login("missing-session@example.com");
@@ -3220,6 +3293,7 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
   }
 
+  @DisplayName("이미 끝난 세션의 종료를 거부한다.")
   @Test
   void endSessionRejectsAlreadyEndedSession() throws Exception {
     StartedSession startedSession =
@@ -3245,6 +3319,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 두 기기의 동시 시작과 중도 종료에도 무료 기회는 같은 대화에 고정된다. */
+  @DisplayName("두 기기의 동시 시작과 중도 종료에도 무료 기회는 같은 대화에 고정된다.")
   @Test
   void lan474ReservesOneFreeSessionAndResumesInterruptedWithin24Hours() throws Exception {
     var seed = startUserFirstSession("free-reservation@example.com", 1291, 2291, 3291);
@@ -3287,6 +3362,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 무료 사용자는 첫 시나리오의 첫 완료 세션만 상세 피드백을 받고, 다른 시나리오와 같은 시나리오의 재완료는 총 피드백까지만 받는다. */
+  @DisplayName("무료 사용자는 첫 시나리오의 첫 완료 세션만 상세 피드백을 받고, 다른 시나리오와 같은 시나리오의 재완료는 총 피드백까지만 받는다.")
   @Test
   void lan499LocksDetailFeedbackOutsideFirstCompletionOfFirstScenario() throws Exception {
     StartedSession first = startFreeUserFirstScenario("lan499-lock@example.com");
@@ -3320,6 +3396,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 잠긴 세션도 결제 후 다시 조회하면 저장된 메시지별 피드백을 전부 내린다. */
+  @DisplayName("잠긴 세션도 결제 후 다시 조회하면 저장된 메시지별 피드백을 전부 내린다.")
   @Test
   void lan499PremiumUnlocksDetailFeedbackOnRetry() throws Exception {
     StartedSession first = startFreeUserFirstScenario("lan499-premium@example.com");
@@ -3338,6 +3415,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 첫 시나리오를 중도 종료하고 하루 뒤 다시 시작해 끝낸 세션이 첫 완료 세션이라 상세 피드백을 받는다. */
+  @DisplayName("첫 시나리오를 중도 종료하고 하루 뒤 다시 시작해 끝낸 세션이 첫 완료 세션이라 상세 피드백을 받는다.")
   @Test
   void lan499AbandonedFirstStartDoesNotConsumeDetailFeedback() throws Exception {
     JsonNode loginBody = login("lan499-abandon@example.com");
@@ -3363,6 +3441,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 도입 전에 시작한 세션은 첫 시나리오가 아니어도 상세 피드백을 잠그지 않는다. */
+  @DisplayName("도입 전에 시작한 세션은 첫 시나리오가 아니어도 상세 피드백을 잠그지 않는다.")
   @Test
   void lan499SessionStartedBeforeLaunchKeepsDetailFeedback() throws Exception {
     StartedSession first = startFreeUserFirstScenario("lan499-prelaunch@example.com");
@@ -3392,6 +3471,7 @@ class ScenarioSessionApiIntegrationTests {
    *   <li>도입 전에 시작한 A 세션은 그 뒤에도 계속 상세 피드백이 열려 있어야 한다.
    * </ol>
    */
+  @DisplayName("도입 전 세션은 무료 기회를 소모하지 않고 도입 후 처음 시작한 시나리오를 예약한다.")
   @Test
   void lan499PreLaunchSessionDoesNotConsumeFirstScenarioAndFirstPostLaunchScenarioIsReserved()
       throws Exception {
@@ -3443,6 +3523,7 @@ class ScenarioSessionApiIntegrationTests {
    *   <li>첫 시나리오 예약은 처음 시작한 시나리오(2499)에 그대로 남는다.
    * </ul>
    */
+  @DisplayName("첫 시나리오 완료 후 무료 사용자도 다음 일일 시나리오를 총 피드백까지 학습한다.")
   @Test
   void lan499NextDailyScenarioIsPlayableUpToSummaryFeedbackForFreeUser() throws Exception {
     StartedSession first = startFreeUserFirstScenario("lan499-next-daily@example.com");
@@ -3474,6 +3555,7 @@ class ScenarioSessionApiIntegrationTests {
    *       피드백이 잠겨야 한다.
    * </ol>
    */
+  @DisplayName("프리미엄 만료 후에도 예약 전에는 상세 피드백을 열고 새 무료 시나리오를 예약하면 잠근다.")
   @Test
   void lan499SessionCompletedWhilePremiumStaysOpenAfterExpiry() throws Exception {
     JsonNode loginBody = login("lan499-expired@example.com");
@@ -3569,6 +3651,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 접수 후 실패한 같은 발화는 재시도하고, 완료 응답은 유예 만료 후에도 재전송한다. */
+  @DisplayName("접수 후 실패한 같은 발화는 재시도하고, 완료 응답은 유예 만료 후에도 재전송한다.")
   @Test
   void lan474RetriesAcceptedMessageAndReplaysStoredResponse() throws Exception {
     var session = startUserFirstSession("durable-turn@example.com", 1292, 2292, 3292);
@@ -3627,6 +3710,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   /** 서버 종료로 남은 구 FE 발화는 임대 중에는 보존하고 만료 후 새 녹음을 받는다. */
+  @DisplayName("서버 종료로 남은 구 FE 발화는 임대 중에는 보존하고 만료 후 새 녹음을 받는다.")
   @Test
   void lan474LegacyRecordingCanReplaceOnlyAnExpiredAttempt() throws Exception {
     var session = startUserFirstSession("legacy-crash@example.com", 1293, 2293, 3293);

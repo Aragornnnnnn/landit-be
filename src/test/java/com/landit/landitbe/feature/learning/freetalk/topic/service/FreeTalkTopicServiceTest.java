@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.learning.freetalk.usage.dto.DailySpeakingUsag
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 프리톡 메인 조회의 주제와 남은 발화 시간을 검증한다. */
@@ -25,6 +26,7 @@ class FreeTalkTopicServiceTest {
       new FreeTalkTopicService(topicRepository, dailySpeakingUsageService);
 
   /** 메인 조회는 활성 주제와 하루 한도, 현재 남은 시간을 함께 반환한다. */
+  @DisplayName("메인 조회는 활성 주제와 하루 한도, 현재 남은 시간을 함께 반환한다.")
   @Test
   void returnsTopicsWithRemainingDailySpeakingTime() {
     FreeTalkTopic topic = mock(FreeTalkTopic.class);
@@ -47,6 +49,7 @@ class FreeTalkTopicServiceTest {
   }
 
   /** 남은 발화 시간이 없으면 메인 화면에서 세션 시작을 막는다. */
+  @DisplayName("남은 발화 시간이 없으면 메인 화면에서 세션 시작을 막는다.")
   @Test
   void cannotStartWhenDailySpeakingTimeIsUsed() {
     when(topicRepository.findAllByStatusOrderByDisplayOrderAsc(ActiveStatus.ACTIVE))

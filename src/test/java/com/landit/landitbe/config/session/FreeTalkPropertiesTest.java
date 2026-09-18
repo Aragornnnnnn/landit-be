@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
@@ -18,6 +19,7 @@ import org.springframework.core.io.ClassPathResource;
 
 class FreeTalkPropertiesTest {
 
+  @DisplayName("프리톡 제한값이 0 이하이면 설정을 거부한다.")
   @ParameterizedTest
   @CsvSource({"0,1000,20", "-1,1000,20", "7200000,0,20", "7200000,1000,-1"})
   void rejectsNonpositiveLimits(long speakingTime, int dailyRequests, int minuteRequests) {
@@ -25,6 +27,7 @@ class FreeTalkPropertiesTest {
         .isInstanceOf(IllegalArgumentException.class);
   }
 
+  @DisplayName("프리톡 제한은 기존 설정보다 새 설정을 우선 적용한다.")
   @ParameterizedTest
   @CsvSource({"7200000,60000,7200000", ",90000,90000", ",,7200000"})
   void resolvesNewSettingBeforeLegacySetting(String dailyLimit, String legacyLimit, long expected) {

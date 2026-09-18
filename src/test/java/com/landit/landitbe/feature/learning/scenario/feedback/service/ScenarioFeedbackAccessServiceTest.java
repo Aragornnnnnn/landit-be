@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 공개 구독 계약과 소유 세션 이력으로 상세 피드백의 공개 범위를 검증한다. */
@@ -44,6 +45,7 @@ class ScenarioFeedbackAccessServiceTest {
       new ScenarioFeedbackAccessService(policies, grants, sessions, scenarioSessions);
 
   /** 도입 전이거나 프리미엄이면 상세 피드백을 잠그지 않는다. */
+  @DisplayName("도입 전이거나 프리미엄이면 상세 피드백을 잠그지 않는다.")
   @Test
   void detailFeedbackStaysOpenBeforeLaunchOrForPremium() {
     var beforeLaunch =
@@ -61,6 +63,7 @@ class ScenarioFeedbackAccessServiceTest {
   }
 
   /** 도입 전에 시작한 세션은 도입 후에 끝났어도 잠그지 않고, 예약이 없는 무료 사용자도 잠그지 않는다. */
+  @DisplayName("도입 전에 시작한 세션은 도입 후에 끝났어도 잠그지 않고, 예약이 없는 무료 사용자도 잠그지 않는다.")
   @Test
   void detailFeedbackStaysOpenForPreLaunchSessionOrWithoutReservation() {
     when(grants.freeReservation(USER_ID))
@@ -75,6 +78,7 @@ class ScenarioFeedbackAccessServiceTest {
   }
 
   /** 첫 시나리오의 첫 완료 세션만 상세 피드백을 열고, 같은 시나리오의 재완료와 다른 시나리오는 잠근다. */
+  @DisplayName("첫 시나리오의 첫 완료 세션만 상세 피드백을 열고, 같은 시나리오의 재완료와 다른 시나리오는 잠근다.")
   @Test
   void detailFeedbackOpensOnlyForFirstCompletionOfFirstScenario() {
     when(grants.freeReservation(USER_ID))
@@ -97,6 +101,7 @@ class ScenarioFeedbackAccessServiceTest {
   }
 
   /** 소유 세션이 없으면 예약 부재만으로 상세 피드백을 공개하지 않는다. */
+  @DisplayName("소유 세션이 없으면 예약 부재만으로 상세 피드백을 공개하지 않는다.")
   @Test
   void missingOwnedSessionFailsBeforeReservationLookup() {
     assertThatThrownBy(() -> service.detailFeedbackLocked(USER_ID, 100L))

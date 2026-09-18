@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -60,6 +61,7 @@ class RemoteAiFreeTalkClientTest {
     server.stop(0);
   }
 
+  @DisplayName("프리톡 AI API별 계약을 전송하고 성공 응답을 변환한다.")
   @Test
   void postsEachFreeTalkContractAndMapsSuccessfulResponses() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -142,6 +144,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(closing.translatedMessage()).isEqualTo("이야기해서 좋았어.");
   }
 
+  @DisplayName("기존 표현 추천 계약을 전송하고 성공 응답을 변환한다.")
   @Test
   void postsExistingExpressionContractAndMapsSuccessfulResponse() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -175,6 +178,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(recommendations.recommendations()).hasSize(1);
   }
 
+  @DisplayName("일반 첫 대화 요청에는 기억 조회보다 긴 대기 시간을 적용한다.")
   @Test
   void normalOpeningWaitsBeyondMemoryTimeout() {
     registerDelayedResponse(
@@ -202,6 +206,7 @@ class RemoteAiFreeTalkClientTest {
         });
   }
 
+  @DisplayName("첫 대화 요청에 기억 문맥을 보내고 사용된 기억 ID를 응답에서 읽는다.")
   @Test
   void mapsUsedMemoryIdsAndSendsMemoryContextForOpening() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -246,6 +251,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(result.usedMemoryIds()).containsExactly(77L);
   }
 
+  @DisplayName("문맥에 없는 기억 ID는 정리하되 대화 응답 자체는 거부하지 않는다.")
   @Test
   void normalizesUsedMemoryIdOutsideContextWithoutRejectingConversation() throws Exception {
     registerJsonResponse(
@@ -271,6 +277,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(result.usedMemoryIds()).isEmpty();
   }
 
+  @DisplayName("필수 필드가 빠진 프리톡 AI 응답을 거부한다.")
   @Test
   void rejectsResponsesMissingRequiredFields() throws Exception {
     registerJsonResponse(
@@ -287,6 +294,7 @@ class RemoteAiFreeTalkClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
+  @DisplayName("프리톡 대화 응답에서 감정 값이 null인 경우를 허용한다.")
   @Test
   void acceptsNullEmotionForConversationResponses() throws Exception {
     registerJsonResponse(
@@ -339,6 +347,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(remoteClient().generateClosing(closingRequest()).emotion()).isNull();
   }
 
+  @DisplayName("빈 종료 제목은 없는 것으로 처리하고 종료 메시지는 보존한다.")
   @Test
   void treatsBlankClosingTitleAsMissingWhilePreservingClosingMessage() throws Exception {
     registerRawResponse(
@@ -356,6 +365,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(result.translatedMessage()).isEqualTo("이야기해서 좋았어.");
   }
 
+  @DisplayName("AI의 502 응답 형식 오류를 유지하고 503은 생성 실패로 변환한다.")
   @Test
   void preservesResponseInvalidForUpstream502AndMaps503ToGenerationFailure() throws Exception {
     server.createContext(
@@ -380,6 +390,7 @@ class RemoteAiFreeTalkClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
   }
 
+  @DisplayName("프리톡 AI 네트워크 오류를 생성 실패로 변환한다.")
   @Test
   void mapsNetworkFailureToGenerationFailure() {
     RemoteAiFreeTalkClient client = remoteClient();
@@ -392,6 +403,7 @@ class RemoteAiFreeTalkClientTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED));
   }
 
+  @DisplayName("성공 응답의 data가 null이면 프리톡 AI 응답을 거부한다.")
   @Test
   void rejectsNullDataOnSuccessfulResponse() throws Exception {
     registerRawResponse(
@@ -401,6 +413,7 @@ class RemoteAiFreeTalkClientTest {
         () -> remoteClient().generateOpening(openingRequest()), ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("발화와 종료 및 표현 추천의 잘못된 AI 응답을 거부한다.")
   @Test
   void rejectsRepresentativeInvalidResponsesForTurnClosingAndRecommendations() throws Exception {
     registerRawResponse(
@@ -436,6 +449,7 @@ class RemoteAiFreeTalkClientTest {
         ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("후보에 없는 기존 표현 ID를 추천한 AI 응답을 거부한다.")
   @Test
   void rejectsRecommendationWithUnknownExistingExpressionId() throws Exception {
     registerRawResponse(
@@ -449,6 +463,7 @@ class RemoteAiFreeTalkClientTest {
         ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("기존 표현 ID가 빠진 추천 응답을 거부한다.")
   @Test
   void rejectsRecommendationMissingExistingExpressionId() throws Exception {
     registerRawResponse(
@@ -461,6 +476,7 @@ class RemoteAiFreeTalkClientTest {
         ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("AI 서버가 검증한 기존 표현 추천 메타데이터를 허용한다.")
   @Test
   void acceptsExistingRecommendationMetadataValidatedByAiServer() throws Exception {
     registerRawResponse(
@@ -475,6 +491,7 @@ class RemoteAiFreeTalkClientTest {
     assertThat(result.recommendations().getFirst().existingExpressionId()).isEqualTo(7L);
   }
 
+  @DisplayName("노출 순서가 중복된 표현 추천을 거부한다.")
   @Test
   void rejectsRecommendationWithDuplicateDisplayOrder() throws Exception {
     registerRawResponse(
@@ -492,6 +509,7 @@ class RemoteAiFreeTalkClientTest {
         ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("프리톡 AI 요청의 시간 초과와 인터럽트를 생성 실패로 변환한다.")
   @Test
   void mapsTimeoutAndInterruptedRequestToGenerationFailure() throws Exception {
     server.createContext(

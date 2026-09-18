@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -105,6 +106,7 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
   }
 
   /** 첫 트랜잭션의 재시도 선점이 커밋될 때까지 두 번째 트랜잭션이 같은 행 잠금을 기다린다. */
+  @DisplayName("첫 트랜잭션의 재시도 선점이 커밋될 때까지 두 번째 트랜잭션이 같은 행 잠금을 기다린다.")
   @Test
   void allowsOnlyOneConcurrentRetryClaim() throws Exception {
     CountDownLatch firstPrepared = new CountDownLatch(1);
@@ -157,6 +159,7 @@ class PushDeliveryRetryConcurrencyIntegrationTests {
   }
 
   /** 같은 설치와 중복 키로 동시에 최초 발송을 선점해도 발송 이력은 한 건만 추가한다. */
+  @DisplayName("같은 설치와 중복 키로 동시에 최초 발송을 선점해도 발송 이력은 한 건만 추가한다.")
   @Test
   void createsOnlyOneDeliveryForConcurrentFirstSend() throws Exception {
     PreparePushDeliveryCommand firstSendCommand =

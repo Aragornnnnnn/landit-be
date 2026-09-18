@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 푸시 발송 이력의 Ticket과 Receipt 상태 전이를 검증한다. */
@@ -18,6 +19,7 @@ class PushDeliveryTest {
   private static final String SENT_EXPO_PUSH_TOKEN = "ExponentPushToken[domain-snapshot]";
 
   /** Expo 호출 전 발송 이력을 요청 상태로 생성한다. */
+  @DisplayName("Expo 호출 전 발송 이력을 요청 상태로 생성한다.")
   @Test
   void createsRequestedDelivery() {
     PushDelivery delivery = requestedDelivery();
@@ -31,6 +33,7 @@ class PushDeliveryTest {
   }
 
   /** 예약 알림 문구 변형을 발송 이력에 함께 스냅샷한다. */
+  @DisplayName("예약 알림 문구 변형을 발송 이력에 함께 스냅샷한다.")
   @Test
   void storesContentVariantInRequestedDelivery() {
     PushDelivery delivery =
@@ -50,6 +53,7 @@ class PushDeliveryTest {
   }
 
   /** Expo Ticket ID를 기록하면 접수 완료 상태로 전환한다. */
+  @DisplayName("Expo Ticket ID를 기록하면 접수 완료 상태로 전환한다.")
   @Test
   void acceptsExpoTicket() {
     PushDelivery delivery = requestedDelivery();
@@ -61,6 +65,7 @@ class PushDeliveryTest {
   }
 
   /** Expo Ticket ID가 없으면 접수 상태로 전환하지 않는다. */
+  @DisplayName("Expo Ticket ID가 없으면 접수 상태로 전환하지 않는다.")
   @Test
   void rejectsBlankExpoTicket() {
     PushDelivery delivery = requestedDelivery();
@@ -73,6 +78,7 @@ class PushDeliveryTest {
   }
 
   /** Receipt가 성공하면 배달 완료 시각을 기록한다. */
+  @DisplayName("Receipt가 성공하면 배달 완료 시각을 기록한다.")
   @Test
   void marksReceiptDelivered() {
     PushDelivery delivery = requestedDelivery();
@@ -86,6 +92,7 @@ class PushDeliveryTest {
   }
 
   /** Ticket 또는 Receipt 오류 코드와 확인 시각을 기록한다. */
+  @DisplayName("Ticket 또는 Receipt 오류 코드와 확인 시각을 기록한다.")
   @Test
   void recordsFailure() {
     PushDelivery delivery = requestedDelivery();
@@ -98,6 +105,7 @@ class PushDeliveryTest {
   }
 
   /** 최종 상태가 된 발송 이력은 늦게 도착한 Ticket 결과로 덮어쓰지 않는다. */
+  @DisplayName("최종 상태가 된 발송 이력은 늦게 도착한 Ticket 결과로 덮어쓰지 않는다.")
   @Test
   void keepsTerminalStateWhenStaleResultArrives() {
     PushDelivery delivery = requestedDelivery();
@@ -112,6 +120,7 @@ class PushDeliveryTest {
   }
 
   /** 일시적인 외부 제공자 오류는 같은 발송 이력을 재시도 가능한 요청 상태로 유지한다. */
+  @DisplayName("일시적인 외부 제공자 오류는 같은 발송 이력을 재시도 가능한 요청 상태로 유지한다.")
   @Test
   void marksTemporaryProviderFailureAsRetryable() {
     PushDelivery delivery = requestedDelivery();
@@ -128,6 +137,7 @@ class PushDeliveryTest {
   }
 
   /** 재시도 표식은 첫 선점만 성공시키고 즉시 소비한다. */
+  @DisplayName("재시도 표식은 첫 선점만 성공시키고 즉시 소비한다.")
   @Test
   void claimsRetryOnlyOnce() {
     PushDelivery delivery = requestedDelivery();
@@ -139,6 +149,7 @@ class PushDeliveryTest {
   }
 
   /** Ticket 접수 뒤 도착한 오래된 Ticket 실패 결과는 접수 상태를 덮지 않는다. */
+  @DisplayName("Ticket 접수 뒤 도착한 오래된 Ticket 실패 결과는 접수 상태를 덮지 않는다.")
   @Test
   void ignoresStaleTicketFailureAfterAcceptedTicket() {
     PushDelivery delivery = requestedDelivery();
@@ -152,6 +163,7 @@ class PushDeliveryTest {
   }
 
   /** 중복 Ticket 접수 결과는 최초 Ticket ID를 덮지 않는다. */
+  @DisplayName("중복 Ticket 접수 결과는 최초 Ticket ID를 덮지 않는다.")
   @Test
   void keepsFirstAcceptedTicketWhenDuplicateResultArrives() {
     PushDelivery delivery = requestedDelivery();
@@ -164,6 +176,7 @@ class PushDeliveryTest {
   }
 
   /** 실패가 확정된 뒤 도착한 오래된 Ticket 접수 결과는 최종 상태를 덮지 않는다. */
+  @DisplayName("실패가 확정된 뒤 도착한 오래된 Ticket 접수 결과는 최종 상태를 덮지 않는다.")
   @Test
   void ignoresStaleAcceptedTicketAfterFailure() {
     PushDelivery delivery = requestedDelivery();
@@ -177,6 +190,7 @@ class PushDeliveryTest {
   }
 
   /** Ticket 접수 전 Receipt 결과는 요청 상태를 변경하지 않는다. */
+  @DisplayName("Ticket 접수 전 Receipt 결과는 요청 상태를 변경하지 않는다.")
   @Test
   void ignoresReceiptResultBeforeAcceptedTicket() {
     PushDelivery delivery = requestedDelivery();

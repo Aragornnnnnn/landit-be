@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -100,6 +101,7 @@ class ExpressionPronunciationServiceTest {
         .thenReturn(Optional.of(asset));
   }
 
+  @DisplayName("유효한 AI 발음 응답을 점수와 단어별 결과로 합친다.")
   @Test
   void mergesValidAiResponseIntoScoreAndWords() {
     givenAiResponse(
@@ -116,6 +118,7 @@ class ExpressionPronunciationServiceTest {
     assertThat(response.words().get(1).nativeDisplay()).isEqualTo("nuh·thing");
   }
 
+  @DisplayName("사용자 음절 수가 기준보다 많으면 음절 삽입 코칭을 제공한다.")
   @Test
   void usesSyllableInsertionCoachingWhenUserSyllablesExceedAsset() {
     // like(1음절)를 "라이크"처럼 3음절로 발음 — 음소 팁 대신 음절 삽입 코칭이 나가야 한다 (LAN-435)
@@ -138,6 +141,7 @@ class ExpressionPronunciationServiceTest {
     assertThat(response.words().get(2).coachingText()).contains("음절이 늘었어요").contains("1음절(like)");
   }
 
+  @DisplayName("음절 수가 기준과 같으면 음소 코칭을 유지한다.")
   @Test
   void keepsPhonemeCoachingWhenSyllableCountMatches() {
     // 음절 수가 같으면(nuh·ssing 2 = 자산 2) 기존 음소 팁 경로를 유지한다
@@ -160,6 +164,7 @@ class ExpressionPronunciationServiceTest {
     assertThat(response.words().get(1).coachingText()).startsWith("'th'가 'ss'처럼 들렸어요.");
   }
 
+  @DisplayName("단어 수가 맞아도 순서가 중복된 AI 발음 응답은 거부한다.")
   @Test
   void rejectsDuplicatedOrderEvenWhenSizeMatches() {
     // 크기는 3으로 같지만 order가 [1, 1, 2]다 — 크기 검증만으로는 통과해버리는 응답.
@@ -171,6 +176,7 @@ class ExpressionPronunciationServiceTest {
     assertInvalidAiResponse();
   }
 
+  @DisplayName("알 수 없는 단어 순서가 포함된 AI 발음 응답을 거부한다.")
   @Test
   void rejectsUnknownOrder() {
     givenAiResponse(
@@ -181,6 +187,7 @@ class ExpressionPronunciationServiceTest {
     assertInvalidAiResponse();
   }
 
+  @DisplayName("단어 판정 상태가 null인 AI 발음 응답을 거부한다.")
   @Test
   void rejectsNullStatus() {
     givenAiResponse(
@@ -191,6 +198,7 @@ class ExpressionPronunciationServiceTest {
     assertInvalidAiResponse();
   }
 
+  @DisplayName("기준 단어와 본문이 다른 AI 발음 응답을 거부한다.")
   @Test
   void rejectsWordTextMismatch() {
     // order는 맞지만 그 order의 단어가 자산과 다르다 — 판정이 엉뚱한 단어에 붙는 것을 막는다.
@@ -202,6 +210,7 @@ class ExpressionPronunciationServiceTest {
     assertInvalidAiResponse();
   }
 
+  @DisplayName("단어 판정 항목이 null인 AI 발음 응답을 거부한다.")
   @Test
   void rejectsNullJudgedWordEntry() {
     // JSON 배열의 null 항목이 NPE(500)를 내는 대신 응답 오류로 처리돼야 한다.

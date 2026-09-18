@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -67,6 +68,7 @@ class ExpressionPracticeServiceTest {
   // ===== 추가 예문 조회(getExtraPracticeExamples) 테스트 =====
 
   /** 없는 표현 ID로 추가 예문을 조회하면 RESOURCE_NOT_FOUND 예외를 던지고, 어떤 ID가 없었는지 warn 로그를 남긴다. */
+  @DisplayName("없는 표현 ID로 추가 예문을 조회하면 RESOURCE_NOT_FOUND 예외를 던지고, 어떤 ID가 없었는지 warn 로그를 남긴다.")
   @Test
   void shouldLogAndThrowWhenExpressionIdNotFound() {
     // given: 로그를 검증하기 위해 서비스 로거에 ListAppender(로그를 리스트에 담아주는 가짜 출력지)를 부착
@@ -102,6 +104,7 @@ class ExpressionPracticeServiceTest {
   }
 
   /** 적절한 표현 ID로 조회하면 표현 정보 + 눈으로 익히는 예문 2개 + 작문 문제 2개가 담긴 응답을 반환한다. */
+  @DisplayName("적절한 표현 ID로 조회하면 표현 정보 + 눈으로 익히는 예문 2개 + 작문 문제 2개가 담긴 응답을 반환한다.")
   @Test
   void shouldReturnDetailForValidExpressionId() {
     // given: 예문 4개가 payload에 담긴 표현이 DB에 있는 상황
@@ -151,6 +154,7 @@ class ExpressionPracticeServiceTest {
    * 예문 분배는 payload 순서로 고정하되 출제 언어만 매 요청 달라지는지 검증한다. 랜덤이라 "항상 다름"은 보장할 수 없으므로 100회 호출해 두 언어가 모두
    * 등장하는지 확인한다.
    */
+  @DisplayName("예문의 분배 순서는 고정하고 반복 출제에서 영어와 한국어를 모두 사용한다.")
   @Test
   void shouldKeepSentenceSplitFixedAndVaryQuizLanguage() {
     // given
@@ -189,6 +193,7 @@ class ExpressionPracticeServiceTest {
    * 유효한 예문이 4개보다 적으면 눈으로 익히는 예문 2건과 작문 문제 2건으로 나눌 수 없다. 개수를 줄여 내보내면 문제가 하나 빈 채로 학습이 진행되고 아무도 눈치채지
    * 못하므로, 콘텐츠 결함으로 보고 RESOURCE_NOT_FOUND로 드러낸다.
    */
+  @DisplayName("유효 예문이 4개보다 적으면 콘텐츠 없음 오류로 연습 구성을 거부한다.")
   @Test
   void shouldThrowWhenValidExamplesAreFewerThanRequired() {
     // given: 예문이 3개뿐인 표현
@@ -206,6 +211,7 @@ class ExpressionPracticeServiceTest {
   }
 
   /** Payload가 빈 배열이면(예문 0개) writingSentence를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
+  @DisplayName("Payload가 빈 배열이면(예문 0개) writingSentence를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다.")
   @Test
   void shouldThrowWhenExpressionHasNoExamples() {
     // given: payload가 빈 배열인 표현
@@ -226,6 +232,7 @@ class ExpressionPracticeServiceTest {
    *
    * <p>분배가 payload 순서 고정이므로 [2]는 키가 없는 예문, [3]은 키가 있는 예문으로 둔다.
    */
+  @DisplayName("예문 이미지 URL이 없으면 null로 매핑하고 있으면 그대로 반환한다.")
   @Test
   void shouldMapMissingImageUrlToNull() {
     WritingExpression expression =
@@ -245,6 +252,7 @@ class ExpressionPracticeServiceTest {
    * 기획자가 시딩한 예문에 필수 키가 빠졌거나 값이 비어 있으면, 그 예문만 응답에서 제외하고 경고 로그를 남긴다. (빈 예문 카드/빈 작문 문제가 사용자에게 노출되는 것을
    * 막고, 로그로 데이터 오류를 추적한다)
    */
+  @DisplayName("기획자가 시딩한 예문에 필수 키가 빠졌거나 값이 비어 있으면, 그 예문만 응답에서 제외하고 경고 로그를 남긴다.")
   @Test
   void shouldExcludeInvalidExamplesAndLogWarning() {
     // given: 로그 검증용 ListAppender 부착
@@ -358,6 +366,7 @@ class ExpressionPracticeServiceTest {
    * 작문 문제의 단어 배열이 출제 언어에 맞게 실리는지 검증한다. 필드 이름은 언어 중립이므로, quizLanguage가 EN이면 영어 배열이, KR이면 한국어 배열이 순서
    * 그대로 들어가야 한다. (LAN-229 단어 칩 스펙 + LAN-360 한국어 퀴즈)
    */
+  @DisplayName("작문 문제의 언어에 맞는 단어 배열을 원래 순서대로 반환한다.")
   @Test
   void shouldMapWordArraysFromPickedExample() {
     // given: 예문 4개(각자 다른 단어 배열)가 payload에 담긴 표현
@@ -404,6 +413,7 @@ class ExpressionPracticeServiceTest {
    * 단어 배열 키가 누락됐거나, 빈 배열이거나, blank 원소를 담은 예문은 응답에서 제외되고 경고 로그가 남는지 검증한다. (LAN-229: 단어 칩을 만들 수 없는
    * 예문이 작문 문제로 노출되는 것을 막는다)
    */
+  @DisplayName("단어 배열 키가 누락됐거나, 빈 배열이거나, blank 원소를 담은 예문은 응답에서 제외되고 경고 로그가 남는지 검증한다.")
   @Test
   void shouldExcludeExamplesWithInvalidWordArrays() {
     // given: 로그 검증용 ListAppender 부착
@@ -529,6 +539,7 @@ class ExpressionPracticeServiceTest {
   }
 
   /** 모든 예문이 불량이면(제외 후 0개) 작문 문제를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다. */
+  @DisplayName("모든 예문이 불량이면(제외 후 0개) 작문 문제를 뽑을 수 없으므로 RESOURCE_NOT_FOUND 예외를 던진다.")
   @Test
   void shouldThrowWhenAllExamplesAreInvalid() {
     // given: 전부 필수 키가 빠진 payload

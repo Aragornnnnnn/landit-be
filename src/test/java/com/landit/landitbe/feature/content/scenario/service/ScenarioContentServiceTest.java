@@ -13,6 +13,7 @@ import com.landit.landitbe.feature.content.scenario.question.repository.Scenario
 import com.landit.landitbe.feature.content.scenario.question.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** ScenarioContentService의 기능 간 질문 조회 계약을 단위 검증한다. */
@@ -23,6 +24,7 @@ class ScenarioContentServiceTest {
   private final ScenarioContentService service = new ScenarioContentService(null, repository);
 
   /** Repository Projection을 Session이 사용할 공개 record로 변환한다. */
+  @DisplayName("시나리오 콘텐츠의 Repository 조회 결과를 공개 record로 변환한다.")
   @Test
   void returnsNextQuestionContext() {
     ScenarioQuestionProjection projection =

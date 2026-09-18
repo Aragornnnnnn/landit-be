@@ -32,6 +32,7 @@ import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrie
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 프리톡 세션 시작 전 일일 발화 잔여 시간을 검증한다. */
@@ -50,6 +51,7 @@ class FreeTalkSessionStartServiceTest {
           dailySpeakingUsageService,
           memoryRetrievalService);
 
+  @DisplayName("프리톡 시작 응답에 설정된 발화 시간 제한을 반환한다.")
   @Test
   void returnsConfiguredSpeakingTimeLimit() {
     StartedFreeTalkSession startedSession =
@@ -77,6 +79,7 @@ class FreeTalkSessionStartServiceTest {
     assertThat(response.speakingTimeLimitMs()).isEqualTo(9_999_999L);
   }
 
+  @DisplayName("주제와 캐릭터를 검색 조건으로 사용해 첫 대화의 기억을 조회한다.")
   @Test
   void retrievesOpeningMemoryWithTopicAndCharacterQuery() {
     StartedFreeTalkSession startedSession =
@@ -129,6 +132,7 @@ class FreeTalkSessionStartServiceTest {
     verify(memoryRetrievalService).recordUsage(memoryResult, List.of(55L), 400L);
   }
 
+  @DisplayName("AI가 기억 사용 메타데이터를 거부해도 첫 대화를 재시도하지 않는다.")
   @Test
   void doesNotRetryOpeningWhenAiRejectsMemoryUsageMetadata() {
     StartedFreeTalkSession startedSession =
@@ -165,6 +169,7 @@ class FreeTalkSessionStartServiceTest {
   }
 
   /** 오늘의 발화 한도를 모두 사용했으면 세션을 생성하지 않는다. */
+  @DisplayName("오늘의 발화 한도를 모두 사용했으면 세션을 생성하지 않는다.")
   @Test
   void rejectsStartWhenDailySpeakingLimitIsUsed() {
     SessionException exception =

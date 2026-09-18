@@ -7,11 +7,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.landit.landitbe.shared.domain.Locale;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 사용자 시나리오 진행도의 완료 성과 갱신을 검증한다. */
 class UserScenarioProgressTest {
 
+  @DisplayName("시나리오 완료 시 첫 완료 시각과 최고 성과를 기록한다.")
   @Test
   void completeSetsFirstClearAndBestPerformance() {
     UserScenarioProgress progress =
@@ -29,6 +31,7 @@ class UserScenarioProgressTest {
     assertThat(progress.getBestStarRating()).isEqualByComparingTo("2.5");
   }
 
+  @DisplayName("더 낮은 점수로 완료해도 첫 완료 시각과 최고 성과를 유지한다.")
   @Test
   void completeKeepsFirstClearAndBestPerformanceWhenScoreIsLower() {
     UserScenarioProgress progress =
@@ -47,6 +50,7 @@ class UserScenarioProgressTest {
     assertThat(progress.getBestStarRating()).isEqualByComparingTo("3.0");
   }
 
+  @DisplayName("점수가 같으면 기존 최고 별점을 유지한다.")
   @Test
   void completeKeepsExistingBestStarRatingWhenScoreIsEqual() {
     UserScenarioProgress progress =

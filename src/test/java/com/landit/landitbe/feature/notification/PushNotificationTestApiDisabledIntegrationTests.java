@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.notification.delivery.PushNotificationTestController;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,6 +26,7 @@ class PushNotificationTestApiDisabledIntegrationTests {
   @Autowired private ApplicationContext applicationContext;
 
   /** 테스트 API 활성화 설정이 없으면 Controller Bean을 생성하지 않는다. */
+  @DisplayName("테스트 API 활성화 설정이 없으면 Controller Bean을 생성하지 않는다.")
   @Test
   void doesNotCreateTestApiControllerByDefault() {
     assertThat(applicationContext.getBeansOfType(PushNotificationTestController.class)).isEmpty();

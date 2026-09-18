@@ -18,6 +18,7 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -55,6 +56,7 @@ class ExpressionCandidateSelectionServiceTest {
         List.of(excerpts), USER_ID, Locale.EN, Locale.KR, MAX_DIFFICULTY_LEVEL);
   }
 
+  @DisplayName("대화 발췌별 검색 결과를 최소 거리로 합치고 가까운 순서로 정렬한다.")
   @Test
   void mergesExcerptResultsWithMinimumDistanceAndSortsAscending() {
     when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(
@@ -74,6 +76,7 @@ class ExpressionCandidateSelectionServiceTest {
     assertThat(candidateIds).containsExactly(201L, 202L, 203L);
   }
 
+  @DisplayName("거리 임계값을 넘는 표현 후보를 제외한다.")
   @Test
   void filtersCandidatesOverDistanceThreshold() {
     when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
@@ -88,6 +91,7 @@ class ExpressionCandidateSelectionServiceTest {
     assertThat(candidateIds).containsExactly(201L);
   }
 
+  @DisplayName("거리 임계값을 만족하는 후보가 없으면 가장 가까운 후보를 유지한다.")
   @Test
   void keepsClosestCandidateWhenNoneMeetsThreshold() {
     when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
@@ -100,6 +104,7 @@ class ExpressionCandidateSelectionServiceTest {
     assertThat(candidateIds).containsExactly(202L);
   }
 
+  @DisplayName("조건을 통과한 표현도 최대 후보 수까지만 반환한다.")
   @Test
   void limitsPassingCandidatesToMaxCandidates() {
     when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
@@ -114,6 +119,7 @@ class ExpressionCandidateSelectionServiceTest {
     assertThat(candidateIds).containsExactly(201L, 202L);
   }
 
+  @DisplayName("표현 검색에 최대 난이도를 포함한 검색 조건을 전달한다.")
   @Test
   void passesSearchConditionsIncludingMaxDifficultyLevel() {
     when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))
@@ -132,6 +138,7 @@ class ExpressionCandidateSelectionServiceTest {
     assertThat(search.baseLocale()).isEqualTo(Locale.KR);
   }
 
+  @DisplayName("표현 검색 결과가 전혀 없으면 후보 선정에 실패한다.")
   @Test
   void failsWhenSearchReturnsNoCandidateAtAll() {
     when(expressionRecommendationService.searchFreeTalkCandidatesByEmbedding(any()))

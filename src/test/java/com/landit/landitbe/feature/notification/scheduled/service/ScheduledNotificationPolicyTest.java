@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.notification.scheduled.dto.NotificationTarget
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.LongStream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -21,6 +22,7 @@ class ScheduledNotificationPolicyTest {
   private static final LocalDate SCHEDULED_DATE = LocalDate.of(2026, 7, 30);
 
   /** 표현과 스몰톡이 동시에 가능하면 같은 날짜·사용자에서 선택 결과가 변하지 않는다. */
+  @DisplayName("표현과 스몰톡이 동시에 가능하면 같은 날짜·사용자에서 선택 결과가 변하지 않는다.")
   @Test
   void selectsSameEligibleTypeDeterministically() {
     NotificationTargetSelectionInput input =
@@ -41,6 +43,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 표현 원문이 있으면 정확한 표현 문구를 만들고 시나리오 딥링크를 유지한다. */
+  @DisplayName("표현 원문이 있으면 정확한 표현 문구를 만들고 시나리오 딥링크를 유지한다.")
   @Test
   void createsDynamicExpressionContent() {
     NotificationTargetSelectionInput input =
@@ -66,6 +69,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 최신 스몰톡 주제가 없으면 미해결 치환 문자열 없이 일반 문구로 대체한다. */
+  @DisplayName("최신 스몰톡 주제가 없으면 미해결 치환 문자열 없이 일반 문구로 대체한다.")
   @Test
   void fallsBackToGenericSmallTalkContentWithoutTitle() {
     NotificationTargetSelectionInput input = input(1L, "민수", true, 0L, List.of());
@@ -82,6 +86,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 예약 표식이 최신 프리톡 제목에 들어오면 개인화하지 않고 일반 문구를 사용한다. */
+  @DisplayName("예약 표식이 최신 프리톡 제목에 들어오면 개인화하지 않고 일반 문구를 사용한다.")
   @Test
   void fallsBackToGenericSmallTalkContentWithReservationMarker() {
     NotificationTargetSelectionInput input = inputWithLatestFreeTalkTitle("{latestFreeTalkTitle}");
@@ -96,6 +101,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 예약 표식이 표현 원문에 들어오면 개인화하지 않고 일반 문구를 사용한다. */
+  @DisplayName("예약 표식이 표현 원문에 들어오면 개인화하지 않고 일반 문구를 사용한다.")
   @Test
   void fallsBackToGenericExpressionContentWithReservationMarker() {
     NotificationTargetSelectionInput input =
@@ -117,6 +123,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 표현 제목은 Unicode code point 255자까지 허용하고 초과하면 일반 문구를 사용한다. */
+  @DisplayName("표현 제목은 Unicode code point 255자까지 허용하고 초과하면 일반 문구를 사용한다.")
   @Test
   void appliesExpressionCodePointBoundary() {
     String expressionText = "😀".repeat(239);
@@ -152,6 +159,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 스몰톡 본문은 Unicode code point 500자까지 허용하고 초과하면 일반 문구를 사용한다. */
+  @DisplayName("스몰톡 본문은 Unicode code point 500자까지 허용하고 초과하면 일반 문구를 사용한다.")
   @Test
   void appliesSmallTalkCodePointBoundary() {
     String suffix = " 이야기, 테디와 조금 더 나눠볼까요?";
@@ -168,6 +176,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** R3은 닉네임 치환 결과의 고정된 문구와 개행을 유지한다. */
+  @DisplayName("R3은 닉네임 치환 결과의 고정된 문구와 개행을 유지한다.")
   @Test
   void preservesR3MessageWording() {
     long userProfileId = findUserProfileIdForVariant(NotificationContentVariant.SCENARIO_R3, "민수");
@@ -184,6 +193,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 닉네임에 예약 표식이 들어오면 닉네임 사용 변형을 후보에서 제외한다. */
+  @DisplayName("닉네임에 예약 표식이 들어오면 닉네임 사용 변형을 후보에서 제외한다.")
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -211,6 +221,7 @@ class ScheduledNotificationPolicyTest {
   }
 
   /** 어제 활동으로 최고 기록을 갱신하면 시나리오 A4를 강제한다. */
+  @DisplayName("어제 활동으로 최고 기록을 갱신하면 시나리오 A4를 강제한다.")
   @Test
   void usesA4WhenYesterdayActivitySetsNewRecord() {
     NotificationTargetSelectionInput input =

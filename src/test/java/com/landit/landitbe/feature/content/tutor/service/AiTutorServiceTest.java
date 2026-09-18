@@ -15,6 +15,7 @@ import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +31,7 @@ class AiTutorServiceTest {
   @InjectMocks private AiTutorService aiTutorService;
 
   /** 조건에 맞는 활성 튜터가 하나이면 해당 ID를 반환한다. */
+  @DisplayName("조건에 맞는 활성 튜터가 하나이면 해당 ID를 반환한다.")
   @Test
   void returnsOnlyActiveTutorId() {
     AiTutor aiTutor = mock(AiTutor.class);
@@ -43,6 +45,7 @@ class AiTutorServiceTest {
   }
 
   /** 활성 튜터 후보가 정확히 하나가 아니면 설정 오류를 반환한다. */
+  @DisplayName("활성 튜터 후보가 정확히 하나가 아니면 설정 오류를 반환한다.")
   @Test
   void rejectsMissingActiveTutor() {
     when(aiTutorRepository.findAllByAccentLocaleAndTargetLocaleAndStatus(

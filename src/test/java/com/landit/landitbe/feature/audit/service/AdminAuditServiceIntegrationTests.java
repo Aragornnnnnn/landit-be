@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,6 +43,7 @@ class AdminAuditServiceIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 관리자가 변경한 대상과 이전·이후 값을 감사 로그에 저장한다. */
+  @DisplayName("관리자가 변경한 대상과 이전·이후 값을 감사 로그에 저장한다.")
   @Test
   void recordsAdminWriteAuditLog() throws Exception {
     Long adminUserProfileId = loginAndFindUserProfileId("admin-audit-record");
@@ -72,6 +74,7 @@ class AdminAuditServiceIntegrationTests {
   }
 
   /** 인증 정보가 포함된 감사 값은 저장하지 않는다. */
+  @DisplayName("인증 정보가 포함된 감사 값은 저장하지 않는다.")
   @Test
   void rejectsSensitiveValuesFromAuditLog() throws Exception {
     Long adminUserProfileId = loginAndFindUserProfileId("admin-audit-sensitive");

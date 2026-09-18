@@ -55,6 +55,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
@@ -88,6 +89,7 @@ class FreeTalkMessageServiceTest {
           memoryGenerationDispatchService,
           memoryRetrievalService);
 
+  @DisplayName("사용자의 첫 발화에서만 기억을 조회하고 응답에서 사용한 기억을 기록한다.")
   @Test
   void retrievesMemoryOnlyForTheFirstUserTurnAndRecordsUsedResponse() {
     FreeTalkMessageReservation reservation = reservation();
@@ -128,6 +130,7 @@ class FreeTalkMessageServiceTest {
     verify(memoryRetrievalService).recordUsage(memoryResult, List.of(11L), 8L);
   }
 
+  @DisplayName("AI가 기억 사용 메타데이터를 거부해도 같은 발화를 재시도하지 않는다.")
   @Test
   void doesNotRetryTurnWhenAiRejectsMemoryUsageMetadata() {
     MemoryRetrievalResult memoryResult =
@@ -147,6 +150,7 @@ class FreeTalkMessageServiceTest {
     verify(aiFreeTalkClient, times(1)).generateTurn(any());
   }
 
+  @DisplayName("완료된 속마음의 저장이 실패하면 속마음을 실패 상태로 바꾼다.")
   @Test
   void marksInnerThoughtFailedWhenPersistingCompletedThoughtFails() {
     FreeTalkMessageReservation reservation = reservation();
@@ -172,6 +176,7 @@ class FreeTalkMessageServiceTest {
         .generateInnerThought(argThat(request -> request.characterId().equals("chloe")));
   }
 
+  @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")
   @Test
   void logsFailedInnerThoughtGenerationAsStructuredError() {
     Logger logger = (Logger) LoggerFactory.getLogger(FreeTalkMessageService.class);
@@ -208,6 +213,7 @@ class FreeTalkMessageServiceTest {
     }
   }
 
+  @DisplayName("프리톡 발화 생성 전에 속마음 생성을 시작한다.")
   @Test
   void startsInnerThoughtBeforeGeneratingTurn() {
     TaskExecutor taskExecutor = mock(TaskExecutor.class);
@@ -228,6 +234,7 @@ class FreeTalkMessageServiceTest {
     invocationOrder.verify(aiFreeTalkClient).generateTurn(any());
   }
 
+  @DisplayName("속마음 실행기가 작업을 거부해도 핵심 대화 응답을 유지한다.")
   @Test
   void keepsCoreResponseWhenInnerThoughtExecutorRejectsTask() {
     TaskExecutor rejectingExecutor =
@@ -251,6 +258,7 @@ class FreeTalkMessageServiceTest {
   }
 
   /** 완료 응답이 트랜잭션 확정 뒤에만 기억 생성 dispatcher로 전달되는지 확인한다. */
+  @DisplayName("완료 응답이 트랜잭션 확정 뒤에만 기억 생성 dispatcher로 전달되는지 확인한다.")
   @Test
   void dispatchesMemoryGenerationAfterNewlyCompletedResponse() {
     FreeTalkMessageReservation reservation = timeLimitReservation();
@@ -267,6 +275,7 @@ class FreeTalkMessageServiceTest {
   }
 
   /** 완료되지 않은 응답은 기억 생성 dispatcher로 전달하지 않는다. */
+  @DisplayName("완료되지 않은 응답은 기억 생성 dispatcher로 전달하지 않는다.")
   @Test
   void doesNotDispatchMemoryGenerationForNonCompletedResponse() {
     when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
@@ -280,6 +289,7 @@ class FreeTalkMessageServiceTest {
   }
 
   /** 이미 저장된 완료 응답을 재생할 때 기억 생성 dispatcher를 중복 호출하지 않는다. */
+  @DisplayName("이미 저장된 완료 응답을 재생할 때 기억 생성 dispatcher를 중복 호출하지 않는다.")
   @Test
   void doesNotDispatchMemoryGenerationForReplayedResponse() {
     when(replayService.findCompletedResponse(any(Long.class), any(Long.class), any()))
@@ -292,6 +302,7 @@ class FreeTalkMessageServiceTest {
   }
 
   /** 종료 확정으로 새로 완료된 응답도 기억 생성 dispatcher로 전달한다. */
+  @DisplayName("종료 확정으로 새로 완료된 응답도 기억 생성 dispatcher로 전달한다.")
   @Test
   void dispatchesMemoryGenerationAfterUserConfirmedCompletion() {
     FreeTalkExitDecisionReservation reservation = decisionReservation();
@@ -307,6 +318,7 @@ class FreeTalkMessageServiceTest {
     verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
   }
 
+  @DisplayName("종료 의도를 감지하면 미리 시작한 속마음 생성을 취소한다.")
   @Test
   void cancelsSpeculativeInnerThoughtWhenExitIntentIsDetected() throws InterruptedException {
     ExecutorService executor = Executors.newSingleThreadExecutor();

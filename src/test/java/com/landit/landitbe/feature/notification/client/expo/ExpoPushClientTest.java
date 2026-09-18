@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -52,6 +53,7 @@ class ExpoPushClientTest {
   }
 
   /** 정해진 여섯 필드와 선택 Access Token으로 알림을 보내고 Ticket ID를 반환한다. */
+  @DisplayName("정해진 여섯 필드와 선택 Access Token으로 알림을 보내고 Ticket ID를 반환한다.")
   @Test
   void sendsPushMessageAndMapsAcceptedTicket() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -86,6 +88,7 @@ class ExpoPushClientTest {
   }
 
   /** 여러 메시지를 한 요청 배열로 보내고 요청 순서대로 Ticket 결과를 반환한다. */
+  @DisplayName("여러 메시지를 한 요청 배열로 보내고 요청 순서대로 Ticket 결과를 반환한다.")
   @Test
   void sendsPushMessagesInBatchAndMapsTicketsInRequestOrder() throws Exception {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -118,6 +121,7 @@ class ExpoPushClientTest {
   }
 
   /** Expo Access Token이 없으면 Authorization Header를 보내지 않는다. */
+  @DisplayName("Expo Access Token이 없으면 Authorization Header를 보내지 않는다.")
   @Test
   void omitsAuthorizationHeaderWithoutExpoAccessToken() {
     AtomicReference<String> authorization = new AtomicReference<>();
@@ -134,6 +138,7 @@ class ExpoPushClientTest {
   }
 
   /** Ticket 단위 Expo 오류를 재시도 예외가 아닌 실패 결과로 변환한다. */
+  @DisplayName("Ticket 단위 Expo 오류를 재시도 예외가 아닌 실패 결과로 변환한다.")
   @Test
   void mapsRejectedTicketError() {
     stubResponse(
@@ -151,6 +156,7 @@ class ExpoPushClientTest {
   }
 
   /** Expo가 Receipt 성공을 반환하면 배달 완료 결과로 변환한다. */
+  @DisplayName("Expo가 Receipt 성공을 반환하면 배달 완료 결과로 변환한다.")
   @Test
   void mapsDeliveredReceipt() {
     stubResponse(RECEIPT_PATH, 200, "{\"data\":{\"ticket-1\":{\"status\":\"ok\"}}}");
@@ -162,6 +168,7 @@ class ExpoPushClientTest {
   }
 
   /** 요청한 Ticket ID가 응답에 없으면 Receipt 미준비 결과로 변환한다. */
+  @DisplayName("요청한 Ticket ID가 응답에 없으면 Receipt 미준비 결과로 변환한다.")
   @Test
   void mapsMissingReceiptAsNotReady() {
     AtomicReference<String> requestBody = new AtomicReference<>();
@@ -180,6 +187,7 @@ class ExpoPushClientTest {
   }
 
   /** Receipt 단위 Expo 오류 코드가 있는 응답을 배달 실패 결과로 변환한다. */
+  @DisplayName("Receipt 단위 Expo 오류 코드가 있는 응답을 배달 실패 결과로 변환한다.")
   @Test
   void mapsFailedReceiptError() {
     stubResponse(
@@ -196,6 +204,7 @@ class ExpoPushClientTest {
   }
 
   /** APNs가 BadDeviceToken을 반환하면 포괄적인 DeveloperError 대신 실제 원인을 보존한다. */
+  @DisplayName("APNs가 BadDeviceToken을 반환하면 포괄적인 DeveloperError 대신 실제 원인을 보존한다.")
   @Test
   void mapsApnsBadDeviceTokenReceiptError() throws Exception {
     stubResponse(RECEIPT_PATH, 200, fixture("/fixtures/expo/receipt-bad-device-token.json"));
@@ -207,6 +216,7 @@ class ExpoPushClientTest {
   }
 
   /** APNs BadDeviceToken이 아닌 DeveloperError는 기존 포괄 오류 코드를 유지한다. */
+  @DisplayName("APNs BadDeviceToken이 아닌 DeveloperError는 기존 포괄 오류 코드를 유지한다.")
   @Test
   void keepsGenericDeveloperErrorReceipt() {
     stubResponse(
@@ -226,6 +236,7 @@ class ExpoPushClientTest {
   }
 
   /** HTTP 400 전체 요청 오류는 Ticket 실패 결과로 변환한다. */
+  @DisplayName("HTTP 400 전체 요청 오류는 Ticket 실패 결과로 변환한다.")
   @Test
   void mapsNonRetryableRequestError() {
     stubResponse(
@@ -242,6 +253,7 @@ class ExpoPushClientTest {
   }
 
   /** HTTP 429와 5xx는 SQS 재시도를 유도하는 예외로 변환한다. */
+  @DisplayName("HTTP 429와 5xx는 SQS 재시도를 유도하는 예외로 변환한다.")
   @Test
   void throwsRetryableExceptionForTemporaryHttpFailure() {
     AtomicInteger requestCount = new AtomicInteger();
@@ -257,6 +269,7 @@ class ExpoPushClientTest {
   }
 
   /** 요청 제한시간을 넘기면 명시적으로 재시도 가능한 예외로 변환한다. */
+  @DisplayName("요청 제한시간을 넘기면 명시적으로 재시도 가능한 예외로 변환한다.")
   @Test
   void throwsRetryableExceptionForRequestTimeout() {
     server.createContext(
@@ -279,6 +292,7 @@ class ExpoPushClientTest {
   }
 
   /** 연결 실패처럼 결과를 알 수 없는 일반 I/O 오류는 자동 재시도 예외로 분류하지 않는다. */
+  @DisplayName("연결 실패처럼 결과를 알 수 없는 일반 I/O 오류는 자동 재시도 예외로 분류하지 않는다.")
   @Test
   void throwsNonRetryableExceptionForConnectionFailure() {
     String stoppedServerUrl = "http://localhost:" + server.getAddress().getPort();
@@ -290,6 +304,7 @@ class ExpoPushClientTest {
   }
 
   /** 요청 중단은 interrupt 상태를 복원하고 자동 재시도 예외로 분류하지 않는다. */
+  @DisplayName("요청 중단은 interrupt 상태를 복원하고 자동 재시도 예외로 분류하지 않는다.")
   @Test
   void restoresInterruptAndThrowsNonRetryableException() {
     Thread.currentThread().interrupt();
@@ -305,6 +320,7 @@ class ExpoPushClientTest {
   }
 
   /** Expo 응답 JSON이 계약과 다르면 자동 재시도하지 않는 예외로 변환한다. */
+  @DisplayName("Expo 응답 JSON이 계약과 다르면 자동 재시도하지 않는 예외로 변환한다.")
   @Test
   void throwsNonRetryableExceptionForMalformedResponse() {
     stubResponse(SEND_PATH, 200, "{\"data\":{}}");
@@ -314,6 +330,7 @@ class ExpoPushClientTest {
   }
 
   /** Expo Ticket 응답이 배열이 아닌 객체면 응답 형식 오류로 처리한다. */
+  @DisplayName("Expo Ticket 응답이 배열이 아닌 객체면 응답 형식 오류로 처리한다.")
   @Test
   void throwsNonRetryableExceptionForSingleObjectTicketResponse() {
     stubResponse(SEND_PATH, 200, "{\"data\":{\"status\":\"ok\",\"id\":\"ticket-1\"}}");

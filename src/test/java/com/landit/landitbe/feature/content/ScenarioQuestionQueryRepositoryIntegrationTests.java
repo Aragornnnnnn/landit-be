@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.content.scenario.question.repository.Scenario
 import com.landit.landitbe.feature.content.scenario.question.repository.projection.ScenarioQuestionProjection;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +29,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
 
   @Autowired private ScenarioQuestionQueryRepository scenarioQuestionQueryRepository;
 
+  @DisplayName("과거 진단용 시나리오 질문은 원래 그룹에 유지한다.")
   @Test
   void keepsHistoricalDiagnosticScenarioQuestionsInTheirOriginalGroups() {
     seedScenario(1L);
@@ -50,6 +52,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         .isEqualTo("New diagnostic question");
   }
 
+  @DisplayName("시나리오와 노출 순서 및 언어에 맞는 활성 질문을 조회한다.")
   @Test
   void findsActiveQuestionByScenarioDisplayOrderAndLocale() {
     seedScenario(991101L);
@@ -85,6 +88,7 @@ class ScenarioQuestionQueryRepositoryIntegrationTests {
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
+  @DisplayName("비활성 질문이나 비활성 언어 변형은 조회하지 않는다.")
   @Test
   void doesNotReturnInactiveQuestionOrInactiveVariant() {
     seedScenario(991102L);

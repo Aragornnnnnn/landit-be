@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -27,6 +28,7 @@ class NotificationTargetPageQueryServiceQueryContractTest {
   private static final LocalDate SCHEDULED_DATE = LocalDate.of(2026, 7, 30);
 
   /** 활동 조회는 사용자당 하나의 집계 행만 읽도록 SQL을 발행한다. */
+  @DisplayName("활동 조회는 사용자당 하나의 집계 행만 읽도록 SQL을 발행한다.")
   @Test
   void aggregatesActivityRowsPerUser() {
     NamedParameterJdbcTemplate jdbcTemplate =
@@ -60,6 +62,7 @@ class NotificationTargetPageQueryServiceQueryContractTest {
   }
 
   /** 최신 프리톡 조회는 사용자별 순위를 매겨 하나의 행만 읽도록 SQL을 발행한다. */
+  @DisplayName("최신 프리톡 조회는 사용자별 순위를 매겨 하나의 행만 읽도록 SQL을 발행한다.")
   @Test
   void limitsLatestFreeTalkRowsPerUser() {
     NamedParameterJdbcTemplate jdbcTemplate =

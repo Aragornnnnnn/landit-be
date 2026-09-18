@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.shared.exception.ApiException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** 실제 실행 전 SQL 경계와 설정 누락 시 차단을 확인한다. */
 class AdminPushAudienceSqlServiceTest {
+  @DisplayName("설문 미응답자 조회와 읽기 전용 CTE를 허용한다.")
   @Test
   void acceptsSurveyNonRespondersAndReadOnlyCte() {
     assertThatCode(
@@ -30,6 +32,7 @@ class AdminPushAudienceSqlServiceTest {
         .doesNotThrowAnyException();
   }
 
+  @DisplayName("지원하지 않는 SQL과 데이터 변경 SQL을 거부한다.")
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -53,6 +56,7 @@ class AdminPushAudienceSqlServiceTest {
         .isInstanceOf(ApiException.class);
   }
 
+  @DisplayName("대상 조회 실패 시 애플리케이션 DB로 대체 접속하지 않는다.")
   @Test
   void neverFallsBackToApplicationDatabase() {
     var service =

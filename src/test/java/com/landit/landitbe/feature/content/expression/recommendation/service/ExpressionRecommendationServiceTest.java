@@ -22,6 +22,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +41,7 @@ class ExpressionRecommendationServiceTest {
   @Mock private ScenarioLearningLevelService scenarioLearningLevelService;
   @InjectMocks private ExpressionRecommendationService expressionRecommendationService;
 
+  @DisplayName("표현 후보를 ID로 조회할 때 입력 순서를 보존한다.")
   @Test
   void returnsCandidatesByIdsPreservingInputOrder() {
     WritingExpression first = mock(WritingExpression.class);
@@ -71,6 +73,7 @@ class ExpressionRecommendationServiceTest {
             new ExpressionRecommendationCandidate(101L, "target-101", "base-101", "제안에 동의할 때 사용"));
   }
 
+  @DisplayName("표현 임베딩 검색을 소유 업무의 Repository에 위임한다.")
   @Test
   void delegatesEmbeddingSearchToOwnedRepository() {
     List<ExpressionEmbeddingMatch> matches = List.of(new ExpressionEmbeddingMatch(101L, 0.2));
@@ -84,6 +87,7 @@ class ExpressionRecommendationServiceTest {
     assertThat(result).isEqualTo(matches);
   }
 
+  @DisplayName("공개 프리톡 후보에 속하지 않는 표현을 거부한다.")
   @Test
   void rejectsExpressionOutsidePublicFreeTalkCandidates() {
     when(writingExpressionRepository.findPublicExpressionCandidateById(
@@ -103,6 +107,7 @@ class ExpressionRecommendationServiceTest {
         .isEqualTo(ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("사용자와 언어가 같은 공개 프리톡 표현을 허용한다.")
   @Test
   void acceptsPublicFreeTalkExpressionWithSameLocale() {
     WritingExpression expression = mock(WritingExpression.class);

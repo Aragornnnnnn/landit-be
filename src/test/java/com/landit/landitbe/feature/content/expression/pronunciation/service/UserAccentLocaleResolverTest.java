@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,6 +29,7 @@ class UserAccentLocaleResolverTest {
   @InjectMocks private UserAccentLocaleResolver resolver;
 
   /** AI 튜터 조회 없이 프로필에 저장된 억양을 반환한다. */
+  @DisplayName("AI 튜터 조회 없이 프로필에 저장된 억양을 반환한다.")
   @Test
   void returnsAccentLocaleStoredOnUserProfile() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -39,6 +41,7 @@ class UserAccentLocaleResolverTest {
   }
 
   /** 프로필의 억양이 있으면 부가 조회도 해당 억양으로 반환한다. */
+  @DisplayName("프로필의 억양이 있으면 부가 조회도 해당 억양으로 반환한다.")
   @Test
   void tryResolveReturnsAccentLocaleStoredOnUserProfile() {
     UserProfile userProfile = mock(UserProfile.class);
@@ -50,6 +53,7 @@ class UserAccentLocaleResolverTest {
   }
 
   /** 프로필의 억양이 비어 있으면 부가 조회는 빈 값으로 반환한다. */
+  @DisplayName("프로필의 억양이 비어 있으면 부가 조회는 빈 값으로 반환한다.")
   @Test
   void tryResolveReturnsEmptyWhenAccentLocaleIsMissing() {
     UserProfile userProfile = mock(UserProfile.class);

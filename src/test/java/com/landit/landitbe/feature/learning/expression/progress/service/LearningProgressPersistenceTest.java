@@ -20,6 +20,7 @@ import com.landit.landitbe.shared.domain.Locale;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,6 +44,7 @@ class LearningProgressPersistenceTest {
   @InjectMocks private ScenarioProgressService scenarioProgressService;
 
   /** 처음 완료한 표현은 새 완료 기록으로 저장한다. */
+  @DisplayName("처음 완료한 표현은 새 완료 기록으로 저장한다.")
   @Test
   void savesFirstExpressionCompletion() {
     when(expressionCompletionRepository.findAllByUserProfileIdAndScenarioIdAndLearningSource(
@@ -55,6 +57,7 @@ class LearningProgressPersistenceTest {
   }
 
   /** 이미 완료한 표현은 새 row 대신 마지막 완료 시각만 갱신한다. */
+  @DisplayName("이미 완료한 표현은 새 row 대신 마지막 완료 시각만 갱신한다.")
   @Test
   void updatesRepeatedExpressionCompletion() {
     UserWritingExpressionCompletion completion = mock(UserWritingExpressionCompletion.class);
@@ -70,6 +73,7 @@ class LearningProgressPersistenceTest {
   }
 
   /** 프리톡 완료 이력은 시나리오 이력과 별도로 저장한다. */
+  @DisplayName("프리톡 완료 이력은 시나리오 이력과 별도로 저장한다.")
   @Test
   void savesFreeTalkCompletionSeparately() {
     when(expressionCompletionRepository.findByUserProfileIdAndWritingExpressionIdAndLearningSource(
@@ -82,6 +86,7 @@ class LearningProgressPersistenceTest {
   }
 
   /** 다른 기능에는 학습 완료 엔티티 대신 완료한 표현 ID record를 반환한다. */
+  @DisplayName("다른 기능에는 학습 완료 엔티티 대신 완료한 표현 ID record를 반환한다.")
   @Test
   void returnsCompletedExpressionIds() {
     UserWritingExpressionCompletion first = mock(UserWritingExpressionCompletion.class);
@@ -99,6 +104,7 @@ class LearningProgressPersistenceTest {
   }
 
   /** 기존 시나리오 진행도가 있으면 새 row를 만들지 않고 시작 시각을 갱신한다. */
+  @DisplayName("기존 시나리오 진행도가 있으면 새 row를 만들지 않고 시작 시각을 갱신한다.")
   @Test
   void updatesExistingScenarioProgress() {
     LocalDateTime startedAt = LocalDateTime.of(2026, 7, 23, 12, 0);

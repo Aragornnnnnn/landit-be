@@ -16,6 +16,7 @@ import com.landit.landitbe.feature.notification.delivery.messaging.PushQueueMess
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.scheduler.SchedulerClient;
@@ -52,6 +53,7 @@ class EventBridgeAdminPushSchedulerTest {
         .deleteSchedule(any(DeleteScheduleRequest.class));
   }
 
+  @DisplayName("기존 큐 메시지 형식으로 한국 시각에 관리자 푸시를 예약한다.")
   @Test
   void schedulesExistingQueuePayloadAtKoreanTime() {
     UUID id = UUID.randomUUID();
@@ -74,6 +76,7 @@ class EventBridgeAdminPushSchedulerTest {
     assertThat(message.occurredAt()).isEqualTo(time);
   }
 
+  @DisplayName("동일한 기존 예약은 허용하되 발송 목적지가 다른 예약은 거부한다.")
   @Test
   void acceptsMatchingExistingScheduleButRejectsDifferentDestination() {
     UUID id = UUID.randomUUID();
@@ -113,6 +116,7 @@ class EventBridgeAdminPushSchedulerTest {
     assertThatThrownBy(() -> scheduler.schedule(id, time)).isInstanceOf(ApiException.class);
   }
 
+  @DisplayName("예약이 자동 삭제된 뒤에도 반복 취소를 성공 처리한다.")
   @Test
   void repeatedCancellationSucceedsAfterAutomaticDeletion() {
     doThrow(ResourceNotFoundException.builder().build())

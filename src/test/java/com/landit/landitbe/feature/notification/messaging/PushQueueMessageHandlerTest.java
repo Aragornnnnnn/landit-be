@@ -20,6 +20,7 @@ import com.landit.landitbe.feature.notification.delivery.service.PushReceiptServ
 import com.landit.landitbe.feature.notification.scheduled.service.ScheduledNotificationService;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -44,6 +45,7 @@ class PushQueueMessageHandlerTest {
 
   @InjectMocks private PushQueueMessageHandler pushQueueMessageHandler;
 
+  @DisplayName("관리자 캠페인 큐 메시지를 검증하고 처리한다.")
   @Test
   void handlesAndValidatesAdminCampaign() {
     java.util.UUID id = java.util.UUID.randomUUID();
@@ -69,6 +71,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** Receipt 확인 메시지의 발송 이력 ID와 시도 횟수를 Service에 전달한다. */
+  @DisplayName("Receipt 확인 메시지의 발송 이력 ID와 시도 횟수를 Service에 전달한다.")
   @Test
   void handlesPushReceiptCheck() {
     PushQueueMessage message =
@@ -85,6 +88,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** EventBridge Scheduler 배치 메시지는 예정 시각을 기준으로 대상 계산 Service에 위임한다. */
+  @DisplayName("EventBridge Scheduler 배치 메시지는 예정 시각을 기준으로 대상 계산 Service에 위임한다.")
   @Test
   void handlesScheduledNotificationBatch() {
     Instant occurredAt = Instant.parse("2026-07-26T11:00:00Z");
@@ -102,6 +106,7 @@ class PushQueueMessageHandlerTest {
         .process(org.mockito.ArgumentMatchers.eq("scheduler-execution"), eq(occurredAt), any());
   }
 
+  @DisplayName("편지 답장 알림의 묶음 큐 메시지를 처리한다.")
   @Test
   void handlesMailboxReplyNotificationBatch() {
     Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
@@ -149,6 +154,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** 편지함 답장 배치를 발송하는 동안 SQS visibility를 발송 전후로 연장한다. */
+  @DisplayName("편지함 답장 배치를 발송하는 동안 SQS visibility를 발송 전후로 연장한다.")
   @Test
   void extendsVisibilityAroundMailboxReplyBatchDispatch() {
     Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
@@ -170,6 +176,7 @@ class PushQueueMessageHandlerTest {
     dispatchOrder.verify(visibilityExtender).run();
   }
 
+  @DisplayName("잘못된 편지 답장 알림 페이로드를 거부한다.")
   @Test
   void rejectsInvalidMailboxReplyNotificationPayload() {
     Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
@@ -194,6 +201,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** Receipt 확인 횟수 정책은 Handler가 아닌 Receipt Service가 판단한다. */
+  @DisplayName("Receipt 확인 횟수 정책은 Handler가 아닌 Receipt Service가 판단한다.")
   @Test
   void delegatesPositiveReceiptAttemptToReceiptService() {
     PushQueueMessage message =
@@ -210,6 +218,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** 지원하지 않는 version은 실패시켜 SQS 재시도와 DLQ 이동 대상으로 남긴다. */
+  @DisplayName("지원하지 않는 version은 실패시켜 SQS 재시도와 DLQ 이동 대상으로 남긴다.")
   @Test
   void rejectsUnsupportedVersion() {
     PushQueueMessage message =
@@ -225,6 +234,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** 비어 있는 messageId와 지원하지 않는 messageType을 거부한다. */
+  @DisplayName("비어 있는 messageId와 지원하지 않는 messageType을 거부한다.")
   @Test
   void rejectsInvalidMessageIdentityAndType() {
     PushQueueMessage blankMessageId =
@@ -249,6 +259,7 @@ class PushQueueMessageHandlerTest {
   }
 
   /** Receipt 확인에 필요한 발송 이력 ID와 시도 횟수가 없으면 메시지를 거부한다. */
+  @DisplayName("Receipt 확인에 필요한 발송 이력 ID와 시도 횟수가 없으면 메시지를 거부한다.")
   @Test
   void rejectsInvalidReceiptPayload() {
     PushQueueMessage message =

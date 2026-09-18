@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.mailbox.feedback.event.MailboxReplyCreatedEve
 import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePublisher;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,6 +25,7 @@ class MailboxReplyNotificationListenerTest {
 
   @InjectMocks private MailboxReplyNotificationListener listener;
 
+  @DisplayName("편지 답장의 푸시 큐 발행 실패를 격리한다.")
   @Test
   void isolatesPushQueuePublicationFailure() {
     doThrow(new PushNotificationException("SQS unavailable"))

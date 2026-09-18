@@ -19,6 +19,7 @@ import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRe
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,6 +67,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** 같은 이벤트·사용자·Token 발송을 반복 선점해도 발송 이력은 한 건만 생성한다. */
+  @DisplayName("같은 이벤트·사용자·Token 발송을 반복 선점해도 발송 이력은 한 건만 생성한다.")
   @Test
   void preparesSameReviewReminderOnlyOnce() {
     PreparePushDeliveryCommand command = command();
@@ -76,6 +78,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** 예약 알림의 문구 변형을 동일한 발송 이력에 저장한다. */
+  @DisplayName("예약 알림의 문구 변형을 동일한 발송 이력에 저장한다.")
   @Test
   void persistsContentVariantSnapshot() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(commandWithVariant()).orElseThrow();
@@ -89,6 +92,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** 일시 오류가 기록된 발송은 같은 이력 ID로 재시도하고 새 행을 만들지 않는다. */
+  @DisplayName("일시 오류가 기록된 발송은 같은 이력 ID로 재시도하고 새 행을 만들지 않는다.")
   @Test
   void reusesSameDeliveryAfterTemporaryProviderFailure() {
     PreparePushDeliveryCommand command = command();
@@ -104,6 +108,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** 재시도 전에 Token이 해제되면 오래된 이력을 다시 발송하지 않는다. */
+  @DisplayName("재시도 전에 Token이 해제되면 오래된 이력을 다시 발송하지 않는다.")
   @Test
   void skipsRetryWhenTokenIsRevoked() {
     PreparePushDeliveryCommand command = command();
@@ -116,6 +121,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** DeviceNotRegistered Receipt를 기록하면 실제 Expo Push Token을 REVOKED로 변경한다. */
+  @DisplayName("DeviceNotRegistered Receipt를 기록하면 실제 Expo Push Token을 REVOKED로 변경한다.")
   @Test
   void revokesTokenAfterDeviceNotRegisteredReceipt() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
@@ -134,6 +140,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** BadDeviceToken Receipt는 실패 원인을 기록하고 현재 Token을 REVOKED로 변경한다. */
+  @DisplayName("BadDeviceToken Receipt는 실패 원인을 기록하고 현재 Token을 REVOKED로 변경한다.")
   @Test
   void revokesTokenAfterBadDeviceTokenReceipt() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
@@ -152,6 +159,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** 일반 DeveloperError Receipt는 실패만 기록하고 현재 Token을 ACTIVE로 유지한다. */
+  @DisplayName("일반 DeveloperError Receipt는 실패만 기록하고 현재 Token을 ACTIVE로 유지한다.")
   @Test
   void keepsTokenActiveAfterGenericDeveloperErrorReceipt() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();
@@ -170,6 +178,7 @@ class PushDeliveryServiceIntegrationTests {
   }
 
   /** 오래된 Token의 Receipt 실패가 새로 등록된 다른 Token을 비활성화하지 않는다. */
+  @DisplayName("오래된 Token의 Receipt 실패가 새로 등록된 다른 Token을 비활성화하지 않는다.")
   @Test
   void keepsNewTokenActiveAfterOldTokenReceiptFailure() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(command()).orElseThrow();

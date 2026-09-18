@@ -28,11 +28,13 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class SessionLevelAssessmentRecoveryTest {
+  @DisplayName("도입 시각 전에는 진행 중 세션의 수준 평가 조회에 null을 반환하고 작업을 생략한다.")
   @Test
   void futureLaunchReturnsNullForInProgressSessionAndSkipsAssessmentWork() {
     final var sessions = mock(LearningSessionService.class);
@@ -154,6 +156,7 @@ class SessionLevelAssessmentRecoveryTest {
     }
   }
 
+  @DisplayName("문맥 조회가 실패해도 평가 선점을 복구할 수 있으며 AI를 다시 호출하지 않는다.")
   @Test
   void contextFailureLeavesReservationRecoverableWithoutAnotherAiCall() {
     final var sessions = mock(LearningSessionService.class);

@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -36,6 +37,7 @@ class Lan405AssetUrlRefreshMigrationTests {
               + "'(https://[^']+/scenario-question-audio/\\1/revisions/[0-9a-f]{64}\\.mp3)'\\)[,;]$",
           Pattern.MULTILINE);
 
+  @DisplayName("연습 이미지 35개를 새 UUID URL로 정확히 교체한다.")
   @Test
   void mapsExactlyThirtyFivePracticeImagesToFreshUuidUrls() throws Exception {
     Matcher matcher = IMAGE_MAPPING_PATTERN.matcher(readMigrationSql());
@@ -62,6 +64,7 @@ class Lan405AssetUrlRefreshMigrationTests {
             });
   }
 
+  @DisplayName("검토를 마친 이미지 자산 매핑을 그대로 유지한다.")
   @Test
   void preservesTheReviewedAssetMappingExactly() throws Exception {
     String migrationSql = readMigrationSql();
@@ -103,6 +106,7 @@ class Lan405AssetUrlRefreshMigrationTests {
     assertThat(actualSha256).isEqualTo(EXPECTED_MAPPING_SHA256);
   }
 
+  @DisplayName("질문 14개를 콘텐츠 기반 버전 URL에 정확히 매핑한다.")
   @Test
   void mapsExactlyFourteenQuestionsToContentAddressedRevisionUrls() throws Exception {
     Matcher matcher = AUDIO_MAPPING_PATTERN.matcher(readMigrationSql());
@@ -123,6 +127,7 @@ class Lan405AssetUrlRefreshMigrationTests {
     assertThat(newUrls).hasSize(14);
   }
 
+  @DisplayName("기존 URL을 검사하고 모든 자산 URL의 교체 결과를 검증한다.")
   @Test
   void guardsCurrentUrlsAndVerifiesEveryReplacement() throws Exception {
     assertThat(readMigrationSql())

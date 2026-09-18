@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -56,6 +57,7 @@ class FreeTalkMemoryRetrievalServiceTest {
             meterRegistry);
   }
 
+  @DisplayName("기억 사용이 켜져 있으면 허용 범위에서 상위 기억 3개를 반환한다.")
   @Test
   void returnsTopThreeScopedMemoriesWhenUseIsEnabled() {
     when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v2"))
@@ -88,6 +90,7 @@ class FreeTalkMemoryRetrievalServiceTest {
     verify(traceRepository).recordUsage(10L, MemoryRetrievalStage.OPENING, List.of(2L), 99L);
   }
 
+  @DisplayName("최소 코사인 유사도보다 낮은 기억은 검색 결과에서 제외한다.")
   @Test
   void excludesMemoriesBelowMinimumCosineSimilarity() {
     when(traceRepository.claim(10L, MemoryRetrievalStage.FIRST_USER_TURN, "memory-retrieval-v2"))
@@ -105,6 +108,7 @@ class FreeTalkMemoryRetrievalServiceTest {
     assertThat(result.contexts()).extracting(AiFreeTalkMemoryContext::memoryId).containsExactly(1L);
   }
 
+  @DisplayName("기억 검색이 실패하면 빈 기억 문맥을 반환한다.")
   @Test
   void returnsEmptyContextWhenMemorySearchFails() {
     when(traceRepository.claim(10L, MemoryRetrievalStage.FIRST_USER_TURN, "memory-retrieval-v2"))
@@ -127,6 +131,7 @@ class FreeTalkMemoryRetrievalServiceTest {
         .isEqualTo(1.0);
   }
 
+  @DisplayName("세션의 검색 이력이 이미 있으면 기억을 다시 검색하지 않는다.")
   @Test
   void doesNotSearchTwiceWhenSessionTraceAlreadyExists() {
     when(traceRepository.claim(10L, MemoryRetrievalStage.OPENING, "memory-retrieval-v2"))

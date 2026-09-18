@@ -16,6 +16,7 @@ import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterReposi
 import com.landit.landitbe.feature.mailbox.letter.service.MailboxLetterService;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +35,7 @@ class MailboxServiceTest {
   @InjectMocks private MailboxLetterService mailboxLetterService;
 
   /** 첫 페이지 조회도 PostgreSQL이 타입을 결정할 수 있도록 null이 아닌 커서를 전달한다. */
+  @DisplayName("첫 페이지 조회도 PostgreSQL이 타입을 결정할 수 있도록 null이 아닌 커서를 전달한다.")
   @Test
   void passesNonNullCursorValuesForFirstReceivedPage() {
     when(mailboxLetterRepository.findReceivedLetters(

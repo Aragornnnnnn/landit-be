@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -29,18 +30,21 @@ class AdminPushInputServiceTest {
     service = new AdminPushInputService(JsonMapper.builder().build());
   }
 
+  @DisplayName("관리자 푸시에서 지원하는 링크를 허용한다.")
   @ParameterizedTest
   @MethodSource("validLinks")
   void acceptsSupportedLinks(String link) {
     assertThatCode(() -> service.validate(request(link))).doesNotThrowAnyException();
   }
 
+  @DisplayName("관리자 푸시에서 잘못된 링크를 거부한다.")
   @ParameterizedTest
   @MethodSource("invalidLinks")
   void rejectsInvalidLinks(String link) {
     assertThatThrownBy(() -> service.validate(request(link))).isInstanceOf(ApiException.class);
   }
 
+  @DisplayName("대상 없는 제외 목록은 거부하되 선택 대상 전체를 제외하는 것은 허용한다.")
   @Test
   void rejectsExclusionsWithoutAnAudienceButAllowsAllSelectedUsersToBeExcluded() {
     var excludedOnly =
@@ -54,6 +58,7 @@ class AdminPushInputServiceTest {
     assertThat(service.fingerprint(allExcluded)).isNotBlank();
   }
 
+  @DisplayName("푸시 페이로드가 너무 크거나 멱등 키가 잘못되면 거부한다.")
   @Test
   void rejectsOversizedPayloadAndInvalidKey() {
     assertThatThrownBy(
@@ -66,6 +71,7 @@ class AdminPushInputServiceTest {
     return new AdminPushCampaignRequest("공지", "내용", link);
   }
 
+  @DisplayName("기존 전체 대상 요청을 허용하고 선택 ID를 정규화하되 푸시 페이로드 크기에서 제외한다.")
   @Test
   void acceptsLegacyAllAndNormalizesSelectedIdsWithoutCountingThemInPushPayload() {
     AdminPushCampaignRequest legacy =
@@ -92,6 +98,7 @@ class AdminPushInputServiceTest {
         .containsExactly(1L, 2L);
   }
 
+  @DisplayName("잘못된 관리자 푸시 대상 선택을 거부한다.")
   @ParameterizedTest
   @MethodSource("invalidAudiences")
   void rejectsInvalidAudienceSelections(AdminPushCampaignRequest request) {

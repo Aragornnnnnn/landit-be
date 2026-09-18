@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.postgresql.Driver;
@@ -95,6 +96,7 @@ class AdminPushAudiencePostgresTest {
     }
   }
 
+  @DisplayName("PostgreSQL에서 활성 설문 미응답자만 조회한다.")
   @Test
   void returnsOnlyActiveSurveyNonResponders() {
     assertThat(
@@ -106,6 +108,7 @@ class AdminPushAudiencePostgresTest {
         .containsExactly(1L);
   }
 
+  @DisplayName("대상 조회 결과의 ID 초과 범위와 잘못된 컬럼 및 비정수 ID를 거부한다.")
   @Test
   void rejectsOverflowWrongColumnsAndNonIntegralIds() {
     assertThatThrownBy(() -> service(1).query("select id as user_profile_id from user_profile"))
@@ -118,6 +121,7 @@ class AdminPushAudiencePostgresTest {
         .isInstanceOf(ApiException.class);
   }
 
+  @DisplayName("읽기 전용 트랜잭션은 뷰 안에 숨긴 쓰기도 차단한다.")
   @Test
   void readOnlyTransactionBlocksWritesHiddenBehindView() throws Exception {
     assertThatThrownBy(() -> service(10).query("select user_profile_id from mutation_view"))
@@ -130,6 +134,7 @@ class AdminPushAudiencePostgresTest {
     }
   }
 
+  @DisplayName("비용이 큰 대상 조회는 SQL 제한 시간에 중단한다.")
   @Test
   void stopsExpensiveReadAtStatementTimeout() {
     Instant start = Instant.now();

@@ -18,11 +18,13 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.time.Clock;
 import java.time.Duration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 경계 설정을 실제 요청 객체와 이벤트 역직렬화로 검증한다. */
 class Lan474IntegrationBoundaryTest {
+  @DisplayName("내부 인증 토큰은 요청에 전송하되 설정 로그에는 노출하지 않는다.")
   @Test
   void internalTokenIsSentAndExcludedFromConfigurationLogs() {
     var timeout = Duration.ofSeconds(30);
@@ -45,6 +47,7 @@ class Lan474IntegrationBoundaryTest {
     assertThat(properties.toString()).doesNotContain("internal-test-token");
   }
 
+  @DisplayName("샌드박스 구매와 계정 이전 이벤트는 구독 상태를 조회하거나 변경하지 않는다.")
   @Test
   void sandboxPurchaseAndTransferDoNotReadOrWriteSubscriptionState() {
     var profiles = mock(UserProfileService.class);

@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 현재 구독과 기존 학습의 완료 권한을 서로 혼동하지 않도록 검증한다. */
@@ -95,6 +96,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 해지 예정 구독도 만료 직전까지 인정하고 정확한 만료 시각에는 갱신 웹훅 없이 제한한다. */
+  @DisplayName("해지 예정 구독도 만료 직전까지 인정하고 정확한 만료 시각에는 갱신 웹훅 없이 제한한다.")
   @Test
   void premiumUsesExpirationInsteadOfOnlyWebhookStatus() {
     subscription(SubscriptionStatus.CANCELED, NOW.plusNanos(1));
@@ -108,6 +110,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 첫 시나리오 예약은 처음 시작한 세션에 고정되고, 이후 시나리오 시작은 예약 없이 FREE로 허용한다. */
+  @DisplayName("첫 시나리오 예약은 처음 시작한 세션에 고정되고, 이후 시나리오 시작은 예약 없이 FREE로 허용한다.")
   @Test
   void firstFreeReservationStaysBoundToItsOriginalSession() {
     StartAccess start = service.requireScenarioStart(USER_ID);
@@ -137,6 +140,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 현재 유료 사용자의 시작은 첫 무료 기회를 소비하지 않는다. */
+  @DisplayName("현재 유료 사용자의 시작은 첫 무료 기회를 소비하지 않는다.")
   @Test
   void paidStartDoesNotReserveFreeConversation() {
     subscription(SubscriptionStatus.ACTIVE, NOW.plusDays(1));
@@ -148,6 +152,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 구독이 없어져도 같은 표현의 미완료 시도만 재개하고 만료 시각을 연장하지 않는다. */
+  @DisplayName("구독이 없어져도 같은 표현의 미완료 시도만 재개하고 만료 시각을 연장하지 않는다.")
   @Test
   void resumingAnExistingExpressionPreservesItsOriginalExpiry() {
     LearningAccessGrant grant = expressionGrant(NOW.minusHours(2));
@@ -162,6 +167,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 24시간 직전에는 이어갈 수 있지만 정확히 24시간이 되면 새 입력을 제한한다. */
+  @DisplayName("24시간 직전에는 이어갈 수 있지만 정확히 24시간이 되면 새 입력을 제한한다.")
   @Test
   void existingGrantExpiresAtExactlyTwentyFourHours() {
     store(expressionGrant(NOW.minusHours(24).plusSeconds(1)));
@@ -181,6 +187,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 완료 저장 재요청은 허용해도 완료한 권한으로 새 표현 연습을 시작할 수 없다. */
+  @DisplayName("완료 저장 재요청은 허용해도 완료한 권한으로 새 표현 연습을 시작할 수 없다.")
   @Test
   void completedExpressionAllowsOnlyCompletionReplay() {
     LearningAccessGrant grant = expressionGrant(NOW.minusHours(1));
@@ -204,6 +211,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 다른 사용자의 권한이나 다른 시도 ID는 완료 재요청에도 사용할 수 없다. */
+  @DisplayName("다른 사용자의 권한이나 다른 시도 ID는 완료 재요청에도 사용할 수 없다.")
   @Test
   void existingGrantRejectsAnotherOwnerTargetOrAttempt() {
     LearningAccessGrant grant = expressionGrant(NOW.minusHours(1));
@@ -237,6 +245,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 필터 밖 호출에서도 만료되거나 없는 표현 학습의 완료를 거부한다. */
+  @DisplayName("필터 밖 호출에서도 만료되거나 없는 표현 학습의 완료를 거부한다.")
   @Test
   void completionServiceRejectsMissingOrExpiredExpressionGrants() {
     assertPremiumRequired(() -> service.completeExpression(USER_ID, EXPRESSION_ID));
@@ -245,6 +254,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 유료 사용자의 늦은 완료 요청도 새 학습 시도를 닫을 수 없다. */
+  @DisplayName("유료 사용자의 늦은 완료 요청도 새 학습 시도를 닫을 수 없다.")
   @Test
   void staleCompletionCannotCloseTheLatestPaidAttempt() {
     subscription(SubscriptionStatus.ACTIVE, NOW.plusDays(1));
@@ -258,6 +268,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 검증된 도입 전 시작 시각만 24시간 직전까지 인정하며 신규·미검증 시각은 거부한다. */
+  @DisplayName("검증된 도입 전 시작 시각만 24시간 직전까지 인정하며 신규·미검증 시각은 거부한다.")
   @Test
   void legacyStartNeedsVerifiedPreLaunchTimeWithinTwentyFourHours() {
     assertThat(
@@ -289,6 +300,7 @@ class Lan474LearningAccessGrantServiceTest {
   }
 
   /** 저장된 권한이 만료됐다면 도입 전 시작 이력을 전달해도 유예 권한으로 우회할 수 없다. */
+  @DisplayName("저장된 권한이 만료됐다면 도입 전 시작 이력을 전달해도 유예 권한으로 우회할 수 없다.")
   @Test
   void expiredStoredGrantDoesNotFallBackToLegacyStart() {
     store(

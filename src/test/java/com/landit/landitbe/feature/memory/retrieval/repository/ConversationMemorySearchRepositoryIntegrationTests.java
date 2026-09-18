@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,6 +42,7 @@ class ConversationMemorySearchRepositoryIntegrationTests {
         "delete from user_profile where id between ? and ?", USER_ID, OTHER_USER_ID);
   }
 
+  @DisplayName("현재 범위의 기억만 조회하고 거리와 기억 ID 순으로 정렬한다.")
   @Test
   void searchesOnlyCurrentScopeAndOrdersByDistanceThenMemoryId() {
     seedUser(USER_ID);
@@ -63,6 +65,7 @@ class ConversationMemorySearchRepositoryIntegrationTests {
     assertThat(matches.get(1).distance()).isCloseTo(0.4, org.assertj.core.data.Offset.offset(1e-9));
   }
 
+  @DisplayName("동일한 유형과 범위의 비교 대상 기억만 검색한다.")
   @Test
   void searchesComparableMemoriesByExactTypeAndScope() {
     seedUser(USER_ID);
@@ -80,6 +83,7 @@ class ConversationMemorySearchRepositoryIntegrationTests {
         .containsExactly(997122L, 997123L);
   }
 
+  @DisplayName("기억 검색 인자가 잘못되면 SQL 실행 전에 거부한다.")
   @Test
   void rejectsInvalidSearchArgumentsBeforeSql() {
     assertThatThrownBy(() -> searchRepository.searchActive(USER_ID, "chloe", List.of(0.1f), 1))
@@ -96,6 +100,7 @@ class ConversationMemorySearchRepositoryIntegrationTests {
         .hasRootCauseInstanceOf(IllegalArgumentException.class);
   }
 
+  @DisplayName("저장된 임베딩의 차원이 다르거나 영벡터이면 거부한다.")
   @Test
   void rejectsStoredDimensionAndZeroVector() {
     seedUser(USER_ID);

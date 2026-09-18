@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -74,6 +75,7 @@ class ScenarioListApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM category");
   }
 
+  @DisplayName("시나리오 목록 조회에는 인증이 필요하다.")
   @Test
   void scenariosRequireAuthentication() throws Exception {
     mockMvc
@@ -83,6 +85,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("유효하지 않은 access token으로 시나리오 목록을 조회할 수 없다.")
   @Test
   void scenariosRejectInvalidAccessToken() throws Exception {
     mockMvc
@@ -92,6 +95,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("기존 진도 값과 무관하게 노출 순서가 가장 빠른 미완료 시나리오를 신규로 표시한다.")
   @Test
   void scenariosExposeLowestDisplayOrderUnclearedScenarioAsNewAndIgnoreLegacyProgress()
       throws Exception {
@@ -118,6 +122,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[1].openingPreview").value(nullValue()));
   }
 
+  @DisplayName("현재 시나리오 선정에서 비활성 콘텐츠를 건너뛴다.")
   @Test
   void scenariosSkipInactiveContentWhenSelectingCurrentScenario() throws Exception {
     JsonNode loginResponseBody = login();
@@ -141,6 +146,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[1].scenarios[0].dailyScenarioType").value("NEW"));
   }
 
+  @DisplayName("현재 시나리오 선정에서 비활성 시나리오와 언어 변형을 건너뛴다.")
   @Test
   void scenariosSkipInactiveScenarioAndVariantWhenSelectingCurrentScenario() throws Exception {
     JsonNode loginResponseBody = login();
@@ -168,6 +174,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[2].dailyScenarioType").value("NEW"));
   }
 
+  @DisplayName("카테고리 번역이 없는 콘텐츠는 현재 시나리오 선정에서 제외한다.")
   @Test
   void scenariosSkipContentWithoutCategoryTranslationWhenSelectingCurrentScenario()
       throws Exception {
@@ -190,6 +197,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("NEW"));
   }
 
+  @DisplayName("전날 끝내지 않은 시나리오 세션을 재시도로 표시한다.")
   @Test
   void scenariosExposePreviousDayUncompletedSessionAsRetry() throws Exception {
     JsonNode loginResponseBody = login();
@@ -221,6 +229,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("RETRY"));
   }
 
+  @DisplayName("전날 중단한 시나리오 세션을 재시도로 표시한다.")
   @Test
   void scenariosExposePreviousDayInterruptedSessionAsRetry() throws Exception {
     mutableClock.setInstant(Instant.parse("2026-07-27T14:00:00Z"));
@@ -256,6 +265,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("RETRY"));
   }
 
+  @DisplayName("접근 권한을 획득한 시나리오를 완료로 표시한다.")
   @Test
   void scenariosExposeGrantedAccessAsCleared() throws Exception {
     JsonNode loginResponseBody = login();
@@ -277,6 +287,7 @@ class ScenarioListApiIntegrationTests {
             jsonPath("$.data.categories[0].scenarios[1].dailyScenarioType").value(nullValue()));
   }
 
+  @DisplayName("OpenAPI 문서에 시나리오 목록 계약을 명시한다.")
   @Test
   void openApiDocumentsScenarioListContract() throws Exception {
     mockMvc
@@ -296,6 +307,7 @@ class ScenarioListApiIntegrationTests {
                 .value("인증 실패"));
   }
 
+  @DisplayName("시나리오를 순서대로 반환하며 접근 상태와 첫 대화 미리보기를 제공한다.")
   @Test
   void scenariosReturnOrderedAccessStatusAndOpeningPreview() throws Exception {
     JsonNode loginResponseBody = login();
@@ -387,6 +399,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[2].scenarios[0].openingPreview").value(nullValue()));
   }
 
+  @DisplayName("시나리오 완료 다음 날에는 다음 시나리오를 제공한다.")
   @Test
   void scenariosExposeNextScenarioOnTheDayAfterCompletion() throws Exception {
     JsonNode loginResponseBody = login();
@@ -418,6 +431,7 @@ class ScenarioListApiIntegrationTests {
         .andExpect(jsonPath("$.data.categories[0].scenarios[0].dailyScenarioType").value("NEW"));
   }
 
+  @DisplayName("TTS 음성이 없거나 비활성이면 시나리오의 음성 정보를 null로 반환한다.")
   @Test
   void scenariosReturnNullTtsVoiceWhenVoiceIsInactiveOrMissing() throws Exception {
     final JsonNode loginResponseBody = login();

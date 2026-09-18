@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.content.expression.recommendation.repository
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
  */
 class PgVectorExpressionEmbeddingSearchRepositoryTests {
 
+  @DisplayName("표현 임베딩 검색 SQL은 벡터 연산자와 필터를 유지한다.")
   @Test
   void searchSqlKeepsVectorOperatorAndFilters() {
     String sql = PgVectorExpressionEmbeddingSearchRepository.SEARCH_SQL;
@@ -33,6 +35,7 @@ class PgVectorExpressionEmbeddingSearchRepositoryTests {
   }
 
   /** 위치 인자로 바인딩하므로 플레이스홀더의 개수와 순서가 곧 계약이다. 조건을 끼워 넣으면서 인자 순서를 함께 고치지 않으면 예외 없이 잘못된 값으로 검색된다. */
+  @DisplayName("표현 임베딩 검색의 바인딩 인자 7개와 순서를 유지한다.")
   @Test
   void searchSqlKeepsPlaceholderCountAndOrder() {
     String sql = PgVectorExpressionEmbeddingSearchRepository.SEARCH_SQL;

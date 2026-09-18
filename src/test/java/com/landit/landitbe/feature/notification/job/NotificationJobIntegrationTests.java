@@ -44,6 +44,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -112,6 +113,7 @@ class NotificationJobIntegrationTests {
         LocalDateTime.ofInstant(NOW.plusSeconds(86400), ZoneId.of("Asia/Seoul")));
   }
 
+  @DisplayName("채널이 꺼져 있어도 채널별 기한에 만료 예약을 종료한다.")
   @Test
   void expiredReservationsCloseAtEachChannelDeadlineEvenWhenDisabled() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -129,6 +131,7 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().status()).isEqualTo("SKIPPED");
   }
 
+  @DisplayName("영구적인 예약 실패는 10회 시도 후 중단한다.")
   @Test
   void permanentReservationFailureStopsAtTenAttempts() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -148,6 +151,7 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.pendingReservations()).isEmpty();
   }
 
+  @DisplayName("일시적인 예약 실패는 선점 만료 후 재시도하고 성공 상태는 보존한다.")
   @Test
   void temporaryReservationFailureRetriesAfterLeaseAndPreservesSuccess() {
     adminJobs.requestTest(USER_ID, UUID.randomUUID(), "test@example.com");
@@ -169,6 +173,7 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.find(job("TEST_EMAIL").id()).orElseThrow().status()).isEqualTo("PENDING");
   }
 
+  @DisplayName("체험 알림 채널은 활성 상태로 시작하고 DB 기본값도 활성이다.")
   @Test
   void trialChannelsStartEnabledAndUseEnabledColumnDefaults() {
     assertThat(jobs.settings()).isEqualTo(new TrialReminderSettings(true, true));
@@ -177,6 +182,7 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.settings()).isEqualTo(new TrialReminderSettings(true, true));
   }
 
+  @DisplayName("푸시를 거부한 사용자에게도 이메일은 한 번만 보낸다.")
   @Test
   void deniedPushStillSendsEmailOnlyOnce() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -200,6 +206,7 @@ class NotificationJobIntegrationTests {
     verifyNoInteractions(push);
   }
 
+  @DisplayName("구독 취소나 채널 비활성화 시 대기 작업을 제외한다.")
   @Test
   void cancellationAndChannelOffExcludePendingJobs() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -217,6 +224,7 @@ class NotificationJobIntegrationTests {
     verifyNoInteractions(sender, push);
   }
 
+  @DisplayName("재시도 가능한 거절만 재시도하고 결과가 불명확한 전송은 자동 재발송하지 않는다.")
   @Test
   void retryableRejectionRetriesButUnknownResponseNeverAutomaticallyResends() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -234,6 +242,7 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.find(job("TRIAL_PUSH").id()).orElseThrow().status()).isEqualTo("PENDING");
   }
 
+  @DisplayName("선점 후 중단된 이메일은 재발송하지 않고 기한 지난 작업은 생략한다.")
   @Test
   void crashAfterClaimDoesNotResendEmailAndLateJobsAreSkipped() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -249,6 +258,7 @@ class NotificationJobIntegrationTests {
     verifyNoInteractions(sender, push);
   }
 
+  @DisplayName("샌드박스 이벤트나 허용 목록에 없는 상품은 알림 작업을 만들지 않는다.")
   @Test
   void sandboxAndUnlistedProductsDoNotCreateJobs() {
     jobs.recordTrial(USER_ID, "SANDBOX");
@@ -260,12 +270,14 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.pendingReservations()).isEmpty();
   }
 
+  @DisplayName("프로모션 권한 부여는 체험 종료 알림을 예약하지 않는다.")
   @Test
   void promotionalGrantDoesNotScheduleTrialReminders() throws Exception {
     grantPromotionalSubscription();
     assertThat(jobs.pendingReservations()).isEmpty();
   }
 
+  @DisplayName("프로모션 권한으로 바뀌면 이미 예약된 체험 종료 알림도 제외한다.")
   @Test
   void promotionalGrantExcludesPreviouslyScheduledTrialReminders() throws Exception {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -306,6 +318,7 @@ class NotificationJobIntegrationTests {
         .andExpect(jsonPath("$.data.periodType").value("PROMOTIONAL"));
   }
 
+  @DisplayName("관리자는 임의 수신자에게 테스트 발송하며 멱등성과 입력값을 검증한다.")
   @Test
   void adminCanTestArbitraryRecipientWithIdempotencyAndValidation() throws Exception {
     adminJobs.updateSettings(USER_ID, new TrialReminderSettings(false, false));
@@ -341,6 +354,7 @@ class NotificationJobIntegrationTests {
     verify(sender).send(eq("arbitrary@example.org"), contains("테스트"), anyString(), anyString());
   }
 
+  @DisplayName("관리자 설정 변경은 각 알림 예약 채널에 즉시 반영된다.")
   @Test
   void adminSettingsImmediatelyControlEachReservationChannel() throws Exception {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -365,6 +379,7 @@ class NotificationJobIntegrationTests {
     assertThat(jobs.pendingReservations()).hasSize(2);
   }
 
+  @DisplayName("예약 후 이메일을 꺼도 푸시 채널은 비활성화하지 않는다.")
   @Test
   void disablingEmailAfterReservationDoesNotDisablePush() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -383,6 +398,7 @@ class NotificationJobIntegrationTests {
     verify(push).sendAll(org.mockito.ArgumentMatchers.anyList());
   }
 
+  @DisplayName("푸시를 꺼도 이메일 발송은 막지 않는다.")
   @Test
   void disabledPushDoesNotPreventEmailDelivery() {
     jobs.recordTrial(USER_ID, "PRODUCTION");
@@ -398,6 +414,7 @@ class NotificationJobIntegrationTests {
     verify(sender).send(eq("member@example.com"), anyString(), anyString(), anyString());
   }
 
+  @DisplayName("이메일 관리 API에는 관리자 권한과 인증이 필요하다.")
   @Test
   void emailApiRequiresAdminAndAuthentication() throws Exception {
     mvc.perform(post("/api/v1/admin/notifications/email-tests"))
@@ -411,6 +428,7 @@ class NotificationJobIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/admin/notifications/email-tests'].post").exists());
   }
 
+  @DisplayName("웹훅의 구독 갱신과 알림 예약을 같은 트랜잭션에서 처리한다.")
   @Test
   void webhookKeepsSubscriptionAndReservationsInTheSameTransaction() throws Exception {
     long expiry = NOW.plusSeconds(7 * 86400).toEpochMilli();

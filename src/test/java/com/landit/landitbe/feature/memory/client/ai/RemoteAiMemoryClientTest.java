@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -46,6 +47,7 @@ class RemoteAiMemoryClientTest {
     server.stop(0);
   }
 
+  @DisplayName("기억 후보 추출 계약을 AI에 전송하고 성공 응답을 변환한다.")
   @Test
   void postsMemoryCandidateContractAndMapsSuccessfulResponse() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -72,6 +74,7 @@ class RemoteAiMemoryClientTest {
         .isEqualTo("openai/text-embedding-3-small");
   }
 
+  @DisplayName("기억 충돌 해결 계약을 AI에 전송하고 성공 응답을 변환한다.")
   @Test
   void postsMemoryResolutionContractAndMapsSuccessfulResponse() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -106,6 +109,7 @@ class RemoteAiMemoryClientTest {
     assertThat(result.resolutions().getFirst().supersededMemoryIds()).containsExactly(77L);
   }
 
+  @DisplayName("기억 검색 임베딩 계약을 전송하고 정해진 차원의 벡터를 반환한다.")
   @Test
   void postsMemoryQueryEmbeddingContractAndMapsFixedDimensionVector() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -126,6 +130,7 @@ class RemoteAiMemoryClientTest {
     assertThat(result.embedding()).hasSize(1536);
   }
 
+  @DisplayName("기억 조회의 성공 응답이 늦으면 응답 전에 시간 초과로 처리한다.")
   @Test
   void memoryQueryTimesOutBeforeDelayedSuccessfulResponse() {
     registerDelayedResponse(

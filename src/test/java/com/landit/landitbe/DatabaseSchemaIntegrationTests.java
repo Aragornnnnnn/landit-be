@@ -43,6 +43,7 @@ class DatabaseSchemaIntegrationTests {
 
   @Autowired private FreeTalkMemoryRetrievalTraceRepository memoryRetrievalTraceRepository;
 
+  @DisplayName("DBML에 정의된 핵심 테이블이 생성된다.")
   @Test
   void dbmlCoreTablesExist() {
     List<String> tableNames =
@@ -62,6 +63,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 관리자 역할과 쓰기 감사 로그에 필요한 스키마를 생성한다. */
+  @DisplayName("관리자 역할과 쓰기 감사 로그에 필요한 스키마를 생성한다.")
   @Test
   void userRoleAndAuditLogSchemaSupportsAdminAuthorizationAndAudit() {
     assertColumnExists("user_profile", "role");
@@ -77,6 +79,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** Expo 발송 추적에 필요한 스키마를 생성한다. */
+  @DisplayName("Expo 발송 추적에 필요한 스키마를 생성한다.")
   @Test
   void pushDeliverySchemaSupportsDeliveryTracking() {
     assertTableExists("push_delivery");
@@ -88,6 +91,7 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("push_delivery", "uk_push_delivery_deduplication_key");
   }
 
+  @DisplayName("OAuth 사용자 식별 정보의 조회 인덱스가 존재한다.")
   @Test
   void oauthIdentityHasLookupIndexes() {
     assertIndexExists("idx_oauth_identity_provider_user");
@@ -162,6 +166,7 @@ class DatabaseSchemaIntegrationTests {
         .contains("CREATE TABLE nps_response", "DROP TABLE session_nps_response");
   }
 
+  @DisplayName("표현 발음 자산은 표현과 억양 조합마다 한 행만 저장한다.")
   @Test
   void expressionPronunciationAssetStoresOneRowPerExpressionAndAccent() {
     assertTableExists("expression_pronunciation_asset");
@@ -177,6 +182,7 @@ class DatabaseSchemaIntegrationTests {
         "fk_expression_pronunciation_asset_writing_expression_id");
   }
 
+  @DisplayName("메시지 피드백은 학습 표현에 대한 역참조를 보관하지 않는다.")
   @Test
   void sessionHistoryMessageFeedbackDoesNotKeepLearningExpressionBackReference() {
     Integer columnCount =
@@ -192,6 +198,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(columnCount).isZero();
   }
 
+  @DisplayName("NPS 응답은 사용자에 연결되며 같은 사용자의 중복 제출을 허용한다.")
   @Test
   void npsResponseIsUserBoundAndAllowsDuplicateSubmissions() {
     assertTableExists("nps_response");
@@ -803,6 +810,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 공용 캐릭터가 시나리오와 프리톡의 TTS 매핑 원본이 된다. */
+  @DisplayName("공용 캐릭터가 시나리오와 프리톡의 TTS 매핑 원본이 된다.")
   @Test
   void conversationCharacterOwnsScenarioAndFreeTalkTtsMapping() {
     assertTableExists("conversation_character");
@@ -833,6 +841,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 기존 시나리오 음성을 동일한 공용 캐릭터로 이전한다. */
+  @DisplayName("V55 migration은 기존 시나리오 음성을 동일한 공용 캐릭터로 이전한다.")
   @Test
   void v55MigrationBackfillsScenarioCharacterFromExistingVoice() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -850,6 +859,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V58 migration은 기존 학습 수준을 1~5 정수 척도로 변환하고 범위를 제한한다. */
+  @DisplayName("V58 migration은 기존 학습 수준을 1~5 정수 척도로 변환하고 범위를 제한한다.")
   @Test
   void v58MigrationConvertsAndConstrainsUserLearningLevel() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -889,6 +899,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** Repeatable migration은 활성 Expo Push Token 보유자의 푸시 권한을 허용 상태로 보정한다. */
+  @DisplayName("Repeatable migration은 활성 Expo Push Token 보유자의 푸시 권한을 허용 상태로 보정한다.")
   @Test
   void repeatableMigrationBackfillsGrantedPushPermissionForActiveTokenOwners() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -943,6 +954,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 사용자 학습 수준 CHECK 제약은 1과 5를 허용하고 범위를 벗어난 값을 거절한다. */
+  @DisplayName("사용자 학습 수준 CHECK 제약은 1과 5를 허용하고 범위를 벗어난 값을 거절한다.")
   @Test
   void userLearningLevelConstraintAllowsOneToFiveOnly() {
     long userProfileId = 990404L;
@@ -967,6 +979,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 하나의 시나리오가 여러 캐릭터 음성을 사용하면 적용을 중단한다. */
+  @DisplayName("V55 migration은 하나의 시나리오가 여러 캐릭터 음성을 사용하면 적용을 중단한다.")
   @Test
   void v55MigrationRejectsScenarioWithMultipleCharacterVoices() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -981,6 +994,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 한 시나리오의 음성 설정 여부가 언어별로 다르면 적용을 중단한다. */
+  @DisplayName("V55 migration은 한 시나리오의 음성 설정 여부가 언어별로 다르면 적용을 중단한다.")
   @Test
   void v55MigrationRejectsScenarioWithMixedNullAndCharacterVoice() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -995,6 +1009,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 공용 캐릭터로 역매핑할 수 없는 음성이 있으면 적용을 중단한다. */
+  @DisplayName("V55 migration은 공용 캐릭터로 역매핑할 수 없는 음성이 있으면 적용을 중단한다.")
   @Test
   void v55MigrationRejectsUnmappedScenarioVoice() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1204,6 +1219,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V34 migration이 활성 정책의 최소 지원 버전명을 보존하는지 검증한다. */
+  @DisplayName("V34 migration이 활성 정책의 최소 지원 버전명을 보존하는지 검증한다.")
   @Test
   void v34MigrationKeepsSingleActivePolicyAndMapsMinimumSupportedVersionName() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1231,6 +1247,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V34 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다. */
+  @DisplayName("V34 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다.")
   @Test
   void v34MigrationFailsWhenMinimumSupportedBuildCannotBeMapped() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1244,6 +1261,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V48 migration은 두 플랫폼에 1.1.0 강제 업데이트 정책을 적용한다. */
+  @DisplayName("V48 migration은 두 플랫폼에 1.1.0 강제 업데이트 정책을 적용한다.")
   @Test
   void v48MigrationRequiresVersion110ForBothPlatforms() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1283,6 +1301,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 기존 발화 사용량은 보존하고 요청 횟수는 0에서 시작하도록 V97을 적용한다. */
+  @DisplayName("기존 발화 사용량은 보존하고 요청 횟수는 0에서 시작하도록 V97을 적용한다.")
   @Test
   void v97PreservesSpeakingUsageAndInitializesRequestCounters() {
     String databaseUrl = migrationTestDatabaseUrl();

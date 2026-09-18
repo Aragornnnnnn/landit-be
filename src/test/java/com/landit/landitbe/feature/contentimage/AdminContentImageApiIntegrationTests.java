@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +54,7 @@ class AdminContentImageApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 관리자는 UUID 객체 키와 필수 PUT 헤더가 포함된 업로드 정보를 발급받는다. */
+  @DisplayName("관리자는 UUID 객체 키와 필수 PUT 헤더가 포함된 업로드 정보를 발급받는다.")
   @Test
   void adminCreatesPresignedContentImageUpload() throws Exception {
     String accessToken = loginAdmin("content-image-admin");
@@ -85,6 +87,7 @@ class AdminContentImageApiIntegrationTests {
   }
 
   /** 일반 사용자는 관리자 이미지 업로드 URL을 발급받을 수 없다. */
+  @DisplayName("일반 사용자는 관리자 이미지 업로드 URL을 발급받을 수 없다.")
   @Test
   void rejectsNonAdminPresignedContentImageUpload() throws Exception {
     String accessToken = login("content-image-user");
@@ -102,6 +105,7 @@ class AdminContentImageApiIntegrationTests {
   }
 
   /** MIME type과 확장자가 다르면 업로드 URL을 발급하지 않는다. */
+  @DisplayName("MIME type과 확장자가 다르면 업로드 URL을 발급하지 않는다.")
   @Test
   void rejectsMismatchedContentImageType() throws Exception {
     String accessToken = loginAdmin("content-image-invalid");
@@ -120,6 +124,7 @@ class AdminContentImageApiIntegrationTests {
   }
 
   /** OpenAPI 문서에 관리자 이미지 업로드 URL 발급 계약을 노출한다. */
+  @DisplayName("OpenAPI 문서에 관리자 이미지 업로드 URL 발급 계약을 노출한다.")
   @Test
   void documentsPresignedContentImageUpload() throws Exception {
     mockMvc

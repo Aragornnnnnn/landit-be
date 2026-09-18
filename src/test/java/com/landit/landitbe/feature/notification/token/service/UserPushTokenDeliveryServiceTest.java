@@ -13,6 +13,7 @@ import com.landit.landitbe.shared.domain.AppPlatform;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +30,7 @@ class UserPushTokenDeliveryServiceTest {
   @InjectMocks private UserPushTokenDeliveryService userPushTokenDeliveryService;
 
   /** 활성 Token이 요청한 사용자의 소유일 때만 발송 대상으로 반환한다. */
+  @DisplayName("활성 Token이 요청한 사용자의 소유일 때만 발송 대상으로 반환한다.")
   @Test
   void findsActiveOwnedTokenForDelivery() {
     UserPushToken token = token(11L, 7L, "ExponentPushToken[active-owner]");
@@ -42,6 +44,7 @@ class UserPushTokenDeliveryServiceTest {
   }
 
   /** Expo가 사용할 수 없다고 응답한 현재 Token을 발송 대상에서 제외한다. */
+  @DisplayName("Expo가 사용할 수 없다고 응답한 현재 Token을 발송 대상에서 제외한다.")
   @Test
   void revokesCurrentTokenOwner() {
     UserPushToken token = token(12L, 8L, "ExponentPushToken[unregistered]");
@@ -54,6 +57,7 @@ class UserPushTokenDeliveryServiceTest {
   }
 
   /** 여러 사용자의 활성 Token ID를 사용자별로 묶어 반환한다. */
+  @DisplayName("여러 사용자의 활성 Token ID를 사용자별로 묶어 반환한다.")
   @Test
   void groupsActiveTokenIdsByUser() {
     UserPushToken first = token(21L, 3L, "ExponentPushToken[first]");

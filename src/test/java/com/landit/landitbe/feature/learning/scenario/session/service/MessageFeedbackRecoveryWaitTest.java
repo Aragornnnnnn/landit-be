@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
@@ -56,6 +57,7 @@ class MessageFeedbackRecoveryWaitTest {
                   List.of())),
           Optional.empty());
 
+  @DisplayName("대기 및 선점 중인 피드백 작업도 HTTP 요청을 무한히 대기시키지 않는다.")
   @Test
   void queuedOrLeasedWorkCannotHoldTheRequestForever() {
     when(repository.findAllById(List.of(200L)))
@@ -72,6 +74,7 @@ class MessageFeedbackRecoveryWaitTest {
                             .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED)));
   }
 
+  @DisplayName("피드백 복구 대기 중 종료 인터럽트를 보존한다.")
   @Test
   void shutdownInterruptionIsPreserved() {
     when(repository.findAllById(List.of(200L))).thenReturn(List.of());
@@ -86,6 +89,7 @@ class MessageFeedbackRecoveryWaitTest {
     }
   }
 
+  @DisplayName("피드백 실행기가 중단되면 기존 일시 이용 불가 오류를 반환한다.")
   @Test
   void stoppedExecutorReturnsTheExistingUnavailableError() {
     MessageFeedbackWorkService service =

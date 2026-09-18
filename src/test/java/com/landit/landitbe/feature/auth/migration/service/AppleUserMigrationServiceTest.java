@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AppleUserMigrationServiceTest {
@@ -52,6 +53,7 @@ class AppleUserMigrationServiceTest {
     databaseKeeper.close();
   }
 
+  @DisplayName("한 사용자의 Apple 이전 준비가 실패해도 나머지를 처리하고 실패 수를 반환한다.")
   @Test
   void prepareContinuesAfterOneUserFailsAndReturnsFailedSummary() throws Exception {
     insertIdentity(1L, "old-sub-1");
@@ -67,6 +69,7 @@ class AppleUserMigrationServiceTest {
     assertThat(client.createCallCount).isEqualTo(2);
   }
 
+  @DisplayName("Apple 이전 준비를 재시도하면 이전에 실패한 사용자만 호출한다.")
   @Test
   void prepareRetryCallsOnlyPreviouslyFailedUser() throws Exception {
     insertIdentity(1L, "old-sub-1");
@@ -81,6 +84,7 @@ class AppleUserMigrationServiceTest {
     assertThat(client.createCallCount).isEqualTo(1);
   }
 
+  @DisplayName("Apple 이전 토큰 발급이 실패하면 사용자별 요청 전에 중단한다.")
   @Test
   void tokenFailureAbortsBeforeAnyUserRequest() throws Exception {
     insertIdentity(1L, "old-sub-1");
@@ -95,6 +99,7 @@ class AppleUserMigrationServiceTest {
     assertThat(repository.findCandidates(AppleUserMigrationPhase.PREPARE)).hasSize(1);
   }
 
+  @DisplayName("Apple 이전 완료는 제공자 식별 정보만 바꾸고 프로필을 유지한다.")
   @Test
   void completeChangesOnlyProviderIdentityAndKeepsUserProfile() throws Exception {
     insertIdentity(77L, "old-sub");
@@ -109,6 +114,7 @@ class AppleUserMigrationServiceTest {
                 77L, "new-transfer-old-sub", "new@privaterelay.appleid.com", "APPLE", "ACTIVE"));
   }
 
+  @DisplayName("완료된 Apple 이전을 재시도하면 사용자 처리와 토큰 요청을 생략한다.")
   @Test
   void completeSkipsCompletedUsersAndTokenRequestWhenRetried() throws Exception {
     insertIdentity(77L, "old-sub");
@@ -123,6 +129,7 @@ class AppleUserMigrationServiceTest {
     assertThat(client.totalCallCount()).isZero();
   }
 
+  @DisplayName("한 사용자의 Apple 이전 완료가 실패해도 나머지를 계속 처리한다.")
   @Test
   void completeMarksOneFailureAndContinuesWithRemainingUsers() throws Exception {
     insertIdentity(1L, "old-sub-1");

@@ -18,9 +18,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ScenarioLearningLevelServiceTest {
+  @DisplayName("과거 질문 그룹을 유지하되 진단 표현은 평가된 학습 수준으로 선택한다.")
   @Test
   void preservesPastGroupsButUsesAssessedLevelForDiagnosticExpressions() {
     var sessions = mock(ScenarioLearningHistoryQueryRepository.class);

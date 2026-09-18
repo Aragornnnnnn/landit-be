@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionAcce
 import com.landit.landitbe.feature.learning.conversation.repository.LearningSessionRepository;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 세션의 소유 상태 계약을 검증한다. */
@@ -21,6 +22,7 @@ class LearningSessionOwnershipTest {
       spy(new LearningSessionService(mock(LearningSessionRepository.class)));
 
   /** 완료한 본인 스몰톡의 결과 복구만 허용하며 다른 세션의 신규 작업은 허용하지 않는다. */
+  @DisplayName("완료한 본인 스몰톡의 결과 복구만 허용하며 다른 세션의 신규 작업은 허용하지 않는다.")
   @Test
   void resultRetryRequiresOwnedCompletedFreeTalk() {
     when(sessions.findOwnedIfPresent(USER_ID, 100L))
@@ -45,6 +47,7 @@ class LearningSessionOwnershipTest {
   }
 
   /** 세션 소유권과 종류가 일치하는 경우에만 원래 시작 시각을 권한 판정에 제공한다. */
+  @DisplayName("세션 소유권과 종류가 일치하는 경우에만 원래 시작 시각을 권한 판정에 제공한다.")
   @Test
   void verifiedStartRequiresMatchingOwnerAndSessionType() {
     var repository = mock(LearningSessionRepository.class);

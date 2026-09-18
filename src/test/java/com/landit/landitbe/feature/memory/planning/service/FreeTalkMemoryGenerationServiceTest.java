@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -80,6 +81,7 @@ class FreeTalkMemoryGenerationServiceTest {
         .thenReturn(ConversationMemoryWriteService.PersistenceResult.STORED);
   }
 
+  @DisplayName("기억 후보가 없으면 충돌 해결이나 저장 계획 없이 작업을 완료한다.")
   @Test
   void completesEmptyCandidatesWithoutResolutionOrMemoryPlans() {
     when(aiClient.extractMemoryCandidates(any()))
@@ -96,6 +98,7 @@ class FreeTalkMemoryGenerationServiceTest {
     verify(contextService, never()).fail(anyLong());
   }
 
+  @DisplayName("후보가 하나이고 비교 기억이 없으면 로컬에서 추가 계획을 만든다.")
   @Test
   void locallyAddsSingleCandidateWhenComparableSearchIsEmpty() {
     AiMemoryCandidatesResult.Candidate candidate = candidate(0, USER_MESSAGE_ID, "user fact");
@@ -124,6 +127,7 @@ class FreeTalkMemoryGenerationServiceTest {
     verify(aiClient, never()).resolveMemory(any());
   }
 
+  @DisplayName("후보가 여러 개면 비교 기억이 없어도 모든 후보의 충돌을 해결한다.")
   @Test
   void resolvesEveryCandidateWhenThereAreMultipleCandidatesEvenWithoutComparables() {
     AiMemoryCandidatesResult.Candidate first = candidate(0, USER_MESSAGE_ID, "first fact");
@@ -156,6 +160,7 @@ class FreeTalkMemoryGenerationServiceTest {
         .persistAndComplete(any(ConversationMemoryGenerationRequest.class), any());
   }
 
+  @DisplayName("사용자 발화가 아닌 출처의 기억 후보는 저장 전에 거부한다.")
   @Test
   void rejectsCandidateWithNonUserSourceBeforeWriting() {
     AiMemoryCandidatesResult.Candidate candidate = candidate(0, AI_MESSAGE_ID, "invalid source");
@@ -168,6 +173,7 @@ class FreeTalkMemoryGenerationServiceTest {
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 
+  @DisplayName("임베딩 모델이 잘못된 기억 후보는 저장 전에 거부한다.")
   @Test
   void rejectsCandidateWithInvalidEmbeddingModelBeforeWriting() {
     AiMemoryCandidatesResult.Candidate candidate =
@@ -193,16 +199,19 @@ class FreeTalkMemoryGenerationServiceTest {
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 
+  @DisplayName("AI 응답에 후보 인덱스가 없으면 기억 생성을 실패로 처리한다.")
   @Test
   void failsClosedWhenCandidateIndexIsMissingFromMappedResponse() throws Exception {
     assertMissingCandidateFieldFails("candidateIndex");
   }
 
+  @DisplayName("AI 응답에 신뢰도가 없으면 기억 생성을 실패로 처리한다.")
   @Test
   void failsClosedWhenConfidenceIsMissingFromMappedResponse() throws Exception {
     assertMissingCandidateFieldFails("confidence");
   }
 
+  @DisplayName("기억 저장 대상이 변경되어 있으면 재시도 없이 실패로 처리한다.")
   @Test
   void failsClosedAfterStaleWriteWithoutRetrying() {
     AiMemoryCandidatesResult.Candidate candidate = candidate(0, USER_MESSAGE_ID, "updated fact");
@@ -232,6 +241,7 @@ class FreeTalkMemoryGenerationServiceTest {
     verify(contextService).fail(LEARNING_SESSION_ID);
   }
 
+  @DisplayName("다른 Worker가 선점한 기억 생성 작업은 실행하지 않는다.")
   @Test
   void doesNotRunWhenAnotherWorkerAlreadyClaimedTheJob() {
     when(contextService.claim(LEARNING_SESSION_ID)).thenReturn(null);

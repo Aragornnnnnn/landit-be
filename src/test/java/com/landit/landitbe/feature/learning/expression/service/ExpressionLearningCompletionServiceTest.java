@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -107,6 +108,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 존재하지 않거나 비활성인 표현은 완료 이력을 저장하지 않는다. */
+  @DisplayName("존재하지 않거나 비활성인 표현은 완료 이력을 저장하지 않는다.")
   @Test
   void shouldThrowWhenExpressionNotFound() {
     // given: 해당 ID의 활성 표현이 없음
@@ -127,6 +129,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 해금된 표현은 완료 이력을 조회하고 갱신하기 전에 잠금 조회한다. */
+  @DisplayName("해금된 표현은 완료 이력을 조회하고 갱신하기 전에 잠금 조회한다.")
   @Test
   void shouldLockUnlockedExpressionBeforeReadingCompletionHistory() {
     // given: 아무것도 완료하지 않은 사용자 + 학습 순서 201→202→203인 시나리오
@@ -151,6 +154,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 이미 완료한 표현은 새 기록 없이 마지막 완료 시각만 갱신한다. */
+  @DisplayName("이미 완료한 표현은 새 기록 없이 마지막 완료 시각만 갱신한다.")
   @Test
   void shouldUpdateLastCompletedAtForRepeatedCompletion() {
     // given: 표현이 존재하고, 사용자가 이미 그 표현을 완료한 상태
@@ -172,6 +176,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 아직 잠긴 표현의 완료 요청은 경고를 남기고 저장 없이 거부한다. */
+  @DisplayName("아직 잠긴 표현의 완료 요청은 경고를 남기고 저장 없이 거부한다.")
   @Test
   void shouldLogAndThrowWhenExpressionIsLocked() {
     // given: 로그 검증용 ListAppender 부착
@@ -209,6 +214,7 @@ class ExpressionLearningCompletionServiceTest {
     logger.detachAppender(logAppender);
   }
 
+  @DisplayName("사용자 난이도보다 높은 시나리오 표현의 완료를 거부한다.")
   @Test
   void shouldRejectScenarioExpressionAboveUserDifficulty() {
     WritingExpression expression = expressionInScenario();
@@ -230,6 +236,7 @@ class ExpressionLearningCompletionServiceTest {
         .findByIdAndStatusForUpdate(LOCKED_EXPRESSION_ID, ActiveStatus.ACTIVE);
   }
 
+  @DisplayName("사용자 난이도 그룹보다 낮은 시나리오 표현의 완료를 거부한다.")
   @Test
   void shouldRejectScenarioExpressionBelowUserDifficultyGroup() {
     WritingExpression expression = expressionInScenario();
@@ -252,6 +259,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 프리톡 추천 표현은 시나리오 학습 순서와 관계없이 완료한다. */
+  @DisplayName("프리톡 추천 표현은 시나리오 학습 순서와 관계없이 완료한다.")
   @Test
   void shouldCompleteScenarioExpressionFromFreeTalkWithoutOrderLock() {
     final long learningSessionId = 701L;
@@ -295,6 +303,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 다른 사용자의 프리톡 세션으로는 표현을 완료할 수 없다. */
+  @DisplayName("다른 사용자의 프리톡 세션으로는 표현을 완료할 수 없다.")
   @Test
   void shouldRejectFreeTalkCompletionForAnotherUser() {
     final long learningSessionId = 701L;
@@ -323,6 +332,7 @@ class ExpressionLearningCompletionServiceTest {
   }
 
   /** 완료되지 않은 프리톡 세션의 표현 완료를 시도하면 RESOURCE_NOT_FOUND 예외를 던진다. */
+  @DisplayName("완료되지 않은 프리톡 세션의 표현 완료를 시도하면 RESOURCE_NOT_FOUND 예외를 던진다.")
   @Test
   void shouldRejectFreeTalkCompletionForIncompleteSession() {
     final long learningSessionId = 701L;

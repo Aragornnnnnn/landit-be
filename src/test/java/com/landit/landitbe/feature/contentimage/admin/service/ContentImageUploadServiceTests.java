@@ -18,6 +18,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -28,6 +29,7 @@ class ContentImageUploadServiceTests {
   private static final long TEN_MIB = 10L * 1024 * 1024;
 
   /** 허용한 MIME type별 표준 확장자로 UUID 객체 키를 발급한다. */
+  @DisplayName("허용한 MIME type별 표준 확장자로 UUID 객체 키를 발급한다.")
   @ParameterizedTest
   @CsvSource({"photo.jpg,image/jpeg,jpg", "photo.png,image/png,png", "photo.webp,image/webp,webp"})
   void createsUploadForSupportedImageTypes(
@@ -54,6 +56,7 @@ class ContentImageUploadServiceTests {
   }
 
   /** JPEG의 일반적인 jpeg 확장자는 표준 jpg 객체 키로 정규화한다. */
+  @DisplayName("JPEG의 일반적인 jpeg 확장자는 표준 jpg 객체 키로 정규화한다.")
   @Test
   void normalizesJpegExtensionToJpg() {
     ContentImageUploadService service = service(new CapturingUploadClient());
@@ -66,6 +69,7 @@ class ContentImageUploadServiceTests {
   }
 
   /** 지원하지 않는 형식과 MIME type이 일치하지 않는 확장자를 거부한다. */
+  @DisplayName("지원하지 않는 형식과 MIME type이 일치하지 않는 확장자를 거부한다.")
   @ParameterizedTest
   @CsvSource({"photo.gif,image/gif", "photo.png,image/jpeg", "photo,image/png"})
   void rejectsUnsupportedOrMismatchedImageTypes(String fileName, String contentType) {
@@ -78,6 +82,7 @@ class ContentImageUploadServiceTests {
   }
 
   /** 비어 있거나 10 MiB를 초과하는 요청 크기를 거부한다. */
+  @DisplayName("비어 있거나 10 MiB를 초과하는 요청 크기를 거부한다.")
   @ParameterizedTest
   @CsvSource({"0", "-1", "10485761"})
   void rejectsFileSizeOutsideAllowedRange(long fileSize) {
@@ -90,6 +95,7 @@ class ContentImageUploadServiceTests {
   }
 
   /** 경계값인 10 MiB 파일은 발급을 허용한다. */
+  @DisplayName("경계값인 10 MiB 파일은 발급을 허용한다.")
   @Test
   void acceptsTenMibFile() {
     ContentImageUploadService service = service(new CapturingUploadClient());
@@ -102,6 +108,7 @@ class ContentImageUploadServiceTests {
   }
 
   /** 같은 파일 메타데이터로 반복 발급해도 기존 객체를 가리키는 키를 재사용하지 않는다. */
+  @DisplayName("같은 파일 메타데이터로 반복 발급해도 기존 객체를 가리키는 키를 재사용하지 않는다.")
   @Test
   void createsUniqueObjectKeyForEachRequest() {
     ContentImageUploadService service = service(new CapturingUploadClient());
@@ -115,6 +122,7 @@ class ContentImageUploadServiceTests {
   }
 
   /** URL 발급이 지연돼도 응답 만료 시각은 요청 처리 시작 시점을 기준으로 계산한다. */
+  @DisplayName("URL 발급이 지연돼도 응답 만료 시각은 요청 처리 시작 시점을 기준으로 계산한다.")
   @Test
   void calculatesExpirationFromRequestStart() {
     Clock clock = mock(Clock.class);

@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDaily
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
@@ -60,6 +61,7 @@ class FreeTalkSessionServiceTest {
           conversationCharacterService);
 
   /** 사용자 잠금을 얻은 뒤 일일 잔여 시간을 다시 확인하고 세션 저장을 중단한다. */
+  @DisplayName("사용자 잠금을 얻은 뒤 일일 잔여 시간을 다시 확인하고 세션 저장을 중단한다.")
   @Test
   void checksDailySpeakingTimeAfterLockingUser() {
     UserProfile userProfile = mock(UserProfile.class);

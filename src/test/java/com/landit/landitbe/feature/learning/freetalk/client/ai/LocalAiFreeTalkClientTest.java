@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFr
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 로컬 프리톡 AI 클라이언트의 결정적 응답 계약을 검증한다. */
@@ -19,6 +20,7 @@ class LocalAiFreeTalkClientTest {
 
   private final LocalAiFreeTalkClient client = new LocalAiFreeTalkClient();
 
+  @DisplayName("로컬 AI 클라이언트는 재현 가능한 발화와 기존 표현 추천 계약을 반환한다.")
   @Test
   void returnsDeterministicTurnAndExistingExpressionRecommendationContracts() {
     AiFreeTalkTurnResult turn = client.generateTurn(turnRequest());

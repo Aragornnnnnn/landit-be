@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,6 +58,7 @@ class ExpoPushTokenApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 인증된 사용자는 PUT 요청으로 Expo Push Token을 등록하고 비활성화할 수 있다. */
+  @DisplayName("인증된 사용자는 PUT 요청으로 Expo Push Token을 등록하고 비활성화할 수 있다.")
   @Test
   void upsertsAndRevokesExpoPushToken() throws Exception {
     String userKey = "expo-push-token-owner";
@@ -77,6 +79,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** Expo Push Token을 활성화하면 사용자의 푸시 권한을 허용 상태로 기록한다. */
+  @DisplayName("Expo Push Token을 활성화하면 사용자의 푸시 권한을 허용 상태로 기록한다.")
   @Test
   void grantsPushPermissionWhenExpoPushTokenIsEnabled() throws Exception {
     String userKey = "expo-push-permission-granted";
@@ -92,6 +95,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 다른 사용자는 본인 소유가 아닌 Expo Push Token을 비활성화할 수 없다. */
+  @DisplayName("다른 사용자는 본인 소유가 아닌 Expo Push Token을 비활성화할 수 없다.")
   @Test
   void doesNotRevokeAnotherUsersExpoPushToken() throws Exception {
     String ownerAccessToken = login("expo-push-token-real-owner");
@@ -119,6 +123,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 인증되지 않은 요청은 Expo Push Token 상태를 변경할 수 없다. */
+  @DisplayName("인증되지 않은 요청은 Expo Push Token 상태를 변경할 수 없다.")
   @Test
   void rejectsUnauthenticatedExpoPushTokenUpdate() throws Exception {
     mockMvc
@@ -137,6 +142,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** APNs나 FCM 형식의 Token은 Expo Push Token으로 저장할 수 없다. */
+  @DisplayName("APNs나 FCM 형식의 Token은 Expo Push Token으로 저장할 수 없다.")
   @Test
   void rejectsNonExpoPushToken() throws Exception {
     String accessToken = login("expo-push-token-invalid-format");
@@ -163,6 +169,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 같은 신규 Token의 동시 PUT 요청은 모두 성공하고 하나의 행만 저장한다. */
+  @DisplayName("같은 신규 Token의 동시 PUT 요청은 모두 성공하고 하나의 행만 저장한다.")
   @Test
   void handlesConcurrentUpsertsIdempotently() throws Exception {
     String userKey = "expo-push-token-concurrent-owner";
@@ -200,6 +207,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 사용자 프로필 권한 갱신에 실패하면 Expo Push Token 등록도 함께 롤백한다. */
+  @DisplayName("사용자 프로필 권한 갱신에 실패하면 Expo Push Token 등록도 함께 롤백한다.")
   @Test
   void rollsBackExpoPushTokenWhenPermissionGrantFails() throws Exception {
     String userKey = "expo-push-permission-grant-failure";

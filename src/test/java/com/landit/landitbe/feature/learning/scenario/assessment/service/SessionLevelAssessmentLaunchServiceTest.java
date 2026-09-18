@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -20,6 +21,7 @@ class SessionLevelAssessmentLaunchServiceTest {
   private final Clock clock =
       Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneId.of("Asia/Seoul"));
 
+  @DisplayName("수준 평가 도입 시각이 없으면 완료 날짜와 무관하게 평가를 비활성화한다.")
   @Test
   void blankSettingDisablesAssessmentRegardlessOfCompletionDate() {
     var launch =
@@ -32,6 +34,7 @@ class SessionLevelAssessmentLaunchServiceTest {
     assertThatThrownBy(launch::requireLaunchedAt).isInstanceOf(IllegalStateException.class);
   }
 
+  @DisplayName("서비스 시간대를 기준으로 정확한 도입 시각부터 수준 평가를 허용한다.")
   @ParameterizedTest
   @ValueSource(strings = {"2026-07-01T00:00:00Z", "2026-07-01T09:00:00+09:00"})
   void usesServiceTimeZoneAndIncludesExactLaunchInstant(String launchedAt) {
@@ -49,6 +52,7 @@ class SessionLevelAssessmentLaunchServiceTest {
     assertThat(launch.includes(1L, boundary.plusNanos(1))).isTrue();
   }
 
+  @DisplayName("현재 시각이 도입 시각에 도달하면 재시작 없이 수준 평가를 활성화한다.")
   @Test
   void enablesWithoutRestartOnlyWhenCurrentTimeReachesLaunch() {
     var movingClock = mock(Clock.class);

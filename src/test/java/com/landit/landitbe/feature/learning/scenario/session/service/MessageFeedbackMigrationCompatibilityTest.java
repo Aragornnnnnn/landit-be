@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.ClassPathResource;
@@ -16,6 +17,7 @@ import org.springframework.core.io.ClassPathResource;
 class MessageFeedbackMigrationCompatibilityTest {
   @TempDir Path migrations;
 
+  @DisplayName("반복 초기화는 메시지 피드백 버전을 올리거나 기존 결과를 교체하지 않는다.")
   @Test
   void repeatableBootstrapDoesNotAdvanceVersionsOrReplaceExistingFeedback() throws Exception {
     String url = "jdbc:h2:mem:compat_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
