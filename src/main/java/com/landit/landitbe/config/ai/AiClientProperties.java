@@ -66,6 +66,10 @@ public record AiClientProperties(
 
   /** 모든 AI HTTP 클라이언트가 같은 내부 인증 헤더를 전달한다. */
   public java.net.http.HttpRequest.Builder authorize(java.net.http.HttpRequest.Builder builder) {
+    String requestId = org.slf4j.MDC.get("request_id");
+    if (requestId != null) {
+      builder.header("X-Request-Id", requestId);
+    }
     return internalToken.isBlank()
         ? builder
         : builder.header("X-Landit-Internal-Token", internalToken);

@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.learning.scenario.session.message.feedback.cl
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.service.MessageFeedbackWorkService;
 import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +33,8 @@ class SessionMessageFeedbackRequester {
     try {
       feedbackWorkService.prepare(toRequest(submittedContext));
     } catch (ApiException exception) {
+      FailureObservation.failed(
+          "message_feedback", "prepare", "evaluation_context_missing", exception);
       // 평가 기준이 빠져도 대화의 다음 질문 생성은 계속한다.
       conversationMessageService.failFeedback(submittedContext.submittedMessageId());
     }

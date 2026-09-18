@@ -21,9 +21,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -32,7 +34,10 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 class GlobalExceptionHandlerTests {
 
   private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
-  private final Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+  private final Logger logger =
+      (Logger)
+          LoggerFactory.getLogger(
+              com.landit.landitbe.shared.observability.FailureObservation.class);
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
 
   @BeforeEach
@@ -45,6 +50,7 @@ class GlobalExceptionHandlerTests {
   void detachLogAppender() {
     logger.detachAppender(logAppender);
     logAppender.stop();
+    org.springframework.security.core.context.SecurityContextHolder.clearContext();
   }
 
   @Test
@@ -123,7 +129,7 @@ class GlobalExceptionHandlerTests {
 
     assertError(
         response, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다.");
-    assertSingleErrorLog(exception, "예상하지 못한");
+    assertSingleErrorLog(exception, "unexpected_exception");
   }
 
   @Test
@@ -131,6 +137,45 @@ class GlobalExceptionHandlerTests {
     assertThat(GlobalExceptionHandler.class.getDeclaredConstructors())
         .singleElement()
         .satisfies(constructor -> assertThat(constructor.getParameterCount()).isZero());
+  }
+
+  @Test
+  void methodRejectionPreservesAllowHeader() throws Exception {
+    var response =
+        resolveException(
+            new org.springframework.web.HttpRequestMethodNotSupportedException(
+                "POST", List.of("GET")));
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    assertThat(response.getHeaders().getAllow()).containsExactly(HttpMethod.GET);
+    assertThat(errorLogs()).isEmpty();
+  }
+
+  @Test
+  void missingPathVariableUsesServerErrorCodeWithServerStatus() throws Exception {
+    Method method = getClass().getDeclaredMethod("pathVariableTarget", String.class);
+    var exception = new MissingPathVariableException("id", new MethodParameter(method, 0));
+
+    var response = handler.handleHttpContract(exception);
+
+    assertError(
+        response, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다.");
+    assertSingleErrorLog(exception, "server_contract");
+  }
+
+  private void pathVariableTarget(String id) {}
+
+  @Test
+  void authenticatedContractViolationIsReportedDespiteClientStatus() {
+    org.springframework.security.core.context.SecurityContextHolder.getContext()
+        .setAuthentication(
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+                .authenticated("test-user", null, List.of()));
+    var response = handler.handleConstraintViolation(new ConstraintViolationException(Set.of()));
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(errorLogs())
+        .singleElement()
+        .satisfies(
+            event -> assertThat(event.getFormattedMessage()).contains("application_contract"));
   }
 
   private void assertError(
@@ -151,9 +196,10 @@ class GlobalExceptionHandlerTests {
             event -> {
               assertThat(event.getFormattedMessage()).contains(messageFragment);
               assertThat(event.getThrowableProxy()).isNotNull();
-              assertThat(event.getThrowableProxy().getClassName())
+              assertThat(event.getThrowableProxy().getClassName()).endsWith("SanitizedFailure");
+              assertThat(event.getThrowableProxy().getMessage())
                   .isEqualTo(exception.getClass().getName());
-              assertThat(event.getThrowableProxy().getMessage()).isEqualTo(exception.getMessage());
+              assertThat(event.getFormattedMessage()).doesNotContain(exception.getMessage());
             });
   }
 
