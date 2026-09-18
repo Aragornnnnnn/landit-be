@@ -167,9 +167,9 @@ class ExpressionReviewIntegrationTests {
     }
   }
 
-  @DisplayName("복습 문제 3개를 고정 저장하고 인증된 소유자만 시작할 수 있다.")
+  @DisplayName("복습 조회와 시작 및 답안 제출은 인증이 필요하고 다른 사용자의 시작은 거부한다.")
   @Test
-  void createsFixedThreeQuestionsAndRequiresAuthenticatedOwner() throws Exception {
+  void requiresAuthenticationAndReviewOwnership() throws Exception {
     User user = user(3);
     ReviewOffer offer = offer(user);
     String path = "/api/v1/reviews/" + offer.reviewId();
@@ -180,6 +180,14 @@ class ExpressionReviewIntegrationTests {
     User other = user(0);
     mvc.perform(post(path + "/start").header("Authorization", "Bearer " + other.token()))
         .andExpect(status().isNotFound());
+  }
+
+  @DisplayName("복습은 언어별 문제 3개를 고정하고 콘텐츠 변경 후에도 같은 문제를 재사용한다.")
+  @Test
+  void fixesThreeQuestionsAndReusesSnapshotAfterContentChanges() throws Exception {
+    User user = user(3);
+    ReviewOffer offer = offer(user);
+    String path = "/api/v1/reviews/" + offer.reviewId();
     mvc.perform(get(path).header("Authorization", "Bearer " + user.token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("READY"))
@@ -210,9 +218,9 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.offer(user.id(), date())).isEmpty();
   }
 
-  @DisplayName("복수 정답을 채점하고 오답은 뒤로 보내며 중복 제출을 멱등 처리한다.")
+  @DisplayName("오답은 문제를 뒤로 이동하고 같은 제출을 재전송해도 오답 횟수를 중복 증가시키지 않는다.")
   @Test
-  void gradesMultipleAnswersMovesWrongToEndAndDeduplicatesSubmissions() throws Exception {
+  void wrongAnswerMovesQuestionToEndAndReplaysSubmission() throws Exception {
     User user = user(3);
     UUID id = offer(user).reviewId();
     ReviewResponse state = reviews.start(user.id(), id);
@@ -224,6 +232,18 @@ class ExpressionReviewIntegrationTests {
     assertThat(failed.review().currentQuestionId()).isNotEqualTo(first.questionId());
     assertThat(reviews.answer(user.id(), id, wrong)).isEqualTo(failed);
     assertThat(failed.review().questions().getFirst().wrongCount()).isEqualTo(1);
+  }
+
+  @DisplayName("같은 제출 ID에 다른 답을 보내면 거부한다.")
+  @Test
+  void repeatedSubmissionRejectsDifferentAnswer() throws Exception {
+    User user = user(3);
+    UUID id = offer(user).reviewId();
+    ReviewResponse state = reviews.start(user.id(), id);
+    ReviewQuestion first = current(state);
+    ReviewAnswerRequest wrong =
+        new ReviewAnswerRequest(UUID.randomUUID(), first.questionId(), List.of("wrong"));
+    var failed = reviews.answer(user.id(), id, wrong);
     assertThatThrownBy(
             () ->
                 reviews.answer(
@@ -233,6 +253,18 @@ class ExpressionReviewIntegrationTests {
                         wrong.submissionId(), first.questionId(), List.of("different"))))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("제출 키");
+  }
+
+  @DisplayName("복수 정답으로 복습을 완료하고 마지막 답안 재전송과 기한 이후 조회도 완료 결과를 유지한다.")
+  @Test
+  void acceptedAnswersCompleteReviewAndReplayFinalSubmission() throws Exception {
+    User user = user(3);
+    UUID id = offer(user).reviewId();
+    ReviewResponse state = reviews.start(user.id(), id);
+    ReviewQuestion first = current(state);
+    ReviewAnswerRequest wrong =
+        new ReviewAnswerRequest(UUID.randomUUID(), first.questionId(), List.of("wrong"));
+    var failed = reviews.answer(user.id(), id, wrong);
     state = failed.review();
     ReviewAnswerRequest last = null;
     while (state.currentQuestionId() != null) {
