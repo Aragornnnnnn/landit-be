@@ -7,12 +7,12 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-import com.landit.landitbe.feature.content.domain.TtsVoice;
-import com.landit.landitbe.feature.content.repository.TtsVoiceRepository;
+import com.landit.landitbe.feature.content.tutor.domain.TtsVoice;
+import com.landit.landitbe.feature.content.tutor.repository.TtsVoiceRepository;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
-import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
-import com.landit.landitbe.feature.memory.repository.FreeTalkMemoryRetrievalTraceRepository;
-import com.landit.landitbe.feature.memory.service.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
+import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.retrieval.repository.FreeTalkMemoryRetrievalTraceRepository;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
@@ -43,6 +43,7 @@ class DatabaseSchemaIntegrationTests {
 
   @Autowired private FreeTalkMemoryRetrievalTraceRepository memoryRetrievalTraceRepository;
 
+  @DisplayName("DBML에 정의된 핵심 테이블이 생성된다.")
   @Test
   void dbmlCoreTablesExist() {
     List<String> tableNames =
@@ -62,6 +63,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 관리자 역할과 쓰기 감사 로그에 필요한 스키마를 생성한다. */
+  @DisplayName("관리자 역할과 쓰기 감사 로그에 필요한 스키마를 생성한다.")
   @Test
   void userRoleAndAuditLogSchemaSupportsAdminAuthorizationAndAudit() {
     assertColumnExists("user_profile", "role");
@@ -77,6 +79,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** Expo 발송 추적에 필요한 스키마를 생성한다. */
+  @DisplayName("Expo 발송 추적에 필요한 스키마를 생성한다.")
   @Test
   void pushDeliverySchemaSupportsDeliveryTracking() {
     assertTableExists("push_delivery");
@@ -88,6 +91,7 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("push_delivery", "uk_push_delivery_deduplication_key");
   }
 
+  @DisplayName("OAuth 사용자 식별 정보의 조회 인덱스가 존재한다.")
   @Test
   void oauthIdentityHasLookupIndexes() {
     assertIndexExists("idx_oauth_identity_provider_user");
@@ -162,6 +166,7 @@ class DatabaseSchemaIntegrationTests {
         .contains("CREATE TABLE nps_response", "DROP TABLE session_nps_response");
   }
 
+  @DisplayName("표현 발음 자산은 표현과 억양 조합마다 한 행만 저장한다.")
   @Test
   void expressionPronunciationAssetStoresOneRowPerExpressionAndAccent() {
     assertTableExists("expression_pronunciation_asset");
@@ -177,6 +182,7 @@ class DatabaseSchemaIntegrationTests {
         "fk_expression_pronunciation_asset_writing_expression_id");
   }
 
+  @DisplayName("메시지 피드백은 학습 표현에 대한 역참조를 보관하지 않는다.")
   @Test
   void sessionHistoryMessageFeedbackDoesNotKeepLearningExpressionBackReference() {
     Integer columnCount =
@@ -192,6 +198,7 @@ class DatabaseSchemaIntegrationTests {
     assertThat(columnCount).isZero();
   }
 
+  @DisplayName("NPS 응답은 사용자에 연결되며 같은 사용자의 중복 제출을 허용한다.")
   @Test
   void npsResponseIsUserBoundAndAllowsDuplicateSubmissions() {
     assertTableExists("nps_response");
@@ -650,49 +657,11 @@ class DatabaseSchemaIntegrationTests {
     assertThat(status).isEqualTo("REVOKED");
   }
 
-  @DisplayName("V27은 pending 메시지 FK와 클라이언트 메시지 멱등 unique를 실제로 강제한다.")
+  @DisplayName("V27은 존재하지 않는 pending 사용자 메시지를 거부한다.")
   @Test
   @Transactional
-  void v27EnforcesPendingMessageForeignKeyAndClientMessageUniqueness() {
-    Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
-    jdbcTemplate.update(
-        """
-        insert into user_profile (id, nickname, target_locale, base_locale, current_level,
-            ai_tutor_id, push_permission_status, status, created_at, updated_at)
-        values (992001, 'free-talk-schema-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED',
-            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """,
-        aiTutorId);
-    jdbcTemplate.update(
-        """
-        insert into learning_session (id, user_profile_id, session_type, ai_tutor_id,
-            target_locale, base_locale, input_mode, status, started_at, created_at, updated_at)
-        values (992002, 992001, 'FREE_TALK', ?, 'EN', 'KR', 'MIXED', 'IN_PROGRESS',
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """,
-        aiTutorId);
-    jdbcTemplate.update(
-        """
-        insert into free_talk_session (id, learning_session_id, start_mode, character_id,
-            conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)
-        values (992003, 992002, 'USER_FIRST', 'chloe', 'IN_PROGRESS', 0,
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """);
-    jdbcTemplate.update(
-        """
-        insert into session_history (id, learning_session_id, user_profile_id, session_type,
-            target_locale, base_locale, started_at, ended_at, duration_seconds, user_message_count,
-            created_at)
-        values (992004, 992002, 992001, 'FREE_TALK', 'EN', 'KR', CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP, 0, 0, CURRENT_TIMESTAMP)
-        """);
-    jdbcTemplate.update(
-        """
-        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
-            role, content, input_type, client_message_id, created_at, updated_at)
-        values (992005, 992004, 1, 1, 'USER', 'hello', 'TEXT', 'client-1',
-            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """);
+  void v27RejectsMissingPendingUserMessage() {
+    seedFreeTalkMessageForConstraints();
 
     assertThatThrownBy(
             () ->
@@ -703,6 +672,14 @@ class DatabaseSchemaIntegrationTests {
                     where id = 992003
                     """))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @DisplayName("V27은 같은 대화에서 중복된 클라이언트 메시지 ID를 거부한다.")
+  @Test
+  @Transactional
+  void v27RejectsDuplicateClientMessageId() {
+    seedFreeTalkMessageForConstraints();
+
     assertThatThrownBy(
             () ->
                 jdbcTemplate.update(
@@ -803,6 +780,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 공용 캐릭터가 시나리오와 프리톡의 TTS 매핑 원본이 된다. */
+  @DisplayName("공용 캐릭터가 시나리오와 프리톡의 TTS 매핑 원본이 된다.")
   @Test
   void conversationCharacterOwnsScenarioAndFreeTalkTtsMapping() {
     assertTableExists("conversation_character");
@@ -833,6 +811,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 기존 시나리오 음성을 동일한 공용 캐릭터로 이전한다. */
+  @DisplayName("V55 migration은 기존 시나리오 음성을 동일한 공용 캐릭터로 이전한다.")
   @Test
   void v55MigrationBackfillsScenarioCharacterFromExistingVoice() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -850,6 +829,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V58 migration은 기존 학습 수준을 1~5 정수 척도로 변환하고 범위를 제한한다. */
+  @DisplayName("V58 migration은 기존 학습 수준을 1~5 정수 척도로 변환하고 범위를 제한한다.")
   @Test
   void v58MigrationConvertsAndConstrainsUserLearningLevel() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -889,6 +869,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** Repeatable migration은 활성 Expo Push Token 보유자의 푸시 권한을 허용 상태로 보정한다. */
+  @DisplayName("Repeatable migration은 활성 Expo Push Token 보유자의 푸시 권한을 허용 상태로 보정한다.")
   @Test
   void repeatableMigrationBackfillsGrantedPushPermissionForActiveTokenOwners() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -943,6 +924,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 사용자 학습 수준 CHECK 제약은 1과 5를 허용하고 범위를 벗어난 값을 거절한다. */
+  @DisplayName("사용자 학습 수준 CHECK 제약은 1과 5를 허용하고 범위를 벗어난 값을 거절한다.")
   @Test
   void userLearningLevelConstraintAllowsOneToFiveOnly() {
     long userProfileId = 990404L;
@@ -967,6 +949,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 하나의 시나리오가 여러 캐릭터 음성을 사용하면 적용을 중단한다. */
+  @DisplayName("V55 migration은 하나의 시나리오가 여러 캐릭터 음성을 사용하면 적용을 중단한다.")
   @Test
   void v55MigrationRejectsScenarioWithMultipleCharacterVoices() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -981,6 +964,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 한 시나리오의 음성 설정 여부가 언어별로 다르면 적용을 중단한다. */
+  @DisplayName("V55 migration은 한 시나리오의 음성 설정 여부가 언어별로 다르면 적용을 중단한다.")
   @Test
   void v55MigrationRejectsScenarioWithMixedNullAndCharacterVoice() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -995,6 +979,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V55 migration은 공용 캐릭터로 역매핑할 수 없는 음성이 있으면 적용을 중단한다. */
+  @DisplayName("V55 migration은 공용 캐릭터로 역매핑할 수 없는 음성이 있으면 적용을 중단한다.")
   @Test
   void v55MigrationRejectsUnmappedScenarioVoice() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1008,13 +993,10 @@ class DatabaseSchemaIntegrationTests {
         .isInstanceOf(FlywayException.class);
   }
 
-  @DisplayName("V14 migration이 기본 튜터와 시나리오 TTS 음성 두 건을 추가한다.")
+  @DisplayName("V14는 시나리오 음성 두 건과 제공자 정보를 등록한다.")
   @Test
-  void v14MigrationSeedsDefaultTutorAndScenarioTtsVoices() throws Exception {
-    String databaseUrl = migrationTestDatabaseUrl();
-    JdbcTemplate migrationJdbcTemplate =
-        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
-    migrateToVersion(databaseUrl, "14");
+  void v14SeedsScenarioVoiceMetadata() throws Exception {
+    JdbcTemplate migrationJdbcTemplate = databaseMigratedToVersion14();
 
     List<Map<String, Object>> voices =
         migrationJdbcTemplate.queryForList(
@@ -1039,6 +1021,12 @@ class DatabaseSchemaIntegrationTests {
               assertThat(row.get("ACCENT_LOCALE")).isEqualTo("EN_US");
               assertThat(row.get("STATUS")).isEqualTo("ACTIVE");
             });
+  }
+
+  @DisplayName("V14는 제공자의 중복 음성 등록을 거부한다.")
+  @Test
+  void v14RejectsDuplicateProviderVoice() throws Exception {
+    JdbcTemplate migrationJdbcTemplate = databaseMigratedToVersion14();
 
     assertThatThrownBy(
             () ->
@@ -1054,6 +1042,12 @@ class DatabaseSchemaIntegrationTests {
                     )
                     """))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @DisplayName("V14는 한국어 이름을 가진 기본 미국 영어 튜터를 등록한다.")
+  @Test
+  void v14SeedsDefaultTutorWithKoreanName() throws Exception {
+    JdbcTemplate migrationJdbcTemplate = databaseMigratedToVersion14();
 
     Integer defaultTutorCount =
         migrationJdbcTemplate.queryForObject(
@@ -1081,7 +1075,11 @@ class DatabaseSchemaIntegrationTests {
             """,
             Integer.class);
     assertThat(koreanVariantCount).isEqualTo(1);
+  }
 
+  @DisplayName("V14는 튜터를 선택하지 않은 프로필만 갱신한다.")
+  @Test
+  void v14BackfillsOnlyProfilesWithoutTutor() throws Exception {
     String migrationSql =
         readMigrationSql("db/migration/V14__separate_ai_tutor_and_scenario_tts_voice.sql");
     assertThat(migrationSql).contains("UPDATE user_profile", "WHERE ai_tutor_id IS NULL");
@@ -1204,6 +1202,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V34 migration이 활성 정책의 최소 지원 버전명을 보존하는지 검증한다. */
+  @DisplayName("V34 migration이 활성 정책의 최소 지원 버전명을 보존하는지 검증한다.")
   @Test
   void v34MigrationKeepsSingleActivePolicyAndMapsMinimumSupportedVersionName() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1231,6 +1230,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V34 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다. */
+  @DisplayName("V34 migration은 기존 최소 지원 빌드에 대응하는 버전명이 없으면 적용을 중단한다.")
   @Test
   void v34MigrationFailsWhenMinimumSupportedBuildCannotBeMapped() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1244,6 +1244,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** V48 migration은 두 플랫폼에 1.1.0 강제 업데이트 정책을 적용한다. */
+  @DisplayName("V48 migration은 두 플랫폼에 1.1.0 강제 업데이트 정책을 적용한다.")
   @Test
   void v48MigrationRequiresVersion110ForBothPlatforms() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1283,6 +1284,7 @@ class DatabaseSchemaIntegrationTests {
   }
 
   /** 기존 발화 사용량은 보존하고 요청 횟수는 0에서 시작하도록 V97을 적용한다. */
+  @DisplayName("기존 발화 사용량은 보존하고 요청 횟수는 0에서 시작하도록 V97을 적용한다.")
   @Test
   void v97PreservesSpeakingUsageAndInitializesRequestCounters() {
     String databaseUrl = migrationTestDatabaseUrl();
@@ -1790,5 +1792,56 @@ class DatabaseSchemaIntegrationTests {
   private String readMigrationSql(String path) throws Exception {
     return StreamUtils.copyToString(
         new ClassPathResource(path).getInputStream(), java.nio.charset.StandardCharsets.UTF_8);
+  }
+
+  private void seedFreeTalkMessageForConstraints() {
+    Long aiTutorId = jdbcTemplate.queryForObject("select min(id) from ai_tutor", Long.class);
+    jdbcTemplate.update(
+        """
+        insert into user_profile (id, nickname, target_locale, base_locale, current_level,
+            ai_tutor_id, push_permission_status, status, created_at, updated_at)
+        values (992001, 'free-talk-schema-user', 'EN', 'KR', 1, ?, 'NOT_DETERMINED',
+            'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into learning_session (id, user_profile_id, session_type, ai_tutor_id,
+            target_locale, base_locale, input_mode, status, started_at, created_at, updated_at)
+        values (992002, 992001, 'FREE_TALK', ?, 'EN', 'KR', 'MIXED', 'IN_PROGRESS',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        aiTutorId);
+    jdbcTemplate.update(
+        """
+        insert into free_talk_session (id, learning_session_id, start_mode, character_id,
+            conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)
+        values (992003, 992002, 'USER_FIRST', 'chloe', 'IN_PROGRESS', 0,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history (id, learning_session_id, user_profile_id, session_type,
+            target_locale, base_locale, started_at, ended_at, duration_seconds, user_message_count,
+            created_at)
+        values (992004, 992002, 992001, 'FREE_TALK', 'EN', 'KR', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP, 0, 0, CURRENT_TIMESTAMP)
+        """);
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, input_type, client_message_id, created_at, updated_at)
+        values (992005, 992004, 1, 1, 'USER', 'hello', 'TEXT', 'client-1',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+  }
+
+  private JdbcTemplate databaseMigratedToVersion14() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    migrateToVersion(databaseUrl, "14");
+
+    return migrationJdbcTemplate;
   }
 }

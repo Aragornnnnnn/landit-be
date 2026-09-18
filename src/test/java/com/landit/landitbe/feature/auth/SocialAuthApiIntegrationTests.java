@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,6 +66,7 @@ class SocialAuthApiIntegrationTests {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  @DisplayName("소셜 로그인 시 사용자를 생성하고 토큰을 반환한다.")
   @Test
   void socialLoginCreatesUserAndReturnsTokens() throws Exception {
     MvcResult firstLogin =
@@ -121,6 +123,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.data.user.status").value("ACTIVE"));
   }
 
+  @DisplayName("소셜 로그인 요청에 nonce가 없으면 거부한다.")
   @Test
   void socialLoginRejectsMissingNonce() throws Exception {
     mockMvc
@@ -139,6 +142,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("OIDC_NONCE_MISMATCH"));
   }
 
+  @DisplayName("소셜 로그인 nonce가 일치하지 않으면 거부한다.")
   @Test
   void socialLoginRejectsNonceMismatch() throws Exception {
     mockMvc
@@ -158,6 +162,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("OIDC_NONCE_MISMATCH"));
   }
 
+  @DisplayName("Apple 최초 로그인에 닉네임이 없으면 게스트 닉네임을 부여한다.")
   @Test
   void socialLoginCreatesGuestForAppleWithoutRequestNickname() throws Exception {
     MvcResult result =
@@ -191,6 +196,7 @@ class SocialAuthApiIntegrationTests {
     assertDefaultAiTutorAssigned(userId);
   }
 
+  @DisplayName("Apple 최초 로그인에서 요청한 닉네임을 사용한다.")
   @Test
   void socialLoginUsesRequestNicknameForApple() throws Exception {
     mockMvc
@@ -210,6 +216,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
   }
 
+  @DisplayName("Apple 재로그인에 닉네임이 없으면 기존 닉네임을 유지한다.")
   @Test
   void socialLoginKeepsExistingAppleNicknameWhenRequestNicknameIsMissing() throws Exception {
     mockMvc
@@ -244,6 +251,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.data.user.nickname").value("Apple Request Name"));
   }
 
+  @DisplayName("Google 로그인에서는 요청의 닉네임을 사용하지 않는다.")
   @Test
   void socialLoginIgnoresRequestNicknameForGoogle() throws Exception {
     mockMvc
@@ -263,6 +271,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.data.user.nickname").value("Id Token Name"));
   }
 
+  @DisplayName("기본 AI 튜터가 없으면 신규 사용자 로그인을 거부한다.")
   @Test
   void socialLoginRejectsNewUserWhenDefaultAiTutorIsMissing() throws Exception {
     jdbcTemplate.update(
@@ -300,6 +309,7 @@ class SocialAuthApiIntegrationTests {
     }
   }
 
+  @DisplayName("기본 AI 튜터가 중복되면 신규 사용자 로그인을 거부한다.")
   @Test
   void socialLoginRejectsNewUserWhenDefaultAiTutorIsDuplicated() throws Exception {
     jdbcTemplate.update(
@@ -329,6 +339,7 @@ class SocialAuthApiIntegrationTests {
     }
   }
 
+  @DisplayName("지원하지 않는 소셜 로그인 제공자는 거부한다.")
   @Test
   void socialLoginRejectsUnsupportedProvider() throws Exception {
     mockMvc
@@ -366,6 +377,7 @@ class SocialAuthApiIntegrationTests {
         Long.class);
   }
 
+  @DisplayName("토큰 갱신 시 refresh token을 교체하고 이전 토큰의 재사용을 거부한다.")
   @Test
   void refreshRotatesRefreshTokenAndRejectsReusedToken() throws Exception {
     JsonNode loginBody =
@@ -415,6 +427,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
   }
 
+  @DisplayName("조건부 토큰 폐기는 같은 refresh token을 한 번만 소비한다.")
   @Test
   @Transactional
   void conditionalRefreshTokenRevocationConsumesTokenOnlyOnce() {
@@ -433,6 +446,7 @@ class SocialAuthApiIntegrationTests {
   }
 
   /** 동일한 Refresh Token을 동시에 사용해도 한 요청만 새 토큰을 발급한다. */
+  @DisplayName("동일한 Refresh Token을 동시에 사용해도 한 요청만 새 토큰을 발급한다.")
   @Test
   void concurrentRefreshConsumesTokenOnlyOnce() throws Exception {
     JsonNode loginBody =
@@ -465,6 +479,7 @@ class SocialAuthApiIntegrationTests {
   }
 
   /** Refresh Token 회전과 탈퇴가 겹쳐도 탈퇴 완료 후 사용할 수 있는 토큰이 남지 않는다. */
+  @DisplayName("Refresh Token 회전과 탈퇴가 겹쳐도 탈퇴 완료 후 사용할 수 있는 토큰이 남지 않는다.")
   @Test
   void concurrentRefreshAndWithdrawalLeaveNoUsableRefreshToken() throws Exception {
     JsonNode loginBody =
@@ -523,6 +538,7 @@ class SocialAuthApiIntegrationTests {
     }
   }
 
+  @DisplayName("로그아웃하면 refresh token을 폐기한다.")
   @Test
   void logoutRevokesRefreshToken() throws Exception {
     JsonNode loginBody =
@@ -560,6 +576,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
   }
 
+  @DisplayName("탈퇴는 access token으로 인증하고 refresh token을 폐기한다.")
   @Test
   void withdrawUsesAccessTokenAndRevokesRefreshTokens() throws Exception {
     mockMvc
@@ -611,6 +628,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
   }
 
+  @DisplayName("유효하지 않은 access token으로 탈퇴할 수 없다.")
   @Test
   void withdrawRejectsInvalidAccessToken() throws Exception {
     mockMvc
@@ -621,6 +639,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("탈퇴한 사용자의 토큰 갱신을 거부한다.")
   @Test
   void refreshRejectsTokenOwnedByWithdrawnUser() throws Exception {
     UserProfile userProfile =

@@ -5,6 +5,7 @@ package com.landit.landitbe.config.observability;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.SpringApplication;
@@ -18,6 +19,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 @ExtendWith(OutputCaptureExtension.class)
 class DeploymentReadyLoggerTest {
 
+  @DisplayName("애플리케이션 준비 완료 이벤트가 발생하면 배포 버전을 기록한다.")
   @Test
   void logsDeploymentVersionWhenApplicationReadyEventIsPublished(CapturedOutput output) {
     try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {

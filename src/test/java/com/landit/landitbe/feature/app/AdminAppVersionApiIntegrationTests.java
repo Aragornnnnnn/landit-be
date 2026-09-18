@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.app;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.patchJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +54,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 일반 로그인 사용자는 관리자 앱 버전 목록을 조회할 수 없다. */
+  @DisplayName("일반 로그인 사용자는 관리자 앱 버전 목록을 조회할 수 없다.")
   @Test
   void rejectsNonAdminAppVersionList() throws Exception {
     String accessToken = login("admin-app-version-denied", "일반 사용자");
@@ -65,6 +67,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 관리자는 iOS와 Android의 단일 버전 정책을 조회할 수 있다. */
+  @DisplayName("관리자는 iOS와 Android의 단일 버전 정책을 조회할 수 있다.")
   @Test
   void listsSinglePolicyForEachPlatform() throws Exception {
     insertPolicy("IOS", "1.0.0", "1.0.0", 10);
@@ -85,6 +88,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 관리자는 플랫폼을 기준으로 단일 정책과 감사 기록을 함께 수정한다. */
+  @DisplayName("관리자는 플랫폼을 기준으로 단일 정책과 감사 기록을 함께 수정한다.")
   @Test
   void updatesPlatformPolicyAndRecordsBeforeAndAfterValues() throws Exception {
     insertPolicy("ANDROID", "1.0.0", "1.0.0", 10);
@@ -94,10 +98,11 @@ class AdminAppVersionApiIntegrationTests {
     MvcResult patchResult =
         mockMvc
             .perform(
-                patch("/api/v1/admin/app-versions/{platform}", "ANDROID")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(requestBody("1.2.0", "1.1.0", 11)))
+                patchJsonWithToken(
+                    "/api/v1/admin/app-versions/{platform}",
+                    adminAccessToken,
+                    requestBody("1.2.0", "1.1.0", 11),
+                    "ANDROID"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.versionName").value("1.2.0"))
             .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.1.0"))
@@ -146,6 +151,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 감사 이력이 없는 기존 앱 버전 정책은 생성 시각과 빈 수정자로 이관한다. */
+  @DisplayName("감사 이력이 없는 기존 앱 버전 정책은 생성 시각과 빈 수정자로 이관한다.")
   @Test
   void migratesPolicyWithoutAuditHistoryUsingCreatedAtAndNullModifier() {
     DriverManagerDataSource dataSource = newMigrationDataSource();
@@ -174,6 +180,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 최신 앱 버전 감사 기록의 수정 시각과 관리자를 기존 정책에 이관한다. */
+  @DisplayName("최신 앱 버전 감사 기록의 수정 시각과 관리자를 기존 정책에 이관한다.")
   @Test
   void migratesLatestAuditHistoryForPlatform() {
     DriverManagerDataSource dataSource = newMigrationDataSource();
@@ -206,6 +213,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 최소 지원 버전이 최신 버전보다 높으면 정책 수정을 거절한다. */
+  @DisplayName("최소 지원 버전이 최신 버전보다 높으면 정책 수정을 거절한다.")
   @Test
   void rejectsPolicyWithMinimumVersionHigherThanLatestVersion() throws Exception {
     insertPolicy("IOS", "1.0.0", "1.0.0", 10);
@@ -213,14 +221,16 @@ class AdminAppVersionApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/app-versions/{platform}", "IOS")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody("1.1.0", "1.2.0", 11)))
+            patchJsonWithToken(
+                "/api/v1/admin/app-versions/{platform}",
+                adminAccessToken,
+                requestBody("1.1.0", "1.2.0", 11),
+                "IOS"))
         .andExpect(status().isBadRequest());
   }
 
   /** Major.Minor.Patch 형식이 아닌 관리자 버전명은 정책 수정을 거절한다. */
+  @DisplayName("Major.Minor.Patch 형식이 아닌 관리자 버전명은 정책 수정을 거절한다.")
   @Test
   void rejectsPolicyWithInvalidVersionName() throws Exception {
     insertPolicy("IOS", "1.0.0", "1.0.0", 10);
@@ -228,14 +238,16 @@ class AdminAppVersionApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/app-versions/{platform}", "IOS")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody("1.1", "1.0.0", 11)))
+            patchJsonWithToken(
+                "/api/v1/admin/app-versions/{platform}",
+                adminAccessToken,
+                requestBody("1.1", "1.0.0", 11),
+                "IOS"))
         .andExpect(status().isBadRequest());
   }
 
   /** 등록과 활성 전환 경로는 관리자 OpenAPI에 노출되지 않는다. */
+  @DisplayName("등록과 활성 전환 경로는 관리자 OpenAPI에 노출되지 않는다.")
   @Test
   void documentsOnlyListAndPlatformUpdateApis() throws Exception {
     mockMvc
@@ -252,6 +264,7 @@ class AdminAppVersionApiIntegrationTests {
   }
 
   /** 관리자 앱 버전 응답의 OpenAPI required 및 nullable 계약을 노출한다. */
+  @DisplayName("관리자 앱 버전 응답의 OpenAPI required 및 nullable 계약을 노출한다.")
   @Test
   void documentsAdminAppVersionResponseContract() throws Exception {
     String responseSchema = "$.components.schemas.AdminAppVersionResponse";

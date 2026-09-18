@@ -22,6 +22,10 @@ Spotless는 `src/main/java`와 `src/test/java`의 Java 파일을 검사한다. `
 
 새 Java 소스 파일은 첫 줄에 파일 역할을 설명하는 한국어 `//` 주석을 둔다. 이 규칙은 Google Java Style의 일반 파일 순서에 대한 저장소 로컬 예외다. 역할 주석 다음 줄을 비우고 `package` 선언을 둬 Checkstyle의 파일 순서 규칙도 함께 만족한다. 역할 주석의 존재 여부는 Spotless나 Checkstyle이 검사하지 않으므로 코드 리뷰에서 확인한다.
 
+## 테스트 이름
+
+JUnit 테스트 메서드에는 한국어 `@DisplayName`으로 검증 조건과 기대 결과를 적는다. 파라미터 테스트도 적용하며, 메서드명이나 이슈 번호만 반복하지 않고 실제 assert가 확인하는 범위 안에서 설명한다. 실행 도구에서 사용하는 영문 메서드명은 유지한다.
+
 ## Javadoc 규칙
 
 공개 타입과 `public`, `protected` 메서드는 Javadoc으로 역할과 호출 계약을 설명한다.

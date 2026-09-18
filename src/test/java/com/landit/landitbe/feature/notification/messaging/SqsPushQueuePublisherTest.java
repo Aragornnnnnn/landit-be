@@ -9,13 +9,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.notification.NotificationProperties;
-import com.landit.landitbe.feature.notification.client.PushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
+import com.landit.landitbe.feature.notification.delivery.messaging.SqsPushQueuePublisher;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,6 +60,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** 같은 Push Queue에 Receipt 확인 payload와 900초 지연을 지정해 발행한다. */
+  @DisplayName("같은 Push Queue에 Receipt 확인 payload와 900초 지연을 지정해 발행한다.")
   @Test
   void publishesDelayedReceiptCheckMessage() throws Exception {
     stubSqsSendMessage();
@@ -80,6 +83,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** Receipt 확인 지연 시간은 Expo Receipt 조회 계약에 맞춰 900초만 허용한다. */
+  @DisplayName("Receipt 확인 지연 시간은 Expo Receipt 조회 계약에 맞춰 900초만 허용한다.")
   @ParameterizedTest
   @ValueSource(ints = {0, 899, 901})
   void rejectsReceiptDelayThatDiffersFromFifteenMinutes(int receiptDelaySeconds) {
@@ -100,6 +104,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** Receipt 배치와 공존하는 관리자 작업은 지정한 payload를 지연 없이 발행한다. */
+  @DisplayName("Receipt 배치와 공존하는 관리자 작업은 지정한 payload를 지연 없이 발행한다.")
   @Test
   void publishesAdminCampaignAndTestWithoutReceiptDelay() {
     stubSqsSendMessage();
@@ -133,6 +138,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** SQS 응답이 지연되면 설정된 요청 제한 시간 뒤 발행 실패로 처리한다. */
+  @DisplayName("SQS 응답이 지연되면 설정된 요청 제한 시간 뒤 발행 실패로 처리한다.")
   @Test
   void failsWhenSqsSendExceedsRequestTimeout() {
     NotificationProperties properties =
@@ -162,6 +168,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** 21개 예약은 10·10·1로 분리하고 각 항목의 지연·payload를 유지한다. */
+  @DisplayName("21개 예약은 10·10·1로 분리하고 각 항목의 지연·payload를 유지한다.")
   @Test
   void batchesReceiptsWithEntryDelayAndPayload() {
     when(sqsAsyncClient.sendMessageBatch(any(SendMessageBatchRequest.class)))
@@ -211,6 +218,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** HTTP 성공 응답의 개별 실패도 예외로 처리해 접수 이력 기반 재예약을 유도한다. */
+  @DisplayName("HTTP 성공 응답의 개별 실패도 예외로 처리해 접수 이력 기반 재예약을 유도한다.")
   @Test
   void rejectsPartialFailure() {
     when(sqsAsyncClient.sendMessageBatch(any(SendMessageBatchRequest.class)))
@@ -231,6 +239,7 @@ class SqsPushQueuePublisherTest {
   }
 
   /** 성공 목록에서 누락된 항목을 성공으로 간주하지 않는다. */
+  @DisplayName("성공 목록에서 누락된 항목을 성공으로 간주하지 않는다.")
   @Test
   void rejectsMissingBatchResult() {
     when(sqsAsyncClient.sendMessageBatch(any(SendMessageBatchRequest.class)))

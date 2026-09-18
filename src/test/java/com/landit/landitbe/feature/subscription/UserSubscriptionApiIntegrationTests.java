@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -90,6 +91,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 구독 이력이 없는 사용자는 NONE 상태에 프리미엄이 꺼진 것으로 조회된다. */
+  @DisplayName("구독 이력이 없는 사용자는 NONE 상태에 프리미엄이 꺼진 것으로 조회된다.")
   @Test
   void returnsNoneSubscriptionForNewUser() throws Exception {
     String accessToken = login("subscription-free");
@@ -111,6 +113,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 웹훅으로 무료 체험 구매가 반영되면 ACTIVE 상태, 체험 중(isTrial), TRIAL 기간 종류, 만료 시각이 조회된다. */
+  @DisplayName("웹훅으로 무료 체험 구매가 반영되면 ACTIVE 상태, 체험 중(isTrial), TRIAL 기간 종류, 만료 시각이 조회된다.")
   @Test
   void returnsActiveSubscriptionAfterWebhookPurchase() throws Exception {
     String userKey = "subscription-active";
@@ -153,6 +156,7 @@ class UserSubscriptionApiIntegrationTests {
    * 대시보드에서 부여한 프로모션 권한(NON_RENEWING_PURCHASE)은 프리미엄이 켜지지만 무료 체험이 아니므로 isTrial은 false이고 periodType은
    * PROMOTIONAL로 조회된다. 앱은 이 값으로 체험 종료 결제 경고를 보내지 않는다.
    */
+  @DisplayName("프로모션 구독은 프리미엄으로 조회하되 무료 체험으로 표시하지 않는다.")
   @Test
   void returnsPromotionalSubscriptionAsPremiumButNotTrial() throws Exception {
     String userKey = "subscription-promotional";
@@ -193,43 +197,13 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 결제 이력은 발생 시각 내림차순으로 내려오고, 결제 없는 이벤트의 price는 0이다. */
+  @DisplayName("결제 이력은 발생 시각 내림차순으로 내려오고, 결제 없는 이벤트의 price는 0이다.")
   @Test
   void returnsSubscriptionEventsNewestFirst() throws Exception {
     String userKey = "subscription-events";
     final String accessToken = login(userKey);
     Long userId = userIdOf(userKey);
-    String renewalId = UUID.randomUUID().toString();
-    postWebhook(
-        webhookEvent(
-            UUID.randomUUID().toString(),
-            "INITIAL_PURCHASE",
-            userId,
-            EVENT_TIMESTAMP_MS,
-            """
-            "period_type": "TRIAL", "price": 0, "price_in_purchased_currency": 0, "currency": "KRW",
-            "purchased_at_ms": %d,
-            """
-                .formatted(EVENT_TIMESTAMP_MS)));
-    postWebhook(
-        webhookEvent(
-            renewalId,
-            "RENEWAL",
-            userId,
-            EVENT_TIMESTAMP_MS + 2_000,
-            """
-            "period_type": "NORMAL", "price": 39.5, "price_in_purchased_currency": 58500.0,
-            "currency": "KRW", "purchased_at_ms": %d,
-            """
-                .formatted(EVENT_TIMESTAMP_MS + 2_000)));
-    postWebhook(
-        webhookEvent(
-            UUID.randomUUID().toString(),
-            "CANCELLATION",
-            userId,
-            EVENT_TIMESTAMP_MS + 1_000,
-            """
-            "cancel_reason": "UNSUBSCRIBE",
-            """));
+    String renewalId = postOutOfOrderSubscriptionEvents(userId);
 
     mockMvc
         .perform(
@@ -259,6 +233,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 결제 이력은 페이지 없이 최근 50개까지만 내려준다. */
+  @DisplayName("결제 이력은 페이지 없이 최근 50개까지만 내려준다.")
   @Test
   void limitsSubscriptionEventsToFifty() throws Exception {
     String userKey = "subscription-events-limit";
@@ -289,6 +264,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 이력이 없는 사용자는 빈 목록을 받는다. */
+  @DisplayName("이력이 없는 사용자는 빈 목록을 받는다.")
   @Test
   void returnsEmptySubscriptionEventsForNewUser() throws Exception {
     String accessToken = login("subscription-events-empty");
@@ -303,6 +279,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 도입 시점 이후에 시나리오를 끝까지 완료한 사용자는 대화 완료로 조회된다. */
+  @DisplayName("도입 시점 이후에 시나리오를 끝까지 완료한 사용자는 대화 완료로 조회된다.")
   @Test
   void marksConversationCompletedWhenScenarioClearedAfterLaunch() throws Exception {
     String userKey = "subscription-cleared-after";
@@ -324,6 +301,7 @@ class UserSubscriptionApiIntegrationTests {
    * 무료가 되면서 완료 이력과 관계없이 canStartScenario는 true여야 하고, conversationCompletedSinceLaunch는 완료 여부를 그대로
    * 알리며, 무료 상태로 시나리오를 시작한 적이 없어 freeScenarioSessionId는 null이어야 한다.
    */
+  @DisplayName("도입 후 완료 이력이 있는 무료 사용자도 구독 응답에서 시나리오 시작을 허용한다.")
   @Test
   void keepsScenarioStartOpenForFreeUserAfterCompletionSinceLaunch() throws Exception {
     String userKey = "subscription-start-open";
@@ -344,6 +322,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 도입 시점 전에만 완료한 기존 사용자는 대화 완료로 보지 않는다. */
+  @DisplayName("도입 시점 전에만 완료한 기존 사용자는 대화 완료로 보지 않는다.")
   @Test
   void ignoresScenarioClearedBeforeLaunch() throws Exception {
     String userKey = "subscription-cleared-before";
@@ -359,6 +338,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 시작만 하고 끝까지 완료하지 않은 시나리오는 대화 완료로 보지 않는다. */
+  @DisplayName("시작만 하고 끝까지 완료하지 않은 시나리오는 대화 완료로 보지 않는다.")
   @Test
   void ignoresScenarioOnlyStarted() throws Exception {
     String userKey = "subscription-in-progress";
@@ -374,6 +354,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** 인증되지 않은 사용자는 구독 상태를 조회할 수 없다. */
+  @DisplayName("인증되지 않은 사용자는 구독 상태를 조회할 수 없다.")
   @Test
   void rejectsUnauthenticatedSubscriptionRequest() throws Exception {
     mockMvc.perform(get("/api/v1/me/subscription")).andExpect(status().isUnauthorized());
@@ -381,6 +362,7 @@ class UserSubscriptionApiIntegrationTests {
   }
 
   /** OpenAPI 문서에 구독 상태·결제 이력 조회 API와 새 필드를 Subscription 태그로 공개한다. */
+  @DisplayName("OpenAPI 문서에 구독 상태·결제 이력 조회 API와 새 필드를 Subscription 태그로 공개한다.")
   @Test
   void openApiDocsDescribeSubscriptionApi() throws Exception {
     mockMvc
@@ -488,5 +470,42 @@ class UserSubscriptionApiIntegrationTests {
             .andReturn();
     JsonNode body = objectMapper.readTree(result.getResponse().getContentAsByteArray());
     return body.get("data").get("accessToken").asText();
+  }
+
+  private String postOutOfOrderSubscriptionEvents(Long userId) throws Exception {
+    String renewalId = UUID.randomUUID().toString();
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "INITIAL_PURCHASE",
+            userId,
+            EVENT_TIMESTAMP_MS,
+            """
+            "period_type": "TRIAL", "price": 0, "price_in_purchased_currency": 0, "currency": "KRW",
+            "purchased_at_ms": %d,
+            """
+                .formatted(EVENT_TIMESTAMP_MS)));
+    postWebhook(
+        webhookEvent(
+            renewalId,
+            "RENEWAL",
+            userId,
+            EVENT_TIMESTAMP_MS + 2_000,
+            """
+            "period_type": "NORMAL", "price": 39.5, "price_in_purchased_currency": 58500.0,
+            "currency": "KRW", "purchased_at_ms": %d,
+            """
+                .formatted(EVENT_TIMESTAMP_MS + 2_000)));
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "CANCELLATION",
+            userId,
+            EVENT_TIMESTAMP_MS + 1_000,
+            """
+            "cancel_reason": "UNSUBSCRIBE",
+            """));
+
+    return renewalId;
   }
 }

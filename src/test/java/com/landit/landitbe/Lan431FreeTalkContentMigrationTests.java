@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -30,6 +31,7 @@ class Lan431FreeTalkContentMigrationTests {
   private static final String UUID_WEBP =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp";
 
+  @DisplayName("각 표현에 해당 표현의 대표 이미지와 마지막 두 연습 이미지를 매핑한다.")
   @Test
   void mapsEveryExpressionToItsOwnRepresentativeAndLastTwoPracticeImages() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
@@ -77,6 +79,7 @@ class Lan431FreeTalkContentMigrationTests {
     assertThat(urls).hasSize(2226);
   }
 
+  @DisplayName("프리톡 콘텐츠만 적재하고 임베딩은 유한한 1,536차원 값으로 구성한다.")
   @Test
   void includesFinite1536DimensionalEmbeddingsAndOnlyFreeTalkRows() throws Exception {
     List<String> rows = readSql().lines().filter(line -> line.startsWith("(")).toList();
@@ -92,6 +95,7 @@ class Lan431FreeTalkContentMigrationTests {
     assertThat(rows).hasSize(742);
   }
 
+  @DisplayName("프리톡 적재 시 충돌을 검사하고 Flyway 트랜잭션과 시퀀스 증가를 보존한다.")
   @Test
   void guardsCollisionsAndKeepsFlywayTransactionAndSequenceMonotonicity() throws Exception {
     String sql = readSql();

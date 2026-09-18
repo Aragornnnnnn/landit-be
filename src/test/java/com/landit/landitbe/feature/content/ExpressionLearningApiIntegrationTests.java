@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,6 +47,7 @@ class ExpressionLearningApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper(); // 응답 JSON 파싱용
 
   /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
+  @DisplayName("토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다.")
   @Test
   void learningStartRejectsMissingAccessToken() throws Exception {
     // given: 조회 대상 표현이 DB에 존재
@@ -61,6 +63,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 정상 호출 시 DB에 심어둔 표현 상세가 응답 필드에 그대로 담기는지 검증한다. */
+  @DisplayName("정상 호출 시 DB에 심어둔 표현 상세가 응답 필드에 그대로 담기는지 검증한다.")
   @Test
   void learningStartReturnsExpressionDetail() throws Exception {
     // given: 조회 대상 표현이 DB에 존재하고, 로그인해서 토큰을 발급받은 상태
@@ -113,6 +116,7 @@ class ExpressionLearningApiIntegrationTests {
         .andExpect(jsonPath("$.data.completed").value(false));
   }
 
+  @DisplayName("사용자 학습 수준보다 어려운 표현의 학습 시작을 거부한다.")
   @Test
   void learningStartRejectsExpressionAboveLearningLevel() throws Exception {
     Long expressionId = seedExpression();
@@ -134,6 +138,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 학습을 완료한 표현은 다시 조회했을 때 완료 여부가 true로 내려가는지 검증한다. */
+  @DisplayName("학습을 완료한 표현은 다시 조회했을 때 완료 여부가 true로 내려가는지 검증한다.")
   @Test
   void learningStartReturnsCompletedAfterFinishingLearning() throws Exception {
     // given: 표현을 심고 로그인한 뒤, 학습 완료 API로 해당 표현을 완료한 상태
@@ -156,6 +161,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 완료 여부는 사용자별로 갈린다 — 남이 완료해도 내 응답은 false여야 한다. */
+  @DisplayName("완료 여부는 사용자별로 갈린다 — 남이 완료해도 내 응답은 false여야 한다.")
   @Test
   void learningStartReturnsNotCompletedForAnotherUser() throws Exception {
     // given: 한 사용자가 표현 학습을 완료한 상태
@@ -182,6 +188,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 발음 자산(TTS 완성)이 있으면 사용자 억양에 맞는 대표 예문 음성 URL이 내려가는지 검증한다. */
+  @DisplayName("발음 자산(TTS 완성)이 있으면 사용자 억양에 맞는 대표 예문 음성 URL이 내려가는지 검증한다.")
   @Test
   void learningStartReturnsSentenceAudioUrlWhenPronunciationAssetIsReady() throws Exception {
     // given: 표현 + EN_US 발음 자산(TTS 완성)이 있고, 사용자의 튜터가 EN_US 억양인 상태
@@ -211,6 +218,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 패턴형 표현(발화 불가)은 표현 음성만 null이고 대표 예문 음성은 정상 응답되는지 검증한다. */
+  @DisplayName("패턴형 표현(발화 불가)은 표현 음성만 null이고 대표 예문 음성은 정상 응답되는지 검증한다.")
   @Test
   void learningStartReturnsNullExpressionAudioUrlForTemplatedExpression() throws Exception {
     // given: 표현 음성 없이(TTS 배치가 패턴형에는 표현 음성을 만들지 않음) 문장 TTS만 완성된 자산
@@ -238,6 +246,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 발음 자산이 아직 없으면 음성 URL이 null이고 나머지 응답은 정상인지 검증한다 (단계적 자산 구축 대응). */
+  @DisplayName("발음 자산이 없으면 음성 URL만 null로 반환하고 나머지 표현 정보는 유지한다.")
   @Test
   void learningStartReturnsNullAudioUrlWhenAssetIsMissing() throws Exception {
     Long expressionId = seedExpression();
@@ -266,6 +275,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** 존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
+  @DisplayName("존재하지 않는 표현 ID로 호출하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다.")
   @Test
   void learningStartRejectsUnknownExpression() throws Exception {
     // given: 로그인만 하고, 표현은 심지 않은 상태
@@ -284,6 +294,7 @@ class ExpressionLearningApiIntegrationTests {
   }
 
   /** INACTIVE(내려간) 표현은 존재하지 않는 것처럼 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
+  @DisplayName("INACTIVE(내려간) 표현은 존재하지 않는 것처럼 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다.")
   @Test
   void learningStartRejectsInactiveExpression() throws Exception {
     // given: INACTIVE 상태로 심어진 표현

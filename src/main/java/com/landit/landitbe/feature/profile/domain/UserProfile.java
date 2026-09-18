@@ -2,6 +2,9 @@
 
 package com.landit.landitbe.feature.profile.domain;
 
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionPeriodType;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStore;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import com.landit.landitbe.shared.domain.Locale;

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -73,6 +74,7 @@ class Lan277ContentMigrationTests {
           "swinged",
           "swungs");
 
+  @DisplayName("개선 대상으로 확인한 표현만 빠짐없이 수정한다.")
   @Test
   void migrationRefinesAllDetectedExpressionsOnly() throws Exception {
     String migrationSql = readMigrationSql();
@@ -88,6 +90,7 @@ class Lan277ContentMigrationTests {
         .hasSize(REFINED_EXPRESSION_IDS.size() + 1);
   }
 
+  @DisplayName("표현 개선 후 존재하지 않는 단어가 남지 않는다.")
   @Test
   void migrationLeavesNoNonExistentWords() throws Exception {
     String migrationSql = readMigrationSql();
@@ -98,6 +101,7 @@ class Lan277ContentMigrationTests {
     }
   }
 
+  @DisplayName("표현 개선은 varchar 배열 컬럼에 ARRAY 구문을 사용한다.")
   @Test
   void migrationUsesArraySyntaxForVarcharArrayColumn() throws Exception {
     String migrationSql = readMigrationSql();

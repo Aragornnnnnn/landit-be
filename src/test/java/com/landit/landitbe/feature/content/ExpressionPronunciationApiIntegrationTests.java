@@ -10,10 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.content.domain.ExpressionPronunciationAsset;
+import com.landit.landitbe.feature.content.expression.pronunciation.domain.ExpressionPronunciationAsset;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,7 +52,8 @@ class ExpressionPronunciationApiIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired
-  private com.landit.landitbe.feature.content.repository.ExpressionPronunciationAssetRepository
+  private com.landit.landitbe.feature.content.expression.pronunciation.repository
+          .ExpressionPronunciationAssetRepository
       assetRepository;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -88,6 +90,7 @@ class ExpressionPronunciationApiIntegrationTests {
         NO_ASSET_EXPRESSION_ID);
   }
 
+  @DisplayName("발음 분석 결과에 점수와 코칭 및 발음 자산 정보를 함께 반환한다.")
   @Test
   void analyzeReturnsScoreCoachingAndMergedAssetData() throws Exception {
     String accessToken = loginWithUsTutor("pron-analyze-success");
@@ -138,6 +141,7 @@ class ExpressionPronunciationApiIntegrationTests {
     assertThat(stress.path("coachingText").asText()).contains("'hik' 음절에 힘을 줘보세요");
   }
 
+  @DisplayName("모든 단어를 올바르게 발음하면 통과로 판정한다.")
   @Test
   void analyzePassesWhenEveryWordIsCorrect() throws Exception {
     String accessToken = loginWithUsTutor("pron-analyze-pass");
@@ -154,6 +158,7 @@ class ExpressionPronunciationApiIntegrationTests {
         .andExpect(jsonPath("$.data.words.length()").value(1));
   }
 
+  @DisplayName("발음 자산이 없으면 분석 요청에 404를 반환한다.")
   @Test
   void analyzeReturnsNotFoundWhenAssetIsMissing() throws Exception {
     String accessToken = loginWithUsTutor("pron-analyze-no-asset");
@@ -167,6 +172,7 @@ class ExpressionPronunciationApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("PRONUNCIATION_DATA_NOT_FOUND"));
   }
 
+  @DisplayName("지원하지 않는 음성 형식의 발음 분석을 거부한다.")
   @Test
   void analyzeRejectsUnsupportedAudioFormat() throws Exception {
     String accessToken = loginWithUsTutor("pron-analyze-bad-format");
@@ -182,6 +188,7 @@ class ExpressionPronunciationApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_AUDIO"));
   }
 
+  @DisplayName("WebM 녹음 파일의 발음 분석을 허용한다.")
   @Test
   void analyzeAcceptsWebmRecording() throws Exception {
     String accessToken = loginWithUsTutor("pron-analyze-webm");
@@ -198,6 +205,7 @@ class ExpressionPronunciationApiIntegrationTests {
         .andExpect(jsonPath("$.data.score").isNumber());
   }
 
+  @DisplayName("발음 분석에는 인증이 필요하다.")
   @Test
   void analyzeRequiresAuthentication() throws Exception {
     mockMvc

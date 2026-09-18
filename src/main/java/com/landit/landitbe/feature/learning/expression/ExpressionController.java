@@ -1,0 +1,79 @@
+// 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다.
+
+package com.landit.landitbe.feature.learning.expression;
+
+import com.landit.landitbe.feature.content.expression.dto.ExpressionLearningResponse;
+import com.landit.landitbe.feature.content.expression.dto.ExpressionResponse;
+import com.landit.landitbe.feature.content.expression.practice.dto.ExpressionPracticeResponse;
+import com.landit.landitbe.feature.learning.expression.docs.ExpressionControllerDocs;
+import com.landit.landitbe.feature.learning.expression.dto.ExpressionLearningFinishRequest;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningCompletionService;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningContentService;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningQueryService;
+import com.landit.landitbe.feature.learning.expression.service.ExpressionLearningStartService;
+import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
+import java.util.List;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+
+/** 원어민 표현 학습 API 요청을 받아 시나리오별 표현 목록을 공통 응답으로 반환한다. */
+@RestController
+@RequiredArgsConstructor
+public class ExpressionController implements ExpressionControllerDocs {
+
+  private final ExpressionLearningQueryService expressionLearningQueryService;
+  private final ExpressionLearningStartService expressionLearningStartService;
+  private final ExpressionLearningContentService expressionPracticeService;
+  private final ExpressionLearningCompletionService expressionLearningCompletionService;
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/expressions/{scenarioId}")
+  public ApiResponse<List<ExpressionResponse>> getExpressions(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long scenarioId) {
+    return ApiResponse.success(
+        expressionLearningQueryService.getExpressionsPerScenario(principal.userId(), scenarioId));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/expressions/{expressionId}/learning-start")
+  public ApiResponse<ExpressionLearningResponse> getOneExpressionToStartLearning(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
+    return ApiResponse.success(
+        expressionLearningStartService.startLearning(principal.userId(), expressionId));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/expressions/{expressionId}/practice")
+  public ApiResponse<ExpressionPracticeResponse> getExtraPracticeExamples(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable Long expressionId) {
+    return ApiResponse.success(
+        expressionPracticeService.getExtraPracticeExamples(principal.userId(), expressionId));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/expressions/{expressionId}/learning-finish")
+  public ApiResponse<Map<String, Object>> finishLearning(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable Long expressionId,
+      @RequestBody(required = false) ExpressionLearningFinishRequest request,
+      @RequestHeader(value = "X-Learning-Attempt-Id", required = false) String attemptId) {
+    expressionLearningCompletionService.completeLearning(
+        principal.userId(),
+        expressionId,
+        request == null ? null : request.freeTalkSessionId(),
+        attemptId);
+    return ApiResponse.success(Map.of());
+  }
+}

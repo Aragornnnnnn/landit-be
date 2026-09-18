@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.auth.TokenProperties;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -60,34 +61,34 @@ public class LanditTokenService {
     try {
       String[] parts = token.split("\\.", -1);
       if (parts.length != 3) {
-        throw new ApiException(ErrorCode.INVALID_TOKEN);
+        throw new ApiException(AuthErrorCode.INVALID_TOKEN);
       }
 
       String unsignedToken = parts[0] + "." + parts[1];
       if (!MessageDigest.isEqual(
           sign(unsignedToken).getBytes(StandardCharsets.UTF_8),
           parts[2].getBytes(StandardCharsets.UTF_8))) {
-        throw new ApiException(ErrorCode.INVALID_TOKEN);
+        throw new ApiException(AuthErrorCode.INVALID_TOKEN);
       }
 
       Map<String, Object> claims =
           objectMapper.readValue(BASE64_URL_DECODER.decode(parts[1]), CLAIMS_TYPE);
       if (!ACCESS_TOKEN_TYPE.equals(claims.get("type"))) {
-        throw new ApiException(ErrorCode.INVALID_TOKEN);
+        throw new ApiException(AuthErrorCode.INVALID_TOKEN);
       }
       long expiresAt = number(claims.get("exp"));
       if (Instant.now().getEpochSecond() >= expiresAt) {
-        throw new ApiException(ErrorCode.INVALID_TOKEN);
+        throw new ApiException(AuthErrorCode.INVALID_TOKEN);
       }
       String subject = text(claims.get("sub"));
       if (subject == null || subject.isBlank()) {
-        throw new ApiException(ErrorCode.INVALID_TOKEN);
+        throw new ApiException(AuthErrorCode.INVALID_TOKEN);
       }
       return Long.valueOf(subject);
     } catch (ApiException exception) {
       throw exception;
     } catch (Exception exception) {
-      throw new ApiException(ErrorCode.INVALID_TOKEN);
+      throw new ApiException(AuthErrorCode.INVALID_TOKEN);
     }
   }
 
@@ -154,7 +155,7 @@ public class LanditTokenService {
     try {
       return Long.parseLong(text(value));
     } catch (NumberFormatException exception) {
-      throw new ApiException(ErrorCode.INVALID_TOKEN);
+      throw new ApiException(AuthErrorCode.INVALID_TOKEN);
     }
   }
 

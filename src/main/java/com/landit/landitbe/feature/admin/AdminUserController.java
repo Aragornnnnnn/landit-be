@@ -6,8 +6,6 @@ import com.landit.landitbe.feature.admin.docs.AdminUserControllerDocs;
 import com.landit.landitbe.feature.admin.dto.AdminUserDetailResponse;
 import com.landit.landitbe.feature.admin.dto.AdminUserListResponse;
 import com.landit.landitbe.feature.admin.service.AdminUserQueryService;
-import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +28,6 @@ public class AdminUserController implements AdminUserControllerDocs {
       @RequestParam(defaultValue = "20") int size,
       @RequestParam(required = false) Boolean active,
       @RequestParam(required = false) Boolean pushConsent) {
-    validatePage(page, size);
 
     return ApiResponse.success(adminUserQueryService.getUsers(page, size, active, pushConsent));
   }
@@ -40,11 +37,5 @@ public class AdminUserController implements AdminUserControllerDocs {
   @GetMapping("/api/v1/admin/users/{userProfileId}")
   public ApiResponse<AdminUserDetailResponse> detail(@PathVariable long userProfileId) {
     return ApiResponse.success(adminUserQueryService.getUser(userProfileId));
-  }
-
-  private static void validatePage(int page, int size) {
-    if (page < 0 || size < 1 || size > 50) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST);
-    }
   }
 }

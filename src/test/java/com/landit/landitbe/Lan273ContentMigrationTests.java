@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -31,6 +32,7 @@ class Lan273ContentMigrationTests {
               + "WHERE scenario_question_id = (\\d+)"
               + " AND target_locale = 'EN' AND base_locale = 'KR';");
 
+  @DisplayName("AI가 먼저 시작하는 첫 질문의 속마음만 빠짐없이 갱신한다.")
   @Test
   void migrationUpdatesInnerThoughtsOfAllAiFirstOpeningQuestionsOnly() throws Exception {
     String migrationSql = readMigrationSql();
@@ -52,6 +54,7 @@ class Lan273ContentMigrationTests {
         .hasSize(AI_FIRST_OPENING_QUESTION_IDS.size() + 1);
   }
 
+  @DisplayName("속마음 마이그레이션은 질문 본문을 변경하지 않는다.")
   @Test
   void migrationDoesNotTouchQuestionTexts() throws Exception {
     String migrationSql = readMigrationSql();

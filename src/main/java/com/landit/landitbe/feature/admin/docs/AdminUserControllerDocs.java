@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 /** 관리자 사용자 API의 OpenAPI 문서를 정의한다. */
 @Tag(name = "Admin User", description = "관리자 사용자 조회 API")
@@ -46,8 +48,8 @@ public interface AdminUserControllerDocs {
         description = "관리자 권한 없음")
   })
   ApiResponse<AdminUserListResponse> list(
-      @Parameter(description = "0부터 시작하는 페이지 번호", example = "0") int page,
-      @Parameter(description = "페이지 크기 (1~50)", example = "20") int size,
+      @Parameter(description = "0부터 시작하는 페이지 번호", example = "0") @Min(0) int page,
+      @Parameter(description = "페이지 크기 (1~50)", example = "20") @Min(1) @Max(50) int size,
       @Parameter(description = "true: ACTIVE, false: WITHDRAWN 또는 BANNED") Boolean active,
       @Parameter(description = "true: GRANTED, false: DENIED 또는 NOT_DETERMINED")
           Boolean pushConsent);

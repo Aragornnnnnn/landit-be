@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -47,6 +48,7 @@ class UserSubscriptionLaunchUnsetIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 도입 시점이 비어 있으면 완료 이력이 있어도 대화 완료로 응답하지 않는다. */
+  @DisplayName("도입 시점이 비어 있으면 완료 이력이 있어도 대화 완료로 응답하지 않는다.")
   @Test
   void returnsFalseWhenLaunchedAtIsNotConfigured() throws Exception {
     String userKey = "subscription-launch-unset";
@@ -62,6 +64,7 @@ class UserSubscriptionLaunchUnsetIntegrationTests {
   }
 
   /** 도입 시점이 비어 있으면 유료 기능 게이트도 꺼져 비프리미엄 사용자의 표현 학습 요청이 403을 받지 않는다. */
+  @DisplayName("도입 시점이 비어 있으면 유료 기능 게이트도 꺼져 비프리미엄 사용자의 표현 학습 요청이 403을 받지 않는다.")
   @Test
   void doesNotGatePremiumFeaturesWhenLaunchedAtIsNotConfigured() throws Exception {
     String accessToken = login("subscription-launch-unset-gate");

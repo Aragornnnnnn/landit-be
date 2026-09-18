@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.character.dto;
 
-import com.landit.landitbe.feature.character.service.StreakService;
 import java.time.LocalDate;
 
 /**
@@ -20,7 +19,7 @@ public record CurrentStreakResponse(int currentStreakDays, boolean activeToday, 
    * @param currentStreak 현재 스트릭 조회 결과
    * @return 현재 스트릭 API 응답
    */
-  public static CurrentStreakResponse from(StreakService.CurrentStreak currentStreak) {
+  public static CurrentStreakResponse from(CurrentStreak currentStreak) {
     return new CurrentStreakResponse(
         currentStreak.currentStreakDays(), currentStreak.activeToday(), currentStreak.today());
   }

@@ -5,6 +5,7 @@ package com.landit.landitbe;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.DriverManager;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,6 +13,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 
 class Lan483LearningLevelMigrationTests {
+  @DisplayName("미설정 학습 수준만 채우고 기존 평가 상태를 보존한다.")
   @Test
   void backfillsOnlyUnsetLevelAndPreservesAssessmentState() throws Exception {
     try (var connection =

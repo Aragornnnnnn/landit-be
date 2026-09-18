@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.config.ai;
 
-import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
+import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationSettings;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

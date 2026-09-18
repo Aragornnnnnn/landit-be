@@ -5,6 +5,7 @@ package com.landit.landitbe.shared.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.shared.exception.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 /** 공통 API 응답 객체의 생성 규칙을 검증한다. */
 class ApiResponseTests {
 
+  @DisplayName("성공 응답은 전달한 데이터를 공통 응답으로 감싼다.")
   @Test
   void successWrapsResponseData() {
     ApiResponse<String> response = ApiResponse.success("ok");
@@ -21,6 +23,7 @@ class ApiResponseTests {
     assertThat(response.error()).isNull();
   }
 
+  @DisplayName("상태를 지정한 성공 응답은 해당 HTTP 상태의 ResponseEntity를 반환한다.")
   @Test
   void successWithStatusReturnsResponseEntityUsingGivenHttpStatus() {
     ResponseEntity<ApiResponse<String>> response =
@@ -33,6 +36,7 @@ class ApiResponseTests {
     assertThat(response.getBody().error()).isNull();
   }
 
+  @DisplayName("오류 응답은 오류 코드 이름과 메시지를 사용한다.")
   @Test
   void errorUsesErrorCodeNameAndMessage() {
     ApiResponse<Void> response = ApiResponse.error(ErrorCode.VALIDATION_FAILED);

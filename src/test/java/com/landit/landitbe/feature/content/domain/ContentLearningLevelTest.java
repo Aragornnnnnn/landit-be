@@ -9,10 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ContentLearningLevelTest {
 
+  @DisplayName("미설정 값과 학습 수준을 질문 그룹 및 표현 난이도 범위로 변환한다.")
   @Test
   void mapsNullAndLevelsToQuestionGroupsAndExpressionDifficultyRanges() {
     assertAll(
@@ -30,6 +32,7 @@ class ContentLearningLevelTest {
         () -> assertEquals(5, ContentLearningLevel.from(4).maximumExpressionDifficulty()));
   }
 
+  @DisplayName("지원 범위를 벗어난 학습 수준을 거부한다.")
   @Test
   void rejectsLearningLevelsOutsideSupportedRange() {
     assertAll(

@@ -5,12 +5,14 @@ package com.landit.landitbe;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
 
 class ConversationMemoryMigrationTests {
 
+  @DisplayName("V65는 DB 종류에 맞는 벡터와 인덱스 구문을 사용한다.")
   @Test
   void v65MigrationsUseDatabaseSpecificVectorAndIndexSyntax() throws Exception {
     String postgresqlSql = readMigrationSql("db/postgresql/V65__add_conversation_memory.sql");

@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
+import com.landit.landitbe.feature.character.dto.CurrentStreak;
+import com.landit.landitbe.feature.character.dto.StreakCalendar;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
 import java.time.Clock;
@@ -20,6 +22,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -44,6 +47,7 @@ class StreakServiceTest {
   @InjectMocks private StreakService streakService;
 
   /** 첫 정상 완료는 활동일과 현재·최장 스트릭을 1로 만든다. */
+  @DisplayName("첫 정상 완료는 활동일과 현재·최장 스트릭을 1로 만든다.")
   @Test
   void createsFirstActiveDayAndStreak() {
     LocalDate activityDate = LocalDate.now(KOREA_ZONE_ID);
@@ -70,6 +74,7 @@ class StreakServiceTest {
   }
 
   /** 같은 날짜의 두 번째 완료는 세션 횟수만 증가시키고 스트릭을 유지한다. */
+  @DisplayName("같은 날짜의 두 번째 완료는 세션 횟수만 증가시키고 스트릭을 유지한다.")
   @Test
   void keepsStreakForRepeatedCompletionOnSameDay() {
     LocalDate activityDate = LocalDate.now(KOREA_ZONE_ID);
@@ -83,6 +88,7 @@ class StreakServiceTest {
     verifyNoInteractions(summaryRepository);
   }
 
+  @DisplayName("학습을 정상 완료하면 비활성 날짜를 활성화하고 연속 학습을 기록한다.")
   @Test
   void activatesInactiveDayAndRecordsStreakOnNormalCompletion() {
     LocalDate activityDate = LocalDate.now(KOREA_ZONE_ID);
@@ -102,6 +108,7 @@ class StreakServiceTest {
   }
 
   /** 어제 활동한 사용자가 오늘 완료하면 현재 스트릭이 하루 연장된다. */
+  @DisplayName("어제 활동한 사용자가 오늘 완료하면 현재 스트릭이 하루 연장된다.")
   @Test
   void extendsStreakWhenYesterdayWasActive() {
     LocalDate activityDate = LocalDate.now(KOREA_ZONE_ID);
@@ -120,6 +127,7 @@ class StreakServiceTest {
   }
 
   /** 이틀 이상 활동하지 않은 뒤 완료하면 이전 스트릭을 이어 붙이지 않는다. */
+  @DisplayName("이틀 이상 활동하지 않은 뒤 완료하면 이전 스트릭을 이어 붙이지 않는다.")
   @Test
   void restartsStreakAfterGap() {
     LocalDate activityDate = LocalDate.now(KOREA_ZONE_ID);
@@ -138,6 +146,7 @@ class StreakServiceTest {
   }
 
   /** 오래된 마지막 활동일은 저장값을 바꾸지 않고 현재 스트릭 0으로 조회한다. */
+  @DisplayName("오래된 마지막 활동일은 저장값을 바꾸지 않고 현재 스트릭 0으로 조회한다.")
   @Test
   void returnsZeroForExpiredStreakWithoutUpdatingSummary() {
     UserLearningActivitySummary summary = UserLearningActivitySummary.initialize(USER_ID);
@@ -146,7 +155,7 @@ class StreakServiceTest {
     when(clock.instant()).thenReturn(Instant.parse("2026-08-05T00:00:00Z"));
     when(summaryRepository.findById(USER_ID)).thenReturn(Optional.of(summary));
 
-    StreakService.CurrentStreak currentStreak = streakService.getCurrentStreak(USER_ID);
+    CurrentStreak currentStreak = streakService.getCurrentStreak(USER_ID);
 
     assertThat(currentStreak.currentStreakDays()).isZero();
     assertThat(currentStreak.activeToday()).isFalse();
@@ -156,6 +165,7 @@ class StreakServiceTest {
   }
 
   /** 달력은 요청한 월의 완료 날짜만 반환하고 전체 학습일을 함께 반환한다. */
+  @DisplayName("달력은 요청한 월의 완료 날짜만 반환하고 전체 학습일을 함께 반환한다.")
   @Test
   void returnsOnlyRequestedMonthActiveDates() {
     LocalDate firstDate = LocalDate.of(2026, 7, 12);
@@ -174,8 +184,7 @@ class StreakServiceTest {
             USER_ID, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 1)))
         .thenReturn(List.of(firstActivity, secondActivity));
 
-    StreakService.StreakCalendar calendar =
-        streakService.getCalendar(USER_ID, YearMonth.of(2026, 7));
+    StreakCalendar calendar = streakService.getCalendar(USER_ID, YearMonth.of(2026, 7));
 
     assertThat(calendar.firstActiveDate()).isEqualTo(firstDate);
     assertThat(calendar.totalActiveDays()).isEqualTo(2);

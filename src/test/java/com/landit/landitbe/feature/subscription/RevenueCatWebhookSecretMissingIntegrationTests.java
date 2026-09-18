@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +32,7 @@ class RevenueCatWebhookSecretMissingIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   /** 설정값이 비어 있으면 값이 있는 Authorization 헤더로도 웹훅을 받지 않는다. 빈 헤더는 불일치 분기로도 거절되므로 값을 채워 보낸다. */
+  @DisplayName("설정값이 비어 있으면 값이 있는 Authorization 헤더로도 웹훅을 받지 않는다.")
   @Test
   void rejectsEveryWebhookWhenSecretIsNotConfigured() throws Exception {
     mockMvc
