@@ -80,7 +80,7 @@ com.landit.landitbe
 │   │   │   ├── session     # start / message / innerthought / admin
 │   │   │   ├── feedback    # 최종 피드백
 │   │   │   └── assessment  # 수준 평가
-│   │   ├── freetalk         # message / topic / usage / innerthought
+│   │   ├── freetalk         # start / message / topic / usage / innerthought
 │   │   │   ├── expression
 │   │   │   ├── memory
 │   │   │   └── history
@@ -152,6 +152,9 @@ Entity는 콘텐츠 정의가 `content.*.domain`, 시나리오 실행이 `learni
 | 시나리오 시작·재개 | `learning.scenario.session.start` |
 | 시나리오 발화 접수·AI 생성·저장 | `learning.scenario.session.message` |
 | 메시지 피드백 작업·복구 | `learning.scenario.session.message.feedback` |
+| 프리톡 세션 시작·시작 실패 보상과 요청·응답 | `learning.freetalk.start` |
+| 프리톡 발화·종료 선택 요청과 처리 | `learning.freetalk.message` |
+| 프리톡 주제·메인 응답과 주제 저장소 | `learning.freetalk.topic` |
 | 프리톡 대화·표현 추천 AI 계약 | 각각 `learning.freetalk.message.client.ai`, `learning.freetalk.expression.client.ai` |
 | 표현 발음 자산·발음 평가 | `content.expression.pronunciation` |
 | 연습 예문·표현 추천 검색 | `content.expression.practice`, `content.expression.recommendation` |
@@ -164,6 +167,20 @@ Entity는 콘텐츠 정의가 `content.*.domain`, 시나리오 실행이 `learni
 | Apple 사용자 이전 CLI | `auth.migration` 진입점과 역할별 하위 패키지 |
 
 HTTP Controller가 여러 하위 업무를 조율하면 공통 상위 패키지에 유지합니다. 예를 들어 `UserProfileController`는 학습·설정 Service를 호출합니다. `UserProfileService`는 공통 소유권·활성 여부·관리자 조회를 맡고, 인증·학습·설정·구독 Service가 해당 업무의 조회·변경 로직을 소유합니다. 같은 profile Repository를 공유하며 단순 위임 Service를 추가하지 않습니다.
+
+| HTTP 진입점 | 위치와 담당 범위 |
+| --- | --- |
+| `ScenarioController` | `learning.scenario.selection`. 목록·오늘 시나리오·달력 조회를 담당합니다. |
+| `ScenarioSessionController` | `learning.scenario.session`. 시나리오 대화 시작을 담당합니다. |
+| `SessionController` | `learning.scenario`. session·feedback·assessment의 API를 함께 담당하므로 공통 상위에 둡니다. 문서도 같은 업무의 `docs`에 둡니다. |
+| `FreeTalkController` | `learning.freetalk`. 주제·시작·메시지·이력·표현 재시도 API를 함께 담당합니다. |
+| `AdminScenarioController` | `content.scenario.admin`. 관리자 콘텐츠 조회를 담당합니다. 일반 사용자의 목록 조회는 selection에서 사용자 상태와 콘텐츠를 조합합니다. |
+
+Controller가 없는 업무는 공개 Service로 다른 업무와 협력할 수 있습니다. 각 패키지에 Controller나 모든 역할 폴더를 기계적으로 만들지 않습니다.
+`freetalk`의 시작 전용 Service·DTO는 `start`, 종료 선택 DTO는 `message`, 주제 응답·Repository는 `topic`에 둡니다.
+프리톡 세션의 공통 Entity·Repository와 여러 AI 요청을 처리하는 클라이언트는 freetalk 상위에 유지합니다.
+`innerthought.client.ai`는 속마음 생성 요청·응답 계약만 분류하며, 호출 조율은 message Service와 저장 책임은 conversation Service가 담당합니다.
+하위 패키지는 프리톡 내부의 탐색 단위입니다. 각각을 별도 모듈로 검사하거나 모든 Service를 Controller 전용으로 제한하는 규칙은 아닙니다.
 
 시나리오 메시지 처리와 기억 후보 판정의 package-private helper는 각각 구현 Service와 같은 패키지에 둡니다. 패키지 이동을 위해 공개 범위를 넓히지 않습니다. 여러 대화 유형이 사용하는 `learning.conversation.domain`의 상태·종료·입력 타입과 기능 독립적인 `shared.domain`은 공통 위치를 유지합니다.
 
@@ -200,7 +217,7 @@ Repository·Entity·Repository projection과 공통 도메인 값은 원래 업�
 | --- | --- |
 | 업무 패키지 루트 | Controller를 두어 HTTP 진입점을 노출 |
 | `docs` | Swagger 문서 인터페이스 |
-| `dto` | HTTP 요청·응답 및 다른 업무에 공개하는 값 record |
+| `dto` | HTTP 요청·응답 및 다른 업무에 공개하는 전달용 값. 단순 값 DTO는 record로 구현 |
 | `domain` | 핵심 비즈니스 규칙 |
 | `repository` | JPA Repository와 조회 Projection |
 | `service` | 요청 흐름, 트랜잭션과 기능 동작 |
@@ -237,6 +254,11 @@ config -> feature/shared
 - `shared`는 어떤 `feature`에도 의존하지 않습니다.
 - 순수 Entity·Projection 변환은 응답 record의 `from()`이 담당합니다.
 - 요청 record에서 Entity를 만들 때는 `toEntity()`를 사용합니다.
+
+DTO는 데이터 전달 역할이고 record와 class는 구현 방식입니다. 일반 class로도 DTO를 만들 수 있지만,
+현재 단순한 값 계약은 필드 재할당을 막고 생성자·접근자 등을 간결하게 정의하는 record를 기본으로 사용합니다.
+경계의 핵심은 Entity를 전달하지 않는 것입니다. record 안에 Entity나 변경 가능한 객체를 그대로 넣으면
+데이터가 분리되지 않으므로, 컬렉션과 JSON 등 내부 값도 필요한 복사·불변 처리를 적용합니다.
 
 ## 상태 변경과 조회 결합의 경계
 

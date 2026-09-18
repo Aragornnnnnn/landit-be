@@ -1,5 +1,20 @@
 # LAN-488 작업 기록
 
+## 2026-09-18 Controller와 하위 업무 패키지 배치 보완
+
+사용자가 패키지·Controller 배치 설명에서 확인한 불일치 수정을 승인했다. 기준은 LAN-488 `3cc752c0`이다.
+업무 → 역할 순서를 유지하고, 함께 담당하는 업무의 범위와 파일 위치를 맞춘다.
+
+- [x] freetalk 상위 service의 시작 조율·시작 저장 Service와 시작 요청·응답·중간 값 DTO를 `start`로 이동한다. 대응 단위 테스트도 같은 위치로 옮긴다.
+- [x] 종료 선택 요청 DTO는 `message.dto`, 주제·발화 시간 메인 응답은 `topic.dto`, 주제 Repository는 `topic.repository`에 둔다.
+- [x] session·feedback·assessment를 함께 담당하는 SessionController와 문서는 `learning.scenario` 및 `docs`로 옮긴다. 선택·시작·관리 Controller는 담당 업무에 유지한다.
+- [x] 이동 후 빈 디렉터리를 정리하고, Controller 배치와 DTO/record의 의미를 아키텍처 문서에 명시한다.
+- [x] 전체 `./gradlew spotlessApply check` 통과. 총 1,244개 중 성공 1,238개, 실패·오류 0개, 환경 조건 생략 6개다. 생략 범위는 PostgreSQL 관리자 SQL 4개, 실제 AI 1개, FE·BE·AI 교차 검사 1개다.
+- [x] 운영·테스트 Java 864개를 기준과 비교했다. 12개 파일 이동, package/import·타입 경로·공백 및 Controller 역할 주석을 제외한 본문은 동일하다. 이전 FQCN 참조와 resources·빌드 변경이 없고 `git diff --check`가 통과했다.
+
+class 이름·메서드·HTTP 경로·JSON·오류 코드·DB 스키마·트랜잭션은 유지한다. 프리톡 하위 패키지를 별도 모듈로 나누거나 새로운 위임 Service를 추가하지 않는다.
+빈 디렉터리는 로컬에서 정리했으며 Git이 추적하지 않으므로 별도 삭제 커밋은 없다. 기존 `scripts/__pycache__`는 변경하지 않았다.
+
 ## 2026-09-17 승인된 학습 모듈 통합 계획
 
 사용자가 전체 구조 재검수와 실행 계획을 확인한 뒤 구현을 승인했다. 기준은 LAN-488 `fc349c2b`, origin/develop `017bd552`다. 아래 항목은 이번 통합 작업이며 이후 과거 완료 기록과 구분한다.
