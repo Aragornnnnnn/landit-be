@@ -45,6 +45,12 @@ public class RevenueCatWebhookService {
   /** RevenueCat은 환불을 별도 이벤트 대신 이 해지 사유를 가진 CANCELLATION으로 보낸다. */
   private static final String CANCEL_REASON_REFUND = "CUSTOMER_SUPPORT";
 
+  /**
+   * 스토어가 갱신 결제 실패를 알릴 때 BILLING_ISSUE와 함께 보내는 CANCELLATION의 해지 사유. 자동 갱신은 켜진 채 스토어가 재시도하므로 구독 상태를
+   * 바꾸지 않는다.
+   */
+  private static final String CANCEL_REASON_BILLING_ERROR = "BILLING_ERROR";
+
   private final RevenueCatProperties revenueCatProperties;
   private final UserProfileService userProfileService;
   private final ProfileSubscriptionService profileSubscriptionService;
@@ -203,9 +209,11 @@ public class RevenueCatWebhookService {
    * 이벤트 타입을 목표 구독 상태로 변환한다. 구독 상태와 무관한 타입이면 빈 값을 반환한다.
    *
    * <p>환불은 RevenueCat이 별도 이벤트 대신 cancel_reason이 CUSTOMER_SUPPORT인 CANCELLATION으로 보내므로, 이 경우 해지 예약이
-   * 아니라 즉시 종료(EXPIRED)로 처리한다. BILLING_ISSUE와 PRODUCT_CHANGE는 결제 이력으로만 남기고 상태는 바꾸지 않는다. 단,
-   * BILLING_ISSUE에 유예 종료 시각이 있으면 만료 시각만 늘린다. NON_RENEWING_PURCHASE는 RevenueCat 대시보드에서 프로모션 권한을 부여했을
-   * 때 오므로 구매와 같이 ACTIVE로 처리하고, 만료는 다른 구독처럼 EXPIRATION으로 온다.
+   * 아니라 즉시 종료(EXPIRED)로 처리한다. cancel_reason이 BILLING_ERROR인 CANCELLATION은 갱신 결제 실패와 함께 오는 스토어 재시도
+   * 알림이라 이력만 남기고 상태는 유지한다. 실제 종료는 유예가 끝난 뒤 EXPIRATION(expiration_reason=BILLING_ERROR)으로 온다.
+   * BILLING_ISSUE와 PRODUCT_CHANGE는 결제 이력으로만 남기고 상태는 바꾸지 않는다. 단, BILLING_ISSUE에 유예 종료 시각이 있으면 만료 시각만
+   * 늘린다. NON_RENEWING_PURCHASE는 RevenueCat 대시보드에서 프로모션 권한을 부여했을 때 오므로 구매와 같이 ACTIVE로 처리하고, 만료는 다른
+   * 구독처럼 EXPIRATION으로 온다.
    *
    * @param event 웹훅 이벤트
    * @return 목표 구독 상태. 구독 상태와 무관한 타입이면 빈 값
@@ -217,14 +225,26 @@ public class RevenueCatWebhookService {
                 switch (type) {
                   case INITIAL_PURCHASE, RENEWAL, UNCANCELLATION, NON_RENEWING_PURCHASE ->
                       Optional.of(SubscriptionStatus.ACTIVE);
-                  case CANCELLATION ->
-                      Optional.of(
-                          CANCEL_REASON_REFUND.equals(event.cancelReason())
-                              ? SubscriptionStatus.EXPIRED
-                              : SubscriptionStatus.CANCELED);
+                  case CANCELLATION -> resolveCancellationStatus(event.cancelReason());
                   case EXPIRATION -> Optional.of(SubscriptionStatus.EXPIRED);
                   case BILLING_ISSUE, PRODUCT_CHANGE, TRANSFER -> Optional.empty();
                 });
+  }
+
+  /**
+   * CANCELLATION 이벤트의 해지 사유를 목표 구독 상태로 변환한다.
+   *
+   * @param cancelReason RevenueCat cancel_reason 값. 없으면 null
+   * @return 환불이면 EXPIRED, 갱신 결제 실패면 빈 값(상태 유지), 그 외에는 CANCELED
+   */
+  private static Optional<SubscriptionStatus> resolveCancellationStatus(String cancelReason) {
+    if (CANCEL_REASON_BILLING_ERROR.equals(cancelReason)) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        CANCEL_REASON_REFUND.equals(cancelReason)
+            ? SubscriptionStatus.EXPIRED
+            : SubscriptionStatus.CANCELED);
   }
 
   /**
