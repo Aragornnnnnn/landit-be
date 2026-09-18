@@ -44,10 +44,9 @@ class ScenarioFeedbackAccessServiceTest {
   private final ScenarioFeedbackAccessService service =
       new ScenarioFeedbackAccessService(policies, grants, sessions, scenarioSessions);
 
-  /** 도입 전이거나 프리미엄이면 상세 피드백을 잠그지 않는다. */
-  @DisplayName("도입 전이거나 프리미엄이면 상세 피드백을 잠그지 않는다.")
+  @DisplayName("구독 정책 도입 전에는 상세 피드백을 잠그지 않는다.")
   @Test
-  void detailFeedbackStaysOpenBeforeLaunchOrForPremium() {
+  void detailFeedbackStaysOpenBeforeLaunch() {
     var beforeLaunch =
         new ScenarioFeedbackAccessService(
             new SubscriptionLaunchPolicyService(
@@ -56,48 +55,74 @@ class ScenarioFeedbackAccessServiceTest {
             sessions,
             scenarioSessions);
     assertThat(beforeLaunch.detailFeedbackLocked(USER_ID, 100L)).isFalse();
+    verify(sessions, never()).findOwnedIfPresent(anyLong(), anyLong());
+  }
 
+  @DisplayName("프리미엄 사용자는 상세 피드백을 잠그지 않는다.")
+  @Test
+  void detailFeedbackStaysOpenForPremium() {
     when(grants.premium(USER_ID)).thenReturn(true);
     assertThat(service.detailFeedbackLocked(USER_ID, 100L)).isFalse();
     verify(sessions, never()).findOwnedIfPresent(anyLong(), anyLong());
   }
 
-  /** 도입 전에 시작한 세션은 도입 후에 끝났어도 잠그지 않고, 예약이 없는 무료 사용자도 잠그지 않는다. */
-  @DisplayName("도입 전에 시작한 세션은 도입 후에 끝났어도 잠그지 않고, 예약이 없는 무료 사용자도 잠그지 않는다.")
+  @DisplayName("도입 전에 시작한 세션은 도입 후에 완료해도 상세 피드백을 잠그지 않는다.")
   @Test
-  void detailFeedbackStaysOpenForPreLaunchSessionOrWithoutReservation() {
+  void detailFeedbackStaysOpenForPreLaunchSession() {
     when(grants.freeReservation(USER_ID))
         .thenReturn(Optional.of(new FreeScenarioAccess(101L, 300L)));
     ownedSession(100L, policies.current().effectiveAt().minusNanos(1));
     assertThat(service.detailFeedbackLocked(USER_ID, 100L)).isFalse();
+    verify(scenarioSessions, never()).requireMessageContext(anyLong());
+  }
 
+  @DisplayName("무료 시나리오 예약이 없으면 소유 세션의 상세 피드백을 잠그지 않는다.")
+  @Test
+  void detailFeedbackStaysOpenWithoutReservation() {
     when(grants.freeReservation(USER_ID)).thenReturn(Optional.empty());
     ownedSession(101L, NOW);
     assertThat(service.detailFeedbackLocked(USER_ID, 101L)).isFalse();
     verify(scenarioSessions, never()).requireMessageContext(anyLong());
   }
 
-  /** 첫 시나리오의 첫 완료 세션만 상세 피드백을 열고, 같은 시나리오의 재완료와 다른 시나리오는 잠근다. */
-  @DisplayName("첫 시나리오의 첫 완료 세션만 상세 피드백을 열고, 같은 시나리오의 재완료와 다른 시나리오는 잠근다.")
+  @DisplayName("첫 시나리오를 처음 완료한 세션은 상세 피드백을 공개한다.")
   @Test
   void detailFeedbackOpensOnlyForFirstCompletionOfFirstScenario() {
     when(grants.freeReservation(USER_ID))
         .thenReturn(Optional.of(new FreeScenarioAccess(100L, 300L)));
     ownedSession(100L, NOW);
-    ownedSession(101L, NOW.plusDays(1));
-    ownedSession(102L, NOW.plusDays(2));
     scenarioOf(100L, 300L);
-    scenarioOf(101L, 300L);
-    scenarioOf(102L, 301L);
     LocalDateTime effectiveAt = policies.current().effectiveAt();
     when(scenarioSessions.isFirstCompletedSince(USER_ID, 300L, effectiveAt, 100L)).thenReturn(true);
+
+    assertThat(service.detailFeedbackLocked(USER_ID, 100L)).isFalse();
+  }
+
+  @DisplayName("첫 시나리오라도 재완료한 세션은 상세 피드백을 잠근다.")
+  @Test
+  void detailFeedbackLocksRepeatedCompletionOfFirstScenario() {
+    when(grants.freeReservation(USER_ID))
+        .thenReturn(Optional.of(new FreeScenarioAccess(100L, 300L)));
+    ownedSession(101L, NOW.plusDays(1));
+    scenarioOf(101L, 300L);
+    LocalDateTime effectiveAt = policies.current().effectiveAt();
     when(scenarioSessions.isFirstCompletedSince(USER_ID, 300L, effectiveAt, 101L))
         .thenReturn(false);
 
-    assertThat(service.detailFeedbackLocked(USER_ID, 100L)).isFalse();
     assertThat(service.detailFeedbackLocked(USER_ID, 101L)).isTrue();
+  }
+
+  @DisplayName("예약한 첫 시나리오와 다른 시나리오는 상세 피드백을 잠근다.")
+  @Test
+  void detailFeedbackLocksOtherScenarioWithoutCheckingFirstCompletion() {
+    when(grants.freeReservation(USER_ID))
+        .thenReturn(Optional.of(new FreeScenarioAccess(100L, 300L)));
+    ownedSession(102L, NOW.plusDays(2));
+    scenarioOf(102L, 301L);
+
     assertThat(service.detailFeedbackLocked(USER_ID, 102L)).isTrue();
-    verify(scenarioSessions, never()).isFirstCompletedSince(USER_ID, 301L, effectiveAt, 102L);
+    verify(scenarioSessions, never())
+        .isFirstCompletedSince(USER_ID, 301L, policies.current().effectiveAt(), 102L);
   }
 
   /** 소유 세션이 없으면 예약 부재만으로 상세 피드백을 공개하지 않는다. */
