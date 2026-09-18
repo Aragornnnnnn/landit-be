@@ -145,37 +145,8 @@ class ExpressionPracticeApiIntegrationTests {
   @DisplayName("한국어 작문은 모든 허용 정답을 반환하고 영어 작문은 정답 하나를 반환한다.")
   @Test
   void practiceReturnsAllKoreanAcceptedAnswersAndSingleEnglishAnswer() throws Exception {
-    JsonNode payload = objectMapper.readTree(practiceExamplesPayloadJson());
-    for (int index = 0; index < 2; index++) {
-      ObjectNode example = (ObjectNode) payload.get(index);
-      JsonNode canonical = example.get("sentenceTranslateWords");
-      example
-          .putArray("sentenceTranslateAcceptedAnswers")
-          .add(canonical)
-          .add(objectMapper.createArrayNode().add(canonical.get(1)).add(canonical.get(0)));
-    }
-    Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload.toString());
-    String token =
-        login(
-            "google-practice-multiple",
-            "practice-multiple@example.com",
-            "Multiple Answers",
-            "practice-multiple-nonce");
-    MvcResult result =
-        mockMvc
-            .perform(
-                get("/api/v1/expressions/{expressionId}/practice", expressionId)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-            .andExpect(status().isOk())
-            .andExpect(
-                jsonPath("$.data.practiceSentence[0].sentenceTranslateAcceptedAnswers")
-                    .doesNotExist())
-            .andReturn();
-    JsonNode writings =
-        objectMapper
-            .readTree(result.getResponse().getContentAsByteArray())
-            .path("data")
-            .path("writingSentence");
+    JsonNode payload = examplesWithAlternativeKoreanWordOrder();
+    JsonNode writings = getWritingsWithAcceptedAnswers(payload);
     assertThat(writings.size()).isEqualTo(2);
     for (int index = 0; index < 2; index++) {
       JsonNode writing = writings.get(index);
@@ -630,5 +601,44 @@ class ExpressionPracticeApiIntegrationTests {
             .andExpect(status().isOk())
             .andReturn();
     return objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
+  }
+
+  private JsonNode examplesWithAlternativeKoreanWordOrder() throws Exception {
+    JsonNode payload = objectMapper.readTree(practiceExamplesPayloadJson());
+    for (int index = 0; index < 2; index++) {
+      ObjectNode example = (ObjectNode) payload.get(index);
+      JsonNode canonical = example.get("sentenceTranslateWords");
+      example
+          .putArray("sentenceTranslateAcceptedAnswers")
+          .add(canonical)
+          .add(objectMapper.createArrayNode().add(canonical.get(1)).add(canonical.get(0)));
+    }
+    return payload;
+  }
+
+  private JsonNode getWritingsWithAcceptedAnswers(JsonNode payload) throws Exception {
+    Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload.toString());
+    String token =
+        login(
+            "google-practice-multiple",
+            "practice-multiple@example.com",
+            "Multiple Answers",
+            "practice-multiple-nonce");
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.data.practiceSentence[0].sentenceTranslateAcceptedAnswers")
+                    .doesNotExist())
+            .andReturn();
+    JsonNode writings =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .path("data")
+            .path("writingSentence");
+    return writings;
   }
 }
