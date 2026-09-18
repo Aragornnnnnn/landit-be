@@ -96,30 +96,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("속마음 생성에 대화 문맥을 전송하고 응답을 변환한다.")
   @Test
   void generateInnerThoughtPostsConversationContextAndMapsResponse() throws Exception {
-    AtomicReference<String> requestBody = new AtomicReference<>();
-    server.createContext(
-        "/api/v1/conversation/inner-thought",
-        exchange -> {
-          requestBody.set(
-              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-          byte[] responseBody =
-              """
-                    {
-                      "success": true,
-                      "data": {
-                        "sessionId": 100,
-                        "messageId": 200,
-                        "innerThought": "사용자가 이유를 덧붙여 답변했으니 관심을 표현하면 좋겠다.",
-                        "innerThoughtType": "GOOD"
-                      },
-                      "error": null
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(200, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+    AtomicReference<String> requestBody = stubInnerThoughtResponse();
 
     AiInnerThoughtResult result =
         remoteClient()
@@ -217,26 +194,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("다음 메시지 생성 응답의 수신 확인 정보를 변환한다.")
   @Test
   void generateNextMessageMapsAcknowledgementResponse() throws Exception {
-    server.createContext(
-        "/api/v1/conversation/next-message",
-        exchange -> {
-          byte[] responseBody =
-              """
-                    {
-                      "success": true,
-                      "data": {
-                        "acknowledgement": "Sounds tasty.",
-                        "translatedAcknowledgement": "맛있겠다.",
-                        "goalCompletionStatus": "PARTIAL"
-                      },
-                      "error": null
-                    }
-              """
-                  .getBytes(StandardCharsets.UTF_8);
-          exchange.sendResponseHeaders(200, responseBody.length);
-          exchange.getResponseBody().write(responseBody);
-          exchange.close();
-        });
+    stubNextMessageAcknowledgement();
 
     AiNextMessageResult result =
         remoteClient()
@@ -891,5 +849,56 @@ class RemoteAiConversationClientTest {
 
   private String baseUrl() {
     return "http://localhost:%d/".formatted(server.getAddress().getPort());
+  }
+
+  private AtomicReference<String> stubInnerThoughtResponse() {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        "/api/v1/conversation/inner-thought",
+        exchange -> {
+          requestBody.set(
+              new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] responseBody =
+              """
+                    {
+                      "success": true,
+                      "data": {
+                        "sessionId": 100,
+                        "messageId": 200,
+                        "innerThought": "사용자가 이유를 덧붙여 답변했으니 관심을 표현하면 좋겠다.",
+                        "innerThoughtType": "GOOD"
+                      },
+                      "error": null
+                    }
+              """
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, responseBody.length);
+          exchange.getResponseBody().write(responseBody);
+          exchange.close();
+        });
+    return requestBody;
+  }
+
+  private void stubNextMessageAcknowledgement() {
+    server.createContext(
+        "/api/v1/conversation/next-message",
+        exchange -> {
+          byte[] responseBody =
+              """
+                    {
+                      "success": true,
+                      "data": {
+                        "acknowledgement": "Sounds tasty.",
+                        "translatedAcknowledgement": "맛있겠다.",
+                        "goalCompletionStatus": "PARTIAL"
+                      },
+                      "error": null
+                    }
+              """
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, responseBody.length);
+          exchange.getResponseBody().write(responseBody);
+          exchange.close();
+        });
   }
 }

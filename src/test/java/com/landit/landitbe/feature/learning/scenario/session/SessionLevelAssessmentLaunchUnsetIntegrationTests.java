@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.session;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.postJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +45,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "landit.subscription.launched-at=",
       "spring.datasource.url=jdbc:h2:mem:lan483;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
     })
+@org.junit.jupiter.api.TestInstance(org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS)
 class SessionLevelAssessmentLaunchUnsetIntegrationTests {
   @Autowired private MockMvc mockMvc;
   @Autowired private JdbcTemplate jdbc;
@@ -54,42 +56,12 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
 
   private final ObjectMapper mapper = new ObjectMapper();
 
-  @DisplayName("수준 평가 도입 시각이 없으면 평가 없이 시나리오와 피드백을 완료하며 소유권은 검사한다.")
+  @DisplayName("수준 평가 도입 시각이 없으면 평가 없이 시나리오와 피드백을 완료한다.")
   @Test
-  void completesScenarioAndFeedbackWithoutAssessmentAndKeepsOwnershipChecks() throws Exception {
-    seedDiagnosticScenario();
-    JsonNode login = login();
-    String token = login.path("accessToken").asText();
-    long userId = login.path("user").path("userId").asLong();
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT learning_level FROM user_profile WHERE id=?", Integer.class, userId))
-        .isEqualTo(3);
-    var start =
-        mockMvc
-            .perform(
-                post("/api/v1/scenarios/1/sessions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-            .andExpect(status().isCreated())
-            .andReturn();
-    long sessionId =
-        mapper
-            .readTree(start.getResponse().getContentAsByteArray())
-            .path("data")
-            .path("sessionId")
-            .asLong();
-    for (int turn = 0; turn < 4; turn++) {
-      mockMvc
-          .perform(
-              post("/api/v1/sessions/{id}/messages", sessionId)
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(
-                      "{\"content\":\"I like traveling because I can meet people.\","
-                          + "\"inputType\":\"VOICE\"}"))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.progress.completed").value(turn == 3));
-    }
+  void completesScenarioAndFeedbackWithoutAssessment() throws Exception {
+    CompletedSession session = completeDiagnosticSession();
+    long sessionId = session.sessionId();
+    String token = session.token();
     assertThat(
             jdbc.queryForObject(
                 "SELECT level_assessment_processing_status FROM learning_session WHERE id=?",
@@ -102,6 +74,15 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
         .andExpect(status().isOk());
     assertNullAssessment(token, sessionId);
+    verify(ai, never()).generateSessionLevelAssessment(any());
+  }
+
+  @DisplayName("수준 평가 도입 시각이 없으면 만료된 평가 예약도 복구하지 않는다.")
+  @Test
+  void doesNotRecoverExpiredAssessmentBeforeLaunch() throws Exception {
+    CompletedSession session = completeDiagnosticSession();
+    long sessionId = session.sessionId();
+    String token = session.token();
     // 과거 배포가 남긴 만료 예약도 비활성 기간에는 fallback으로 변경하지 않는다.
     jdbc.update(
         "UPDATE learning_session SET level_assessment_processing_status='PREPARING', "
@@ -121,6 +102,14 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
                 sessionId))
         .isEqualTo("PREPARING");
     verify(ai, never()).generateSessionLevelAssessment(any());
+  }
+
+  @DisplayName("도입 전 완료한 시나리오는 프로필 수준이 바뀌어도 완료 당시 수준을 유지한다.")
+  @Test
+  void keepsCompletionLevelAfterProfileLevelChanges() throws Exception {
+    CompletedSession session = completeDiagnosticSession();
+    long sessionId = session.sessionId();
+    long userId = session.userId();
     assertThat(contentLevelService.expressionLevel(userId, 1L))
         .isEqualTo(ContentLearningLevel.LEVEL_2_TO_3);
     jdbc.update("UPDATE learning_session SET ended_at='2020-01-01 00:00:00' WHERE id=?", sessionId);
@@ -139,6 +128,14 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
             jdbc.queryForObject(
                 "SELECT learning_level FROM user_profile WHERE id=?", Integer.class, userId))
         .isEqualTo(3);
+  }
+
+  @DisplayName("수준 평가 도입 전에도 타인 세션과 미인증 요청 및 없는 세션을 거부한다.")
+  @Test
+  void enforcesAssessmentOwnershipAndAuthenticationBeforeLaunch() throws Exception {
+    CompletedSession session = completeDiagnosticSession();
+    long sessionId = session.sessionId();
+    String token = session.token();
     String otherToken = login().path("accessToken").asText();
     mockMvc
         .perform(
@@ -194,7 +191,8 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
     return mapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
   }
 
-  private void seedDiagnosticScenario() {
+  @org.junit.jupiter.api.BeforeAll
+  void seedDiagnosticScenario() {
     jdbc.update(
         "INSERT INTO category (id, display_order, status, created_at, updated_at) "
             + "VALUES (1, 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
@@ -220,4 +218,42 @@ class SessionLevelAssessmentLaunchUnsetIntegrationTests {
               return null;
             });
   }
+
+  private CompletedSession completeDiagnosticSession() throws Exception {
+    JsonNode login = login();
+    String token = login.path("accessToken").asText();
+    long userId = login.path("user").path("userId").asLong();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT learning_level FROM user_profile WHERE id=?", Integer.class, userId))
+        .isEqualTo(3);
+    var start =
+        mockMvc
+            .perform(
+                post("/api/v1/scenarios/1/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        mapper
+            .readTree(start.getResponse().getContentAsByteArray())
+            .path("data")
+            .path("sessionId")
+            .asLong();
+    for (int turn = 0; turn < 4; turn++) {
+      mockMvc
+          .perform(
+              postJsonWithToken(
+                  "/api/v1/sessions/{id}/messages",
+                  token,
+                  "{\"content\":\"I like traveling because I can meet people.\","
+                      + "\"inputType\":\"VOICE\"}",
+                  sessionId))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.progress.completed").value(turn == 3));
+    }
+    return new CompletedSession(userId, token, sessionId);
+  }
+
+  private record CompletedSession(long userId, String token, long sessionId) {}
 }

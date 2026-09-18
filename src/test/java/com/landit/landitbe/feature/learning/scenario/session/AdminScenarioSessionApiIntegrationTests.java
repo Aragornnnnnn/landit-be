@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @SpringBootTest
 @TestPropertySource(
     properties = {
+      "spring.datasource.url=jdbc:h2:mem:admin-scenario;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
       "landit.auth.oidc.fake-enabled=true",
       "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough"
     })
