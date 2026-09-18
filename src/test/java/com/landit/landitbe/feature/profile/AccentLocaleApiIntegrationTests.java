@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.profile;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.putJsonWithToken;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -86,10 +87,8 @@ class AccentLocaleApiIntegrationTests {
 
     mockMvc
         .perform(
-            put("/api/v1/me/accent-locale")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"accentLocale\":\"EN_GB\"}"))
+            putJsonWithToken(
+                "/api/v1/me/accent-locale", accessToken, "{\"accentLocale\":\"EN_GB\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
 
@@ -117,11 +116,7 @@ class AccentLocaleApiIntegrationTests {
 
     for (String content : List.of("{}", "{\"accentLocale\":\"EN_KR\"}")) {
       mockMvc
-          .perform(
-              put("/api/v1/me/accent-locale")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(content))
+          .perform(putJsonWithToken("/api/v1/me/accent-locale", accessToken, content))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }

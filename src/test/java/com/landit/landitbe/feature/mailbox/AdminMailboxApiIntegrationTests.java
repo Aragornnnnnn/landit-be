@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.mailbox;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.patchJsonWithToken;
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.postJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.nullValue;
@@ -11,7 +13,6 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -84,18 +85,17 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "type":"NOTICE",
-                      "title":"새 공지",
-                      "contentBlocks":[{"type":"TEXT","text":"공지 본문"}],
-                      "preview":"공지 본문"
-                    }
-                    """))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                """
+                {
+                  "type":"NOTICE",
+                  "title":"새 공지",
+                  "contentBlocks":[{"type":"TEXT","text":"공지 본문"}],
+                  "preview":"공지 본문"
+                }
+                """))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.data.publicationStatus").value("DRAFT"))
         .andExpect(jsonPath("$.data.title").value("새 공지"))
@@ -107,43 +107,22 @@ class AdminMailboxApiIntegrationTests {
   @Test
   void adminCanCreateAndUpdateImageContentBlock() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-image-block");
-    MvcResult created =
-        mockMvc
-            .perform(
-                post("/api/v1/admin/mailbox/letters")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        """
-                        {
-                          "type":"UPDATE",
-                          "title":"이미지 업데이트",
-                          "contentBlocks":[{
-                            "type":"image",
-                            "url":"https://content.example.com/content/inbox/image.webp",
-                            "altText":"업데이트 화면 예시"
-                          }],
-                          "preview":"업데이트 화면"
-                        }
-                        """))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.contentBlocks[0].altText").value("업데이트 화면 예시"))
-            .andReturn();
+    MvcResult created = createImageLetter(accessToken);
     long letterId = responseData(created).get("letterId").asLong();
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"contentBlocks":[{
-                      "type":"image",
-                      "url":"https://content.example.com/content/inbox/image.webp",
-                      "altText":"수정된 대체 텍스트"
-                    }]}
-                    """))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                """
+                {"contentBlocks":[{
+                  "type":"image",
+                  "url":"https://content.example.com/content/inbox/image.webp",
+                  "altText":"수정된 대체 텍스트"
+                }]}
+                """,
+                letterId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.contentBlocks[0].type").value("image"))
         .andExpect(jsonPath("$.data.contentBlocks[0].url").value(endsWith("/image.webp")))
@@ -168,23 +147,24 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"title":"게시 공지","publicationStatus":"PUBLISHED","pinned":true}
-                    """))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                """
+                {"title":"게시 공지","publicationStatus":"PUBLISHED","pinned":true}
+                """,
+                letterId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publicationStatus").value("PUBLISHED"))
         .andExpect(jsonPath("$.data.pinned").value(true));
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"publicationStatus\":\"UNPUBLISHED\"}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"publicationStatus\":\"UNPUBLISHED\"}",
+                letterId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publicationStatus").value("UNPUBLISHED"))
         .andExpect(jsonPath("$.data.pinned").value(false));
@@ -198,19 +178,21 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"publicationStatus\":\"UNPUBLISHED\"}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"publicationStatus\":\"UNPUBLISHED\"}",
+                letterId))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"pinned\":true}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"pinned\":true}",
+                letterId))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
@@ -227,10 +209,11 @@ class AdminMailboxApiIntegrationTests {
     MvcResult result =
         mockMvc
             .perform(
-                patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"title\":\"수정된 공지\"}"))
+                patchJsonWithToken(
+                    "/api/v1/admin/mailbox/letters/{letterId}",
+                    accessToken,
+                    "{\"title\":\"수정된 공지\"}",
+                    letterId))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -250,10 +233,11 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"변경된 감사 로그 공지\"}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"title\":\"변경된 감사 로그 공지\"}",
+                letterId))
         .andExpect(status().isOk());
 
     Map<String, Object> auditLog =
@@ -280,10 +264,11 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", publishedId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"publicationStatus\":\"PUBLISHED\",\"pinned\":true}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"publicationStatus\":\"PUBLISHED\",\"pinned\":true}",
+                publishedId))
         .andExpect(status().isOk());
 
     mockMvc
@@ -335,23 +320,21 @@ class AdminMailboxApiIntegrationTests {
     String accessToken = loginAsAdmin("mailbox-admin-letter-validation");
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"type\":\"REPLY\",\"title\":\"답장\","
-                        + "\"contentBlocks\":[{}],\"preview\":\"답장\"}"))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                "{\"type\":\"REPLY\",\"title\":\"답장\","
+                    + "\"contentBlocks\":[{}],\"preview\":\"답장\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"type\":\"NOTICE\",\"title\":\"빈 본문\",\"contentBlocks\":[],\"preview\":\"빈"
-                        + " 본문\"}"))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                "{\"type\":\"NOTICE\",\"title\":\"빈 본문\",\"contentBlocks\":[],\"preview\":\"빈"
+                    + " 본문\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
@@ -588,15 +571,14 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", List.of(feedbackId, 999999L),
-                            "title", "실패 답장",
-                            "bodyText", "저장되면 안 됩니다."))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                adminToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", List.of(feedbackId, 999999L),
+                        "title", "실패 답장",
+                        "bodyText", "저장되면 안 됩니다."))))
         .andExpect(status().isNotFound());
 
     MvcResult result = sendReply(adminToken, List.of(feedbackId), "답변 제목");
@@ -741,15 +723,14 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", List.of(feedbackId),
-                            "title", "가".repeat(201),
-                            "bodyText", "답장 본문"))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                adminToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", List.of(feedbackId),
+                        "title", "가".repeat(201),
+                        "bodyText", "답장 본문"))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
@@ -763,15 +744,14 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", List.of(feedbackId, 999999L),
-                            "title", "답변",
-                            "bodyText", "문의 확인했습니다."))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                adminToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", List.of(feedbackId, 999999L),
+                        "title", "답변",
+                        "bodyText", "문의 확인했습니다."))))
         .andExpect(status().isNotFound());
 
     assertThat(feedback(feedbackId).get("PROCESSING_STATUS")).isEqualTo("PENDING");
@@ -818,14 +798,13 @@ class AdminMailboxApiIntegrationTests {
   private MvcResult createNotice(String accessToken, String title) throws Exception {
     return mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"type":"NOTICE","title":"%s","contentBlocks":[{"type":"TEXT","text":"본문"}],"preview":"본문"}
-                    """
-                        .formatted(title)))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                """
+                {"type":"NOTICE","title":"%s","contentBlocks":[{"type":"TEXT","text":"본문"}],"preview":"본문"}
+                """
+                    .formatted(title)))
         .andExpect(status().isCreated())
         .andReturn();
   }
@@ -834,15 +813,14 @@ class AdminMailboxApiIntegrationTests {
       throws Exception {
     return mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", feedbackIds,
-                            "title", title,
-                            "bodyText", "답장 본문"))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                accessToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", feedbackIds,
+                        "title", title,
+                        "bodyText", "답장 본문"))))
         .andExpect(status().isCreated())
         .andReturn();
   }
@@ -964,5 +942,30 @@ class AdminMailboxApiIntegrationTests {
     SqsAsyncClient sqsAsyncClient() {
       return mock(SqsAsyncClient.class);
     }
+  }
+
+  private MvcResult createImageLetter(String accessToken) throws Exception {
+    MvcResult created =
+        mockMvc
+            .perform(
+                postJsonWithToken(
+                    "/api/v1/admin/mailbox/letters",
+                    accessToken,
+                    """
+                    {
+                      "type":"UPDATE",
+                      "title":"이미지 업데이트",
+                      "contentBlocks":[{
+                        "type":"image",
+                        "url":"https://content.example.com/content/inbox/image.webp",
+                        "altText":"업데이트 화면 예시"
+                      }],
+                      "preview":"업데이트 화면"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.contentBlocks[0].altText").value("업데이트 화면 예시"))
+            .andReturn();
+    return created;
   }
 }

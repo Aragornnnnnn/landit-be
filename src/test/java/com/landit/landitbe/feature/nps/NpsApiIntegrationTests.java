@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.nps;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.postJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -161,10 +161,7 @@ class NpsApiIntegrationTests {
 
   /** NPS 제출 요청을 만든다. */
   private MockHttpServletRequestBuilder npsRequest(String accessToken, String content) {
-    return post("/api/v1/nps")
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(content);
+    return postJsonWithToken("/api/v1/nps", accessToken, content);
   }
 
   /** 성공 응답을 검증하며 NPS를 제출한다. */

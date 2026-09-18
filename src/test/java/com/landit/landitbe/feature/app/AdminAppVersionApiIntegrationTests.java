@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.app;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.patchJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -98,10 +98,11 @@ class AdminAppVersionApiIntegrationTests {
     MvcResult patchResult =
         mockMvc
             .perform(
-                patch("/api/v1/admin/app-versions/{platform}", "ANDROID")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(requestBody("1.2.0", "1.1.0", 11)))
+                patchJsonWithToken(
+                    "/api/v1/admin/app-versions/{platform}",
+                    adminAccessToken,
+                    requestBody("1.2.0", "1.1.0", 11),
+                    "ANDROID"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.versionName").value("1.2.0"))
             .andExpect(jsonPath("$.data.minimumSupportedVersionName").value("1.1.0"))
@@ -220,10 +221,11 @@ class AdminAppVersionApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/app-versions/{platform}", "IOS")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody("1.1.0", "1.2.0", 11)))
+            patchJsonWithToken(
+                "/api/v1/admin/app-versions/{platform}",
+                adminAccessToken,
+                requestBody("1.1.0", "1.2.0", 11),
+                "IOS"))
         .andExpect(status().isBadRequest());
   }
 
@@ -236,10 +238,11 @@ class AdminAppVersionApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/app-versions/{platform}", "IOS")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody("1.1", "1.0.0", 11)))
+            patchJsonWithToken(
+                "/api/v1/admin/app-versions/{platform}",
+                adminAccessToken,
+                requestBody("1.1", "1.0.0", 11),
+                "IOS"))
         .andExpect(status().isBadRequest());
   }
 

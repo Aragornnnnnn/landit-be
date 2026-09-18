@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.profile;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.putJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -160,11 +161,7 @@ class UserLearningLevelApiIntegrationTests {
 
     for (String content : List.of("{}", "{\"learningLevel\":0}", "{\"learningLevel\":6}")) {
       mockMvc
-          .perform(
-              put("/api/v1/me/learning-level")
-                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(content))
+          .perform(putJsonWithToken("/api/v1/me/learning-level", accessToken, content))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
@@ -219,10 +216,10 @@ class UserLearningLevelApiIntegrationTests {
   private void updateLearningLevel(String accessToken, int learningLevel) throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/me/learning-level")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"learningLevel\":%d}".formatted(learningLevel)))
+            putJsonWithToken(
+                "/api/v1/me/learning-level",
+                accessToken,
+                "{\"learningLevel\":%d}".formatted(learningLevel)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
   }

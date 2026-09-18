@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.contentimage;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.postJsonWithToken;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,7 +21,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -61,13 +61,12 @@ class AdminContentImageApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/content-images/presigned-url")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"fileName":"notice.webp","contentType":"image/webp","fileSize":1842030}
-                    """))
+            postJsonWithToken(
+                "/api/v1/admin/content-images/presigned-url",
+                accessToken,
+                """
+                {"fileName":"notice.webp","contentType":"image/webp","fileSize":1842030}
+                """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.uploadUrl").value(startsWith("https://")))
         .andExpect(jsonPath("$.data.method").value("PUT"))
@@ -94,13 +93,12 @@ class AdminContentImageApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/content-images/presigned-url")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"fileName":"notice.webp","contentType":"image/webp","fileSize":1024}
-                    """))
+            postJsonWithToken(
+                "/api/v1/admin/content-images/presigned-url",
+                accessToken,
+                """
+                {"fileName":"notice.webp","contentType":"image/webp","fileSize":1024}
+                """))
         .andExpect(status().isForbidden());
   }
 
@@ -112,13 +110,12 @@ class AdminContentImageApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/content-images/presigned-url")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"fileName":"notice.png","contentType":"image/jpeg","fileSize":1024}
-                    """))
+            postJsonWithToken(
+                "/api/v1/admin/content-images/presigned-url",
+                accessToken,
+                """
+                {"fileName":"notice.png","contentType":"image/jpeg","fileSize":1024}
+                """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
