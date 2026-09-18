@@ -21,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -50,6 +51,7 @@ class UserAlarmApiIntegrationTests {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  @DisplayName("알람 미설정 사용자는 새 행 생성 없이 비활성 상태로 조회한다.")
   @Test
   void returnsDisabledWithoutCreatingAlarmForUnconfiguredUser() throws Exception {
     String userKey = "alarm-default";
@@ -62,6 +64,7 @@ class UserAlarmApiIntegrationTests {
     assertThat(alarmCount(userId(userKey))).isZero();
   }
 
+  @DisplayName("알람 하나를 생성하고 시각 변경과 비활성 및 재활성화를 저장한다.")
   @Test
   void createsUpdatesDisablesAndReenablesOneAlarm() throws Exception {
     String userKey = "alarm-lifecycle";
@@ -92,6 +95,7 @@ class UserAlarmApiIntegrationTests {
         .isEqualTo(LocalTime.of(23, 59));
   }
 
+  @DisplayName("잘못된 알람 설정은 거부하고 저장된 설정을 유지한다.")
   @Test
   void rejectsInvalidSettingsWithoutChangingSavedAlarm() throws Exception {
     String token = login("alarm-invalid");
@@ -119,6 +123,7 @@ class UserAlarmApiIntegrationTests {
         .andExpect(jsonPath("$.data.enabled").value(true));
   }
 
+  @DisplayName("사용자별 알람 설정을 서로 분리해 조회한다.")
   @Test
   void isolatesSettingsBetweenUsers() throws Exception {
     String ownerToken = login("alarm-owner");
@@ -136,6 +141,7 @@ class UserAlarmApiIntegrationTests {
         .andExpect(jsonPath("$.data.enabled").value(false));
   }
 
+  @DisplayName("인증되지 않거나 탈퇴한 사용자의 알람 조회와 변경을 거부한다.")
   @Test
   void rejectsUnauthenticatedAndWithdrawnUsers() throws Exception {
     mockMvc.perform(get("/api/v1/me/alarm")).andExpect(status().isUnauthorized());
@@ -156,6 +162,7 @@ class UserAlarmApiIntegrationTests {
     assertThat(alarmCount(userId(userKey))).isZero();
   }
 
+  @DisplayName("알람 최초 설정을 동시에 저장해도 하나의 완전한 설정만 남는다.")
   @Test
   void concurrentFirstWritesStoreOneCompleteSetting() throws Exception {
     String userKey = "alarm-concurrent";
@@ -191,6 +198,7 @@ class UserAlarmApiIntegrationTests {
     assertThat(userAlarmService.getAlarm(userId)).isIn(expectedSettings);
   }
 
+  @DisplayName("OpenAPI 문서에 알람 조회·변경과 검증 계약을 명시한다.")
   @Test
   void documentsAlarmApisAndValidation() throws Exception {
     mockMvc
