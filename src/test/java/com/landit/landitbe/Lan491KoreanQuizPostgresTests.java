@@ -20,6 +20,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -79,6 +80,7 @@ class Lan491KoreanQuizPostgresTests {
     }
   }
 
+  @DisplayName("검토한 정답을 PostgreSQL에 적재하고 다른 필드를 보존하며 적용된 버전은 건너뛴다.")
   @Test
   void migratesEveryReviewedAnswerPreservesOtherFieldsAndSkipsCompletedVersion() throws Exception {
     assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
@@ -109,6 +111,7 @@ class Lan491KoreanQuizPostgresTests {
     assertThat(snapshot()).isEqualTo(appliedSnapshot);
   }
 
+  @DisplayName("원본 콘텐츠가 달라졌으면 표현을 변경하지 않고 마이그레이션을 거부한다.")
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -131,6 +134,7 @@ class Lan491KoreanQuizPostgresTests {
     assertRolledBack(before);
   }
 
+  @DisplayName("마이그레이션 사후 검증이 실패하면 모든 갱신을 롤백한다.")
   @ParameterizedTest
   @ValueSource(strings = {"sentenceWords", "sentenceTranslateAcceptedAnswers"})
   void rollsBackAllUpdatesWhenPostconditionsFail(String corruptedField) throws Exception {

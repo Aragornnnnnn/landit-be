@@ -142,7 +142,7 @@ class ExpressionPracticeApiIntegrationTests {
     assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
   }
 
-  @DisplayName("사용자 학습 수준보다 어려운 표현의 연습 조회를 거부한다.")
+  @DisplayName("한국어 작문은 모든 허용 정답을 반환하고 영어 작문은 정답 하나를 반환한다.")
   @Test
   void practiceReturnsAllKoreanAcceptedAnswersAndSingleEnglishAnswer() throws Exception {
     JsonNode payload = objectMapper.readTree(practiceExamplesPayloadJson());
@@ -194,6 +194,7 @@ class ExpressionPracticeApiIntegrationTests {
     }
   }
 
+  @DisplayName("OpenAPI에 중첩 정답 배열을 명시하고 기존 단어 배열 스키마를 유지한다.")
   @Test
   void practiceOpenApiDescribesNestedAnswersAndPreservesLegacyArraySchemas() throws Exception {
     String properties = "$.components.schemas.WritingSentenceResponse.properties.";
@@ -210,6 +211,7 @@ class ExpressionPracticeApiIntegrationTests {
         .andExpect(jsonPath(properties + "writingSentenceWordChoices.items.type").value("string"));
   }
 
+  @DisplayName("사용자 학습 수준보다 어려운 표현의 연습 조회를 거부한다.")
   @Test
   void practiceRejectsExpressionAboveLearningLevel() throws Exception {
     Long expressionId = seedExpressionWithPracticeExamples();

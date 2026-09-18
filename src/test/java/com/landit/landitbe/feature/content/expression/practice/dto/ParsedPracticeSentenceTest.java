@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -17,12 +18,14 @@ class ParsedPracticeSentenceTest {
   private final ObjectMapper mapper = new ObjectMapper();
   private final List<String> canonical = List.of("나는", "오늘", "쉬어");
 
+  @DisplayName("허용 정답 필드가 없으면 기본 정답을 사용한다.")
   @Test
   void missingAcceptedAnswersUsesCanonicalAnswer() throws Exception {
     assertThat(ParsedPracticeSentence.from(example()).sentenceTranslateAcceptedAnswers())
         .containsExactly(canonical);
   }
 
+  @DisplayName("허용 정답 형식이 잘못되면 기본 정답을 사용한다.")
   @ParameterizedTest
   @ValueSource(strings = {"null", "[]", "{}", "\"invalid\"", "[\"나는\",\"오늘\",\"쉬어\"]"})
   void malformedAcceptedAnswersUsesCanonicalAnswer(String json) throws Exception {
@@ -32,6 +35,7 @@ class ParsedPracticeSentenceTest {
         .containsExactly(canonical);
   }
 
+  @DisplayName("기본 정답을 맨 앞에 유지하고 유효한 서로 다른 어순만 보존한다.")
   @Test
   void keepsCanonicalFirstAndRetainsDistinctValidOrders() throws Exception {
     ObjectNode example = example();
@@ -47,6 +51,7 @@ class ParsedPracticeSentenceTest {
         .containsExactly(canonical, List.of("오늘", "나는", "쉬어"), List.of("나는", "쉬어", "오늘"));
   }
 
+  @DisplayName("단어 종류가 같아도 단어별 개수가 다르면 허용 정답에서 제외한다.")
   @Test
   void rejectsSameTokenSetWithDifferentMultiplicity() throws Exception {
     ObjectNode example = example();

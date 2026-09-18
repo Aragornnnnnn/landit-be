@@ -18,6 +18,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
@@ -31,6 +32,7 @@ class Lan491KoreanQuizMigrationTests {
   private static final String REVIEWED_MANIFEST_SHA256 =
       "4863d2d5272b551e7379e3f7efeb9e6e05ac7a06a8cd54d51033e21902edffb6";
 
+  @DisplayName("검토한 매니페스트와 지정한 범위의 오답 선택지 수정만 유지한다.")
   @Test
   void preservesReviewedManifestAndExactlyScopedChoiceEdits() throws Exception {
     String manifest = readManifestText();
@@ -62,6 +64,7 @@ class Lan491KoreanQuizMigrationTests {
     assertThat(changedChoices).isEqualTo(33);
   }
 
+  @DisplayName("모든 허용 정답에 기본 정답 순서와 단어별 개수를 보존한다.")
   @Test
   void preservesCanonicalOrderAndTokenMultiplicityInEveryAcceptedAnswer() throws Exception {
     int acceptedCount = 0;
@@ -90,6 +93,7 @@ class Lan491KoreanQuizMigrationTests {
     assertThat(singleAnswerCount).isEqualTo(124);
   }
 
+  @DisplayName("복수 정답 필드를 추가해도 기존 한국어와 영어 응답을 파싱한다.")
   @Test
   void newPayloadKeyPreservesExistingKoreanAndEnglishResponseParsing() throws Exception {
     JsonNode mapping = readManifest().get(0);
@@ -113,6 +117,7 @@ class Lan491KoreanQuizMigrationTests {
         .isEqualTo(mapping.get("acceptedAnswers"));
   }
 
+  @DisplayName("검토한 한국어 허용 정답을 잘라내지 않고 모두 응답한다.")
   @Test
   void deliversEveryReviewedAnswerThroughKoreanResponseWithoutTruncation() throws Exception {
     for (JsonNode mapping : readManifest()) {
