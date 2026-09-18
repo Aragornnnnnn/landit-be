@@ -43,6 +43,7 @@ class PushQueueMessageHandlerTest {
   private com.landit.landitbe.feature.notification.scheduled.service.ReviewNotificationService
       reviewNotificationService;
 
+  @DisplayName("복습 배치 메시지를 전달하며 SQS 처리 기한 연장 함수를 함께 제공한다.")
   @Test
   void routesReviewBatchWithVisibilityExtension() {
     Instant occurredAt = Instant.parse("2026-09-16T06:00:00Z");

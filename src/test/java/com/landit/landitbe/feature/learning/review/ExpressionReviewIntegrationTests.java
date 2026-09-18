@@ -40,6 +40,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -84,6 +85,7 @@ class ExpressionReviewIntegrationTests {
     when(clock.getZone()).thenReturn(ZONE);
   }
 
+  @DisplayName("일일 알림을 재처리해도 복습 알림의 발송 가능 시각을 늦추지 않는다.")
   @Test
   void reviewDailyReplayMustNotPostponeTheReviewNotificationWindow() throws Exception {
     User user = user(0);
@@ -110,6 +112,7 @@ class ExpressionReviewIntegrationTests {
         .containsExactly(review);
   }
 
+  @DisplayName("날짜별 예약이 없는 기존 일일 알림도 자정을 넘어 복습 알림 간격을 제한한다.")
   @Test
   void legacyDailyWithoutMatchingDateSlotStillBlocksReviewAcrossMidnight() throws Exception {
     User user = user(0);
@@ -134,6 +137,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(frequency.reserveAll(List.of(review))).containsExactly(review);
   }
 
+  @DisplayName("유효 문제 3개를 모으거나 후보가 소진될 때까지 불량 후보를 건너뛴다.")
   @ParameterizedTest
   @CsvSource({"30, 0", "30, 1", "30, 3", "29, 3"})
   void continuesPastInvalidCandidatesUntilThreeValidQuestionsOrExhaustion(
@@ -163,6 +167,7 @@ class ExpressionReviewIntegrationTests {
     }
   }
 
+  @DisplayName("복습 문제 3개를 고정 저장하고 인증된 소유자만 시작할 수 있다.")
   @Test
   void createsFixedThreeQuestionsAndRequiresAuthenticatedOwner() throws Exception {
     User user = user(3);
@@ -205,6 +210,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.offer(user.id(), date())).isEmpty();
   }
 
+  @DisplayName("복수 정답을 채점하고 오답은 뒤로 보내며 중복 제출을 멱등 처리한다.")
   @Test
   void gradesMultipleAnswersMovesWrongToEndAndDeduplicatesSubmissions() throws Exception {
     User user = user(3);
@@ -261,6 +267,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.start(user.id(), id).status()).isEqualTo("COMPLETED");
   }
 
+  @DisplayName("유효 콘텐츠가 0~2개이면 가능한 수만 출제하고 불량 콘텐츠로 문제를 만들지 않는다.")
   @Test
   void handlesZeroOneTwoAndInvalidContentWithoutInventingQuestions() throws Exception {
     User empty = user(0);
@@ -283,6 +290,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(countReviews(invalid)).isZero();
   }
 
+  @DisplayName("최근 출제하거나 비활성인 표현과 다른 언어 및 미완료 표현을 복습에서 제외한다.")
   @Test
   void excludesRecentInactiveOtherLanguageAndNeverCompletedExpressions() throws Exception {
     User user = user(3);
@@ -301,6 +309,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.offer(user.id(), date())).isEmpty();
   }
 
+  @DisplayName("다른 학습 경로에서 최근 완료한 표현도 복습에서 제외한다.")
   @Test
   void excludesExpressionCompletedRecentlyThroughAnotherLearningSource() throws Exception {
     User user = user(1);
@@ -320,6 +329,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.start(user.id(), offer(user).reviewId()).questions()).hasSize(1);
   }
 
+  @DisplayName("실제 구독 도입 시각부터 발송과 시작을 제한하되 이미 시작한 복습은 유예한다.")
   @Test
   void usesActualLaunchTimeForSendingAndStartingButPreservesStartedSession() throws Exception {
     User started = user(1);
@@ -356,6 +366,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.get(started.id(), startedId).questions()).isEmpty();
   }
 
+  @DisplayName("복습 제공 간격과 생성 후 7일의 시작 기한을 지킨다.")
   @Test
   void respectsOfferIntervalAndSevenDayStartDeadline() throws Exception {
     User user = user(1);
@@ -372,6 +383,7 @@ class ExpressionReviewIntegrationTests {
     assertThat(reviews.get(user.id(), first).status()).isEqualTo("EXPIRED");
   }
 
+  @DisplayName("동시 복습 생성과 시작 및 중복 오답 제출을 직렬화한다.")
   @Test
   void serializesConcurrentOffersStartsAndDuplicateWrongAnswer() throws Exception {
     User user = user(3);
@@ -394,6 +406,7 @@ class ExpressionReviewIntegrationTests {
     }
   }
 
+  @DisplayName("정확한 알림 간격부터 종류별 발송을 예약하고 기기 수를 중복 계산하지 않는다.")
   @Test
   void reservesSeparateLearningSlotsAtExactGapAndNeverCountsDevicesTwice() throws Exception {
     User user = user(0);
@@ -420,6 +433,7 @@ class ExpressionReviewIntegrationTests {
         .isEqualTo(2);
   }
 
+  @DisplayName("일일 알림 때문에 발송이 막히면 복습 생성을 롤백하고 재시도는 같은 이벤트를 사용한다.")
   @Test
   void rollsBackOfferWhenDailyPushBlocksItAndReusesEventOnDispatchRetry() throws Exception {
     User user = user(3);
@@ -451,6 +465,7 @@ class ExpressionReviewIntegrationTests {
         .isEqualTo(NotificationType.EXPRESSION_REVIEW);
   }
 
+  @DisplayName("순서를 벗어나거나 잘못된 답안을 거부하고 허용 정답 계약을 문서화한다.")
   @Test
   void rejectsOutOfOrderAndInvalidAnswersAndDocumentsAcceptedAnswers() throws Exception {
     User user = user(3);
