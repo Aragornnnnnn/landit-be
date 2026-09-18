@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
  * @param currency ISO 4217 통화 코드. 없으면 {@code null}
  * @param store 결제한 스토어
  * @param environment SANDBOX(테스트 결제) 또는 PRODUCTION(실제 결제)
- * @param cancelReason CANCELLATION 이벤트의 해지 사유. 환불이면 CUSTOMER_SUPPORT. 없으면 {@code null}
+ * @param cancelReason CANCELLATION 이벤트의 해지 사유. 환불이면 CUSTOMER_SUPPORT, 갱신 결제 실패면 BILLING_ERROR. 없으면
+ *     {@code null}
  * @param occurredAt 결제 또는 이벤트 발생 시각
  * @param expiresAt 구독 만료 시각. 없으면 {@code null}
  */
@@ -36,7 +37,7 @@ public record SubscriptionEventResponse(
             description =
                 "이벤트 타입. INITIAL_PURCHASE(첫 결제 또는 체험 시작), RENEWAL(갱신, 체험 끝 첫 결제 포함),"
                     + " CANCELLATION(해지 예약·환불), UNCANCELLATION(해지 취소), EXPIRATION(만료),"
-                    + " BILLING_ISSUE(결제 실패), PRODUCT_CHANGE(플랜 변경),"
+                    + " BILLING_ISSUE(갱신 결제 실패, 유예 기간 중 프리미엄 유지), PRODUCT_CHANGE(플랜 변경),"
                     + " NON_RENEWING_PURCHASE(대시보드 프로모션 권한 부여 등 자동 갱신 없는 구매),"
                     + " TRANSFER(다른 계정에서 구독을 넘겨받음)",
             example = "RENEWAL")
@@ -54,7 +55,9 @@ public record SubscriptionEventResponse(
     @Schema(description = "SANDBOX(테스트 결제) 또는 PRODUCTION(실제 결제)", example = "PRODUCTION")
         String environment,
     @Schema(
-            description = "해지 사유. 환불이면 CUSTOMER_SUPPORT. CANCELLATION 외에는 null",
+            description =
+                "해지 사유. 환불이면 CUSTOMER_SUPPORT, 갱신 결제 실패 재시도 중이면 BILLING_ERROR(구독 상태 유지)."
+                    + " CANCELLATION 외에는 null",
             example = "UNSUBSCRIBE")
         String cancelReason,
     @Schema(description = "결제 또는 이벤트 발생 시각", example = "2026-09-10T03:12:00")
