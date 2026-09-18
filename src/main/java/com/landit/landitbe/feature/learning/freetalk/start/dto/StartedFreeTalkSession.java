@@ -1,6 +1,6 @@
 // 업무 간에 전달할 StartedFreeTalkSession 값을 정의한다.
 
-package com.landit.landitbe.feature.learning.freetalk.dto;
+package com.landit.landitbe.feature.learning.freetalk.start.dto;
 
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;

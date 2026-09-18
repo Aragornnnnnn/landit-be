@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkMainResponse;
-import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.topic.domain.FreeTalkTopic;
+import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkMainResponse;
+import com.landit.landitbe.feature.learning.freetalk.topic.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.domain.ActiveStatus;

@@ -1,12 +1,12 @@
-// 기존 학습 세션을 조작하는 API 요청을 처리한다.
+// 시나리오 메시지·속마음·피드백·수준 평가 API 요청을 연결한다.
 
-package com.landit.landitbe.feature.learning.scenario.session;
+package com.landit.landitbe.feature.learning.scenario;
 
 import com.landit.landitbe.feature.learning.scenario.assessment.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.learning.scenario.assessment.service.SessionLevelAssessmentGenerationService;
+import com.landit.landitbe.feature.learning.scenario.docs.SessionControllerDocs;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.service.SessionFeedbackService;
-import com.landit.landitbe.feature.learning.scenario.session.docs.SessionControllerDocs;
 import com.landit.landitbe.feature.learning.scenario.session.innerthought.dto.SessionInnerThoughtResponse;
 import com.landit.landitbe.feature.learning.scenario.session.innerthought.service.SessionInnerThoughtQueryService;
 import com.landit.landitbe.feature.learning.scenario.session.message.dto.SessionMessageSubmitRequest;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 기존 학습 세션을 조작하는 API 요청을 처리한다. */
+/** 시나리오 메시지·속마음·피드백·수준 평가 API 요청을 연결한다. */
 @RequiredArgsConstructor
 @RestController
 public class SessionController implements SessionControllerDocs {

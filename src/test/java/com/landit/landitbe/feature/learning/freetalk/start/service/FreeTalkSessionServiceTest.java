@@ -1,6 +1,6 @@
 // 프리톡 세션 시작의 사용자 잠금과 일일 한도 검증 순서를 확인한다.
 
-package com.landit.landitbe.feature.learning.freetalk.service;
+package com.landit.landitbe.feature.learning.freetalk.start.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
@@ -15,9 +15,9 @@ import com.landit.landitbe.feature.learning.conversation.history.repository.Sess
 import com.landit.landitbe.feature.learning.conversation.history.repository.SessionHistoryRepository;
 import com.landit.landitbe.feature.learning.conversation.repository.LearningSessionRepository;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkTopicRepository;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
+import com.landit.landitbe.feature.learning.freetalk.topic.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;

@@ -1,6 +1,6 @@
-// 학습 세션 조작 API의 OpenAPI 문서를 정의한다.
+// 시나리오 메시지·속마음·피드백·수준 평가 API의 OpenAPI 문서를 정의한다.
 
-package com.landit.landitbe.feature.learning.scenario.session.docs;
+package com.landit.landitbe.feature.learning.scenario.docs;
 
 import com.landit.landitbe.feature.learning.scenario.assessment.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse;
@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 
-/** 학습 세션 조작 API의 OpenAPI 문서를 정의한다. */
+/** 시나리오 메시지·속마음·피드백·수준 평가 API의 OpenAPI 문서를 정의한다. */
 @Tag(name = "Session", description = "학습 세션 API")
 public interface SessionControllerDocs {
 

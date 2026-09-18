@@ -2,15 +2,15 @@
 
 package com.landit.landitbe.feature.learning.freetalk.docs;
 
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkExitDecisionRequest;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkMainResponse;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartRequest;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.learning.freetalk.expression.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionDetailResponse;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionListResponse;
+import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageSubmitResponse;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse;
+import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkMainResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;

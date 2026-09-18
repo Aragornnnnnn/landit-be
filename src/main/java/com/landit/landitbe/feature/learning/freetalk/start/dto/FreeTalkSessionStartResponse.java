@@ -1,6 +1,6 @@
 // 프리톡 세션 시작 결과와 첫 AI 메시지 정보를 제공한다.
 
-package com.landit.landitbe.feature.learning.freetalk.dto;
+package com.landit.landitbe.feature.learning.freetalk.start.dto;
 
 import com.landit.landitbe.feature.content.tutor.dto.ConversationCharacterResponse;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;

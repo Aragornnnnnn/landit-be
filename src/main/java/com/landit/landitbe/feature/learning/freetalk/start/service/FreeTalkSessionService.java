@@ -1,6 +1,6 @@
 // 프리톡 세션 시작 레코드의 짧은 트랜잭션 저장과 삭제를 담당한다.
 
-package com.landit.landitbe.feature.learning.freetalk.service;
+package com.landit.landitbe.feature.learning.freetalk.start.service;
 
 import com.landit.landitbe.feature.content.exception.ContentErrorCode;
 import com.landit.landitbe.feature.content.tutor.dto.TtsVoiceResponse;
@@ -14,13 +14,13 @@ import com.landit.landitbe.feature.learning.conversation.service.LearningSession
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartRequest;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
-import com.landit.landitbe.feature.learning.freetalk.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkTopicRepository;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.topic.domain.FreeTalkTopic;
+import com.landit.landitbe.feature.learning.freetalk.topic.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.profile.learning.dto.UserLearningProfile;
 import com.landit.landitbe.feature.profile.service.UserProfileService;

@@ -1,6 +1,6 @@
 // 프리톡 세션 시작 전 일일 발화 잔여 시간을 검증한다.
 
-package com.landit.landitbe.feature.learning.freetalk.service;
+package com.landit.landitbe.feature.learning.freetalk.start.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,11 +18,11 @@ import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorC
 import com.landit.landitbe.feature.learning.conversation.exception.SessionException;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartRequest;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartResponse;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
-import com.landit.landitbe.feature.learning.freetalk.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningResult;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;

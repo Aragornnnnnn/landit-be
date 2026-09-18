@@ -1,6 +1,6 @@
 // 프리톡 세션 시작 방식과 선택 주제를 받는다.
 
-package com.landit.landitbe.feature.learning.freetalk.dto;
+package com.landit.landitbe.feature.learning.freetalk.start.dto;
 
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
 import io.swagger.v3.oas.annotations.media.Schema;

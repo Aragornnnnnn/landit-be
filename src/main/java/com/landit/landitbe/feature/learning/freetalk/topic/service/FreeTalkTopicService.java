@@ -2,9 +2,9 @@
 
 package com.landit.landitbe.feature.learning.freetalk.topic.service;
 
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkMainResponse;
-import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkTopicRepository;
+import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkTopicResponse;
+import com.landit.landitbe.feature.learning.freetalk.topic.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.shared.domain.ActiveStatus;

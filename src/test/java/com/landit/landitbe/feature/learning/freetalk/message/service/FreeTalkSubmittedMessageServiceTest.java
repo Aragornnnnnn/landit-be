@@ -26,8 +26,8 @@ import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionReservation;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
-import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
+import com.landit.landitbe.feature.learning.freetalk.topic.repository.FreeTalkTopicRepository;
 import com.landit.landitbe.feature.learning.freetalk.usage.dto.DailySpeakingUsage;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;

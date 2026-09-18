@@ -1,16 +1,16 @@
 // 프리톡 세션 시작과 외부 AI opening 호출을 조율한다.
 
-package com.landit.landitbe.feature.learning.freetalk.service;
+package com.landit.landitbe.feature.learning.freetalk.start.service;
 
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartRequest;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartResponse;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
-import com.landit.landitbe.feature.learning.freetalk.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningResult;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse.CurrentMessageResponse;
+import com.landit.landitbe.feature.learning.freetalk.start.dto.StartedFreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;

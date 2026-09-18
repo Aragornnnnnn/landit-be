@@ -1,6 +1,6 @@
 // 프리톡 추천 주제를 저장하고 조회한다.
 
-package com.landit.landitbe.feature.learning.freetalk.repository;
+package com.landit.landitbe.feature.learning.freetalk.topic.repository;
 
 import com.landit.landitbe.feature.learning.freetalk.topic.domain.FreeTalkTopic;
 import com.landit.landitbe.shared.domain.ActiveStatus;

@@ -27,12 +27,12 @@ import com.landit.landitbe.feature.learning.conversation.history.service.Convers
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
-import com.landit.landitbe.feature.learning.freetalk.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionReservation;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageSubmitRequest;

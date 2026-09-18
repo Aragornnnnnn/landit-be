@@ -1,8 +1,7 @@
 // 프리톡 메인 화면의 주제와 일일 발화 시간을 반환한다.
 
-package com.landit.landitbe.feature.learning.freetalk.dto;
+package com.landit.landitbe.feature.learning.freetalk.topic.dto;
 
-import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkTopicResponse;
 import java.util.List;
 
 /**
