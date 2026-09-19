@@ -214,6 +214,49 @@ class PremiumAccessIntegrationTests {
         get("/api/v1/expressions/" + MISSING_ID + "/learning-start"), accessToken);
   }
 
+  /** 구독이 만료된 사용자도 구독 중에 끝낸 프리톡의 교정은 조회할 수 있고, 새 프리톡은 시작할 수 없다. */
+  @DisplayName("구독이 만료된 사용자도 구독 중에 끝낸 프리톡의 교정은 조회할 수 있고, 새 프리톡은 시작할 수 없다.")
+  @Test
+  void allowsExpiredUserToReadCompletedFreeTalkCorrectionsButNotStartNewSession() throws Exception {
+    String userKey = "premium-gate-correction";
+    String accessToken = login(userKey);
+    Long userId = userIdOf(userKey);
+    activatePremium(userId);
+    MvcResult started =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(started.getResponse().getContentAsByteArray())
+            .at("/data/sessionId")
+            .asLong();
+    seedCompletedFreeTalkWithCorrection(sessionId);
+    expirePremium(userId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/" + sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.correctionCount").value(1))
+        .andExpect(jsonPath("$.data.messages[0].correctionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.messages[0].correction.betterSentence").value("I went home."));
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+  }
+
   /** 인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다. */
   @DisplayName("인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다.")
   @Test
@@ -300,6 +343,59 @@ class PremiumAccessIntegrationTests {
                 userId,
                 EVENT_TIMESTAMP_MS,
                 EVENT_TIMESTAMP_MS + 30L * 24 * 60 * 60 * 1000);
+    mockMvc
+        .perform(
+            post("/webhooks/revenuecat")
+                .header(HttpHeaders.AUTHORIZATION, WEBHOOK_SECRET)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+  }
+
+  private void seedCompletedFreeTalkWithCorrection(long learningSessionId) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO session_history_message (
+            session_history_id, message_sequence, turn_number, role, content, input_type,
+            correction_original, correction_better, correction_reason, mistake_pattern,
+            reacted_to_partner, correction_processing_status, created_at, updated_at
+        )
+        SELECT id, 1, 1, 'USER', 'I go home.', 'TEXT', 'I go home.', 'I went home.',
+               '과거 일이에요.', 'TENSE', TRUE, 'COMPLETED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM session_history
+        WHERE learning_session_id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        UPDATE learning_session
+        SET status = 'COMPLETED', ended_at = CURRENT_TIMESTAMP,
+            ended_by = 'USER', completion_reason = 'USER_ENDED'
+        WHERE id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        "UPDATE free_talk_session SET conversation_status = 'COMPLETED' WHERE learning_session_id ="
+            + " ?",
+        learningSessionId);
+  }
+
+  private void expirePremium(Long userId) throws Exception {
+    String body =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "EXPIRATION",
+            "app_user_id": "%d",
+            "period_type": "NORMAL",
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """
+            .formatted(UUID.randomUUID(), userId, EVENT_TIMESTAMP_MS + 1, EVENT_TIMESTAMP_MS + 1);
     mockMvc
         .perform(
             post("/webhooks/revenuecat")
