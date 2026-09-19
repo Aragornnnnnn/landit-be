@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
  * @param isTrial 연간 구독의 무료 체험 중이면 {@code true}. periodType이 TRIAL일 때만 참이고, 프리미엄이 꺼져 있으면 항상 {@code
  *     false}
  * @param periodType 현재 결제 기간 종류. 무료 체험 중이면 TRIAL. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
- * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
+ * @param expiresAt 구독 만료 시각. 갱신 결제 실패 유예 중이면 유예 종료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
  * @param productId 구독 상품 ID. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param store 결제한 스토어. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
@@ -45,7 +45,9 @@ public record UserSubscriptionResponse(
                     + " PREPAID(선결제). 프리미엄이 꺼져 있으면 null",
             example = "TRIAL")
         SubscriptionPeriodType periodType,
-    @Schema(description = "구독 만료 시각. 프리미엄이 꺼져 있으면 null", example = "2026-10-04T12:00:00")
+    @Schema(
+            description = "구독 만료 시각. 갱신 결제 실패 유예 중이면 유예 종료 시각. 프리미엄이 꺼져 있으면 null",
+            example = "2026-10-04T12:00:00")
         LocalDateTime expiresAt,
     @Schema(
             description =
