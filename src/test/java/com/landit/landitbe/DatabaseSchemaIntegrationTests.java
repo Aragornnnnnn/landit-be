@@ -340,6 +340,20 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("scenario_language_variant", "ai_opening_inner_thought_type");
   }
 
+  /** V112 migration은 프리톡 턴 교정과 처리 상태를 사용자 메시지에 추가한다. */
+  @DisplayName("V112 migration은 프리톡 턴 교정과 처리 상태를 사용자 메시지에 추가한다.")
+  @Test
+  void v112AddsFreeTalkTurnCorrectionToSessionHistoryMessage() {
+    assertColumnExists("session_history_message", "correction_original");
+    assertColumnExists("session_history_message", "correction_better");
+    assertColumnExists("session_history_message", "correction_reason");
+    assertColumnExists("session_history_message", "mistake_pattern");
+    assertColumnExists("session_history_message", "reacted_to_partner");
+    assertColumnExists("session_history_message", "correction_processing_status");
+    assertTableConstraintExists("session_history_message", "chk_session_message_correction_status");
+    assertTableConstraintExists("session_history_message", "chk_session_message_correction_fields");
+  }
+
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
   @Test
   void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
@@ -1314,6 +1328,79 @@ class DatabaseSchemaIntegrationTests {
                 migrationJdbcTemplate.update(
                     "UPDATE free_talk_daily_speaking_usage SET request_count = -1"))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  /** 기존 프리톡 사용자 발화만 교정 실패로 채우고 시나리오 발화와 AI 메시지는 비워 두도록 V112를 적용한다. */
+  @DisplayName("기존 프리톡 사용자 발화만 교정 실패로 채우고 시나리오 발화와 AI 메시지는 비워 두도록 V112를 적용한다.")
+  @Test
+  void v112BackfillsOnlyExistingFreeTalkUserMessagesAsFailedCorrection() {
+    String databaseUrl = migrationTestDatabaseUrl();
+    migrateToVersion(databaseUrl, "107");
+    JdbcTemplate migrationJdbcTemplate =
+        new JdbcTemplate(new DriverManagerDataSource(databaseUrl, "sa", ""));
+    // 백필은 세션 유형과 화자만 보므로 사용자 프로필 없이 히스토리만 심는다.
+    migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+    insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+    insertLegacySessionHistory(migrationJdbcTemplate, 2L, "SCENARIO");
+    insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+    insertLegacyMessage(migrationJdbcTemplate, 12L, 1L, 2, "AI");
+    insertLegacyMessage(migrationJdbcTemplate, 21L, 2L, 1, "USER");
+    migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+
+    migrateToLatestVersion(databaseUrl);
+
+    assertThat(correctionStatus(migrationJdbcTemplate, 11L)).isEqualTo("FAILED");
+    assertThat(correctionStatus(migrationJdbcTemplate, 12L)).isNull();
+    assertThat(correctionStatus(migrationJdbcTemplate, 21L)).isNull();
+    // 교정문만 있고 원문·이유·실수 패턴이 없는 반쪽 교정은 저장할 수 없다.
+    assertThatThrownBy(
+            () ->
+                migrationJdbcTemplate.update(
+                    "UPDATE session_history_message SET correction_better = 'I went.',"
+                        + " correction_processing_status = 'COMPLETED' WHERE id = 11"))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  private String correctionStatus(JdbcTemplate migrationJdbcTemplate, long messageId) {
+    return migrationJdbcTemplate.queryForObject(
+        "SELECT correction_processing_status FROM session_history_message WHERE id = ?",
+        String.class,
+        messageId);
+  }
+
+  private void insertLegacySessionHistory(
+      JdbcTemplate migrationJdbcTemplate, long sessionHistoryId, String sessionType) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO session_history (
+            id, user_profile_id, session_type, target_locale, base_locale, started_at, ended_at,
+            duration_seconds, user_message_count, created_at
+        )
+        VALUES (?, 1, ?, 'EN', 'KR', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, 1,
+                CURRENT_TIMESTAMP)
+        """,
+        sessionHistoryId,
+        sessionType);
+  }
+
+  private void insertLegacyMessage(
+      JdbcTemplate migrationJdbcTemplate,
+      long messageId,
+      long sessionHistoryId,
+      int messageSequence,
+      String role) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO session_history_message (
+            id, session_history_id, message_sequence, turn_number, role, content, input_type,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, 1, ?, 'hello', 'TEXT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        messageId,
+        sessionHistoryId,
+        messageSequence,
+        role);
   }
 
   private String migrationTestDatabaseUrl() {
