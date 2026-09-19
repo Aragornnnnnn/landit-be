@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.SessionMessageInputType;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionException;
@@ -126,7 +127,37 @@ public class ConversationMessageService {
   }
 
   /**
-   * 준비 중인 속마음 처리를 실패로 변경한다.
+   * 준비 중인 프리톡 속마음과 같은 AI 응답의 턴 교정을 한 번에 완료 처리한다.
+   *
+   * @param messageId 메시지 ID
+   * @param innerThought 생성된 속마음
+   * @param innerThoughtType 속마음 유형
+   * @param correction 턴 교정 판정. 판정 실패({@code FAILED})여도 속마음은 완료로 저장한다
+   * @return 갱신된 row 수. 이미 처리된 메시지면 0
+   */
+  @Transactional
+  public int completeFreeTalkInnerThought(
+      long messageId,
+      String innerThought,
+      InnerThoughtType innerThoughtType,
+      FreeTalkTurnCorrection correction) {
+    FreeTalkTurnCorrection.Sentence sentence = correction.sentence();
+    return sessionHistoryMessageRepository.completeInnerThoughtAndCorrectionIfPreparing(
+        messageId,
+        innerThought,
+        innerThoughtType,
+        sentence == null ? null : sentence.originalSentence(),
+        sentence == null ? null : sentence.betterSentence(),
+        sentence == null ? null : sentence.reason(),
+        sentence == null ? null : sentence.mistakePattern(),
+        correction.reactedToPartner(),
+        correction.status(),
+        ProcessingStatus.COMPLETED,
+        ProcessingStatus.PREPARING);
+  }
+
+  /**
+   * 준비 중인 속마음 처리를 실패로 변경한다. 함께 준비 중이던 프리톡 턴 교정도 실패로 바꾼다.
    *
    * @param messageId 메시지 ID
    * @return 갱신된 row 수

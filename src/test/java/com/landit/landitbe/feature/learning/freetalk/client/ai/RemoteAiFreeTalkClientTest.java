@@ -8,6 +8,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
@@ -132,6 +134,88 @@ class RemoteAiFreeTalkClientTest {
         remoteClient().generateInnerThought(innerThoughtRequest());
 
     assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
+  }
+
+  @DisplayName("교정 필드가 없는 구버전 속마음 응답은 속마음을 살리고 교정만 실패로 본다.")
+  @Test
+  void treatsMissingCorrectionFieldsAsFailedCorrection() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD"},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.innerThought()).isEqualTo("즐거웠나 보다.");
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
+  }
+
+  @DisplayName("속마음 응답의 턴 교정과 상대 반응 여부를 변환한다.")
+  @Test
+  void mapsTurnCorrectionFromInnerThoughtResponse() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":false,
+             "correction":{"originalSentence":"I go hiking yesterday.",
+                           "betterSentence":"I went hiking yesterday.",
+                           "reason":"어제 일이라 went를 써요.","mistakePattern":"TENSE"}},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.correction())
+        .isEqualTo(
+            FreeTalkTurnCorrection.completed(
+                new FreeTalkTurnCorrection.Sentence(
+                    "I go hiking yesterday.",
+                    "I went hiking yesterday.",
+                    "어제 일이라 went를 써요.",
+                    FreeTalkMistakePattern.TENSE),
+                false));
+  }
+
+  @DisplayName("고칠 것이 없는 턴은 교정 없이 완료로 변환한다.")
+  @Test
+  void mapsNullCorrectionWithReactionAsCompleted() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,"correction":null},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.completed(null, true));
+  }
+
+  @DisplayName("모르는 실수 패턴은 임의 값으로 바꾸지 않고 교정만 실패로 본다.")
+  @Test
+  void treatsUnknownMistakePatternAsFailedCorrection() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I go.","betterSentence":"I went.",
+                           "reason":"과거예요.","mistakePattern":"BRAND_NEW_PATTERN"}},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.innerThoughtType().name()).isEqualTo("GOOD");
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
   }
 
   @DisplayName("프리톡 종료 요청에 종료 사유와 제목 생성 조건을 보내고 응답을 변환한다.")
