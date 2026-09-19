@@ -313,6 +313,73 @@ class RemoteAiFreeTalkClientTest {
         });
   }
 
+  @DisplayName("AI가 먼저 배포되어 시작·발화·표현 추천 응답에 모르는 필드가 실려 와도 기존 값을 그대로 변환한다.")
+  @Test
+  void ignoresUnknownFieldsAddedByNewerAiServer() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "aiMessage": "How was your weekend?",
+                "translatedMessage": "주말 어땠어?",
+                "emotion": null,
+                "usedMemoryIds": [],
+                "followUpAsked": true,
+                "followUpId": 9
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/turn",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "userExitIntentDetected": false,
+                "inferredTitle": "주말 이야기",
+                "aiMessage": "That sounds fun.",
+                "translatedMessage": "재밌겠다.",
+                "emotion": null,
+                "usedMemoryIds": [],
+                "followUpAsked": false,
+                "followUpId": null
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "recommendations": [{
+                  "displayOrder": 1,
+                  "existingExpressionId": 7
+                }],
+                "usedExpressions": [{
+                  "expressionId": 7,
+                  "messageId": 10,
+                  "matchedText": "grab a coffee"
+                }]
+              },
+              "error": null
+            }
+        """);
+    RemoteAiFreeTalkClient client = remoteClient();
+
+    assertThat(client.generateOpening(openingRequest()).aiMessage())
+        .isEqualTo("How was your weekend?");
+    assertThat(client.generateTurn(turnRequest()).aiMessage()).isEqualTo("That sounds fun.");
+    assertThat(client.recommendExpressions(recommendationsRequest()).recommendations()).hasSize(1);
+  }
+
   @DisplayName("첫 대화 요청에 기억 문맥을 보내고 사용된 기억 ID를 응답에서 읽는다.")
   @Test
   void mapsUsedMemoryIdsAndSendsMemoryContextForOpening() throws Exception {

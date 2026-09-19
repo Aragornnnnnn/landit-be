@@ -74,6 +74,28 @@ class RemoteAiMemoryClientTest {
         .isEqualTo("openai/text-embedding-3-small");
   }
 
+  @DisplayName("AI가 먼저 배포되어 기억 후보 응답에 모르는 후속 질문 필드가 실려 와도 후보를 그대로 변환한다.")
+  @Test
+  void ignoresUnknownFollowUpQuestionInMemoryCandidateResponse() throws Exception {
+    String candidatesWithFollowUp =
+        "{\"extractorVersion\":\"memory-candidate-v10\",\"candidates\":["
+            + memoryCandidateJson(0, "EVENT")
+            + "],\"followUpQuestion\":{\"memoryId\":null,\"candidateIndex\":0,"
+            + "\"triggerType\":\"PAST_EVENT\",\"question\":\"면접 어떻게 됐어?\","
+            + "\"invite\":\"다음엔 그 얘기 하자.\"}}";
+    registerJsonResponse(
+        "/api/v1/free-talk/memory-candidates",
+        new ConcurrentHashMap<>(),
+        successResponse(candidatesWithFollowUp));
+
+    AiMemoryCandidatesResult result =
+        memoryClient().extractMemoryCandidates(memoryCandidatesRequest());
+
+    assertThat(result.extractorVersion()).isEqualTo("memory-candidate-v10");
+    assertThat(result.candidates()).hasSize(1);
+    assertThat(result.candidates().getFirst().candidateIndex()).isZero();
+  }
+
   @DisplayName("기억 충돌 해결 계약을 AI에 전송하고 성공 응답을 변환한다.")
   @Test
   void postsMemoryResolutionContractAndMapsSuccessfulResponse() throws Exception {
