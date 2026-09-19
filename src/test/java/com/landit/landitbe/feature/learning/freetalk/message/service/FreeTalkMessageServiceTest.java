@@ -20,9 +20,11 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.SessionMessageInputType;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
@@ -162,10 +164,13 @@ class FreeTalkMessageServiceTest {
                 false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
     when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
     when(aiFreeTalkClient.generateInnerThought(any()))
-        .thenReturn(new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD));
+        .thenReturn(
+            new AiFreeTalkInnerThoughtResult(
+                "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed()));
     doThrow(new IllegalStateException("save failed"))
         .when(sessionMessageService)
-        .completeInnerThought(7L, "즐거웠나 보다.", InnerThoughtType.GOOD);
+        .completeFreeTalkInnerThought(
+            7L, "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed());
 
     service.submit(1L, 300L, request());
 
@@ -174,6 +179,31 @@ class FreeTalkMessageServiceTest {
         .generateTurn(argThat(request -> request.characterId().equals("chloe")));
     verify(aiFreeTalkClient)
         .generateInnerThought(argThat(request -> request.characterId().equals("chloe")));
+  }
+
+  @DisplayName("속마음과 같은 응답에 실려 온 턴 교정을 한 번의 저장으로 함께 넘긴다.")
+  @Test
+  void persistsTurnCorrectionTogetherWithInnerThought() {
+    FreeTalkTurnCorrection correction =
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I go hiking.", "I went hiking.", "과거 일이에요.", FreeTalkMistakePattern.TENSE),
+            true);
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation());
+    when(aiFreeTalkClient.generateTurn(any()))
+        .thenReturn(
+            new AiFreeTalkTurnResult(
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
+    when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+    when(aiFreeTalkClient.generateInnerThought(any()))
+        .thenReturn(
+            new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD, correction));
+
+    service.submit(1L, 300L, request());
+
+    verify(sessionMessageService)
+        .completeFreeTalkInnerThought(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
   }
 
   @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")

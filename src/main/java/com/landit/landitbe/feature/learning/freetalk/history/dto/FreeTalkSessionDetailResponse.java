@@ -3,6 +3,8 @@
 package com.landit.landitbe.feature.learning.freetalk.history.dto;
 
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionLearningStatus;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
@@ -18,6 +20,7 @@ import java.util.List;
  * @param startedAt 세션 시작 시각
  * @param completedAt 세션 완료 시각
  * @param userSpeakingDurationMs 세션의 사용자 발화 시간 합계
+ * @param correctionCount 교정이 있는 사용자 메시지 수. 기록 상세의 채팅 아이콘 뱃지 숫자이며 0이면 뱃지가 없다
  * @param messages 전체 대화 메시지
  * @param expressionGenerationStatus 맞춤 표현 생성 상태
  * @param expressionLearningStatus 맞춤 표현 학습 상태
@@ -30,6 +33,7 @@ public record FreeTalkSessionDetailResponse(
     LocalDateTime startedAt,
     LocalDateTime completedAt,
     long userSpeakingDurationMs,
+    int correctionCount,
     List<Message> messages,
     ExpressionGenerationStatus expressionGenerationStatus,
     ExpressionLearningStatus expressionLearningStatus,
@@ -47,6 +51,9 @@ public record FreeTalkSessionDetailResponse(
    * @param emotion AI 캐릭터 감정
    * @param innerThought 사용자 메시지에 대한 AI 상대의 속마음
    * @param innerThoughtType 계산된 속마음 유형
+   * @param correctionStatus 사용자 메시지의 교정 처리 상태. AI 메시지는 null
+   * @param correction 사용자 메시지의 교정. 고칠 것이 없거나({@code COMPLETED}) 생성 중·실패면 null
+   * @param reusedExpression 이 메시지에서 다시 쓴 배운 표현. 아직 판정하지 않아 항상 null
    */
   public record Message(
       Long messageId,
@@ -57,7 +64,35 @@ public record FreeTalkSessionDetailResponse(
       String translatedContent,
       CharacterEmotion emotion,
       String innerThought,
-      InnerThoughtType innerThoughtType) {}
+      InnerThoughtType innerThoughtType,
+      ProcessingStatus correctionStatus,
+      Correction correction,
+      ReusedExpression reusedExpression) {}
+
+  /**
+   * 사용자 메시지 한 턴에서 고른 한 문장의 교정이다.
+   *
+   * @param originalSentence 이 턴에서 고른 한 문장 원문
+   * @param betterSentence 더 자연스러운 문장
+   * @param reason 기준 언어로 쓴 이유 한 줄
+   * @param mistakePattern 실수 패턴 코드. 화면에 노출하지 않는 참고 값
+   * @param memoryTag 장기기억을 근거로 교정했을 때의 태그 문구. 아직 생성하지 않아 항상 null
+   */
+  public record Correction(
+      String originalSentence,
+      String betterSentence,
+      String reason,
+      FreeTalkMistakePattern mistakePattern,
+      String memoryTag) {}
+
+  /**
+   * 사용자 메시지에서 다시 쓴 배운 표현이다.
+   *
+   * @param expressionId 공통 표현 ID
+   * @param text 표현 원형
+   * @param matchedText 메시지 원문 안에서 밑줄을 그을 구절
+   */
+  public record ReusedExpression(Long expressionId, String text, String matchedText) {}
 
   /**
    * 세션별 맞춤 표현의 요약이다.

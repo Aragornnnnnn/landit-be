@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.learning.freetalk.client.ai;
 
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationExcerpt;
@@ -58,7 +59,8 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
     String innerThought = "사용자가 대화를 자연스럽게 이어가고 있다.";
-    return new AiFreeTalkInnerThoughtResult(innerThought, InnerThoughtType.GOOD);
+    return new AiFreeTalkInnerThoughtResult(
+        innerThought, InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true));
   }
 
   /** {@inheritDoc} */

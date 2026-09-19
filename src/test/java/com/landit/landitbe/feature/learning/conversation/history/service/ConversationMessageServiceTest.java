@@ -8,7 +8,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionException;
@@ -65,6 +67,56 @@ class ConversationMessageServiceTest {
             3L,
             "thought",
             InnerThoughtType.GOOD,
+            ProcessingStatus.COMPLETED,
+            ProcessingStatus.PREPARING);
+  }
+
+  /** 프리톡 속마음과 턴 교정을 준비 상태 조건의 한 갱신으로 전달한다. */
+  @DisplayName("프리톡 속마음과 턴 교정을 준비 상태 조건의 한 갱신으로 전달한다.")
+  @Test
+  void completesFreeTalkInnerThoughtAndCorrectionInOneUpdate() {
+    service.completeFreeTalkInnerThought(
+        3L,
+        "thought",
+        InnerThoughtType.GOOD,
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I go.", "I went.", "과거예요.", FreeTalkMistakePattern.TENSE),
+            false));
+
+    verify(repository)
+        .completeInnerThoughtAndCorrectionIfPreparing(
+            3L,
+            "thought",
+            InnerThoughtType.GOOD,
+            "I go.",
+            "I went.",
+            "과거예요.",
+            FreeTalkMistakePattern.TENSE,
+            false,
+            ProcessingStatus.COMPLETED,
+            ProcessingStatus.COMPLETED,
+            ProcessingStatus.PREPARING);
+  }
+
+  /** 교정 판정에 실패해도 속마음은 완료로 저장하고 교정만 실패로 남긴다. */
+  @DisplayName("교정 판정에 실패해도 속마음은 완료로 저장하고 교정만 실패로 남긴다.")
+  @Test
+  void completesInnerThoughtWhileMarkingCorrectionFailed() {
+    service.completeFreeTalkInnerThought(
+        3L, "thought", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed());
+
+    verify(repository)
+        .completeInnerThoughtAndCorrectionIfPreparing(
+            3L,
+            "thought",
+            InnerThoughtType.GOOD,
+            null,
+            null,
+            null,
+            null,
+            null,
+            ProcessingStatus.FAILED,
             ProcessingStatus.COMPLETED,
             ProcessingStatus.PREPARING);
   }

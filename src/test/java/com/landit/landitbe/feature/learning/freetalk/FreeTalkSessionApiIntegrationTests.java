@@ -15,6 +15,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.session.FreeTalkProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
@@ -43,6 +46,7 @@ import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionR
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Clock;
@@ -99,6 +103,8 @@ class FreeTalkSessionApiIntegrationTests {
   @Autowired private FreeTalkSessionExpressionRepository freeTalkSessionExpressionRepository;
 
   @Autowired private FakeAiFreeTalkClient fakeAiFreeTalkClient;
+
+  @Autowired private ConversationMessageService conversationMessageService;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -369,6 +375,129 @@ class FreeTalkSessionApiIntegrationTests {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.characterId").value("teddy"));
+  }
+
+  @DisplayName("턴 교정은 진행 중 응답에 싣지 않고 완료한 프리톡 상세에서 메시지별로 내려준다.")
+  @Test
+  void storesTurnCorrectionsAndExposesThemOnlyInCompletedSessionDetail() throws Exception {
+    String accessToken =
+        login("free-talk-correction@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    fakeAiFreeTalkClient.correctNextTurn(
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I go hiking yesterday.",
+                "I went hiking yesterday.",
+                "어제 일이라 go가 아니라 went를 써요.",
+                FreeTalkMistakePattern.TENSE),
+            true));
+    long correctedMessageId =
+        submitWithoutCorrectionFields(accessToken, sessionId, "I go hiking yesterday.");
+    awaitCorrectionStatus(correctedMessageId, "COMPLETED");
+
+    fakeAiFreeTalkClient.correctNextTurn(FreeTalkTurnCorrection.completed(null, false));
+    long cleanMessageId = submitWithoutCorrectionFields(accessToken, sessionId, "It was fun.");
+    awaitCorrectionStatus(cleanMessageId, "COMPLETED");
+
+    fakeAiFreeTalkClient.correctNextTurn(FreeTalkTurnCorrection.failed());
+    long failedMessageId = submitWithoutCorrectionFields(accessToken, sessionId, "See you.");
+    awaitCorrectionStatus(failedMessageId, "FAILED");
+
+    // 이미 반영한 턴에 교정이 다시 도착해도 덮어쓰거나 추가하지 않는다.
+    assertThat(
+            conversationMessageService.completeFreeTalkInnerThought(
+                correctedMessageId,
+                "다시 온 속마음",
+                InnerThoughtType.GOOD,
+                FreeTalkTurnCorrection.completed(
+                    new FreeTalkTurnCorrection.Sentence(
+                        "I go hiking yesterday.",
+                        "Another sentence.",
+                        "다른 이유",
+                        FreeTalkMistakePattern.OTHER),
+                    true)))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT reacted_to_partner FROM session_history_message WHERE id = ?",
+                Boolean.class,
+                cleanMessageId))
+        .isFalse();
+
+    completeSession(sessionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.correctionCount").value(1))
+        .andExpect(jsonPath("$.data.messages[0].role").value("USER"))
+        .andExpect(jsonPath("$.data.messages[0].correctionStatus").value("COMPLETED"))
+        .andExpect(
+            jsonPath("$.data.messages[0].correction.originalSentence")
+                .value("I go hiking yesterday."))
+        .andExpect(
+            jsonPath("$.data.messages[0].correction.betterSentence")
+                .value("I went hiking yesterday."))
+        .andExpect(
+            jsonPath("$.data.messages[0].correction.reason").value("어제 일이라 go가 아니라 went를 써요."))
+        .andExpect(jsonPath("$.data.messages[0].correction.mistakePattern").value("TENSE"))
+        .andExpect(jsonPath("$.data.messages[0].correction.memoryTag").value(nullValue()))
+        .andExpect(jsonPath("$.data.messages[0].correction.reactedToPartner").doesNotExist())
+        .andExpect(jsonPath("$.data.messages[0].reusedExpression").value(nullValue()))
+        .andExpect(jsonPath("$.data.messages[1].role").value("AI"))
+        .andExpect(jsonPath("$.data.messages[1].correctionStatus").value(nullValue()))
+        .andExpect(jsonPath("$.data.messages[1].correction").value(nullValue()))
+        .andExpect(jsonPath("$.data.messages[2].correctionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.messages[2].correction").value(nullValue()))
+        .andExpect(jsonPath("$.data.messages[4].correctionStatus").value("FAILED"))
+        .andExpect(jsonPath("$.data.messages[4].correction").value(nullValue()));
+
+    // 다른 사용자는 교정이 담긴 세션 상세에 접근할 수 없다.
+    String otherToken =
+        login("free-talk-correction-other@example.com").get("data").get("accessToken").asText();
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.data").value(nullValue()));
+  }
+
+  private long submitWithoutCorrectionFields(String accessToken, long sessionId, String content)
+      throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                postJsonWithToken(
+                    messagePath(sessionId),
+                    accessToken,
+                    messageRequest(UUID.randomUUID().toString(), content, 1000, false)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.submittedMessage.correction").doesNotExist())
+            .andExpect(jsonPath("$.data.submittedMessage.correctionStatus").doesNotExist())
+            .andExpect(jsonPath("$.data.submittedMessage.reactedToPartner").doesNotExist())
+            .andExpect(jsonPath("$.data.correctionCount").doesNotExist())
+            .andReturn();
+    return responseData(result).at("/submittedMessage/messageId").asLong();
+  }
+
+  private void awaitCorrectionStatus(long messageId, String expected) throws InterruptedException {
+    String status = null;
+    for (int attempt = 0; attempt < 100; attempt++) {
+      status =
+          jdbcTemplate.queryForObject(
+              "SELECT correction_processing_status FROM session_history_message WHERE id = ?",
+              String.class,
+              messageId);
+      if (expected.equals(status)) {
+        return;
+      }
+      Thread.sleep(50);
+    }
+    assertThat(status).isEqualTo(expected);
   }
 
   @DisplayName("프리톡 시작 방식과 주제의 잘못된 조합을 거부한다.")
@@ -1737,6 +1866,8 @@ class FreeTalkSessionApiIntegrationTests {
     private volatile boolean turnTransactionActive;
     private volatile boolean failTurn;
     private volatile boolean exitIntentDetected;
+    private volatile FreeTalkTurnCorrection nextCorrection =
+        FreeTalkTurnCorrection.completed(null, true);
     private final AtomicInteger turnCallCount = new AtomicInteger();
     private final AtomicInteger closingCallCount = new AtomicInteger();
     private volatile CountDownLatch turnStarted = new CountDownLatch(1);
@@ -1793,7 +1924,9 @@ class FreeTalkSessionApiIntegrationTests {
     public AiFreeTalkInnerThoughtResult generateInnerThought(
         AiFreeTalkInnerThoughtRequest request) {
       return new AiFreeTalkInnerThoughtResult(
-          "즐거운 시간을 보냈나 봐.", com.landit.landitbe.shared.domain.InnerThoughtType.GOOD);
+          "즐거운 시간을 보냈나 봐.",
+          com.landit.landitbe.shared.domain.InnerThoughtType.GOOD,
+          nextCorrection);
     }
 
     @Override
@@ -1846,7 +1979,12 @@ class FreeTalkSessionApiIntegrationTests {
               .toList());
     }
 
+    void correctNextTurn(FreeTalkTurnCorrection correction) {
+      nextCorrection = correction;
+    }
+
     void reset() {
+      nextCorrection = FreeTalkTurnCorrection.completed(null, true);
       lastOpeningRequest = null;
       openingTransactionActive = false;
       failOpening = false;

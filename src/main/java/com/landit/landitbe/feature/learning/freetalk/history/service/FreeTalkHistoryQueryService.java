@@ -5,7 +5,9 @@ package com.landit.landitbe.feature.learning.freetalk.history.service;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionText;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
 import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
+import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -116,19 +118,10 @@ public class FreeTalkHistoryQueryService {
     // 대화 메시지는 저장 순서대로 API 응답 형태로 변환한다.
     List<FreeTalkSessionDetailResponse.Message> messages =
         conversationMessageService.findAll(history.getId()).stream()
-            .map(
-                message ->
-                    new FreeTalkSessionDetailResponse.Message(
-                        message.getId(),
-                        message.getTurnNumber(),
-                        message.getMessageSequence(),
-                        message.getRole().name(),
-                        message.getContent(),
-                        message.getTranslatedContent(),
-                        message.getEmotion(),
-                        message.getInnerThought(),
-                        message.getInnerThoughtType()))
+            .map(this::toMessageResponse)
             .toList();
+    int correctionCount =
+        Math.toIntExact(messages.stream().filter(message -> message.correction() != null).count());
 
     return new FreeTalkSessionDetailResponse(
         learningSessionId,
@@ -137,10 +130,45 @@ public class FreeTalkHistoryQueryService {
         completedSession.learningSession().getStartedAt(),
         completedSession.learningSession().getEndedAt(),
         session.getAccumulatedSpeakingDurationMs(),
+        correctionCount,
         messages,
         session.getExpressionGenerationStatus(),
         progress.learningStatus(),
         progress.expressions());
+  }
+
+  // 교정은 완료된 세션의 기록에서만 내려준다. 배운 표현 재사용은 아직 판정하지 않아 null이다.
+  private FreeTalkSessionDetailResponse.Message toMessageResponse(
+      SessionHistoryMessageSnapshot message) {
+    FreeTalkTurnCorrection turnCorrection = message.getCorrection();
+    return new FreeTalkSessionDetailResponse.Message(
+        message.getId(),
+        message.getTurnNumber(),
+        message.getMessageSequence(),
+        message.getRole().name(),
+        message.getContent(),
+        message.getTranslatedContent(),
+        message.getEmotion(),
+        message.getInnerThought(),
+        message.getInnerThoughtType(),
+        turnCorrection == null ? null : turnCorrection.status(),
+        toCorrectionResponse(turnCorrection),
+        null);
+  }
+
+  // 고칠 것이 없거나 생성 중·실패인 턴은 교정 없이 상태만 내려준다. 기억 태그는 아직 생성하지 않아 null이다.
+  private FreeTalkSessionDetailResponse.Correction toCorrectionResponse(
+      FreeTalkTurnCorrection turnCorrection) {
+    if (turnCorrection == null || turnCorrection.sentence() == null) {
+      return null;
+    }
+    FreeTalkTurnCorrection.Sentence sentence = turnCorrection.sentence();
+    return new FreeTalkSessionDetailResponse.Correction(
+        sentence.originalSentence(),
+        sentence.betterSentence(),
+        sentence.reason(),
+        sentence.mistakePattern(),
+        null);
   }
 
   private FreeTalkSessionListResponse.Item toListItem(

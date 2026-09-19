@@ -371,8 +371,11 @@ public class FreeTalkMessageService {
         (result, exception) -> {
           if (exception == null) {
             try {
-              conversationMessageService.completeInnerThought(
-                  request.submittedMessageId(), result.innerThought(), result.innerThoughtType());
+              conversationMessageService.completeFreeTalkInnerThought(
+                  request.submittedMessageId(),
+                  result.innerThought(),
+                  result.innerThoughtType(),
+                  result.correction());
             } catch (RuntimeException persistenceException) {
               log.warn(
                   "프리톡 속마음 저장에 실패했습니다. messageId={}",

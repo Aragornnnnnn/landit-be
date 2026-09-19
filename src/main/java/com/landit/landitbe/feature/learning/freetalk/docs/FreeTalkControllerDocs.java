@@ -213,7 +213,13 @@ public interface FreeTalkControllerDocs {
    */
   @Operation(
       summary = "지난 프리톡 상세 조회",
-      description = "인증된 사용자가 완료한 프리톡의 세션 정보와 전체 대화를 조회한다.",
+      description =
+          "인증된 사용자가 완료한 프리톡의 세션 정보와 전체 대화를 조회한다. 사용자 메시지에는 턴 교정(correction)과"
+              + " 교정 처리 상태(correctionStatus)가 함께 내려가고, correctionCount는 교정이 있는 사용자 메시지"
+              + " 수다. correction이 null이고 correctionStatus가 COMPLETED면 고칠 것이 없는 턴, PREPARING이면"
+              + " 생성 중이라 재조회가 필요한 턴, FAILED면 교정을 만들지 못한 턴이다. AI 메시지는 세 필드가 모두"
+              + " null이다. correction.memoryTag와 reusedExpression은 아직 제공하지 않아 항상 null이다. 교정은"
+              + " 진행 중인 대화의 응답에는 포함되지 않는다. 구독이 만료된 사용자도 본인이 완료한 세션은 조회할 수 있다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
