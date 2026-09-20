@@ -8,7 +8,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -40,10 +40,10 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
   private String leaseToken;
 
   @Column(name = "lease_until")
-  private LocalDateTime leaseUntil;
+  private Instant leaseUntil;
 
   @Column(name = "next_attempt_at")
-  private LocalDateTime nextAttemptAt;
+  private Instant nextAttemptAt;
 
   @Column(name = "source_byte_limit", nullable = false)
   private int sourceByteLimit;
@@ -69,7 +69,7 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
   }
 
   /** 외부 AI 호출을 선점한다. */
-  public void claim(String token, LocalDateTime until) {
+  public void claim(String token, Instant until) {
     leaseToken = token;
     leaseUntil = until;
   }
@@ -86,7 +86,7 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
   }
 
   /** 실패한 작업의 다음 실행 시각을 기록하고 선점을 해제한다. */
-  public void defer(LocalDateTime nextAttemptAt) {
+  public void defer(Instant nextAttemptAt) {
     this.nextAttemptAt = nextAttemptAt;
     leaseToken = null;
     leaseUntil = null;
@@ -99,8 +99,17 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
     leaseUntil = null;
   }
 
-  /** 선점 토큰이 현재 작업과 같은지 확인한다. */
-  public boolean ownsLease(String token) {
-    return leaseToken != null && leaseToken.equals(token);
+  /**
+   * 현재 작업의 선점이 만료되지 않았는지 확인한다.
+   *
+   * @param token 작업의 선점 식별자
+   * @param now DB 기준 현재 시각
+   * @return 같은 토큰이며 만료 전이면 true
+   */
+  public boolean ownsLease(String token, Instant now) {
+    return leaseToken != null
+        && leaseToken.equals(token)
+        && leaseUntil != null
+        && leaseUntil.isAfter(now);
   }
 }

@@ -17,7 +17,7 @@ import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
 import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalkContextSummaryRepository;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -141,13 +141,14 @@ public class FreeTalkContextSummaryService {
           if (state == null) {
             return null;
           }
+          Instant now = repository.currentTime();
           List<List<SessionHistoryMessageSnapshot>> rounds =
               FreeTalkSummaryWindow.rounds(messages, state.getCoveredThroughSequence());
           if (!shouldSummarize(rounds)
               || state.getSuspendedReason() != null
-              || activeLease(state)
+              || activeLease(state, now)
               || (state.getNextAttemptAt() != null
-                  && state.getNextAttemptAt().isAfter(LocalDateTime.now()))) {
+                  && state.getNextAttemptAt().isAfter(now))) {
             return null;
           }
           List<SessionHistoryMessageSnapshot> source = sourceMessages(messages, state);
@@ -155,7 +156,7 @@ public class FreeTalkContextSummaryService {
             return null;
           }
           String token = UUID.randomUUID().toString();
-          state.claim(token, LocalDateTime.now().plusSeconds(properties.leaseSeconds()));
+          state.claim(token, now.plusSeconds(properties.leaseSeconds()));
           repository.save(state);
           AiFreeTalkContextSummaryRequest request =
               new AiFreeTalkContextSummaryRequest(
@@ -182,7 +183,7 @@ public class FreeTalkContextSummaryService {
         status ->
             repository
                 .findByIdForUpdate(pending.sessionId())
-                .filter(state -> state.ownsLease(pending.leaseToken()))
+                .filter(state -> state.ownsLease(pending.leaseToken(), repository.currentTime()))
                 .ifPresent(
                     state -> {
                       state.complete(
@@ -206,11 +207,11 @@ public class FreeTalkContextSummaryService {
         status ->
             repository
                 .findByIdForUpdate(pending.sessionId())
-                .filter(state -> state.ownsLease(pending.leaseToken()))
+                .filter(state -> state.ownsLease(pending.leaseToken(), repository.currentTime()))
                 .ifPresent(
                     state ->
                         state.defer(
-                            LocalDateTime.now().plusSeconds(properties.retryDelaySeconds()))));
+                            repository.currentTime().plusSeconds(properties.retryDelaySeconds()))));
   }
 
   private boolean shouldSummarize(List<List<SessionHistoryMessageSnapshot>> rounds) {
@@ -276,10 +277,10 @@ public class FreeTalkContextSummaryService {
     return properties.enabled() && properties.allowedUserIds().contains(userId);
   }
 
-  private boolean activeLease(FreeTalkContextSummary state) {
+  private boolean activeLease(FreeTalkContextSummary state, Instant now) {
     return state.getLeaseToken() != null
         && state.getLeaseUntil() != null
-        && state.getLeaseUntil().isAfter(LocalDateTime.now());
+        && state.getLeaseUntil().isAfter(now);
   }
 
   private record PendingSummary(

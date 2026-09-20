@@ -19,4 +19,12 @@ public interface FreeTalkContextSummaryRepository
       "select summary from FreeTalkContextSummary summary "
           + "where summary.freeTalkSessionId = :freeTalkSessionId")
   Optional<FreeTalkContextSummary> findByIdForUpdate(Long freeTalkSessionId);
+
+  /**
+   * 잠금 대기를 포함한 트랜잭션 시작 시각 대신 PostgreSQL의 현재 시각을 읽는다.
+   *
+   * @return DB 시각의 절대 시점
+   */
+  @Query(value = "select clock_timestamp()", nativeQuery = true)
+  java.time.Instant currentTime();
 }
