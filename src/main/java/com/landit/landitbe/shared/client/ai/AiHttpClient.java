@@ -102,6 +102,15 @@ public class AiHttpClient {
   private ApiException toApiException(int statusCode, String responseBody) {
     try {
       JsonNode root = jsonMapper.readTree(responseBody);
+      if (statusCode == 400 && root != null) {
+        String code = root.path("error").path("code").asString();
+        if (ErrorCode.FREE_TALK_CONTEXT_TOO_LARGE.name().equals(code)) {
+          return new ApiException(ErrorCode.FREE_TALK_CONTEXT_TOO_LARGE);
+        }
+        if (ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE.name().equals(code)) {
+          return new ApiException(ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE);
+        }
+      }
       if (statusCode == 502
           && root != null
           && ErrorCode.AI_RESPONSE_INVALID
