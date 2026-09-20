@@ -83,6 +83,7 @@ com.landit.landitbe
 │   │   ├── freetalk         # start / message / topic / usage / innerthought
 │   │   │   ├── expression
 │   │   │   ├── feedback    # 턴 교정(메시지별 피드백)
+│   │   │   ├── followup    # 요약 마지막의 "다음 스몰톡에서" 후속 질문
 │   │   │   ├── memory
 │   │   │   └── history
 │   │   ├── expression      # 표현 목록 / 시작 / 완료 조율

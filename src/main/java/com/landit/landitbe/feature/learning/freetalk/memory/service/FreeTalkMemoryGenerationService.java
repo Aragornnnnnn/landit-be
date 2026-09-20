@@ -2,11 +2,10 @@
 
 package com.landit.landitbe.feature.learning.freetalk.memory.service;
 
-import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
 import com.landit.landitbe.feature.memory.planning.service.ConversationMemoryPlanningService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,8 +35,8 @@ public class FreeTalkMemoryGenerationService {
   /** 장기기억 생성 문맥으로 후보를 판정하고 저장한다. */
   private void generate(ConversationMemoryGenerationRequest request) {
     try {
-      List<ConversationMemoryResolutionPlan> plans = planningService.createPlans(request).plans();
-      if (contextService.persistAndComplete(request, plans)
+      ConversationMemoryPlanningResult planning = planningService.createPlans(request);
+      if (contextService.persistAndComplete(request, planning)
           == ConversationMemoryWriteService.PersistenceResult.STALE) {
         throw new IllegalStateException("장기기억 비교 snapshot이 변경됐습니다.");
       }

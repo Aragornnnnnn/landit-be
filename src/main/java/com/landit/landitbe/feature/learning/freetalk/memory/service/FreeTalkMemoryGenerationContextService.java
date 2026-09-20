@@ -13,14 +13,15 @@ import com.landit.landitbe.feature.learning.conversation.history.service.Session
 import com.landit.landitbe.feature.learning.conversation.service.LearningSessionService;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
-import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTalkFollowUpRepository;
+import com.landit.landitbe.feature.learning.freetalk.followup.service.FreeTalkFollowUpService;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingReason;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
-import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpContext;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPersistence;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.Clock;
@@ -41,7 +42,7 @@ public class FreeTalkMemoryGenerationContextService {
   private final SessionHistoryService sessionHistoryService;
   private final ConversationMessageService conversationMessageService;
   private final ConversationMemoryWriteService memoryWriteService;
-  private final FreeTalkFollowUpRepository followUpRepository;
+  private final FreeTalkFollowUpService followUpService;
   private final Clock clock;
 
   /**
@@ -80,7 +81,7 @@ public class FreeTalkMemoryGenerationContextService {
         clock.getZone().getId(),
         historyMessages,
         new ConversationMemoryFollowUpContext(
-            followUpRepository.findUsedMemoryIds(learningSession.getUserProfileId()),
+            followUpService.findUsedMemoryIds(learningSession.getUserProfileId()),
             sessionEndedBy(learningSession.getCompletionReason())));
   }
 
@@ -134,37 +135,35 @@ public class FreeTalkMemoryGenerationContextService {
   }
 
   /**
-   * 장기기억 저장과 같은 트랜잭션에서 완료 세션을 READY로 전환한다.
+   * 장기기억 저장, 후속 질문 저장, 완료 상태 전환을 같은 트랜잭션에서 수행한다.
    *
-   * @param learningSessionId 완료할 프리톡 학습 세션 ID
+   * <p>snapshot이 달라져 기억을 저장하지 않았으면(STALE) 후속 질문도 저장하지 않는다.
+   *
+   * @param request 장기기억 생성 문맥
+   * @param planning 후보별 저장 계획과 후속 질문
+   * @return snapshot이 최신이어서 저장과 완료를 수행했으면 STORED, 아니면 STALE
    * @throws ApiException 프리톡 세션을 찾을 수 없을 때
    * @throws IllegalStateException 세션이 실행 중인 장기기억 작업이 아닐 때
    */
   @Transactional
-  public void complete(long learningSessionId) {
+  public ConversationMemoryWriteService.PersistenceResult persistAndComplete(
+      ConversationMemoryGenerationRequest request, ConversationMemoryPlanningResult planning) {
+    ConversationMemoryPersistence persistence =
+        memoryWriteService.persistIfSnapshotCurrent(request.userProfileId(), planning.plans());
+    if (persistence.result() == ConversationMemoryWriteService.PersistenceResult.STALE) {
+      return persistence.result();
+    }
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
-            .findByLearningSessionIdForUpdate(learningSessionId)
+            .findByLearningSessionIdForUpdate(request.learningSessionId())
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
     freeTalkSession.completeMemoryGeneration();
-  }
-
-  /**
-   * 장기기억 저장과 완료 상태 전환을 같은 트랜잭션에서 수행한다.
-   *
-   * @param request 장기기억 생성 문맥
-   * @param plans 후보별 저장 계획
-   * @return snapshot이 최신이어서 저장과 완료를 수행했으면 STORED, 아니면 STALE
-   */
-  @Transactional
-  public ConversationMemoryWriteService.PersistenceResult persistAndComplete(
-      ConversationMemoryGenerationRequest request, List<ConversationMemoryResolutionPlan> plans) {
-    ConversationMemoryWriteService.PersistenceResult result =
-        memoryWriteService.persistIfSnapshotCurrent(request.userProfileId(), plans);
-    if (result == ConversationMemoryWriteService.PersistenceResult.STORED) {
-      complete(request.learningSessionId());
-    }
-    return result;
+    followUpService.record(
+        request.userProfileId(),
+        freeTalkSession.getId(),
+        planning.followUp(),
+        persistence.savedMemoryIdsByPlanIndex());
+    return persistence.result();
   }
 
   /**

@@ -16,10 +16,11 @@ import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemo
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
 import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
-import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpContext;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
@@ -129,11 +130,11 @@ class FreeTalkMemoryGenerationServiceTest {
 
     generationService.generate(LEARNING_SESSION_ID);
 
-    ArgumentCaptor<List<ConversationMemoryResolutionPlan>> plans =
-        ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<ConversationMemoryPlanningResult> planning =
+        ArgumentCaptor.forClass(ConversationMemoryPlanningResult.class);
     verify(contextService)
-        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), plans.capture());
-    assertThat(plans.getValue()).isEmpty();
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), planning.capture());
+    assertThat(planning.getValue().plans()).isEmpty();
     verify(aiClient, never()).resolveMemory(any());
     verify(contextService, never()).fail(anyLong());
   }
@@ -150,11 +151,11 @@ class FreeTalkMemoryGenerationServiceTest {
 
     generationService.generate(LEARNING_SESSION_ID);
 
-    ArgumentCaptor<List<ConversationMemoryResolutionPlan>> plans =
-        ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<ConversationMemoryPlanningResult> planning =
+        ArgumentCaptor.forClass(ConversationMemoryPlanningResult.class);
     verify(contextService)
-        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), plans.capture());
-    assertThat(plans.getValue())
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), planning.capture());
+    assertThat(planning.getValue().plans())
         .singleElement()
         .satisfies(
             plan -> {
@@ -165,6 +166,34 @@ class FreeTalkMemoryGenerationServiceTest {
               assertThat(plan.memory().characterId()).isEqualTo("chloe");
             });
     verify(aiClient, never()).resolveMemory(any());
+  }
+
+  @DisplayName("AI가 준 후속 질문을 저장 계획과 함께 저장 단계로 넘긴다.")
+  @Test
+  void passesFollowUpQuestionToPersistenceWithItsPlans() {
+    AiMemoryCandidatesResult.Candidate candidate = candidate(0, USER_MESSAGE_ID, "user fact");
+    when(aiClient.extractMemoryCandidates(any()))
+        .thenReturn(
+            new AiMemoryCandidatesResult(
+                "extractor-v1",
+                List.of(candidate),
+                new AiMemoryCandidatesResult.FollowUpQuestion(
+                    null, 0, "CONCERN", "면접 준비는 어떻게 됐어?", "다음엔 그 얘기 하자.")));
+    when(searchRepository.searchActiveComparable(
+            any(), eq(USER_PROFILE_ID), eq("chloe"), eq(ConversationMemoryType.EVENT), eq(3)))
+        .thenReturn(List.of());
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    ArgumentCaptor<ConversationMemoryPlanningResult> planning =
+        ArgumentCaptor.forClass(ConversationMemoryPlanningResult.class);
+    verify(contextService)
+        .persistAndComplete(any(ConversationMemoryGenerationRequest.class), planning.capture());
+    assertThat(planning.getValue().plans()).hasSize(1);
+    assertThat(planning.getValue().followUp())
+        .isEqualTo(
+            new ConversationMemoryFollowUpDraft(
+                null, 0, "CONCERN", "면접 준비는 어떻게 됐어?", "다음엔 그 얘기 하자."));
   }
 
   @DisplayName("후보가 여러 개면 비교 기억이 없어도 모든 후보의 충돌을 해결한다.")
