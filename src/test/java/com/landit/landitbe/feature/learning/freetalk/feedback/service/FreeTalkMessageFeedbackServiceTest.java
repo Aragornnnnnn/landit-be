@@ -16,11 +16,15 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMes
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /** 프리톡 턴 교정의 준비·확정·조회 경계를 검증한다. */
@@ -80,14 +84,20 @@ class FreeTalkMessageFeedbackServiceTest {
     verify(repository, never()).save(any());
   }
 
-  @DisplayName("교정 판정은 준비 상태 조건의 한 갱신으로 문장 값과 함께 반영한다.")
+  @DisplayName("교정 판정은 준비 상태 조건의 한 갱신으로 문장과 근거 기억 값을 함께 반영한다.")
   @Test
   void completesCorrectionInOneConditionalUpdate() {
     service.completeIfPreparing(
         7L,
         FreeTalkTurnCorrection.completed(
             new FreeTalkTurnCorrection.Sentence(
-                "I go.", "I went.", "과거예요.", FreeTalkMistakePattern.TENSE),
+                "at a gym",
+                "at the gym",
+                "둘 다 아는 곳이에요.",
+                FreeTalkMistakePattern.ARTICLE,
+                42L,
+                LocalDate.of(2026, 9, 13),
+                "헬스장"),
             false));
 
     verify(repository)
@@ -95,10 +105,13 @@ class FreeTalkMessageFeedbackServiceTest {
             7L,
             ProcessingStatus.COMPLETED,
             false,
-            "I go.",
-            "I went.",
-            "과거예요.",
-            FreeTalkMistakePattern.TENSE,
+            "at a gym",
+            "at the gym",
+            "둘 다 아는 곳이에요.",
+            FreeTalkMistakePattern.ARTICLE,
+            42L,
+            LocalDate.of(2026, 9, 13),
+            "헬스장",
             ProcessingStatus.PREPARING);
   }
 
@@ -109,7 +122,40 @@ class FreeTalkMessageFeedbackServiceTest {
 
     verify(repository)
         .updateIfPreparing(
-            7L, ProcessingStatus.FAILED, null, null, null, null, null, ProcessingStatus.PREPARING);
+            7L,
+            ProcessingStatus.FAILED,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            ProcessingStatus.PREPARING);
+  }
+
+  @DisplayName("근거 기억 값이 어긋난 행은 교정은 내려주되 근거 기억만 빼고 경고를 남긴다.")
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void dropsOnlyInconsistentStoredMemoryWhenReading(CapturedOutput output) {
+    FreeTalkMessageFeedback broken = FreeTalkMessageFeedback.preparing(7L, 3L);
+    ReflectionTestUtils.setField(broken, "processingStatus", ProcessingStatus.COMPLETED);
+    ReflectionTestUtils.setField(broken, "originalSentence", "at a gym");
+    ReflectionTestUtils.setField(broken, "betterSentence", "at the gym");
+    ReflectionTestUtils.setField(broken, "reason", "둘 다 아는 곳이에요.");
+    ReflectionTestUtils.setField(broken, "mistakePattern", FreeTalkMistakePattern.ARTICLE);
+    ReflectionTestUtils.setField(broken, "memoryId", 42L);
+    when(repository.findBySessionHistoryId(3L)).thenReturn(List.of(broken));
+
+    FreeTalkTurnCorrection correction = service.findBySessionHistoryId(3L).get(7L);
+
+    assertThat(correction.sentence().betterSentence()).isEqualTo("at the gym");
+    assertThat(correction.sentence().usedMemoryId()).isNull();
+    assertThat(correction.sentence().memoryObservedOn()).isNull();
+    assertThat(output.getOut())
+        .contains("reason=inconsistent_stored_memory")
+        .contains("messageId=7");
   }
 
   @DisplayName("대화 기록의 교정을 사용자 발화 ID로 묶어 돌려준다.")
