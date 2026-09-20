@@ -587,7 +587,9 @@ public class FreeTalkSubmittedMessageService {
                     message.getTurnNumber(),
                     message.getRole().name(),
                     message.getContent(),
-                    message.getTranslatedContent()))
+                    message.getTranslatedContent(),
+                    null,
+                    message.getMessageSequence()))
         .toList();
   }
 

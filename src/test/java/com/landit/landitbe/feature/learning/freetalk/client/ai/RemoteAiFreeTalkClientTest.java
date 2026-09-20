@@ -65,6 +65,14 @@ class RemoteAiFreeTalkClientTest {
   }
 
   @Test
+  void doesNotSendInternalMessageSequenceToAi() {
+    String json =
+        jsonMapper.writeValueAsString(
+            new AiConversationHistoryMessage(101L, 1, "USER", "Hello", null, null, 30));
+    assertThat(json).doesNotContain("messageSequence");
+  }
+
+  @Test
   void preservesContextLengthErrorFromAi() {
     server.createContext(
         "/api/v1/free-talk/turn",
