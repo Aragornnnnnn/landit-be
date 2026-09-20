@@ -43,6 +43,7 @@ public class FreeTalkContextSummaryService {
   private static final JsonMapper SOURCE_MAPPER = JsonMapper.builder().build();
   private final TransactionTemplate transactionTemplate;
   private final FreeTalkContextExecutionService executor;
+  private final FreeTalkContextLifecycleService lifecycle;
 
   /**
    * 요약 저장소와 원문 조회·AI 호출 의존성을 구성한다.
@@ -53,6 +54,7 @@ public class FreeTalkContextSummaryService {
    * @param properties 요약 정책 설정
    * @param transactionManager 요약 선점과 저장 트랜잭션 관리자
    * @param taskExecutor best-effort 요약 작업 실행기
+   * @param lifecycle 사용자와 세션의 유효성 잠금 서비스
    */
   public FreeTalkContextSummaryService(
       FreeTalkContextSummaryRepository repository,
@@ -60,13 +62,15 @@ public class FreeTalkContextSummaryService {
       AiFreeTalkClient aiFreeTalkClient,
       FreeTalkContextProperties properties,
       org.springframework.transaction.PlatformTransactionManager transactionManager,
-      FreeTalkContextExecutionService taskExecutor) {
+      FreeTalkContextExecutionService taskExecutor,
+      FreeTalkContextLifecycleService lifecycle) {
     this.repository = repository;
     this.conversationMessageService = conversationMessageService;
     this.aiFreeTalkClient = aiFreeTalkClient;
     this.properties = properties;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.executor = taskExecutor;
+    this.lifecycle = lifecycle;
   }
 
   /**
@@ -136,6 +140,13 @@ public class FreeTalkContextSummaryService {
       FreeTalkMessageReservation reservation, List<SessionHistoryMessageSnapshot> messages) {
     return transactionTemplate.execute(
         status -> {
+          if (!eligible(reservation.userId())
+              || !lifecycle.lockActive(
+                  reservation.userId(),
+                  reservation.learningSessionId(),
+                  reservation.freeTalkSessionId())) {
+            return null;
+          }
           FreeTalkContextSummary state =
               repository.findByIdForUpdate(reservation.freeTalkSessionId()).orElse(null);
           if (state == null) {
@@ -169,7 +180,8 @@ public class FreeTalkContextSummaryService {
                   "Asia/Seoul",
                   source.stream().map(this::toSourceMessage).toList());
           return new PendingSummary(
-              reservation.freeTalkSessionId(), token, state.getRevision(), request);
+              reservation.freeTalkSessionId(), token, state.getRevision(), request,
+              reservation.userId(), reservation.learningSessionId());
         });
   }
 
@@ -180,17 +192,30 @@ public class FreeTalkContextSummaryService {
       return;
     }
     transactionTemplate.executeWithoutResult(
-        status ->
-            repository
-                .findByIdForUpdate(pending.sessionId())
-                .filter(state -> state.ownsLease(pending.leaseToken(), repository.currentTime()))
-                .ifPresent(
-                    state -> {
-                      state.complete(
-                          OBJECT_MAPPER.valueToTree(result.summary()),
-                          result.coveredThroughSequence());
-                      repository.save(state);
-                    }));
+        status -> {
+          if (!eligible(pending.userId())
+              || !lifecycle.lockActive(
+                  pending.userId(), pending.learningSessionId(), pending.sessionId())) {
+            return;
+          }
+          repository
+              .findByIdForUpdate(pending.sessionId())
+              .filter(state -> current(pending, state))
+              .ifPresent(
+                  state -> {
+                    state.complete(
+                        OBJECT_MAPPER.valueToTree(result.summary()),
+                        pending.request().targetThroughSequence());
+                    repository.save(state);
+                  });
+        });
+  }
+
+  private boolean current(PendingSummary pending, FreeTalkContextSummary state) {
+    return state.ownsLease(pending.leaseToken(), repository.currentTime())
+        && state.getRevision() == pending.revision()
+        && state.getPolicyVersion().equals(pending.request().policyVersion())
+        && state.getCoveredThroughSequence() == pending.request().coveredThroughSequence();
   }
 
   private boolean compatible(PendingSummary pending, AiFreeTalkContextSummaryResult result) {
@@ -207,7 +232,7 @@ public class FreeTalkContextSummaryService {
         status ->
             repository
                 .findByIdForUpdate(pending.sessionId())
-                .filter(state -> state.ownsLease(pending.leaseToken(), repository.currentTime()))
+                .filter(state -> current(pending, state))
                 .ifPresent(
                     state ->
                         state.defer(
@@ -284,5 +309,6 @@ public class FreeTalkContextSummaryService {
   }
 
   private record PendingSummary(
-      long sessionId, String leaseToken, int revision, AiFreeTalkContextSummaryRequest request) {}
+      long sessionId, String leaseToken, int revision, AiFreeTalkContextSummaryRequest request,
+      long userId, long learningSessionId) {}
 }
