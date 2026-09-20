@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.memory.retrieval.repository;
 
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
 import java.util.ArrayList;
@@ -76,6 +78,47 @@ public class FreeTalkMemoryRetrievalTraceRepository {
           match.distance(),
           policyVersion);
     }
+  }
+
+  /**
+   * 세션 시작 단계들에서 이미 검색해 AI에 제공했던 기억을 가까운 순으로 다시 읽는다.
+   *
+   * <p>새로 검색하지 않는다. 다른 사용자의 기억이나 그사이 비활성화된 기억은 제외한다.
+   *
+   * @param sessionId 프리톡 세션 ID
+   * @param userProfileId 세션 소유 사용자 프로필 ID
+   * @param limit 돌려줄 최대 기억 수
+   * @return 같은 기억이 여러 단계에 있어도 한 번만 담은 기억 문맥 목록
+   */
+  public List<AiFreeTalkMemoryContext> findRetrievedContexts(
+      long sessionId, long userProfileId, int limit) {
+    return jdbcTemplate.query(
+        """
+        SELECT cm.id, cm.memory_type, cm.content, cm.valid_from, cm.valid_to, cm.observed_at
+        FROM conversation_memory cm
+        JOIN (
+            SELECT memory_id, MIN(distance) AS best_distance
+            FROM free_talk_memory_retrieval
+            WHERE free_talk_session_id = ?
+              AND memory_id IS NOT NULL
+              AND retrieval_stage IN ('OPENING', 'FIRST_USER_TURN')
+            GROUP BY memory_id
+        ) retrieved ON retrieved.memory_id = cm.id
+        WHERE cm.user_profile_id = ? AND cm.status = 'ACTIVE'
+        ORDER BY retrieved.best_distance, cm.id
+        LIMIT ?
+        """,
+        (resultSet, rowNumber) ->
+            new AiFreeTalkMemoryContext(
+                resultSet.getLong("id"),
+                ConversationMemoryType.valueOf(resultSet.getString("memory_type")),
+                resultSet.getString("content"),
+                ConversationMemorySearchSupport.toLocalDateTime(resultSet, "valid_from"),
+                ConversationMemorySearchSupport.toLocalDateTime(resultSet, "valid_to"),
+                ConversationMemorySearchSupport.toLocalDateTime(resultSet, "observed_at")),
+        sessionId,
+        userProfileId,
+        limit);
   }
 
   /**

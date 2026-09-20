@@ -76,7 +76,8 @@ public record FreeTalkSessionDetailResponse(
    * @param betterSentence 더 자연스러운 문장
    * @param reason 기준 언어로 쓴 이유 한 줄
    * @param mistakePattern 실수 패턴 코드. 화면에 노출하지 않는 참고 값
-   * @param memoryTag 장기기억을 근거로 교정했을 때의 태그 문구. 아직 생성하지 않아 항상 null
+   * @param memoryTag 장기기억을 근거로 교정했을 때의 태그 문구("9/13 스몰톡에서 말한 헬스장"). 라벨이 없으면 "9/13 스몰톡에서 말한 내용"이다.
+   *     기억을 근거로 쓰지 않은 교정은 null. 교정과 함께 저장한 값이라 그 기억이 나중에 바뀌어도 달라지지 않는다
    */
   public record Correction(
       String originalSentence,

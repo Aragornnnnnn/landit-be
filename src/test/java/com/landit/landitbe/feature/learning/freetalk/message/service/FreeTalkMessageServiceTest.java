@@ -202,6 +202,89 @@ class FreeTalkMessageServiceTest {
     verify(turnResultService).complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
   }
 
+  @DisplayName("일반 턴의 속마음 요청에 세션에서 이미 검색한 기억을 새 검색 없이 싣는다.")
+  @Test
+  void sendsAlreadyRetrievedMemoriesWithInnerThoughtRequest() {
+    List<AiFreeTalkMemoryContext> retrieved =
+        List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
+    when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation());
+    when(aiFreeTalkClient.generateTurn(any())).thenReturn(turnResult());
+    when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+    when(aiFreeTalkClient.generateInnerThought(any()))
+        .thenReturn(
+            new AiFreeTalkInnerThoughtResult(
+                "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true)));
+
+    service.submit(1L, 300L, request());
+
+    verify(aiFreeTalkClient)
+        .generateInnerThought(argThat(request -> request.memoryContext().equals(retrieved)));
+  }
+
+  @DisplayName("속마음 요청의 기억은 이 턴의 기억 검색보다 먼저 읽는다. 사용자가 먼저 말을 건 세션의 첫 턴은 빈 문맥으로 나간다.")
+  @Test
+  void readsCorrectionMemoryBeforeTheTurnRetrievesItsOwn() {
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation());
+    when(memoryRetrievalService.retrieve(any()))
+        .thenReturn(
+            new MemoryRetrievalResult(
+                30L,
+                MemoryRetrievalStage.FIRST_USER_TURN,
+                List.of(new AiFreeTalkMemoryContext(11L, ConversationMemoryType.EVENT, "hiking")),
+                true));
+    when(aiFreeTalkClient.generateTurn(any())).thenReturn(turnResult());
+    when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+    when(aiFreeTalkClient.generateInnerThought(any()))
+        .thenReturn(
+            new AiFreeTalkInnerThoughtResult(
+                "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true)));
+
+    service.submit(1L, 300L, request());
+
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(memoryRetrievalService);
+    order.verify(memoryRetrievalService).retrievedContexts(30L, 1L);
+    order.verify(memoryRetrievalService).retrieve(any());
+    verify(aiFreeTalkClient)
+        .generateInnerThought(argThat(request -> request.memoryContext().isEmpty()));
+  }
+
+  @DisplayName("기억 문맥을 읽다 실패해도 예약을 되돌린다.")
+  @Test
+  void compensatesReservationWhenReadingCorrectionMemoryFails() {
+    FreeTalkMessageReservation reservation = reservation();
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation);
+    when(memoryRetrievalService.retrievedContexts(30L, 1L))
+        .thenThrow(new IllegalStateException("unexpected"));
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.submit(1L, 300L, request()))
+        .isInstanceOf(IllegalStateException.class);
+
+    verify(submittedMessageService).compensate(reservation);
+  }
+
+  @DisplayName("종료 선택 뒤의 속마음 요청에도 세션에서 이미 검색한 기억을 싣는다.")
+  @Test
+  void sendsAlreadyRetrievedMemoriesWithInnerThoughtRequestAfterExitDecision() {
+    List<AiFreeTalkMemoryContext> retrieved =
+        List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
+    when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(submittedMessageService.reserveDecision(
+            any(Long.class), any(Long.class), any(Long.class), any()))
+        .thenReturn(decisionReservation());
+    when(aiFreeTalkClient.generateClosing(any())).thenReturn(closingResult());
+    when(submittedMessageService.finalizeEnd(any(), any())).thenReturn(completedResponse());
+
+    service.decideExit(1L, 300L, new FreeTalkExitDecisionRequest(7L, FreeTalkExitDecision.END));
+
+    verify(aiFreeTalkClient)
+        .generateInnerThought(argThat(request -> request.memoryContext().equals(retrieved)));
+    verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
+  }
+
   @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")
   @Test
   void logsFailedInnerThoughtGenerationAsStructuredError() {
