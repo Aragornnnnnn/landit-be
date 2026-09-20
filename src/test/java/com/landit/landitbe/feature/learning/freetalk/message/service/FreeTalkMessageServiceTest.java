@@ -161,6 +161,7 @@ class FreeTalkMessageServiceTest {
     ArgumentCaptor<AiFreeTalkTurnRequest> captor =
         ArgumentCaptor.forClass(AiFreeTalkTurnRequest.class);
     verify(aiFreeTalkClient).generateTurn(captor.capture());
+    verify(contextSummaryService, times(1)).snapshot(1L, 30L);
     assertThat(captor.getValue().conversationHistory())
         .extracting(AiConversationHistoryMessage::messageId)
         .containsExactly(104L, 105L, 106L);

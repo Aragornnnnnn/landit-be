@@ -123,7 +123,10 @@ public class FreeTalkMessageService {
         submittedMessageService.reserve(userId, learningSessionId, request);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
-      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
+      AiFreeTalkContextWindow context =
+          contextWindow(
+              reservation.userId(), reservation.freeTalkSessionId(), reservation.history());
+      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation, context);
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
       if (reservation.dailyLimitReached()) {
@@ -131,9 +134,10 @@ public class FreeTalkMessageService {
             submittedMessageService.finalizeTimeLimit(
                 reservation,
                 aiFreeTalkClient.generateClosing(
-                    closingRequest(reservation, AiFreeTalkClosingReason.TIME_LIMIT_REACHED)));
+                    closingRequest(
+                        reservation, AiFreeTalkClosingReason.TIME_LIMIT_REACHED, context)));
       } else {
-        response = processRegularTurn(reservation);
+        response = processRegularTurn(reservation, context);
       }
       if (response.turnStatus()
           != com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus
@@ -152,10 +156,11 @@ public class FreeTalkMessageService {
   }
 
   /** 일반 턴에서 첫 사용자 기억 조회, AI 생성, 저장, 사용 trace를 순서대로 처리한다. */
-  private FreeTalkMessageSubmitResponse processRegularTurn(FreeTalkMessageReservation reservation) {
+  private FreeTalkMessageSubmitResponse processRegularTurn(
+      FreeTalkMessageReservation reservation, AiFreeTalkContextWindow context) {
     MemoryRetrievalResult memoryResult = retrieveFirstUserMemory(reservation);
     AiFreeTalkTurnResult turnResult =
-        generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult);
+        generateTurn(reservation, AiFreeTalkResponseMode.NORMAL, memoryResult, context);
     FreeTalkMessageSubmitResponse response =
         submittedMessageService.finalizeTurn(reservation, turnResult);
     recordMemoryUsage(memoryResult, turnResult, response);
@@ -206,9 +211,12 @@ public class FreeTalkMessageService {
       FreeTalkExitDecisionReservation reservation) {
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
-      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
+      AiFreeTalkContextWindow context =
+          contextWindow(
+              reservation.userId(), reservation.freeTalkSessionId(), reservation.history());
+      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation, context);
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
-      FreeTalkMessageSubmitResponse response = finalizeDecision(reservation);
+      FreeTalkMessageSubmitResponse response = finalizeDecision(reservation, context);
       recordInnerThought(innerThoughtRequest, innerThoughtFuture);
       dispatchIfCompleted(response);
       return response;
@@ -221,27 +229,28 @@ public class FreeTalkMessageService {
 
   /** 종료 선택에 따라 END 또는 CONTINUE의 상태 확정 경계를 선택한다. */
   private FreeTalkMessageSubmitResponse finalizeDecision(
-      FreeTalkExitDecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation, AiFreeTalkContextWindow context) {
     if (reservation.decision() == FreeTalkExitDecision.END) {
-      return finalizeEndDecision(reservation);
+      return finalizeEndDecision(reservation, context);
     }
-    return finalizeContinueDecision(reservation);
+    return finalizeContinueDecision(reservation, context);
   }
 
   /** END 선택은 closing AI 응답과 완료 확정을 한 경계에서 처리한다. */
   private FreeTalkMessageSubmitResponse finalizeEndDecision(
-      FreeTalkExitDecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation, AiFreeTalkContextWindow context) {
     AiFreeTalkClosingRequest closingRequest =
-        closingRequestForDecision(reservation, AiFreeTalkClosingReason.USER_CONFIRMED);
+        closingRequestForDecision(reservation, AiFreeTalkClosingReason.USER_CONFIRMED, context);
     AiFreeTalkClosingResult closingResult = aiFreeTalkClient.generateClosing(closingRequest);
     return submittedMessageService.finalizeEnd(reservation, closingResult);
   }
 
   /** CONTINUE 선택은 후속 turn AI 응답과 진행 확정을 한 경계에서 처리한다. */
   private FreeTalkMessageSubmitResponse finalizeContinueDecision(
-      FreeTalkExitDecisionReservation reservation) {
+      FreeTalkExitDecisionReservation reservation, AiFreeTalkContextWindow context) {
     AiFreeTalkTurnRequest turnRequest =
-        turnRequestForDecision(reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED);
+        turnRequestForDecision(
+            reservation, AiFreeTalkResponseMode.CONTINUE_AFTER_EXIT_DECLINED, context);
     AiFreeTalkTurnResult turnResult = aiFreeTalkClient.generateTurn(turnRequest);
     return submittedMessageService.finalizeContinue(reservation, turnResult);
   }
@@ -249,9 +258,8 @@ public class FreeTalkMessageService {
   private AiFreeTalkTurnRequest turnRequest(
       FreeTalkMessageReservation reservation,
       AiFreeTalkResponseMode responseMode,
-      List<AiFreeTalkMemoryContext> memoryContext) {
-    AiFreeTalkContextWindow context =
-        contextWindow(reservation.userId(), reservation.freeTalkSessionId());
+      List<AiFreeTalkMemoryContext> memoryContext,
+      AiFreeTalkContextWindow context) {
     return new AiFreeTalkTurnRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -303,10 +311,12 @@ public class FreeTalkMessageService {
   private AiFreeTalkTurnResult generateTurn(
       FreeTalkMessageReservation reservation,
       AiFreeTalkResponseMode responseMode,
-      MemoryRetrievalResult memoryResult) {
+      MemoryRetrievalResult memoryResult,
+      AiFreeTalkContextWindow context) {
     List<AiFreeTalkMemoryContext> memoryContext =
         memoryResult == null ? List.of() : memoryResult.contexts();
-    return aiFreeTalkClient.generateTurn(turnRequest(reservation, responseMode, memoryContext));
+    return aiFreeTalkClient.generateTurn(
+        turnRequest(reservation, responseMode, memoryContext, context));
   }
 
   /** 완료 응답만 후속 표현·장기기억 생성을 등록해 중간 응답을 재처리하지 않는다. */
@@ -329,9 +339,9 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkClosingRequest closingRequest(
-      FreeTalkMessageReservation reservation, AiFreeTalkClosingReason closingReason) {
-    AiFreeTalkContextWindow context =
-        contextWindow(reservation.userId(), reservation.freeTalkSessionId());
+      FreeTalkMessageReservation reservation,
+      AiFreeTalkClosingReason closingReason,
+      AiFreeTalkContextWindow context) {
     return new AiFreeTalkClosingRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -349,9 +359,9 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkTurnRequest turnRequestForDecision(
-      FreeTalkExitDecisionReservation reservation, AiFreeTalkResponseMode responseMode) {
-    AiFreeTalkContextWindow context =
-        contextWindow(reservation.userId(), reservation.freeTalkSessionId());
+      FreeTalkExitDecisionReservation reservation,
+      AiFreeTalkResponseMode responseMode,
+      AiFreeTalkContextWindow context) {
     return new AiFreeTalkTurnRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -370,9 +380,9 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkClosingRequest closingRequestForDecision(
-      FreeTalkExitDecisionReservation reservation, AiFreeTalkClosingReason closingReason) {
-    AiFreeTalkContextWindow context =
-        contextWindow(reservation.userId(), reservation.freeTalkSessionId());
+      FreeTalkExitDecisionReservation reservation,
+      AiFreeTalkClosingReason closingReason,
+      AiFreeTalkContextWindow context) {
     return new AiFreeTalkClosingRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -390,9 +400,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
-      FreeTalkMessageReservation reservation) {
-    AiFreeTalkContextWindow context =
-        contextWindow(reservation.userId(), reservation.freeTalkSessionId());
+      FreeTalkMessageReservation reservation, AiFreeTalkContextWindow context) {
     return new AiFreeTalkInnerThoughtRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -408,9 +416,7 @@ public class FreeTalkMessageService {
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
-      FreeTalkExitDecisionReservation reservation) {
-    AiFreeTalkContextWindow context =
-        contextWindow(reservation.userId(), reservation.freeTalkSessionId());
+      FreeTalkExitDecisionReservation reservation, AiFreeTalkContextWindow context) {
     return new AiFreeTalkInnerThoughtRequest(
         reservation.freeTalkSessionId(),
         reservation.characterId(),
@@ -425,10 +431,24 @@ public class FreeTalkMessageService {
         context.historyIncomplete());
   }
 
-  private AiFreeTalkContextWindow contextWindow(long userId, long freeTalkSessionId) {
-    return contextSummaryService == null
-        ? AiFreeTalkContextWindow.disabled()
-        : contextSummaryService.snapshot(userId, freeTalkSessionId);
+  private AiFreeTalkContextWindow contextWindow(
+      long userId, long freeTalkSessionId, List<AiConversationHistoryMessage> history) {
+    AiFreeTalkContextWindow context =
+        contextSummaryService == null
+            ? AiFreeTalkContextWindow.disabled()
+            : contextSummaryService.snapshot(userId, freeTalkSessionId);
+    if (context.sessionSummary() == null) {
+      return context;
+    }
+    int covered = context.sessionSummary().coveredThroughSequence();
+    boolean knownBoundary =
+        history.stream().allMatch(message -> message.messageSequence() != null)
+            && history.stream()
+                .anyMatch(
+                    message -> "AI".equals(message.role()) && message.messageSequence() == covered);
+    return knownBoundary
+        ? context
+        : new AiFreeTalkContextWindow(context.contextPolicyVersion(), null, false);
   }
 
   /** 실제 sequence 이후 원문과 직전 AI 질문을 보존한다. 목록 위치는 경계로 사용하지 않는다. */
