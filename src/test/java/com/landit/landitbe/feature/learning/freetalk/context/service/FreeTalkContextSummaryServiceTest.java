@@ -119,6 +119,41 @@ class FreeTalkContextSummaryServiceTest {
   }
 
   @Test
+  void expiredLeaseCannotPersist() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            inv -> {
+              AiFreeTalkContextSummaryRequest req = inv.getArgument(0);
+              state.claim(state.getLeaseToken(), now.minusSeconds(1));
+              return new AiFreeTalkContextSummaryResult(
+                  "v1",
+                  req.baseRevision(),
+                  req.targetThroughSequence(),
+                  new AiFreeTalkSessionSummaryContent("topic", List.of(), List.of(), List.of()));
+            });
+    FreeTalkMessageReservation reservation = reservation();
+    service.dispatchIfNeeded(reservation);
+    assertEquals(0, state.getRevision());
+  }
+
+  @Test
+  void staleWorkerCannotReplaceNewLease() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            call -> {
+              state.claim("newer-worker", now.plusSeconds(30));
+              return result(call.getArgument(0));
+            });
+    service.dispatchIfNeeded(reservation());
+    assertEquals(0, state.getRevision());
+    assertEquals("newer-worker", state.getLeaseToken());
+  }
+
+  @Test
   void doesNotEnrollExistingSessionOnDispatch() {
     var all = rounds(12, 10);
     when(messages.findAll(3L)).thenReturn(all);
