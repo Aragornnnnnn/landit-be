@@ -28,42 +28,45 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Long id; // 예: 9001
 
   @Column(name = "session_history_message_id", nullable = false, updatable = false)
-  private Long sessionHistoryMessageId;
+  private Long sessionHistoryMessageId; // 예: 55020 (교정 대상 USER 메시지)
 
   @Column(name = "session_history_id", nullable = false, updatable = false)
-  private Long sessionHistoryId;
+  private Long sessionHistoryId; // 예: 3100 (그 메시지가 속한 대화 기록)
 
   @Enumerated(EnumType.STRING)
   @Column(name = "processing_status", nullable = false, length = 20)
-  private ProcessingStatus processingStatus;
+  private ProcessingStatus processingStatus; // 예: COMPLETED
 
   @Column(name = "reacted_to_partner")
-  private Boolean reactedToPartner;
+  private Boolean reactedToPartner; // 예: true. 판정에 실패하면 null
 
+  // 예: "And I am doing stairs at a gym." (발화 전체가 아니라 그중 고른 한 문장)
   @Column(name = "original_sentence", columnDefinition = "text")
   private String originalSentence;
 
+  // 예: "Today it's just stairs at the gym."
   @Column(name = "better_sentence", columnDefinition = "text")
   private String betterSentence;
 
+  // 예: "9월 13일에 말한 그 헬스장이면 a gym이 아니라 the gym이에요."
   @Column(name = "reason", columnDefinition = "text")
   private String reason;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "mistake_pattern", length = 40)
-  private FreeTalkMistakePattern mistakePattern;
+  private FreeTalkMistakePattern mistakePattern; // 예: ARTICLE
 
   @Column(name = "memory_id")
-  private Long memoryId;
+  private Long memoryId; // 예: 9012. 기억을 근거로 쓰지 않았으면 null
 
   @Column(name = "memory_observed_on")
-  private LocalDate memoryObservedOn;
+  private LocalDate memoryObservedOn; // 예: 2026-09-13 (그 기억을 말한 날)
 
   @Column(name = "memory_label", length = 40)
-  private String memoryLabel;
+  private String memoryLabel; // 예: "헬스장". AI가 라벨을 못 주면 null
 
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkMessageFeedback() {}
