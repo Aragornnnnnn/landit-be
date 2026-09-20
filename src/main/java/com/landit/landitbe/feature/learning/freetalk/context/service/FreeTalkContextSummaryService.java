@@ -17,7 +17,6 @@ import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
 import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalkContextSummaryRepository;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -25,6 +24,7 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 /** 프리톡 원문을 보존한 채 파생 요약을 best-effort로 갱신한다. */
 @Slf4j
@@ -38,6 +38,7 @@ public class FreeTalkContextSummaryService {
   private final AiFreeTalkClient aiFreeTalkClient;
   private final FreeTalkContextProperties properties;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final JsonMapper SOURCE_MAPPER = JsonMapper.builder().build();
   private final TransactionTemplate transactionTemplate;
   private final FreeTalkContextExecutionService executor;
 
@@ -201,29 +202,16 @@ public class FreeTalkContextSummaryService {
 
   private List<SessionHistoryMessageSnapshot> sourceMessages(
       List<SessionHistoryMessageSnapshot> messages, FreeTalkContextSummary state) {
-    int lastSequence =
-        messages.stream()
-            .filter(message -> "AI".equals(message.getRole().name()))
-            .mapToInt(SessionHistoryMessageSnapshot::getMessageSequence)
-            .max()
-            .orElse(0);
-    int targetSequence =
-        Math.max(state.getCoveredThroughSequence(), lastSequence - properties.recentRounds() * 2);
-    List<SessionHistoryMessageSnapshot> source = new java.util.ArrayList<>();
-    int bytes = 0;
-    for (SessionHistoryMessageSnapshot message : messages) {
-      if (message.getMessageSequence() <= state.getCoveredThroughSequence()
-          || message.getMessageSequence() > targetSequence) {
-        continue;
-      }
-      int messageBytes = message.getContent().getBytes(StandardCharsets.UTF_8).length;
-      if (bytes + messageBytes > properties.summarySourceMaxBytes()) {
-        break;
-      }
-      source.add(message);
-      bytes += messageBytes;
-    }
-    return List.copyOf(source);
+    List<List<SessionHistoryMessageSnapshot>> rounds =
+        FreeTalkSummaryWindow.rounds(messages, state.getCoveredThroughSequence());
+    int count = Math.max(0, rounds.size() - properties.recentRounds());
+    return FreeTalkSummaryWindow.source(
+        rounds.subList(0, count), state.getSourceByteLimit(), this::sourceBytes);
+  }
+
+  private int sourceBytes(List<SessionHistoryMessageSnapshot> messages) {
+    return SOURCE_MAPPER.writeValueAsBytes(messages.stream().map(this::toSourceMessage).toList())
+        .length;
   }
 
   private int completedRounds(List<SessionHistoryMessageSnapshot> messages) {
