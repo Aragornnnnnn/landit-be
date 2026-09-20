@@ -4,7 +4,9 @@ package com.landit.landitbe.feature.learning.freetalk.followup.service;
 
 import com.landit.landitbe.feature.learning.freetalk.followup.domain.FreeTalkFollowUp;
 import com.landit.landitbe.feature.learning.freetalk.followup.domain.FreeTalkFollowUpTriggerType;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollowUpSummary;
 import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTalkFollowUpRepository;
+import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,28 @@ public class FreeTalkFollowUpService {
   @Transactional(readOnly = true)
   public List<Long> findUsedMemoryIds(long userProfileId) {
     return followUpRepository.findUsedMemoryIds(userProfileId);
+  }
+
+  /**
+   * 요약 화면에 보여 줄 후속 질문을 조회한다. 세션 소유권은 호출하는 쪽이 먼저 확인한다.
+   *
+   * <p>후속 질문은 세션 종료 후 장기기억 작업이 만들기 때문에, 그 작업이 아직 끝나지 않았고 질문도 없으면 기다리는 중으로 알린다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @param memoryGenerationStatus 그 세션의 장기기억 작업 상태. 작업 대상이 아니면 null
+   * @return 저장된 질문, 기다리는 중, 질문 없음 중 하나
+   */
+  @Transactional(readOnly = true)
+  public FreeTalkFollowUpSummary findSummary(
+      long freeTalkSessionId, MemoryGenerationStatus memoryGenerationStatus) {
+    return followUpRepository
+        .findByFreeTalkSessionId(freeTalkSessionId)
+        .map(FreeTalkFollowUpSummary::of)
+        .orElseGet(
+            () ->
+                memoryGenerationStatus == MemoryGenerationStatus.PREPARING
+                    ? FreeTalkFollowUpSummary.waiting()
+                    : FreeTalkFollowUpSummary.none());
   }
 
   /**
