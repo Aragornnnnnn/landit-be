@@ -120,7 +120,7 @@ class FreeTalkMessageServiceTest {
                 "v1",
                 new AiFreeTalkSessionSummary(
                     1,
-                    4,
+                    3,
                     new AiFreeTalkSessionSummaryContent("하이킹", List.of(), List.of(), List.of())),
                 false));
     when(aiFreeTalkClient.generateInnerThought(any()))
@@ -138,7 +138,7 @@ class FreeTalkMessageServiceTest {
     verify(aiFreeTalkClient).generateTurn(captor.capture());
     assertThat(captor.getValue().conversationHistory())
         .extracting(AiConversationHistoryMessage::messageId)
-        .containsExactly(105L, 106L);
+        .containsExactly(104L, 105L, 106L);
   }
 
   @DisplayName("사용자의 첫 발화에서만 기억을 조회하고 응답에서 사용한 기억을 기록한다.")
@@ -470,12 +470,14 @@ class FreeTalkMessageServiceTest {
         "KO",
         new AiFreeTalkTopic(null, "하이킹", null),
         List.of(
-            new AiConversationHistoryMessage(101L, 1, "AI", "Where did you go?", "어디 갔어?"),
-            new AiConversationHistoryMessage(102L, 1, "USER", "I went hiking.", null),
-            new AiConversationHistoryMessage(103L, 2, "AI", "Who went with you?", "누구와 갔어?"),
-            new AiConversationHistoryMessage(104L, 2, "USER", "I went with a friend.", null),
-            new AiConversationHistoryMessage(105L, 3, "AI", "That sounds fun.", "재밌겠다."),
-            new AiConversationHistoryMessage(106L, 3, "USER", "It was fun.", null)));
+            new AiConversationHistoryMessage(101L, 1, "AI", "Where did you go?", "어디 갔어?", null, 1),
+            new AiConversationHistoryMessage(102L, 1, "USER", "I went hiking.", null, null, 2),
+            new AiConversationHistoryMessage(
+                103L, 2, "AI", "Who went with you?", "누구와 갔어?", null, 3),
+            new AiConversationHistoryMessage(
+                104L, 2, "USER", "I went with a friend.", null, null, 4),
+            new AiConversationHistoryMessage(105L, 3, "AI", "That sounds fun.", "재밌겠다.", null, 5),
+            new AiConversationHistoryMessage(106L, 3, "USER", "It was fun.", null, null, 6)));
   }
 
   private FreeTalkMessageReservation timeLimitReservation() {

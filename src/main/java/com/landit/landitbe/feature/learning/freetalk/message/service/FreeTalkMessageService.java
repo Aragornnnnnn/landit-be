@@ -431,18 +431,29 @@ public class FreeTalkMessageService {
         : contextSummaryService.snapshot(userId, freeTalkSessionId);
   }
 
-  /** 확정된 요약 경계 이전 원문을 모델 요청에서 제외하고 현재 사용자 발화는 유지한다. */
+  /** 실제 sequence 이후 원문과 직전 AI 질문을 보존한다. 목록 위치는 경계로 사용하지 않는다. */
   private List<AiConversationHistoryMessage> modelHistory(
       List<AiConversationHistoryMessage> history, AiFreeTalkContextWindow context) {
-    if (context.sessionSummary() == null || history.size() <= 1) {
+    if (context.sessionSummary() == null
+        || history.size() <= 1
+        || history.stream().anyMatch(message -> message.messageSequence() == null)) {
       return history;
     }
-    int coveredThroughSequence = context.sessionSummary().coveredThroughSequence();
-    if (coveredThroughSequence <= 0) {
-      return history;
-    }
-    int firstIndex = Math.min(coveredThroughSequence, history.size() - 1);
-    return List.copyOf(history.subList(firstIndex, history.size()));
+    int covered = context.sessionSummary().coveredThroughSequence();
+    Long latestAiId =
+        history.reversed().stream()
+            .filter(message -> "AI".equals(message.role()))
+            .map(AiConversationHistoryMessage::messageId)
+            .findFirst()
+            .orElse(null);
+    Long currentId = history.getLast().messageId();
+    return history.stream()
+        .filter(
+            message ->
+                message.messageSequence() > covered
+                    || message.messageId().equals(latestAiId)
+                    || message.messageId().equals(currentId))
+        .toList();
   }
 
   private CompletableFuture<AiFreeTalkInnerThoughtResult> startInnerThought(
