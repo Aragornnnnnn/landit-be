@@ -97,6 +97,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers("/api/v1/me/alarm")
                     .authenticated()
+                    .requestMatchers("/api/v1/reviews/**")
+                    .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/learning-level")
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/learning-level")

@@ -291,6 +291,8 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | learning.scenario.session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 시나리오 실행 업무가 소유합니다. |
 | learning.scenario.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 대화/콘텐츠 테이블을 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
+| learning.review의 ExpressionReviewRepository | 학습 완료 이력·활성 콘텐츠·사용자 언어를 읽어 복습 후보를 선정합니다. 복습 스냅샷·진행·제출 테이블만 씁니다. |
+| notification.scheduled의 LearningNotificationSlotRepository | 활성 프로필을 ID 순서로 잠그고 알림 슬롯을 묶음 예약합니다. 기존 알림 상태는 읽기만 하며, 프로필 필드를 변경하지 않습니다. |
 | memory의 검색/원본 계보 저장 | 공유 DB의 기억 원본 메시지·세션 FK 관계를 유지합니다. |
 
 공통 메시지 테이블에는 시나리오 생성 선점·응답과 프리톡 처리 결과 칼럼이 남습니다. `FreeTalkTurnStatus`는 저장·응답에 사용하는 값 계약으로 conversation에 두며 종료 판단 로직은 freetalk에 둡니다. 이를 옮겼다고 테이블이 독립된 것은 아닙니다.
