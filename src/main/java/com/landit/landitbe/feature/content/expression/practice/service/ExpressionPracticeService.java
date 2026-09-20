@@ -50,11 +50,11 @@ public class ExpressionPracticeService {
   /**
    * 추가 예문 조회에 필요한 유효 예문 개수다.
    *
-   * <p>payload 순서대로 앞 2건은 눈으로 익히는 예문, 뒤 2건은 직접 푸는 작문 문제로 쓴다. 이보다 적으면 응답을 만들 수 없다.
+   * <p>payload 순서대로 앞 2건은 직접 푸는 작문 문제, 뒤 2건은 눈으로 익히는 예문으로 쓴다. 이보다 적으면 응답을 만들 수 없다.
    */
   private static final int REQUIRED_PRACTICE_SENTENCE_COUNT = 4;
 
-  /** 눈으로 익히는 예문으로 내보낼 개수다. payload의 앞에서부터 이만큼을 쓴다. */
+  /** 작문 문제와 눈으로 익히는 예문을 나누는 위치다. 앞 2건을 작문 문제로 쓴다. */
   private static final int PRACTICE_SENTENCE_COUNT = 2;
 
   private static final String NOT_ENOUGH_PRACTICE_SENTENCE_LOG =
