@@ -145,7 +145,7 @@ class FreeTalkContextPostgresTests {
       jdbc.execute("drop table if exists free_talk_context_summary");
       jdbc.execute("create table if not exists free_talk_session(id bigint primary key)");
       new ResourceDatabasePopulator(
-              new ClassPathResource("db/migration/V112__add_free_talk_context_summary.sql"))
+              new ClassPathResource("db/migration/V114__add_free_talk_context_summary.sql"))
           .execute(source);
       return source;
     }
