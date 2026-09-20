@@ -129,8 +129,9 @@ public class FreeTalkContextSummaryService {
                                   reservation.freeTalkSessionId(),
                                   "v1",
                                   properties.summarySourceMaxBytes())));
-          int completedRounds = completedRounds(messages);
-          if (completedRounds < properties.summaryTriggerRounds()
+          List<List<SessionHistoryMessageSnapshot>> rounds =
+              FreeTalkSummaryWindow.rounds(messages, state.getCoveredThroughSequence());
+          if (!shouldSummarize(rounds)
               || state.getSuspendedReason() != null
               || activeLease(state)
               || (state.getNextAttemptAt() != null
@@ -200,6 +201,14 @@ public class FreeTalkContextSummaryService {
                             LocalDateTime.now().plusSeconds(properties.retryDelaySeconds()))));
   }
 
+  private boolean shouldSummarize(List<List<SessionHistoryMessageSnapshot>> rounds) {
+    if (rounds.size() <= properties.recentRounds()) {
+      return false;
+    }
+    return rounds.size() >= properties.summaryTriggerRounds()
+        || sourceBytes(rounds.stream().flatMap(List::stream).toList()) >= 12000;
+  }
+
   private List<SessionHistoryMessageSnapshot> sourceMessages(
       List<SessionHistoryMessageSnapshot> messages, FreeTalkContextSummary state) {
     List<List<SessionHistoryMessageSnapshot>> rounds =
@@ -212,16 +221,6 @@ public class FreeTalkContextSummaryService {
   private int sourceBytes(List<SessionHistoryMessageSnapshot> messages) {
     return SOURCE_MAPPER.writeValueAsBytes(messages.stream().map(this::toSourceMessage).toList())
         .length;
-  }
-
-  private int completedRounds(List<SessionHistoryMessageSnapshot> messages) {
-    return (int)
-        messages.stream()
-            .filter(
-                message ->
-                    "USER".equals(message.getRole().name())
-                        && message.getFreeTalkTurnStatus() != null)
-            .count();
   }
 
   private AiFreeTalkContextSummarySourceMessage toSourceMessage(
