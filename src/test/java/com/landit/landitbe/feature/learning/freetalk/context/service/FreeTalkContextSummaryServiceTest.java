@@ -138,6 +138,36 @@ class FreeTalkContextSummaryServiceTest {
   }
 
   @Test
+  void sequenceGapsDoNotChangeRetainedRoundCount() {
+    var all = rounds(12, 10);
+    for (int i = 0; i < all.size(); i++) {
+      when(all.get(i).getMessageSequence()).thenReturn((i + 1) * 3);
+    }
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any())).thenAnswer(call -> result(call.getArgument(0)));
+    service.dispatchIfNeeded(reservation());
+    assertEquals(24, state.getCoveredThroughSequence());
+  }
+
+  @Test
+  void openingAndPendingUserDoNotCountAsCompletedRounds() {
+    var all = new ArrayList<>(rounds(12, 10));
+    var opening = mock(SessionHistoryMessageSnapshot.class);
+    when(opening.getMessageSequence()).thenReturn(1);
+    when(opening.getRole()).thenReturn(ConversationSpeaker.AI);
+    for (int i = 0; i < all.size(); i++) {
+      when(all.get(i).getMessageSequence()).thenReturn(i + 2);
+    }
+    all.addFirst(opening);
+    when(all.get(23).getFreeTalkTurnStatus())
+        .thenReturn(FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED);
+    var completed = FreeTalkSummaryWindow.rounds(all, 0);
+    assertEquals(11, completed.size());
+    assertEquals(3, completed.getFirst().size());
+    assertEquals(ConversationSpeaker.AI, completed.getFirst().getFirst().getRole());
+  }
+
+  @Test
   void registeredSessionHasPolicyBeforeFirstSummary() {
     when(repo.findById(30L)).thenReturn(Optional.of(state));
     assertEquals("v1", service.snapshot(1L, 30L).contextPolicyVersion());
