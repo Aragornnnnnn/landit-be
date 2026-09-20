@@ -97,6 +97,17 @@ class FreeTalkMessageServiceTest {
           memoryGenerationDispatchService,
           memoryRetrievalService);
 
+  @Test
+  void compensatesReservationWhenSummarySnapshotFails() {
+    FreeTalkMessageReservation reservation = reservation();
+    when(submittedMessageService.reserve(1L, 300L, request())).thenReturn(reservation);
+    when(contextSummaryService.snapshot(1L, 30L))
+        .thenThrow(new IllegalStateException("summary snapshot failed"));
+    assertThatThrownBy(() -> contextAwareService().submit(1L, 300L, request()))
+        .isInstanceOf(IllegalStateException.class);
+    verify(submittedMessageService).compensate(reservation);
+  }
+
   @DisplayName("확정된 요약 경계 이전 원문을 모델 요청에서 제외하고 최신 발화를 유지한다.")
   @Test
   void sendsOnlyHistoryAfterContextSummaryBoundary() {

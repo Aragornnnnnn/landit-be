@@ -121,9 +121,9 @@ public class FreeTalkMessageService {
     }
     FreeTalkMessageReservation reservation =
         submittedMessageService.reserve(userId, learningSessionId, request);
-    AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
+      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
       if (reservation.dailyLimitReached()) {
@@ -204,9 +204,9 @@ public class FreeTalkMessageService {
   /** 속마음·결정 확정·보상 순서를 한 예외 경계에서 보존한다. */
   private FreeTalkMessageSubmitResponse processExitDecision(
       FreeTalkExitDecisionReservation reservation) {
-    AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
+      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response = finalizeDecision(reservation);
       recordInnerThought(innerThoughtRequest, innerThoughtFuture);
