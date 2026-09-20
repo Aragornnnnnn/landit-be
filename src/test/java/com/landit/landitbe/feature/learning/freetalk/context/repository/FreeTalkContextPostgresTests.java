@@ -2,13 +2,19 @@
 
 package com.landit.landitbe.feature.learning.freetalk.context.repository;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,9 +69,65 @@ class FreeTalkContextPostgresTests {
   }
 
   @Test
+  void concurrentClaimWaitsAndOldTokenCannotOwnNewLease() throws Exception {
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch secondStarted = new CountDownLatch(1);
+    try (var workers = Executors.newFixedThreadPool(2)) {
+      var first =
+          workers.submit(
+              () ->
+                  new TransactionTemplate(manager)
+                      .executeWithoutResult(
+                          status -> {
+                            var state = repository.findByIdForUpdate(30L).orElseThrow();
+                            state.claim("first", repository.currentTime().plusSeconds(30));
+                            locked.countDown();
+                            await(release);
+                          }));
+      try {
+        assertTrue(locked.await(5, TimeUnit.SECONDS));
+        var second =
+            workers.submit(
+                () ->
+                    new TransactionTemplate(manager)
+                        .execute(
+                            status -> {
+                              secondStarted.countDown();
+                              var state = repository.findByIdForUpdate(30L).orElseThrow();
+                              return state.ownsLease("first", repository.currentTime());
+                            }));
+        assertTrue(secondStarted.await(5, TimeUnit.SECONDS));
+        assertThrows(TimeoutException.class, () -> second.get(150, TimeUnit.MILLISECONDS));
+        release.countDown();
+        first.get(5, TimeUnit.SECONDS);
+        assertEquals(Boolean.TRUE, second.get(5, TimeUnit.SECONDS));
+      } finally {
+        release.countDown();
+      }
+    }
+    new TransactionTemplate(manager)
+        .executeWithoutResult(
+            status -> {
+              var state = repository.findByIdForUpdate(30L).orElseThrow();
+              state.claim("second", repository.currentTime().plusSeconds(30));
+              assertFalse(state.ownsLease("first", repository.currentTime()));
+            });
+  }
+
+  @Test
   void deletingSessionCascadesSummary() {
     new JdbcTemplate(dataSource).update("delete from free_talk_session where id=30");
     assertTrue(repository.findById(30L).isEmpty());
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(5, TimeUnit.SECONDS));
+    } catch (InterruptedException error) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(error);
+    }
   }
 
   @Configuration
