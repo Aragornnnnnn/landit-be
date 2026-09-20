@@ -64,6 +64,29 @@ class RemoteAiFreeTalkClientTest {
     server.stop(0);
   }
 
+  @Test
+  void preservesContextLengthErrorFromAi() {
+    server.createContext(
+        "/api/v1/free-talk/turn",
+        exchange -> {
+          byte[] body =
+              "{\"success\":false,\"error\":{\"code\":\"FREE_TALK_CONTEXT_TOO_LARGE\"}}"
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(400, body.length);
+          try (var output = exchange.getResponseBody()) {
+            output.write(body);
+          }
+        });
+    assertThatThrownBy(() -> remoteClient().generateTurn(turnRequest()))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            error -> {
+              ApiException exception = (ApiException) error;
+              assertThat(exception.getErrorCode().name()).isEqualTo("FREE_TALK_CONTEXT_TOO_LARGE");
+              assertThat(exception.getErrorCode().getStatus().value()).isEqualTo(400);
+            });
+  }
+
   @DisplayName("프리톡 시작 요청의 주제와 이름 제외 계약을 전송하고 감정을 변환한다.")
   @Test
   void postsOpeningContractAndMapsResponse() throws Exception {
