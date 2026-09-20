@@ -119,6 +119,22 @@ class FreeTalkContextSummaryServiceTest {
   }
 
   @Test
+  void oversizedMinimumPairSuspendsAfterAiRejection() {
+    when(ai.generateContextSummary(any()))
+        .thenThrow(
+            new com.landit.landitbe.shared.exception.ApiException(
+                com.landit.landitbe.shared.exception.ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE));
+    List<SessionHistoryMessageSnapshot> all = rounds(12, 6001);
+    when(messages.findAll(3L)).thenReturn(all);
+    FreeTalkMessageReservation reservation = reservation();
+    service.dispatchIfNeeded(reservation);
+    service.dispatchIfNeeded(reservation);
+    verify(ai, times(1)).generateContextSummary(any());
+    assertEquals(0, state.getCoveredThroughSequence());
+    assertEquals("OVERSIZED_UNIT", state.getSuspendedReason());
+  }
+
+  @Test
   void expiredLeaseCannotPersist() {
     var all = rounds(12, 10);
     when(messages.findAll(3L)).thenReturn(all);
