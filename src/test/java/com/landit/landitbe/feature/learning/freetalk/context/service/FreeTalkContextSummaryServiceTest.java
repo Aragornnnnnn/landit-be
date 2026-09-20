@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.freetalk.context.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -238,6 +239,30 @@ class FreeTalkContextSummaryServiceTest {
     when(repo.findById(30L)).thenReturn(Optional.of(state));
     assertEquals("v1", service.snapshot(1L, 30L).contextPolicyVersion());
     assertNull(service.snapshot(1L, 30L).sessionSummary());
+  }
+
+  @Test
+  void inputOverflowReducesNextAttemptAndHonorsRetryDelay() {
+    var all = rounds(12, 100);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenThrow(
+            new com.landit.landitbe.shared.exception.ApiException(
+                com.landit.landitbe.shared.exception.ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE));
+    service.dispatchIfNeeded(reservation());
+    assertTrue(state.getSourceByteLimit() < 3000);
+    assertEquals(now.plusSeconds(30), state.getNextAttemptAt());
+    service.dispatchIfNeeded(reservation());
+    verify(ai, times(1)).generateContextSummary(any());
+    when(repo.currentTime()).thenReturn(now.plusSeconds(31));
+    doAnswer(call -> result(call.getArgument(0))).when(ai).generateContextSummary(any());
+    service.dispatchIfNeeded(reservation());
+    var captured = org.mockito.ArgumentCaptor.forClass(AiFreeTalkContextSummaryRequest.class);
+    verify(ai, times(2)).generateContextSummary(captured.capture());
+    assertTrue(
+        captured.getAllValues().get(1).sourceMessages().size()
+            < captured.getAllValues().get(0).sourceMessages().size());
+    assertEquals(6000, state.getSourceByteLimit());
   }
 
   private AiFreeTalkContextSummaryResult result(AiFreeTalkContextSummaryRequest request) {
