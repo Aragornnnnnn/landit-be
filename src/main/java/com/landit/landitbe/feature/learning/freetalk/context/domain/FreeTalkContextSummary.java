@@ -75,7 +75,8 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
   }
 
   /** 요약 결과를 자신의 선점 범위에서만 확정한다. */
-  public void complete(JsonNode content, int coveredThroughSequence) {
+  public void complete(JsonNode content, int coveredThroughSequence, int defaultByteLimit) {
+    sourceByteLimit = defaultByteLimit;
     summaryContent = content;
     this.coveredThroughSequence = coveredThroughSequence;
     revision++;
@@ -90,6 +91,17 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
     this.nextAttemptAt = nextAttemptAt;
     leaseToken = null;
     leaseUntil = null;
+  }
+
+  /**
+   * AI 입력 초과 후 다음 시도의 원문 구간 크기를 줄인다.
+   *
+   * @param byteLimit 다음 시도의 UTF-8 구간 한도
+   * @param nextAttempt 다음 시도 가능 시각
+   */
+  public void reduceSourceLimit(int byteLimit, Instant nextAttempt) {
+    sourceByteLimit = byteLimit;
+    defer(nextAttempt);
   }
 
   /** 최소 요약 단위도 처리할 수 없음을 기록한다. */

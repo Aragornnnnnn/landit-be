@@ -17,6 +17,8 @@ import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
 import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalkContextSummaryRepository;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -131,7 +133,7 @@ public class FreeTalkContextSummaryService {
           aiFreeTalkClient.generateContextSummary(pending.request());
       complete(pending, result);
     } catch (RuntimeException exception) {
-      defer(pending);
+      handleFailure(pending, exception);
       log.info("프리톡 컨텍스트 요약 생성에 실패했습니다. sessionId={}", reservation.freeTalkSessionId());
     }
   }
@@ -158,8 +160,7 @@ public class FreeTalkContextSummaryService {
           if (!shouldSummarize(rounds)
               || state.getSuspendedReason() != null
               || activeLease(state, now)
-              || (state.getNextAttemptAt() != null
-                  && state.getNextAttemptAt().isAfter(now))) {
+              || (state.getNextAttemptAt() != null && state.getNextAttemptAt().isAfter(now))) {
             return null;
           }
           List<SessionHistoryMessageSnapshot> source = sourceMessages(messages, state);
@@ -180,8 +181,14 @@ public class FreeTalkContextSummaryService {
                   "Asia/Seoul",
                   source.stream().map(this::toSourceMessage).toList());
           return new PendingSummary(
-              reservation.freeTalkSessionId(), token, state.getRevision(), request,
-              reservation.userId(), reservation.learningSessionId());
+              reservation.freeTalkSessionId(),
+              token,
+              state.getRevision(),
+              request,
+              FreeTalkSummaryWindow.rounds(source, state.getCoveredThroughSequence()).size(),
+              sourceBytes(rounds.getFirst()),
+              reservation.userId(),
+              reservation.learningSessionId());
         });
   }
 
@@ -205,7 +212,8 @@ public class FreeTalkContextSummaryService {
                   state -> {
                     state.complete(
                         OBJECT_MAPPER.valueToTree(result.summary()),
-                        pending.request().targetThroughSequence());
+                        pending.request().targetThroughSequence(),
+                        properties.summarySourceMaxBytes());
                     repository.save(state);
                   });
         });
@@ -261,6 +269,35 @@ public class FreeTalkContextSummaryService {
         .length;
   }
 
+  private void handleFailure(PendingSummary pending, RuntimeException exception) {
+    if (!(exception instanceof ApiException apiException)
+        || apiException.getErrorCode() != ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE) {
+      defer(pending);
+      return;
+    }
+    transactionTemplate.executeWithoutResult(
+        status ->
+            repository
+                .findByIdForUpdate(pending.sessionId())
+                .filter(state -> current(pending, state))
+                .ifPresent(
+                    state -> {
+                      if (pending.rounds() == 1) {
+                        state.suspend("OVERSIZED_UNIT");
+                      } else {
+                        int limit =
+                            Math.max(
+                                pending.firstRoundBytes(),
+                                SOURCE_MAPPER.writeValueAsBytes(pending.request().sourceMessages())
+                                        .length
+                                    / 2);
+                        state.reduceSourceLimit(
+                            limit,
+                            repository.currentTime().plusSeconds(properties.retryDelaySeconds()));
+                      }
+                    }));
+  }
+
   private AiFreeTalkContextSummarySourceMessage toSourceMessage(
       SessionHistoryMessageSnapshot message) {
     return new AiFreeTalkContextSummarySourceMessage(
@@ -309,6 +346,12 @@ public class FreeTalkContextSummaryService {
   }
 
   private record PendingSummary(
-      long sessionId, String leaseToken, int revision, AiFreeTalkContextSummaryRequest request,
-      long userId, long learningSessionId) {}
+      long sessionId,
+      String leaseToken,
+      int revision,
+      AiFreeTalkContextSummaryRequest request,
+      int rounds,
+      int firstRoundBytes,
+      long userId,
+      long learningSessionId) {}
 }
