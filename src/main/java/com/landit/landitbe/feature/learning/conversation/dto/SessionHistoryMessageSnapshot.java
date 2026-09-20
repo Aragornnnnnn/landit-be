@@ -38,7 +38,6 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
  * @param fluencyScore 유창성 점수
  * @param speechAnalysisPayload 발화 분석 값
  * @param reusedExpressionPayload 재사용 표현 값
- * @param correction 프리톡 턴 교정 판정. 교정 대상이 아닌 메시지는 null
  * @param createdAt 생성 시각
  * @param updatedAt 수정 시각
  */
@@ -67,7 +66,6 @@ public record SessionHistoryMessageSnapshot(
     Integer fluencyScore,
     JsonNode speechAnalysisPayload,
     JsonNode reusedExpressionPayload,
-    FreeTalkTurnCorrection correction,
     java.time.LocalDateTime createdAt,
     java.time.LocalDateTime updatedAt) {
   /**
@@ -106,7 +104,6 @@ public record SessionHistoryMessageSnapshot(
         entity.getReusedExpressionPayload() == null
             ? null
             : entity.getReusedExpressionPayload().deepCopy(),
-        turnCorrectionOf(entity),
         entity.getCreatedAt(),
         entity.getUpdatedAt());
   }
@@ -328,15 +325,6 @@ public record SessionHistoryMessageSnapshot(
   }
 
   /**
-   * 프리톡 턴 교정 판정 값을 반환한다.
-   *
-   * @return 조회 당시 턴 교정 판정. 교정 대상이 아닌 메시지는 null
-   */
-  public FreeTalkTurnCorrection getCorrection() {
-    return correction;
-  }
-
-  /**
    * 생성 시각 값을 반환한다.
    *
    * @return 조회 당시 생성 시각
@@ -352,22 +340,5 @@ public record SessionHistoryMessageSnapshot(
    */
   public java.time.LocalDateTime getUpdatedAt() {
     return updatedAt;
-  }
-
-  // 교정 처리 상태가 없는 메시지(AI 메시지·시나리오 발화)는 교정 대상이 아니다.
-  private static FreeTalkTurnCorrection turnCorrectionOf(SessionHistoryMessage entity) {
-    if (entity.getCorrectionProcessingStatus() == null) {
-      return null;
-    }
-    FreeTalkTurnCorrection.Sentence sentence =
-        entity.getCorrectionBetter() == null
-            ? null
-            : new FreeTalkTurnCorrection.Sentence(
-                entity.getCorrectionOriginal(),
-                entity.getCorrectionBetter(),
-                entity.getCorrectionReason(),
-                entity.getMistakePattern());
-    return new FreeTalkTurnCorrection(
-        entity.getCorrectionProcessingStatus(), sentence, entity.getReactedToPartner());
   }
 }

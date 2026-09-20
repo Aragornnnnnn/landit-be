@@ -5,7 +5,6 @@ package com.landit.landitbe.feature.learning.freetalk.history.service;
 import com.landit.landitbe.feature.content.expression.dto.ExpressionText;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
 import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
-import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
@@ -19,6 +18,8 @@ import com.landit.landitbe.feature.learning.freetalk.expression.domain.Expressio
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionLearningStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionDetailResponse;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
@@ -46,6 +47,7 @@ public class FreeTalkHistoryQueryService {
   private final ConversationMessageService conversationMessageService;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionContentService expressionContentService;
+  private final FreeTalkMessageFeedbackService messageFeedbackService;
 
   /**
    * 완료 프리톡을 최신순 페이지로 조회한다.
@@ -116,9 +118,12 @@ public class FreeTalkHistoryQueryService {
             lastRecommendedAtByExpressionId);
 
     // 대화 메시지는 저장 순서대로 API 응답 형태로 변환한다.
+    // 교정은 메시지마다 조회하지 않고 대화 기록 단위로 한 번에 읽어 메시지 ID로 붙인다.
+    Map<Long, FreeTalkTurnCorrection> correctionsByMessageId =
+        messageFeedbackService.findBySessionHistoryId(history.getId());
     List<FreeTalkSessionDetailResponse.Message> messages =
         conversationMessageService.findAll(history.getId()).stream()
-            .map(this::toMessageResponse)
+            .map(message -> toMessageResponse(message, correctionsByMessageId.get(message.getId())))
             .toList();
     int correctionCount =
         Math.toIntExact(messages.stream().filter(message -> message.correction() != null).count());
@@ -139,8 +144,7 @@ public class FreeTalkHistoryQueryService {
 
   // 교정은 완료된 세션의 기록에서만 내려준다. 배운 표현 재사용은 아직 판정하지 않아 null이다.
   private FreeTalkSessionDetailResponse.Message toMessageResponse(
-      SessionHistoryMessageSnapshot message) {
-    FreeTalkTurnCorrection turnCorrection = message.getCorrection();
+      SessionHistoryMessageSnapshot message, FreeTalkTurnCorrection turnCorrection) {
     return new FreeTalkSessionDetailResponse.Message(
         message.getId(),
         message.getTurnNumber(),

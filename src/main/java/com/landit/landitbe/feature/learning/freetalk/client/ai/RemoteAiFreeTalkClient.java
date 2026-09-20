@@ -5,8 +5,6 @@ package com.landit.landitbe.feature.learning.freetalk.client.ai;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
-import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
-import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationExcerpt;
@@ -14,6 +12,8 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingRequest;

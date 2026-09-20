@@ -4,7 +4,6 @@ package com.landit.landitbe.feature.learning.conversation.history.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
-import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.SessionMessageInputType;
@@ -113,26 +112,6 @@ public class SessionHistoryMessage extends BaseTimeEntity {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "reused_expression_payload", columnDefinition = "jsonb")
   private JsonNode reusedExpressionPayload;
-
-  @Column(name = "correction_original", columnDefinition = "text")
-  private String correctionOriginal;
-
-  @Column(name = "correction_better", columnDefinition = "text")
-  private String correctionBetter;
-
-  @Column(name = "correction_reason", columnDefinition = "text")
-  private String correctionReason;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "mistake_pattern", length = 40)
-  private FreeTalkMistakePattern mistakePattern;
-
-  @Column(name = "reacted_to_partner")
-  private Boolean reactedToPartner;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "correction_processing_status", length = 20)
-  private ProcessingStatus correctionProcessingStatus;
 
   /** 동일한 사용자 발화의 다음 질문 생성을 한 시도만 맡는다. */
   public String claimScenarioGeneration(String clientMessageId, java.time.LocalDateTime until) {
@@ -311,16 +290,9 @@ public class SessionHistoryMessage extends BaseTimeEntity {
     this.innerThoughtProcessingStatus = ProcessingStatus.COMPLETED;
   }
 
-  /** 프리톡 속마음과 같은 AI 응답에 실려 오는 턴 교정의 비동기 생성을 함께 준비 상태로 표시한다. */
+  /** 프리톡 속마음의 비동기 생성을 준비 상태로 표시한다. */
   public void prepareInnerThought() {
     innerThoughtProcessingStatus = ProcessingStatus.PREPARING;
-    // 준비 상태의 교정은 문장 값을 가질 수 없다(chk_session_message_correction_fields).
-    correctionOriginal = null;
-    correctionBetter = null;
-    correctionReason = null;
-    mistakePattern = null;
-    reactedToPartner = null;
-    correctionProcessingStatus = ProcessingStatus.PREPARING;
   }
 
   /** 프리톡 사용자 발화의 최초 처리 결과 상태를 기록한다. */

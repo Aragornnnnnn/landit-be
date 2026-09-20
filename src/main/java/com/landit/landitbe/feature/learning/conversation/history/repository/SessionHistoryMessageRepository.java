@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.learning.conversation.history.repository;
 
-import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.history.domain.SessionHistoryMessage;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
@@ -67,51 +66,12 @@ public interface SessionHistoryMessageRepository
       @Param("completedStatus") ProcessingStatus completedStatus,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
 
-  /**
-   * 준비 상태인 메시지에만 프리톡 속마음과 같은 AI 응답의 턴 교정을 한 번에 반영한다.
-   *
-   * <p>속마음과 교정은 함께 준비 상태가 되므로, 같은 메시지에 두 번 호출해도 교정은 한 번만 저장된다.
-   */
-  @Modifying(flushAutomatically = true, clearAutomatically = true)
-  @Query(
-      """
-            update SessionHistoryMessage message
-            set message.innerThought = :innerThought,
-                message.innerThoughtType = :innerThoughtType,
-                message.innerThoughtProcessingStatus = :completedStatus,
-                message.correctionOriginal = :correctionOriginal,
-                message.correctionBetter = :correctionBetter,
-                message.correctionReason = :correctionReason,
-                message.mistakePattern = :mistakePattern,
-                message.reactedToPartner = :reactedToPartner,
-                message.correctionProcessingStatus = :correctionStatus,
-                message.updatedAt = CURRENT_TIMESTAMP
-            where message.id = :messageId
-              and message.innerThoughtProcessingStatus = :preparingStatus
-      """)
-  int completeInnerThoughtAndCorrectionIfPreparing(
-      @Param("messageId") long messageId,
-      @Param("innerThought") String innerThought,
-      @Param("innerThoughtType") InnerThoughtType innerThoughtType,
-      @Param("correctionOriginal") String correctionOriginal,
-      @Param("correctionBetter") String correctionBetter,
-      @Param("correctionReason") String correctionReason,
-      @Param("mistakePattern") FreeTalkMistakePattern mistakePattern,
-      @Param("reactedToPartner") Boolean reactedToPartner,
-      @Param("correctionStatus") ProcessingStatus correctionStatus,
-      @Param("completedStatus") ProcessingStatus completedStatus,
-      @Param("preparingStatus") ProcessingStatus preparingStatus);
-
-  /** 준비 상태인 메시지의 속마음과, 함께 준비 중이던 턴 교정의 처리 상태를 실패로 바꾼다. */
+  /** 준비 상태인 메시지의 속마음 처리 상태만 실패로 바꾼다. */
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       """
             update SessionHistoryMessage message
             set message.innerThoughtProcessingStatus = :failedStatus,
-                message.correctionProcessingStatus =
-                    case when message.correctionProcessingStatus = :preparingStatus
-                         then :failedStatus
-                         else message.correctionProcessingStatus end,
                 message.updatedAt = CURRENT_TIMESTAMP
             where message.id = :messageId
               and message.innerThoughtProcessingStatus = :preparingStatus

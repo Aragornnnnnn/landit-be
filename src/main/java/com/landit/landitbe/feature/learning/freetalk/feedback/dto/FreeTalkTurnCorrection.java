@@ -1,9 +1,9 @@
 // 프리톡 사용자 발화 한 턴의 교정 판정 결과를 표현한다.
 
-package com.landit.landitbe.feature.learning.conversation.dto;
+package com.landit.landitbe.feature.learning.freetalk.feedback.dto;
 
-import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 
 /**
  * 프리톡 사용자 발화 한 턴의 교정 판정 결과다.

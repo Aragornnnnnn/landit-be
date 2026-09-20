@@ -3,10 +3,10 @@
 package com.landit.landitbe.feature.learning.freetalk.history.dto;
 
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
-import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionLearningStatus;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import java.time.LocalDateTime;
 import java.util.List;

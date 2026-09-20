@@ -20,16 +20,15 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
-import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.SessionMessageInputType;
-import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
-import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
@@ -71,8 +70,7 @@ class FreeTalkMessageServiceTest {
   private final FreeTalkSubmittedMessageService submittedMessageService =
       mock(FreeTalkSubmittedMessageService.class);
   private final AiFreeTalkClient aiFreeTalkClient = mock(AiFreeTalkClient.class);
-  private final ConversationMessageService sessionMessageService =
-      mock(ConversationMessageService.class);
+  private final FreeTalkTurnResultService turnResultService = mock(FreeTalkTurnResultService.class);
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
       mock(FreeTalkExpressionGenerationDispatcher.class);
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService =
@@ -85,7 +83,7 @@ class FreeTalkMessageServiceTest {
           submittedMessageService,
           replayService,
           aiFreeTalkClient,
-          sessionMessageService,
+          turnResultService,
           directExecutor,
           expressionGenerationDispatcher,
           memoryGenerationDispatchService,
@@ -168,13 +166,12 @@ class FreeTalkMessageServiceTest {
             new AiFreeTalkInnerThoughtResult(
                 "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed()));
     doThrow(new IllegalStateException("save failed"))
-        .when(sessionMessageService)
-        .completeFreeTalkInnerThought(
-            7L, "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed());
+        .when(turnResultService)
+        .complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed());
 
     service.submit(1L, 300L, request());
 
-    verify(sessionMessageService).failInnerThought(7L);
+    verify(turnResultService).fail(7L);
     verify(aiFreeTalkClient)
         .generateTurn(argThat(request -> request.characterId().equals("chloe")));
     verify(aiFreeTalkClient)
@@ -202,8 +199,7 @@ class FreeTalkMessageServiceTest {
 
     service.submit(1L, 300L, request());
 
-    verify(sessionMessageService)
-        .completeFreeTalkInnerThought(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
+    verify(turnResultService).complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
   }
 
   @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")
@@ -236,7 +232,7 @@ class FreeTalkMessageServiceTest {
                     .contains("errorCode=AI_RESPONSE_INVALID");
                 assertThat(event.getThrowableProxy()).isNotNull();
               });
-      verify(sessionMessageService).failInnerThought(7L);
+      verify(turnResultService).fail(7L);
     } finally {
       logger.detachAppender(appender);
       appender.stop();
@@ -284,7 +280,7 @@ class FreeTalkMessageServiceTest {
 
     verify(aiFreeTalkClient).generateTurn(any());
     verify(submittedMessageService).finalizeTurn(any(), any());
-    verify(sessionMessageService).failInnerThought(7L);
+    verify(turnResultService).fail(7L);
   }
 
   /** 완료 응답이 트랜잭션 확정 뒤에만 기억 생성 dispatcher로 전달되는지 확인한다. */
@@ -392,7 +388,7 @@ class FreeTalkMessageServiceTest {
         submittedMessageService,
         replayService,
         aiFreeTalkClient,
-        sessionMessageService,
+        turnResultService,
         taskExecutor,
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,

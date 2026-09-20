@@ -357,13 +357,25 @@ class PremiumAccessIntegrationTests {
         """
         INSERT INTO session_history_message (
             session_history_id, message_sequence, turn_number, role, content, input_type,
-            correction_original, correction_better, correction_reason, mistake_pattern,
-            reacted_to_partner, correction_processing_status, created_at, updated_at
+            created_at, updated_at
         )
-        SELECT id, 1, 1, 'USER', 'I go home.', 'TEXT', 'I go home.', 'I went home.',
-               '과거 일이에요.', 'TENSE', TRUE, 'COMPLETED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        SELECT id, 1, 1, 'USER', 'I go home.', 'TEXT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         FROM session_history
         WHERE learning_session_id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO free_talk_message_feedback (
+            session_history_message_id, session_history_id, processing_status,
+            reacted_to_partner, original_sentence, better_sentence, reason, mistake_pattern,
+            created_at, updated_at
+        )
+        SELECT message.id, message.session_history_id, 'COMPLETED', TRUE, 'I go home.',
+               'I went home.', '과거 일이에요.', 'TENSE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM session_history_message message
+        JOIN session_history history ON history.id = message.session_history_id
+        WHERE history.learning_session_id = ?
         """,
         learningSessionId);
     jdbcTemplate.update(

@@ -3,7 +3,6 @@
 package com.landit.landitbe.feature.learning.freetalk.message.service;
 
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
-import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
@@ -46,7 +45,7 @@ public class FreeTalkMessageService {
   private final FreeTalkSubmittedMessageService submittedMessageService;
   private final FreeTalkMessageReplayService replayService;
   private final AiFreeTalkClient aiFreeTalkClient;
-  private final ConversationMessageService conversationMessageService;
+  private final FreeTalkTurnResultService turnResultService;
   private final TaskExecutor taskExecutor;
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService;
@@ -56,7 +55,7 @@ public class FreeTalkMessageService {
       FreeTalkSubmittedMessageService submittedMessageService,
       FreeTalkMessageReplayService replayService,
       AiFreeTalkClient aiFreeTalkClient,
-      ConversationMessageService conversationMessageService,
+      FreeTalkTurnResultService turnResultService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
@@ -64,7 +63,7 @@ public class FreeTalkMessageService {
     this.submittedMessageService = submittedMessageService;
     this.replayService = replayService;
     this.aiFreeTalkClient = aiFreeTalkClient;
-    this.conversationMessageService = conversationMessageService;
+    this.turnResultService = turnResultService;
     this.taskExecutor = taskExecutor;
     this.expressionGenerationDispatcher = expressionGenerationDispatcher;
     this.memoryGenerationDispatchService = memoryGenerationDispatchService;
@@ -371,7 +370,7 @@ public class FreeTalkMessageService {
         (result, exception) -> {
           if (exception == null) {
             try {
-              conversationMessageService.completeFreeTalkInnerThought(
+              turnResultService.complete(
                   request.submittedMessageId(),
                   result.innerThought(),
                   result.innerThoughtType(),
@@ -381,7 +380,7 @@ public class FreeTalkMessageService {
                   "프리톡 속마음 저장에 실패했습니다. messageId={}",
                   request.submittedMessageId(),
                   persistenceException);
-              conversationMessageService.failInnerThought(request.submittedMessageId());
+              turnResultService.fail(request.submittedMessageId());
             }
             return;
           }
@@ -391,7 +390,7 @@ public class FreeTalkMessageService {
               request.submittedMessageId(),
               errorCode(exception),
               exception);
-          conversationMessageService.failInnerThought(request.submittedMessageId());
+          turnResultService.fail(request.submittedMessageId());
         });
   }
 

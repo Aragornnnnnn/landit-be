@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai;
 
-import com.landit.landitbe.feature.learning.conversation.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import java.util.Objects;
 
