@@ -4,12 +4,11 @@ package com.landit.landitbe.feature.memory.service;
 
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
-import com.landit.landitbe.feature.memory.repository.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepository;
-import com.landit.landitbe.feature.memory.repository.ConversationMemorySearchRepository;
-import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
-import com.landit.landitbe.feature.session.service.FreeTalkMemoryGenerationContextService;
+import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
+import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
+import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -25,14 +24,13 @@ public class ConversationMemoryWriteService {
 
   private static final int MAX_COMPARABLE_MEMORIES = 3;
 
-  private final UserProfileRepository userProfileRepository;
+  private final ProfileLearningService profileLearningService;
   private final ConversationMemoryRepository memoryRepository;
   private final ConversationMemorySearchRepository searchRepository;
-  private final FreeTalkMemoryGenerationContextService contextService;
 
   /** 저장 결과가 snapshot 검증을 통과했는지 나타낸다. */
   public enum PersistenceResult {
-    /** 기억과 READY 상태를 저장했다. */
+    /** 기억 저장을 완료했다. */
     STORED,
 
     /** 비교 검색 결과가 변경되어 아무것도 저장하지 않았다. */
@@ -42,7 +40,6 @@ public class ConversationMemoryWriteService {
   /**
    * 사용자 잠금 후 비교 검색 snapshot을 재검증하고 기억 상태를 원자적으로 저장한다.
    *
-   * @param learningSessionId READY로 전환할 프리톡 학습 세션 ID
    * @param userProfileId 잠글 사용자 프로필 ID
    * @param plans 후보별 상태 판정과 비교 검색 snapshot
    * @return snapshot이 같아 저장을 완료했으면 STORED, 달라졌으면 STALE
@@ -52,15 +49,14 @@ public class ConversationMemoryWriteService {
    */
   @Transactional
   public PersistenceResult persistIfSnapshotCurrent(
-      long learningSessionId, long userProfileId, List<ConversationMemoryResolutionPlan> plans) {
-    requirePositive(learningSessionId, "학습 세션 ID");
+      long userProfileId, List<ConversationMemoryResolutionPlan> plans) {
     requirePositive(userProfileId, "사용자 프로필 ID");
     if (plans == null) {
       throw new IllegalArgumentException("장기기억 판정 계획이 필요합니다.");
     }
 
-    userProfileRepository
-        .findActiveByIdForUpdate(userProfileId)
+    profileLearningService
+        .findActiveLearningProfileForUpdate(userProfileId)
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     validatePlans(userProfileId, plans);
     if (snapshotChanged(plans)) {
@@ -70,7 +66,6 @@ public class ConversationMemoryWriteService {
     for (ConversationMemoryResolutionPlan plan : plans) {
       persistPlan(plan);
     }
-    contextService.complete(learningSessionId);
     return PersistenceResult.STORED;
   }
 

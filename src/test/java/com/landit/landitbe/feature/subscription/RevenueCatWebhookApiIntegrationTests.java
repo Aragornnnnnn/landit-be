@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,6 +53,7 @@ class RevenueCatWebhookApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 최초 구매 이벤트는 프리미엄을 켜고 만료 시각을 저장한다. */
+  @DisplayName("최초 구매 이벤트는 프리미엄을 켜고 만료 시각을 저장한다.")
   @Test
   void activatesPremiumOnInitialPurchase() throws Exception {
     Long userId = createUser("rc-initial");
@@ -65,6 +67,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 갱신 이벤트는 해지 예약 상태였더라도 다시 활성 구독으로 되돌린다. */
+  @DisplayName("갱신 이벤트는 해지 예약 상태였더라도 다시 활성 구독으로 되돌린다.")
   @Test
   void activatesPremiumOnRenewal() throws Exception {
     Long userId = createUser("rc-renewal");
@@ -80,6 +83,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 해지 이벤트는 해지 예약으로 표시하고, 해지 철회 이벤트는 다시 활성으로 되돌린다. */
+  @DisplayName("해지 이벤트는 해지 예약으로 표시하고, 해지 철회 이벤트는 다시 활성으로 되돌린다.")
   @Test
   void schedulesCancellationAndRestoresOnUncancellation() throws Exception {
     Long userId = createUser("rc-cancel");
@@ -97,6 +101,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 환불은 CUSTOMER_SUPPORT 사유의 해지 이벤트로 오며 프리미엄을 즉시 끈다. */
+  @DisplayName("환불은 CUSTOMER_SUPPORT 사유의 해지 이벤트로 오며 프리미엄을 즉시 끈다.")
   @Test
   void deactivatesPremiumOnRefund() throws Exception {
     Long userId = createUser("rc-refund");
@@ -117,6 +122,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 만료 이벤트는 프리미엄을 끄고 만료 시각을 비운다. */
+  @DisplayName("만료 이벤트는 프리미엄을 끄고 만료 시각을 비운다.")
   @Test
   void deactivatesPremiumOnExpiration() throws Exception {
     Long userId = createUser("rc-expire");
@@ -131,6 +137,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 무료 체험 시작은 TRIAL 기간 종류로, 유료 전환 갱신은 NORMAL로 저장한다. */
+  @DisplayName("무료 체험 시작은 TRIAL 기간 종류로, 유료 전환 갱신은 NORMAL로 저장한다.")
   @Test
   void storesPeriodTypeFromTrialToPaid() throws Exception {
     Long userId = createUser("rc-trial");
@@ -159,6 +166,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 프리미엄이 꺼지면 기간 종류를 비운다. */
+  @DisplayName("프리미엄이 꺼지면 기간 종류를 비운다.")
   @Test
   void clearsPeriodTypeWhenPremiumTurnsOff() throws Exception {
     Long userId = createUser("rc-trial-expire");
@@ -185,6 +193,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 알 수 없는 period_type은 기간 종류만 비우고 상태 갱신은 그대로 진행한다. */
+  @DisplayName("알 수 없는 period_type은 기간 종류만 비우고 상태 갱신은 그대로 진행한다.")
   @Test
   void storesNullPeriodTypeForUnknownValue() throws Exception {
     Long userId = createUser("rc-period-unknown");
@@ -203,6 +212,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 이미 반영한 이벤트보다 오래된 이벤트가 뒤늦게 도착하면 상태는 무시하되 이력에는 남긴다. */
+  @DisplayName("이미 반영한 이벤트보다 오래된 이벤트가 뒤늦게 도착하면 상태는 무시하되 이력에는 남긴다.")
   @Test
   void ignoresStaleEvent() throws Exception {
     Long userId = createUser("rc-stale");
@@ -219,6 +229,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 익명 App User ID로 온 이벤트도 aliases에 Landit 사용자 ID가 있으면 반영한다. */
+  @DisplayName("익명 App User ID로 온 이벤트도 aliases에 Landit 사용자 ID가 있으면 반영한다.")
   @Test
   void resolvesUserFromAliasesWhenAppUserIdIsAnonymous() throws Exception {
     Long userId = createUser("rc-alias");
@@ -245,6 +256,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 구독 상태와 무관한 이벤트나 존재하지 않는 사용자의 이벤트는 200으로 응답하고 상태를 바꾸지 않는다. */
+  @DisplayName("구독 상태와 무관한 이벤트나 존재하지 않는 사용자의 이벤트는 200으로 응답하고 상태를 바꾸지 않는다.")
   @Test
   void acknowledgesIrrelevantOrUnmatchedEvents() throws Exception {
     Long userId = createUser("rc-ignore");
@@ -260,6 +272,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 구매 이벤트는 상품 ID와 스토어를 프로필에 저장하고, 프리미엄이 꺼지면 둘 다 비운다. */
+  @DisplayName("구매 이벤트는 상품 ID와 스토어를 프로필에 저장하고, 프리미엄이 꺼지면 둘 다 비운다.")
   @Test
   void storesProductAndStoreWhilePremiumAndClearsWhenOff() throws Exception {
     Long userId = createUser("rc-product");
@@ -284,6 +297,7 @@ class RevenueCatWebhookApiIntegrationTests {
    * RevenueCat 대시보드에서 프로모션 권한을 부여하면 NON_RENEWING_PURCHASE로 오며, 프리미엄을 켜고 PROMOTIONAL 기간 종류·스토어와 만료
    * 시각을 저장한다. 기간이 끝나 EXPIRATION이 오면 다른 구독처럼 프리미엄을 끈다.
    */
+  @DisplayName("프로모션 구매 이벤트로 권한을 활성화하고 만료 이벤트로 해제한다.")
   @Test
   void activatesPremiumOnNonRenewingPurchaseAndExpiresLikeSubscription() throws Exception {
     Long userId = createUser("rc-promotional");
@@ -324,6 +338,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 알 수 없는 store 값은 스토어만 비우고 상태 갱신은 그대로 진행한다. */
+  @DisplayName("알 수 없는 store 값은 스토어만 비우고 상태 갱신은 그대로 진행한다.")
   @Test
   void storesNullStoreForUnknownValue() throws Exception {
     Long userId = createUser("rc-store-unknown");
@@ -358,6 +373,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 결제 이력은 결제 통화 기준 금액, 스토어, 환경, 결제 시각, 만료 시각, 해지 사유를 웹훅 그대로 저장한다. */
+  @DisplayName("결제 이력은 결제 통화 기준 금액, 스토어, 환경, 결제 시각, 만료 시각, 해지 사유를 웹훅 그대로 저장한다.")
   @Test
   void recordsEventHistoryFromWebhookFields() throws Exception {
     Long userId = createUser("rc-history");
@@ -393,6 +409,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 결제 시각이 없으면 이벤트 생성 시각을 발생 시각으로 저장한다. */
+  @DisplayName("결제 시각이 없으면 이벤트 생성 시각을 발생 시각으로 저장한다.")
   @Test
   void fallsBackToEventTimestampWhenPurchasedAtMissing() throws Exception {
     Long userId = createUser("rc-occurred-fallback");
@@ -423,6 +440,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 같은 이벤트 ID가 다시 오면 이력을 한 번만 남기고 상태도 바꾸지 않는다. */
+  @DisplayName("같은 이벤트 ID가 다시 오면 이력을 한 번만 남기고 상태도 바꾸지 않는다.")
   @Test
   void ignoresDuplicateEventId() throws Exception {
     Long userId = createUser("rc-duplicate");
@@ -463,6 +481,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태는 바꾸지 않는다. */
+  @DisplayName("결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태는 바꾸지 않는다.")
   @Test
   void recordsBillingIssueAndProductChangeWithoutStatusChange() throws Exception {
     Long userId = createUser("rc-history-only");
@@ -481,6 +500,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 구독 이전 이벤트를 받으면 넘겨준 계정은 구독 없음이 되고 넘겨받은 계정이 같은 구독 정보를 갖는다. */
+  @DisplayName("구독 이전 이벤트를 받으면 넘겨준 계정은 구독 없음이 되고 넘겨받은 계정이 같은 구독 정보를 갖는다.")
   @Test
   void movesSubscriptionToTransferredAccount() throws Exception {
     Long fromUserId = createUser("rc-transfer-from");
@@ -519,6 +539,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 이미 반영한 이벤트보다 오래된 구독 이전은 두 계정 모두 바꾸지 않는다. */
+  @DisplayName("이미 반영한 이벤트보다 오래된 구독 이전은 두 계정 모두 바꾸지 않는다.")
   @Test
   void ignoresStaleTransfer() throws Exception {
     Long fromUserId = createUser("rc-transfer-stale-from");
@@ -536,6 +557,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 같은 구독 이전 이벤트가 다시 오면 이력을 추가하거나 상태를 되돌리지 않는다. */
+  @DisplayName("같은 구독 이전 이벤트가 다시 오면 이력을 추가하거나 상태를 되돌리지 않는다.")
   @Test
   void ignoresDuplicateTransfer() throws Exception {
     Long fromUserId = createUser("rc-transfer-dup-from");
@@ -556,6 +578,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 넘겨준 계정에 구독이 없으면 넘겨받은 계정을 건드리지 않고 이력도 남기지 않는다. */
+  @DisplayName("넘겨준 계정에 구독이 없으면 넘겨받은 계정을 건드리지 않고 이력도 남기지 않는다.")
   @Test
   void skipsTransferWhenSourceHasNoSubscription() throws Exception {
     Long fromUserId = createUser("rc-transfer-none-from");
@@ -575,6 +598,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 넘겨준 계정이 만료 상태면 넘겨받은 계정의 살아 있는 구독을 덮어쓰지 않는다. */
+  @DisplayName("넘겨준 계정이 만료 상태면 넘겨받은 계정의 살아 있는 구독을 덮어쓰지 않는다.")
   @Test
   void skipsTransferWhenSourceIsExpired() throws Exception {
     Long fromUserId = createUser("rc-transfer-expired-from");
@@ -599,6 +623,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 넘겨준 계정과 넘겨받은 계정이 같으면 아무것도 바꾸지 않는다. */
+  @DisplayName("넘겨준 계정과 넘겨받은 계정이 같으면 아무것도 바꾸지 않는다.")
   @Test
   void skipsTransferToSameAccount() throws Exception {
     Long userId = createUser("rc-transfer-self");
@@ -615,6 +640,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 익명 ID만 담겼거나 한쪽 계정이 없는 구독 이전은 로그만 남기고 200으로 응답한다. */
+  @DisplayName("익명 ID만 담겼거나 한쪽 계정이 없는 구독 이전은 로그만 남기고 200으로 응답한다.")
   @Test
   void acknowledgesTransferWithoutResolvableAccounts() throws Exception {
     Long fromUserId = createUser("rc-transfer-unresolved");
@@ -636,6 +662,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** Authorization 헤더가 없거나 설정값과 다르면 401로 거절하고 상태를 바꾸지 않는다. */
+  @DisplayName("Authorization 헤더가 없거나 설정값과 다르면 401로 거절하고 상태를 바꾸지 않는다.")
   @Test
   void rejectsMissingOrWrongAuthorization() throws Exception {
     Long userId = createUser("rc-unauthorized");
@@ -651,6 +678,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** 이벤트 객체, type, id가 없는 본문은 400으로 거절해 이력 없이 상태만 바뀌는 일을 막는다. */
+  @DisplayName("이벤트 객체, type, id가 없는 본문은 400으로 거절해 이력 없이 상태만 바뀌는 일을 막는다.")
   @Test
   void rejectsMalformedBody() throws Exception {
     Long userId = createUser("rc-malformed");
@@ -674,6 +702,7 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   /** OpenAPI 문서에는 웹훅 경로를 공개하지 않는다. */
+  @DisplayName("OpenAPI 문서에는 웹훅 경로를 공개하지 않는다.")
   @Test
   void openApiDocsHideWebhookPath() throws Exception {
     mockMvc

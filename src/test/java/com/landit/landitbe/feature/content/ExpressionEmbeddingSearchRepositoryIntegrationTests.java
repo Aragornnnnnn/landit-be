@@ -5,11 +5,12 @@ package com.landit.landitbe.feature.content;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingMatch;
-import com.landit.landitbe.feature.content.repository.ExpressionEmbeddingSearchRepository;
-import com.landit.landitbe.feature.content.repository.FreeTalkCandidateSearch;
+import com.landit.landitbe.feature.content.expression.recommendation.dto.ExpressionEmbeddingMatch;
+import com.landit.landitbe.feature.content.expression.recommendation.dto.FreeTalkCandidateSearch;
+import com.landit.landitbe.feature.content.expression.recommendation.repository.ExpressionEmbeddingSearchRepository;
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,7 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
 
   @Autowired private ExpressionEmbeddingSearchRepository searchRepository;
 
+  @DisplayName("임베딩 후보를 코사인 거리순으로 조회한다.")
   @Test
   void searchOrdersCandidatesByCosineDistance() {
     seedUser(USER_ID);
@@ -49,6 +51,7 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
     assertThat(matches.get(1).distance()).isCloseTo(0.4, org.assertj.core.data.Offset.offset(1e-9));
   }
 
+  @DisplayName("임베딩 검색의 후보 수를 제한한다.")
   @Test
   void searchLimitsCandidateCount() {
     seedUser(USER_ID);
@@ -64,6 +67,7 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
         .containsExactly(991101L, 991102L);
   }
 
+  @DisplayName("완료하거나 비활성인 표현과 다른 언어의 표현은 임베딩 검색에서 제외한다.")
   @Test
   void searchExcludesCompletedAndInactiveAndOtherLocaleExpressions() {
     seedUser(USER_ID);
@@ -79,6 +83,7 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
     assertThat(matches).extracting(ExpressionEmbeddingMatch::expressionId).containsExactly(991101L);
   }
 
+  @DisplayName("저장된 임베딩의 차원이 다르면 검색을 거부한다.")
   @Test
   void searchRejectsDimensionMismatchedStoredEmbedding() {
     seedUser(USER_ID);
@@ -88,6 +93,7 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
         .hasRootCauseInstanceOf(IllegalStateException.class);
   }
 
+  @DisplayName("최대 난이도를 넘는 표현은 임베딩 검색에서 제외한다.")
   @Test
   void searchExcludesExpressionsOverMaxDifficultyLevel() {
     seedUser(USER_ID);
@@ -105,6 +111,7 @@ class ExpressionEmbeddingSearchRepositoryIntegrationTests {
         .containsExactly(991101L, 991102L);
   }
 
+  @DisplayName("최대 난이도가 5이면 모든 난이도의 표현을 검색한다.")
   @Test
   void searchIncludesEveryDifficultyLevelWhenMaxIsFive() {
     seedUser(USER_ID);

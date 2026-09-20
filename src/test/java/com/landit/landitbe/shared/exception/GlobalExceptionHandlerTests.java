@@ -8,10 +8,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
+import com.landit.landitbe.feature.learning.conversation.exception.SessionException;
 import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
-import com.landit.landitbe.feature.session.exception.SessionErrorCode;
-import com.landit.landitbe.feature.session.exception.SessionException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import java.lang.reflect.Method;
@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
@@ -47,6 +48,7 @@ class GlobalExceptionHandlerTests {
     logAppender.stop();
   }
 
+  @DisplayName("클라이언트 API 예외는 오류 코드의 상태와 메시지를 반환하고 오류 로그를 남기지 않는다.")
   @Test
   void clientApiExceptionUsesErrorCodeStatusAndMessageWithoutErrorLog() {
     ApiException exception = new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "리소스가 없습니다.");
@@ -57,6 +59,7 @@ class GlobalExceptionHandlerTests {
     assertThat(errorLogs()).isEmpty();
   }
 
+  @DisplayName("서버 API 예외는 예외 객체를 포함한 오류 로그를 한 번 남긴다.")
   @Test
   void serverApiExceptionWritesSingleErrorLogWithThrowable() {
     ApiException exception = new ApiException(ErrorCode.INTERNAL_SERVER_ERROR, "처리할 수 없습니다.");
@@ -67,6 +70,7 @@ class GlobalExceptionHandlerTests {
     assertSingleErrorLog(exception, "INTERNAL_SERVER_ERROR");
   }
 
+  @DisplayName("입력 검증 예외는 오류 로그 없이 VALIDATION_FAILED를 반환한다.")
   @Test
   void validationExceptionUsesValidationFailedErrorWithoutErrorLog() {
     ConstraintViolationException exception = new ConstraintViolationException(Set.of());
@@ -77,6 +81,7 @@ class GlobalExceptionHandlerTests {
     assertThat(errorLogs()).isEmpty();
   }
 
+  @DisplayName("세션 예외는 해당 기능의 HTTP 상태와 오류 코드를 반환한다.")
   @Test
   void sessionExceptionUsesFeatureStatusAndCode() {
     ResponseEntity<ApiResponse<Void>> response =
@@ -85,6 +90,7 @@ class GlobalExceptionHandlerTests {
     assertError(response, HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "세션을 찾을 수 없습니다.");
   }
 
+  @DisplayName("사용자 프로필 예외는 해당 기능의 HTTP 상태와 오류 코드를 반환한다.")
   @Test
   void userProfileExceptionUsesFeatureStatusAndCode() {
     ResponseEntity<ApiResponse<Void>> response =
@@ -94,6 +100,7 @@ class GlobalExceptionHandlerTests {
     assertError(response, HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", "유효하지 않은 토큰입니다.");
   }
 
+  @DisplayName("잘못된 multipart 요청은 오류 로그 없이 VALIDATION_FAILED를 반환한다.")
   @Test
   void malformedMultipartRequestUsesValidationFailedErrorWithoutErrorLog() throws Exception {
     MultipartException exception = new MultipartException("Stream ended unexpectedly");
@@ -104,6 +111,7 @@ class GlobalExceptionHandlerTests {
     assertThat(errorLogs()).isEmpty();
   }
 
+  @DisplayName("정적 자원이 없으면 Sentry 전송 없이 찾을 수 없음 오류를 반환한다.")
   @Test
   void missingStaticResourceUsesNotFoundErrorWithoutSentryCapture() {
     NoResourceFoundException exception =
@@ -115,6 +123,7 @@ class GlobalExceptionHandlerTests {
     assertThat(errorLogs()).isEmpty();
   }
 
+  @DisplayName("예상하지 못한 예외는 예외 객체를 포함한 오류 로그를 한 번 남긴다.")
   @Test
   void unexpectedExceptionWritesSingleErrorLogWithThrowable() {
     RuntimeException exception = new RuntimeException("boom");
@@ -126,6 +135,7 @@ class GlobalExceptionHandlerTests {
     assertSingleErrorLog(exception, "예상하지 못한");
   }
 
+  @DisplayName("전역 예외 처리기는 기본 생성자로 생성할 수 있다.")
   @Test
   void handlerUsesDefaultConstructor() {
     assertThat(GlobalExceptionHandler.class.getDeclaredConstructors())

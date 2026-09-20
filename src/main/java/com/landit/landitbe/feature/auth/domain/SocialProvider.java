@@ -2,8 +2,8 @@
 
 package com.landit.landitbe.feature.auth.domain;
 
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 
 /** 소셜 로그인을 지원하는 OIDC 제공자를 정의한다. */
 public enum SocialProvider {
@@ -18,6 +18,6 @@ public enum SocialProvider {
         return provider;
       }
     }
-    throw new ApiException(ErrorCode.UNSUPPORTED_SOCIAL_PROVIDER);
+    throw new ApiException(AuthErrorCode.UNSUPPORTED_SOCIAL_PROVIDER);
   }
 }

@@ -4,12 +4,14 @@ package com.landit.landitbe.feature.admin.service;
 
 import com.landit.landitbe.feature.admin.dto.AdminUserDetailResponse;
 import com.landit.landitbe.feature.admin.dto.AdminUserListResponse;
+import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
 import com.landit.landitbe.feature.character.service.StreakService;
-import com.landit.landitbe.feature.content.service.ScenarioProgressionService;
-import com.landit.landitbe.feature.content.service.ScenarioQueryService;
-import com.landit.landitbe.feature.learning.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.scenario.access.service.ScenarioAccessService;
+import com.landit.landitbe.feature.learning.scenario.selection.dto.CurrentScenario;
+import com.landit.landitbe.feature.learning.scenario.selection.service.CurrentScenarioSelectionService;
+import com.landit.landitbe.feature.learning.scenario.selection.service.ScenarioQueryService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
-import com.landit.landitbe.feature.profile.dto.AdminUserProfile;
+import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.time.Clock;
@@ -25,7 +27,7 @@ public class AdminUserQueryService {
   private final UserProfileService userProfileService;
   private final ScenarioAccessService scenarioAccessService;
   private final StreakService streakService;
-  private final ScenarioProgressionService scenarioProgressionService;
+  private final CurrentScenarioSelectionService currentScenarioSelectionService;
   private final ScenarioQueryService scenarioQueryService;
   private final Clock clock;
 
@@ -41,7 +43,7 @@ public class AdminUserQueryService {
   @Transactional(readOnly = true)
   public AdminUserListResponse getUsers(int page, int size, Boolean active, Boolean pushConsent) {
     return AdminUserListResponse.from(
-        userProfileService.getAdminUserProfiles(page, size, active, pushConsent));
+        userProfileService.getUserProfiles(page, size, active, pushConsent));
   }
 
   /**
@@ -53,11 +55,11 @@ public class AdminUserQueryService {
    */
   @Transactional(readOnly = true)
   public AdminUserDetailResponse getUser(long userProfileId) {
-    AdminUserProfile profile = userProfileService.getAdminUserProfile(userProfileId);
+    UserProfileDetails profile = userProfileService.getUserProfileDetails(userProfileId);
 
     long completedScenarioCount =
         scenarioAccessService.countCompletedScenarios(userProfileId, profile.targetLocale());
-    StreakService.LearningActivitySummary activitySummary =
+    LearningActivitySummary activitySummary =
         streakService.getLearningActivitySummary(userProfileId);
 
     // 비활성 사용자는 더 이상 학습 대상이 아니므로
@@ -75,9 +77,9 @@ public class AdminUserQueryService {
    * @param profile 관리자 사용자 프로필
    * @return 현재 제공 대상 시나리오. 제공할 시나리오가 없으면 null
    */
-  private AdminUserDetailResponse.CurrentScenario findCurrentScenario(AdminUserProfile profile) {
-    ScenarioProgressionService.CurrentScenario currentScenario =
-        scenarioProgressionService
+  private AdminUserDetailResponse.CurrentScenario findCurrentScenario(UserProfileDetails profile) {
+    CurrentScenario currentScenario =
+        currentScenarioSelectionService
             .findCurrentScenario(profile.userProfileId(), profile.targetLocale(), clock.instant())
             .orElse(null);
     if (currentScenario == null) {

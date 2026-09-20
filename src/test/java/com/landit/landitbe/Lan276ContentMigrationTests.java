@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -48,6 +49,7 @@ class Lan276ContentMigrationTests {
           "runn",
           "struggl");
 
+  @DisplayName("수정 대상으로 확인한 표현만 빠짐없이 교정한다.")
   @Test
   void migrationFixesAllDetectedExpressionsOnly() throws Exception {
     String migrationSql = readMigrationSql();
@@ -63,6 +65,7 @@ class Lan276ContentMigrationTests {
         .hasSize(FIXED_EXPRESSION_IDS.size() + 1);
   }
 
+  @DisplayName("표현 교정 후 존재하지 않는 단어가 남지 않는다.")
   @Test
   void migrationLeavesNoNonExistentWords() throws Exception {
     String migrationSql = readMigrationSql();
@@ -73,6 +76,7 @@ class Lan276ContentMigrationTests {
     }
   }
 
+  @DisplayName("표현 교정은 varchar 배열 컬럼에 ARRAY 구문을 사용한다.")
   @Test
   void migrationUsesArraySyntaxForVarcharArrayColumn() throws Exception {
     String migrationSql = readMigrationSql();

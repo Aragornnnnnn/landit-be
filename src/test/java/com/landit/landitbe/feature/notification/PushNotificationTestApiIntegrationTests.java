@@ -12,10 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificationCommand;
+import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import com.landit.landitbe.feature.notification.service.NotificationDispatchService;
-import com.landit.landitbe.feature.notification.service.SendPushNotificationCommand;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,7 @@ class PushNotificationTestApiIntegrationTests {
   }
 
   /** 인증된 요청은 현재 사용자에게 보낼 일반 테스트 알림을 즉시 발송한다. */
+  @DisplayName("인증된 요청은 현재 사용자에게 보낼 일반 테스트 알림을 즉시 발송한다.")
   @Test
   void publishesTestNotificationForAuthenticatedRequest() throws Exception {
     JsonNode loginData = login("push-test-api");
@@ -87,6 +89,7 @@ class PushNotificationTestApiIntegrationTests {
   }
 
   /** 인증되지 않은 요청은 dev 테스트 API를 실행할 수 없다. */
+  @DisplayName("인증되지 않은 요청은 dev 테스트 API를 실행할 수 없다.")
   @Test
   void rejectsRequestWithoutAccessToken() throws Exception {
     mockMvc.perform(post(TEST_ENDPOINT)).andExpect(status().isUnauthorized());

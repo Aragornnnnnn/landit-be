@@ -18,6 +18,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -85,6 +86,7 @@ class DailyScenarioApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM category");
   }
 
+  @DisplayName("완료 기록이 없는 과거 날짜는 일일 시나리오가 없는 응답을 반환한다.")
   @Test
   void dailyScenarioReturnsNoScenarioForPastDateWithoutCompletion() throws Exception {
     JsonNode loginResponseBody = login();
@@ -102,6 +104,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario").value(nullValue()));
   }
 
+  @DisplayName("학습 수준이 올라가도 과거 표현과 진도에 접근할 수 있다.")
   @Test
   void pastExpressionsAndProgressRemainAccessibleAfterPromotion() throws Exception {
     JsonNode loginResponseBody = login();
@@ -158,6 +161,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(status().isOk());
   }
 
+  @DisplayName("현재 시나리오 중 노출 순서가 가장 빠른 항목과 표현 진도를 반환한다.")
   @Test
   void dailyScenarioReturnsLowestDisplayOrderCurrentScenarioAndExpressionProgress()
       throws Exception {
@@ -192,6 +196,7 @@ class DailyScenarioApiIntegrationTests {
                 .value("aura-2-luna-en"));
   }
 
+  @DisplayName("시나리오 ID와 노출 순서가 다르면 노출 순서를 우선한다.")
   @Test
   void dailyScenarioPrefersDisplayOrderOverIdWhenOrdersDiverge() throws Exception {
     JsonNode loginResponseBody = login();
@@ -221,6 +226,7 @@ class DailyScenarioApiIntegrationTests {
                 .value("https://cdn.example.com/questions/1002.mp3"));
   }
 
+  @DisplayName("과거 완료 날짜를 조회하면 해당 날짜에 완료한 시나리오를 반환한다.")
   @Test
   void dailyScenarioReturnsClearedScenarioForPastCompletionDate() throws Exception {
     JsonNode loginResponseBody = login();
@@ -244,6 +250,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.starRating").value(3.0));
   }
 
+  @DisplayName("같은 날 여러 시나리오를 완료했다면 가장 먼저 완료한 항목을 반환한다.")
   @Test
   void dailyScenarioReturnsEarliestCompletionWhenMultipleScenariosWereClearedOnTheSameDate()
       throws Exception {
@@ -264,6 +271,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completedAt").value("2026-07-27T10:00:00+09:00"));
   }
 
+  @DisplayName("오늘 시나리오를 완료했다면 완료 상태로 반환한다.")
   @Test
   void dailyScenarioReturnsClearedScenarioWhenCompletedToday() throws Exception {
     JsonNode loginResponseBody = login();
@@ -285,6 +293,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completed").value(true));
   }
 
+  @DisplayName("전날 끝내지 않은 시나리오 세션은 재시도 상태로 반환한다.")
   @Test
   void dailyScenarioReturnsRetryForPreviousDayUncompletedSession() throws Exception {
     JsonNode loginResponseBody = login();
@@ -320,6 +329,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.completed").value(false));
   }
 
+  @DisplayName("미래 날짜의 일일 시나리오 조회를 거부한다.")
   @Test
   void dailyScenarioRejectsFutureDate() throws Exception {
     JsonNode loginResponseBody = login();
@@ -335,6 +345,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("일일 시나리오 조회에는 인증이 필요하다.")
   @Test
   void dailyScenarioRequiresAuthentication() throws Exception {
     mockMvc
@@ -343,6 +354,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("조회 날짜가 없으면 오늘의 시나리오를 반환한다.")
   @Test
   void dailyScenarioUsesTodayWhenDateIsMissing() throws Exception {
     JsonNode loginResponseBody = login();
@@ -359,6 +371,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.scenario.scenarioId").value(100));
   }
 
+  @DisplayName("날짜가 없으면 자정 경계에서도 서울 시간으로 오늘을 판단한다.")
   @Test
   void dailyScenarioUsesAsiaSeoulDateWhenDateIsMissingAtMidnightBoundary() throws Exception {
     mutableClock.setInstant(Instant.parse("2026-07-28T15:00:00Z"));
@@ -374,6 +387,7 @@ class DailyScenarioApiIntegrationTests {
         .andExpect(jsonPath("$.data.date").value("2026-07-29"));
   }
 
+  @DisplayName("OpenAPI 문서에 일일 시나리오 API 계약을 명시한다.")
   @Test
   void openApiDocumentsDailyScenarioContract() throws Exception {
     String dailyScenarioPath = "$.paths['/api/v1/scenarios/daily'].get";

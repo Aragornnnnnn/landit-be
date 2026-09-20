@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -29,6 +30,7 @@ class Lan269ContentMigrationTests {
       Pattern.compile(
           "https://d19azau1un4t7r\\.cloudfront\\.net/content/scenarios/(\\d+)/expressions/(\\d+)/practice-examples/[^\\\"]+\\.png");
 
+  @DisplayName("시나리오 썸네일 URL을 빠짐없이 마이그레이션한다.")
   @Test
   void migrationContainsAllScenarioThumbnailUrls() throws Exception {
     String migrationSql = readMigrationSql();
@@ -46,6 +48,7 @@ class Lan269ContentMigrationTests {
         .isEqualTo("c606f53ab414db1d513c379508c311de51d535531ee1f795af8b0f51a48e1ecd");
   }
 
+  @DisplayName("모든 작문 표현과 연습 예문의 URL을 마이그레이션한다.")
   @Test
   void migrationContainsAllWritingExpressionsAndPracticeExampleUrls() throws Exception {
     String migrationSql = readMigrationSql();

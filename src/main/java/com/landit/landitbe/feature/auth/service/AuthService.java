@@ -15,16 +15,16 @@ import com.landit.landitbe.feature.auth.dto.LogoutRequest;
 import com.landit.landitbe.feature.auth.dto.SocialLoginRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
-import com.landit.landitbe.feature.content.service.AiTutorService;
+import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
+import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,7 @@ public class AuthService {
   private static final AccentLocale DEFAULT_AI_TUTOR_ACCENT_LOCALE = AccentLocale.EN_US;
   private static final Locale DEFAULT_AI_TUTOR_TARGET_LOCALE = Locale.EN;
 
-  private final UserProfileService userProfileService;
+  private final ProfileAuthenticationService profileAuthenticationService;
   private final AiTutorService aiTutorService;
   private final OauthIdentityRepository oauthIdentityRepository;
   private final RefreshTokenRepository refreshTokenRepository;
@@ -52,7 +52,7 @@ public class AuthService {
   /**
    * 로그인부터 토큰 발급까지 필요한 인증 협력 객체를 주입받는다.
    *
-   * @param userProfileService 사용자 프로필 Service
+   * @param profileAuthenticationService 사용자 프로필 Service
    * @param aiTutorService AI 튜터 Service
    * @param oauthIdentityRepository OAuth 연결 Repository
    * @param refreshTokenRepository Refresh token Repository
@@ -62,7 +62,7 @@ public class AuthService {
    * @param tokenProperties 자체 토큰 설정
    */
   public AuthService(
-      UserProfileService userProfileService,
+      ProfileAuthenticationService profileAuthenticationService,
       AiTutorService aiTutorService,
       OauthIdentityRepository oauthIdentityRepository,
       RefreshTokenRepository refreshTokenRepository,
@@ -70,7 +70,7 @@ public class AuthService {
       ConversationMemoryDeletionService conversationMemoryDeletionService,
       LanditTokenService tokenService,
       TokenProperties tokenProperties) {
-    this.userProfileService = userProfileService;
+    this.profileAuthenticationService = profileAuthenticationService;
     this.aiTutorService = aiTutorService;
     this.oauthIdentityRepository = oauthIdentityRepository;
     this.refreshTokenRepository = refreshTokenRepository;
@@ -124,14 +124,14 @@ public class AuthService {
     Long userProfileId =
         refreshTokenRepository
             .findUserProfileIdByTokenHash(refreshTokenHash)
-            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+            .orElseThrow(() -> new ApiException(AuthErrorCode.REFRESH_TOKEN_INVALID));
     AuthProfile authProfile =
-        userProfileService
+        profileAuthenticationService
             .findAuthenticationProfileForUpdate(userProfileId)
-            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+            .orElseThrow(() -> new ApiException(AuthErrorCode.REFRESH_TOKEN_INVALID));
     LocalDateTime now = LocalDateTime.now();
     if (refreshTokenRepository.revokeActiveByTokenHash(refreshTokenHash, now) != 1) {
-      throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.REFRESH_TOKEN_INVALID);
     }
     IssuedTokens issuedTokens = issueTokens(authProfile);
     TokenRefreshResponse response =
@@ -155,7 +155,7 @@ public class AuthService {
     String refreshTokenHash = tokenService.hashToken(request.refreshToken());
     refreshTokenRepository
         .findUserProfileIdByTokenHash(refreshTokenHash)
-        .flatMap(userProfileService::findAuthenticationProfileForUpdate)
+        .flatMap(profileAuthenticationService::findAuthenticationProfileForUpdate)
         .ifPresent(
             ignored ->
                 refreshTokenRepository.revokeActiveByTokenHash(
@@ -171,8 +171,8 @@ public class AuthService {
    */
   @Transactional
   public void withdraw(Long userId) {
-    if (!userProfileService.withdrawIfActiveForUpdate(userId)) {
-      throw new ApiException(ErrorCode.INVALID_TOKEN);
+    if (!profileAuthenticationService.withdrawIfActiveForUpdate(userId)) {
+      throw new ApiException(AuthErrorCode.INVALID_TOKEN);
     }
     conversationMemoryDeletionService.deleteAllByUserProfileId(userId);
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
@@ -199,10 +199,10 @@ public class AuthService {
         .map(
             identity -> {
               AuthProfile authProfile =
-                  userProfileService
+                  profileAuthenticationService
                       .updateAuthenticationProfileForUpdate(
                           identity.getUserProfileId(), userInfo.email(), nickname)
-                      .orElseThrow(() -> new ApiException(ErrorCode.INVALID_TOKEN));
+                      .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_TOKEN));
               identity.updateProviderEmail(userInfo.email());
               return new UserResult(authProfile, identity.getProvider(), false);
             })
@@ -210,7 +210,7 @@ public class AuthService {
             () -> {
               Long defaultAiTutorId = requireDefaultAiTutorId();
               AuthProfile authProfile =
-                  userProfileService.createAuthenticationProfile(
+                  profileAuthenticationService.createAuthenticationProfile(
                       userInfo.email(),
                       nickname == null ? GUEST_NICKNAME : nickname,
                       defaultAiTutorId);

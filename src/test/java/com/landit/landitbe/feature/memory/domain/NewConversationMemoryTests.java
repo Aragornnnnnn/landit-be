@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 장기기억 입력 도메인의 생성 불변식을 검증한다. */
@@ -17,6 +18,7 @@ class NewConversationMemoryTests {
 
   private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 25, 12, 0);
 
+  @DisplayName("프로필과 사건 기억이 각각 허용된 범위를 사용하면 생성한다.")
   @Test
   void acceptsProfileAndEventWithExpectedScope() {
     NewConversationMemory profile =
@@ -35,16 +37,19 @@ class NewConversationMemoryTests {
     assertThat(event.characterId()).isEqualTo("chloe");
   }
 
+  @DisplayName("사용자 프로필 ID가 0 이하이면 기억 생성을 거부한다.")
   @Test
   void rejectsNonPositiveUserProfileId() {
     assertInvalid(fixture -> fixture.userProfileId = 0);
   }
 
+  @DisplayName("프로필 기억에 캐릭터 ID가 있으면 거부한다.")
   @Test
   void rejectsProfileWithCharacterId() {
     assertInvalid(fixture -> fixture.memoryType = ConversationMemoryType.PROFILE);
   }
 
+  @DisplayName("사건 및 에피소드 기억에 캐릭터 ID가 없으면 거부한다.")
   @Test
   void rejectsEventAndEpisodeWithoutCharacterId() {
     assertInvalid(fixture -> fixture.characterId = " ");
@@ -55,6 +60,7 @@ class NewConversationMemoryTests {
         });
   }
 
+  @DisplayName("기억 유효 종료 시각을 보존하고 역전된 유효 기간은 거부한다.")
   @Test
   void preservesValidToAndRejectsReversedValidity() {
     LocalDateTime validTo = NOW.plusDays(1);
@@ -66,12 +72,14 @@ class NewConversationMemoryTests {
         .hasMessage("기억 유효 종료 시각이 시작 시각보다 빠릅니다.");
   }
 
+  @DisplayName("기억 본문이 비어 있거나 너무 길면 거부한다.")
   @Test
   void rejectsBlankOrTooLongContent() {
     assertInvalid(fixture -> fixture.content = " ");
     assertInvalid(fixture -> fixture.content = "a".repeat(501));
   }
 
+  @DisplayName("유효 범위를 벗어난 기억 신뢰도를 거부한다.")
   @Test
   void rejectsInvalidConfidence() {
     for (double confidence : new double[] {-0.01, 1.01, Double.NaN, Double.POSITIVE_INFINITY}) {
@@ -79,6 +87,7 @@ class NewConversationMemoryTests {
     }
   }
 
+  @DisplayName("필수 시간 정보나 메타데이터가 없는 기억을 거부한다.")
   @Test
   void rejectsMissingTemporalValuesAndMetadata() {
     assertInvalid(fixture -> fixture.validFrom = null);
@@ -92,6 +101,7 @@ class NewConversationMemoryTests {
     assertInvalid(fixture -> fixture.embeddingModel = " ");
   }
 
+  @DisplayName("기억의 유효 기간이 올바르면 null 종료 시각을 허용한다.")
   @Test
   void preservesNullableValidToWhenTemporalRangeIsValid() {
     NewConversationMemory memory = memory(fixture -> fixture.validTo = NOW.plusDays(1));
@@ -99,6 +109,7 @@ class NewConversationMemoryTests {
     assertThat(memory.validTo()).isEqualTo(NOW.plusDays(1));
   }
 
+  @DisplayName("임베딩의 차원이나 구성 값이 잘못되면 기억 생성을 거부한다.")
   @Test
   void rejectsInvalidEmbeddingShapeAndComponents() {
     assertInvalid(fixture -> fixture.embedding = List.of(0.1f));
@@ -113,6 +124,7 @@ class NewConversationMemoryTests {
     assertInvalid(fixture -> fixture.embedding = withInfinity);
   }
 
+  @DisplayName("기억 본문의 주변 공백을 제거하고 임베딩을 방어적으로 복사한다.")
   @Test
   void trimsTextAndDefensivelyCopiesEmbedding() {
     List<Float> embedding = validEmbedding();

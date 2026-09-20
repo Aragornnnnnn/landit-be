@@ -326,12 +326,17 @@ class AdminUserApiIntegrationTests {
                   .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
           .andExpect(status().isBadRequest());
     }
-    mockMvc
-        .perform(
-            get("/api/v1/admin/users")
-                .param("size", "51")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
-        .andExpect(status().isBadRequest());
+    for (String[] parameters :
+        List.of(new String[] {"0", "51"}, new String[] {"-1", "20"}, new String[] {"0", "0"})) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/users")
+                  .param("page", parameters[0])
+                  .param("size", parameters[1])
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminAccessToken))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
   }
 
   @DisplayName("관리자 사용자 목록과 상세 API를 OpenAPI 문서에 노출한다.")
@@ -359,9 +364,9 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath("$.paths['/api/v1/admin/users/{userProfileId}'].get.summary").exists());
   }
 
-  @DisplayName("관리자 사용자와 로그인 응답의 OpenAPI required 및 nullable 계약을 노출한다.")
+  @DisplayName("관리자 사용자 목록의 항목과 페이지 필수 필드 및 nullable 이메일 계약을 노출한다.")
   @Test
-  void documentsAdminUserAndLoginResponseContracts() throws Exception {
+  void documentsAdminUserListResponseContract() throws Exception {
     String schemas = "$.components.schemas.";
 
     mockMvc
@@ -386,7 +391,17 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'role')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'status')]").exists())
         .andExpect(jsonPath(schemas + "AdminUserListItem.required[?(@ == 'createdAt')]").exists())
-        .andExpect(jsonPath(schemas + "AdminUserListItem.properties.email.type[1]").value("null"))
+        .andExpect(jsonPath(schemas + "AdminUserListItem.properties.email.type[1]").value("null"));
+  }
+
+  @DisplayName("관리자 사용자 상세의 필수 필드와 nullable 계약을 노출한다.")
+  @Test
+  void documentsAdminUserDetailResponseContract() throws Exception {
+    String schemas = "$.components.schemas.";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
         .andExpect(
             jsonPath(schemas + "AdminUserDetailResponse.required[?(@ == 'userProfileId')]")
                 .exists())
@@ -424,7 +439,17 @@ class AdminUserApiIntegrationTests {
                 .value("null"))
         .andExpect(
             jsonPath(schemas + "AdminUserDetailResponse.properties.aiTutorId.type[1]")
-                .value("null"))
+                .value("null"));
+  }
+
+  @DisplayName("학습 요약과 현재 시나리오의 필수 필드 및 nullable 계약을 노출한다.")
+  @Test
+  void documentsLearningSummaryResponseContract() throws Exception {
+    String schemas = "$.components.schemas.";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
         .andExpect(
             jsonPath(schemas + "LearningSummary.required[?(@ == 'completedScenarioCount')]")
                 .exists())
@@ -442,7 +467,17 @@ class AdminUserApiIntegrationTests {
         .andExpect(jsonPath(schemas + "CurrentScenario.required[?(@ == 'scenarioTitle')]").exists())
         .andExpect(jsonPath(schemas + "CurrentScenario.required[?(@ == 'displayOrder')]").exists())
         .andExpect(
-            jsonPath(schemas + "CurrentScenario.required[?(@ == 'dailyScenarioType')]").exists())
+            jsonPath(schemas + "CurrentScenario.required[?(@ == 'dailyScenarioType')]").exists());
+  }
+
+  @DisplayName("인증 토큰 응답의 필수 필드를 노출한다.")
+  @Test
+  void documentsAuthTokenResponseContract() throws Exception {
+    String schemas = "$.components.schemas.";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
         .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'tokenType')]").exists())
         .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'accessToken')]").exists())
         .andExpect(
@@ -453,7 +488,17 @@ class AdminUserApiIntegrationTests {
         .andExpect(
             jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'refreshTokenExpiresIn')]")
                 .exists())
-        .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'user')]").exists())
+        .andExpect(jsonPath(schemas + "AuthTokenResponse.required[?(@ == 'user')]").exists());
+  }
+
+  @DisplayName("로그인 사용자 응답의 필수 필드와 nullable 이메일 계약을 노출한다.")
+  @Test
+  void documentsAuthUserResponseContract() throws Exception {
+    String schemas = "$.components.schemas.";
+
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
         .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'userId')]").exists())
         .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'nickname')]").exists())
         .andExpect(jsonPath(schemas + "AuthUserResponse.required[?(@ == 'email')]").exists())

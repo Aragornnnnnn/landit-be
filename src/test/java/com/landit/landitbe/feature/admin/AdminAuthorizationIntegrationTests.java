@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +39,7 @@ class AdminAuthorizationIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 관리자 역할이 아닌 일반 로그인 사용자는 관리자 경로에 접근할 수 없다. */
+  @DisplayName("관리자 역할이 아닌 일반 로그인 사용자는 관리자 경로에 접근할 수 없다.")
   @Test
   void rejectsAuthenticatedNonAdminFromAdminPath() throws Exception {
     String accessToken = login("admin-access-denied");
@@ -49,6 +51,7 @@ class AdminAuthorizationIntegrationTests {
   }
 
   /** 관리자 역할이 아닌 일반 로그인 사용자는 정확한 관리자 루트에도 접근할 수 없다. */
+  @DisplayName("관리자 역할이 아닌 일반 로그인 사용자는 정확한 관리자 루트에도 접근할 수 없다.")
   @Test
   void rejectsAuthenticatedNonAdminFromExactAdminRootPath() throws Exception {
     String accessToken = login("admin-root-access-denied");
@@ -59,6 +62,7 @@ class AdminAuthorizationIntegrationTests {
   }
 
   /** 인코딩된 관리자 경로로 공개 정책 변경 권한을 우회할 수 없다. */
+  @DisplayName("인코딩된 관리자 경로로 공개 정책 변경 권한을 우회할 수 없다.")
   @Test
   void rejectsEncodedAdminPolicyMutation() throws Exception {
     String token = login("encoded-policy-denied");
@@ -76,6 +80,7 @@ class AdminAuthorizationIntegrationTests {
   }
 
   /** 관리자 역할을 가진 사용자는 관리자 경로의 다음 처리 단계까지 도달한다. */
+  @DisplayName("관리자 역할을 가진 사용자는 관리자 경로의 다음 처리 단계까지 도달한다.")
   @Test
   void allowsRegisteredAdminToReachAdminPath() throws Exception {
     String userKey = "admin-access-allowed";

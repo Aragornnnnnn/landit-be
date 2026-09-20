@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,6 +46,7 @@ class ExpressionApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper(); // 응답 JSON 파싱용
 
   /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
+  @DisplayName("토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다.")
   @Test
   void getExpressionsRejectsMissingAccessToken() throws Exception {
     // given: 조회 대상 시나리오와 표현들이 DB에 존재
@@ -60,6 +62,7 @@ class ExpressionApiIntegrationTests {
   }
 
   /** 일부 완료 상태에서 표현이 학습 순서대로 반환되고, 완료/해금/잠김 3가지 상태가 규칙대로 계산되는지 검증한다. */
+  @DisplayName("일부 완료 상태에서 표현이 학습 순서대로 반환되고, 완료/해금/잠김 3가지 상태가 규칙대로 계산되는지 검증한다.")
   @Test
   void getExpressionsReturnsOrderedListWithCompletionAndLockStatus() throws Exception {
     // given: 표현 5개가 있는 시나리오에서 1번 표현만 완료한 사용자
@@ -106,6 +109,7 @@ class ExpressionApiIntegrationTests {
         .andExpect(jsonPath("$.data[4].locked").value(true));
   }
 
+  @DisplayName("사용자 학습 수준보다 어려운 표현은 목록에서 제외한다.")
   @Test
   void getExpressionsExcludesDifficultyAboveLearningLevel() throws Exception {
     Long scenarioId = seedScenarioWithExpressions();
@@ -134,6 +138,7 @@ class ExpressionApiIntegrationTests {
                         org.hamcrest.Matchers.hasItem(advancedExpressionId.intValue()))));
   }
 
+  @DisplayName("학습 수준 2의 사용자에게 난이도 2~3 그룹 표현만 반환한다.")
   @Test
   void getExpressionsReturnsOnlyLevelTwoToThreeDifficultyGroup() throws Exception {
     Long scenarioId = seedScenarioWithExpressions();
@@ -163,6 +168,7 @@ class ExpressionApiIntegrationTests {
   }
 
   /** 모든 표현을 완료한 사용자는 전부 completed=true, locked=false로 받는지 검증한다. (해금 대상이 없는 엣지 케이스) */
+  @DisplayName("모든 표현을 완료한 사용자는 전부 completed=true, locked=false로 받는지 검증한다.")
   @Test
   void getExpressionsUnlocksEveryExpressionWhenAllCompleted() throws Exception {
     // given: 표현 5개를 전부 완료한 사용자
@@ -197,6 +203,7 @@ class ExpressionApiIntegrationTests {
   }
 
   /** 아무것도 완료하지 않은 사용자는 학습 순서 첫 번째 표현만 해금되는지 검증한다. (최초 진입 상태) */
+  @DisplayName("아무것도 완료하지 않은 사용자는 학습 순서 첫 번째 표현만 해금되는지 검증한다.")
   @Test
   void getExpressionsUnlocksOnlyFirstWhenNoneCompleted() throws Exception {
     // given: 아무 표현도 완료하지 않은 사용자
@@ -227,6 +234,7 @@ class ExpressionApiIntegrationTests {
   }
 
   /** 존재하지 않는 시나리오 ID로 호출하면 404(SCENARIO_NOT_FOUND)로 거절되는지 검증한다. */
+  @DisplayName("존재하지 않는 시나리오 ID로 호출하면 404(SCENARIO_NOT_FOUND)로 거절되는지 검증한다.")
   @Test
   void getExpressionsRejectsUnknownScenario() throws Exception {
     // given: 로그인만 하고, 시나리오는 심지 않은 상태
@@ -247,6 +255,7 @@ class ExpressionApiIntegrationTests {
    * 다국어 데이터가 섞여 있어도 사용자 locale(en/ko)의 표현만 반환되는지 검증한다. locale이 다른 표현은 displayOrder가 겹칠 수
    * 있어서(UNIQUE가 locale 조합별), 필터가 없으면 응답에 섞여 들어가고 순차 해금 순서도 깨진다.
    */
+  @DisplayName("다국어 데이터가 섞여 있어도 사용자 언어에 맞는 표현만 반환한다.")
   @Test
   void getExpressionsReturnsOnlyUserLocaleExpressions() throws Exception {
     // given: en-ko 표현 5개가 있는 시나리오에 en-ja 표현 1개(displayOrder 1 중복)를 추가로 심는다

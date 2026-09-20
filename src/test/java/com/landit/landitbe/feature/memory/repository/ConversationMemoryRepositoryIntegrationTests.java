@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,6 +73,7 @@ class ConversationMemoryRepositoryIntegrationTests {
     jdbcTemplate.update("delete from user_profile where id between ? and ?", USER_ID, USER_ID + 2);
   }
 
+  @DisplayName("활성 기억과 출처의 유효 기간을 저장하고 대체 및 무효화 정보는 비워 둔다.")
   @Test
   void savesActiveMemoryAndItsSourceWithValidityAndNullableStateUnset() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
@@ -104,6 +106,7 @@ class ConversationMemoryRepositoryIntegrationTests {
         .isTrue();
   }
 
+  @DisplayName("출처 ID가 비어 있거나 중복이거나 0 이하이면 기억 저장 전에 거부한다.")
   @Test
   void rejectsEmptyDuplicateAndNonPositiveSourceIdsBeforeInsert() {
     seedConversation(
@@ -124,6 +127,7 @@ class ConversationMemoryRepositoryIntegrationTests {
     assertThat(countMemoriesForUser(USER_ID + 1)).isEqualTo(before);
   }
 
+  @DisplayName("출처 외래 키 저장이 실패하면 기억 저장도 롤백한다.")
   @Test
   void rollsBackMemoryWhenSourceForeignKeyFails() {
     seedConversation(
@@ -136,6 +140,7 @@ class ConversationMemoryRepositoryIntegrationTests {
     assertThat(countMemoriesForUser(USER_ID + 2)).isZero();
   }
 
+  @DisplayName("탈퇴 시 기억과 출처 및 프리톡 기억 검색 이력을 삭제한다.")
   @Test
   void deletesMemorySourceAndFreeTalkRetrievalTraceOnUserWithdrawal() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
@@ -171,6 +176,7 @@ class ConversationMemoryRepositoryIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("활성 기억만 대체하며 새 기억 시작 시각으로 기존 유효 기간을 닫는다.")
   @Test
   void supersedesOnlyActiveMemoryAndClosesItsValidityAtNewMemoryStart() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);

@@ -5,38 +5,15 @@ package com.landit.landitbe.shared.exception;
 import org.springframework.http.HttpStatus;
 
 /** 공통 예외가 사용할 애플리케이션 오류 코드와 HTTP 상태를 정의한다. */
-public enum ErrorCode {
+public enum ErrorCode implements ApiErrorCode {
   VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
   INVALID_REQUEST(HttpStatus.BAD_REQUEST, "잘못된 요청입니다."),
-  INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
-  ACCESS_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "인증 토큰이 만료됐습니다."),
-  REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "재발급 토큰이 올바르지 않습니다."),
   FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
-  CATEGORY_LOCKED(HttpStatus.FORBIDDEN, "잠긴 카테고리입니다."),
-  SCENARIO_LOCKED(HttpStatus.FORBIDDEN, "잠긴 시나리오입니다."),
-  EXPRESSION_LOCKED(HttpStatus.FORBIDDEN, "잠긴 표현입니다."),
   RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
-  SCENARIO_NOT_FOUND(HttpStatus.NOT_FOUND, "시나리오를 찾을 수 없습니다."),
-  SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션을 찾을 수 없습니다."),
-  IDEMPOTENCY_KEY_CONFLICT(HttpStatus.CONFLICT, "같은 요청 키에 다른 입력을 사용할 수 없습니다."),
-  PUSH_PAYLOAD_TOO_LARGE(HttpStatus.BAD_REQUEST, "푸시 메시지가 허용 크기를 초과했습니다."),
   SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "요청 기능의 외부 연동 설정을 확인해 주세요."),
   CONFLICT(HttpStatus.CONFLICT, "요청이 현재 상태와 충돌합니다."),
-  SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 세션입니다."),
-  SESSION_NOT_COMPLETED(HttpStatus.CONFLICT, "완료되지 않은 세션입니다."),
-  FEEDBACK_NOT_READY(HttpStatus.CONFLICT, "메시지별 피드백이 아직 준비되지 않았습니다."),
   AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI 응답 형식이 올바르지 않습니다."),
   AI_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 응답 생성에 실패했습니다."),
-  PRONUNCIATION_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "발음 분석에 실패했습니다."),
-  PRONUNCIATION_DATA_NOT_FOUND(HttpStatus.NOT_FOUND, "발음 데이터가 없습니다."),
-  INVALID_AUDIO(HttpStatus.BAD_REQUEST, "지원하지 않는 오디오입니다."),
-  FEEDBACK_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "최종 피드백 생성에 실패했습니다."),
-  UNSUPPORTED_SOCIAL_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 소셜 로그인 제공자입니다."),
-  OIDC_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "소셜 로그인 토큰이 올바르지 않습니다."),
-  OIDC_NONCE_MISMATCH(HttpStatus.BAD_REQUEST, "소셜 로그인 요청 검증 값이 일치하지 않습니다."),
-  OIDC_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "소셜 로그인 제공자 검증에 실패했습니다."),
-  APP_VERSION_POLICY_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "앱 버전 정책이 올바르게 설정되지 않았습니다."),
-  DEFAULT_AI_TUTOR_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "기본 AI 튜터가 올바르게 설정되지 않았습니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
 
   private final HttpStatus status;

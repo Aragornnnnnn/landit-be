@@ -5,16 +5,19 @@ package com.landit.landitbe.feature.memory.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationContextService;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,6 +44,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
   @Autowired private ConversationMemoryWriteService writeService;
 
+  @Autowired private FreeTalkMemoryGenerationContextService contextService;
+
   @AfterEach
   void clearFixtures() {
     jdbcTemplate.update(
@@ -64,15 +69,14 @@ class ConversationMemoryWriteServiceIntegrationTests {
     jdbcTemplate.update("delete from user_profile where id = ?", OTHER_USER_ID);
   }
 
+  @DisplayName("기억 추가와 출처 계보를 원자적으로 저장한다.")
   @Test
-  void storesAddAndSourceLineageThenCompletesSessionAtomically() {
+  void storesAddAndSourceLineageAtomically() {
     seedCompletedPreparingSession();
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+        contextService.persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
     assertThat(countMemories()).isEqualTo(1);
@@ -80,21 +84,21 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @DisplayName("기억 무시 계획은 새 기억 없이 준비 완료로 저장한다.")
   @Test
   void storesIgnoreAsReadyWithoutAddingMemory() {
     seedCompletedPreparingSession();
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())));
+        contextService.persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
     assertThat(countMemories()).isZero();
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @DisplayName("활성 기억 여러 개를 대체하고 새 기억의 출처 계보를 저장한다.")
   @Test
   void supersedesMultipleActiveMemoriesAndStoresTheNewSourceLineage() {
     seedCompletedPreparingSession();
@@ -102,9 +106,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
     seedMemory(SECOND_OLD_MEMORY_ID, "second old memory", "ACTIVE");
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
+        contextService.persistAndComplete(
+            generationRequest(),
             List.of(
                 plan(
                     AiMemoryOperation.SUPERSEDE,
@@ -130,22 +133,22 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @DisplayName("조회했던 기억 ID와 순서가 바뀌면 오래된 계획으로 판단하고 아무것도 저장하지 않는다.")
   @Test
   void returnsStaleAndWritesNothingWhenOrderedSnapshotIdsChanged() {
     seedCompletedPreparingSession();
     seedMemory(FIRST_OLD_MEMORY_ID, "new comparable memory", "ACTIVE");
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+        contextService.persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STALE);
     assertThat(countMemories()).isEqualTo(1);
     assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
   }
 
+  @DisplayName("대체 대상 하나라도 잘못되면 새 기억과 앞선 대체 작업을 모두 롤백한다.")
   @Test
   void rollsBackNewMemoryAndEarlierSupersedesWhenOneTargetIsInvalid() {
     seedCompletedPreparingSession();
@@ -154,7 +157,6 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThatThrownBy(
             () ->
                 writeService.persistIfSnapshotCurrent(
-                    LEARNING_SESSION_ID,
                     USER_ID,
                     List.of(
                         plan(
@@ -169,9 +171,32 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
     assertThat(countMemories()).isEqualTo(1);
     assertThat(statusOf(FIRST_OLD_MEMORY_ID)).isEqualTo("ACTIVE");
-    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
   }
 
+  @DisplayName("기억 저장 후 세션 완료 처리에 실패하면 기억 저장도 롤백한다.")
+  @Test
+  void rollsBackMemoryWhenSessionCompletionFailsAfterMemoryWrite() {
+    seedCompletedPreparingSession();
+    jdbcTemplate.update(
+        "update free_talk_session set memory_generation_status = 'READY', "
+            + "memory_generation_started_at = null where id = ?",
+        FREE_TALK_SESSION_ID);
+
+    ConversationMemoryGenerationRequest request =
+        new ConversationMemoryGenerationRequest(
+            LEARNING_SESSION_ID, USER_ID, "chloe", "EN", "KR", "Asia/Seoul", List.of());
+
+    assertThatThrownBy(
+            () ->
+                contextService.persistAndComplete(
+                    request, List.of(plan(AiMemoryOperation.ADD, List.of(), List.of()))))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(countMemories()).isZero();
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("스냅샷이나 사용자 범위를 벗어난 대체 대상은 저장 전에 거부한다.")
   @Test
   void rejectsSupersedeTargetOutsideSnapshotAndUserScopeBeforeWriting() {
     seedCompletedPreparingSession();
@@ -181,7 +206,6 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThatThrownBy(
             () ->
                 writeService.persistIfSnapshotCurrent(
-                    LEARNING_SESSION_ID,
                     USER_ID,
                     List.of(
                         plan(
@@ -192,13 +216,17 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
     assertThat(countMemories()).isZero();
     assertThat(statusOf(OTHER_USER_MEMORY_ID)).isEqualTo("ACTIVE");
-    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
   }
 
   private ConversationMemoryResolutionPlan plan(
       AiMemoryOperation operation, List<Long> supersededMemoryIds, List<Long> snapshotMemoryIds) {
     return new ConversationMemoryResolutionPlan(
         newMemory(), List.of(SOURCE_MESSAGE_ID), snapshotMemoryIds, operation, supersededMemoryIds);
+  }
+
+  private ConversationMemoryGenerationRequest generationRequest() {
+    return new ConversationMemoryGenerationRequest(
+        LEARNING_SESSION_ID, USER_ID, "chloe", "EN", "KR", "Asia/Seoul", List.of());
   }
 
   private NewConversationMemory newMemory() {

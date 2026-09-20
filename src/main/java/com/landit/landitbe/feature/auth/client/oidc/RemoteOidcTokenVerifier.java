@@ -7,8 +7,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.auth.OidcProperties;
 import com.landit.landitbe.feature.auth.domain.SocialProvider;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -76,7 +76,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
 
     String sub = text(claims.get("sub"));
     if (sub == null || sub.isBlank()) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
     String email = text(claims.get("email"));
     String nickname = nickname(settings, claims, sub);
@@ -109,7 +109,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
   private String[] splitToken(String idToken) {
     String[] parts = idToken.split("\\.");
     if (parts.length != 3) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
     return parts;
   }
@@ -119,13 +119,13 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
       byte[] decoded = BASE64_URL_DECODER.decode(encoded);
       return objectMapper.readValue(decoded, CLAIMS_TYPE);
     } catch (IllegalArgumentException | IOException exception) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
   }
 
   private void verifyAlgorithm(Map<String, Object> header) {
     if (!RS256_ALGORITHM.equals(text(header.get("alg")))) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
   }
 
@@ -136,7 +136,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
       ProviderSettings settings) {
     String kid = text(header.get("kid"));
     if (kid == null || kid.isBlank()) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
 
     try {
@@ -145,12 +145,12 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
       signature.initVerify(publicKey);
       signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
       if (!signature.verify(BASE64_URL_DECODER.decode(parts[2]))) {
-        throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+        throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
       }
     } catch (ApiException exception) {
       throw exception;
     } catch (Exception exception) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
   }
 
@@ -165,7 +165,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
         key = findKey(refreshedJwks, kid);
       }
       if (key == null) {
-        throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+        throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
       }
       JsonNode certificates = key.path("x5c");
       if (certificates.isArray() && !certificates.isEmpty()) {
@@ -175,7 +175,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
     } catch (ApiException exception) {
       throw exception;
     } catch (Exception exception) {
-      throw new ApiException(ErrorCode.OIDC_PROVIDER_UNAVAILABLE);
+      throw new ApiException(AuthErrorCode.OIDC_PROVIDER_UNAVAILABLE);
     }
   }
 
@@ -194,14 +194,14 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
-        throw new ApiException(ErrorCode.OIDC_PROVIDER_UNAVAILABLE);
+        throw new ApiException(AuthErrorCode.OIDC_PROVIDER_UNAVAILABLE);
       }
       return objectMapper.readTree(response.body());
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
-      throw new ApiException(ErrorCode.OIDC_PROVIDER_UNAVAILABLE);
+      throw new ApiException(AuthErrorCode.OIDC_PROVIDER_UNAVAILABLE);
     } catch (IOException exception) {
-      throw new ApiException(ErrorCode.OIDC_PROVIDER_UNAVAILABLE);
+      throw new ApiException(AuthErrorCode.OIDC_PROVIDER_UNAVAILABLE);
     }
   }
 
@@ -219,31 +219,31 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
 
   private void verifyClaims(ProviderSettings settings, Map<String, Object> claims, String nonce) {
     if (!settings.issuers().contains(text(claims.get("iss")))) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
 
     boolean audienceMatched =
         audienceValues(claims.get("aud")).stream().anyMatch(settings.audiences()::contains);
     if (settings.audiences().isEmpty() || !audienceMatched) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
     Instant now = Instant.now();
     long expiration = number(claims.get("exp"));
     long issuedAt = number(claims.get("iat"));
     if (expiration <= now.minusSeconds(ALLOWED_CLOCK_SKEW_SECONDS).getEpochSecond()
         || issuedAt > now.plusSeconds(ALLOWED_CLOCK_SKEW_SECONDS).getEpochSecond()) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
 
     String tokenNonce = text(claims.get("nonce"));
     if (nonce == null || nonce.isBlank() || tokenNonce == null || tokenNonce.isBlank()) {
-      throw new ApiException(ErrorCode.OIDC_NONCE_MISMATCH);
+      throw new ApiException(AuthErrorCode.OIDC_NONCE_MISMATCH);
     }
 
     byte[] expected = tokenNonce.getBytes(StandardCharsets.UTF_8);
     byte[] actual = nonce.getBytes(StandardCharsets.UTF_8);
     if (!MessageDigest.isEqual(expected, actual)) {
-      throw new ApiException(ErrorCode.OIDC_NONCE_MISMATCH);
+      throw new ApiException(AuthErrorCode.OIDC_NONCE_MISMATCH);
     }
   }
 
@@ -279,7 +279,7 @@ public class RemoteOidcTokenVerifier implements OidcTokenVerifier {
     try {
       return Long.parseLong(text(value));
     } catch (NumberFormatException exception) {
-      throw new ApiException(ErrorCode.OIDC_TOKEN_INVALID);
+      throw new ApiException(AuthErrorCode.OIDC_TOKEN_INVALID);
     }
   }
 

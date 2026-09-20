@@ -2,13 +2,15 @@
 
 package com.landit.landitbe.feature.subscription.service;
 
-import com.landit.landitbe.feature.learning.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.learning.scenario.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
-import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
+import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
-import com.landit.landitbe.feature.subscription.repository.SubscriptionEventRepository;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
+import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserSubscriptionService {
 
   private final UserProfileService userProfileService;
-  private final LearningProgressService learningProgressService;
+  private final ProfileSubscriptionService profileSubscriptionService;
+  private final ScenarioProgressService scenarioProgressService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final SubscriptionLaunchPolicyService policies;
   private final LearningAccessGrantService grants;
@@ -26,20 +29,23 @@ public class UserSubscriptionService {
   /**
    * 구독 상태와 동일한 실행 정책을 조회할 협력 Service를 주입받는다.
    *
-   * @param userProfileService 구독 상태 스냅샷을 제공하는 프로필 Service
-   * @param learningProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
+   * @param userProfileService 활성 사용자 여부를 확인하는 프로필 Service
+   * @param profileSubscriptionService 구독 상태 스냅샷을 제공하는 프로필 Service
+   * @param scenarioProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
    * @param subscriptionEventRepository 결제 이력 Repository
    * @param policies 서버 실행 정책
    * @param grants 저장된 학습 권한
    */
   public UserSubscriptionService(
       UserProfileService userProfileService,
-      LearningProgressService learningProgressService,
+      ProfileSubscriptionService profileSubscriptionService,
+      ScenarioProgressService scenarioProgressService,
       SubscriptionEventRepository subscriptionEventRepository,
       SubscriptionLaunchPolicyService policies,
       LearningAccessGrantService grants) {
     this.userProfileService = userProfileService;
-    this.learningProgressService = learningProgressService;
+    this.profileSubscriptionService = profileSubscriptionService;
+    this.scenarioProgressService = scenarioProgressService;
     this.subscriptionEventRepository = subscriptionEventRepository;
     this.policies = policies;
     this.grants = grants;
@@ -57,7 +63,7 @@ public class UserSubscriptionService {
    */
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
-    UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
+    UserSubscriptionSnapshot snapshot = profileSubscriptionService.getSubscription(userId);
     var policy = policies.current();
     boolean enabled = policies.enabledFor(policy, userId);
     boolean premium = grants.premium(userId);
@@ -70,7 +76,7 @@ public class UserSubscriptionService {
             policy.version(),
             policy.newStartsPaused(),
             !policy.newStartsPaused(),
-            reservation == null ? null : reservation.getSessionId());
+            reservation == null ? null : reservation.sessionId());
   }
 
   /**
@@ -110,8 +116,8 @@ public class UserSubscriptionService {
   }
 
   private boolean hasCompletedConversationSinceLaunch(
-      Long userId, SubscriptionLaunchPolicyService.Policy policy) {
+      Long userId, SubscriptionLaunchPolicy policy) {
     return policies.enabledFor(policy, userId)
-        && learningProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
+        && scenarioProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
   }
 }

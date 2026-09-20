@@ -18,6 +18,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,6 +64,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 인증되지 않은 요청은 현재 스트릭을 조회할 수 없다. */
+  @DisplayName("인증되지 않은 요청은 현재 스트릭을 조회할 수 없다.")
   @Test
   void currentStreakRequiresAuthentication() throws Exception {
     mockMvc
@@ -73,6 +75,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 기록이 없는 사용자는 현재 스트릭과 오늘 완료 여부의 기본값을 받는다. */
+  @DisplayName("기록이 없는 사용자는 현재 스트릭과 오늘 완료 여부의 기본값을 받는다.")
   @Test
   void currentStreakReturnsDefaultsWithoutActivity() throws Exception {
     LoginResult login = login();
@@ -90,6 +93,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 달력은 요청한 월의 완료 날짜와 전체 스트릭 정보를 반환한다. */
+  @DisplayName("달력은 요청한 월의 완료 날짜와 전체 스트릭 정보를 반환한다.")
   @Test
   void calendarReturnsRequestedMonthActiveDates() throws Exception {
     LoginResult login = login();
@@ -115,6 +119,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 비활성 일별 활동은 최초 활성일로 사용하지 않는다. */
+  @DisplayName("비활성 일별 활동은 최초 활성일로 사용하지 않는다.")
   @Test
   void calendarIgnoresInactiveDayForFirstActiveDate() throws Exception {
     LoginResult login = login();
@@ -145,6 +150,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 월 범위를 벗어난 요청은 공통 검증 오류를 반환한다. */
+  @DisplayName("월 범위를 벗어난 요청은 공통 검증 오류를 반환한다.")
   @Test
   void calendarRejectsOutOfRangeMonth() throws Exception {
     LoginResult login = login();
@@ -158,6 +164,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 연·월을 생략하면 서버의 KST 오늘이 속한 월을 조회한다. */
+  @DisplayName("연·월을 생략하면 서버의 KST 오늘이 속한 월을 조회한다.")
   @Test
   void calendarDefaultsToCurrentKstMonth() throws Exception {
     LoginResult login = login();
@@ -173,6 +180,7 @@ class StreakApiIntegrationTests {
   }
 
   /** 연도와 월 중 하나만 전달한 달력 요청은 공통 검증 오류를 반환한다. */
+  @DisplayName("연도와 월 중 하나만 전달한 달력 요청은 공통 검증 오류를 반환한다.")
   @Test
   void calendarRejectsPartialMonthParameters() throws Exception {
     LoginResult login = login();
@@ -188,6 +196,7 @@ class StreakApiIntegrationTests {
   }
 
   /** OpenAPI 문서가 두 스트릭 조회 경로를 노출한다. */
+  @DisplayName("OpenAPI 문서가 두 스트릭 조회 경로를 노출한다.")
   @Test
   void openApiDocumentsStreakPaths() throws Exception {
     mockMvc

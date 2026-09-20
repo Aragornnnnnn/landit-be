@@ -1,0 +1,37 @@
+// 관리자 쓰기 작업의 감사 로그 유형을 정의한다.
+
+package com.landit.landitbe.feature.audit.domain;
+
+/** 관리자 쓰기 작업의 감사 로그 유형을 정의한다. */
+public enum AdminAction {
+  /** 관리자 이메일 테스트 접수다. */
+  EMAIL_TEST_REQUESTED,
+  /** 무료 체험 알림 채널 설정 변경이다. */
+  TRIAL_REMINDER_SETTINGS_UPDATED,
+  /** 관리자 푸시 캠페인 생성이다. */
+  PUSH_CAMPAIGN_CREATED,
+  /** 관리자 본인 테스트 요청이다. */
+  PUSH_CAMPAIGN_TESTED,
+  /** 전체 푸시 발송 요청이다. */
+  PUSH_CAMPAIGN_SENT,
+  /** 대상 SQL 조회다. */
+  PUSH_AUDIENCE_QUERIED,
+  /** 캠페인 예약 요청이다. */
+  PUSH_CAMPAIGN_SCHEDULED,
+  /** 예약 취소다. */
+  PUSH_CAMPAIGN_CANCELLED,
+  /** 앱 버전 정책 수정 작업이다. */
+  APP_VERSION_UPDATED,
+
+  /** 편지함 공지·업데이트 생성 작업이다. */
+  MAILBOX_LETTER_CREATED,
+
+  /** 편지함 공지·업데이트 수정 작업이다. */
+  MAILBOX_LETTER_UPDATED,
+
+  /** 편지함 답장 발송 작업이다. */
+  MAILBOX_REPLY_SENT,
+
+  /** 발음 평가 자산 일괄 임포트 작업이다. */
+  EXPRESSION_PRONUNCIATION_ASSET_IMPORTED
+}

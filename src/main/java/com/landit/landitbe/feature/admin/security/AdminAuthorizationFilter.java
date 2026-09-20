@@ -2,10 +2,10 @@
 
 package com.landit.landitbe.feature.admin.security;
 
-import com.landit.landitbe.feature.auth.security.AuthFailureResponseWriter;
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
+import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +25,7 @@ public class AdminAuthorizationFilter extends OncePerRequestFilter {
           "/api/v1/admin/**");
 
   private final UserProfileService userProfileService;
-  private final AuthFailureResponseWriter failureResponseWriter;
+  private final SecurityFailureResponseWriter failureResponseWriter;
 
   /**
    * 사용자 프로필 Service와 접근 거부 응답 작성기를 주입받는다.
@@ -34,7 +34,7 @@ public class AdminAuthorizationFilter extends OncePerRequestFilter {
    * @param failureResponseWriter 접근 거부 응답 작성기
    */
   public AdminAuthorizationFilter(
-      UserProfileService userProfileService, AuthFailureResponseWriter failureResponseWriter) {
+      UserProfileService userProfileService, SecurityFailureResponseWriter failureResponseWriter) {
     this.userProfileService = userProfileService;
     this.failureResponseWriter = failureResponseWriter;
   }

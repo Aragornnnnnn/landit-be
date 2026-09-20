@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.character.docs;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.character.dto.CurrentStreakResponse;
 import com.landit.landitbe.feature.character.dto.StreakCalendarResponse;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

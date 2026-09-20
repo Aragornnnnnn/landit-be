@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -23,6 +24,7 @@ class ContentImageWebpMigrationTests {
   private static final Pattern URL_MAPPING_PATTERN =
       Pattern.compile("\\('([^']+\\.png)', '([^']+\\.webp)'\\)");
 
+  @DisplayName("사용 중인 PNG마다 중복 없는 WebP URL 하나를 매핑한다.")
   @Test
   void migrationMapsEveryUsedPngToOneUniqueWebpUrl() throws Exception {
     List<UrlMapping> mappings = readMappings();
@@ -43,6 +45,7 @@ class ContentImageWebpMigrationTests {
     assertThat(newUrls).allMatch(url -> url.contains("/content/") && url.endsWith(".webp"));
   }
 
+  @DisplayName("이미지 마이그레이션은 현재 참조하는 콘텐츠 종류만 포함한다.")
   @Test
   void migrationContainsOnlyCurrentReferenceCategories() throws Exception {
     List<UrlMapping> mappings = readMappings();
@@ -54,6 +57,7 @@ class ContentImageWebpMigrationTests {
         .hasSize(652);
   }
 
+  @DisplayName("이미지 참조 집합을 검증하고 JSON 배열 순서를 보존한다.")
   @Test
   void migrationGuardsReferenceSetAndPreservesJsonArrayOrder() throws Exception {
     String migrationSql = readMigrationSql();

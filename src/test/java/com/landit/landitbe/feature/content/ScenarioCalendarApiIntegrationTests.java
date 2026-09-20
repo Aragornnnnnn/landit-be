@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -77,6 +78,7 @@ class ScenarioCalendarApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM category");
   }
 
+  @DisplayName("시나리오 달력 조회에는 인증이 필요하다.")
   @Test
   void calendarRequiresAuthentication() throws Exception {
     mockMvc
@@ -86,6 +88,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
   }
 
+  @DisplayName("주간 달력은 오늘을 기본 날짜로 삼아 7일을 모두 채운다.")
   @Test
   void weekCalendarFillsAllSevenCellsWithTodayAsDefaultDate() throws Exception {
     JsonNode loginResponseBody = login();
@@ -134,6 +137,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[6].scenarioId").value(nullValue()));
   }
 
+  @DisplayName("주간 달력의 월 표시는 요청 날짜의 월을 따른다.")
   @Test
   void weekCalendarLabelFollowsRequestedDateMonth() throws Exception {
     JsonNode loginResponseBody = login();
@@ -154,6 +158,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[6].date").value("2026-08-01"));
   }
 
+  @DisplayName("월간 달력은 요청한 달의 날짜만 반환한다.")
   @Test
   void monthCalendarReturnsOnlyDaysOfRequestedMonth() throws Exception {
     JsonNode loginResponseBody = login();
@@ -192,6 +197,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[30].completed").value(false));
   }
 
+  @DisplayName("미래 월의 달력은 빈 학습 칸을 반환한다.")
   @Test
   void monthCalendarForFutureMonthReturnsEmptyCells() throws Exception {
     JsonNode loginResponseBody = login();
@@ -215,6 +221,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[29].completed").value(false));
   }
 
+  @DisplayName("신규 사용자의 달력은 오늘 칸에만 배정된 시나리오를 표시한다.")
   @Test
   void calendarForNewUserFillsOnlyTodayCellWithAssignedScenario() throws Exception {
     JsonNode loginResponseBody = login();
@@ -237,6 +244,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[6].scenarioId").value(nullValue()));
   }
 
+  @DisplayName("오늘 학습을 완료하면 달력의 오늘 칸을 완료로 표시한다.")
   @Test
   void calendarMarksTodayCompletedAfterTodayCompletion() throws Exception {
     JsonNode loginResponseBody = login();
@@ -259,6 +267,7 @@ class ScenarioCalendarApiIntegrationTests {
             jsonPath("$.data.days[4].thumbnailUrl").value("https://cdn.landit.com/first.png"));
   }
 
+  @DisplayName("모든 시나리오를 완료했다면 달력의 오늘 칸을 비워 둔다.")
   @Test
   void calendarLeavesTodayCellEmptyWhenAllScenariosCleared() throws Exception {
     JsonNode loginResponseBody = login();
@@ -281,6 +290,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[4].scenarioId").value(nullValue()));
   }
 
+  @DisplayName("다른 사용자와 다른 언어의 완료 기록은 달력에서 제외한다.")
   @Test
   void calendarExcludesOtherUserAndOtherLocaleCompletions() throws Exception {
     JsonNode loginResponseBody = login();
@@ -304,6 +314,7 @@ class ScenarioCalendarApiIntegrationTests {
         .andExpect(jsonPath("$.data.days[2].completed").value(false));
   }
 
+  @DisplayName("같은 날 여러 접근 권한이 있으면 가장 먼저 부여한 기록을 사용한다.")
   @Test
   void calendarUsesEarliestGrantWhenMultipleGrantsExistOnSameDay() throws Exception {
     JsonNode loginResponseBody = login();
@@ -325,6 +336,7 @@ class ScenarioCalendarApiIntegrationTests {
             jsonPath("$.data.days[1].thumbnailUrl").value("https://cdn.landit.com/second.png"));
   }
 
+  @DisplayName("시나리오 달력의 잘못된 조회 파라미터를 거부한다.")
   @Test
   void calendarRejectsInvalidParameters() throws Exception {
     final String accessToken = login().get("data").get("accessToken").asText();
@@ -351,6 +363,7 @@ class ScenarioCalendarApiIntegrationTests {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
   }
 
+  @DisplayName("OpenAPI 문서에 시나리오 달력 계약을 명시한다.")
   @Test
   void openApiDocumentsCalendarContract() throws Exception {
     mockMvc
