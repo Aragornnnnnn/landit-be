@@ -2,7 +2,7 @@
 
 ## 승인 범위와 기준
 
-- BE: PR #188 `feat/LAN-488` (`3cc752c0`) 위의 `feat/LAN-466`.
+- BE: PR #188 병합 후 `develop` (`5346aae7`) 위의 `feat/LAN-466`. PR #202의 병합 대상도 `develop`이다.
 - AI: `develop` (`f247bfe6`) 위의 `feat/LAN-466`. AI 구현·검증은 AI 저장소의 같은 이슈 문서에서 관리한다.
 - 예상된 요청 거절(`expected_rejection`), 정상 복구(`recovered`), 최종 실패(`failed`)를 구분한다. 필수 결과 유실, DB·설정·코드 결함은 fallback이 있어도 실패로 보고한다.
 - LLM 평가 기준, 기억 후보 제외 정책, 재시도 횟수, API 성공 응답 계약은 변경하지 않는다. HTTP 오류 상태·헤더만 바로잡는다.
@@ -38,6 +38,7 @@
 - 2026-09-17 사용자 요청으로 BE 기준을 `fc349c2b`에서 `3cc752c0`으로 rebase. 세션 Entity 직접 변경 대신 새 conversation Service/snapshot 계약을 유지하며 관측 변경을 복원. AI develop은 `f247bfe6`으로 동일. rebase 전 stash와 backup 브랜치 보존.
 - PR #202 CI에서 피드백 호출 신호가 트랜잭션 상태 기록보다 먼저 전달되어 빈 목록을 검사하는 테스트 경쟁 조건을 확인했다. 테스트용 클라이언트의 기록을 신호보다 앞에 두고, 응답을 latch로 차단하여 기존 코드의 실패와 수정 후 성공을 검증했다. 시나리오 통합 테스트 106개와 전체 `./gradlew check --no-daemon`(1,256개, 실패 0, skip 6개)이 통과했다.
 - PR #202 리뷰에서 속마음 후처리 실행기 거절 시 PREPARING 잔류, HTTP 500의 요청 오류 코드, 래퍼·원인 예외의 중복 전송, 웹훅 인증 예외 Javadoc 불일치를 확인했다. 실패 상태 저장과 별도 관측, 500 본문 코드, 원인 체인 원자적 등록을 수정하고 회귀 테스트를 추가했다. 속마음 작업이 없는 세션 종료 경로도 재검증했고 전체 `./gradlew spotlessApply check --no-daemon`은 1,260개, 실패 0, skip 6개로 통과했다.
+- 2026-09-20 PR #188 병합으로 #202의 대상이 `develop`으로 바뀌어 `5346aae7` 위에 22개 커밋을 rebase했다. `backup/LAN-466-before-develop-20260920`에 이전 HEAD를 보존했다. 최신 develop에서 분리된 시나리오 테스트 구조를 유지하고 피드백 호출 동기화 검증을 `submitMessageSuppliesFeedbackEvaluationContext`로 옮겼다. 전체 `./gradlew check --no-daemon`은 1,369개, 실패 0, skip 9개로 통과했다.
 
 ## 관측 상세와 운영 확인
 
