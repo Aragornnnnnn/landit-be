@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.learning.FreeTalkContextProperties;
@@ -14,10 +16,15 @@ import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStat
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
 import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
 import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalkContextSummaryRepository;
+import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,6 +85,29 @@ class FreeTalkContextSummaryServiceTest {
   }
 
   @Test
+  void waitsForTwelveUnsummarizedRounds() {
+    var twelve = rounds(12, 10);
+    var thirteen = rounds(13, 10);
+    when(messages.findAll(3L)).thenReturn(twelve, thirteen);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            inv -> {
+              AiFreeTalkContextSummaryRequest req = inv.getArgument(0);
+              return new AiFreeTalkContextSummaryResult(
+                  "v1",
+                  req.baseRevision(),
+                  req.targetThroughSequence(),
+                  new AiFreeTalkSessionSummaryContent("topic", List.of(), List.of(), List.of()));
+            });
+    FreeTalkMessageReservation reservation = reservation();
+    service.dispatchIfNeeded(reservation);
+    assertEquals(8, state.getCoveredThroughSequence());
+    service.dispatchIfNeeded(reservation);
+    verify(ai, times(1)).generateContextSummary(any());
+    assertEquals(8, state.getCoveredThroughSequence());
+  }
+
+  @Test
   void byteLimitPreservesMinimumCompletedPair() {
     List<SessionHistoryMessageSnapshot> all = rounds(12, 4000);
     List<SessionHistoryMessageSnapshot> source =
@@ -93,4 +123,22 @@ class FreeTalkContextSummaryServiceTest {
     assertNull(service.snapshot(1L, 30L).sessionSummary());
   }
 
+  private FreeTalkMessageReservation reservation() {
+    return new FreeTalkMessageReservation(
+        1L,
+        LocalDate.now(),
+        300L,
+        30L,
+        "chloe",
+        3L,
+        24L,
+        "client-id",
+        1000L,
+        false,
+        false,
+        "EN",
+        "KO",
+        null,
+        List.of());
+  }
 }
