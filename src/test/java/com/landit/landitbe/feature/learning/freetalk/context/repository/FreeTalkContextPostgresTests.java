@@ -2,10 +2,12 @@
 
 package com.landit.landitbe.feature.learning.freetalk.context.repository;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
 import jakarta.persistence.EntityManagerFactory;
+import java.time.Duration;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +27,7 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringJUnitConfig(FreeTalkContextPostgresTests.Config.class)
 @EnabledIfEnvironmentVariable(named = "LAN531_TEST_POSTGRES", matches = "true")
@@ -39,6 +42,24 @@ class FreeTalkContextPostgresTests {
     new JdbcTemplate(dataSource)
         .update("insert into free_talk_session(id) values(30) on conflict do nothing");
     repository.saveAndFlush(FreeTalkContextSummary.start(30L, "v1", 6000));
+  }
+
+  @Test
+  void databaseClockAdvancesWithinTransactionAndLeaseRoundTrips() {
+    new TransactionTemplate(manager)
+        .executeWithoutResult(
+            status -> {
+              var before = repository.currentTime();
+              new JdbcTemplate(dataSource).execute("select pg_sleep(0.15)");
+              var after = repository.currentTime();
+              assertTrue(Duration.between(before, after).toMillis() >= 100);
+              var state = repository.findByIdForUpdate(30L).orElseThrow();
+              state.claim("worker", after.plusSeconds(30));
+              repository.saveAndFlush(state);
+            });
+    var state = repository.findById(30L).orElseThrow();
+    assertTrue(state.ownsLease("worker", repository.currentTime()));
+    assertFalse(state.ownsLease("worker", state.getLeaseUntil()));
   }
 
   @Test
