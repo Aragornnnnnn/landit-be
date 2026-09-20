@@ -22,9 +22,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -41,7 +39,7 @@ public class FreeTalkContextSummaryService {
   private final FreeTalkContextProperties properties;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final TransactionTemplate transactionTemplate;
-  private final Executor executor;
+  private final FreeTalkContextExecutionService executor;
 
   /**
    * 요약 저장소와 원문 조회·AI 호출 의존성을 구성한다.
@@ -59,8 +57,7 @@ public class FreeTalkContextSummaryService {
       AiFreeTalkClient aiFreeTalkClient,
       FreeTalkContextProperties properties,
       org.springframework.transaction.PlatformTransactionManager transactionManager,
-      @Qualifier("applicationTaskExecutor")
-          org.springframework.core.task.TaskExecutor taskExecutor) {
+      FreeTalkContextExecutionService taskExecutor) {
     this.repository = repository;
     this.conversationMessageService = conversationMessageService;
     this.aiFreeTalkClient = aiFreeTalkClient;
@@ -86,7 +83,15 @@ public class FreeTalkContextSummaryService {
       return;
     }
     try {
-      executor.execute(() -> summarize(reservation));
+      executor.execute(
+          () -> {
+            try {
+              summarize(reservation);
+            } catch (RuntimeException exception) {
+              log.info(
+                  "프리톡 컨텍스트 요약 작업 상태를 처리하지 못했습니다. sessionId={}", reservation.freeTalkSessionId());
+            }
+          });
     } catch (RuntimeException exception) {
       log.info("프리톡 컨텍스트 요약 작업을 등록하지 못했습니다. sessionId={}", reservation.freeTalkSessionId());
     }
