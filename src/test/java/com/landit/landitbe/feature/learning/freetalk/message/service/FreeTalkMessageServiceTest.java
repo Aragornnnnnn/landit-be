@@ -108,6 +108,31 @@ class FreeTalkMessageServiceTest {
     verify(submittedMessageService).compensate(reservation);
   }
 
+  @Test
+  void keepsUnsummarizedCorrectionAcrossSequenceGaps() {
+    var history =
+        List.of(
+            new AiConversationHistoryMessage(101L, 1, "USER", "Old fact.", null, null, 1),
+            new AiConversationHistoryMessage(103L, 2, "AI", "I see.", null, null, 3),
+            new AiConversationHistoryMessage(104L, 2, "USER", "Actually, Friday.", null, null, 4),
+            new AiConversationHistoryMessage(105L, 3, "AI", "How is it going?", null, null, 5),
+            new AiConversationHistoryMessage(106L, 3, "USER", "Good.", null, null, 6));
+    var context =
+        new AiFreeTalkContextWindow(
+            "v1",
+            new AiFreeTalkSessionSummary(
+                1,
+                3,
+                new AiFreeTalkSessionSummaryContent("Old topic", List.of(), List.of(), List.of())),
+            false);
+    List<AiConversationHistoryMessage> result =
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+            contextAwareService(), "modelHistory", history, context);
+    assertThat(result)
+        .extracting(AiConversationHistoryMessage::messageId)
+        .containsExactly(104L, 105L, 106L);
+  }
+
   @DisplayName("확정된 요약 경계 이전 원문을 모델 요청에서 제외하고 최신 발화를 유지한다.")
   @Test
   void sendsOnlyHistoryAfterContextSummaryBoundary() {
