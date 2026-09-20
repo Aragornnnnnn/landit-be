@@ -87,14 +87,22 @@ public class FreeTalkFollowUpService {
       warnSkipped("already_recorded", freeTalkSessionId);
       return;
     }
-    followUpRepository.save(
-        FreeTalkFollowUp.of(
-            userProfileId,
-            freeTalkSessionId,
-            memoryIdOf(draft, savedMemoryIdsByPlanIndex),
-            triggerType,
-            draft.question(),
-            draft.invite()));
+    FreeTalkFollowUp followUp;
+    try {
+      followUp =
+          FreeTalkFollowUp.of(
+              userProfileId,
+              freeTalkSessionId,
+              memoryIdOf(draft, savedMemoryIdsByPlanIndex),
+              triggerType,
+              draft.question(),
+              draft.invite());
+    } catch (IllegalArgumentException exception) {
+      // 검증은 기억 기능이 먼저 하지만, 그 검증이 바뀌어도 질문 하나가 기억 저장을 되돌리지 않게 한다.
+      warnSkipped("invalid_draft", freeTalkSessionId);
+      return;
+    }
+    followUpRepository.save(followUp);
   }
 
   // 근거가 기존 기억이면 그 ID를, 이번 후보면 방금 저장된 새 기억 ID를 쓴다.

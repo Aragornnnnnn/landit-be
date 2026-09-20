@@ -19,6 +19,8 @@ import org.springframework.stereotype.Component;
 class ConversationMemoryFollowUpResolver {
 
   private static final String NO_FOLLOW_UP_TRIGGER = "NONE";
+  // 화면의 한 줄짜리 문구다(예: 20자 안팎). 기록으로 영구 저장되므로 비정상적으로 긴 응답은 받지 않는다.
+  private static final int MAX_TEXT_LENGTH = 200;
 
   /**
    * 후속 질문을 검증해 저장 계획 순번과 연결한다.
@@ -27,18 +29,23 @@ class ConversationMemoryFollowUpResolver {
    * @param followUp AI가 만든 후속 질문. 구버전 AI 서버 응답이면 null
    * @param existingMemories 이번 요청에 실어 보낸 기존 장기기억
    * @param candidates 저장 계획과 같은 순서의 이번 기억 후보
+   * @param planCount 만들어진 저장 계획 수. 후보 수와 다르면 후보의 위치로 계획을 찾을 수 없다
    * @return 검증을 통과한 후속 질문. 없거나 계약과 다르면 null
    */
   ConversationMemoryFollowUpDraft resolve(
       long sessionId,
       AiMemoryCandidatesResult.FollowUpQuestion followUp,
       List<AiFreeTalkMemoryContext> existingMemories,
-      List<FreeTalkMemoryCandidate> candidates) {
+      List<FreeTalkMemoryCandidate> candidates,
+      int planCount) {
     if (followUp == null) {
       return null;
     }
     if (blank(followUp.triggerType()) || blank(followUp.question()) || blank(followUp.invite())) {
       return dropped(sessionId, "blank_text");
+    }
+    if (tooLong(followUp.question()) || tooLong(followUp.invite())) {
+      return dropped(sessionId, "text_too_long");
     }
     boolean hasMemory = followUp.memoryId() != null;
     boolean hasCandidate = followUp.candidateIndex() != null;
@@ -55,6 +62,10 @@ class ConversationMemoryFollowUpResolver {
               .anyMatch(memory -> followUp.memoryId().equals(memory.memoryId()))
           ? draft(followUp, followUp.memoryId(), null)
           : dropped(sessionId, "unknown_memory_id");
+    }
+    // 후보마다 계획이 하나씩 같은 순서로 만들어진다는 전제가 깨지면 엉뚱한 기억에 연결되므로 질문을 버린다.
+    if (candidates.size() != planCount) {
+      return dropped(sessionId, "plan_count_mismatch");
     }
     Integer planIndex = planIndexOf(followUp.candidateIndex(), candidates);
     return planIndex == null
@@ -88,6 +99,10 @@ class ConversationMemoryFollowUpResolver {
         reason,
         sessionId);
     return null;
+  }
+
+  private static boolean tooLong(String value) {
+    return value.strip().length() > MAX_TEXT_LENGTH;
   }
 
   private static boolean blank(String value) {

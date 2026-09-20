@@ -13,7 +13,6 @@ import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollow
 import com.landit.landitbe.feature.learning.freetalk.followup.service.FreeTalkFollowUpService;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationService;
-import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
@@ -116,9 +115,8 @@ class FreeTalkFollowUpFlowIntegrationTests {
     assertThat(first.sessionEndedBy()).isEqualTo("TIME_LIMIT_REACHED");
     AiMemoryCandidatesRequest second = requests.getAllValues().get(1);
     assertThat(second.askedMemoryIds()).containsExactly(newMemoryId);
-    assertThat(second.existingMemories())
-        .extracting(AiFreeTalkMemoryContext::memoryId)
-        .containsExactly(newMemoryId);
+    // 이미 질문에 쓴 기억은 기존 기억 자리에서 빠진다.
+    assertThat(second.existingMemories()).isEmpty();
     assertThat(second.sessionEndedBy()).isEqualTo("USER_CONFIRMED");
     assertThat(
             followUpService.findSummary(SECOND_SESSION_BASE_ID + 1, MemoryGenerationStatus.READY))

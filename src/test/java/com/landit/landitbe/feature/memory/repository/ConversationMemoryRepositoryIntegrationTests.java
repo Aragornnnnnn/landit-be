@@ -219,17 +219,21 @@ class ConversationMemoryRepositoryIntegrationTests {
     repository.supersedeActive(superseded, newest, NOW, NOW);
 
     List<AiFreeTalkMemoryContext> contexts =
-        repository.findRecentActiveContexts(USER_ID, "chloe", 20);
+        repository.findRecentActiveContexts(USER_ID, "chloe", List.of(), 20);
 
     assertThat(contexts)
         .extracting(AiFreeTalkMemoryContext::memoryId)
         .containsExactly(newest, shared, older)
         .doesNotContain(otherCharacter, superseded);
     assertThat(contexts.getFirst().observedAt()).isEqualTo(NOW);
-    assertThat(repository.findRecentActiveContexts(USER_ID, "chloe", 2))
+    assertThat(repository.findRecentActiveContexts(USER_ID, "chloe", List.of(), 2))
         .extracting(AiFreeTalkMemoryContext::memoryId)
         .containsExactly(newest, shared);
-    assertThat(repository.findRecentActiveContexts(USER_ID + 1, "chloe", 20)).isEmpty();
+    // 뺄 기억을 주면 그 자리를 다음으로 최근인 기억이 채운다.
+    assertThat(repository.findRecentActiveContexts(USER_ID, "chloe", List.of(newest, 999999L), 2))
+        .extracting(AiFreeTalkMemoryContext::memoryId)
+        .containsExactly(shared, older);
+    assertThat(repository.findRecentActiveContexts(USER_ID + 1, "chloe", List.of(), 20)).isEmpty();
   }
 
   private long saveMemory(

@@ -248,6 +248,56 @@ class ConversationMemoryWriteServiceIntegrationTests {
         .containsEntry("INVITE", INVITE);
   }
 
+  @DisplayName("기존 기억을 대체하는 후보가 근거면 대체한 새 기억 ID와 함께 저장한다.")
+  @Test
+  void storesFollowUpWithTheSupersedingMemoryId() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "first old memory", "ACTIVE");
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(
+            plan(
+                AiMemoryOperation.SUPERSEDE,
+                List.of(FIRST_OLD_MEMORY_ID),
+                List.of(FIRST_OLD_MEMORY_ID))),
+        new ConversationMemoryFollowUpDraft(null, 0, "GOAL", QUESTION, INVITE));
+
+    Long newMemoryId =
+        jdbcTemplate.queryForObject(
+            "select id from conversation_memory where user_profile_id = ? and status = 'ACTIVE'",
+            Long.class,
+            USER_ID);
+    assertThat(newMemoryId).isNotEqualTo(FIRST_OLD_MEMORY_ID);
+    assertThat(followUpRow()).containsEntry("MEMORY_ID", newMemoryId);
+  }
+
+  @DisplayName("그 세션의 후속 질문이 이미 있으면 기존 질문을 그대로 두고 기억 저장과 완료는 그대로 한다.")
+  @Test
+  void keepsTheRecordedFollowUpAndStillStoresMemory() {
+    seedCompletedPreparingSession();
+    jdbcTemplate.update(
+        "insert into free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id, "
+            + "trigger_type, question, invite, created_at, updated_at) "
+            + "values (?, ?, NULL, 'NONE', '먼저 저장된 질문', '먼저 저장된 초대', "
+            + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        USER_ID,
+        FREE_TALK_SESSION_ID);
+
+    ConversationMemoryWriteService.PersistenceResult result =
+        persistAndComplete(
+            generationRequest(),
+            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())),
+            new ConversationMemoryFollowUpDraft(null, 0, "CONCERN", QUESTION, INVITE));
+
+    assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
+    assertThat(followUpRow())
+        .containsEntry("TRIGGER_TYPE", "NONE")
+        .containsEntry("QUESTION", "먼저 저장된 질문");
+    assertThat(countMemories()).isEqualTo(1);
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
   @DisplayName("기존 기억을 근거로 한 후속 질문은 그 기억 ID를 그대로 저장한다.")
   @Test
   void storesFollowUpWithTheExistingMemoryId() {

@@ -33,10 +33,12 @@ public class ConversationMemoryPlanningService {
    */
   public ConversationMemoryPlanningResult createPlans(ConversationMemoryGenerationRequest request) {
     // 후속 질문의 근거로 쓸 수 있도록 이번 세션의 기억을 저장하기 전의 기존 기억을 함께 보낸다.
+    // 이미 질문에 쓴 기억은 AI 서버가 어차피 고르지 않으므로, 상한만큼의 자리를 아직 묻지 않은 기억으로 채운다.
     List<AiFreeTalkMemoryContext> existingMemories =
         memoryRepository.findRecentActiveContexts(
             request.userProfileId(),
             request.characterId(),
+            request.followUpContext().askedMemoryIds(),
             AiMemoryCandidatesRequest.MAX_EXISTING_MEMORIES);
     AiMemoryCandidatesResult extraction = extractMemoryCandidates(request, existingMemories);
     List<FreeTalkMemoryCandidate> candidates = candidateMapper.mapCandidates(request, extraction);
@@ -47,7 +49,8 @@ public class ConversationMemoryPlanningService {
             request.learningSessionId(),
             extraction.followUpQuestion(),
             existingMemories,
-            candidates));
+            candidates,
+            plans.size()));
   }
 
   private AiMemoryCandidatesResult extractMemoryCandidates(

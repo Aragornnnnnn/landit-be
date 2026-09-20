@@ -157,12 +157,12 @@ public class FreeTalkMemoryGenerationContextService {
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(request.learningSessionId())
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
-    freeTalkSession.completeMemoryGeneration();
     followUpService.record(
         request.userProfileId(),
         freeTalkSession.getId(),
         planning.followUp(),
         persistence.savedMemoryIdsByPlanIndex());
+    freeTalkSession.completeMemoryGeneration();
     return persistence.result();
   }
 

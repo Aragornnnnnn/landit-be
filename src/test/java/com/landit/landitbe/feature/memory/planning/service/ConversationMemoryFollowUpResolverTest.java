@@ -34,7 +34,7 @@ class ConversationMemoryFollowUpResolverTest {
   @DisplayName("구버전 AI 서버 응답처럼 후속 질문이 없으면 없는 그대로 둔다.")
   @Test
   void returnsNullWhenAiDidNotSendFollowUp() {
-    assertThat(resolver.resolve(300L, null, EXISTING_MEMORIES, CANDIDATES)).isNull();
+    assertThat(resolver.resolve(300L, null, EXISTING_MEMORIES, CANDIDATES, 2)).isNull();
   }
 
   @DisplayName("기존 기억을 근거로 한 질문은 그 기억 ID를 그대로 담고 문구의 앞뒤 공백을 없앤다.")
@@ -45,7 +45,8 @@ class ConversationMemoryFollowUpResolverTest {
             300L,
             new FollowUpQuestion(42L, null, "CONCERN", " 면접 준비, 어떻게 됐어? ", "다음엔 그 얘기 하자. "),
             EXISTING_MEMORIES,
-            CANDIDATES);
+            CANDIDATES,
+            CANDIDATES.size());
 
     assertThat(draft)
         .isEqualTo(
@@ -61,7 +62,8 @@ class ConversationMemoryFollowUpResolverTest {
             300L,
             new FollowUpQuestion(null, 5, "CUT_OFF", "아까 회사 얘기 하다 끊겼잖아.", "다음에 이어서 해줄래?"),
             EXISTING_MEMORIES,
-            CANDIDATES);
+            CANDIDATES,
+            CANDIDATES.size());
 
     assertThat(draft.memoryId()).isNull();
     assertThat(draft.planIndex()).isEqualTo(1);
@@ -75,7 +77,8 @@ class ConversationMemoryFollowUpResolverTest {
             300L,
             new FollowUpQuestion(null, null, "NONE", "요즘 빠져 있는 거 얘기해줘.", "기억해둘게."),
             EXISTING_MEMORIES,
-            CANDIDATES);
+            CANDIDATES,
+            CANDIDATES.size());
 
     assertThat(draft.memoryId()).isNull();
     assertThat(draft.planIndex()).isNull();
@@ -109,12 +112,61 @@ class ConversationMemoryFollowUpResolverTest {
             300L,
             new FollowUpQuestion(memoryId, candidateIndex, triggerType, question, "비밀초대"),
             EXISTING_MEMORIES,
-            CANDIDATES);
+            CANDIDATES,
+            CANDIDATES.size());
 
     assertThat(draft).isNull();
     assertThat(output.getOut())
         .contains("workflow=free_talk_follow_up_invalid reason=" + expectedReason)
         .contains("sessionId=300")
         .doesNotContain("비밀");
+  }
+
+  @DisplayName("화면 한 줄을 넘는 비정상적으로 긴 문구는 기록으로 남기지 않고 버린다.")
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void dropsFollowUpWithTooLongText(CapturedOutput output) {
+    String tooLong = "가".repeat(201);
+
+    assertThat(
+            resolver.resolve(
+                300L,
+                new FollowUpQuestion(42L, null, "CONCERN", tooLong, "다음엔 그 얘기 하자."),
+                EXISTING_MEMORIES,
+                CANDIDATES,
+                CANDIDATES.size()))
+        .isNull();
+    assertThat(
+            resolver.resolve(
+                300L,
+                new FollowUpQuestion(42L, null, "CONCERN", "어떻게 됐어?", tooLong),
+                EXISTING_MEMORIES,
+                CANDIDATES,
+                CANDIDATES.size()))
+        .isNull();
+    assertThat(
+            resolver.resolve(
+                300L,
+                new FollowUpQuestion(42L, null, "CONCERN", "가".repeat(200), "다음엔 그 얘기 하자."),
+                EXISTING_MEMORIES,
+                CANDIDATES,
+                CANDIDATES.size()))
+        .isNotNull();
+    assertThat(output.getOut()).contains("reason=text_too_long");
+  }
+
+  @DisplayName("저장 계획 수가 후보 수와 다르면 엉뚱한 기억에 연결될 수 있어 후보 근거 질문을 버린다.")
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void dropsCandidateSourceWhenPlansDoNotLineUpWithCandidates(CapturedOutput output) {
+    FollowUpQuestion fromCandidate =
+        new FollowUpQuestion(null, 5, "CUT_OFF", "아까 회사 얘기 하다 끊겼잖아.", "다음에 이어서 해줄래?");
+    FollowUpQuestion fromMemory =
+        new FollowUpQuestion(42L, null, "CONCERN", "면접 준비, 어떻게 됐어?", "다음엔 그 얘기 하자.");
+
+    assertThat(resolver.resolve(300L, fromCandidate, EXISTING_MEMORIES, CANDIDATES, 1)).isNull();
+    assertThat(output.getOut()).contains("reason=plan_count_mismatch");
+    // 기존 기억이 근거면 계획 순번을 쓰지 않으므로 영향을 받지 않는다.
+    assertThat(resolver.resolve(300L, fromMemory, EXISTING_MEMORIES, CANDIDATES, 1)).isNotNull();
   }
 }

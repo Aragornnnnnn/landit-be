@@ -95,7 +95,7 @@ class FreeTalkMemoryGenerationServiceTest {
   void sendsExistingMemoriesAndFollowUpContextWithCandidateRequest() {
     List<AiFreeTalkMemoryContext> existing =
         List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.EVENT, "다음 주에 면접이 있다."));
-    when(memoryRepository.findRecentActiveContexts(USER_PROFILE_ID, "chloe", 20))
+    when(memoryRepository.findRecentActiveContexts(USER_PROFILE_ID, "chloe", List.of(7L), 20))
         .thenReturn(existing);
     ConversationMemoryGenerationRequest base = context();
     when(contextService.claim(LEARNING_SESSION_ID))

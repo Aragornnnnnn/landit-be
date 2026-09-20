@@ -78,9 +78,11 @@ public class ConversationMemoryRepository {
       WHERE user_profile_id = :userProfileId
         AND status = 'ACTIVE'
         AND (character_id IS NULL OR character_id = :characterId)
+        %s
       ORDER BY observed_at DESC, id DESC
       LIMIT :limit
       """;
+  private static final String EXCLUDED_IDS_CONDITION = "AND id NOT IN (:excludedMemoryIds)";
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -91,18 +93,24 @@ public class ConversationMemoryRepository {
    *
    * @param userProfileId 기억 소유 사용자 프로필 ID
    * @param characterId 현재 대화 캐릭터 ID
+   * @param excludedMemoryIds 결과에서 뺄 기억 ID. 상한만큼의 자리를 쓸 수 있는 기억으로 채우려고 조회할 때 뺀다
    * @param limit 돌려줄 최대 기억 수
    * @return 최근에 말한 순의 기억 문맥
    */
   public List<AiFreeTalkMemoryContext> findRecentActiveContexts(
-      long userProfileId, String characterId, int limit) {
+      long userProfileId, String characterId, List<Long> excludedMemoryIds, int limit) {
     MapSqlParameterSource parameters =
         new MapSqlParameterSource()
             .addValue("userProfileId", userProfileId)
             .addValue("characterId", characterId)
             .addValue("limit", limit);
+    // 빈 목록의 NOT IN ()은 SQL 문법 오류라 뺄 기억이 있을 때만 조건을 붙인다.
+    boolean excludes = !excludedMemoryIds.isEmpty();
+    if (excludes) {
+      parameters.addValue("excludedMemoryIds", excludedMemoryIds);
+    }
     return jdbcTemplate.query(
-        FIND_RECENT_ACTIVE_SQL,
+        FIND_RECENT_ACTIVE_SQL.formatted(excludes ? EXCLUDED_IDS_CONDITION : ""),
         parameters,
         (resultSet, rowNumber) ->
             new AiFreeTalkMemoryContext(
