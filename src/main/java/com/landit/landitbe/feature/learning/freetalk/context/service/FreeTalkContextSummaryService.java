@@ -137,15 +137,10 @@ public class FreeTalkContextSummaryService {
     return transactionTemplate.execute(
         status -> {
           FreeTalkContextSummary state =
-              repository
-                  .findByIdForUpdate(reservation.freeTalkSessionId())
-                  .orElseGet(
-                      () ->
-                          repository.save(
-                              FreeTalkContextSummary.start(
-                                  reservation.freeTalkSessionId(),
-                                  "v1",
-                                  properties.summarySourceMaxBytes())));
+              repository.findByIdForUpdate(reservation.freeTalkSessionId()).orElse(null);
+          if (state == null) {
+            return null;
+          }
           List<List<SessionHistoryMessageSnapshot>> rounds =
               FreeTalkSummaryWindow.rounds(messages, state.getCoveredThroughSequence());
           if (!shouldSummarize(rounds)
@@ -253,9 +248,12 @@ public class FreeTalkContextSummaryService {
 
   private AiFreeTalkContextWindow toWindow(FreeTalkContextSummary state) {
     if (state.getSummaryContent() == null) {
-      return AiFreeTalkContextWindow.disabled();
+      return new AiFreeTalkContextWindow(state.getPolicyVersion(), null, false);
     }
     AiFreeTalkSessionSummaryContent content = toContent(state.getSummaryContent());
+    if (content == null) {
+      return new AiFreeTalkContextWindow(state.getPolicyVersion(), null, true);
+    }
     return new AiFreeTalkContextWindow(
         state.getPolicyVersion(),
         new AiFreeTalkSessionSummary(
