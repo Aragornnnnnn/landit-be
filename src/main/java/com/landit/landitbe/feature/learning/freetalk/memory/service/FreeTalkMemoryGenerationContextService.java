@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.freetalk.memory.service;
 
+import com.landit.landitbe.feature.learning.conversation.domain.CompletionReason;
 import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
@@ -12,10 +13,13 @@ import com.landit.landitbe.feature.learning.conversation.history.service.Session
 import com.landit.landitbe.feature.learning.conversation.service.LearningSessionService;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
+import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTalkFollowUpRepository;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingReason;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpContext;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -37,6 +41,7 @@ public class FreeTalkMemoryGenerationContextService {
   private final SessionHistoryService sessionHistoryService;
   private final ConversationMessageService conversationMessageService;
   private final ConversationMemoryWriteService memoryWriteService;
+  private final FreeTalkFollowUpRepository followUpRepository;
   private final Clock clock;
 
   /**
@@ -73,7 +78,21 @@ public class FreeTalkMemoryGenerationContextService {
         learningSession.getTargetLocale().name(),
         learningSession.getBaseLocale().name(),
         clock.getZone().getId(),
-        historyMessages);
+        historyMessages,
+        new ConversationMemoryFollowUpContext(
+            followUpRepository.findUsedMemoryIds(learningSession.getUserProfileId()),
+            sessionEndedBy(learningSession.getCompletionReason())));
+  }
+
+  // AI 서버는 끊긴 얘기(CUT_OFF)를 가려내려고 세션이 어떻게 끝났는지를 본다. 프리톡에서 생기지 않는 종료 사유는 보내지 않는다.
+  private static String sessionEndedBy(CompletionReason completionReason) {
+    if (completionReason == CompletionReason.USER_ENDED) {
+      return AiFreeTalkClosingReason.USER_CONFIRMED.name();
+    }
+    if (completionReason == CompletionReason.TIME_LIMIT_REACHED) {
+      return AiFreeTalkClosingReason.TIME_LIMIT_REACHED.name();
+    }
+    return null;
   }
 
   /** 완료 후 아직 다른 worker가 선점하지 않은 세션만 장기기억 생성 대상이다. */

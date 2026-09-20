@@ -13,15 +13,19 @@ import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationContextService;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationService;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
 import com.landit.landitbe.feature.memory.client.ai.ConversationMemoryHistoryMessage;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpContext;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionRequest;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionResult;
+import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepository;
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
@@ -60,6 +64,7 @@ class FreeTalkMemoryGenerationServiceTest {
   private AiMemoryClient aiClient;
   private ConversationMemorySearchRepository searchRepository;
   private FreeTalkMemoryGenerationContextService contextService;
+  private ConversationMemoryRepository memoryRepository;
   private FreeTalkMemoryGenerationService generationService;
   private final JsonMapper jsonMapper =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES).build();
@@ -69,16 +74,51 @@ class FreeTalkMemoryGenerationServiceTest {
     aiClient = Mockito.mock(AiMemoryClient.class);
     searchRepository = Mockito.mock(ConversationMemorySearchRepository.class);
     contextService = Mockito.mock(FreeTalkMemoryGenerationContextService.class);
+    memoryRepository = Mockito.mock(ConversationMemoryRepository.class);
     generationService =
         new FreeTalkMemoryGenerationService(
             contextService,
             new ConversationMemoryPlanningService(
                 aiClient,
                 new FreeTalkMemoryCandidateMapper(CLOCK),
-                new FreeTalkMemoryResolutionService(aiClient, searchRepository, CLOCK)));
+                new FreeTalkMemoryResolutionService(aiClient, searchRepository, CLOCK),
+                memoryRepository,
+                new ConversationMemoryFollowUpResolver()));
     when(contextService.claim(LEARNING_SESSION_ID)).thenReturn(context());
     when(contextService.persistAndComplete(any(), any()))
         .thenReturn(ConversationMemoryWriteService.PersistenceResult.STORED);
+  }
+
+  @DisplayName("기억 후보 추출 요청에 기존 기억과 이미 질문에 쓴 기억, 세션 종료 방식을 함께 보낸다.")
+  @Test
+  void sendsExistingMemoriesAndFollowUpContextWithCandidateRequest() {
+    List<AiFreeTalkMemoryContext> existing =
+        List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.EVENT, "다음 주에 면접이 있다."));
+    when(memoryRepository.findRecentActiveContexts(USER_PROFILE_ID, "chloe", 20))
+        .thenReturn(existing);
+    ConversationMemoryGenerationRequest base = context();
+    when(contextService.claim(LEARNING_SESSION_ID))
+        .thenReturn(
+            new ConversationMemoryGenerationRequest(
+                base.learningSessionId(),
+                base.userProfileId(),
+                base.characterId(),
+                base.targetLocale(),
+                base.baseLocale(),
+                base.timezone(),
+                base.history(),
+                new ConversationMemoryFollowUpContext(List.of(7L), "USER_CONFIRMED")));
+    when(aiClient.extractMemoryCandidates(any()))
+        .thenReturn(new AiMemoryCandidatesResult("extractor-v1", List.of()));
+
+    generationService.generate(LEARNING_SESSION_ID);
+
+    ArgumentCaptor<AiMemoryCandidatesRequest> request =
+        ArgumentCaptor.forClass(AiMemoryCandidatesRequest.class);
+    verify(aiClient).extractMemoryCandidates(request.capture());
+    assertThat(request.getValue().existingMemories()).isEqualTo(existing);
+    assertThat(request.getValue().askedMemoryIds()).containsExactly(7L);
+    assertThat(request.getValue().sessionEndedBy()).isEqualTo("USER_CONFIRMED");
   }
 
   @DisplayName("기억 후보가 없으면 충돌 해결이나 저장 계획 없이 작업을 완료한다.")

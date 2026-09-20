@@ -36,7 +36,7 @@ public class FreeTalkMemoryGenerationService {
   /** 장기기억 생성 문맥으로 후보를 판정하고 저장한다. */
   private void generate(ConversationMemoryGenerationRequest request) {
     try {
-      List<ConversationMemoryResolutionPlan> plans = planningService.createPlans(request);
+      List<ConversationMemoryResolutionPlan> plans = planningService.createPlans(request).plans();
       if (contextService.persistAndComplete(request, plans)
           == ConversationMemoryWriteService.PersistenceResult.STALE) {
         throw new IllegalStateException("장기기억 비교 snapshot이 변경됐습니다.");
