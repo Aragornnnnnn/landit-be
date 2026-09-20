@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessa
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.ToIntFunction;
 
 final class FreeTalkSummaryWindow {
   private FreeTalkSummaryWindow() {}
@@ -45,4 +46,19 @@ final class FreeTalkSummaryWindow {
         || message.getFreeTalkTurnStatus() == FreeTalkTurnStatus.COMPLETED;
   }
 
+  static List<SessionHistoryMessageSnapshot> source(
+      List<List<SessionHistoryMessageSnapshot>> rounds,
+      int byteLimit,
+      ToIntFunction<List<SessionHistoryMessageSnapshot>> bytes) {
+    List<SessionHistoryMessageSnapshot> source = new ArrayList<>();
+    for (List<SessionHistoryMessageSnapshot> round : rounds) {
+      List<SessionHistoryMessageSnapshot> next = new ArrayList<>(source);
+      next.addAll(round);
+      if (!source.isEmpty() && bytes.applyAsInt(next) > byteLimit) {
+        break;
+      }
+      source = next;
+    }
+    return List.copyOf(source);
+  }
 }
