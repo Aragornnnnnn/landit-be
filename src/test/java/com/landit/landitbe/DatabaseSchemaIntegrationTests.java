@@ -377,10 +377,10 @@ class DatabaseSchemaIntegrationTests {
         "free_talk_message_feedback", "chk_free_talk_message_feedback_memory");
   }
 
-  /** V114 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다. */
-  @DisplayName("V114 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다.")
+  /** V115 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다. */
+  @DisplayName("V115 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다.")
   @Test
-  void v114AddsFreeTalkFollowUpTable() {
+  void v115AddsFreeTalkFollowUpTable() {
     assertTableExists("free_talk_follow_up");
     assertColumnExists("free_talk_follow_up", "user_profile_id");
     assertColumnExists("free_talk_follow_up", "free_talk_session_id");
@@ -1500,10 +1500,10 @@ class DatabaseSchemaIntegrationTests {
     }
   }
 
-  /** 후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V114를 적용한다. */
-  @DisplayName("후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V114를 적용한다.")
+  /** 후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V115를 적용한다. */
+  @DisplayName("후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V115를 적용한다.")
   @Test
-  void v114RejectsInvalidFollowUpsAndDeletesThemWithSession() {
+  void v115RejectsInvalidFollowUpsAndDeletesThemWithSession() {
     // V112 백필 검증과 같은 이유로 migration과 검증이 한 연결을 같이 쓴다.
     SingleConnectionDataSource dataSource =
         new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
