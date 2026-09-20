@@ -377,6 +377,24 @@ class DatabaseSchemaIntegrationTests {
         "free_talk_message_feedback", "chk_free_talk_message_feedback_memory");
   }
 
+  /** V114 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다. */
+  @DisplayName("V114 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다.")
+  @Test
+  void v114AddsFreeTalkFollowUpTable() {
+    assertTableExists("free_talk_follow_up");
+    assertColumnExists("free_talk_follow_up", "user_profile_id");
+    assertColumnExists("free_talk_follow_up", "free_talk_session_id");
+    assertColumnExists("free_talk_follow_up", "memory_id");
+    assertColumnExists("free_talk_follow_up", "trigger_type");
+    assertColumnExists("free_talk_follow_up", "question");
+    assertColumnExists("free_talk_follow_up", "invite");
+    assertTableConstraintExists("free_talk_follow_up", "uk_free_talk_follow_up_session");
+    assertTableConstraintExists("free_talk_follow_up", "chk_free_talk_follow_up_trigger");
+    assertTableConstraintExists(
+        "free_talk_follow_up", "chk_free_talk_follow_up_none_without_memory");
+    assertTableConstraintExists("free_talk_follow_up", "chk_free_talk_follow_up_text");
+  }
+
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
   @Test
   void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
@@ -1480,6 +1498,88 @@ class DatabaseSchemaIntegrationTests {
     } finally {
       dataSource.destroy();
     }
+  }
+
+  /** 후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V114를 적용한다. */
+  @DisplayName("후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V114를 적용한다.")
+  @Test
+  void v114RejectsInvalidFollowUpsAndDeletesThemWithSession() {
+    // V112 백필 검증과 같은 이유로 migration과 검증이 한 연결을 같이 쓴다.
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      // 제약만 보므로 사용자와 학습 세션 없이 프리톡 세션만 심는다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      for (long sessionId : new long[] {31L, 32L}) {
+        migrationJdbcTemplate.update(
+            "INSERT INTO free_talk_session (id, learning_session_id, start_mode, character_id,"
+                + " conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)"
+                + " VALUES (?, ?, 'USER_FIRST', 'chloe', 'COMPLETED', 0, CURRENT_TIMESTAMP,"
+                + " CURRENT_TIMESTAMP)",
+            sessionId,
+            sessionId + 300L);
+      }
+
+      assertThat(insertFollowUp(migrationJdbcTemplate, 31L, 42L, "CONCERN", "면접 준비, 어떻게 됐어?"))
+          .isEqualTo(1);
+      assertFollowUpRejected(
+          migrationJdbcTemplate, 31L, null, "GOAL", "또 다른 질문", "uk_free_talk_follow_up_session");
+      assertFollowUpRejected(
+          migrationJdbcTemplate, 32L, 42L, "NONE", "기본 문구", "none_without_memory");
+      assertFollowUpRejected(
+          migrationJdbcTemplate,
+          32L,
+          null,
+          "UPCOMING_EVENT",
+          "질문",
+          "chk_free_talk_follow_up_trigger");
+      assertFollowUpRejected(
+          migrationJdbcTemplate, 32L, null, "MOOD", "   ", "chk_free_talk_follow_up_text");
+      // 근거 기억이 없는 기본 문구는 저장된다.
+      assertThat(insertFollowUp(migrationJdbcTemplate, 32L, null, "NONE", "요즘 빠져 있는 거 얘기해줘."))
+          .isEqualTo(1);
+
+      // 후속 질문은 세션의 부속물이라 세션이 지워지면 함께 지워진다. 삭제 전파는 참조 무결성을 켜야 동작한다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update("DELETE FROM free_talk_session WHERE id = 31");
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT free_talk_session_id FROM free_talk_follow_up", Long.class))
+          .containsExactly(32L);
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  private int insertFollowUp(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      Long memoryId,
+      String triggerType,
+      String question) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id,"
+            + " trigger_type, question, invite, created_at, updated_at)"
+            + " VALUES (1, ?, ?, ?, ?, '다음엔 그 얘기 하자.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        sessionId,
+        memoryId,
+        triggerType,
+        question);
+  }
+
+  private void assertFollowUpRejected(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      Long memoryId,
+      String triggerType,
+      String question,
+      String constraintName) {
+    assertThatThrownBy(
+            () -> insertFollowUp(migrationJdbcTemplate, sessionId, memoryId, triggerType, question))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining(constraintName);
   }
 
   private void assertCorrectionMemoryRejected(JdbcTemplate migrationJdbcTemplate, String sql) {
