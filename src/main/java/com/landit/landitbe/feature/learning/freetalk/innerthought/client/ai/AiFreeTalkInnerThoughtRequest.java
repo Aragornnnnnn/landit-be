@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
@@ -18,7 +19,8 @@ import java.util.List;
  * @param baseLocale 사용자 기준 언어
  * @param topic 현재 프리톡 주제
  * @param conversationHistory 속마음 생성에 사용할 대화 문맥
- * @param memoryContext 턴 교정의 근거로만 쓰는 장기기억 문맥. 최대 3개이며 없으면 빈 목록
+ * @param memoryContext 턴 교정의 근거로만 쓰는 장기기억 문맥. 최대 3개. 비어 있으면 요청 JSON에 싣지 않는다. 이 필드를 모르는 구버전 AI
+ *     서버(`extra="forbid"`)가 요청 전체를 거부해 속마음까지 실패시키는 일을, 보낼 기억이 없는 요청에서는 피하기 위함이다
  */
 public record AiFreeTalkInnerThoughtRequest(
     Long sessionId,
@@ -29,7 +31,7 @@ public record AiFreeTalkInnerThoughtRequest(
     String baseLocale,
     AiFreeTalkTopic topic,
     List<AiConversationHistoryMessage> conversationHistory,
-    List<AiFreeTalkMemoryContext> memoryContext) {
+    @JsonInclude(JsonInclude.Include.NON_EMPTY) List<AiFreeTalkMemoryContext> memoryContext) {
 
   /**
    * 기억 문맥은 null 없이 상한 안에서만 전달한다.

@@ -237,9 +237,9 @@ class RemoteAiFreeTalkClientTest {
         .contains("workflow=free_talk_turn_correction_memory reason=memory_without_observed_at");
   }
 
-  @DisplayName("기억 문맥이 없는 속마음 요청은 빈 목록을 보내고 근거 기억 없는 교정을 변환한다.")
+  @DisplayName("기억 문맥이 없는 속마음 요청은 기억 필드를 싣지 않고 근거 기억 없는 교정을 변환한다.")
   @Test
-  void sendsEmptyMemoryContextWhenNoMemoryIsAvailable() throws Exception {
+  void omitsMemoryContextFieldWhenNoMemoryIsAvailable() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
     registerJsonResponse(
         "/api/v1/free-talk/inner-thought",
@@ -249,9 +249,8 @@ class RemoteAiFreeTalkClientTest {
     AiFreeTalkInnerThoughtResult result =
         remoteClient().generateInnerThought(innerThoughtRequest());
 
-    JsonNode memoryContext = requests.get("/api/v1/free-talk/inner-thought").get("memoryContext");
-    assertThat(memoryContext.isArray()).isTrue();
-    assertThat(memoryContext).isEmpty();
+    // 이 필드를 모르는 구버전 AI 서버가 요청 전체를 거부하지 않도록, 보낼 기억이 없으면 필드를 싣지 않는다.
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("memoryContext")).isFalse();
     assertThat(result.correction().sentence().usedMemoryId()).isNull();
     assertThat(result.correction().sentence().memoryLabel()).isNull();
   }
