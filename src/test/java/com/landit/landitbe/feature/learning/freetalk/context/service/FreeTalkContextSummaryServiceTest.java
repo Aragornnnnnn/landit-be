@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.learning.FreeTalkContextProperties;
@@ -117,10 +119,37 @@ class FreeTalkContextSummaryServiceTest {
   }
 
   @Test
+  void doesNotEnrollExistingSessionOnDispatch() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(repo.findByIdForUpdate(30L)).thenReturn(Optional.empty());
+    service.dispatchIfNeeded(reservation());
+    verifyNoInteractions(ai);
+    verify(repo, never()).save(any());
+  }
+
+  @Test
+  void usesByteTriggerBeforeTwelveRounds() {
+    var all = rounds(10, 1000);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any())).thenAnswer(call -> result(call.getArgument(0)));
+    service.dispatchIfNeeded(reservation());
+    assertEquals(4, state.getCoveredThroughSequence());
+  }
+
+  @Test
   void registeredSessionHasPolicyBeforeFirstSummary() {
     when(repo.findById(30L)).thenReturn(Optional.of(state));
     assertEquals("v1", service.snapshot(1L, 30L).contextPolicyVersion());
     assertNull(service.snapshot(1L, 30L).sessionSummary());
+  }
+
+  private AiFreeTalkContextSummaryResult result(AiFreeTalkContextSummaryRequest request) {
+    return new AiFreeTalkContextSummaryResult(
+        "v1",
+        request.baseRevision(),
+        request.targetThroughSequence(),
+        new AiFreeTalkSessionSummaryContent("topic", List.of(), List.of(), List.of()));
   }
 
   private FreeTalkMessageReservation reservation() {
