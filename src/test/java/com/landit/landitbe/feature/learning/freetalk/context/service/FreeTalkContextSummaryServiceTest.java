@@ -139,6 +139,21 @@ class FreeTalkContextSummaryServiceTest {
   }
 
   @Test
+  void ignoresResultWhenLifecycleChangedDuringAiCall() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            call -> {
+              when(lifecycle.lockActive(1L, 300L, 30L)).thenReturn(false);
+              return result(call.getArgument(0));
+            });
+    service.dispatchIfNeeded(reservation());
+    assertEquals(0, state.getRevision());
+    assertNull(state.getSummaryContent());
+  }
+
+  @Test
   void staleWorkerCannotReplaceNewLease() {
     var all = rounds(12, 10);
     when(messages.findAll(3L)).thenReturn(all);
