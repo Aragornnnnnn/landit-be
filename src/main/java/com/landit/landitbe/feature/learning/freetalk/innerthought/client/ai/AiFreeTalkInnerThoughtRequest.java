@@ -2,7 +2,9 @@
 
 package com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import java.util.List;
 
@@ -26,4 +28,32 @@ public record AiFreeTalkInnerThoughtRequest(
     String targetLocale,
     String baseLocale,
     AiFreeTalkTopic topic,
-    List<AiConversationHistoryMessage> conversationHistory) {}
+    List<AiConversationHistoryMessage> conversationHistory,
+    @JsonInclude(JsonInclude.Include.NON_NULL) String contextPolicyVersion,
+    @JsonInclude(JsonInclude.Include.NON_NULL) AiFreeTalkSessionSummary sessionSummary,
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT) boolean historyIncomplete) {
+
+  /** 기존 전체 이력 호출과 호환되는 요청을 생성한다. */
+  public AiFreeTalkInnerThoughtRequest(
+      Long sessionId,
+      String characterId,
+      Long submittedMessageId,
+      int submittedTurnNumber,
+      String targetLocale,
+      String baseLocale,
+      AiFreeTalkTopic topic,
+      List<AiConversationHistoryMessage> conversationHistory) {
+    this(
+        sessionId,
+        characterId,
+        submittedMessageId,
+        submittedTurnNumber,
+        targetLocale,
+        baseLocale,
+        topic,
+        conversationHistory,
+        null,
+        null,
+        false);
+  }
+}

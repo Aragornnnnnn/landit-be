@@ -2,6 +2,8 @@
 
 package com.landit.landitbe.feature.learning.freetalk.client.ai;
 
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
@@ -15,6 +17,7 @@ import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 
 /** 프리톡에 필요한 AI 서버 호출을 추상화한다. */
 public interface AiFreeTalkClient {
@@ -74,4 +77,16 @@ public interface AiFreeTalkClient {
    */
   AiConversationEmbeddingsResult extractConversationEmbeddings(
       AiConversationEmbeddingsRequest request);
+
+  /**
+   * 프리톡 원문 구간을 요약해 다음 생성 요청에 사용할 파생 맥락을 만든다.
+   *
+   * @param request 요약할 원문과 기존 요약 범위
+   * @return AI가 생성한 세션 요약
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  default AiFreeTalkContextSummaryResult generateContextSummary(
+      AiFreeTalkContextSummaryRequest request) {
+    throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+  }
 }

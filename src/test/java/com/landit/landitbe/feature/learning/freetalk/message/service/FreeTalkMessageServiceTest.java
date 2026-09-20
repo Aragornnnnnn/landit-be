@@ -25,12 +25,17 @@ import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus
 import com.landit.landitbe.feature.learning.conversation.domain.SessionMessageInputType;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextWindow;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
+import com.landit.landitbe.feature.learning.freetalk.context.service.FreeTalkContextSummaryService;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionReservation;
@@ -57,6 +62,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.task.TaskExecutor;
@@ -77,6 +83,8 @@ class FreeTalkMessageServiceTest {
       mock(FreeTalkMemoryGenerationDispatchService.class);
   private final FreeTalkMemoryRetrievalService memoryRetrievalService =
       mock(FreeTalkMemoryRetrievalService.class);
+  private final FreeTalkContextSummaryService contextSummaryService =
+      mock(FreeTalkContextSummaryService.class);
   private final TaskExecutor directExecutor = Runnable::run;
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
@@ -88,6 +96,39 @@ class FreeTalkMessageServiceTest {
           expressionGenerationDispatcher,
           memoryGenerationDispatchService,
           memoryRetrievalService);
+
+  @DisplayName("확정된 요약 경계 이전 원문을 모델 요청에서 제외하고 최신 발화를 유지한다.")
+  @Test
+  void sendsOnlyHistoryAfterContextSummaryBoundary() {
+    FreeTalkMessageReservation reservation = longReservation();
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation);
+    when(contextSummaryService.snapshot(1L, 30L))
+        .thenReturn(
+            new AiFreeTalkContextWindow(
+                "v1",
+                new AiFreeTalkSessionSummary(
+                    1,
+                    4,
+                    new AiFreeTalkSessionSummaryContent("하이킹", List.of(), List.of(), List.of())),
+                false));
+    when(aiFreeTalkClient.generateInnerThought(any()))
+        .thenReturn(new AiFreeTalkInnerThoughtResult("좋은 대화다.", InnerThoughtType.GOOD));
+    when(aiFreeTalkClient.generateTurn(any()))
+        .thenReturn(
+            new AiFreeTalkTurnResult(
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
+    when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+
+    contextAwareService().submit(1L, 300L, request());
+
+    ArgumentCaptor<AiFreeTalkTurnRequest> captor =
+        ArgumentCaptor.forClass(AiFreeTalkTurnRequest.class);
+    verify(aiFreeTalkClient).generateTurn(captor.capture());
+    assertThat(captor.getValue().conversationHistory())
+        .extracting(AiConversationHistoryMessage::messageId)
+        .containsExactly(105L, 106L);
+  }
 
   @DisplayName("사용자의 첫 발화에서만 기억을 조회하고 응답에서 사용한 기억을 기록한다.")
   @Test
@@ -369,6 +410,19 @@ class FreeTalkMessageServiceTest {
         memoryRetrievalService);
   }
 
+  private FreeTalkMessageService contextAwareService() {
+    return new FreeTalkMessageService(
+        submittedMessageService,
+        replayService,
+        aiFreeTalkClient,
+        sessionMessageService,
+        directExecutor,
+        expressionGenerationDispatcher,
+        memoryGenerationDispatchService,
+        memoryRetrievalService,
+        contextSummaryService);
+  }
+
   private FreeTalkMessageReservation reservation() {
     return new FreeTalkMessageReservation(
         1L,
@@ -386,6 +440,31 @@ class FreeTalkMessageServiceTest {
         "KO",
         new AiFreeTalkTopic(null, "하이킹", null),
         List.of(new AiConversationHistoryMessage(7L, 1, "USER", "I went hiking.", null)));
+  }
+
+  private FreeTalkMessageReservation longReservation() {
+    return new FreeTalkMessageReservation(
+        1L,
+        java.time.LocalDate.now(),
+        300L,
+        30L,
+        "chloe",
+        3L,
+        106L,
+        "9d6928d0-0cbc-4cb1-a9cf-2f91c1f9c0ec",
+        1200L,
+        false,
+        false,
+        "EN",
+        "KO",
+        new AiFreeTalkTopic(null, "하이킹", null),
+        List.of(
+            new AiConversationHistoryMessage(101L, 1, "AI", "Where did you go?", "어디 갔어?"),
+            new AiConversationHistoryMessage(102L, 1, "USER", "I went hiking.", null),
+            new AiConversationHistoryMessage(103L, 2, "AI", "Who went with you?", "누구와 갔어?"),
+            new AiConversationHistoryMessage(104L, 2, "USER", "I went with a friend.", null),
+            new AiConversationHistoryMessage(105L, 3, "AI", "That sounds fun.", "재밌겠다."),
+            new AiConversationHistoryMessage(106L, 3, "USER", "It was fun.", null)));
   }
 
   private FreeTalkMessageReservation timeLimitReservation() {

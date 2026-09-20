@@ -8,6 +8,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummarySourceMessage;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
@@ -29,6 +31,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -115,6 +119,9 @@ class RemoteAiFreeTalkClientTest {
     assertThat(requests.get("/api/v1/free-talk/turn").get("responseMode").asString())
         .isEqualTo("NORMAL");
     assertThat(requests.get("/api/v1/free-talk/turn").has("partnerDisplayName")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("contextPolicyVersion")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("sessionSummary")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("historyIncomplete")).isFalse();
   }
 
   @DisplayName("프리톡 속마음 응답의 평가 유형을 변환한다.")
@@ -210,6 +217,26 @@ class RemoteAiFreeTalkClientTest {
         successResponse("{\"aiMessage\":\"Hello!\",\"translatedMessage\":\"안녕!\"}"));
     assertThat(remoteClient(Duration.ofSeconds(5)).generateOpening(openingRequest()).aiMessage())
         .isEqualTo("Hello!");
+  }
+
+  @DisplayName("프리톡 컨텍스트 요약은 일반 대화 timeout보다 짧은 전용 제한 시간을 적용한다.")
+  @Test
+  void contextSummaryUsesDedicatedTimeout() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/context-summary",
+        250,
+        successResponse(
+            "{\"policyVersion\":\"v1\",\"baseRevision\":0,"
+                + "\"coveredThroughSequence\":2,\"summary\":{\"topic\":\"주말\","
+                + "\"userStatements\":[],\"openThreads\":[],\"interactionContext\":[]}}"));
+
+    assertThatThrownBy(
+            () ->
+                remoteClient(Duration.ofSeconds(2), Duration.ofMillis(50))
+                    .generateContextSummary(contextSummaryRequest()))
+        .isInstanceOf(ApiException.class)
+        .extracting(exception -> ((ApiException) exception).getErrorCode())
+        .isEqualTo(ErrorCode.AI_GENERATION_FAILED);
   }
 
   private void registerDelayedResponse(String path, long delayMillis, String response) {
@@ -621,6 +648,11 @@ class RemoteAiFreeTalkClientTest {
   }
 
   private RemoteAiFreeTalkClient remoteClient(Duration requestTimeout) {
+    return remoteClient(requestTimeout, Duration.ofSeconds(10));
+  }
+
+  private RemoteAiFreeTalkClient remoteClient(
+      Duration requestTimeout, Duration contextSummaryRequestTimeout) {
     return new RemoteAiFreeTalkClient(
         jsonMapper,
         new AiClientProperties(
@@ -630,7 +662,28 @@ class RemoteAiFreeTalkClientTest {
             Duration.ofSeconds(1),
             requestTimeout,
             Duration.ofSeconds(1),
-            Duration.ofSeconds(20)));
+            Duration.ofSeconds(20),
+            "",
+            contextSummaryRequestTimeout));
+  }
+
+  private AiFreeTalkContextSummaryRequest contextSummaryRequest() {
+    return new AiFreeTalkContextSummaryRequest(
+        1L,
+        "v1",
+        0,
+        null,
+        0,
+        2,
+        "Asia/Seoul",
+        List.of(
+            new AiFreeTalkContextSummarySourceMessage(
+                1,
+                10L,
+                1,
+                "USER",
+                "주말에 등산했어.",
+                OffsetDateTime.of(2026, 9, 20, 10, 0, 0, 0, ZoneOffset.ofHours(9)))));
   }
 
   private String successResponse(String data) {

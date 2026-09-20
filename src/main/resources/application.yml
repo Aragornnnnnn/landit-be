@@ -53,6 +53,14 @@ management:
 
 landit:
   free-talk:
+    context:
+      enabled: ${LANDIT_FREE_TALK_CONTEXT_ENABLED:false}
+      allowed-user-ids: ${LANDIT_FREE_TALK_CONTEXT_ALLOWED_USER_IDS:}
+      recent-rounds: ${LANDIT_FREE_TALK_CONTEXT_RECENT_ROUNDS:8}
+      summary-trigger-rounds: ${LANDIT_FREE_TALK_CONTEXT_SUMMARY_TRIGGER_ROUNDS:12}
+      summary-source-max-bytes: ${LANDIT_FREE_TALK_CONTEXT_SUMMARY_SOURCE_MAX_BYTES:6000}
+      lease-seconds: ${LANDIT_FREE_TALK_CONTEXT_LEASE_SECONDS:30}
+      retry-delay-seconds: ${LANDIT_FREE_TALK_CONTEXT_RETRY_DELAY_SECONDS:30}
     speaking-time-limit-ms: ${LANDIT_FREE_TALK_DAILY_SPEAKING_TIME_LIMIT_MS:${LANDIT_FREE_TALK_SPEAKING_TIME_LIMIT_MS:7200000}}
     daily-request-limit: ${LANDIT_FREE_TALK_DAILY_REQUEST_LIMIT:1000}
     requests-per-minute-limit: ${LANDIT_FREE_TALK_REQUESTS_PER_MINUTE_LIMIT:20}
@@ -74,6 +82,7 @@ landit:
     service-audience: ${LANDIT_AI_SERVICE_AUDIENCE:KOREAN_LEARNER}
     connect-timeout: ${LANDIT_AI_CONNECT_TIMEOUT:5s}
     request-timeout: ${LANDIT_AI_REQUEST_TIMEOUT:60s}
+    context-summary-request-timeout: ${LANDIT_AI_CONTEXT_SUMMARY_REQUEST_TIMEOUT:10s}
     session-feedback-request-timeout: ${LANDIT_AI_SESSION_FEEDBACK_REQUEST_TIMEOUT:120s}
     pronunciation-request-timeout: ${LANDIT_AI_PRONUNCIATION_REQUEST_TIMEOUT:20s}
   expression-search:

@@ -2,8 +2,10 @@
 
 package com.landit.landitbe.feature.learning.freetalk.message.client.ai;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkResponseMode;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import java.util.List;
@@ -34,7 +36,40 @@ public record AiFreeTalkTurnRequest(
     boolean isFirstUserTurn,
     AiFreeTalkTopic topic,
     List<AiConversationHistoryMessage> conversationHistory,
-    List<AiFreeTalkMemoryContext> memoryContext) {
+    List<AiFreeTalkMemoryContext> memoryContext,
+    @JsonInclude(JsonInclude.Include.NON_NULL) String contextPolicyVersion,
+    @JsonInclude(JsonInclude.Include.NON_NULL) AiFreeTalkSessionSummary sessionSummary,
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT) boolean historyIncomplete) {
+
+  /** 기존 전체 이력 호출과 호환되는 요청을 생성한다. */
+  public AiFreeTalkTurnRequest(
+      Long sessionId,
+      String characterId,
+      Long submittedMessageId,
+      int submittedTurnNumber,
+      String targetLocale,
+      String baseLocale,
+      AiFreeTalkResponseMode responseMode,
+      boolean isFirstUserTurn,
+      AiFreeTalkTopic topic,
+      List<AiConversationHistoryMessage> conversationHistory,
+      List<AiFreeTalkMemoryContext> memoryContext) {
+    this(
+        sessionId,
+        characterId,
+        submittedMessageId,
+        submittedTurnNumber,
+        targetLocale,
+        baseLocale,
+        responseMode,
+        isFirstUserTurn,
+        topic,
+        conversationHistory,
+        memoryContext,
+        null,
+        null,
+        false);
+  }
 
   /**
    * 요청 문맥을 방어적으로 복사한다.

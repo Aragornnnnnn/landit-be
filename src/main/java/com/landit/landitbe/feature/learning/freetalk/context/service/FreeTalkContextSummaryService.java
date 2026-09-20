@@ -1,0 +1,280 @@
+// 프리톡 세션 요약을 선점·생성·저장하고 다음 요청용 문맥을 제공한다.
+
+package com.landit.landitbe.feature.learning.freetalk.context.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.config.learning.FreeTalkContextProperties;
+import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
+import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummarySourceMessage;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextWindow;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
+import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
+import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalkContextSummaryRepository;
+import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** 프리톡 원문을 보존한 채 파생 요약을 best-effort로 갱신한다. */
+@Slf4j
+@Service
+public class FreeTalkContextSummaryService {
+
+  private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
+
+  private final FreeTalkContextSummaryRepository repository;
+  private final ConversationMessageService conversationMessageService;
+  private final AiFreeTalkClient aiFreeTalkClient;
+  private final FreeTalkContextProperties properties;
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private final TransactionTemplate transactionTemplate;
+  private final Executor executor;
+
+  /**
+   * 요약 저장소와 원문 조회·AI 호출 의존성을 구성한다.
+   *
+   * @param repository 요약 상태 저장소
+   * @param conversationMessageService 원문 이력 조회 서비스
+   * @param aiFreeTalkClient 요약 생성 AI 클라이언트
+   * @param properties 요약 정책 설정
+   * @param transactionManager 요약 선점과 저장 트랜잭션 관리자
+   * @param taskExecutor best-effort 요약 작업 실행기
+   */
+  public FreeTalkContextSummaryService(
+      FreeTalkContextSummaryRepository repository,
+      ConversationMessageService conversationMessageService,
+      AiFreeTalkClient aiFreeTalkClient,
+      FreeTalkContextProperties properties,
+      org.springframework.transaction.PlatformTransactionManager transactionManager,
+      @Qualifier("applicationTaskExecutor")
+          org.springframework.core.task.TaskExecutor taskExecutor) {
+    this.repository = repository;
+    this.conversationMessageService = conversationMessageService;
+    this.aiFreeTalkClient = aiFreeTalkClient;
+    this.properties = properties;
+    this.transactionTemplate = new TransactionTemplate(transactionManager);
+    this.executor = taskExecutor;
+  }
+
+  /** 활성화된 사용자에게 저장된 요약 문맥을 제공한다. */
+  public AiFreeTalkContextWindow snapshot(long userId, long freeTalkSessionId) {
+    if (!eligible(userId)) {
+      return AiFreeTalkContextWindow.disabled();
+    }
+    return repository
+        .findById(freeTalkSessionId)
+        .map(this::toWindow)
+        .orElse(AiFreeTalkContextWindow.disabled());
+  }
+
+  /** 현재 응답이 완료된 뒤 요약 작업을 비동기로 등록한다. */
+  public void dispatchIfNeeded(FreeTalkMessageReservation reservation) {
+    if (!eligible(reservation.userId())) {
+      return;
+    }
+    try {
+      executor.execute(() -> summarize(reservation));
+    } catch (RuntimeException exception) {
+      log.info("프리톡 컨텍스트 요약 작업을 등록하지 못했습니다. sessionId={}", reservation.freeTalkSessionId());
+    }
+  }
+
+  private void summarize(FreeTalkMessageReservation reservation) {
+    List<SessionHistoryMessageSnapshot> messages =
+        conversationMessageService.findAll(reservation.historyId());
+    PendingSummary pending = prepare(reservation, messages);
+    if (pending == null) {
+      return;
+    }
+    try {
+      AiFreeTalkContextSummaryResult result =
+          aiFreeTalkClient.generateContextSummary(pending.request());
+      complete(pending, result);
+    } catch (RuntimeException exception) {
+      defer(pending);
+      log.info("프리톡 컨텍스트 요약 생성에 실패했습니다. sessionId={}", reservation.freeTalkSessionId());
+    }
+  }
+
+  private PendingSummary prepare(
+      FreeTalkMessageReservation reservation, List<SessionHistoryMessageSnapshot> messages) {
+    return transactionTemplate.execute(
+        status -> {
+          FreeTalkContextSummary state =
+              repository
+                  .findByIdForUpdate(reservation.freeTalkSessionId())
+                  .orElseGet(
+                      () ->
+                          repository.save(
+                              FreeTalkContextSummary.start(
+                                  reservation.freeTalkSessionId(),
+                                  "v1",
+                                  properties.summarySourceMaxBytes())));
+          int completedRounds = completedRounds(messages);
+          if (completedRounds < properties.summaryTriggerRounds()
+              || state.getSuspendedReason() != null
+              || activeLease(state)
+              || (state.getNextAttemptAt() != null
+                  && state.getNextAttemptAt().isAfter(LocalDateTime.now()))) {
+            return null;
+          }
+          List<SessionHistoryMessageSnapshot> source = sourceMessages(messages, state);
+          if (source.isEmpty()) {
+            return null;
+          }
+          String token = UUID.randomUUID().toString();
+          state.claim(token, LocalDateTime.now().plusSeconds(properties.leaseSeconds()));
+          repository.save(state);
+          AiFreeTalkContextSummaryRequest request =
+              new AiFreeTalkContextSummaryRequest(
+                  reservation.freeTalkSessionId(),
+                  "v1",
+                  state.getRevision(),
+                  toContent(state.getSummaryContent()),
+                  state.getCoveredThroughSequence(),
+                  source.getLast().getMessageSequence(),
+                  "Asia/Seoul",
+                  source.stream().map(this::toSourceMessage).toList());
+          return new PendingSummary(
+              reservation.freeTalkSessionId(), token, state.getRevision(), request);
+        });
+  }
+
+  private void complete(PendingSummary pending, AiFreeTalkContextSummaryResult result) {
+    if (!compatible(pending, result)) {
+      defer(pending);
+      log.info("프리톡 컨텍스트 요약 경계 검증에 실패했습니다. sessionId={}", pending.sessionId());
+      return;
+    }
+    transactionTemplate.executeWithoutResult(
+        status ->
+            repository
+                .findByIdForUpdate(pending.sessionId())
+                .filter(state -> state.ownsLease(pending.leaseToken()))
+                .ifPresent(
+                    state -> {
+                      state.complete(
+                          OBJECT_MAPPER.valueToTree(result.summary()),
+                          result.coveredThroughSequence());
+                      repository.save(state);
+                    }));
+  }
+
+  private boolean compatible(PendingSummary pending, AiFreeTalkContextSummaryResult result) {
+    AiFreeTalkContextSummaryRequest request = pending.request();
+    return result != null
+        && request.policyVersion().equals(result.policyVersion())
+        && request.baseRevision() == result.baseRevision()
+        && request.targetThroughSequence() == result.coveredThroughSequence()
+        && result.summary() != null;
+  }
+
+  private void defer(PendingSummary pending) {
+    transactionTemplate.executeWithoutResult(
+        status ->
+            repository
+                .findByIdForUpdate(pending.sessionId())
+                .filter(state -> state.ownsLease(pending.leaseToken()))
+                .ifPresent(
+                    state ->
+                        state.defer(
+                            LocalDateTime.now().plusSeconds(properties.retryDelaySeconds()))));
+  }
+
+  private List<SessionHistoryMessageSnapshot> sourceMessages(
+      List<SessionHistoryMessageSnapshot> messages, FreeTalkContextSummary state) {
+    int lastSequence =
+        messages.stream()
+            .filter(message -> "AI".equals(message.getRole().name()))
+            .mapToInt(SessionHistoryMessageSnapshot::getMessageSequence)
+            .max()
+            .orElse(0);
+    int targetSequence =
+        Math.max(state.getCoveredThroughSequence(), lastSequence - properties.recentRounds() * 2);
+    List<SessionHistoryMessageSnapshot> source = new java.util.ArrayList<>();
+    int bytes = 0;
+    for (SessionHistoryMessageSnapshot message : messages) {
+      if (message.getMessageSequence() <= state.getCoveredThroughSequence()
+          || message.getMessageSequence() > targetSequence) {
+        continue;
+      }
+      int messageBytes = message.getContent().getBytes(StandardCharsets.UTF_8).length;
+      if (bytes + messageBytes > properties.summarySourceMaxBytes()) {
+        break;
+      }
+      source.add(message);
+      bytes += messageBytes;
+    }
+    return List.copyOf(source);
+  }
+
+  private int completedRounds(List<SessionHistoryMessageSnapshot> messages) {
+    return (int)
+        messages.stream()
+            .filter(
+                message ->
+                    "USER".equals(message.getRole().name())
+                        && message.getFreeTalkTurnStatus() != null)
+            .count();
+  }
+
+  private AiFreeTalkContextSummarySourceMessage toSourceMessage(
+      SessionHistoryMessageSnapshot message) {
+    return new AiFreeTalkContextSummarySourceMessage(
+        message.getMessageSequence(),
+        message.getId(),
+        message.getTurnNumber(),
+        message.getRole().name(),
+        message.getContent(),
+        message.getCreatedAt().atZone(KOREA_ZONE_ID).toOffsetDateTime());
+  }
+
+  private AiFreeTalkContextWindow toWindow(FreeTalkContextSummary state) {
+    if (state.getSummaryContent() == null) {
+      return AiFreeTalkContextWindow.disabled();
+    }
+    AiFreeTalkSessionSummaryContent content = toContent(state.getSummaryContent());
+    return new AiFreeTalkContextWindow(
+        state.getPolicyVersion(),
+        new AiFreeTalkSessionSummary(
+            state.getRevision(), state.getCoveredThroughSequence(), content),
+        false);
+  }
+
+  private AiFreeTalkSessionSummaryContent toContent(JsonNode node) {
+    if (node == null || node.isNull()) {
+      return null;
+    }
+    try {
+      return OBJECT_MAPPER.treeToValue(node, AiFreeTalkSessionSummaryContent.class);
+    } catch (com.fasterxml.jackson.core.JacksonException exception) {
+      return null;
+    }
+  }
+
+  private boolean eligible(long userId) {
+    return properties.enabled() && properties.allowedUserIds().contains(userId);
+  }
+
+  private boolean activeLease(FreeTalkContextSummary state) {
+    return state.getLeaseToken() != null
+        && state.getLeaseUntil() != null
+        && state.getLeaseUntil().isAfter(LocalDateTime.now());
+  }
+
+  private record PendingSummary(
+      long sessionId, String leaseToken, int revision, AiFreeTalkContextSummaryRequest request) {}
+}
