@@ -94,7 +94,7 @@ com.landit.landitbe
 │   │   ├── scheduled
 │   │   └── campaign
 │   ├── memory              # planning / retrieval
-│   ├── profile             # authentication / learning / preference / subscription
+│   ├── profile             # alarm / authentication / learning / preference / subscription
 │   ├── subscription        # event
 │   ├── mailbox             # feedback / letter
 │   ├── admin
@@ -111,6 +111,7 @@ com.landit.landitbe
 복습은 서로 다른 경계입니다. 나머지 기능은 `content`, `profile` 등 feature 바로 아래
 패키지를 업무 단위로 검사합니다. 같은 learning 폴더에 있어도 타 업무 Entity·Repository
 직접 접근과 순환은 금지합니다.
+`profile.alarm`도 자체 알람 저장소를 소유하는 별도 업무로 검사합니다.
 
 | 업무 단위 | 소유 책임과 의존 방향 |
 | --- | --- |
@@ -160,6 +161,7 @@ Entity는 콘텐츠 정의가 `content.*.domain`, 시나리오 실행이 `learni
 | 연습 예문·표현 추천 검색 | `content.expression.practice`, `content.expression.recommendation` |
 | 시나리오 질문·일별 콘텐츠 조회 | `content.scenario.question`, `content.scenario.schedule` |
 | 사용자별 시나리오 선택·목록·달력 | `learning.scenario.selection` |
+| 사용자 일일 알람 설정 | `profile.alarm` 아래 Controller·docs·dto·service·domain·repository |
 | 프로필 인증·학습·설정·구독 처리 | `profile.authentication`, `profile.learning`, `profile.preference`, `profile.subscription` |
 | 우편함 문의·답장 / 편지 발행·조회 | `mailbox.feedback`, `mailbox.letter` |
 | 기억 후보 판정·검색 | `memory.planning`, `memory.retrieval` |
@@ -181,6 +183,8 @@ Controller가 없는 업무는 공개 Service로 다른 업무와 협력할 수 
 프리톡 세션의 공통 Entity·Repository와 여러 AI 요청을 처리하는 클라이언트는 freetalk 상위에 유지합니다.
 `innerthought.client.ai`는 속마음 생성 요청·응답 계약만 분류하며, 호출 조율은 message Service와 저장 책임은 conversation Service가 담당합니다.
 하위 패키지는 프리톡 내부의 탐색 단위입니다. 각각을 별도 모듈로 검사하거나 모든 Service를 Controller 전용으로 제한하는 규칙은 아닙니다.
+
+`UserAlarmController`는 `profile.alarm`의 전용 진입점입니다. 알람 Entity·Repository는 이 업무만 소유하며, 활성 사용자 확인과 최초 등록 직렬화에는 공통 `UserProfileService`의 공개 조회·잠금 계약을 사용합니다. 알람 패키지가 프로필 Entity·Repository에 직접 접근하거나 다른 프로필 업무가 알람 저장소에 접근하지 않도록 경계 검사로 확인합니다.
 
 시나리오 메시지 처리와 기억 후보 판정의 package-private helper는 각각 구현 Service와 같은 패키지에 둡니다. 패키지 이동을 위해 공개 범위를 넓히지 않습니다. 여러 대화 유형이 사용하는 `learning.conversation.domain`의 상태·종료·입력 타입과 기능 독립적인 `shared.domain`은 공통 위치를 유지합니다.
 
