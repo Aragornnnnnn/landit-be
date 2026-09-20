@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -65,6 +67,21 @@ public class FreeTalkContextSummaryService {
     this.properties = properties;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.executor = taskExecutor;
+  }
+
+  /**
+   * 새 세션의 생성 트랜잭션에서만 요약 정책을 고정한다.
+   *
+   * @param userId 새 세션 소유자
+   * @param freeTalkSessionId 새 프리톡 세션 ID
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void initialize(long userId, long freeTalkSessionId) {
+    if (eligible(userId)) {
+      repository.save(
+          FreeTalkContextSummary.start(
+              freeTalkSessionId, "v1", properties.summarySourceMaxBytes()));
+    }
   }
 
   /** 활성화된 사용자에게 저장된 요약 문맥을 제공한다. */
