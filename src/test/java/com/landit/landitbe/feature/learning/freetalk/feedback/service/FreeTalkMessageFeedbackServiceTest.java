@@ -180,6 +180,7 @@ class FreeTalkMessageFeedbackServiceTest {
     when(repository.updateIfPreparing(
             anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(1);
+    when(repository.failAttempt(anyLong(), anyInt(), any(), any(), any())).thenReturn(1);
 
     service.completeFirstAttempt(7L, FreeTalkTurnCorrection.completed(null, true));
     service.completeFirstAttempt(8L, FreeTalkTurnCorrection.failed());
@@ -188,28 +189,16 @@ class FreeTalkMessageFeedbackServiceTest {
     assertThat(retryCount("first_invalid")).isEqualTo(1.0);
   }
 
-  private double retryCount(String outcome) {
-    return meterRegistry.counter("landit.free_talk.correction.retry", "outcome", outcome).count();
-  }
-
-  @DisplayName("다시 해도 같을 실패(계약 위반)는 첫 시도에서 바로 실패로 확정한다.")
+  @DisplayName("다시 해도 같을 실패(계약 위반)는 첫 시도에서 바로 실패로 확정하되, 첫 시도가 아직 그 교정을 맡고 있을 때만 한다.")
   @Test
-  void failsContractViolationImmediately() {
+  void failsContractViolationImmediatelyOnlyAsTheAttemptThatOwnsIt() {
     service.completeFirstAttempt(7L, FreeTalkTurnCorrection.failed());
 
-    verify(repository)
+    // 시도 순번 1과 빈 선점 식별자로 확정한다. 그사이 복구가 넘겨받았으면 0건이라 새 시도를 끝내지 않는다.
+    verify(repository).failAttempt(7L, 1, "", ProcessingStatus.FAILED, ProcessingStatus.PREPARING);
+    verify(repository, never())
         .updateIfPreparing(
-            7L,
-            ProcessingStatus.FAILED,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            ProcessingStatus.PREPARING);
+            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     verify(repository, never()).releaseForRetry(anyLong(), anyInt(), any(), any(), any());
   }
 
@@ -291,5 +280,9 @@ class FreeTalkMessageFeedbackServiceTest {
     assertThat(service.findBySessionHistoryId(3L))
         .containsOnlyKeys(7L)
         .containsValue(new FreeTalkTurnCorrection(ProcessingStatus.PREPARING, null, null));
+  }
+
+  private double retryCount(String outcome) {
+    return meterRegistry.counter("landit.free_talk.correction.retry", "outcome", outcome).count();
   }
 }

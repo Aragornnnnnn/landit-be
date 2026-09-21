@@ -138,6 +138,8 @@ public interface FreeTalkMessageFeedbackRepository
    * 준비 상태이면서 임대가 끝난 교정을 임대가 먼저 끝난 순으로 찾는다. 임대가 없는 행은 시도 정보가 생기기 전부터 준비 상태로 남은 것이라 끝난 것으로 보되, 방금 멈춘
    * 교정이 그 뒤로 밀리지 않도록 맨 뒤에 둔다.
    *
+   * <p>NULL을 뒤에 두는 것은 테스트 DB(H2)의 접속 설정과 PostgreSQL의 오름차순 기본 동작이기도 하지만, 그 설정에 기대지 않도록 정렬에 직접 적는다.
+   *
    * @param now 애플리케이션 Clock 기준 현재 시각
    * @param pageable 한 번에 넘겨받을 교정 수
    * @return 복구 대상 교정

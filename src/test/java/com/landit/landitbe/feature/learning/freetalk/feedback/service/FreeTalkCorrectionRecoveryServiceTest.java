@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -71,7 +72,7 @@ class FreeTalkCorrectionRecoveryServiceTest {
     assertThatCode(() -> service(true, new SyncTaskExecutor()).recover())
         .doesNotThrowAnyException();
 
-    verify(feedbackService).abandonAttempt(second);
+    verify(feedbackService).failUnrebuildableAttempt(second);
   }
 
   @DisplayName("앞선 복구가 아직 돌고 있으면 새 복구를 시작하지 않아, 복구의 AI 호출이 한 번에 하나만 나간다.")
@@ -104,6 +105,19 @@ class FreeTalkCorrectionRecoveryServiceTest {
 
     verify(refusing, times(2)).execute(any());
     verify(feedbackService, never()).findRecoverable();
+  }
+
+  @DisplayName("복구 스레드를 만들지 못하는 오류가 나도 도는 중 표시를 풀어, 복구가 흔적 없이 영영 멈추지 않게 한다.")
+  @Test
+  void canStartAgainAfterExecutorThrewAnError() {
+    Executor failing = mock(Executor.class);
+    doThrow(new OutOfMemoryError("unable to create native thread")).when(failing).execute(any());
+    FreeTalkCorrectionRecoveryService service = service(true, failing);
+
+    assertThatThrownBy(service::recover).isInstanceOf(OutOfMemoryError.class);
+    assertThatThrownBy(service::recover).isInstanceOf(OutOfMemoryError.class);
+
+    verify(failing, times(2)).execute(any());
   }
 
   @DisplayName("복구 대상을 찾다가 예외가 나도 다음 주기에 다시 시작할 수 있다.")

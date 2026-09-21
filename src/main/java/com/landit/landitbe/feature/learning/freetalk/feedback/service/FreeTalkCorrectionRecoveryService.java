@@ -103,6 +103,10 @@ public class FreeTalkCorrectionRecoveryService {
       log.warn(
           "workflow=free_talk_correction_retry outcome=not_started error={}",
           exception.getClass().getSimpleName());
+    } catch (Error error) {
+      // 복구 스레드를 만들지 못하는 경우(메모리 부족 등)에도 표시를 풀어야 한다. 풀지 않으면 복구가 흔적 없이 영영 멈춘다.
+      draining.set(false);
+      throw error;
     }
   }
 
@@ -144,7 +148,7 @@ public class FreeTalkCorrectionRecoveryService {
     try {
       Optional<AiFreeTalkInnerThoughtRequest> request = requestService.rebuild(attempt.messageId());
       if (request.isEmpty()) {
-        feedbackService.abandonAttempt(attempt);
+        feedbackService.failUnrebuildableAttempt(attempt);
         return;
       }
       feedbackService.completeAttempt(

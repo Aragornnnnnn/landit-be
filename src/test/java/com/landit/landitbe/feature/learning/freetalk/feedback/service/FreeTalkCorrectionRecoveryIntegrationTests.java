@@ -74,25 +74,38 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
   private final FreeTalkCorrectionRequestService requestService =
       mock(FreeTalkCorrectionRequestService.class);
   private FreeTalkCorrectionRecoveryService recoveryService;
+  private List<Map<String, Object>> foreignLeases = List.of();
 
   @BeforeEach
   void setUp() {
-    // 작업 실행기를 동기 실행기로 바꿔 복구 한 번이 끝까지 돈 뒤에 결과를 확인한다.
+    // 복구 전용 스레드 대신 호출한 스레드에서 바로 도는 실행기를 써서, 복구 한 바퀴가 끝난 뒤에 결과를 확인한다.
     recoveryService =
         new FreeTalkCorrectionRecoveryService(
             feedbackService, requestService, aiClient, retryProperties, new SyncTaskExecutor());
     when(requestService.rebuild(anyLong()))
         .thenReturn(Optional.of(mock(AiFreeTalkInnerThoughtRequest.class)));
-    seedMessage();
-    // 같은 DB를 쓰는 다른 테스트가 남긴 준비 상태 교정이 한 번에 넘겨받는 자리를 차지하지 않게 복구 대상에서 뺀다.
+    // 같은 DB를 쓰는 다른 테스트가 남긴 준비 상태 교정이 한 번에 넘겨받는 자리를 차지하지 않게 복구 대상에서 잠시 뺀다.
+    // 남의 행을 바꾼 채로 두지 않도록 원래 임대를 기억했다가 끝나면 되돌린다.
+    foreignLeases =
+        jdbcTemplate.queryForList(
+            "select id, lease_until from free_talk_message_feedback"
+                + " where processing_status = 'PREPARING'");
     jdbcTemplate.update(
         "update free_talk_message_feedback set lease_until = ? where processing_status ="
             + " 'PREPARING'",
         Timestamp.valueOf(LocalDateTime.now(clock).plusYears(1)));
+    seedMessage();
   }
 
   @AfterEach
   void clearFixtures() {
+    for (Map<String, Object> foreign : foreignLeases) {
+      jdbcTemplate.update(
+          "update free_talk_message_feedback set lease_until = ?"
+              + " where id = ? and processing_status = 'PREPARING'",
+          foreign.get("LEASE_UNTIL"),
+          foreign.get("ID"));
+    }
     jdbcTemplate.update(
         "delete from free_talk_message_feedback where session_history_id = ?", SESSION_HISTORY_ID);
     jdbcTemplate.update(
@@ -238,6 +251,42 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
 
     assertThat(feedbackService.claimNextAttempt(MESSAGE_ID, 1)).isEmpty();
     assertThat(feedbackRow()).containsEntry("ATTEMPTS", 1).containsEntry("ATTEMPT_TOKEN", null);
+  }
+
+  @DisplayName("응답이 늦은 첫 시도의 계약 위반은, 그사이 복구가 넘겨받아 아직 돌고 있는 시도를 끝내지 못하고 그 시도의 교정이 저장된다.")
+  @Test
+  void lateInvalidFirstAttemptDoesNotKillTheAttemptInFlight() {
+    // 첫 시도의 임대가 끝나 복구가 두 번째 시도를 선점했고 AI를 부르는 중이다.
+    seedFeedback(1, expired(), null);
+    FreeTalkCorrectionAttempt second =
+        feedbackService.claimNextAttempt(MESSAGE_ID, 1).orElseThrow();
+
+    feedbackService.completeFirstAttempt(MESSAGE_ID, FreeTalkTurnCorrection.failed());
+
+    assertThat(feedbackRow())
+        .containsEntry("PROCESSING_STATUS", "PREPARING")
+        .containsEntry("ATTEMPT_TOKEN", second.token());
+
+    feedbackService.completeAttempt(second, CORRECTION);
+
+    assertThat(feedbackRow())
+        .containsEntry("PROCESSING_STATUS", "COMPLETED")
+        .containsEntry("BETTER_SENTENCE", "I went to the gym.");
+  }
+
+  @DisplayName("늦게 도착했어도 판정을 마친 교정은 받는다. 그 뒤에 끝난 새 시도의 결과는 반영되지 않는다.")
+  @Test
+  void acceptsLateCompletedFirstAttemptAndIgnoresTheLaterOne() {
+    seedFeedback(1, expired(), null);
+    FreeTalkCorrectionAttempt second =
+        feedbackService.claimNextAttempt(MESSAGE_ID, 1).orElseThrow();
+
+    feedbackService.completeFirstAttempt(MESSAGE_ID, CORRECTION);
+    feedbackService.completeAttempt(second, FreeTalkTurnCorrection.failed());
+
+    assertThat(feedbackRow())
+        .containsEntry("PROCESSING_STATUS", "COMPLETED")
+        .containsEntry("BETTER_SENTENCE", "I went to the gym.");
   }
 
   @DisplayName("AI 호출이 예외로 끝나면 그 시도만 끝내고 다음 시도를 기다리게 한다.")

@@ -110,15 +110,8 @@ public class FreeTalkMessageFeedbackService {
    */
   @Transactional
   public void completeFirstAttempt(long messageId, FreeTalkTurnCorrection correction) {
-    if (correction.retryable()) {
-      retryOrFail(messageId, FIRST_ATTEMPT, null);
-      return;
-    }
-    int updated = completeIfPreparing(messageId, correction);
     // 복구로 살린 비율과 끝내 실패한 비율을 볼 수 있도록 첫 시도에서 끝난 교정도 같은 지표에 센다.
-    String outcome =
-        correction.status() == ProcessingStatus.COMPLETED ? "first_completed" : "first_invalid";
-    report(updated == 1 ? outcome : "ignored", messageId, FIRST_ATTEMPT);
+    finishAttempt(messageId, FIRST_ATTEMPT, null, correction, "first_completed", "first_invalid");
   }
 
   /**
@@ -210,13 +203,41 @@ public class FreeTalkMessageFeedbackService {
   @Transactional
   public void completeAttempt(
       FreeTalkCorrectionAttempt attempt, FreeTalkTurnCorrection correction) {
+    finishAttempt(
+        attempt.messageId(),
+        attempt.attempt(),
+        attempt.token(),
+        correction,
+        "recovered",
+        "invalid");
+  }
+
+  // 판정을 마친 교정은 어느 시도의 것이든 준비 상태이기만 하면 받는다. 늦게 왔어도 제대로 된 교정은 제대로 된 교정이다.
+  // 실패는 그 시도를 시작한 쪽만 확정한다. 응답이 늦은 옛 시도의 계약 위반이, 그사이 넘겨받아 아직 돌고 있는 새 시도를 끝내 버리지 않게 한다.
+  private void finishAttempt(
+      long messageId,
+      int attempt,
+      String attemptToken,
+      FreeTalkTurnCorrection correction,
+      String completedOutcome,
+      String invalidOutcome) {
     if (correction.retryable()) {
-      retryOrFail(attempt.messageId(), attempt.attempt(), attempt.token());
+      retryOrFail(messageId, attempt, attemptToken);
       return;
     }
-    int updated = completeIfPreparing(attempt.messageId(), correction);
-    String outcome = correction.status() == ProcessingStatus.COMPLETED ? "recovered" : "invalid";
-    report(updated == 1 ? outcome : "ignored", attempt.messageId(), attempt.attempt());
+    if (correction.status() == ProcessingStatus.COMPLETED) {
+      int completed = completeIfPreparing(messageId, correction);
+      report(completed == 1 ? completedOutcome : "ignored", messageId, attempt);
+      return;
+    }
+    int failed =
+        feedbackRepository.failAttempt(
+            messageId,
+            attempt,
+            attemptToken == null ? "" : attemptToken,
+            ProcessingStatus.FAILED,
+            ProcessingStatus.PREPARING);
+    report(failed == 1 ? invalidOutcome : "ignored", messageId, attempt);
   }
 
   /**
@@ -225,7 +246,7 @@ public class FreeTalkMessageFeedbackService {
    * @param attempt 선점한 시도
    */
   @Transactional
-  public void abandonAttempt(FreeTalkCorrectionAttempt attempt) {
+  public void failUnrebuildableAttempt(FreeTalkCorrectionAttempt attempt) {
     int failed =
         feedbackRepository.failAttempt(
             attempt.messageId(),
@@ -239,6 +260,15 @@ public class FreeTalkMessageFeedbackService {
   // 교정 문장은 사용자 발화라 남기지 않고, 어느 발화의 몇 번째 시도가 어떻게 끝났는지만 남긴다.
   private void report(String outcome, long messageId, int attempt) {
     meterRegistry.counter("landit.free_talk.correction.retry", "outcome", outcome).increment();
+    // 첫 시도에서 끝나는 것은 턴마다 일어나는 정상 경로라 지표로만 세고, 로그는 복구와 관련된 결과만 남긴다.
+    if (outcome.startsWith("first_")) {
+      log.debug(
+          "workflow=free_talk_correction_retry outcome={} messageId={} attempt={}",
+          outcome,
+          messageId,
+          attempt);
+      return;
+    }
     log.info(
         "workflow=free_talk_correction_retry outcome={} messageId={} attempt={}",
         outcome,
