@@ -562,6 +562,46 @@ class UserSubscriptionApiIntegrationTests {
     }
   }
 
+  @Test
+  @DisplayName("결제 없는 후속 이벤트 50건 이상을 건너뛰고 최신 결제액을 사용자별로 조회한다.")
+  void returnsLatestPaymentBeyondEventListLimit() throws Exception {
+    final String token = login("promo-price");
+    long userId = userIdOf("promo-price");
+    insertPayment(userId, "INITIAL_PURCHASE", "NORMAL", 58500, "KRW", 0);
+    insertPayment(userId, "RENEWAL", "NORMAL", 94800, "KRW", 1);
+    insertPayment(userId, "PRODUCT_CHANGE", "INTRO", 14900, "KRW", 2);
+    insertPayment(userId, "RENEWAL", "NORMAL", 12900, null, 2);
+    for (int index = 0; index < 55; index++) {
+      insertPayment(userId, "CANCELLATION", "NORMAL", 99999, "USD", 3 + index);
+    }
+    insertPayment(userId, "EXPIRATION", "NORMAL", null, null, 60);
+    insertPayment(userId, "INITIAL_PURCHASE", "TRIAL", 0, "KRW", 61);
+    insertPayment(userId, "INITIAL_PURCHASE", "PROMOTIONAL", 100, "KRW", 62);
+    insertPayment(userId, "RENEWAL", "NORMAL", null, "USD", 63);
+    login("promo-other-price");
+    insertPayment(userIdOf("promo-other-price"), "RENEWAL", "NORMAL", 777, "USD", 64);
+    subscription(token)
+        .andExpect(jsonPath("$.data.price").value(12900))
+        .andExpect(jsonPath("$.data.currency").isEmpty());
+  }
+
+  private void insertPayment(
+      long userId, String type, String period, Integer price, String currency, int second) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO subscription_event
+          (event_id, user_profile_id, type, period_type, price, currency, occurred_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        UUID.randomUUID().toString(),
+        userId,
+        type,
+        period,
+        price,
+        currency,
+        AFTER_LAUNCH.plusSeconds(second));
+  }
+
   private LocalDateTime storedPromoExpiry(long userId) {
     return jdbcTemplate.queryForObject(
         "SELECT discount_offer_expires_at FROM user_profile WHERE id = ?",
