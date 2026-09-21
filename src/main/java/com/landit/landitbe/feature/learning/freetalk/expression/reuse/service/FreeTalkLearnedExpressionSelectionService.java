@@ -34,13 +34,13 @@ public class FreeTalkLearnedExpressionSelectionService {
   /** 한 번의 요청에 실을 수 있는 배운 표현 수. AI 서버 계약의 상한과 같다. */
   public static final int MAX_LEARNED_EXPRESSIONS = 50;
 
-  // 어느 문장에나 나와 겹침의 근거가 되지 못하는 단어다. 어간 처리는 하지 않는다(went와 go는 다른 단어로 본다).
-  private static final Set<String> STOP_WORDS =
+  // 어느 문장에나 나와 겹침의 근거가 되지 못하는 단어다. 임의로 고르지 않고 Lucene·Elasticsearch의 영어 기본 불용어 목록
+  // (EnglishAnalyzer.ENGLISH_STOP_WORDS_SET)을 그대로 쓴다. 어간 처리는 하지 않는다(went와 go는 다른 단어로 본다).
+  private static final Set<String> ENGLISH_STOP_WORDS =
       Set.of(
-          "a", "an", "the", "i", "you", "he", "she", "it", "we", "they", "me", "my", "your", "to",
-          "of", "in", "on", "at", "for", "with", "and", "or", "but", "so", "is", "am", "are", "was",
-          "were", "be", "been", "do", "does", "did", "have", "has", "had", "that", "this", "not",
-          "no", "yes", "up", "out", "as", "if", "can", "will", "would", "just");
+          "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is",
+          "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there",
+          "these", "they", "this", "to", "was", "will", "with");
 
   private final ExpressionCompletionService expressionCompletionService;
   private final ExpressionContentService expressionContentService;
@@ -80,10 +80,34 @@ public class FreeTalkLearnedExpressionSelectionService {
         userMessages.stream()
             .flatMap(message -> words(message).stream())
             .collect(Collectors.toSet());
+    Set<String> stopWords = stopWordsOf(targetLocale);
     return candidates.stream()
-        .filter(candidate -> words(candidate.text()).stream().anyMatch(spokenWords::contains))
+        .filter(candidate -> overlaps(words(candidate.text()), spokenWords, stopWords))
         .limit(MAX_LEARNED_EXPRESSIONS)
         .toList();
+  }
+
+  // 표현의 내용어(불용어가 아닌 단어)가 하나라도 발화에 나오면 겹친 것으로 본다.
+  // "up to you"처럼 불용어로만 된 표현은 내용어가 없으므로, 표현의 모든 단어가 발화에 나와야 겹친 것으로 본다.
+  // 이 경우를 따로 두지 않으면 그런 표현은 그대로 말해도 후보가 되지 못한다.
+  private static boolean overlaps(
+      Set<String> expressionWords, Set<String> spokenWords, Set<String> stopWords) {
+    if (expressionWords.isEmpty()) {
+      return false;
+    }
+    Set<String> contentWords =
+        expressionWords.stream()
+            .filter(word -> !stopWords.contains(word))
+            .collect(Collectors.toSet());
+    if (contentWords.isEmpty()) {
+      return spokenWords.containsAll(expressionWords);
+    }
+    return contentWords.stream().anyMatch(spokenWords::contains);
+  }
+
+  // 불용어 목록은 영어용이다. 다른 학습 언어에는 적용하지 않고 단어가 하나라도 겹치면 통과시킨다.
+  private static Set<String> stopWordsOf(Locale targetLocale) {
+    return targetLocale == Locale.EN ? ENGLISH_STOP_WORDS : Set.of();
   }
 
   private static FreeTalkLearnedExpression candidate(
@@ -100,10 +124,11 @@ public class FreeTalkLearnedExpressionSelectionService {
         expression.completedAt().toLocalDate());
   }
 
-  // 대소문자와 문장부호를 무시한 단어 집합. 축약형(don't)은 한 단어로 둔다.
+  // 대소문자와 문장부호를 무시한 단어 집합. 축약형(don't)은 한 단어로 두고, 둥근 아포스트로피(iOS 기본)는 곧은 것과 같게 본다.
   private static Set<String> words(String text) {
-    return Arrays.stream(text.toLowerCase(java.util.Locale.ROOT).split("[^\\p{L}\\p{N}'’]+"))
-        .filter(word -> !word.isBlank() && !STOP_WORDS.contains(word))
+    return Arrays.stream(
+            text.toLowerCase(java.util.Locale.ROOT).replace('’', '\'').split("[^\\p{L}\\p{N}']+"))
+        .filter(word -> !word.isBlank())
         .collect(Collectors.toSet());
   }
 }

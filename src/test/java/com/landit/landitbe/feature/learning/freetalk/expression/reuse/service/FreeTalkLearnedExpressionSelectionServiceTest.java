@@ -109,25 +109,71 @@ class FreeTalkLearnedExpressionSelectionServiceTest {
             LongStream.rangeClosed(1, 50).map(index -> index * 2).boxed().toList());
   }
 
-  @DisplayName("상한을 넘을 때 관사·대명사 같은 흔한 단어만 겹치는 표현은 겹친 것으로 보지 않는다.")
+  @DisplayName("상한을 넘을 때 관사·전치사 같은 흔한 단어만 겹치는 표현은 겹친 것으로 보지 않는다.")
   @Test
   void ignoresStopWordsWhenMatchingBeyondLimit() {
-    List<LearnedExpression> learned = new ArrayList<>();
-    List<ExpressionText> texts = new ArrayList<>();
-    LongStream.rangeClosed(1, 51)
-        .forEach(
-            id -> {
-              learned.add(learnedAt(id));
-              texts.add(new ExpressionText(id, id == 7 ? "hit the gym" : "it is up to you", "뜻"));
-            });
-    learned(learned.toArray(LearnedExpression[]::new));
-    texts(texts.toArray(ExpressionText[]::new));
+    overLimit(7L, "hit the gym", "look for the keys in the bag");
 
+    // "the", "in", "is"만 겹치는 표현들은 빠지고, 내용어 gym이 겹치는 표현만 남는다.
     assertThat(
             service.select(
-                USER_ID, Locale.EN, Locale.KR, List.of("I went to the GYM. It is you, right?")))
+                USER_ID, Locale.EN, Locale.KR, List.of("I went to the GYM. It is in the city.")))
         .extracting(FreeTalkLearnedExpression::expressionId)
         .containsExactly(7L);
+  }
+
+  @DisplayName("불용어로만 이루어진 표현은 그 단어가 발화에 모두 나오면 후보가 된다. 일부만 나오면 되지 않는다.")
+  @Test
+  void matchesStopWordOnlyExpressionWhenEveryWordIsSpoken() {
+    overLimit(7L, "it is on", "paint the wall blue");
+
+    assertThat(
+            service.select(USER_ID, Locale.EN, Locale.KR, List.of("Okay, IT is ON! Let's start.")))
+        .extracting(FreeTalkLearnedExpression::expressionId)
+        .containsExactly(7L);
+    assertThat(service.select(USER_ID, Locale.EN, Locale.KR, List.of("It is cold today.")))
+        .isEmpty();
+  }
+
+  @DisplayName("둥근 아포스트로피로 입력한 축약형도 곧은 아포스트로피로 적힌 표현과 같은 단어로 본다.")
+  @Test
+  void treatsCurlyApostropheAsStraight() {
+    overLimit(7L, "don't mention it", "paint the wall blue");
+
+    assertThat(service.select(USER_ID, Locale.EN, Locale.KR, List.of("Oh, don’t worry about me.")))
+        .extracting(FreeTalkLearnedExpression::expressionId)
+        .containsExactly(7L);
+  }
+
+  @DisplayName("영어가 아닌 학습 언어에는 영어 불용어를 적용하지 않고 단어가 하나라도 겹치면 후보로 둔다.")
+  @Test
+  void appliesNoStopWordsToOtherTargetLocales() {
+    when(contentService.findActiveExpressionTexts(any(), eq(Locale.KR), eq(Locale.EN)))
+        .thenAnswer(invocation -> overLimitTexts(7L, "in the bag", "paint it blue"));
+    when(completionService.findLearnedExpressions(USER_ID)).thenReturn(overLimitLearned());
+
+    assertThat(service.select(USER_ID, Locale.KR, Locale.EN, List.of("the end")))
+        .extracting(FreeTalkLearnedExpression::expressionId)
+        .containsExactly(7L);
+  }
+
+  // 상한을 넘도록 51개를 배운 상태를 만든다. 지정한 하나만 본문이 다르다.
+  private void overLimit(long distinctId, String distinctText, String otherText) {
+    learned(overLimitLearned().toArray(LearnedExpression[]::new));
+    texts(overLimitTexts(distinctId, distinctText, otherText).toArray(ExpressionText[]::new));
+  }
+
+  private static List<LearnedExpression> overLimitLearned() {
+    return LongStream.rangeClosed(1, 51)
+        .mapToObj(FreeTalkLearnedExpressionSelectionServiceTest::learnedAt)
+        .toList();
+  }
+
+  private static List<ExpressionText> overLimitTexts(
+      long distinctId, String distinctText, String otherText) {
+    return LongStream.rangeClosed(1, 51)
+        .mapToObj(id -> new ExpressionText(id, id == distinctId ? distinctText : otherText, "뜻"))
+        .toList();
   }
 
   private void learned(LearnedExpression... expressions) {
