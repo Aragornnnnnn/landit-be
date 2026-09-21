@@ -90,7 +90,13 @@ public class FreeTalkContextSummaryService {
     }
   }
 
-  /** 활성화된 사용자에게 저장된 요약 문맥을 제공한다. */
+  /**
+   * 활성화된 사용자에게 저장된 요약 문맥을 제공한다.
+   *
+   * @param userId 세션 소유 사용자 ID
+   * @param freeTalkSessionId 조회할 프리톡 세션 ID
+   * @return 저장된 요약 문맥 또는 비활성화된 전체 원문 문맥
+   */
   public AiFreeTalkContextWindow snapshot(long userId, long freeTalkSessionId) {
     if (!eligible(userId)) {
       return AiFreeTalkContextWindow.disabled();
@@ -101,7 +107,11 @@ public class FreeTalkContextSummaryService {
         .orElse(AiFreeTalkContextWindow.disabled());
   }
 
-  /** 현재 응답이 완료된 뒤 요약 작업을 비동기로 등록한다. */
+  /**
+   * 현재 응답이 완료된 뒤 요약 작업을 비동기로 등록한다.
+   *
+   * @param reservation 완료된 응답의 세션 및 원문 이력 문맥
+   */
   public void dispatchIfNeeded(FreeTalkMessageReservation reservation) {
     if (!eligible(reservation.userId())) {
       return;

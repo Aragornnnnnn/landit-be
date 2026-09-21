@@ -62,19 +62,37 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
     this.sourceByteLimit = sourceByteLimit;
   }
 
-  /** 새 세션의 빈 요약 상태를 만든다. */
+  /**
+   * 새 세션의 빈 요약 상태를 만든다.
+   *
+   * @param freeTalkSessionId 새 프리톡 세션 ID
+   * @param policyVersion 적용할 요약 정책 버전
+   * @param sourceByteLimit 요약 원문 구간의 초기 바이트 목표
+   * @return 아직 원문을 요약하지 않은 초기 상태
+   */
   public static FreeTalkContextSummary start(
       Long freeTalkSessionId, String policyVersion, int sourceByteLimit) {
     return new FreeTalkContextSummary(freeTalkSessionId, policyVersion, sourceByteLimit);
   }
 
-  /** 외부 AI 호출을 선점한다. */
+  /**
+   * 외부 AI 호출을 선점한다.
+   *
+   * @param token 작업의 선점 식별자
+   * @param until 작업 선점 만료 시각
+   */
   public void claim(String token, Instant until) {
     leaseToken = token;
     leaseUntil = until;
   }
 
-  /** 요약 결과를 자신의 선점 범위에서만 확정한다. */
+  /**
+   * 요약 결과를 자신의 선점 범위에서만 확정한다.
+   *
+   * @param content 새 요약 본문
+   * @param coveredThroughSequence 새 요약이 포함한 마지막 원문 순번
+   * @param defaultByteLimit 다음 요약의 기본 원문 바이트 목표
+   */
   public void complete(JsonNode content, int coveredThroughSequence, int defaultByteLimit) {
     sourceByteLimit = defaultByteLimit;
     summaryContent = content;
@@ -86,7 +104,11 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
     suspendedReason = null;
   }
 
-  /** 실패한 작업의 다음 실행 시각을 기록하고 선점을 해제한다. */
+  /**
+   * 실패한 작업의 다음 실행 시각을 기록하고 선점을 해제한다.
+   *
+   * @param nextAttemptAt 다음 시도 가능 시각
+   */
   public void defer(Instant nextAttemptAt) {
     this.nextAttemptAt = nextAttemptAt;
     leaseToken = null;
@@ -104,7 +126,11 @@ public class FreeTalkContextSummary extends BaseTimeEntity {
     defer(nextAttempt);
   }
 
-  /** 최소 요약 단위도 처리할 수 없음을 기록한다. */
+  /**
+   * 최소 요약 단위도 처리할 수 없음을 기록한다.
+   *
+   * @param reason 자동 요약 중지 사유
+   */
   public void suspend(String reason) {
     suspendedReason = reason;
     leaseToken = null;
