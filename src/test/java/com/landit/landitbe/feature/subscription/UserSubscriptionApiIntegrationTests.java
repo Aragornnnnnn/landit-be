@@ -10,13 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
 import com.landit.landitbe.feature.profile.subscription.service.ProfileDiscountOfferService;
+import com.landit.landitbe.shared.domain.AccentLocale;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +35,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 사용자 구독 상태·결제 이력 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다. */
 @ActiveProfiles("test")
@@ -64,6 +69,10 @@ class UserSubscriptionApiIntegrationTests {
   @Autowired private ProfileDiscountOfferService discountOffers;
 
   @Autowired private Clock clock;
+
+  @Autowired private PlatformTransactionManager transactionManager;
+
+  @Autowired private ProfilePreferenceService preferences;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -621,6 +630,43 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.data.productId").value("com.saynow.app.premium.yearly:promo"))
         .andExpect(jsonPath("$.data.price").value(58500))
         .andExpect(jsonPath("$.data.currency").value("KRW"));
+  }
+
+  @Test
+  @DisplayName("할인 부여 전 읽은 억양 변경 트랜잭션은 할인 기록을 보존하고 재부여하지 않는다.")
+  void preservesDiscountWhenStalePreferenceTransactionCommitsLater() throws Exception {
+    final String token = login("promo-stale-preference");
+    long userId = userIdOf("promo-stale-preference");
+    var grantedExpiry = new AtomicReference<LocalDateTime>();
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      new TransactionTemplate(transactionManager)
+          .executeWithoutResult(
+              status -> {
+                preferences.updateAccentLocale(userId, AccentLocale.EN_GB);
+                try {
+                  grantedExpiry.set(
+                      executor
+                          .submit(() -> discountOffers.dismiss(userId).expiresAt())
+                          .get(10, TimeUnit.SECONDS));
+                } catch (Exception exception) {
+                  throw new IllegalStateException(exception);
+                }
+              });
+    }
+    assertThat(grantedExpiry.get()).isNotNull();
+    assertThat(storedPromoExpiry(userId)).isEqualTo(grantedExpiry.get());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT discount_offer_new_user FROM user_profile WHERE id = ?",
+                Boolean.class,
+                userId))
+        .isTrue();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accent_locale FROM user_profile WHERE id = ?", String.class, userId))
+        .isEqualTo("EN_GB");
+    assertThat(LocalDateTime.parse(dismissPromo(token).path("expiresAt").asText()))
+        .isEqualTo(grantedExpiry.get());
   }
 
   private void insertPayment(
