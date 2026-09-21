@@ -2,11 +2,15 @@
 
 package com.landit.landitbe.feature.learning.freetalk.feedback.service;
 
+import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMessageFeedback;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +25,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkMessageFeedbackService {
 
+  // AI 응답을 기다려 주는 시간에 더하는 여유. 시나리오 메시지 피드백 작업과 같은 규칙이다.
+  private static final Duration LEASE_MARGIN = Duration.ofSeconds(30);
+
   private final FreeTalkMessageFeedbackRepository feedbackRepository;
   private final ConversationMessageService conversationMessageService;
+  private final AiClientProperties aiClientProperties;
+  private final Clock clock;
 
   /**
    * 속마음 준비를 건 같은 트랜잭션에서 교정 판정을 기다리는 행을 만든다.
+   *
+   * <p>행을 만들 때 첫 시도(attempts = 1)와 그 응답을 기다려 줄 시각(lease)을 함께 적는다. 시각은 애플리케이션 Clock으로만 찍는다.
    *
    * <p>교정은 부가 기능이라 준비가 턴 확정을 막아서는 안 된다. 교정 도입 전에 저장되어 실패 행이 먼저 채워진 발화가 도입 뒤에 확정되면 새 행을 만들지 않고 그 행을
    * 준비 상태로 되돌린다. 대화 기록 ID는 호출자에게 받지 않고 발화에서 읽어 둘이 어긋나지 않게 한다.
@@ -35,15 +46,22 @@ public class FreeTalkMessageFeedbackService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void prepareCorrection(long messageId) {
+    LocalDateTime leaseUntil = firstAttemptLeaseUntil();
     feedbackRepository
         .findBySessionHistoryMessageId(messageId)
         .ifPresentOrElse(
-            FreeTalkMessageFeedback::restartPreparing,
+            feedback -> feedback.restartPreparing(leaseUntil),
             () ->
                 feedbackRepository.save(
                     FreeTalkMessageFeedback.preparing(
                         messageId,
-                        conversationMessageService.require(messageId).getSessionHistoryId())));
+                        conversationMessageService.require(messageId).getSessionHistoryId(),
+                        leaseUntil)));
+  }
+
+  // 첫 시도의 응답을 기다려 주는 시각. 이 시각이 지나도 준비 상태면 콜백이 사라진 것으로 보고 복구 워커가 넘겨받는다.
+  private LocalDateTime firstAttemptLeaseUntil() {
+    return LocalDateTime.now(clock).plus(aiClientProperties.requestTimeout()).plus(LEASE_MARGIN);
   }
 
   /**

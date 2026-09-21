@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -16,9 +17,15 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMes
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,12 +37,24 @@ import org.springframework.test.util.ReflectionTestUtils;
 /** 프리톡 턴 교정의 준비·확정·조회 경계를 검증한다. */
 class FreeTalkMessageFeedbackServiceTest {
 
+  private static final LocalDateTime STALE_LEASE = LocalDateTime.of(2026, 9, 1, 0, 0);
+
   private final FreeTalkMessageFeedbackRepository repository =
       mock(FreeTalkMessageFeedbackRepository.class);
   private final ConversationMessageService conversationMessageService =
       mock(ConversationMessageService.class);
+  private final AiClientProperties aiClientProperties = mock(AiClientProperties.class);
+  // 서울 시간 2026-09-21 21:30:00
+  private final Clock clock =
+      Clock.fixed(Instant.parse("2026-09-21T12:30:00Z"), ZoneId.of("Asia/Seoul"));
   private final FreeTalkMessageFeedbackService service =
-      new FreeTalkMessageFeedbackService(repository, conversationMessageService);
+      new FreeTalkMessageFeedbackService(
+          repository, conversationMessageService, aiClientProperties, clock);
+
+  @BeforeEach
+  void stubAiTimeout() {
+    when(aiClientProperties.requestTimeout()).thenReturn(Duration.ofSeconds(60));
+  }
 
   @DisplayName("교정 준비는 대화 기록 ID를 발화에서 읽어 준비 상태 행을 만든다.")
   @Test
@@ -52,27 +71,38 @@ class FreeTalkMessageFeedbackServiceTest {
     assertThat(saved.getValue().getSessionHistoryMessageId()).isEqualTo(7L);
     assertThat(saved.getValue().getSessionHistoryId()).isEqualTo(3L);
     assertThat(saved.getValue().getProcessingStatus()).isEqualTo(ProcessingStatus.PREPARING);
+    // 첫 시도로 세고, AI 응답을 기다려 줄 시각(요청 타임아웃 60초 + 여유 30초)을 서울 시간 Clock으로 적는다.
+    assertThat(saved.getValue().getAttempts()).isEqualTo(1);
+    assertThat(saved.getValue().getLeaseUntil())
+        .isEqualTo(LocalDateTime.of(2026, 9, 21, 21, 31, 30));
+    assertThat(saved.getValue().getAttemptToken()).isNull();
   }
 
   @DisplayName("교정 도입 전에 실패로 채워진 발화를 확정하면 새 행을 만들지 않고 그 행을 준비 상태로 되돌린다.")
   @Test
   void restartsBackfilledFailedFeedbackInsteadOfInsertingDuplicate() {
-    FreeTalkMessageFeedback backfilled = FreeTalkMessageFeedback.preparing(7L, 3L);
+    FreeTalkMessageFeedback backfilled = FreeTalkMessageFeedback.preparing(7L, 3L, STALE_LEASE);
     ReflectionTestUtils.setField(backfilled, "processingStatus", ProcessingStatus.FAILED);
     ReflectionTestUtils.setField(backfilled, "reactedToPartner", Boolean.TRUE);
+    ReflectionTestUtils.setField(backfilled, "attempts", 3);
+    ReflectionTestUtils.setField(backfilled, "attemptToken", "old-token");
     when(repository.findBySessionHistoryMessageId(7L)).thenReturn(Optional.of(backfilled));
 
     service.prepareCorrection(7L);
 
     assertThat(backfilled.getProcessingStatus()).isEqualTo(ProcessingStatus.PREPARING);
     assertThat(backfilled.getReactedToPartner()).isNull();
+    // 예전 시도의 흔적을 지우고 첫 시도부터 다시 센다.
+    assertThat(backfilled.getAttempts()).isEqualTo(1);
+    assertThat(backfilled.getLeaseUntil()).isEqualTo(LocalDateTime.of(2026, 9, 21, 21, 31, 30));
+    assertThat(backfilled.getAttemptToken()).isNull();
     verify(repository, never()).save(any());
   }
 
   @DisplayName("이미 판정이 끝난 교정은 다시 준비해도 지우지 않는다.")
   @Test
   void keepsCompletedCorrectionWhenPreparedAgain() {
-    FreeTalkMessageFeedback completed = FreeTalkMessageFeedback.preparing(7L, 3L);
+    FreeTalkMessageFeedback completed = FreeTalkMessageFeedback.preparing(7L, 3L, STALE_LEASE);
     ReflectionTestUtils.setField(completed, "processingStatus", ProcessingStatus.COMPLETED);
     ReflectionTestUtils.setField(completed, "betterSentence", "I went.");
     when(repository.findBySessionHistoryMessageId(7L)).thenReturn(Optional.of(completed));
@@ -139,7 +169,7 @@ class FreeTalkMessageFeedbackServiceTest {
   @Test
   @ExtendWith(OutputCaptureExtension.class)
   void dropsOnlyInconsistentStoredMemoryWhenReading(CapturedOutput output) {
-    FreeTalkMessageFeedback broken = FreeTalkMessageFeedback.preparing(7L, 3L);
+    FreeTalkMessageFeedback broken = FreeTalkMessageFeedback.preparing(7L, 3L, STALE_LEASE);
     ReflectionTestUtils.setField(broken, "processingStatus", ProcessingStatus.COMPLETED);
     ReflectionTestUtils.setField(broken, "originalSentence", "at a gym");
     ReflectionTestUtils.setField(broken, "betterSentence", "at the gym");
@@ -162,7 +192,7 @@ class FreeTalkMessageFeedbackServiceTest {
   @Test
   void groupsCorrectionsByUserMessageId() {
     when(repository.findBySessionHistoryId(3L))
-        .thenReturn(List.of(FreeTalkMessageFeedback.preparing(7L, 3L)));
+        .thenReturn(List.of(FreeTalkMessageFeedback.preparing(7L, 3L, STALE_LEASE)));
 
     assertThat(service.findBySessionHistoryId(3L))
         .containsOnlyKeys(7L)

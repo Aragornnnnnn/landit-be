@@ -51,6 +51,8 @@ public interface FreeTalkMessageFeedbackRepository
                 feedback.memoryId = :memoryId,
                 feedback.memoryObservedOn = :memoryObservedOn,
                 feedback.memoryLabel = :memoryLabel,
+                feedback.leaseUntil = null,
+                feedback.attemptToken = null,
                 feedback.updatedAt = CURRENT_TIMESTAMP
             where feedback.sessionHistoryMessageId = :messageId
               and feedback.processingStatus = :preparingStatus

@@ -14,6 +14,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.Getter;
 
 /**
@@ -68,13 +69,26 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
   @Column(name = "memory_label", length = 40)
   private String memoryLabel; // 예: "헬스장". AI가 라벨을 못 주면 null
 
+  @Column(name = "attempts", nullable = false)
+  private int attempts; // 예: 1 (AI에 교정을 요청한 횟수. 이 컬럼이 생기기 전의 행은 0)
+
+  // 애플리케이션 Clock(서울 시간)으로만 쓰고 비교한다. updated_at은 JVM 기본 시간대로 찍혀 기준으로 쓰지 않는다.
+  @Column(name = "lease_until")
+  private LocalDateTime leaseUntil; // 예: 2026-09-21T21:31:30. 판정이 끝났으면 null
+
+  @Column(name = "attempt_token", length = 36)
+  private String attemptToken; // 예: "0b9c…(UUID)". 복구 워커가 선점했을 때만 있고 첫 시도는 null
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkMessageFeedback() {}
 
-  private FreeTalkMessageFeedback(Long sessionHistoryMessageId, Long sessionHistoryId) {
+  private FreeTalkMessageFeedback(
+      Long sessionHistoryMessageId, Long sessionHistoryId, LocalDateTime leaseUntil) {
     this.sessionHistoryMessageId = sessionHistoryMessageId;
     this.sessionHistoryId = sessionHistoryId;
     this.processingStatus = ProcessingStatus.PREPARING;
+    this.attempts = 1;
+    this.leaseUntil = leaseUntil;
   }
 
   /**
@@ -82,11 +96,12 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
    *
    * @param sessionHistoryMessageId 교정 대상 사용자 발화 ID
    * @param sessionHistoryId 그 발화가 속한 대화 기록 ID
-   * @return 준비 상태의 교정
+   * @param leaseUntil 첫 시도의 응답을 기다려 줄 시각. 이 시각이 지나면 복구 워커가 넘겨받는다
+   * @return 첫 시도를 시작한 준비 상태의 교정
    */
   public static FreeTalkMessageFeedback preparing(
-      Long sessionHistoryMessageId, Long sessionHistoryId) {
-    return new FreeTalkMessageFeedback(sessionHistoryMessageId, sessionHistoryId);
+      Long sessionHistoryMessageId, Long sessionHistoryId, LocalDateTime leaseUntil) {
+    return new FreeTalkMessageFeedback(sessionHistoryMessageId, sessionHistoryId, leaseUntil);
   }
 
   /**
@@ -94,8 +109,10 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
    *
    * <p>교정 도입 전에 저장되어 실패로 채워진 발화가 도입 뒤에 확정되는 경우(예: 종료 확인을 기다리던 발화)에 쓴다. 실패 상태의 행만 되돌린다. 준비 상태의 교정은
    * 문장 값을 가질 수 없다(chk_free_talk_message_feedback_sentence).
+   *
+   * @param leaseUntil 다시 시작한 첫 시도의 응답을 기다려 줄 시각
    */
-  public void restartPreparing() {
+  public void restartPreparing(LocalDateTime leaseUntil) {
     // 판정을 기다리는 중이거나 이미 끝난 교정은 다시 준비하지 않는다. 끝난 교정을 지우지 않기 위한 방어다.
     if (processingStatus != ProcessingStatus.FAILED) {
       return;
@@ -109,6 +126,9 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
     memoryId = null;
     memoryObservedOn = null;
     memoryLabel = null;
+    attempts = 1;
+    this.leaseUntil = leaseUntil;
+    attemptToken = null;
   }
 
   /**
