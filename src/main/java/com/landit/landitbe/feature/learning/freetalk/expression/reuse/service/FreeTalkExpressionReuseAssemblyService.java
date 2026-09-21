@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FreeTalkExpressionReuseAssemblyService {
 
   private static final String DROPPED_LOG =
-      "workflow=free_talk_expression_reuse reason={} freeTalkSessionId={} expressionId={}"
+      "workflow=free_talk_expression_reuse_invalid reason={} freeTalkSessionId={} expressionId={}"
           + " messageId={}";
   private static final String SENTENCE_ENDS = ".!?";
 
@@ -141,6 +141,7 @@ public class FreeTalkExpressionReuseAssemblyService {
       return "unknown_message_id";
     }
     // 화면이 이 조각을 발화 원문에서 대소문자까지 그대로 찾아 밑줄을 긋는다. 그래서 대소문자를 무시하지 않는다.
+    // 대소문자·공백 차이는 AI 서버가 이미 보정해 원문의 정확한 조각으로 돌려준다. 여기서는 그 보장이 지켜졌는지만 본다.
     if (!userContentByMessageId.get(used.messageId()).contains(used.matchedText())) {
       return "text_not_in_message";
     }

@@ -18,6 +18,8 @@ import com.landit.landitbe.feature.learning.freetalk.expression.domain.Expressio
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionLearningStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkReusedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseQueryService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionDetailResponse;
@@ -54,6 +56,7 @@ public class FreeTalkHistoryQueryService {
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionContentService expressionContentService;
   private final FreeTalkMessageFeedbackService messageFeedbackService;
+  private final FreeTalkExpressionReuseQueryService expressionReuseQueryService;
 
   /**
    * 완료 프리톡을 최신순 페이지로 조회한다.
@@ -124,12 +127,19 @@ public class FreeTalkHistoryQueryService {
             lastRecommendedAtByExpressionId);
 
     // 대화 메시지는 저장 순서대로 API 응답 형태로 변환한다.
-    // 교정은 메시지마다 조회하지 않고 대화 기록 단위로 한 번에 읽어 메시지 ID로 붙인다.
+    // 교정과 다시 쓴 표현은 메시지마다 조회하지 않고 세션 단위로 한 번에 읽어 메시지 ID로 붙인다.
     Map<Long, FreeTalkTurnCorrection> correctionsByMessageId =
         messageFeedbackService.findBySessionHistoryId(history.getId());
+    Map<Long, FreeTalkReusedExpression> reusedByMessageId =
+        expressionReuseQueryService.findFirstByMessageId(session.getId());
     List<FreeTalkSessionDetailResponse.Message> messages =
         conversationMessageService.findAll(history.getId()).stream()
-            .map(message -> toMessageResponse(message, correctionsByMessageId.get(message.getId())))
+            .map(
+                message ->
+                    toMessageResponse(
+                        message,
+                        correctionsByMessageId.get(message.getId()),
+                        reusedByMessageId.get(message.getId())))
             .toList();
     int correctionCount =
         Math.toIntExact(messages.stream().filter(message -> message.correction() != null).count());
@@ -148,9 +158,11 @@ public class FreeTalkHistoryQueryService {
         progress.expressions());
   }
 
-  // 교정은 완료된 세션의 기록에서만 내려준다. 배운 표현 재사용은 아직 판정하지 않아 null이다.
+  // 교정과 다시 쓴 표현은 완료된 세션의 기록에서만 내려준다.
   private FreeTalkSessionDetailResponse.Message toMessageResponse(
-      SessionHistoryMessageSnapshot message, FreeTalkTurnCorrection turnCorrection) {
+      SessionHistoryMessageSnapshot message,
+      FreeTalkTurnCorrection turnCorrection,
+      FreeTalkReusedExpression reusedExpression) {
     return new FreeTalkSessionDetailResponse.Message(
         message.getId(),
         message.getTurnNumber(),
@@ -163,7 +175,12 @@ public class FreeTalkHistoryQueryService {
         message.getInnerThoughtType(),
         turnCorrection == null ? null : turnCorrection.status(),
         toCorrectionResponse(turnCorrection),
-        null);
+        reusedExpression == null
+            ? null
+            : new FreeTalkSessionDetailResponse.ReusedExpression(
+                reusedExpression.expressionId(),
+                reusedExpression.text(),
+                reusedExpression.matchedText()));
   }
 
   // 고칠 것이 없거나 생성 중·실패인 턴은 교정 없이 상태만 내려준다.

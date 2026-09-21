@@ -461,12 +461,20 @@ class FreeTalkSessionApiIntegrationTests {
         .isZero();
 
     completeSession(sessionId);
+    // 한 메시지에서 표현 두 개를 다시 썼으면 먼저 기록된 하나만 내려준다.
+    insertExpressionReuse(sessionId, correctedMessageId, 812L, "go hiking", "I go hiking");
+    insertExpressionReuse(sessionId, correctedMessageId, 813L, "yesterday", "yesterday");
 
     mockMvc
         .perform(
             get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.messages[0].reusedExpression.expressionId").value(812))
+        .andExpect(jsonPath("$.data.messages[0].reusedExpression.text").value("go hiking"))
+        .andExpect(jsonPath("$.data.messages[0].reusedExpression.matchedText").value("I go hiking"))
+        .andExpect(jsonPath("$.data.messages[1].reusedExpression").value(nullValue()))
+        .andExpect(jsonPath("$.data.messages[2].reusedExpression").value(nullValue()))
         .andExpect(jsonPath("$.data.correctionCount").value(1))
         .andExpect(jsonPath("$.data.messages[0].role").value("USER"))
         .andExpect(jsonPath("$.data.messages[0].correctionStatus").value("COMPLETED"))
@@ -481,7 +489,6 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.messages[0].correction.mistakePattern").value("TENSE"))
         .andExpect(jsonPath("$.data.messages[0].correction.memoryTag").value(nullValue()))
         .andExpect(jsonPath("$.data.messages[0].correction.reactedToPartner").doesNotExist())
-        .andExpect(jsonPath("$.data.messages[0].reusedExpression").value(nullValue()))
         .andExpect(jsonPath("$.data.messages[1].role").value("AI"))
         .andExpect(jsonPath("$.data.messages[1].correctionStatus").value(nullValue()))
         .andExpect(jsonPath("$.data.messages[1].correction").value(nullValue()))
@@ -2063,6 +2070,27 @@ class FreeTalkSessionApiIntegrationTests {
 
   private String exitDecisionPath(long sessionId) {
     return "/api/v1/free-talk/sessions/%d/exit-decision".formatted(sessionId);
+  }
+
+  private void insertExpressionReuse(
+      long learningSessionId, long messageId, long expressionId, String text, String matched) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO free_talk_expression_reuse (
+            user_profile_id, free_talk_session_id, session_history_message_id,
+            writing_expression_id, expression_text, expression_meaning, source_type,
+            source_title, source_learned_on, matched_text, quoted_sentence, created_at, updated_at)
+        SELECT learning.user_profile_id, free_talk.id, ?, ?, ?, '뜻', 'SCENARIO', '주말 계획',
+            DATE '2026-09-10', ?, 'I go hiking yesterday.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM free_talk_session free_talk
+        JOIN learning_session learning ON learning.id = free_talk.learning_session_id
+        WHERE learning.id = ?
+        """,
+        messageId,
+        expressionId,
+        text,
+        matched,
+        learningSessionId);
   }
 
   private String awaitExpressionGenerationStatus(long sessionId) throws InterruptedException {

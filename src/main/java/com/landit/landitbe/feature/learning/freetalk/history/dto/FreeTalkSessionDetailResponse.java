@@ -53,7 +53,7 @@ public record FreeTalkSessionDetailResponse(
    * @param innerThoughtType 계산된 속마음 유형
    * @param correctionStatus 사용자 메시지의 교정 처리 상태. AI 메시지는 null
    * @param correction 사용자 메시지의 교정. 고칠 것이 없거나({@code COMPLETED}) 생성 중·실패면 null
-   * @param reusedExpression 이 메시지에서 다시 쓴 배운 표현. 아직 판정하지 않아 항상 null
+   * @param reusedExpression 이 메시지에서 다시 쓴 배운 표현. 여러 개를 썼으면 먼저 기록된 하나다. 다시 쓴 표현이 없거나 AI 메시지면 null
    */
   public record Message(
       Long messageId,
@@ -90,8 +90,8 @@ public record FreeTalkSessionDetailResponse(
    * 사용자 메시지에서 다시 쓴 배운 표현이다.
    *
    * @param expressionId 공통 표현 ID
-   * @param text 표현 원형
-   * @param matchedText 메시지 원문 안에서 밑줄을 그을 구절
+   * @param text 표현 원형. 기록할 때 저장한 값이라 표현이 나중에 바뀌어도 달라지지 않는다
+   * @param matchedText 메시지 원문(content) 안에서 밑줄을 그을 구절. 원문에 대소문자까지 그대로 들어 있다
    */
   public record ReusedExpression(Long expressionId, String text, String matchedText) {}
 
