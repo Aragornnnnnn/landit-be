@@ -14,10 +14,10 @@ import java.util.List;
  * @param letterId 편지 ID
  * @param letterType 편지 유형
  * @param title 편지 제목
- * @param contentBlocks 구조화된 공지·업데이트 본문. 답장이면 {@code null}
- * @param bodyText 답장 본문. 공지·업데이트면 {@code null}
- * @param feedbackType 답장과 연결된 원본 피드백 유형. 공지·업데이트면 {@code null}
- * @param quotedFeedbackContent 답장과 연결된 원본 피드백 내용. 공지·업데이트면 {@code null}
+ * @param contentBlocks 구조화된 공지·업데이트 본문. 답장·직접 편지면 {@code null}
+ * @param bodyText 답장·직접 편지 본문. 공지·업데이트면 {@code null}
+ * @param feedbackType 답장과 연결된 원본 피드백 유형. 답장이 아니면 {@code null}
+ * @param quotedFeedbackContent 답장과 연결된 원본 피드백 내용. 답장이 아니면 {@code null}
  * @param pinned 상단 고정 여부
  * @param sentAt 발송 시각
  * @param readAt 읽은 시각
@@ -27,10 +27,10 @@ public record MailboxReceivedDetailResponse(
     @Schema(description = "편지 ID", example = "101") Long letterId,
     @Schema(description = "편지 유형", example = "NOTICE") MailboxLetterType letterType,
     @Schema(description = "편지 제목") String title,
-    @Schema(description = "구조화된 공지·업데이트 본문. 답장은 null") List<Object> contentBlocks,
-    @Schema(description = "답장 본문. 공지·업데이트는 null") String bodyText,
-    @Schema(description = "답장과 연결된 원본 피드백 유형. 공지·업데이트는 null") UserFeedbackType feedbackType,
-    @Schema(description = "답장과 연결된 원본 피드백 내용. 공지·업데이트는 null") String quotedFeedbackContent,
+    @Schema(description = "구조화된 공지·업데이트 본문. 답장·직접 편지는 null") List<Object> contentBlocks,
+    @Schema(description = "답장·직접 편지 본문. 공지·업데이트는 null") String bodyText,
+    @Schema(description = "답장과 연결된 원본 피드백 유형. 답장이 아니면 null") UserFeedbackType feedbackType,
+    @Schema(description = "답장과 연결된 원본 피드백 내용. 답장이 아니면 null") String quotedFeedbackContent,
     @Schema(description = "상단 고정 여부") boolean pinned,
     @Schema(description = "편지 발송 시각") LocalDateTime sentAt,
     @Schema(description = "읽은 시각") LocalDateTime readAt) {}

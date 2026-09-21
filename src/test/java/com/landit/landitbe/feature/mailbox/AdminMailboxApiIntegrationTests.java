@@ -9,6 +9,7 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -793,6 +795,239 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(
             jsonPath(schemas + "AdminMailboxFeedbackDetailResponse.properties.reply.type[1]")
                 .value("null"));
+  }
+
+  @DisplayName("문의 없이 직접 편지를 받고 수신자별 최초 읽음 상태를 유지한다.")
+  @Test
+  void directLettersArePrivateAndTrackReadsWithoutFeedbackOrPush() throws Exception {
+    String adminToken = loginAsAdmin("direct-admin");
+    LoginResult first = login("direct-first");
+    LoginResult second = login("direct-second");
+    final LoginResult other = login("direct-other");
+    MvcResult sent =
+        sendDirectLetter(adminToken, List.of(first.userProfileId(), second.userProfileId()));
+    long letterId = responseData(sent).get("letterId").asLong();
+    assertThat(responseData(sent).get("recipientCount").asInt()).isEqualTo(2);
+    assertThat(LocalDateTime.parse(responseData(sent).get("sentAt").asText()))
+        .isEqualTo(
+            jdbcTemplate.queryForObject(
+                "select published_at from mailbox_letter where id = ?",
+                LocalDateTime.class,
+                letterId));
+    for (LoginResult user : List.of(first, second)) {
+      mockMvc
+          .perform(
+              get("/api/v1/mailbox/received")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + user.accessToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.items.length()").value(1))
+          .andExpect(jsonPath("$.data.items[0].letterType").value("DIRECT"))
+          .andExpect(jsonPath("$.data.items[0].unread").value(true));
+      assertUnreadCount(user, 1);
+    }
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/received")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + other.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/received/{letterId}", letterId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + other.accessToken()))
+        .andExpect(status().isNotFound());
+    assertUnreadCount(other, 0);
+    MvcResult detail =
+        mockMvc
+            .perform(
+                get("/api/v1/mailbox/received/{letterId}", letterId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + first.accessToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.bodyText").value("직접 편지 본문"))
+            .andExpect(jsonPath("$.data.contentBlocks").value(nullValue()))
+            .andExpect(jsonPath("$.data.feedbackType").value(nullValue()))
+            .andExpect(jsonPath("$.data.quotedFeedbackContent").value(nullValue()))
+            .andReturn();
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/received/{letterId}", letterId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + first.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.readAt").value(responseData(detail).get("readAt").asText()));
+    assertUnreadCount(first, 0);
+    assertUnreadCount(second, 1);
+    assertThat(jdbcTemplate.queryForObject("select count(*) from mailbox_feedback", Integer.class))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from mailbox_letter_recipient where letter_id = ?"
+                    + " and representative_feedback_id is null",
+                Integer.class,
+                letterId))
+        .isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select after_value from admin_audit_log"
+                    + " where action = 'MAILBOX_DIRECT_LETTER_SENT' and target_id = ?",
+                String.class,
+                String.valueOf(letterId)))
+        .isEqualTo("recipientCount=2");
+    verify(sqsAsyncClient, never()).sendMessage(any(SendMessageRequest.class));
+  }
+
+  @DisplayName("직접 편지의 수신자나 입력이 잘못되면 아무 편지도 저장하지 않는다.")
+  @Test
+  void directLetterRejectsInvalidRecipientsAndPayloadsAtomically() throws Exception {
+    String adminToken = loginAsAdmin("direct-invalid-admin");
+    long activeId = loginAndFindUserId("direct-valid");
+    long withdrawnId = loginAndFindUserId("direct-withdrawn");
+    jdbcTemplate.update("update user_profile set status = 'WITHDRAWN' where id = ?", withdrawnId);
+    for (long invalidId : List.of(withdrawnId, Long.MAX_VALUE)) {
+      mockMvc
+          .perform(
+              postJsonWithToken(
+                  "/api/v1/admin/mailbox/direct-letters",
+                  adminToken,
+                  directLetterBody(List.of(activeId, invalidId))))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/direct-letters",
+                adminToken,
+                directLetterBody(List.of(activeId, activeId))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    for (String body :
+        List.of(
+            "{}",
+            directLetterBody(List.of()),
+            directLetterBody(List.of(0L)),
+            directLetterBody(List.of(-1L)),
+            directLetterBody(LongStream.rangeClosed(1, 101).boxed().toList()),
+            "{\"userProfileIds\":[null],\"title\":\"제목\",\"bodyText\":\"본문\"}",
+            directLetterBody(List.of(activeId)).replace("직접 편지 제목", " "),
+            directLetterBody(List.of(activeId)).replace("직접 편지 제목", "가".repeat(201)),
+            directLetterBody(List.of(activeId)).replace("직접 편지 본문", " "))) {
+      mockMvc
+          .perform(postJsonWithToken("/api/v1/admin/mailbox/direct-letters", adminToken, body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+    assertThat(jdbcTemplate.queryForObject("select count(*) from mailbox_letter", Integer.class))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from mailbox_letter_recipient", Integer.class))
+        .isZero();
+  }
+
+  @DisplayName("관리자만 직접 편지를 발송하고 공지 관리 API로는 직접 편지를 공개할 수 없다.")
+  @Test
+  void directLettersRequireAdminAndCannotBecomeGlobalNotices() throws Exception {
+    String adminToken = loginAsAdmin("direct-guard-admin");
+    LoginResult recipient = login("direct-guard-user");
+    String requestBody = directLetterBody(List.of(recipient.userProfileId()));
+    mockMvc
+        .perform(
+            post("/api/v1/admin/mailbox/direct-letters")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/direct-letters", recipient.accessToken(), requestBody))
+        .andExpect(status().isForbidden());
+    long letterId =
+        responseData(sendDirectLetter(adminToken, List.of(recipient.userProfileId())))
+            .get("letterId")
+            .asLong();
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/letters")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+    for (String body :
+        List.of(
+            "{\"type\":\"NOTICE\"}",
+            "{\"pinned\":true}",
+            "{\"publicationStatus\":\"UNPUBLISHED\"}")) {
+      mockMvc
+          .perform(
+              patchJsonWithToken(
+                  "/api/v1/admin/mailbox/letters/{letterId}", adminToken, body, letterId))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                adminToken,
+                "{\"type\":\"DIRECT\",\"title\":\"제목\",\"contentBlocks\":[{}],\"preview\":\"본문\"}"))
+        .andExpect(status().isBadRequest());
+    long noticeId = responseData(createNotice(adminToken, "직접 편지 변환 금지")).get("letterId").asLong();
+    mockMvc
+        .perform(
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                adminToken,
+                "{\"type\":\"DIRECT\"}",
+                noticeId))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/letters")
+                .param("type", "DIRECT")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isBadRequest());
+  }
+
+  @DisplayName("OpenAPI에 직접 편지 발송 계약과 DIRECT 유형을 노출한다.")
+  @Test
+  void documentsDirectLetterContract() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/mailbox/direct-letters'].post.responses['201']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.AdminMailboxDirectLetterRequest"
+                        + ".properties.userProfileIds.maxItems")
+                .value(100))
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.MailboxReceivedDetailResponse.properties.letterType.enum")
+                .value(org.hamcrest.Matchers.hasItem("DIRECT")));
+  }
+
+  private MvcResult sendDirectLetter(String adminToken, List<Long> userIds) throws Exception {
+    return mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/direct-letters", adminToken, directLetterBody(userIds)))
+        .andExpect(status().isCreated())
+        .andReturn();
+  }
+
+  private String directLetterBody(List<Long> userIds) throws Exception {
+    return objectMapper.writeValueAsString(
+        Map.of("userProfileIds", userIds, "title", "직접 편지 제목", "bodyText", "직접 편지 본문"));
+  }
+
+  private void assertUnreadCount(LoginResult user, int count) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/unread-count")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + user.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.unreadCount").value(count));
   }
 
   private MvcResult createNotice(String accessToken, String title) throws Exception {

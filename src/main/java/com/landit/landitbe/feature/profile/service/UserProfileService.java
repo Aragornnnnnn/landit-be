@@ -85,6 +85,24 @@ public class UserProfileService {
   }
 
   /**
+   * 일괄 작업 대상 활성 프로필을 잠그고 해당 ID만 반환한다.
+   *
+   * <p>호출자의 쓰기 트랜잭션 안에서 사용해야 작업이 끝날 때까지 잠금이 유지된다.
+   *
+   * @param userIds 확인할 사용자 ID 목록
+   * @return 존재하는 활성 사용자 ID 목록. 빈 입력은 빈 목록을 반환한다
+   */
+  @Transactional
+  public List<Long> findActiveIdsForUpdate(List<Long> userIds) {
+    if (userIds.isEmpty()) {
+      return List.of();
+    }
+    return userProfileRepository.findActiveByIdsForUpdate(userIds).stream()
+        .map(UserProfile::getId)
+        .toList();
+  }
+
+  /**
    * 활성 사용자 프로필이 관리자 역할을 가졌는지 확인한다.
    *
    * @param userId 확인할 사용자 프로필 ID

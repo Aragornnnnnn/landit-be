@@ -109,7 +109,7 @@ public interface MailboxControllerDocs {
    */
   @Operation(
       summary = "받은 편지 목록 조회",
-      description = "공지·업데이트와 답장을 최신순으로 조회한다.",
+      description = "공지·업데이트와 본인이 수신한 답장·직접 편지(DIRECT)를 최신순으로 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -136,7 +136,9 @@ public interface MailboxControllerDocs {
    */
   @Operation(
       summary = "받은 편지 상세 조회",
-      description = "공지·업데이트와 답장을 조회하고 읽음 처리한다.",
+      description =
+          "공지·업데이트와 본인이 수신한 답장·직접 편지(DIRECT)를 조회하고 읽음 처리한다. "
+              + "DIRECT는 bodyText로 표시하며 피드백 인용 필드는 null이다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

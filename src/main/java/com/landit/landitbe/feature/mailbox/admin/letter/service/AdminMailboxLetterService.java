@@ -145,9 +145,7 @@ public class AdminMailboxLetterService {
         letterRepository
             .findByIdForUpdate(letterId)
             .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
-    if (letter.getLetterType() == MailboxLetterType.REPLY) {
-      throw new ApiException(ErrorCode.INVALID_REQUEST, "답장 편지는 수정할 수 없습니다.");
-    }
+    validateLetterType(letter.getLetterType());
     return letter;
   }
 
@@ -207,7 +205,7 @@ public class AdminMailboxLetterService {
   }
 
   private void validateLetterType(MailboxLetterType type) {
-    if (type == MailboxLetterType.REPLY) {
+    if (type != null && type != MailboxLetterType.NOTICE && type != MailboxLetterType.UPDATE) {
       throw new ApiException(ErrorCode.INVALID_REQUEST, "공지와 업데이트만 관리할 수 있습니다.");
     }
   }

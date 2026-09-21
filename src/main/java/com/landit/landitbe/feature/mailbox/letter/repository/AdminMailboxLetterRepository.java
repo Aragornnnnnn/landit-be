@@ -55,7 +55,9 @@ public interface AdminMailboxLetterRepository extends JpaRepository<MailboxLette
       """
       select letter
       from MailboxLetter letter
-      where letter.letterType <> com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType.REPLY
+      where letter.letterType in (
+        com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType.NOTICE,
+        com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType.UPDATE)
         and (:type is null or letter.letterType = :type)
         and (:publicationStatus is null or letter.publicationStatus = :publicationStatus)
         and (:pinned is null or letter.pinned = :pinned)
