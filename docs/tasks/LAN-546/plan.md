@@ -21,7 +21,7 @@
 - 사용자·관리자 문의 상세 응답에 `attachments` 배열을 추가한다. 각 항목은 `attachmentId`, `contentType`, `fileSize`, `downloadUrl`이다. 기존 문의는 빈 배열이다.
 - `GET /api/v1/mailbox/feedbacks/{feedbackId}/attachments/{attachmentId}`는 작성자·관리자만 접근할 수 있으며 다른 사용자는 404다. `downloadUrl`은 이 API의 상대 경로이며 프론트가 Bearer 토큰으로 조회한 blob을 표시해야 한다. 공개 이미지 URL이나 S3 키를 반환하지 않는다. 응답은 이미지 바이트와 `Cache-Control: private, no-store`다.
 - `S3_BUCKET_NAME`으로 전달되는 환경별 비공개 애플리케이션 버킷을 사용한다. 로컬 IaC `modules/app-platform/main.tf`에서 Public Access Block, API task의 GetObject/PutObject/DeleteObject 권한과 환경 변수 주입을 확인했다. 공개 콘텐츠 버킷 설정은 사용하지 않는다. 운영에 적용된 정책이나 실제 S3 입출력은 아직 검증하지 않았다.
-- V118은 이 작업의 로컬 미배포 migration이므로 문의 첨부 테이블도 여기에 포함한다. 기존 편지 기능 데이터와 순서 제약을 함께 검증한다.
+- 이 작업의 미배포 migration에 문의 첨부 테이블도 포함한다. PR 생성 직전 #211의 V118과 충돌을 발견해 최종 번호를 V119로 변경했다. 기존 편지 기능 데이터와 순서 제약을 함께 검증한다.
 - [x] 업로드·실패 보상·비공개 조회 API와 상세 응답 추가.
 - [x] 첨부 형식·제한·권한·부분 실패와 DB 롤백 테스트.
 - [x] 전체 check 및 PostgreSQL 제약 재검증.
@@ -67,7 +67,8 @@ curl -X POST "$API_BASE/api/v1/mailbox/feedbacks" \
 
 ## 마이그레이션
 
+- PR 생성 전 V119로 변경한 뒤 `./gradlew check --console=plain`과 PostgreSQL 재실행용 SQL을 모두 다시 통과했다. 아래의 V118 검증 기록은 번호 변경 전 기록이며 SQL 본문은 동일하고 설명 주석만 보완했다.
 - 시작 기준 `origin/develop`은 `5346aae7f`, 공용 migration은 V111까지다.
-- 최종 확인 시 열린 PR #202~#210의 변경 파일을 확인했다. #204=V112, #205=V113, #206=V114, #207=V115, #208=V116, #210=V117이므로 이 작업은 V118을 사용한다. #202·#203·#209에는 migration 변경이 없다.
-- 병합·배포 직전 열린 PR과 대상 DB의 Flyway 이력을 재확인한다. V118을 먼저 적용하면 낮은 버전의 미적용 migration에 영향을 줄 수 있으므로 V112~V117의 반영 순서를 조율하거나 최종 순서에 맞게 번호를 조정한다.
+- PR 생성 직전 SSH로 갱신한 `origin/develop`은 `5346aae7f`로 동일하다. 공용·PostgreSQL·H2 runtime migration과 열린 PR #202~#211의 변경 파일을 재확인했다. #204=V112, #205=V113, #206=V114, #207=V115, #208=V116, #210=V117, #211=V118이므로 이 작업은 최종 V119를 사용한다. #202·#203·#209에는 migration 변경이 없다.
+- 병합·배포 직전 열린 PR과 대상 DB의 Flyway 이력을 재확인한다. V119를 먼저 적용하면 낮은 버전의 미적용 migration에 영향을 줄 수 있으므로 V112~V118의 반영 순서를 조율하거나 최종 순서에 맞게 번호를 조정한다.
 - 운영 DB 적용과 프론트엔드·실기기 검증은 이번 로컬 구현 검증에 포함되지 않는다.

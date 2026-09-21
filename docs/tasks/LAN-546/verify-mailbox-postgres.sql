@@ -35,7 +35,7 @@ UNION ALL SELECT 'feedback', to_jsonb(t) FROM mailbox_feedback t
 UNION ALL SELECT 'recipient', to_jsonb(t) FROM mailbox_letter_recipient t
 UNION ALL SELECT 'read', to_jsonb(t) FROM mailbox_letter_read t;
 
-\ir ../../../src/main/resources/db/migration/V118__add_direct_mailbox_letters.sql
+\ir ../../../src/main/resources/db/migration/V119__add_direct_mailbox_letters.sql
 
 DO $$
 DECLARE actual JSONB;

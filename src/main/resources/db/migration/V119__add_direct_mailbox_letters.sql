@@ -1,4 +1,4 @@
--- 문의 없이 지정한 사용자에게 직접 편지를 보낼 수 있도록 저장 제약을 확장한다.
+-- 직접 편지와 비공개 문의 이미지 첨부를 지원하도록 저장 제약을 확장한다.
 ALTER TABLE mailbox_letter DROP CONSTRAINT chk_mailbox_letter_type;
 ALTER TABLE mailbox_letter ADD CONSTRAINT chk_mailbox_letter_type
     CHECK (letter_type IN ('NOTICE', 'UPDATE', 'REPLY', 'DIRECT'));
