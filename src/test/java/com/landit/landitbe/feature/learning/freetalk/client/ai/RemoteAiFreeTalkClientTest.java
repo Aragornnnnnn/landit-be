@@ -11,6 +11,8 @@ import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
@@ -442,6 +444,64 @@ class RemoteAiFreeTalkClientTest {
                 .asLong())
         .isEqualTo(7L);
     assertThat(recommendations.recommendations()).hasSize(1);
+    // 보낼 배운 표현이 없으면 필드 자체를 싣지 않아 이 필드를 모르는 AI 서버도 요청을 받는다.
+    assertThat(
+            requests.get("/api/v1/free-talk/expression-recommendations").has("learnedExpressions"))
+        .isFalse();
+    assertThat(recommendations.usedExpressions()).isEmpty();
+  }
+
+  @DisplayName("배운 표현 후보를 요청에 싣고, 응답의 다시 쓴 표현을 빈 항목만 빼고 그대로 읽는다.")
+  @Test
+  void sendsLearnedExpressionsAndMapsUsedExpressions() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        requests,
+        """
+            {
+              "success": true,
+              "data": {
+                "recommendations": [{
+                  "displayOrder": 1,
+                  "existingExpressionId": 7
+                }],
+                "usedExpressions": [
+                  {
+                    "expressionId": 812,
+                    "messageId": 3002,
+                    "matchedText": "going hiking"
+                  },
+                  null
+                ]
+              },
+              "error": null
+            }
+        """);
+    AiFreeTalkExpressionRecommendationsRequest base = recommendationsRequest();
+
+    AiFreeTalkExpressionRecommendationsResult result =
+        remoteClient()
+            .recommendExpressions(
+                new AiFreeTalkExpressionRecommendationsRequest(
+                    base.sessionId(),
+                    base.targetLocale(),
+                    base.baseLocale(),
+                    base.conversationHistory(),
+                    base.existingExpressions(),
+                    List.of(new AiFreeTalkLearnedExpression(812L, "go hiking", "등산하러 가다"))));
+
+    JsonNode learned =
+        requests.get("/api/v1/free-talk/expression-recommendations").get("learnedExpressions");
+    assertThat(learned).hasSize(1);
+    assertThat(learned.get(0).propertyNames())
+        .containsExactlyInAnyOrder(
+            "expressionId", "targetExpressionText", "baseExpressionMeaningText");
+    assertThat(learned.get(0).get("expressionId").asLong()).isEqualTo(812L);
+    assertThat(learned.get(0).get("targetExpressionText").asString()).isEqualTo("go hiking");
+    assertThat(learned.get(0).get("baseExpressionMeaningText").asString()).isEqualTo("등산하러 가다");
+    assertThat(result.usedExpressions())
+        .containsExactly(new AiFreeTalkUsedExpression(812L, 3002L, "going hiking"));
   }
 
   @DisplayName("일반 첫 대화 요청에는 기억 조회보다 긴 대기 시간을 적용한다.")
@@ -802,6 +862,21 @@ class RemoteAiFreeTalkClientTest {
         200,
         successResponse(
             recommendationsData(8L, "I'm up for that", "좋아, 그거 하자", "제안에 동의할 때 사용", 1)));
+
+    assertGenerationError(
+        () -> remoteClient().recommendExpressions(recommendationsRequest()),
+        ErrorCode.AI_RESPONSE_INVALID);
+  }
+
+  @DisplayName("다시 쓴 표현의 형식이 깨진 응답은 추천까지 통째로 거부한다.")
+  @Test
+  void rejectsRecommendationWhenUsedExpressionsIsMalformed() throws Exception {
+    registerRawResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        200,
+        successResponse(
+            "{\"recommendations\":[{\"displayOrder\":1,\"existingExpressionId\":7}],"
+                + "\"usedExpressions\":\"oops\"}"));
 
     assertGenerationError(
         () -> remoteClient().recommendExpressions(recommendationsRequest()),

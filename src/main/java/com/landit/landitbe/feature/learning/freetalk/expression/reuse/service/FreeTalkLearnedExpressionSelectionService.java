@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.content.expression.dto.ExpressionText;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
 import com.landit.landitbe.feature.learning.expression.progress.dto.LearnedExpression;
 import com.landit.landitbe.feature.learning.expression.progress.service.ExpressionCompletionService;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.domain.FreeTalkExpressionReuseSource;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkLearnedExpression;
 import com.landit.landitbe.shared.domain.Locale;
@@ -31,8 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkLearnedExpressionSelectionService {
 
-  /** 한 번의 요청에 실을 수 있는 배운 표현 수. AI 서버 계약의 상한과 같다. */
-  public static final int MAX_LEARNED_EXPRESSIONS = 50;
+  /** 한 번의 요청에 실을 수 있는 배운 표현 수. AI 서버 계약의 상한을 그대로 쓴다. */
+  public static final int MAX_LEARNED_EXPRESSIONS =
+      AiFreeTalkExpressionRecommendationsRequest.MAX_LEARNED_EXPRESSIONS;
 
   // 어느 문장에나 나와 겹침의 근거가 되지 못하는 단어다. 임의로 고르지 않고 Lucene·Elasticsearch의 영어 기본 불용어 목록
   // (EnglishAnalyzer.ENGLISH_STOP_WORDS_SET)을 그대로 쓴다. 어간 처리는 하지 않는다(went와 go는 다른 단어로 본다).
