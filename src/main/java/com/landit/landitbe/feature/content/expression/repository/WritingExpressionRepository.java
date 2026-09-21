@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.content.expression.domain.WritingExpressionSo
 import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -140,6 +141,30 @@ public interface WritingExpressionRepository extends JpaRepository<WritingExpres
   Optional<WritingExpression> findPublicExpressionCandidateById(
       @Param("id") Long id,
       @Param("expressionSource") WritingExpressionSource expressionSource,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("baseLocale") Locale baseLocale,
+      @Param("status") ActiveStatus status);
+
+  /**
+   * 주어진 ID 중 지금 활성 상태이고 학습 언어·기준 언어가 맞는 표현을 표현 출처와 관계없이 조회한다.
+   *
+   * @param expressionIds 조회할 표현 ID 목록
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @param status 조회할 콘텐츠 상태
+   * @return 조건에 맞는 표현 목록 (순서 보장 없음)
+   */
+  @Query(
+      """
+      SELECT expression
+      FROM WritingExpression expression
+      WHERE expression.id IN :expressionIds
+        AND expression.targetLocale = :targetLocale
+        AND expression.baseLocale = :baseLocale
+        AND expression.status = :status
+      """)
+  List<WritingExpression> findByIdsAndLocales(
+      @Param("expressionIds") Collection<Long> expressionIds,
       @Param("targetLocale") Locale targetLocale,
       @Param("baseLocale") Locale baseLocale,
       @Param("status") ActiveStatus status);

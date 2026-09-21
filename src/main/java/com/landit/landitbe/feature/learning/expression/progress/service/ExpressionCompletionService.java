@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.expression.progress.service;
 import com.landit.landitbe.feature.learning.expression.progress.domain.ExpressionLearningSource;
 import com.landit.landitbe.feature.learning.expression.progress.domain.UserWritingExpressionCompletion;
 import com.landit.landitbe.feature.learning.expression.progress.dto.CompletedExpressionIds;
+import com.landit.landitbe.feature.learning.expression.progress.dto.LearnedExpression;
 import com.landit.landitbe.feature.learning.expression.progress.repository.UserWritingExpressionCompletionRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,28 @@ public class ExpressionCompletionService {
   @Transactional(readOnly = true)
   public CompletedExpressionIds findCompletedExpressionIds(Long userId, Long scenarioId) {
     return CompletedExpressionIds.from(findExpressionCompletions(userId, scenarioId));
+  }
+
+  /**
+   * 사용자가 학습을 마친 표현을 학습 경로와 관계없이 가장 최근에 마친 순으로 조회한다.
+   *
+   * @param userId 사용자 ID
+   * @return 최근에 학습을 마친 순의 표현 목록
+   */
+  @Transactional(readOnly = true)
+  public List<LearnedExpression> findLearnedExpressions(Long userId) {
+    return expressionCompletionRepository
+        .findAllByUserProfileIdOrderByLastCompletedAtDescIdDesc(userId)
+        .stream()
+        .map(
+            completion ->
+                new LearnedExpression(
+                    completion.getWritingExpressionId(),
+                    completion.getLearningSource(),
+                    completion.getScenarioId(),
+                    completion.getCompletedAt(),
+                    completion.getLastCompletedAt()))
+        .toList();
   }
 
   /**
