@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.freetalk.expression.reuse.service;
 
 import com.landit.landitbe.feature.content.expression.dto.ExpressionText;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
+import com.landit.landitbe.feature.learning.expression.progress.domain.ExpressionLearningSource;
 import com.landit.landitbe.feature.learning.expression.progress.dto.LearnedExpression;
 import com.landit.landitbe.feature.learning.expression.progress.service.ExpressionCompletionService;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
@@ -125,9 +126,17 @@ public class FreeTalkLearnedExpressionSelectionService {
         expression.expressionId(),
         text.targetExpressionText(),
         text.baseExpressionMeaningText(),
-        FreeTalkExpressionReuseSource.valueOf(expression.learningSource().name()),
+        sourceOf(expression.learningSource()),
         expression.scenarioId(),
         expression.completedAt().toLocalDate());
+  }
+
+  // 배운 곳이 새로 생기면 여기서 컴파일이 막혀, 이름이 안 맞아 재사용 판정이 조용히 꺼지는 일이 없다.
+  private static FreeTalkExpressionReuseSource sourceOf(ExpressionLearningSource learningSource) {
+    return switch (learningSource) {
+      case SCENARIO -> FreeTalkExpressionReuseSource.SCENARIO;
+      case FREE_TALK -> FreeTalkExpressionReuseSource.FREE_TALK;
+    };
   }
 
   // 대소문자와 문장부호를 무시한 단어 집합. 축약형(don't)은 한 단어로 두고, 둥근 아포스트로피(iOS 기본)는 곧은 것과 같게 본다.

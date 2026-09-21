@@ -83,10 +83,17 @@ public class FreeTalkExpressionReuseAssemblyService {
             .collect(
                 Collectors.toMap(
                     AiConversationHistoryMessage::messageId,
-                    AiConversationHistoryMessage::content));
+                    AiConversationHistoryMessage::content,
+                    (first, later) -> first));
     List<AiFreeTalkUsedExpression> accepted = new ArrayList<>();
     Set<List<Long>> seen = new HashSet<>();
-    for (AiFreeTalkUsedExpression used : usedExpressions) {
+    for (AiFreeTalkUsedExpression claimed : usedExpressions) {
+      // 조각 앞뒤의 공백은 밑줄에 들어가면 안 되므로 떼어 내고 본다.
+      AiFreeTalkUsedExpression used =
+          new AiFreeTalkUsedExpression(
+              claimed.expressionId(),
+              claimed.messageId(),
+              claimed.matchedText() == null ? null : claimed.matchedText().strip());
       String dropReason = dropReason(used, learnedById, userContentByMessageId, seen);
       if (dropReason != null) {
         log.warn(DROPPED_LOG, dropReason, freeTalkSessionId, used.expressionId(), used.messageId());
@@ -219,8 +226,7 @@ public class FreeTalkExpressionReuseAssemblyService {
     while (end < content.length() && SENTENCE_ENDS.indexOf(content.charAt(end)) >= 0) {
       end++;
     }
-    String sentence = content.substring(start, end).strip();
-    return sentence.isEmpty() ? matchedText : sentence;
+    return content.substring(start, end).strip();
   }
 
   private static boolean endsSentence(char character) {

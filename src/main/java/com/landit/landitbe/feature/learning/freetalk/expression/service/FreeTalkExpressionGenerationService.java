@@ -71,6 +71,8 @@ public class FreeTalkExpressionGenerationService {
       "프리톡 배운 표현 후보 조회 실패. 표현 재사용 판정 없이 추천만 진행한다. learningSessionId={}";
   private static final String REUSE_ASSEMBLY_FAILED_LOG =
       "프리톡 표현 재사용 기록 조립 실패. 재사용 기록 없이 추천만 저장한다. learningSessionId={}";
+  private static final String REUSE_ALREADY_RECORDED_LOG =
+      "프리톡 표현 재사용 기록이 이미 있어 새 기록을 버린다. learningSessionId={}, droppedCount={}";
   private static final String GENERATION_FAILED_LOG =
       "프리톡 표현 생성 실패. learningSessionId={}, totalMs={}, stages=[{}]";
 
@@ -181,12 +183,7 @@ public class FreeTalkExpressionGenerationService {
                         context.baseLocale().name(),
                         context.history(),
                         existingExpressions,
-                        learnedExpressions.stream()
-                            .map(
-                                learned ->
-                                    new AiFreeTalkLearnedExpression(
-                                        learned.expressionId(), learned.text(), learned.meaning()))
-                            .toList())));
+                        toAiLearnedExpressions(learnedExpressions))));
     List<AiFreeTalkExpressionRecommendation> recommendations = result.recommendations();
     // 출처 제목 같은 읽기는 저장 트랜잭션 밖에서 끝낸다. 저장 트랜잭션은 추천과 재사용 기록을 넣기만 한다.
     List<FreeTalkExpressionReuse> reuses =
@@ -236,18 +233,35 @@ public class FreeTalkExpressionGenerationService {
   // 표현 재사용은 추천에 얹는 부가 기능이다. 배운 표현을 읽지 못해도 추천은 계속하고, 그 세션은 다시 쓴 표현이 없는 것으로 남는다.
   private List<FreeTalkLearnedExpression> learnedExpressions(GenerationContext context) {
     try {
-      return learnedExpressionSelectionService.select(
-          context.userProfileId(),
-          context.targetLocale(),
-          context.baseLocale(),
-          context.history().stream()
-              .filter(message -> ConversationSpeaker.USER.name().equals(message.role()))
-              .map(AiConversationHistoryMessage::content)
-              .toList());
+      List<FreeTalkLearnedExpression> learnedExpressions =
+          learnedExpressionSelectionService.select(
+              context.userProfileId(),
+              context.targetLocale(),
+              context.baseLocale(),
+              context.history().stream()
+                  .filter(message -> ConversationSpeaker.USER.name().equals(message.role()))
+                  .map(AiConversationHistoryMessage::content)
+                  .toList());
+      // 후보가 AI 서버 계약(상한·ID 중복)을 어기면 요청을 만들 때 예외가 나 추천까지 실패하고, 다시 시도해도 같은 후보라 계속 실패한다.
+      // 그래서 여기서 먼저 확인해 어긴 후보는 통째로 버린다.
+      AiFreeTalkExpressionRecommendationsRequest.requireValidLearnedExpressions(
+          toAiLearnedExpressions(learnedExpressions));
+      return learnedExpressions;
     } catch (RuntimeException exception) {
       log.warn(LEARNED_EXPRESSION_FAILED_LOG, context.learningSessionId(), exception);
       return List.of();
     }
+  }
+
+  // AI에는 표현 ID·원문·뜻만 보낸다. 출처와 배운 날은 재사용 기록을 만들 때만 쓴다.
+  private static List<AiFreeTalkLearnedExpression> toAiLearnedExpressions(
+      List<FreeTalkLearnedExpression> learnedExpressions) {
+    return learnedExpressions.stream()
+        .map(
+            learned ->
+                new AiFreeTalkLearnedExpression(
+                    learned.expressionId(), learned.text(), learned.meaning()))
+        .toList();
   }
 
   // 후보 ID로 공용 활성 표현을 다시 읽어 추천 요청 형식으로 변환한다.
@@ -331,9 +345,13 @@ public class FreeTalkExpressionGenerationService {
       sessionExpressionRepository.save(existingSessionExpression(context, recommendation));
     }
     // 재사용 기록은 고치지 않는 기록이다. 이 세션에 이미 있으면 다시 넣지 않는다.
-    if (!reuses.isEmpty()
-        && !reuseRepository.existsByFreeTalkSessionId(context.freeTalkSessionId())) {
-      reuseRepository.saveAll(reuses);
+    // 기록은 READY와 같은 트랜잭션에서만 저장되고 재시도는 FAILED에서만 되므로 정상 흐름에서는 일어나지 않는다. 일어나면 조용히 버리지 않고 알린다.
+    if (!reuses.isEmpty()) {
+      if (reuseRepository.existsByFreeTalkSessionId(context.freeTalkSessionId())) {
+        log.warn(REUSE_ALREADY_RECORDED_LOG, context.learningSessionId(), reuses.size());
+      } else {
+        reuseRepository.saveAll(reuses);
+      }
     }
     freeTalkSession.completeExpressionGeneration();
   }

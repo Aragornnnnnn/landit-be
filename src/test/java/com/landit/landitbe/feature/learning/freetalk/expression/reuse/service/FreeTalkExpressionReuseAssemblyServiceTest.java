@@ -109,6 +109,19 @@ class FreeTalkExpressionReuseAssemblyServiceTest {
         .containsExactly("grab a coffee");
   }
 
+  @DisplayName("조각 앞뒤에 공백이 붙어 와도 떼어 낸 조각으로 확인하고 기록한다.")
+  @Test
+  void stripsWhitespaceAroundMatchedText() {
+    when(scenarioCatalogService.findTitles(any(), any(), any())).thenReturn(List.of());
+
+    List<FreeTalkExpressionReuse> reuses =
+        assemble(used(EXPRESSION_ID, USER_MESSAGE_ID, " grab a coffee "));
+
+    assertThat(reuses)
+        .extracting(FreeTalkExpressionReuse::getMatchedText)
+        .containsExactly("grab a coffee");
+  }
+
   @DisplayName("받아들일 판정이 없으면 출처를 읽지 않는다.")
   @Test
   void skipsSourceLookupWhenNothingIsAccepted() {

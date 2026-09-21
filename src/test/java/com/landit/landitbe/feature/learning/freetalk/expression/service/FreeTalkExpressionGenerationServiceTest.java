@@ -179,6 +179,19 @@ class FreeTalkExpressionGenerationServiceTest {
     verify(freeTalkSession, never()).failExpressionGeneration();
   }
 
+  @DisplayName("고른 후보가 AI 서버 계약을 어기면(표현 ID 중복) 후보를 통째로 버리고 추천은 끝까지 진행한다.")
+  @Test
+  void dropsLearnedExpressionsThatViolateTheAiContract() {
+    when(learnedExpressionSelectionService.select(anyLong(), any(), any(), any()))
+        .thenReturn(List.of(learnedExpression(), learnedExpression()));
+
+    service.generate(LEARNING_SESSION_ID);
+
+    assertThat(recommendationRequest().learnedExpressions()).isEmpty();
+    verify(freeTalkSession).completeExpressionGeneration();
+    verify(freeTalkSession, never()).failExpressionGeneration();
+  }
+
   @DisplayName("AI가 다시 썼다고 판정한 표현은 다시 확인한 기록으로 바꿔 추천과 함께 저장한다.")
   @Test
   void savesAssembledReusesWithRecommendations() {
