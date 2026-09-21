@@ -298,19 +298,85 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
-  @DisplayName("기존 기억을 근거로 한 후속 질문은 그 기억 ID를 그대로 저장한다.")
+  @DisplayName("기존 기억을 근거로 한 후속 질문은 그 기억이 저장 뒤에도 활성이면 그 ID를 그대로 저장한다.")
   @Test
   void storesFollowUpWithTheExistingMemoryId() {
     seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "interview next week", "ACTIVE");
 
     persistAndComplete(
         generationRequest(),
         List.of(),
-        new ConversationMemoryFollowUpDraft(5504L, null, "GOAL", QUESTION, INVITE));
+        new ConversationMemoryFollowUpDraft(FIRST_OLD_MEMORY_ID, null, "GOAL", QUESTION, INVITE));
 
     assertThat(followUpRow())
-        .containsEntry("MEMORY_ID", 5504L)
+        .containsEntry("MEMORY_ID", FIRST_OLD_MEMORY_ID)
         .containsEntry("TRIGGER_TYPE", "GOAL");
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("이번 저장 계획이 질문의 근거 기억을 대체하면 질문만 버리고 기억 저장과 완료는 그대로 한다.")
+  @Test
+  void skipsFollowUpWhoseSourceMemoryIsSupersededByThisPersistence() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "preparing for an interview", "ACTIVE");
+
+    ConversationMemoryWriteService.PersistenceResult result =
+        persistAndComplete(
+            generationRequest(),
+            List.of(
+                plan(
+                    AiMemoryOperation.SUPERSEDE,
+                    List.of(FIRST_OLD_MEMORY_ID),
+                    List.of(FIRST_OLD_MEMORY_ID))),
+            new ConversationMemoryFollowUpDraft(
+                FIRST_OLD_MEMORY_ID, null, "CONCERN", QUESTION, INVITE));
+
+    assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
+    assertThat(statusOf(FIRST_OLD_MEMORY_ID)).isEqualTo("SUPERSEDED");
+    assertThat(countFollowUps()).isZero();
+    assertThat(countMemories()).isEqualTo(2);
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("질문을 만드는 사이 다른 작업이 근거 기억을 이미 대체했으면 질문만 버린다.")
+  @Test
+  void skipsFollowUpWhoseSourceMemoryWasAlreadySuperseded() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "preparing for an interview", "ACTIVE");
+    seedMemory(SECOND_OLD_MEMORY_ID, "the interview was cancelled", "ACTIVE");
+    jdbcTemplate.update(
+        "update conversation_memory set status = 'SUPERSEDED', valid_to = ?, "
+            + "superseded_at = ?, superseded_by_id = ? where id = ?",
+        NOW,
+        NOW,
+        SECOND_OLD_MEMORY_ID,
+        FIRST_OLD_MEMORY_ID);
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(),
+        new ConversationMemoryFollowUpDraft(
+            FIRST_OLD_MEMORY_ID, null, "CONCERN", QUESTION, INVITE));
+
+    assertThat(countFollowUps()).isZero();
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("다른 사용자의 기억을 근거로 한 질문은 저장하지 않는다.")
+  @Test
+  void skipsFollowUpGroundedInAnotherUsersMemory() {
+    seedCompletedPreparingSession();
+    seedUser(OTHER_USER_ID);
+    seedMemory(OTHER_USER_MEMORY_ID, OTHER_USER_ID, "other user's memory", "ACTIVE");
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(),
+        new ConversationMemoryFollowUpDraft(
+            OTHER_USER_MEMORY_ID, null, "CONCERN", QUESTION, INVITE));
+
+    assertThat(countFollowUps()).isZero();
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 

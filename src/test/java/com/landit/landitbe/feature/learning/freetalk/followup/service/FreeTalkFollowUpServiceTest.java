@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.freetalk.followup.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,7 @@ import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollow
 import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTalkFollowUpRepository;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
+import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -33,7 +36,10 @@ class FreeTalkFollowUpServiceTest {
   private static final long SESSION_ID = 30L;
 
   private final FreeTalkFollowUpRepository repository = mock(FreeTalkFollowUpRepository.class);
-  private final FreeTalkFollowUpService service = new FreeTalkFollowUpService(repository);
+  private final ConversationMemoryWriteService memoryWriteService =
+      mock(ConversationMemoryWriteService.class);
+  private final FreeTalkFollowUpService service =
+      new FreeTalkFollowUpService(repository, memoryWriteService);
 
   @DisplayName("질문이 없고 장기기억 작업이 아직 준비 중이면 기다리는 중으로 알린다.")
   @Test
@@ -81,6 +87,7 @@ class FreeTalkFollowUpServiceTest {
   @ExtendWith(OutputCaptureExtension.class)
   void skipsDraftThatBreaksEntityRulesWithoutThrowing(CapturedOutput output) {
     when(repository.findByFreeTalkSessionId(SESSION_ID)).thenReturn(Optional.empty());
+    when(memoryWriteService.isActiveAfterPersistence(1207L, 5504L)).thenReturn(true);
     ConversationMemoryFollowUpDraft noneWithMemory =
         new ConversationMemoryFollowUpDraft(5504L, null, "NONE", "비밀질문", "비밀초대");
 
@@ -91,6 +98,37 @@ class FreeTalkFollowUpServiceTest {
     assertThat(output.getOut())
         .contains("workflow=free_talk_follow_up_skipped reason=invalid_draft")
         .doesNotContain("비밀");
+  }
+
+  @DisplayName("근거 기억이 기억 저장 뒤 활성이 아니면 옛 내용으로 만든 질문을 남기지 않는다.")
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void skipsFollowUpWhenSourceMemoryIsNoLongerActive(CapturedOutput output) {
+    when(memoryWriteService.isActiveAfterPersistence(1207L, 5504L)).thenReturn(false);
+    ConversationMemoryFollowUpDraft draft =
+        new ConversationMemoryFollowUpDraft(5504L, null, "CONCERN", "비밀질문", "비밀초대");
+
+    service.record(1207L, SESSION_ID, draft, Map.of());
+
+    verify(repository, never()).save(any());
+    assertThat(output.getOut())
+        .contains("workflow=free_talk_follow_up_skipped reason=source_memory_not_active")
+        .doesNotContain("비밀");
+  }
+
+  @DisplayName("이번 후보가 근거인 질문은 기존 기억의 상태를 확인하지 않고 저장한다.")
+  @Test
+  void savesCandidateSourcedFollowUpWithoutCheckingExistingMemory() {
+    when(repository.findByFreeTalkSessionId(SESSION_ID)).thenReturn(Optional.empty());
+    ConversationMemoryFollowUpDraft draft =
+        new ConversationMemoryFollowUpDraft(null, 0, "CONCERN", "면접 준비, 어떻게 됐어?", "다음엔 그 얘기 하자.");
+
+    service.record(1207L, SESSION_ID, draft, Map.of(0, 9031L));
+
+    verify(memoryWriteService, never()).isActiveAfterPersistence(anyLong(), anyLong());
+    ArgumentCaptor<FreeTalkFollowUp> saved = ArgumentCaptor.forClass(FreeTalkFollowUp.class);
+    verify(repository).save(saved.capture());
+    assertThat(saved.getValue().getMemoryId()).isEqualTo(9031L);
   }
 
   @DisplayName("후속 질문이 없으면 아무것도 조회하거나 저장하지 않는다.")

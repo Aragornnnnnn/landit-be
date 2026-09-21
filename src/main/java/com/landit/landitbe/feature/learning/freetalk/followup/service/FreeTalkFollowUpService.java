@@ -8,6 +8,7 @@ import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollow
 import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTalkFollowUpRepository;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
+import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FreeTalkFollowUpService {
 
   private final FreeTalkFollowUpRepository followUpRepository;
+  private final ConversationMemoryWriteService memoryWriteService;
 
   /**
    * 사용자가 지금까지 받은 후속 질문들이 근거로 쓴 장기기억 ID를 조회한다.
@@ -63,6 +65,9 @@ public class FreeTalkFollowUpService {
    * <p>후속 질문은 덤이므로 어떤 경우에도 기억 저장을 실패시키지 않는다. 저장할 수 없는 질문은 사유만 남기고 건너뛴다. 근거 후보가 기억으로 저장되지
    * 않았으면(IGNORE) 문구는 남기고 근거 기억만 비운다.
    *
+   * <p>기존 기억이 근거면 기억 저장을 마친 지금도 활성인지 다시 본다. 이번 저장 계획이나 그사이 끝난 다른 작업이 그 기억을 대체했다면("면접 준비 중" → "면접
+   * 취소") 옛 내용으로 만든 질문은 틀린 기록이 되므로 남기지 않는다.
+   *
    * @param userProfileId 질문을 받을 사용자 프로필 ID
    * @param freeTalkSessionId 질문을 만든 프리톡 세션 ID
    * @param draft 구조 검증을 통과한 후속 질문. 없으면 null
@@ -80,6 +85,11 @@ public class FreeTalkFollowUpService {
     FreeTalkFollowUpTriggerType triggerType = triggerTypeOf(draft.triggerType());
     if (triggerType == null) {
       warnSkipped("unknown_trigger_type", freeTalkSessionId);
+      return;
+    }
+    if (draft.memoryId() != null
+        && !memoryWriteService.isActiveAfterPersistence(userProfileId, draft.memoryId())) {
+      warnSkipped("source_memory_not_active", freeTalkSessionId);
       return;
     }
     // 같은 세션의 질문이 이미 있으면 유일 제약 위반이 기억 저장 트랜잭션까지 되돌리므로 먼저 확인한다.

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 장기기억의 snapshot 재검증과 상태 변경을 하나의 트랜잭션으로 수행한다. */
@@ -74,6 +75,20 @@ public class ConversationMemoryWriteService {
       }
     }
     return new ConversationMemoryPersistence(PersistenceResult.STORED, savedMemoryIdsByPlanIndex);
+  }
+
+  /**
+   * 기억 저장과 같은 트랜잭션에서, 저장을 마친 뒤에도 그 기억이 활성 상태인지 확인한다.
+   *
+   * <p>사용자 잠금을 쥔 저장 트랜잭션 안에서만 부른다. 이번 저장 계획이나 그사이 끝난 다른 작업이 그 기억을 대체했는지를 저장 이후 기준으로 알 수 있다.
+   *
+   * @param userProfileId 기억 소유 사용자 프로필 ID
+   * @param memoryId 확인할 장기기억 ID
+   * @return 본인 소유의 활성 기억이면 true
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean isActiveAfterPersistence(long userProfileId, long memoryId) {
+    return memoryRepository.existsActive(userProfileId, memoryId);
   }
 
   /** 사용자 잠금 안에서 비교 목록을 다시 조회해 AI 판정 시점 이후 변경을 차단한다. */

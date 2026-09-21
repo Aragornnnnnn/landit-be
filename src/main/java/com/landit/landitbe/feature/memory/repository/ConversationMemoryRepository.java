@@ -82,6 +82,14 @@ public class ConversationMemoryRepository {
       ORDER BY observed_at DESC, id DESC
       LIMIT :limit
       """;
+  private static final String EXISTS_ACTIVE_SQL =
+      """
+      SELECT COUNT(*)
+      FROM conversation_memory
+      WHERE id = :memoryId
+        AND user_profile_id = :userProfileId
+        AND status = 'ACTIVE'
+      """;
   private static final String EXCLUDED_IDS_CONDITION = "AND id NOT IN (:excludedMemoryIds)";
 
   private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -120,6 +128,24 @@ public class ConversationMemoryRepository {
                 toLocalDateTime(resultSet.getTimestamp("valid_from")),
                 toLocalDateTime(resultSet.getTimestamp("valid_to")),
                 toLocalDateTime(resultSet.getTimestamp("observed_at"))));
+  }
+
+  /**
+   * 그 사용자의 기억이 지금도 활성 상태인지 확인한다.
+   *
+   * @param userProfileId 기억 소유 사용자 프로필 ID
+   * @param memoryId 확인할 장기기억 ID
+   * @return 본인 소유의 활성 기억이면 true. 대체·무효화됐거나 없거나 다른 사용자의 기억이면 false
+   */
+  public boolean existsActive(long userProfileId, long memoryId) {
+    Integer count =
+        jdbcTemplate.queryForObject(
+            EXISTS_ACTIVE_SQL,
+            new MapSqlParameterSource()
+                .addValue("userProfileId", userProfileId)
+                .addValue("memoryId", memoryId),
+            Integer.class);
+    return count != null && count > 0;
   }
 
   private static LocalDateTime toLocalDateTime(java.sql.Timestamp timestamp) {
