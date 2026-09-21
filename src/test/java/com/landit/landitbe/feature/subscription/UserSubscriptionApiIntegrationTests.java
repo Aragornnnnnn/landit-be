@@ -474,6 +474,32 @@ class UserSubscriptionApiIntegrationTests {
     assertThat(dismissPromo(token).path("newUser").asBoolean()).isTrue();
   }
 
+  @Test
+  @DisplayName("만료된 할인은 조회와 재이탈 모두 null이며 기존 기록을 유지한다.")
+  void neverRestartsExpiredPromo() throws Exception {
+    String token = login("promo-expired");
+    long userId = userIdOf("promo-expired");
+    dismissPromo(token);
+    LocalDateTime expired = LocalDateTime.now(clock).minusMinutes(1).withNano(0);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET discount_offer_expires_at = ? WHERE id = ?", expired, userId);
+    assertThat(dismissPromo(token).isNull()).isTrue();
+    subscription(token).andExpect(jsonPath("$.data.promo").isEmpty());
+    assertThat(storedPromoExpiry(userId)).isEqualTo(expired);
+  }
+
+  @Test
+  @DisplayName("기존 사용자도 첫 이탈 할인을 받지만 신규 혜택 라벨은 받지 않는다.")
+  void grantsOldUserWithoutNewUserLabel() throws Exception {
+    String token = login("promo-old");
+    jdbcTemplate.update(
+        "UPDATE user_profile SET created_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).minusDays(30),
+        userIdOf("promo-old"));
+    assertThat(dismissPromo(token).path("newUser").asBoolean()).isFalse();
+    assertThat(storedPromoExpiry(userIdOf("promo-old"))).isNotNull();
+  }
+
   private LocalDateTime storedPromoExpiry(long userId) {
     return jdbcTemplate.queryForObject(
         "SELECT discount_offer_expires_at FROM user_profile WHERE id = ?",
