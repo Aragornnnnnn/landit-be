@@ -19,6 +19,9 @@ import java.util.List;
  * @param baseLocale 사용자 기준 언어
  * @param topic 현재 프리톡 주제
  * @param conversationHistory 속마음 생성에 사용할 대화 문맥
+ * @param contextPolicyVersion 컨텍스트 정책 버전. 비활성화이면 null
+ * @param sessionSummary 요청에 사용할 세션 요약. 없으면 null
+ * @param historyIncomplete 전달 이력에 요약으로 보완하지 못한 누락 구간이 있는지 여부
  */
 public record AiFreeTalkInnerThoughtRequest(
     Long sessionId,
@@ -33,7 +36,18 @@ public record AiFreeTalkInnerThoughtRequest(
     @JsonInclude(JsonInclude.Include.NON_NULL) AiFreeTalkSessionSummary sessionSummary,
     @JsonInclude(JsonInclude.Include.NON_DEFAULT) boolean historyIncomplete) {
 
-  /** 기존 전체 이력 호출과 호환되는 요청을 생성한다. */
+  /**
+   * 기존 전체 이력 호출과 호환되는 요청을 생성한다.
+   *
+   * @param sessionId 프리톡 학습 세션 ID
+   * @param characterId 선택한 프리톡 캐릭터 식별자
+   * @param submittedMessageId 속마음 대상 사용자 메시지 ID
+   * @param submittedTurnNumber 속마음 대상 사용자 메시지 턴 번호
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param topic 현재 프리톡 주제
+   * @param conversationHistory 속마음 생성에 사용할 대화 문맥
+   */
   public AiFreeTalkInnerThoughtRequest(
       Long sessionId,
       String characterId,
