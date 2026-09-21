@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.learning.freetalk.expression.reuse.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -68,6 +69,21 @@ class FreeTalkLearnedExpressionSelectionServiceTest {
                 FreeTalkExpressionReuseSource.FREE_TALK,
                 null,
                 LocalDate.of(2026, 9, 7)));
+  }
+
+  @DisplayName("같은 표현을 시나리오와 스몰톡 양쪽에서 배웠으면 가장 최근 기록 하나만 후보로 보낸다.")
+  @Test
+  void keepsMostRecentRecordWhenSameExpressionWasLearnedInBothSources() {
+    learned(
+        new LearnedExpression(
+            812L, ExpressionLearningSource.FREE_TALK, null, LEARNED_AT.plusDays(2), LEARNED_AT),
+        new LearnedExpression(
+            812L, ExpressionLearningSource.SCENARIO, 41L, LEARNED_AT, LEARNED_AT.minusDays(1)));
+    texts(new ExpressionText(812L, "grab a coffee", "커피 한잔하다"));
+
+    assertThat(service.select(USER_ID, Locale.EN, Locale.KR, List.of("I like movies.")))
+        .extracting(FreeTalkLearnedExpression::expressionId, FreeTalkLearnedExpression::sourceType)
+        .containsExactly(tuple(812L, FreeTalkExpressionReuseSource.FREE_TALK));
   }
 
   @DisplayName("지금은 비활성이거나 다른 언어로 배워 본문을 읽지 못한 표현은 후보에서 뺀다.")

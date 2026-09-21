@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTa
 import com.landit.landitbe.shared.domain.Locale;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -70,8 +71,11 @@ public class FreeTalkLearnedExpressionSelectionService {
             .stream()
             .collect(Collectors.toMap(ExpressionText::id, Function.identity()));
     // 지금은 비활성이거나 다른 언어로 배운 표현은 본문을 읽지 못해 후보에서 빠진다. 최근에 배운 순서는 그대로 둔다.
+    // 완료 기록은 (표현, 배운 곳)마다 하나라 같은 표현이 두 번 나올 수 있다. AI 서버는 표현 ID가 겹친 요청을 거부하므로 가장 최근 기록 하나만 남긴다.
+    Set<Long> seenExpressionIds = new HashSet<>();
     List<FreeTalkLearnedExpression> candidates =
         learned.stream()
+            .filter(expression -> seenExpressionIds.add(expression.expressionId()))
             .map(expression -> candidate(expression, textsById.get(expression.expressionId())))
             .filter(Objects::nonNull)
             .toList();
