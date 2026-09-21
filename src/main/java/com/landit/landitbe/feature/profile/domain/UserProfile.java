@@ -18,10 +18,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
+import org.hibernate.annotations.DynamicUpdate;
 
 /** 서비스 사용자 프로필과 학습 기본 설정을 저장한다. */
 @Getter
 @Entity
+// 다른 트랜잭션이 부여한 할인 기록을 오래된 프로필 값으로 덮어쓰지 않는다.
+@DynamicUpdate
 @Table(name = "user_profile")
 public class UserProfile extends BaseTimeEntity {
 
