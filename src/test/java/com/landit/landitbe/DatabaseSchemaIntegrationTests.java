@@ -395,10 +395,10 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("free_talk_follow_up", "chk_free_talk_follow_up_text");
   }
 
-  /** V116 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다. */
-  @DisplayName("V116 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다.")
+  /** V117 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다. */
+  @DisplayName("V117 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다.")
   @Test
-  void v116AddsCorrectionRetryColumnsToFreeTalkMessageFeedback() {
+  void v117AddsCorrectionRetryColumnsToFreeTalkMessageFeedback() {
     assertColumnExists("free_talk_message_feedback", "attempts");
     assertColumnExists("free_talk_message_feedback", "lease_until");
     assertColumnExists("free_talk_message_feedback", "attempt_token");
@@ -1593,10 +1593,10 @@ class DatabaseSchemaIntegrationTests {
         .hasMessageContaining(constraintName);
   }
 
-  /** V116 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워져 복구 대상이 된다. */
-  @DisplayName("V116 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워지고 음수 시도 횟수는 거부한다.")
+  /** V117 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워져 복구 대상이 된다. */
+  @DisplayName("V117 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워지고 음수 시도 횟수는 거부한다.")
   @Test
-  void v116FillsExistingCorrectionsAsNeverAttemptedAndRejectsNegativeAttempts() {
+  void v117FillsExistingCorrectionsAsNeverAttemptedAndRejectsNegativeAttempts() {
     SingleConnectionDataSource dataSource =
         new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
     try {

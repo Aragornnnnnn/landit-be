@@ -95,7 +95,7 @@ class FreeTalkMessageFeedbackServiceTest {
     FreeTalkMessageFeedback backfilled = FreeTalkMessageFeedback.preparing(7L, 3L, STALE_LEASE);
     ReflectionTestUtils.setField(backfilled, "processingStatus", ProcessingStatus.FAILED);
     ReflectionTestUtils.setField(backfilled, "reactedToPartner", Boolean.TRUE);
-    // 교정을 한 번도 요청한 적 없이 실패로 채워진 행이다(V112 백필 + V116 기본값).
+    // 교정을 한 번도 요청한 적 없이 실패로 채워진 행이다(V112 백필 + V117 기본값).
     ReflectionTestUtils.setField(backfilled, "attempts", 0);
     ReflectionTestUtils.setField(backfilled, "leaseUntil", null);
     when(repository.findBySessionHistoryMessageId(7L)).thenReturn(Optional.of(backfilled));
