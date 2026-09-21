@@ -111,6 +111,8 @@ public class AuthSecurityConfig {
                     .requestMatchers(
                         HttpMethod.GET, "/api/v1/me/subscription", "/api/v1/me/subscription/events")
                     .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/me/paywall/dismiss")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/internal/test/push")
                     .authenticated()
                     // RevenueCat 웹훅은 Bearer 토큰 대신 공유 비밀값 헤더로 컨트롤러에서 검증한다.
