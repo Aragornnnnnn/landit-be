@@ -500,6 +500,36 @@ class UserSubscriptionApiIntegrationTests {
     assertThat(storedPromoExpiry(userIdOf("promo-old"))).isNotNull();
   }
 
+  @Test
+  @DisplayName("무료 체험·해지 예약을 포함한 프리미엄은 할인을 소진하지 않고 기존 할인도 숨긴다.")
+  void suppressesPromoForPremiumWithoutConsumingIt() throws Exception {
+    String token = login("promo-premium");
+    long userId = userIdOf("promo-premium");
+    jdbcTemplate.update(
+        """
+        UPDATE user_profile SET subscription_status = 'CANCELED', subscription_period_type = 'TRIAL',
+          subscription_expires_at = ? WHERE id = ?
+        """,
+        LocalDateTime.now(clock).plusDays(1),
+        userId);
+    assertThat(dismissPromo(token).isNull()).isTrue();
+    assertThat(storedPromoExpiry(userId)).isNull();
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_expires_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).minusDays(1),
+        userId);
+    JsonNode promo = dismissPromo(token);
+    assertThat(promo.isObject()).isTrue();
+    final LocalDateTime expiry = storedPromoExpiry(userId);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_expires_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).plusDays(1),
+        userId);
+    assertThat(dismissPromo(token).isNull()).isTrue();
+    subscription(token).andExpect(jsonPath("$.data.promo").isEmpty());
+    assertThat(storedPromoExpiry(userId)).isEqualTo(expiry);
+  }
+
   private LocalDateTime storedPromoExpiry(long userId) {
     return jdbcTemplate.queryForObject(
         "SELECT discount_offer_expires_at FROM user_profile WHERE id = ?",
