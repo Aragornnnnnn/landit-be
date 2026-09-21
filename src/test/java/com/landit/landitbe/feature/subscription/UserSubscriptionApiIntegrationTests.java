@@ -585,6 +585,36 @@ class UserSubscriptionApiIntegrationTests {
         .andExpect(jsonPath("$.data.currency").isEmpty());
   }
 
+  @Test
+  @DisplayName("웹훅의 실제 결제액·통화와 Play 베이스 플랜 ID를 그대로 반환한다.")
+  void preservesPlayBasePlanAndWebhookPrice() throws Exception {
+    String token = login("promo-play-price");
+    long userId = userIdOf("promo-play-price");
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "INITIAL_PURCHASE",
+            userId,
+            EVENT_TIMESTAMP_MS,
+            "\"period_type\":\"TRIAL\",\"price_in_purchased_currency\":0,\"currency\":\"KRW\","));
+    subscription(token).andExpect(jsonPath("$.data.price").isEmpty());
+    String event =
+        webhookEvent(
+                UUID.randomUUID().toString(),
+                "RENEWAL",
+                userId,
+                EVENT_TIMESTAMP_MS + 1000,
+                "\"period_type\":\"NORMAL\",\"price_in_purchased_currency\":58500,"
+                    + "\"currency\":\"KRW\",")
+            .replace("APP_STORE", "PLAY_STORE")
+            .replace("com.saynow.app.premium.yearly", "com.saynow.app.premium.yearly:promo");
+    postWebhook(event);
+    subscription(token)
+        .andExpect(jsonPath("$.data.productId").value("com.saynow.app.premium.yearly:promo"))
+        .andExpect(jsonPath("$.data.price").value(58500))
+        .andExpect(jsonPath("$.data.currency").value("KRW"));
+  }
+
   private void insertPayment(
       long userId, String type, String period, Integer price, String currency, int second) {
     jdbcTemplate.update(
