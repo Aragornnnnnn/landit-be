@@ -107,14 +107,16 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
   /**
    * 이미 있는 행을 다시 판정을 기다리는 상태로 되돌린다.
    *
-   * <p>교정 도입 전에 저장되어 실패로 채워진 발화가 도입 뒤에 확정되는 경우(예: 종료 확인을 기다리던 발화)에 쓴다. 실패 상태의 행만 되돌린다. 준비 상태의 교정은
-   * 문장 값을 가질 수 없다(chk_free_talk_message_feedback_sentence).
+   * <p>교정 도입 전에 저장되어 실패로 채워진 발화가 도입 뒤에 확정되는 경우(예: 종료 확인을 기다리던 발화)에 쓴다. 한 번도 시도하지 않은 실패 행만 되돌린다. 준비
+   * 상태의 교정은 문장 값을 가질 수 없다(chk_free_talk_message_feedback_sentence).
    *
    * @param leaseUntil 다시 시작한 첫 시도의 응답을 기다려 줄 시각
    */
   public void restartPreparing(LocalDateTime leaseUntil) {
     // 판정을 기다리는 중이거나 이미 끝난 교정은 다시 준비하지 않는다. 끝난 교정을 지우지 않기 위한 방어다.
-    if (processingStatus != ProcessingStatus.FAILED) {
+    // 되돌리는 것은 교정을 한 번도 요청한 적 없이 실패로 채워진 행(attempts = 0)뿐이다. 실제로 시도하다 실패로 확정된 교정은
+    // 한 번 끝나면 바뀌지 않아야 하므로 되살리지 않는다. 복구 워커는 준비 상태의 행만 쓰므로 이 쓰기와 겹치지 않는다.
+    if (processingStatus != ProcessingStatus.FAILED || attempts != 0) {
       return;
     }
     processingStatus = ProcessingStatus.PREPARING;

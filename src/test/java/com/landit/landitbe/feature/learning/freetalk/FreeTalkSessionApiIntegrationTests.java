@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.session.FreeTalkProperties;
+import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
@@ -111,6 +112,8 @@ class FreeTalkSessionApiIntegrationTests {
   @Autowired private FreeTalkTurnResultService turnResultService;
 
   @Autowired private FreeTalkCorrectionRecoveryService correctionRecoveryService;
+
+  @Autowired private java.time.Clock clock;
 
   private static final FreeTalkTurnCorrection HIKING_CORRECTION =
       FreeTalkTurnCorrection.completed(
@@ -743,7 +746,59 @@ class FreeTalkSessionApiIntegrationTests {
     List<AiFreeTalkInnerThoughtRequest> requests =
         fakeAiFreeTalkClient.innerThoughtRequestsOf(messageId);
     assertThat(requests).hasSize(2);
+    // 기억 사용이 꺼진 테스트 설정에서는 글자 그대로 같다. 기억 사용을 켜면 사용자가 먼저 말을 건 세션의 첫 턴은
+    // 그 턴에서 검색한 기억이 복구 때에만 실린다(FreeTalkCorrectionRequestService 설명 참고).
     assertThat(requests.get(1)).isEqualTo(requests.get(0));
+  }
+
+  @DisplayName("주제로 AI가 먼저 말을 건 세션의 교정을 다시 요청할 때도 첫인사와 주제의 이름·설명이 첫 시도와 같게 실린다.")
+  @Test
+  void rebuildsRequestOfAiFirstTopicSessionWithOpeningAndFullTopic() throws Exception {
+    seedTopic(1151, "주말 계획", "다가오는 주말의 계획을 묻는다.", 1, "ACTIVE");
+    String accessToken =
+        login("free-talk-correction-topic-retry@example.com")
+            .get("data")
+            .get("accessToken")
+            .asText();
+    long sessionId =
+        responseData(
+                mockMvc
+                    .perform(
+                        postJsonWithToken(
+                            "/api/v1/free-talk/sessions",
+                            accessToken,
+                            "{\"startMode\":\"AI_FIRST\",\"topicId\":1151,"
+                                + "\"characterId\":\"chloe\"}"))
+                    .andExpect(status().isCreated())
+                    .andReturn())
+            .path("sessionId")
+            .asLong();
+    fakeAiFreeTalkClient.correctNextTurn(FreeTalkTurnCorrection.unavailable());
+    long messageId =
+        submitWithoutCorrectionFields(accessToken, sessionId, "I go hiking yesterday.");
+    awaitFirstCorrectionAttemptReleased(messageId);
+    fakeAiFreeTalkClient.correctNextTurn(HIKING_CORRECTION);
+
+    recoverUntilCorrected(messageId);
+
+    List<AiFreeTalkInnerThoughtRequest> requests =
+        fakeAiFreeTalkClient.innerThoughtRequestsOf(messageId);
+    assertThat(requests).hasSize(2);
+    AiFreeTalkInnerThoughtRequest rebuilt = requests.get(1);
+    assertThat(rebuilt).isEqualTo(requests.get(0));
+    // 같다는 것만으로는 둘 다 비어 있어도 통과하므로, 실제로 실린 값을 따로 확인한다.
+    assertThat(rebuilt.topic().topicId()).isEqualTo(1151L);
+    assertThat(rebuilt.topic().title()).isEqualTo("주말 계획");
+    assertThat(rebuilt.topic().promptDescription()).isEqualTo("다가오는 주말의 계획을 묻는다.");
+    assertThat(rebuilt.conversationHistory())
+        .extracting(AiConversationHistoryMessage::role)
+        .containsExactly("AI", "USER");
+    assertThat(rebuilt.conversationHistory().getFirst().content())
+        .isEqualTo("What are your weekend plans?");
+    assertThat(rebuilt.conversationHistory().getFirst().translatedContent())
+        .isEqualTo("이번 주말 계획은 뭐야?");
+    assertThat(rebuilt.submittedTurnNumber())
+        .isEqualTo(rebuilt.conversationHistory().getLast().turnNumber());
   }
 
   @DisplayName("종료를 선택해 확정된 발화의 교정도 판정을 받지 못하면 세션이 끝난 뒤 복구가 같은 대화로 다시 요청해 채운다.")
@@ -830,9 +885,11 @@ class FreeTalkSessionApiIntegrationTests {
           jdbcTemplate.queryForObject(
               "SELECT count(*) FROM free_talk_message_feedback"
                   + " WHERE session_history_message_id = ? AND processing_status = 'PREPARING'"
-                  + " AND attempts = 1 AND lease_until <= DATEADD('SECOND', 5, LOCALTIMESTAMP)",
+                  + " AND attempts = 1 AND lease_until <= ?",
               Integer.class,
-              messageId);
+              messageId,
+              // 임대 시각은 애플리케이션 Clock으로 적히므로 DB의 현재 시각이 아니라 같은 Clock으로 견준다.
+              java.sql.Timestamp.valueOf(java.time.LocalDateTime.now(clock).plusSeconds(5)));
       if (released != null && released == 1) {
         return;
       }

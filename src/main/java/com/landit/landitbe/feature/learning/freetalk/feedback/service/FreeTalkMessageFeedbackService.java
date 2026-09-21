@@ -114,7 +114,11 @@ public class FreeTalkMessageFeedbackService {
       retryOrFail(messageId, FIRST_ATTEMPT, null);
       return;
     }
-    completeIfPreparing(messageId, correction);
+    int updated = completeIfPreparing(messageId, correction);
+    // 복구로 살린 비율과 끝내 실패한 비율을 볼 수 있도록 첫 시도에서 끝난 교정도 같은 지표에 센다.
+    String outcome =
+        correction.status() == ProcessingStatus.COMPLETED ? "first_completed" : "first_invalid";
+    report(updated == 1 ? outcome : "ignored", messageId, FIRST_ATTEMPT);
   }
 
   /**

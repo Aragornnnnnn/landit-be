@@ -285,7 +285,7 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
   void claimsNoMoreThanBatchSizePerRun() {
     seedFeedback(1, expired(), null);
     for (int index = 1; index <= 11; index++) {
-      seedExtraMessageWithExpiredFeedback(MESSAGE_ID + index, index + 1);
+      seedExtraMessageWithFeedback(MESSAGE_ID + index, index + 1, 1, expired());
     }
     when(aiClient.generateInnerThought(any())).thenReturn(result("속마음", CORRECTION));
 
@@ -299,6 +299,22 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
     recoveryService.recover();
 
     assertThat(countByStatus("COMPLETED")).isEqualTo(12);
+  }
+
+  @DisplayName("방금 멈춘 교정은 시도 정보가 생기기 전부터 쌓여 있던 교정들 뒤로 밀리지 않고 첫 번째 복구에서 처리된다.")
+  @Test
+  void recoversFreshlyStalledCorrectionBeforeLegacyBacklog() {
+    // 임대가 없는 옛 교정 11건이 먼저 만들어져 있고(낮은 ID), 방금 멈춘 교정이 가장 늦게 만들어졌다.
+    for (int index = 1; index <= 11; index++) {
+      seedExtraMessageWithFeedback(MESSAGE_ID + index, index + 1, 0, null);
+    }
+    seedFeedback(1, expired(), null);
+    when(aiClient.generateInnerThought(any())).thenReturn(result("속마음", CORRECTION));
+
+    recoveryService.recover();
+
+    assertThat(feedbackRow()).containsEntry("PROCESSING_STATUS", "COMPLETED");
+    assertThat(countByStatus("PREPARING")).isEqualTo(2);
   }
 
   @DisplayName("재시도 설정은 기본값(최대 3회, 0초·1분·5분, 10건)으로 읽히고 테스트에서는 주기 복구가 꺼져 있다.")
@@ -352,7 +368,8 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
         status);
   }
 
-  private void seedExtraMessageWithExpiredFeedback(long messageId, int sequence) {
+  private void seedExtraMessageWithFeedback(
+      long messageId, int sequence, int attempts, LocalDateTime leaseUntil) {
     jdbcTemplate.update(
         """
         insert into session_history_message (
@@ -368,10 +385,11 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
     jdbcTemplate.update(
         "insert into free_talk_message_feedback (session_history_message_id, session_history_id,"
             + " processing_status, attempts, lease_until, created_at, updated_at)"
-            + " values (?, ?, 'PREPARING', 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            + " values (?, ?, 'PREPARING', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
         messageId,
         SESSION_HISTORY_ID,
-        Timestamp.valueOf(expired()));
+        attempts,
+        leaseUntil == null ? null : Timestamp.valueOf(leaseUntil));
   }
 
   private LocalDateTime expired() {

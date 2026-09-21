@@ -66,9 +66,9 @@ public class FreeTalkCorrectionRecoveryService {
             .ifPresent(this::dispatch);
       } catch (RuntimeException exception) {
         log.warn(
-            "workflow=free_talk_correction_retry outcome=claim_error messageId={}",
+            "workflow=free_talk_correction_retry outcome=claim_error messageId={} error={}",
             candidate.getSessionHistoryMessageId(),
-            exception);
+            exception.getClass().getSimpleName());
       }
     }
   }
@@ -79,9 +79,10 @@ public class FreeTalkCorrectionRecoveryService {
       executor.execute(() -> run(attempt));
     } catch (RuntimeException exception) {
       log.warn(
-          "workflow=free_talk_correction_retry outcome=rejected messageId={} attempt={}",
+          "workflow=free_talk_correction_retry outcome=rejected messageId={} attempt={} error={}",
           attempt.messageId(),
-          attempt.attempt());
+          attempt.attempt(),
+          exception.getClass().getSimpleName());
       feedbackService.retryOrFail(attempt.messageId(), attempt.attempt(), attempt.token());
     }
   }
@@ -114,9 +115,11 @@ public class FreeTalkCorrectionRecoveryService {
     } catch (RuntimeException exception) {
       // 여기서도 실패하면 임대가 끝난 뒤 다음 주기가 다시 집는다.
       log.warn(
-          "workflow=free_talk_correction_retry outcome=release_error messageId={} attempt={}",
+          "workflow=free_talk_correction_retry outcome=release_error messageId={} attempt={}"
+              + " error={}",
           attempt.messageId(),
-          attempt.attempt());
+          attempt.attempt(),
+          exception.getClass().getSimpleName());
     }
   }
 }

@@ -61,6 +61,7 @@ landit:
       retry-delays: ${LANDIT_FREE_TALK_CORRECTION_RETRY_DELAYS:0s,1m,5m}
       batch-size: ${LANDIT_FREE_TALK_CORRECTION_RECOVERY_BATCH_SIZE:10}
       scheduling-enabled: ${LANDIT_FREE_TALK_CORRECTION_RECOVERY_ENABLED:true}
+      recovery-interval-ms: ${LANDIT_FREE_TALK_CORRECTION_RECOVERY_INTERVAL_MS:30000}
   cors:
     allowed-origins: ${LANDIT_CORS_ALLOWED_ORIGINS:}
   auth:
