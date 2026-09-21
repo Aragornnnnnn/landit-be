@@ -6,8 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStore;
+import com.landit.landitbe.feature.profile.subscription.dto.DiscountOffer;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -21,6 +23,9 @@ import java.time.LocalDateTime;
  * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
  * @param productId 구독 상품 ID. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
+ * @param promo 진행 중인 할인 기회. 미부여·만료·프리미엄이면 null
+ * @param price 가장 최근 실제 결제 금액. 이력이 없으면 null
+ * @param currency 최근 실제 결제의 ISO 4217 통화. 값이 없으면 null
  * @param store 결제한 스토어. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  */
 @Schema(description = "사용자 구독 상태")
@@ -69,7 +74,12 @@ public record UserSubscriptionResponse(
     @Schema(description = "새 시나리오 대화를 시작할 수 있는지. 시나리오 대화는 구독과 관계없이 허용하므로 배포 전환 중이 아니면 항상 true")
         boolean canStartScenario,
     @Schema(description = "유료 도입 후 무료 상태로 처음 시작한 첫 시나리오의 예약 세션. 24시간 내 같은 시나리오 재시작 시 이어간다")
-        Long freeScenarioSessionId) {
+        Long freeScenarioSessionId,
+    @Schema(description = "진행 중인 할인. 조회는 할인 기회를 생성하지 않음", nullable = true) DiscountOffer promo,
+    @Schema(description = "가장 최근 실제 결제 금액. 결제 이력이 없으면 null", example = "58500", nullable = true)
+        BigDecimal price,
+    @Schema(description = "최근 실제 결제의 ISO 4217 통화. 없으면 null", example = "KRW", nullable = true)
+        String currency) {
 
   /**
    * 프로필의 구독 스냅샷과 대화 완료 여부를 응답으로 합친다.
@@ -93,6 +103,9 @@ public record UserSubscriptionResponse(
         0,
         false,
         true,
+        null,
+        null,
+        null,
         null);
   }
 
@@ -117,6 +130,38 @@ public record UserSubscriptionResponse(
         paymentPolicyVersion,
         newStartsPaused,
         canStartScenario,
-        freeScenarioSessionId);
+        freeScenarioSessionId,
+        effectivePremium ? null : promo,
+        price,
+        currency);
+  }
+
+  /**
+   * 할인 기회와 실제 결제 금액을 구독 응답에 추가한다.
+   *
+   * @param promo 유효한 할인 기회 또는 null
+   * @param price 최근 실제 결제 금액 또는 null
+   * @param currency 최근 실제 결제 통화 또는 null
+   * @return 결제 표시 정보가 추가된 응답
+   */
+  public UserSubscriptionResponse withPaymentDetails(
+      DiscountOffer promo, BigDecimal price, String currency) {
+    return new UserSubscriptionResponse(
+        subscriptionStatus,
+        premium,
+        isTrial,
+        periodType,
+        expiresAt,
+        conversationCompletedSinceLaunch,
+        productId,
+        store,
+        paymentEnabled,
+        paymentPolicyVersion,
+        newStartsPaused,
+        canStartScenario,
+        freeScenarioSessionId,
+        premium ? null : promo,
+        price,
+        currency);
   }
 }
