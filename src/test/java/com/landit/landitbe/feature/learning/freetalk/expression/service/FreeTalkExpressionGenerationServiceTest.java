@@ -7,9 +7,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.feature.content.expression.recommendation.dto.ExpressionRecommendationCandidate;
@@ -30,10 +32,14 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.domain.FreeTalkExpressionReuse;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.domain.FreeTalkExpressionReuseSource;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.repository.FreeTalkExpressionReuseRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseAssemblyService;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkLearnedExpressionSelectionService;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
@@ -69,6 +75,10 @@ class FreeTalkExpressionGenerationServiceTest {
       mock(ExpressionCandidateSelectionService.class);
   private final FreeTalkLearnedExpressionSelectionService learnedExpressionSelectionService =
       mock(FreeTalkLearnedExpressionSelectionService.class);
+  private final FreeTalkExpressionReuseAssemblyService reuseAssemblyService =
+      mock(FreeTalkExpressionReuseAssemblyService.class);
+  private final FreeTalkExpressionReuseRepository reuseRepository =
+      mock(FreeTalkExpressionReuseRepository.class);
   private final ProfileLearningService profileLearningService = mock(ProfileLearningService.class);
   private final AiFreeTalkClient aiFreeTalkClient = mock(AiFreeTalkClient.class);
   private final FreeTalkSession freeTalkSession = mock(FreeTalkSession.class);
@@ -83,6 +93,8 @@ class FreeTalkExpressionGenerationServiceTest {
           expressionRecommendationService,
           candidateSelectionService,
           learnedExpressionSelectionService,
+          reuseAssemblyService,
+          reuseRepository,
           profileLearningService,
           aiFreeTalkClient,
           mock(PlatformTransactionManager.class));
@@ -165,6 +177,90 @@ class FreeTalkExpressionGenerationServiceTest {
     assertThat(recommendationRequest().learnedExpressions()).isEmpty();
     verify(freeTalkSession).completeExpressionGeneration();
     verify(freeTalkSession, never()).failExpressionGeneration();
+  }
+
+  @DisplayName("AI가 다시 썼다고 판정한 표현은 다시 확인한 기록으로 바꿔 추천과 함께 저장한다.")
+  @Test
+  void savesAssembledReusesWithRecommendations() {
+    List<FreeTalkLearnedExpression> learned = List.of(learnedExpression());
+    List<AiFreeTalkUsedExpression> used =
+        List.of(new AiFreeTalkUsedExpression(812L, 5504L, "grabbed a coffee"));
+    List<FreeTalkExpressionReuse> reuses = List.of(mock(FreeTalkExpressionReuse.class));
+    when(learnedExpressionSelectionService.select(anyLong(), any(), any(), any()))
+        .thenReturn(learned);
+    when(aiFreeTalkClient.recommendExpressions(any()))
+        .thenReturn(
+            new AiFreeTalkExpressionRecommendationsResult(
+                List.of(new AiFreeTalkExpressionRecommendation(1, 7L)), used));
+    when(reuseAssemblyService.assemble(
+            eq(USER_PROFILE_ID),
+            eq(301L),
+            eq(Locale.EN),
+            eq(Locale.KR),
+            any(),
+            eq(learned),
+            eq(used)))
+        .thenReturn(reuses);
+
+    service.generate(LEARNING_SESSION_ID);
+
+    verify(reuseRepository).saveAll(reuses);
+    verify(freeTalkSession).completeExpressionGeneration();
+  }
+
+  @DisplayName("세션에 재사용 기록이 이미 있으면 다시 넣지 않는다.")
+  @Test
+  void skipsReusesWhenSessionAlreadyHasThem() {
+    stubUsedExpressionsAssembledInto(List.of(mock(FreeTalkExpressionReuse.class)));
+    when(reuseRepository.existsByFreeTalkSessionId(301L)).thenReturn(true);
+
+    service.generate(LEARNING_SESSION_ID);
+
+    verify(reuseRepository, never()).saveAll(any());
+    verify(freeTalkSession).completeExpressionGeneration();
+  }
+
+  @DisplayName("재사용 기록을 만들다 실패해도 추천은 저장하고 완료한다.")
+  @Test
+  void savesRecommendationsWhenReuseAssemblyFails() {
+    stubUsedExpressionsAssembledInto(null);
+    when(reuseAssemblyService.assemble(anyLong(), anyLong(), any(), any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("source titles unavailable"));
+
+    service.generate(LEARNING_SESSION_ID);
+
+    verify(reuseRepository, never()).saveAll(any());
+    verify(sessionExpressionRepository).save(any());
+    verify(freeTalkSession).completeExpressionGeneration();
+    verify(freeTalkSession, never()).failExpressionGeneration();
+  }
+
+  @DisplayName("AI가 다시 쓴 표현이 없다고 하면 재사용 기록을 만들지도 넣지도 않는다.")
+  @Test
+  void skipsReuseAssemblyWhenNothingWasUsed() {
+    service.generate(LEARNING_SESSION_ID);
+
+    verifyNoInteractions(reuseAssemblyService, reuseRepository);
+  }
+
+  private void stubUsedExpressionsAssembledInto(List<FreeTalkExpressionReuse> reuses) {
+    when(aiFreeTalkClient.recommendExpressions(any()))
+        .thenReturn(
+            new AiFreeTalkExpressionRecommendationsResult(
+                List.of(new AiFreeTalkExpressionRecommendation(1, 7L)),
+                List.of(new AiFreeTalkUsedExpression(812L, 5504L, "grabbed a coffee"))));
+    when(reuseAssemblyService.assemble(anyLong(), anyLong(), any(), any(), any(), any(), any()))
+        .thenReturn(reuses);
+  }
+
+  private static FreeTalkLearnedExpression learnedExpression() {
+    return new FreeTalkLearnedExpression(
+        812L,
+        "grab a coffee",
+        "커피 한잔하다",
+        FreeTalkExpressionReuseSource.SCENARIO,
+        41L,
+        LocalDate.of(2026, 9, 10));
   }
 
   private AiFreeTalkExpressionRecommendationsRequest recommendationRequest() {

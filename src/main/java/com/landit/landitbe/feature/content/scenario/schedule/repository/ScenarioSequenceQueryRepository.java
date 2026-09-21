@@ -4,6 +4,8 @@ package com.landit.landitbe.feature.content.scenario.schedule.repository;
 
 import com.landit.landitbe.feature.content.scenario.domain.Scenario;
 import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioThumbnail;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioTitle;
+import com.landit.landitbe.shared.domain.Locale;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -60,4 +62,28 @@ public interface ScenarioSequenceQueryRepository extends JpaRepository<Scenario,
       """)
   List<ScenarioThumbnail> findThumbnailsByScenarioIds(
       @Param("scenarioIds") Collection<Long> scenarioIds);
+
+  /**
+   * 시나리오 ID 목록의 제목을 언어 조합에 맞춰 조회한다. 지난 기록에 출처로 남기는 것이 목적이므로 활성 상태는 필터링하지 않는다.
+   *
+   * @param scenarioIds 시나리오 ID 목록
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @return 시나리오 ID와 제목 projection 목록. 그 언어 조합이 없는 시나리오는 빠진다
+   */
+  @Query(
+      """
+            SELECT new com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioTitle(
+                v.scenarioId,
+                v.title
+            )
+            FROM ScenarioLanguageVariant v
+            WHERE v.scenarioId IN :scenarioIds
+              AND v.targetLocale = :targetLocale
+              AND v.baseLocale = :baseLocale
+      """)
+  List<ScenarioTitle> findTitlesByScenarioIds(
+      @Param("scenarioIds") Collection<Long> scenarioIds,
+      @Param("targetLocale") Locale targetLocale,
+      @Param("baseLocale") Locale baseLocale);
 }

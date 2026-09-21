@@ -22,10 +22,14 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.domain.FreeTalkExpressionReuse;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.repository.FreeTalkExpressionReuseRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseAssemblyService;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkLearnedExpressionSelectionService;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.profile.learning.service.ProfileLearningService;
@@ -56,14 +60,17 @@ public class FreeTalkExpressionGenerationService {
   private static final String CANDIDATE_LOAD_STAGE = "candidateLoad";
   private static final String LEARNED_EXPRESSION_STAGE = "learnedExpressionLoad";
   private static final String RECOMMENDATION_STAGE = "recommendation";
+  private static final String REUSE_ASSEMBLY_STAGE = "reuseAssembly";
   private static final String PERSIST_STAGE = "persist";
 
   private static final String GENERATION_COMPLETED_LOG =
       "프리톡 표현 생성 완료. learningSessionId={}, historyMessageCount={}, excerptCount={},"
           + " candidateCount={}, recommendationCount={}, learnedExpressionCount={},"
-          + " usedExpressionCount={}, totalMs={}, stages=[{}]";
+          + " usedExpressionCount={}, reuseCount={}, totalMs={}, stages=[{}]";
   private static final String LEARNED_EXPRESSION_FAILED_LOG =
       "프리톡 배운 표현 후보 조회 실패. 표현 재사용 판정 없이 추천만 진행한다. learningSessionId={}";
+  private static final String REUSE_ASSEMBLY_FAILED_LOG =
+      "프리톡 표현 재사용 기록 조립 실패. 재사용 기록 없이 추천만 저장한다. learningSessionId={}";
   private static final String GENERATION_FAILED_LOG =
       "프리톡 표현 생성 실패. learningSessionId={}, totalMs={}, stages=[{}]";
 
@@ -75,6 +82,8 @@ public class FreeTalkExpressionGenerationService {
   private final ExpressionRecommendationService expressionRecommendationService;
   private final ExpressionCandidateSelectionService candidateSelectionService;
   private final FreeTalkLearnedExpressionSelectionService learnedExpressionSelectionService;
+  private final FreeTalkExpressionReuseAssemblyService reuseAssemblyService;
+  private final FreeTalkExpressionReuseRepository reuseRepository;
   private final ProfileLearningService profileLearningService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final PlatformTransactionManager transactionManager;
@@ -105,6 +114,7 @@ public class FreeTalkExpressionGenerationService {
           outcome.recommendationCount(),
           outcome.learnedExpressionCount(),
           outcome.usedExpressionCount(),
+          outcome.reuseCount(),
           elapsedMillis(startNanos),
           timings);
     } catch (RuntimeException exception) {
@@ -178,20 +188,49 @@ public class FreeTalkExpressionGenerationService {
                                         learned.expressionId(), learned.text(), learned.meaning()))
                             .toList())));
     List<AiFreeTalkExpressionRecommendation> recommendations = result.recommendations();
+    // 출처 제목 같은 읽기는 저장 트랜잭션 밖에서 끝낸다. 저장 트랜잭션은 추천과 재사용 기록을 넣기만 한다.
+    List<FreeTalkExpressionReuse> reuses =
+        timings.measure(
+            REUSE_ASSEMBLY_STAGE,
+            () -> reuses(context, learnedExpressions, result.usedExpressions()));
 
     // 모든 외부 호출이 끝난 뒤 추천 결과를 한 트랜잭션으로 저장한다.
     timings.measureVoid(
         PERSIST_STAGE,
         () ->
             transactionTemplate.executeWithoutResult(
-                status -> persistReady(context, recommendations)));
+                status -> persistReady(context, recommendations, reuses)));
     return new GenerationOutcome(
         context.history().size(),
         conversationEmbeddings.excerpts().size(),
         existingExpressions.size(),
         recommendations.size(),
         learnedExpressions.size(),
-        result.usedExpressions().size());
+        result.usedExpressions().size(),
+        reuses.size());
+  }
+
+  // 배운 표현 후보와 같은 이유로, 재사용 기록을 만들지 못해도 추천은 저장한다.
+  private List<FreeTalkExpressionReuse> reuses(
+      GenerationContext context,
+      List<FreeTalkLearnedExpression> learnedExpressions,
+      List<AiFreeTalkUsedExpression> usedExpressions) {
+    if (usedExpressions.isEmpty()) {
+      return List.of();
+    }
+    try {
+      return reuseAssemblyService.assemble(
+          context.userProfileId(),
+          context.freeTalkSessionId(),
+          context.targetLocale(),
+          context.baseLocale(),
+          context.history(),
+          learnedExpressions,
+          usedExpressions);
+    } catch (RuntimeException exception) {
+      log.warn(REUSE_ASSEMBLY_FAILED_LOG, context.learningSessionId(), exception);
+      return List.of();
+    }
   }
 
   // 표현 재사용은 추천에 얹는 부가 기능이다. 배운 표현을 읽지 못해도 추천은 계속하고, 그 세션은 다시 쓴 표현이 없는 것으로 남는다.
@@ -274,9 +313,11 @@ public class FreeTalkExpressionGenerationService {
             .toList());
   }
 
-  // AI 추천 결과를 세션 표현으로 저장하고 생성 상태를 완료한다.
+  // AI 추천 결과를 세션 표현으로, 다시 쓴 표현을 재사용 기록으로 저장하고 생성 상태를 완료한다.
   private void persistReady(
-      GenerationContext context, List<AiFreeTalkExpressionRecommendation> recommendations) {
+      GenerationContext context,
+      List<AiFreeTalkExpressionRecommendation> recommendations,
+      List<FreeTalkExpressionReuse> reuses) {
     FreeTalkSession freeTalkSession =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(context.learningSessionId())
@@ -288,6 +329,11 @@ public class FreeTalkExpressionGenerationService {
     sessionExpressionRepository.deleteByFreeTalkSessionId(context.freeTalkSessionId());
     for (AiFreeTalkExpressionRecommendation recommendation : recommendations) {
       sessionExpressionRepository.save(existingSessionExpression(context, recommendation));
+    }
+    // 재사용 기록은 고치지 않는 기록이다. 이 세션에 이미 있으면 다시 넣지 않는다.
+    if (!reuses.isEmpty()
+        && !reuseRepository.existsByFreeTalkSessionId(context.freeTalkSessionId())) {
+      reuseRepository.saveAll(reuses);
     }
     freeTalkSession.completeExpressionGeneration();
   }
@@ -339,7 +385,8 @@ public class FreeTalkExpressionGenerationService {
       int candidateCount,
       int recommendationCount,
       int learnedExpressionCount,
-      int usedExpressionCount) {}
+      int usedExpressionCount,
+      int reuseCount) {}
 
   /** 표현 생성 단계별 소요 시간을 실행 순서대로 모아 로그 한 줄로 표현한다. */
   private static final class StageTimings {

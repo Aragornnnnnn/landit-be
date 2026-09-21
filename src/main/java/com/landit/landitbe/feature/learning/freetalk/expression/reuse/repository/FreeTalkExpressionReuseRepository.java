@@ -17,4 +17,12 @@ public interface FreeTalkExpressionReuseRepository
    * @return 그 세션에서 배운 표현을 다시 쓴 기록
    */
   List<FreeTalkExpressionReuse> findByFreeTalkSessionIdOrderByIdAsc(Long freeTalkSessionId);
+
+  /**
+   * 세션에 재사용 기록이 이미 있는지 확인한다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @return 하나라도 있으면 true
+   */
+  boolean existsByFreeTalkSessionId(Long freeTalkSessionId);
 }
