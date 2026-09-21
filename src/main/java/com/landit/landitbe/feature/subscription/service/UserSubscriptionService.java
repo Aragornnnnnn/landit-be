@@ -5,7 +5,9 @@ package com.landit.landitbe.feature.subscription.service;
 import com.landit.landitbe.feature.learning.scenario.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileDiscountOfferService;
 import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
+import com.landit.landitbe.feature.subscription.dto.PaywallDismissResponse;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
 import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
@@ -25,6 +27,7 @@ public class UserSubscriptionService {
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final SubscriptionLaunchPolicyService policies;
   private final LearningAccessGrantService grants;
+  private final ProfileDiscountOfferService discountOffers;
 
   /**
    * 구독 상태와 동일한 실행 정책을 조회할 협력 Service를 주입받는다.
@@ -34,6 +37,7 @@ public class UserSubscriptionService {
    * @param scenarioProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
    * @param subscriptionEventRepository 결제 이력 Repository
    * @param policies 서버 실행 정책
+   * @param discountOffers 계정별 할인 기회 Service
    * @param grants 저장된 학습 권한
    */
   public UserSubscriptionService(
@@ -42,13 +46,15 @@ public class UserSubscriptionService {
       ScenarioProgressService scenarioProgressService,
       SubscriptionEventRepository subscriptionEventRepository,
       SubscriptionLaunchPolicyService policies,
-      LearningAccessGrantService grants) {
+      LearningAccessGrantService grants,
+      ProfileDiscountOfferService discountOffers) {
     this.userProfileService = userProfileService;
     this.profileSubscriptionService = profileSubscriptionService;
     this.scenarioProgressService = scenarioProgressService;
     this.subscriptionEventRepository = subscriptionEventRepository;
     this.policies = policies;
     this.grants = grants;
+    this.discountOffers = discountOffers;
   }
 
   /**
@@ -69,6 +75,7 @@ public class UserSubscriptionService {
     boolean premium = grants.premium(userId);
     var reservation = grants.freeReservation(userId).orElse(null);
     boolean completed = hasCompletedConversationSinceLaunch(userId, policy);
+    var payment = subscriptionEventRepository.findLatestPayment(userId).orElse(null);
     return UserSubscriptionResponse.of(snapshot, completed)
         .withAccess(
             premium,
@@ -76,7 +83,22 @@ public class UserSubscriptionService {
             policy.version(),
             policy.newStartsPaused(),
             !policy.newStartsPaused(),
-            reservation == null ? null : reservation.sessionId());
+            reservation == null ? null : reservation.sessionId())
+        .withPaymentDetails(
+            discountOffers.findActive(userId),
+            payment == null ? null : payment.getPrice(),
+            payment == null ? null : payment.getCurrency());
+  }
+
+  /**
+   * 페이월 이탈 시 계정별 할인 기회를 부여하거나 기존 기회를 반환한다.
+   *
+   * @param userId 인증된 사용자 ID
+   * @return 할인 기회가 포함된 이탈 응답
+   * @throws com.landit.landitbe.feature.profile.exception.UserProfileException 활성 프로필이 없을 때
+   */
+  public PaywallDismissResponse dismissPaywall(Long userId) {
+    return new PaywallDismissResponse(discountOffers.dismiss(userId));
   }
 
   /**
