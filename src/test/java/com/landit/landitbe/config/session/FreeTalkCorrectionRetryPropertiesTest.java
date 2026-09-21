@@ -21,7 +21,7 @@ class FreeTalkCorrectionRetryPropertiesTest {
   @Test
   void picksDelayByFailedAttempt() {
     FreeTalkCorrectionRetryProperties properties =
-        new FreeTalkCorrectionRetryProperties(5, DELAYS, 10);
+        new FreeTalkCorrectionRetryProperties(5, DELAYS, 10, true);
 
     assertThat(properties.delayAfter(1)).isEqualTo(Duration.ZERO);
     assertThat(properties.delayAfter(2)).isEqualTo(Duration.ofMinutes(1));
@@ -34,19 +34,22 @@ class FreeTalkCorrectionRetryPropertiesTest {
   @DisplayName("시도 횟수·처리량이 양수가 아니거나 간격이 비었거나 음수면 기동 시점에 거부한다.")
   @Test
   void rejectsInvalidSettings() {
-    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(0, DELAYS, 10))
+    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(0, DELAYS, 10, true))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(3, DELAYS, 0))
+    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(3, DELAYS, 0, true))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(3, List.of(), 10))
+    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(3, List.of(), 10, true))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(3, null, 10))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(
-            () -> new FreeTalkCorrectionRetryProperties(3, List.of(Duration.ofSeconds(-1)), 10))
+    assertThatThrownBy(() -> new FreeTalkCorrectionRetryProperties(3, null, 10, true))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(
-            () -> new FreeTalkCorrectionRetryProperties(3, Arrays.asList(Duration.ZERO, null), 10))
+            () ->
+                new FreeTalkCorrectionRetryProperties(3, List.of(Duration.ofSeconds(-1)), 10, true))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new FreeTalkCorrectionRetryProperties(
+                    3, Arrays.asList(Duration.ZERO, null), 10, true))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

@@ -13,10 +13,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param retryDelays 실패한 뒤 다음 시도까지 기다리는 시간. n번째 시도가 실패하면 n번째 값을 쓰고, 모자라면 마지막 값을 쓴다. 예: 0초, 1분, 5분.
  *     마지막 시도가 실패하면 기다리지 않고 실패로 확정하므로, 최대 3회에서는 앞의 두 값만 쓰이고 5분은 횟수를 늘릴 때를 위한 값이다
  * @param batchSize 복구 한 번에 넘겨받는 교정 수의 상한. 예: 10
+ * @param schedulingEnabled 주기 복구를 돌릴지 여부. 테스트에서는 꺼서 복구가 다른 테스트의 교정을 넘겨받지 않게 한다. 예: true
  */
 @ConfigurationProperties(prefix = "landit.free-talk.correction-retry")
 public record FreeTalkCorrectionRetryProperties(
-    int maxAttempts, List<Duration> retryDelays, int batchSize) {
+    int maxAttempts, List<Duration> retryDelays, int batchSize, boolean schedulingEnabled) {
 
   /**
    * 재시도 설정을 검증한다.

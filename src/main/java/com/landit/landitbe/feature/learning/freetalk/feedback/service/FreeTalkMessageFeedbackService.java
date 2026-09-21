@@ -7,16 +7,21 @@ import com.landit.landitbe.config.session.FreeTalkCorrectionRetryProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMessageFeedback;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkCorrectionAttempt;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,7 +71,11 @@ public class FreeTalkMessageFeedbackService {
 
   // 첫 시도의 응답을 기다려 주는 시각. 이 시각이 지나도 준비 상태면 콜백이 사라진 것으로 보고 복구 워커가 넘겨받는다.
   private LocalDateTime firstAttemptLeaseUntil() {
-    return LocalDateTime.now(clock).plus(aiClientProperties.requestTimeout()).plus(LEASE_MARGIN);
+    return leaseUntil(LocalDateTime.now(clock));
+  }
+
+  private LocalDateTime leaseUntil(LocalDateTime now) {
+    return now.plus(aiClientProperties.requestTimeout()).plus(LEASE_MARGIN);
   }
 
   /**
@@ -145,6 +154,82 @@ public class FreeTalkMessageFeedbackService {
             LocalDateTime.now(clock).plus(retryProperties.delayAfter(attempt)),
             ProcessingStatus.PREPARING);
     report(released == 1 ? "scheduled" : "ignored", messageId, attempt);
+  }
+
+  /**
+   * 준비 상태이면서 임대가 끝난 교정을 오래된 순으로 찾는다.
+   *
+   * @return 복구 대상 교정. 한 번에 넘겨받는 수는 설정의 처리량을 넘지 않는다
+   */
+  @Transactional(readOnly = true)
+  public List<FreeTalkMessageFeedbackRepository.RecoverableCorrection> findRecoverable() {
+    return feedbackRepository.findRecoverable(
+        LocalDateTime.now(clock),
+        ProcessingStatus.PREPARING,
+        PageRequest.of(0, retryProperties.batchSize()));
+  }
+
+  /**
+   * 임대가 끝난 교정의 다음 시도를 선점한다. 시도를 다 썼으면 선점하지 않고 실패로 확정한다.
+   *
+   * @param messageId 교정 대상 사용자 발화 ID
+   * @param attempts 찾았을 때의 시도 횟수
+   * @return 선점한 시도. 시도를 다 썼거나 다른 쪽이 먼저 가져갔거나 이미 끝났으면 비어 있다
+   */
+  @Transactional
+  public Optional<FreeTalkCorrectionAttempt> claimNextAttempt(long messageId, int attempts) {
+    LocalDateTime now = LocalDateTime.now(clock);
+    if (attempts >= retryProperties.maxAttempts()) {
+      int failed =
+          feedbackRepository.failExpired(
+              messageId, attempts, now, ProcessingStatus.FAILED, ProcessingStatus.PREPARING);
+      report(failed == 1 ? "abandoned" : "ignored", messageId, attempts);
+      return Optional.empty();
+    }
+    String token = UUID.randomUUID().toString();
+    int claimed =
+        feedbackRepository.claim(
+            messageId, attempts, token, leaseUntil(now), now, ProcessingStatus.PREPARING);
+    if (claimed == 0) {
+      report("contended", messageId, attempts);
+      return Optional.empty();
+    }
+    return Optional.of(new FreeTalkCorrectionAttempt(messageId, attempts + 1, token));
+  }
+
+  /**
+   * 복구 워커가 선점한 시도의 판정 결과를 반영한다.
+   *
+   * @param attempt 선점한 시도
+   * @param correction 그 시도의 교정 판정 결과
+   */
+  @Transactional
+  public void completeAttempt(
+      FreeTalkCorrectionAttempt attempt, FreeTalkTurnCorrection correction) {
+    if (correction.retryable()) {
+      retryOrFail(attempt.messageId(), attempt.attempt(), attempt.token());
+      return;
+    }
+    int updated = completeIfPreparing(attempt.messageId(), correction);
+    String outcome = correction.status() == ProcessingStatus.COMPLETED ? "recovered" : "invalid";
+    report(updated == 1 ? outcome : "ignored", attempt.messageId(), attempt.attempt());
+  }
+
+  /**
+   * 다시 조립할 수 없어 더 시도할 수 없는 교정을 실패로 확정한다.
+   *
+   * @param attempt 선점한 시도
+   */
+  @Transactional
+  public void abandonAttempt(FreeTalkCorrectionAttempt attempt) {
+    int failed =
+        feedbackRepository.failAttempt(
+            attempt.messageId(),
+            attempt.attempt(),
+            attempt.token(),
+            ProcessingStatus.FAILED,
+            ProcessingStatus.PREPARING);
+    report(failed == 1 ? "unrebuildable" : "ignored", attempt.messageId(), attempt.attempt());
   }
 
   // 교정 문장은 사용자 발화라 남기지 않고, 어느 발화의 몇 번째 시도가 어떻게 끝났는지만 남긴다.

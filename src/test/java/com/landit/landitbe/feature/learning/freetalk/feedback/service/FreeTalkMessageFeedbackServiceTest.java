@@ -57,7 +57,7 @@ class FreeTalkMessageFeedbackServiceTest {
           conversationMessageService,
           aiClientProperties,
           new FreeTalkCorrectionRetryProperties(
-              3, List.of(Duration.ZERO, Duration.ofMinutes(1), Duration.ofMinutes(5)), 10),
+              3, List.of(Duration.ZERO, Duration.ofMinutes(1), Duration.ofMinutes(5)), 10, true),
           new SimpleMeterRegistry(),
           clock);
 

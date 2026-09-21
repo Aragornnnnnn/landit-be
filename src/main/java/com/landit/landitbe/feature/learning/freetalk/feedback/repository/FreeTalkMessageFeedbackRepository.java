@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -121,6 +122,92 @@ public interface FreeTalkMessageFeedbackRepository
       @Param("messageId") long messageId,
       @Param("attempts") int attempts,
       @Param("attemptToken") String attemptToken,
+      @Param("failedStatus") ProcessingStatus failedStatus,
+      @Param("preparingStatus") ProcessingStatus preparingStatus);
+
+  /** 복구 대상 교정의 발화 ID와 지금까지의 시도 횟수다. */
+  interface RecoverableCorrection {
+    /** 교정 대상 사용자 발화 ID. */
+    Long getSessionHistoryMessageId();
+
+    /** 지금까지 AI에 교정을 요청한 횟수. */
+    int getAttempts();
+  }
+
+  /**
+   * 준비 상태이면서 임대가 끝난 교정을 오래된 순으로 찾는다. 임대가 없는 행은 시도 정보가 생기기 전부터 준비 상태로 남은 것이라 끝난 것으로 본다.
+   *
+   * @param now 애플리케이션 Clock 기준 현재 시각
+   * @param pageable 한 번에 넘겨받을 교정 수
+   * @return 복구 대상 교정
+   */
+  @Query(
+      """
+            select feedback.sessionHistoryMessageId as sessionHistoryMessageId,
+                   feedback.attempts as attempts
+            from FreeTalkMessageFeedback feedback
+            where feedback.processingStatus = :preparingStatus
+              and (feedback.leaseUntil is null or feedback.leaseUntil < :now)
+            order by feedback.id
+      """)
+  List<RecoverableCorrection> findRecoverable(
+      @Param("now") LocalDateTime now,
+      @Param("preparingStatus") ProcessingStatus preparingStatus,
+      Pageable pageable);
+
+  /**
+   * 임대가 끝난 교정의 다음 시도를 선점한다. 여러 서버가 같은 교정을 집어도 한 곳만 성공한다.
+   *
+   * @param attempts 찾았을 때의 시도 횟수. 그사이 다른 쪽이 넘겨받았으면 달라져 있다
+   * @param attemptToken 이번 시도의 선점 식별자
+   * @param leaseUntil 이번 시도의 응답을 기다려 줄 시각
+   * @return 선점했으면 1, 다른 쪽이 먼저 가져갔거나 이미 끝났으면 0
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+            update FreeTalkMessageFeedback feedback
+            set feedback.attempts = feedback.attempts + 1,
+                feedback.attemptToken = :attemptToken,
+                feedback.leaseUntil = :leaseUntil,
+                feedback.updatedAt = CURRENT_TIMESTAMP
+            where feedback.sessionHistoryMessageId = :messageId
+              and feedback.processingStatus = :preparingStatus
+              and feedback.attempts = :attempts
+              and (feedback.leaseUntil is null or feedback.leaseUntil < :now)
+      """)
+  int claim(
+      @Param("messageId") long messageId,
+      @Param("attempts") int attempts,
+      @Param("attemptToken") String attemptToken,
+      @Param("leaseUntil") LocalDateTime leaseUntil,
+      @Param("now") LocalDateTime now,
+      @Param("preparingStatus") ProcessingStatus preparingStatus);
+
+  /**
+   * 시도를 다 쓴 채 임대가 끝난 교정을 실패로 확정한다. 마지막 시도를 하던 서버가 결과를 남기지 못하고 사라진 경우다.
+   *
+   * <p>그 시도의 선점 식별자를 알 수 없으므로 임대가 끝났다는 사실로 확정한다.
+   *
+   * @return 확정했으면 1, 그사이 끝났거나 다른 쪽이 넘겨받았으면 0
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+            update FreeTalkMessageFeedback feedback
+            set feedback.processingStatus = :failedStatus,
+                feedback.leaseUntil = null,
+                feedback.attemptToken = null,
+                feedback.updatedAt = CURRENT_TIMESTAMP
+            where feedback.sessionHistoryMessageId = :messageId
+              and feedback.processingStatus = :preparingStatus
+              and feedback.attempts = :attempts
+              and (feedback.leaseUntil is null or feedback.leaseUntil < :now)
+      """)
+  int failExpired(
+      @Param("messageId") long messageId,
+      @Param("attempts") int attempts,
+      @Param("now") LocalDateTime now,
       @Param("failedStatus") ProcessingStatus failedStatus,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
 }
