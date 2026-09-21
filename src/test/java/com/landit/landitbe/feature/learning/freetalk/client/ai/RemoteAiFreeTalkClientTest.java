@@ -142,9 +142,28 @@ class RemoteAiFreeTalkClientTest {
     assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
   }
 
-  @DisplayName("교정 필드가 없는 구버전 속마음 응답은 속마음을 살리고 교정만 실패로 본다.")
+  @DisplayName("AI가 교정 판정을 돌려주지 못해 교정 필드가 비어 온 응답은 속마음을 살리고 교정은 다시 해 볼 실패로 본다.")
   @Test
-  void treatsMissingCorrectionFieldsAsFailedCorrection() throws Exception {
+  void treatsNullCorrectionJudgmentAsRetryableFailure() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":null,"correction":null},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.innerThought()).isEqualTo("즐거웠나 보다.");
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.unavailable());
+    assertThat(result.correction().retryable()).isTrue();
+  }
+
+  @DisplayName("교정 필드가 아예 없는 구버전 속마음 응답도 속마음을 살리고 교정은 다시 해 볼 실패로 본다.")
+  @Test
+  void treatsMissingCorrectionFieldsAsRetryableFailure() throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/inner-thought",
         new ConcurrentHashMap<>(),
@@ -156,7 +175,7 @@ class RemoteAiFreeTalkClientTest {
         remoteClient().generateInnerThought(innerThoughtRequest());
 
     assertThat(result.innerThought()).isEqualTo("즐거웠나 보다.");
-    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.unavailable());
   }
 
   @DisplayName("속마음 응답의 턴 교정과 상대 반응 여부를 변환한다.")
@@ -355,6 +374,7 @@ class RemoteAiFreeTalkClientTest {
 
     assertThat(result.innerThoughtType().name()).isEqualTo("GOOD");
     assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
+    assertThat(result.correction().retryable()).isFalse();
   }
 
   @DisplayName("프리톡 종료 요청에 종료 사유와 제목 생성 조건을 보내고 응답을 변환한다.")

@@ -4,12 +4,15 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.config.session.FreeTalkCorrectionRetryProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -17,6 +20,7 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMes
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -49,7 +53,13 @@ class FreeTalkMessageFeedbackServiceTest {
       Clock.fixed(Instant.parse("2026-09-21T12:30:00Z"), ZoneId.of("Asia/Seoul"));
   private final FreeTalkMessageFeedbackService service =
       new FreeTalkMessageFeedbackService(
-          repository, conversationMessageService, aiClientProperties, clock);
+          repository,
+          conversationMessageService,
+          aiClientProperties,
+          new FreeTalkCorrectionRetryProperties(
+              3, List.of(Duration.ZERO, Duration.ofMinutes(1), Duration.ofMinutes(5)), 10),
+          new SimpleMeterRegistry(),
+          clock);
 
   @BeforeEach
   void stubAiTimeout() {
@@ -145,10 +155,10 @@ class FreeTalkMessageFeedbackServiceTest {
             ProcessingStatus.PREPARING);
   }
 
-  @DisplayName("교정 실패는 문장 값 없이 준비 상태 조건으로 실패를 기록한다.")
+  @DisplayName("다시 해도 같을 실패(계약 위반)는 첫 시도에서 바로 실패로 확정한다.")
   @Test
-  void failsCorrectionWithoutSentence() {
-    service.failIfPreparing(7L);
+  void failsContractViolationImmediately() {
+    service.completeFirstAttempt(7L, FreeTalkTurnCorrection.failed());
 
     verify(repository)
         .updateIfPreparing(
@@ -163,6 +173,53 @@ class FreeTalkMessageFeedbackServiceTest {
             null,
             null,
             ProcessingStatus.PREPARING);
+    verify(repository, never()).releaseForRetry(anyLong(), anyInt(), any(), any(), any());
+  }
+
+  @DisplayName("AI가 판정을 돌려주지 못한 첫 시도는 실패로 끝내지 않고 준비 상태로 둔 채 바로 다시 시도되게 한다.")
+  @Test
+  void keepsUnavailableFirstAttemptPreparingForImmediateRetry() {
+    when(repository.releaseForRetry(anyLong(), anyInt(), any(), any(), any())).thenReturn(1);
+
+    service.completeFirstAttempt(7L, FreeTalkTurnCorrection.unavailable());
+
+    // 첫 시도는 선점 식별자가 없고, 첫 실패 뒤의 간격은 0초라 지금 시각(서울 21:30:00)이 다음 시도 시각이다.
+    verify(repository)
+        .releaseForRetry(
+            7L, 1, "", LocalDateTime.of(2026, 9, 21, 21, 30, 0), ProcessingStatus.PREPARING);
+    verify(repository, never())
+        .updateIfPreparing(
+            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @DisplayName("AI 호출 자체가 실패한 첫 시도도 같은 방식으로 다시 시도되게 한다.")
+  @Test
+  void keepsFailedCallPreparingForRetry() {
+    service.failFirstAttempt(7L);
+
+    verify(repository)
+        .releaseForRetry(
+            7L, 1, "", LocalDateTime.of(2026, 9, 21, 21, 30, 0), ProcessingStatus.PREPARING);
+  }
+
+  @DisplayName("두 번째 시도가 실패하면 1분 뒤로 다음 시도를 미루고, 선점한 시도의 식별자가 같을 때만 반영한다.")
+  @Test
+  void schedulesThirdAttemptOneMinuteLater() {
+    service.retryOrFail(7L, 2, "token-2");
+
+    verify(repository)
+        .releaseForRetry(
+            7L, 2, "token-2", LocalDateTime.of(2026, 9, 21, 21, 31, 0), ProcessingStatus.PREPARING);
+  }
+
+  @DisplayName("마지막 시도까지 실패하면 그 시도의 식별자로 실패를 확정하고 더 미루지 않는다.")
+  @Test
+  void failsForGoodAfterLastAttempt() {
+    service.retryOrFail(7L, 3, "token-3");
+
+    verify(repository)
+        .failAttempt(7L, 3, "token-3", ProcessingStatus.FAILED, ProcessingStatus.PREPARING);
+    verify(repository, never()).releaseForRetry(anyLong(), anyInt(), any(), any(), any());
   }
 
   @DisplayName("근거 기억 값이 어긋난 행은 교정은 내려주되 근거 기억만 빼고 경고를 남긴다.")

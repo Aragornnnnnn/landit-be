@@ -3,11 +3,13 @@
 package com.landit.landitbe.feature.learning.freetalk.feedback.service;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
+import com.landit.landitbe.config.session.FreeTalkCorrectionRetryProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMessageFeedback;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -27,10 +29,13 @@ public class FreeTalkMessageFeedbackService {
 
   // AI 응답을 기다려 주는 시간에 더하는 여유. 시나리오 메시지 피드백 작업과 같은 규칙이다.
   private static final Duration LEASE_MARGIN = Duration.ofSeconds(30);
+  private static final int FIRST_ATTEMPT = 1;
 
   private final FreeTalkMessageFeedbackRepository feedbackRepository;
   private final ConversationMessageService conversationMessageService;
   private final AiClientProperties aiClientProperties;
+  private final FreeTalkCorrectionRetryProperties retryProperties;
+  private final MeterRegistry meterRegistry;
   private final Clock clock;
 
   /**
@@ -89,14 +94,67 @@ public class FreeTalkMessageFeedbackService {
   }
 
   /**
-   * 준비 상태인 교정을 실패로 확정한다.
+   * 첫 시도의 판정 결과를 반영한다. AI가 판정을 돌려주지 못했으면 실패로 끝내지 않고 다음 시도를 기다리게 한다.
    *
    * @param messageId 교정 대상 사용자 발화 ID
-   * @return 갱신된 row 수. 이미 판정이 끝난 교정이면 0
+   * @param correction 첫 시도의 교정 판정 결과
    */
   @Transactional
-  public int failIfPreparing(long messageId) {
-    return completeIfPreparing(messageId, FreeTalkTurnCorrection.failed());
+  public void completeFirstAttempt(long messageId, FreeTalkTurnCorrection correction) {
+    if (correction.retryable()) {
+      retryOrFail(messageId, FIRST_ATTEMPT, null);
+      return;
+    }
+    completeIfPreparing(messageId, correction);
+  }
+
+  /**
+   * AI 호출 자체가 실패한 첫 시도를 끝낸다. 실패로 확정하지 않고 다음 시도를 기다리게 한다.
+   *
+   * @param messageId 교정 대상 사용자 발화 ID
+   */
+  @Transactional
+  public void failFirstAttempt(long messageId) {
+    retryOrFail(messageId, FIRST_ATTEMPT, null);
+  }
+
+  /**
+   * 다시 해 볼 실패로 끝난 시도를 정리한다. 시도가 남았으면 준비 상태를 유지한 채 다음 시도 시각을 적고, 다 썼으면 실패로 확정한다.
+   *
+   * <p>그 시도를 시작한 쪽의 결과만 반영한다. 응답이 늦어 복구 워커가 이미 넘겨받은 교정은 건드리지 않는다.
+   *
+   * @param messageId 교정 대상 사용자 발화 ID
+   * @param attempt 방금 실패한 시도의 순번(첫 시도가 1)
+   * @param attemptToken 그 시도의 선점 식별자. 첫 시도는 null
+   */
+  @Transactional
+  public void retryOrFail(long messageId, int attempt, String attemptToken) {
+    String token = attemptToken == null ? "" : attemptToken;
+    if (attempt >= retryProperties.maxAttempts()) {
+      int failed =
+          feedbackRepository.failAttempt(
+              messageId, attempt, token, ProcessingStatus.FAILED, ProcessingStatus.PREPARING);
+      report(failed == 1 ? "exhausted" : "ignored", messageId, attempt);
+      return;
+    }
+    int released =
+        feedbackRepository.releaseForRetry(
+            messageId,
+            attempt,
+            token,
+            LocalDateTime.now(clock).plus(retryProperties.delayAfter(attempt)),
+            ProcessingStatus.PREPARING);
+    report(released == 1 ? "scheduled" : "ignored", messageId, attempt);
+  }
+
+  // 교정 문장은 사용자 발화라 남기지 않고, 어느 발화의 몇 번째 시도가 어떻게 끝났는지만 남긴다.
+  private void report(String outcome, long messageId, int attempt) {
+    meterRegistry.counter("landit.free_talk.correction.retry", "outcome", outcome).increment();
+    log.info(
+        "workflow=free_talk_correction_retry outcome={} messageId={} attempt={}",
+        outcome,
+        messageId,
+        attempt);
   }
 
   /**

@@ -32,7 +32,7 @@ class FreeTalkTurnResultServiceTest {
 
     service.complete(7L, "thought", InnerThoughtType.GOOD, correction);
 
-    verify(messageFeedbackService).completeIfPreparing(7L, correction);
+    verify(messageFeedbackService).completeFirstAttempt(7L, correction);
   }
 
   @DisplayName("속마음이 먼저 시간 초과로 실패 처리된 발화에 응답이 늦게 와도 교정은 반영을 시도한다.")
@@ -44,15 +44,15 @@ class FreeTalkTurnResultServiceTest {
 
     service.complete(7L, "thought", InnerThoughtType.GOOD, correction);
 
-    verify(messageFeedbackService).completeIfPreparing(7L, correction);
+    verify(messageFeedbackService).completeFirstAttempt(7L, correction);
   }
 
-  @DisplayName("AI 판정에 실패하면 속마음과 함께 기다리던 턴 교정도 실패로 확정한다.")
+  @DisplayName("AI 호출에 실패하면 속마음은 실패로 확정하고 턴 교정은 첫 시도만 끝내 다시 시도되게 한다.")
   @Test
-  void failsInnerThoughtAndCorrectionTogether() {
+  void failsInnerThoughtAndLeavesCorrectionToRetry() {
     service.fail(7L);
 
     verify(conversationMessageService).failInnerThought(7L);
-    verify(messageFeedbackService).failIfPreparing(7L);
+    verify(messageFeedbackService).failFirstAttempt(7L);
   }
 }
