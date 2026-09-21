@@ -23,8 +23,13 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConv
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkExpressionReuseSummary;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseQueryService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkCorrectionRecoveryService;
@@ -109,6 +114,8 @@ class FreeTalkSessionApiIntegrationTests {
 
   @Autowired private FreeTalkMessageFeedbackService messageFeedbackService;
 
+  @Autowired private FreeTalkExpressionReuseQueryService expressionReuseQueryService;
+
   @Autowired private FreeTalkTurnResultService turnResultService;
 
   @Autowired private FreeTalkCorrectionRecoveryService correctionRecoveryService;
@@ -142,6 +149,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
+    jdbcTemplate.update("DELETE FROM free_talk_expression_reuse");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
     jdbcTemplate.update("DELETE FROM free_talk_session");
@@ -152,6 +160,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994104");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994103");
     jdbcTemplate.update("DELETE FROM writing_expression WHERE id = 994201");
+    jdbcTemplate.update("DELETE FROM scenario_language_variant WHERE scenario_id = 994102");
     jdbcTemplate.update("DELETE FROM scenario WHERE id = 994102");
     jdbcTemplate.update("DELETE FROM category WHERE id = 994101");
   }
@@ -1469,6 +1478,133 @@ class FreeTalkSessionApiIntegrationTests {
     assertCurrentStreak(accessToken, 1, true);
   }
 
+  @DisplayName("세션이 끝나면 배운 표현을 다시 쓴 기록이 저장되고, 출처가 나중에 바뀌어도 상세와 요약은 그대로다.")
+  @Test
+  void storesExpressionReuseAfterSessionAndKeepsItWhenSourcesChange() throws Exception {
+    seedEmbeddedCandidateExpression();
+    long learnedExpressionId = seedWritingExpression();
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_language_variant (
+            scenario_id, target_locale, base_locale, title, briefing,
+            user_opening_instruction, conversation_goal, status, created_at, updated_at)
+        VALUES (994102, 'EN', 'KR', '주말 계획', '설명', '시작', '목표', 'ACTIVE',
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    String accessToken =
+        login("free-talk-expression-reuse@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+    long userProfileId =
+        jdbcTemplate.queryForObject(
+            "SELECT user_profile_id FROM learning_session WHERE id = ?", Long.class, sessionId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO user_writing_expression_completion (
+            user_profile_id, scenario_id, writing_expression_id, learning_source,
+            completed_at, last_completed_at)
+        VALUES (?, 994102, ?, 'SCENARIO', TIMESTAMP '2026-09-10 09:00:00',
+            TIMESTAMP '2026-09-10 09:00:00')
+        """,
+        userProfileId,
+        learnedExpressionId);
+    // AI는 맞는 판정 하나와, 후보에 없는 표현·원문에 없는 조각을 주장하는 틀린 판정 둘을 돌려준다.
+    fakeAiFreeTalkClient.judgeUsedExpressions(
+        request -> {
+          long userMessageId =
+              request.conversationHistory().stream()
+                  .filter(message -> "USER".equals(message.role()))
+                  .findFirst()
+                  .orElseThrow()
+                  .messageId();
+          return List.of(
+              new AiFreeTalkUsedExpression(999999L, userMessageId, "made up for"),
+              new AiFreeTalkUsedExpression(learnedExpressionId, userMessageId, "make up for"),
+              new AiFreeTalkUsedExpression(learnedExpressionId, userMessageId, "made up for"));
+        });
+
+    // 진행 중인 대화의 응답에는 재사용 정보가 없다.
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                messagePath(sessionId),
+                accessToken,
+                messageRequest(
+                    UUID.randomUUID().toString(),
+                    "I was late. I made up for it today!",
+                    7200000,
+                    true)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.submittedMessage.reusedExpression").doesNotExist());
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
+
+    assertThat(fakeAiFreeTalkClient.lastRecommendationsRequest().learnedExpressions())
+        .containsExactly(
+            new AiFreeTalkLearnedExpression(learnedExpressionId, "make up for", "만회하다"));
+    // 검증을 통과한 판정만 저장되고, 추천 표현 저장은 틀린 판정에 영향받지 않는다.
+    assertThat(
+            jdbcTemplate.queryForList(
+                "SELECT matched_text FROM free_talk_expression_reuse", String.class))
+        .containsExactly("made up for");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM free_talk_session_expression", Integer.class))
+        .isEqualTo(1);
+    long freeTalkSessionId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
+            Long.class,
+            sessionId);
+    FreeTalkExpressionReuseSummary expectedSummary =
+        new FreeTalkExpressionReuseSummary(
+            false,
+            List.of(
+                new FreeTalkExpressionReuseSummary.Item(
+                    learnedExpressionId,
+                    "make up for",
+                    "만회하다",
+                    "9월 10일 「주말 계획」",
+                    "I made up for it today!",
+                    "made up for")));
+    assertThat(
+            expressionReuseQueryService.findSummary(
+                freeTalkSessionId, ExpressionGenerationStatus.READY))
+        .isEqualTo(expectedSummary);
+    assertReusedExpressionInDetail(accessToken, sessionId, learnedExpressionId);
+
+    // 표현 원문·뜻과 시나리오 제목이 바뀌고 완료 기록이 지워져도 지난 기록은 달라지지 않는다.
+    jdbcTemplate.update(
+        "UPDATE writing_expression SET target_expression_text = 'changed',"
+            + " base_expression_meaning_text = '바뀐 뜻', status = 'INACTIVE' WHERE id = ?",
+        learnedExpressionId);
+    jdbcTemplate.update(
+        "UPDATE scenario_language_variant SET title = '바뀐 제목' WHERE scenario_id = 994102");
+    jdbcTemplate.update(
+        "DELETE FROM user_writing_expression_completion WHERE user_profile_id = ?", userProfileId);
+
+    assertThat(
+            expressionReuseQueryService.findSummary(
+                freeTalkSessionId, ExpressionGenerationStatus.READY))
+        .isEqualTo(expectedSummary);
+    assertReusedExpressionInDetail(accessToken, sessionId, learnedExpressionId);
+  }
+
+  private void assertReusedExpressionInDetail(String accessToken, long sessionId, long expressionId)
+      throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.messages[0].role").value("USER"))
+        .andExpect(
+            jsonPath("$.data.messages[0].content").value("I was late. I made up for it today!"))
+        .andExpect(jsonPath("$.data.messages[0].reusedExpression.expressionId").value(expressionId))
+        .andExpect(jsonPath("$.data.messages[0].reusedExpression.text").value("make up for"))
+        .andExpect(
+            jsonPath("$.data.messages[0].reusedExpression.matchedText").value("made up for"));
+  }
+
   @DisplayName("학습자 난이도보다 높은 표현 후보를 제외한다.")
   @Test
   void excludesCandidatesAboveLearnerDifficultyLevel() throws Exception {
@@ -2411,6 +2547,11 @@ class FreeTalkSessionApiIntegrationTests {
     private volatile CountDownLatch turnStarted = new CountDownLatch(1);
     private volatile CountDownLatch turnRelease = new CountDownLatch(0);
     private volatile boolean omitClosingTitle;
+    // 표현 추천 요청을 받아 AI가 다시 썼다고 판정할 표현을 정한다. 기본은 판정 없음이다.
+    private volatile java.util.function.Function<
+            AiFreeTalkExpressionRecommendationsRequest, List<AiFreeTalkUsedExpression>>
+        usedExpressionsJudge = request -> List.of();
+    private volatile AiFreeTalkExpressionRecommendationsRequest lastRecommendationsRequest;
 
     @Override
     public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
@@ -2488,13 +2629,26 @@ class FreeTalkSessionApiIntegrationTests {
     @Override
     public AiFreeTalkExpressionRecommendationsResult recommendExpressions(
         AiFreeTalkExpressionRecommendationsRequest request) {
+      lastRecommendationsRequest = request;
       if (request.existingExpressions().isEmpty()) {
         return new AiFreeTalkExpressionRecommendationsResult(List.of());
       }
       return new AiFreeTalkExpressionRecommendationsResult(
           List.of(
               new AiFreeTalkExpressionRecommendation(
-                  1, request.existingExpressions().getFirst().expressionId())));
+                  1, request.existingExpressions().getFirst().expressionId())),
+          usedExpressionsJudge.apply(request));
+    }
+
+    void judgeUsedExpressions(
+        java.util.function.Function<
+                AiFreeTalkExpressionRecommendationsRequest, List<AiFreeTalkUsedExpression>>
+            judge) {
+      usedExpressionsJudge = judge;
+    }
+
+    AiFreeTalkExpressionRecommendationsRequest lastRecommendationsRequest() {
+      return lastRecommendationsRequest;
     }
 
     @Override
@@ -2552,6 +2706,8 @@ class FreeTalkSessionApiIntegrationTests {
       turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(0);
       omitClosingTitle = false;
+      usedExpressionsJudge = request -> List.of();
+      lastRecommendationsRequest = null;
     }
 
     void omitClosingTitle() {
