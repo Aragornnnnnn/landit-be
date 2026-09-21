@@ -23,6 +23,11 @@ import java.time.LocalDateTime;
  * @param expiresAt 구독 만료 시각. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
  * @param conversationCompletedSinceLaunch 유료 구독 도입 이후 시나리오 대화를 끝까지 완료한 적이 있는지
  * @param productId 구독 상품 ID. 프리미엄이 꺼져 있거나 알 수 없으면 {@code null}
+ * @param paymentEnabled 현재 계정에 유료 제한을 적용하는지
+ * @param paymentPolicyVersion 공개 정책 버전
+ * @param newStartsPaused 새 학습 시작이 일시 중지됐는지
+ * @param canStartScenario 새 시나리오 대화를 시작할 수 있는지
+ * @param freeScenarioSessionId 최초 무료 시나리오 예약 세션
  * @param promo 진행 중인 할인 기회. 미부여·만료·프리미엄이면 null
  * @param price 가장 최근 실제 결제 금액. 이력이 없으면 null
  * @param currency 최근 실제 결제의 ISO 4217 통화. 값이 없으면 null
@@ -59,7 +64,7 @@ public record UserSubscriptionResponse(
             example = "false")
         boolean conversationCompletedSinceLaunch,
     @Schema(
-            description = "구독 상품 ID. 웹은 이 값으로 월간·연간 이름을 붙인다. 프리미엄이 꺼져 있으면 null",
+            description = "구독 상품 ID. Play의 상품ID:베이스플랜ID 전체를 보존한다. 프리미엄이 꺼져 있으면 null",
             example = "com.saynow.app.premium.yearly")
         String productId,
     @Schema(
@@ -109,7 +114,17 @@ public record UserSubscriptionResponse(
         null);
   }
 
-  /** 기존 구독 상태와 서버의 새 시작 정책을 함께 전달한다. */
+  /**
+   * 기존 구독 상태와 서버의 새 시작 정책을 함께 전달한다.
+   *
+   * @param effectivePremium 만료 시각을 반영한 프리미엄 여부
+   * @param paymentEnabled 유료 제한 적용 여부
+   * @param paymentPolicyVersion 공개 정책 버전
+   * @param newStartsPaused 새 학습 시작 중지 여부
+   * @param canStartScenario 새 시나리오 시작 가능 여부
+   * @param freeScenarioSessionId 최초 무료 시나리오 예약 세션
+   * @return 서버 접근 정책을 반영한 응답
+   */
   public UserSubscriptionResponse withAccess(
       boolean effectivePremium,
       boolean paymentEnabled,
