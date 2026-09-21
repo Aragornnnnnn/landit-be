@@ -65,7 +65,7 @@ class ScheduledNotificationPolicyTest {
     assertThat(content.deepLink())
         .isEqualTo(
             "/expressions/scenario/10/100?utm_source=push&utm_medium=notification&"
-                + "utm_campaign=continue_expression");
+                + "utm_campaign=continue_expression&utm_content=expression_usage_question");
   }
 
   /** 최신 스몰톡 주제가 없으면 미해결 치환 문자열 없이 일반 문구로 대체한다. */
@@ -82,6 +82,7 @@ class ScheduledNotificationPolicyTest {
     assertThat(content.contentVariant()).isEqualTo(NotificationContentVariant.SMALL_TALK_GENERIC);
     assertThat(content.title()).isEqualTo("오늘은 스몰톡 안 하시나요? 🥺");
     assertThat(content.body()).isEqualTo("테디가 당신과의 대화를 애타게 기다려요.");
+    assertThat(content.deepLink()).endsWith("&utm_content=small_talk_teddy_waiting");
     assertThat(content.body()).doesNotContain("null", "{latestFreeTalkTitle}");
   }
 
@@ -153,8 +154,10 @@ class ScheduledNotificationPolicyTest {
             SCHEDULED_DATE);
 
     assertThat(dynamic.contentVariant()).isEqualTo(NotificationContentVariant.EXPRESSION_DYNAMIC);
+    assertThat(dynamic.deepLink()).endsWith("&utm_content=expression_usage_question");
     assertThat(dynamic.title().codePointCount(0, dynamic.title().length())).isEqualTo(255);
     assertThat(generic.contentVariant()).isEqualTo(NotificationContentVariant.EXPRESSION_GENERIC);
+    assertThat(generic.deepLink()).endsWith("&utm_content=expression_continue");
     assertThat(generic.title()).isEqualTo("표현 학습을 이어가 볼까요?");
   }
 
@@ -170,8 +173,10 @@ class ScheduledNotificationPolicyTest {
     ScheduledNotificationContent generic = smallTalkContent(titleOverLimit);
 
     assertThat(dynamic.contentVariant()).isEqualTo(NotificationContentVariant.SMALL_TALK_DYNAMIC);
+    assertThat(dynamic.deepLink()).endsWith("&utm_content=small_talk_continue_topic");
     assertThat(dynamic.body().codePointCount(0, dynamic.body().length())).isEqualTo(500);
     assertThat(generic.contentVariant()).isEqualTo(NotificationContentVariant.SMALL_TALK_GENERIC);
+    assertThat(generic.deepLink()).endsWith("&utm_content=small_talk_teddy_waiting");
     assertThat(generic.body()).isEqualTo("테디가 당신과의 대화를 애타게 기다려요.");
   }
 
@@ -189,6 +194,7 @@ class ScheduledNotificationPolicyTest {
             SCHEDULED_DATE);
 
     assertThat(content.contentVariant()).isEqualTo(NotificationContentVariant.SCENARIO_R3);
+    assertThat(content.deepLink()).endsWith("&utm_content=scenario_keep_habit");
     assertThat(content.body()).isEqualTo("하지만 민수님은 아직입니다!!\n습관이 되기 전에 영어 공부 5분만 해봐요🥺");
   }
 
@@ -235,6 +241,7 @@ class ScheduledNotificationPolicyTest {
             SCHEDULED_DATE);
 
     assertThat(content.contentVariant()).isEqualTo(NotificationContentVariant.SCENARIO_A4);
+    assertThat(content.deepLink()).endsWith("&utm_content=scenario_streak_record");
     assertThat(content.title()).isEqualTo("🚨 오늘의 시나리오를 깨면 연속 5일 달성");
     assertThat(content.body()).isEqualTo("5분 투자로 최고 기록을 달성해보세요!");
   }
