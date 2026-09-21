@@ -10,9 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileDiscountOfferService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,6 +60,8 @@ class UserSubscriptionApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private ProfileDiscountOfferService discountOffers;
 
   @Autowired private Clock clock;
 
@@ -528,6 +534,32 @@ class UserSubscriptionApiIntegrationTests {
     assertThat(dismissPromo(token).isNull()).isTrue();
     subscription(token).andExpect(jsonPath("$.data.promo").isEmpty());
     assertThat(storedPromoExpiry(userId)).isEqualTo(expiry);
+  }
+
+  @Test
+  @DisplayName("동시 최초 이탈 요청은 하나의 만료 시각만 저장하고 동일한 값을 반환한다.")
+  void concurrentDismissalsKeepOneExpiry() throws Exception {
+    login("promo-concurrent");
+    long userId = userIdOf("promo-concurrent");
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      java.util.concurrent.Callable<LocalDateTime> dismiss =
+          () -> {
+            ready.countDown();
+            if (!start.await(5, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("동시 요청 시작 대기 실패");
+            }
+            return discountOffers.dismiss(userId).expiresAt();
+          };
+      var first = executor.submit(dismiss);
+      var second = executor.submit(dismiss);
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      LocalDateTime expiry = first.get(10, TimeUnit.SECONDS);
+      assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(expiry);
+      assertThat(storedPromoExpiry(userId)).isEqualTo(expiry);
+    }
   }
 
   private LocalDateTime storedPromoExpiry(long userId) {
