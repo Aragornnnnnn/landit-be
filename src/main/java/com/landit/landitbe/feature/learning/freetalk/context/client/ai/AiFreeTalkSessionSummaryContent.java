@@ -4,13 +4,27 @@ package com.landit.landitbe.feature.learning.freetalk.context.client.ai;
 
 import java.util.List;
 
-/** 프리톡 세션의 주제와 미완료 맥락을 보관한다. */
+/**
+ * 프리톡 세션의 주제와 미완료 맥락을 보관한다.
+ *
+ * @param topic 대화의 주요 주제
+ * @param userStatements 사용자 원문에 근거한 진술
+ * @param openThreads 아직 끝나지 않은 대화 주제
+ * @param interactionContext 이후 대화에 필요한 상호작용 맥락
+ */
 public record AiFreeTalkSessionSummaryContent(
     String topic,
     List<AiFreeTalkSessionSummaryEntry> userStatements,
     List<AiFreeTalkSessionSummaryEntry> openThreads,
     List<AiFreeTalkSessionSummaryEntry> interactionContext) {
-  /** 목록을 방어적으로 복사한다. */
+  /**
+   * 목록을 방어적으로 복사한다.
+   *
+   * @param topic 대화의 주요 주제
+   * @param userStatements 사용자 원문에 근거한 진술
+   * @param openThreads 아직 끝나지 않은 대화 주제
+   * @param interactionContext 이후 대화에 필요한 상호작용 맥락
+   */
   public AiFreeTalkSessionSummaryContent {
     userStatements = copy(userStatements);
     openThreads = copy(openThreads);
