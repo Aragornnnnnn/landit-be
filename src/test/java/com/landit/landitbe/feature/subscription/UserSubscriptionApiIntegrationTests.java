@@ -368,6 +368,7 @@ class UserSubscriptionApiIntegrationTests {
   @DisplayName("인증되지 않은 사용자는 구독 상태를 조회할 수 없다.")
   @Test
   void rejectsUnauthenticatedSubscriptionRequest() throws Exception {
+    mockMvc.perform(post("/api/v1/me/paywall/dismiss")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/me/subscription")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/me/subscription/events")).andExpect(status().isUnauthorized());
   }
@@ -379,6 +380,13 @@ class UserSubscriptionApiIntegrationTests {
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/me/paywall/dismiss'].post.responses['401']").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.promo").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.price").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.currency").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.tags[0]").value("Subscription"))
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.responses['200']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.responses['401']").exists())
