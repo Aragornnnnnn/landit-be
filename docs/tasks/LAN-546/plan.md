@@ -1,4 +1,4 @@
-# LAN-546 특정 사용자에게 편지 발송
+# LAN-546 특정 사용자에게 편지 발송과 문의 이미지 첨부
 
 ## 범위와 계약
 
@@ -11,6 +11,40 @@
 - 공지·업데이트 관리 API는 해당 두 유형만 허용한다. 직접 편지를 공지로 바꾸거나 전역으로 공개할 수 없게 한다.
 - 편지·수신자·감사 로그는 같은 트랜잭션으로 저장한다. 활성 수신자 프로필을 ID 순서로 잠가 탈퇴와의 상태 변경을 직렬화한다.
 - 앱은 `DIRECT`를 일반 텍스트 편지로 렌더링하고, 어드민은 기존 사용자 목록의 ID로 발송 API를 연동해야 한다. 이 저장소의 작업 범위는 BE다.
+
+## 추가 범위: 사용자 문의 이미지
+
+- 사용자가 같은 이슈에서 프론트 → BE → S3 방식의 이미지 첨부 구현을 요청했다.
+- 기존 `POST /api/v1/mailbox/feedbacks`의 JSON 계약을 유지한다. 이미지 첨부 요청은 같은 경로에 `multipart/form-data`로 보낸다. `feedback` 파트는 `application/json`의 `{ "type": "QUESTION", "content": "문의 본문" }`, 반복되는 `images` 파트는 이미지 파일이다.
+- PNG/JPEG 최대 3장, 장당 5 MiB, 합계 10 MiB, 이미지당 2천만 픽셀로 제한한다. 실제 이미지 디코딩 결과와 MIME을 대조하며 빈 파일·손상·위조 형식·초과 크기는 저장 전에 거부한다. 기존 전체 multipart 요청 상한 11MB와 오디오 파일 상한 10MB를 유지한다.
+- 업로드는 DB 트랜잭션 밖에서 수행한다. 문의와 첨부 연결은 별도 트랜잭션으로 확정하고, 업로드 또는 DB commit 실패 시 해당 요청이 업로드를 시도한 객체를 모두 삭제한다. 삭제 자체가 실패하면 객체 키를 로그에 남긴다. 프로세스 강제 종료나 삭제 실패로 남는 미연결 파일의 자동 정리 작업은 이번 구현에 포함하지 않는다.
+- 사용자·관리자 문의 상세 응답에 `attachments` 배열을 추가한다. 각 항목은 `attachmentId`, `contentType`, `fileSize`, `downloadUrl`이다. 기존 문의는 빈 배열이다.
+- `GET /api/v1/mailbox/feedbacks/{feedbackId}/attachments/{attachmentId}`는 작성자·관리자만 접근할 수 있으며 다른 사용자는 404다. `downloadUrl`은 이 API의 상대 경로이며 프론트가 Bearer 토큰으로 조회한 blob을 표시해야 한다. 공개 이미지 URL이나 S3 키를 반환하지 않는다. 응답은 이미지 바이트와 `Cache-Control: private, no-store`다.
+- `S3_BUCKET_NAME`으로 전달되는 환경별 비공개 애플리케이션 버킷을 사용한다. 로컬 IaC `modules/app-platform/main.tf`에서 Public Access Block, API task의 GetObject/PutObject/DeleteObject 권한과 환경 변수 주입을 확인했다. 공개 콘텐츠 버킷 설정은 사용하지 않는다. 운영에 적용된 정책이나 실제 S3 입출력은 아직 검증하지 않았다.
+- V118은 이 작업의 로컬 미배포 migration이므로 문의 첨부 테이블도 여기에 포함한다. 기존 편지 기능 데이터와 순서 제약을 함께 검증한다.
+- [x] 업로드·실패 보상·비공개 조회 API와 상세 응답 추가.
+- [x] 첨부 형식·제한·권한·부분 실패와 DB 롤백 테스트.
+- [x] 전체 check 및 PostgreSQL 제약 재검증.
+
+프론트 요청 예시:
+
+```bash
+curl -X POST "$API_BASE/api/v1/mailbox/feedbacks" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -F 'feedback={"type":"QUESTION","content":"화면 오류 문의입니다."};type=application/json' \
+  -F 'images=@screen.png;type=image/png'
+```
+
+- 전체 `Content-Type`과 multipart boundary는 HTTP 클라이언트가 설정하게 한다. `feedback` 파트의 `application/json`은 반드시 지정한다. 본문 검증 실패·파트 누락은 400, 지원하지 않는 파트 MIME은 415다.
+- 이미지 다운로드는 인증 헤더를 붙인 별도 요청으로 처리한다. 웹에서는 응답 blob의 object URL을 표시하고 사용 후 해제한다. `downloadUrl`을 인증 없이 `<img src>`에 바로 넣는 방식은 지원하지 않는다.
+
+이미지 첨부 검증 기록:
+
+- 최종 `./gradlew spotlessApply check` 성공. Spotless·Checkstyle·전체 테스트를 실행했고 JUnit XML 집계 1,371개, 실패·오류 0개, skip 9개다.
+- 통합 테스트 7개: JSON·multipart 호환, PNG/JPEG 순서와 상세 응답, 작성자·관리자 조회, 다른 사용자·비인증 차단, 잘못된 파일·본문·파트 형식, 업로드 부분 실패 및 삭제 실패, commit 준비 단계 예외의 DB 롤백·객체 정리, OpenAPI의 두 요청 형식을 확인했다.
+- 이미지 검증 단위 테스트 3개: 장당 5 MiB·합계 10 MiB와 3장 경계 허용, 2천만 픽셀 초과 조기 거부, 보고된 크기를 신뢰하지 않는 실제 스트림 상한을 확인했다.
+- S3 adapter 단위 테스트 4개: 비공개 버킷·ACL 미지정·바이트 보존, 제한된 Range 조회·삭제 대상, SDK 오류 상세 비노출, 설정 누락 시 호출 차단을 확인한다. S3는 mock이므로 실제 AWS 권한과 저장 성공을 증명하지 않는다.
+- PostgreSQL 15.18에서 실제 V118에 포함된 첨부 테이블을 생성하고, 이미지 형식·크기·순서·객체 키 중복·외래 키 위반 8건의 거부와 문의 삭제 시 첨부 메타데이터 연쇄 삭제를 확인했다. 기존 직접 편지 검증도 함께 통과했다. 검증 schema는 롤백되었고 임시 서버는 종료했다.
 
 ## 구현과 검증
 

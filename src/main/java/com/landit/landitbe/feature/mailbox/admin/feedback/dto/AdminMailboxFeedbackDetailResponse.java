@@ -2,10 +2,12 @@
 
 package com.landit.landitbe.feature.mailbox.admin.feedback.dto;
 
+import com.landit.landitbe.feature.mailbox.feedback.attachment.dto.MailboxFeedbackAttachmentResponse;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 편지함 어드민 피드백 상세 응답이다.
@@ -21,6 +23,7 @@ import java.time.LocalDateTime;
  * @param createdAt 생성 시각
  * @param updatedAt 수정 시각
  * @param reply 최신 답장. 없으면 {@code null}
+ * @param attachments 첨부 순서대로 정렬한 이미지 목록. 첨부가 없으면 빈 배열
  */
 @Schema(description = "편지함 어드민 피드백 상세 응답")
 public record AdminMailboxFeedbackDetailResponse(
@@ -38,7 +41,8 @@ public record AdminMailboxFeedbackDetailResponse(
             description = "최신 답장. 없으면 null",
             nullable = true,
             types = {"object", "null"})
-        Reply reply) {
+        Reply reply,
+    @Schema(description = "첨부 이미지 목록") List<MailboxFeedbackAttachmentResponse> attachments) {
 
   /**
    * 피드백에 연결된 최신 답장이다.

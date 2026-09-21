@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 컨트롤러에서 발생한 예외를 공통 API 오류 응답으로 변환한다. */
@@ -81,10 +83,23 @@ public class GlobalExceptionHandler {
     org.springframework.web.bind.MissingRequestHeaderException.class,
     HttpMessageNotReadableException.class,
     MethodArgumentTypeMismatchException.class,
+    MissingServletRequestPartException.class,
     MultipartException.class
   })
   public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception exception) {
     return error(ErrorCode.VALIDATION_FAILED);
+  }
+
+  /**
+   * 지원하지 않는 본문·multipart 파트 형식을 415 요청 오류로 변환한다.
+   *
+   * @param exception 지원하지 않는 미디어 유형
+   * @return 공통 검증 오류 본문과 415 상태
+   */
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(
+      HttpMediaTypeNotSupportedException exception) {
+    return ResponseEntity.status(415).body(ApiResponse.error(ErrorCode.VALIDATION_FAILED));
   }
 
   /** Spring Security 접근 거부를 공통 권한 오류로 변환한다. */

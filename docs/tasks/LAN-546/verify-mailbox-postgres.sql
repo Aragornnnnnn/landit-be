@@ -132,6 +132,43 @@ BEGIN
     RAISE NOTICE 'PASS: 반복 읽음의 무변경 및 수신자별 상태 분리';
 END $$;
 
+INSERT INTO mailbox_feedback_attachment
+    (feedback_id, object_key, content_type, file_size, display_order, created_at)
+VALUES (1, 'mailbox/feedback/first', 'image/png', 100, 0, now()),
+       (1, 'mailbox/feedback/second', 'image/jpeg', 5242880, 1, now());
+
+DO $$
+DECLARE statement TEXT;
+BEGIN
+    FOR statement IN SELECT * FROM (VALUES
+        ('UPDATE mailbox_feedback_attachment SET content_type = ''image/svg+xml'''),
+        ('UPDATE mailbox_feedback_attachment SET file_size = 0'),
+        ('UPDATE mailbox_feedback_attachment SET file_size = 5242881'),
+        ('UPDATE mailbox_feedback_attachment SET display_order = 3'),
+        ('UPDATE mailbox_feedback_attachment SET display_order = -1'),
+        ('UPDATE mailbox_feedback_attachment SET display_order = 0'),
+        ('UPDATE mailbox_feedback_attachment SET object_key = ''duplicate'''),
+        ('UPDATE mailbox_feedback_attachment SET feedback_id = 999')
+    ) AS cases(statement)
+    LOOP
+        BEGIN
+            EXECUTE statement;
+            RAISE EXCEPTION '첨부의 잘못된 입력을 거부하지 않았다: %', statement;
+        EXCEPTION WHEN check_violation OR unique_violation OR foreign_key_violation THEN
+            NULL;
+        END;
+    END LOOP;
+    IF (SELECT count(*) FROM mailbox_feedback_attachment) <> 2 THEN
+        RAISE EXCEPTION '기존 첨부가 보존되지 않았다.';
+    END IF;
+    DELETE FROM mailbox_letter_recipient WHERE representative_feedback_id = 1;
+    DELETE FROM mailbox_feedback WHERE id = 1;
+    IF EXISTS (SELECT 1 FROM mailbox_feedback_attachment) THEN
+        RAISE EXCEPTION '문의 삭제 시 첨부 메타데이터가 남았다.';
+    END IF;
+    RAISE NOTICE 'PASS: 첨부 저장, 형식·크기·순서·중복·외래 키 위반 8건 거부, 연쇄 삭제';
+END $$;
+
 SELECT version() AS verified_postgresql_version;
 ROLLBACK;
 \echo 'LAN-546 PostgreSQL verification passed; all fixture data rolled back.'
