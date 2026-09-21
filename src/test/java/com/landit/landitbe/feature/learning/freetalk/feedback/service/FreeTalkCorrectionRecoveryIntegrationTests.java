@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -21,6 +22,7 @@ import com.landit.landitbe.shared.domain.InnerThoughtType;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -79,16 +81,22 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
     recoveryService =
         new FreeTalkCorrectionRecoveryService(
             feedbackService, requestService, aiClient, retryProperties, new SyncTaskExecutor());
-    when(requestService.rebuild(MESSAGE_ID))
+    when(requestService.rebuild(anyLong()))
         .thenReturn(Optional.of(mock(AiFreeTalkInnerThoughtRequest.class)));
     seedMessage();
+    // 같은 DB를 쓰는 다른 테스트가 남긴 준비 상태 교정이 한 번에 넘겨받는 자리를 차지하지 않게 복구 대상에서 뺀다.
+    jdbcTemplate.update(
+        "update free_talk_message_feedback set lease_until = ? where processing_status ="
+            + " 'PREPARING'",
+        Timestamp.valueOf(LocalDateTime.now(clock).plusYears(1)));
   }
 
   @AfterEach
   void clearFixtures() {
     jdbcTemplate.update(
-        "delete from free_talk_message_feedback where session_history_message_id = ?", MESSAGE_ID);
-    jdbcTemplate.update("delete from session_history_message where id = ?", MESSAGE_ID);
+        "delete from free_talk_message_feedback where session_history_id = ?", SESSION_HISTORY_ID);
+    jdbcTemplate.update(
+        "delete from session_history_message where session_history_id = ?", SESSION_HISTORY_ID);
     jdbcTemplate.update("delete from session_history where id = ?", SESSION_HISTORY_ID);
     jdbcTemplate.update("delete from learning_session where id = ?", LEARNING_SESSION_ID);
     jdbcTemplate.update("delete from user_profile where id = ?", USER_ID);
@@ -164,6 +172,33 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
         .containsEntry("ATTEMPTS", 3)
         .containsEntry("ATTEMPT_TOKEN", null);
     verify(aiClient, never()).generateInnerThought(any());
+  }
+
+  @DisplayName("마지막 시도의 응답을 아직 기다려 주는 중이면 시도를 다 썼어도 실패로 확정하지 않는다.")
+  @Test
+  void doesNotAbandonLastAttemptThatIsStillInFlight() {
+    seedFeedback(3, LocalDateTime.now(clock).plusSeconds(60), "running-token");
+
+    assertThat(feedbackService.claimNextAttempt(MESSAGE_ID, 3)).isEmpty();
+
+    assertThat(feedbackRow())
+        .containsEntry("PROCESSING_STATUS", "PREPARING")
+        .containsEntry("ATTEMPT_TOKEN", "running-token");
+  }
+
+  @DisplayName("실패 확정은 찾았을 때의 시도 횟수가 그대로일 때만 한다. 그사이 시도 횟수가 달라진 교정은 건드리지 않는다.")
+  @Test
+  void abandonsOnlyWhenAttemptsAreUnchangedSinceFound() {
+    // 최대 시도가 더 컸던 때 네 번째 시도까지 간 교정이다. 찾았을 때 3회였다고 믿는 쪽의 확정은 반영되지 않는다.
+    seedFeedback(4, expired(), "dead-worker-token");
+
+    assertThat(feedbackService.claimNextAttempt(MESSAGE_ID, 3)).isEmpty();
+    assertThat(feedbackRow()).containsEntry("PROCESSING_STATUS", "PREPARING");
+
+    assertThat(feedbackService.claimNextAttempt(MESSAGE_ID, 4)).isEmpty();
+    assertThat(feedbackRow())
+        .containsEntry("PROCESSING_STATUS", "FAILED")
+        .containsEntry("ATTEMPT_TOKEN", null);
   }
 
   @DisplayName("시도 정보가 생기기 전부터 준비 상태로 남아 있던 교정(시도 0회·임대 없음)도 넘겨받는다.")
@@ -245,6 +280,37 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
     verify(aiClient, never()).generateInnerThought(any());
   }
 
+  @DisplayName("끝나지 못한 교정이 몰려 있어도 복구 한 번은 설정한 처리량만큼만 넘겨받아 AI 호출이 그 안에 묶인다.")
+  @Test
+  void claimsNoMoreThanBatchSizePerRun() {
+    seedFeedback(1, expired(), null);
+    for (int index = 1; index <= 11; index++) {
+      seedExtraMessageWithExpiredFeedback(MESSAGE_ID + index, index + 1);
+    }
+    when(aiClient.generateInnerThought(any())).thenReturn(result("속마음", CORRECTION));
+
+    recoveryService.recover();
+
+    assertThat(retryProperties.batchSize()).isEqualTo(10);
+    verify(aiClient, times(10)).generateInnerThought(any());
+    assertThat(countByStatus("COMPLETED")).isEqualTo(10);
+    assertThat(countByStatus("PREPARING")).isEqualTo(2);
+
+    recoveryService.recover();
+
+    assertThat(countByStatus("COMPLETED")).isEqualTo(12);
+  }
+
+  @DisplayName("재시도 설정은 기본값(최대 3회, 0초·1분·5분, 10건)으로 읽히고 테스트에서는 주기 복구가 꺼져 있다.")
+  @Test
+  void bindsRetrySettingsFromConfiguration() {
+    assertThat(retryProperties.maxAttempts()).isEqualTo(3);
+    assertThat(retryProperties.retryDelays())
+        .containsExactly(Duration.ZERO, Duration.ofMinutes(1), Duration.ofMinutes(5));
+    assertThat(retryProperties.batchSize()).isEqualTo(10);
+    assertThat(retryProperties.schedulingEnabled()).isFalse();
+  }
+
   @DisplayName("두 복구 워커가 같은 교정을 동시에 집어도 한 곳만 선점한다.")
   @Test
   void letsOnlyOneWorkerClaimTheSameCorrection() throws Exception {
@@ -275,6 +341,37 @@ class FreeTalkCorrectionRecoveryIntegrationTests {
 
   private double counter(String outcome) {
     return meterRegistry.counter("landit.free_talk.correction.retry", "outcome", outcome).count();
+  }
+
+  private int countByStatus(String status) {
+    return jdbcTemplate.queryForObject(
+        "select count(*) from free_talk_message_feedback"
+            + " where session_history_id = ? and processing_status = ?",
+        Integer.class,
+        SESSION_HISTORY_ID,
+        status);
+  }
+
+  private void seedExtraMessageWithExpiredFeedback(long messageId, int sequence) {
+    jdbcTemplate.update(
+        """
+        insert into session_history_message (
+            id, session_history_id, message_sequence, turn_number, role, content,
+            input_type, inner_thought_processing_status, created_at, updated_at)
+        values (?, ?, ?, ?, 'USER', 'I go to a gym.', 'TEXT', 'FAILED', CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP)
+        """,
+        messageId,
+        SESSION_HISTORY_ID,
+        sequence,
+        sequence);
+    jdbcTemplate.update(
+        "insert into free_talk_message_feedback (session_history_message_id, session_history_id,"
+            + " processing_status, attempts, lease_until, created_at, updated_at)"
+            + " values (?, ?, 'PREPARING', 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        messageId,
+        SESSION_HISTORY_ID,
+        Timestamp.valueOf(expired()));
   }
 
   private LocalDateTime expired() {
