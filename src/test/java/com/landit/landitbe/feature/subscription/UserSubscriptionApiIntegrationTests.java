@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.subscription;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -25,6 +27,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** 사용자 구독 상태·결제 이력 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다. */
 @ActiveProfiles("test")
@@ -53,6 +56,8 @@ class UserSubscriptionApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private Clock clock;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -442,6 +447,59 @@ class UserSubscriptionApiIntegrationTests {
         lastClearedAt == null ? 0 : 1,
         lastClearedAt,
         lastClearedAt);
+  }
+
+  @Test
+  @DisplayName("조회는 할인을 만들지 않고 최초 이탈만 5분을 부여하며 재조회·재로그인에도 유지한다.")
+  void grantsPromoOnceAndSharesItWithSubscription() throws Exception {
+    String token = login("promo-once");
+    long userId = userIdOf("promo-once");
+    subscription(token)
+        .andExpect(jsonPath("$.data.promo").isEmpty())
+        .andExpect(jsonPath("$.data.price").isEmpty())
+        .andExpect(jsonPath("$.data.currency").isEmpty());
+    assertThat(storedPromoExpiry(userId)).isNull();
+    JsonNode first = dismissPromo(token);
+    assertThat(first.path("remainingSeconds").asInt()).isEqualTo(300);
+    assertThat(first.path("newUser").asBoolean()).isTrue();
+    String expiresAt = first.path("expiresAt").asText();
+    assertThat(dismissPromo(login("promo-once")).path("expiresAt").asText()).isEqualTo(expiresAt);
+    subscription(token)
+        .andExpect(jsonPath("$.data.promo.expiresAt").value(expiresAt))
+        .andExpect(jsonPath("$.data.promo.newUser").value(true));
+    jdbcTemplate.update(
+        "UPDATE user_profile SET created_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).minusDays(30),
+        userId);
+    assertThat(dismissPromo(token).path("newUser").asBoolean()).isTrue();
+  }
+
+  private LocalDateTime storedPromoExpiry(long userId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT discount_offer_expires_at FROM user_profile WHERE id = ?",
+        LocalDateTime.class,
+        userId);
+  }
+
+  private ResultActions subscription(String token) throws Exception {
+    return mockMvc
+        .perform(
+            get("/api/v1/me/subscription").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+  }
+
+  private JsonNode dismissPromo(String token) throws Exception {
+    var result =
+        mockMvc
+            .perform(
+                post("/api/v1/me/paywall/dismiss")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper
+        .readTree(result.getResponse().getContentAsByteArray())
+        .path("data")
+        .path("promo");
   }
 
   private Long userIdOf(String userKey) {
