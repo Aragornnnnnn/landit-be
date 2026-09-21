@@ -7,10 +7,14 @@ import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkCorrectionAttempt;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository.RecoverableCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
+import jakarta.annotation.PreDestroy;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.task.TaskExecutor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +22,7 @@ import org.springframework.stereotype.Service;
  * 끝나지 못한 턴 교정의 복구 워커다.
  *
  * <p>교정은 서버 메모리 안의 비동기 콜백이 저장한다. 서버가 재시작되면 콜백이 사라지고, AI가 판정을 돌려주지 못하면 교정이 비어 버린다. 프론트는 교정을 폴링하지
- * 않으므로 서버가 스스로 끝내야 한다. 준비 상태이면서 임대가 끝난 교정을 주기적으로 넘겨받아 같은 입력으로 다시 요청한다.
+ * 않으므로 서버가 스스로 끝내야 한다. 준비 상태이면서 임대가 끝난 교정을 주기적으로 넘겨받아 같은 대화로 다시 요청한다.
  *
  * <p>이 워커는 세션 잠금 밖에서 교정 행을 쓴다. 그래서 행을 읽어서 고치지 않고 조건부 갱신으로만 쓴다. 다시 요청한 응답의 속마음은 버린다. 속마음은 대화 중에만 의미가
  * 있고 이미 끝나 있다.
@@ -31,15 +35,41 @@ public class FreeTalkCorrectionRecoveryService {
   private final FreeTalkCorrectionRequestService requestService;
   private final AiFreeTalkClient aiFreeTalkClient;
   private final FreeTalkCorrectionRetryProperties retryProperties;
-  private final TaskExecutor executor;
+  private final Executor executor;
+  private final AtomicBoolean draining = new AtomicBoolean();
 
-  /** AI 호출은 스케줄러 스레드를 붙잡지 않도록 작업 실행기로 넘긴다. */
+  /**
+   * 복구 전용 스레드 하나로 워커를 만든다.
+   *
+   * <p>실시간 속마음 호출과 같은 실행기를 쓰지 않는다. AI가 느려져 다시 시도할 교정이 늘어날수록 복구가 실시간 요청의 자리를 차지하게 되기 때문이다. 스레드가 하나라
+   * 복구의 AI 호출은 한 번에 하나만 나간다.
+   */
+  @Autowired
   public FreeTalkCorrectionRecoveryService(
       FreeTalkMessageFeedbackService feedbackService,
       FreeTalkCorrectionRequestService requestService,
       AiFreeTalkClient aiFreeTalkClient,
+      FreeTalkCorrectionRetryProperties retryProperties) {
+    this(
+        feedbackService,
+        requestService,
+        aiFreeTalkClient,
+        retryProperties,
+        Executors.newSingleThreadExecutor(
+            task -> {
+              Thread thread = new Thread(task, "free-talk-correction-recovery");
+              thread.setDaemon(true);
+              return thread;
+            }));
+  }
+
+  /** 테스트에서 복구를 같은 스레드에서 끝까지 돌릴 수 있게 실행기를 받는다. */
+  FreeTalkCorrectionRecoveryService(
+      FreeTalkMessageFeedbackService feedbackService,
+      FreeTalkCorrectionRequestService requestService,
+      AiFreeTalkClient aiFreeTalkClient,
       FreeTalkCorrectionRetryProperties retryProperties,
-      @Qualifier("applicationTaskExecutor") TaskExecutor executor) {
+      Executor executor) {
     this.feedbackService = feedbackService;
     this.requestService = requestService;
     this.aiFreeTalkClient = aiFreeTalkClient;
@@ -57,33 +87,55 @@ public class FreeTalkCorrectionRecoveryService {
     }
   }
 
-  /** 임대가 끝난 교정을 선점해 다시 시도한다. 한 건의 실패가 나머지 복구를 막지 않는다. */
+  /**
+   * 임대가 끝난 교정을 복구 스레드에서 하나씩 다시 시도한다. 앞선 복구가 아직 돌고 있으면 새로 시작하지 않는다.
+   *
+   * <p>AI 호출이 스케줄러 스레드를 붙잡지 않도록 복구 스레드로 넘긴다.
+   */
   public void recover() {
-    for (RecoverableCorrection candidate : feedbackService.findRecoverable()) {
-      try {
-        feedbackService
-            .claimNextAttempt(candidate.getSessionHistoryMessageId(), candidate.getAttempts())
-            .ifPresent(this::dispatch);
-      } catch (RuntimeException exception) {
-        log.warn(
-            "workflow=free_talk_correction_retry outcome=claim_error messageId={} error={}",
-            candidate.getSessionHistoryMessageId(),
-            exception.getClass().getSimpleName());
-      }
+    if (!draining.compareAndSet(false, true)) {
+      return;
+    }
+    try {
+      executor.execute(this::drain);
+    } catch (RuntimeException exception) {
+      draining.set(false);
+      log.warn(
+          "workflow=free_talk_correction_retry outcome=not_started error={}",
+          exception.getClass().getSimpleName());
     }
   }
 
-  // 실행기가 작업을 받지 못하면 이번 시도를 실패한 시도로 끝내 다음 주기에 다시 집히게 한다.
-  private void dispatch(FreeTalkCorrectionAttempt attempt) {
+  /** 서버가 내려갈 때 복구 스레드를 정리한다. 처리 중이던 시도는 임대가 끝난 뒤 다른 서버가 넘겨받는다. */
+  @PreDestroy
+  void shutdown() {
+    if (executor instanceof ExecutorService service) {
+      service.shutdownNow();
+    }
+  }
+
+  // 찾은 교정을 하나씩 "선점 → 호출 → 저장"한다. 선점을 호출 직전에 해야 임대가 줄을 서서 기다리는 동안 끝나 버리지 않는다.
+  // 한 건의 실패가 나머지 복구를 막지 않는다.
+  private void drain() {
     try {
-      executor.execute(() -> run(attempt));
+      for (RecoverableCorrection candidate : feedbackService.findRecoverable()) {
+        try {
+          feedbackService
+              .claimNextAttempt(candidate.getSessionHistoryMessageId(), candidate.getAttempts())
+              .ifPresent(this::run);
+        } catch (RuntimeException exception) {
+          log.warn(
+              "workflow=free_talk_correction_retry outcome=claim_error messageId={} error={}",
+              candidate.getSessionHistoryMessageId(),
+              exception.getClass().getSimpleName());
+        }
+      }
     } catch (RuntimeException exception) {
       log.warn(
-          "workflow=free_talk_correction_retry outcome=rejected messageId={} attempt={} error={}",
-          attempt.messageId(),
-          attempt.attempt(),
+          "workflow=free_talk_correction_retry outcome=find_error error={}",
           exception.getClass().getSimpleName());
-      feedbackService.retryOrFail(attempt.messageId(), attempt.attempt(), attempt.token());
+    } finally {
+      draining.set(false);
     }
   }
 

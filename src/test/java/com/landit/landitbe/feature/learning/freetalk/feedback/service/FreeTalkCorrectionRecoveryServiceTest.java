@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,16 +18,17 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkCorrec
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository.RecoverableCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.core.task.TaskRejectedException;
 
 /** 턴 교정 복구 워커의 주기 실행 스위치와 한 건의 실패가 나머지를 막지 않는지 검증한다. */
 class FreeTalkCorrectionRecoveryServiceTest {
@@ -72,20 +74,48 @@ class FreeTalkCorrectionRecoveryServiceTest {
     verify(feedbackService).abandonAttempt(second);
   }
 
-  @DisplayName("실행기가 작업을 받지 못하면 선점한 시도를 끝내 다음 주기에 다시 집히게 한다.")
+  @DisplayName("앞선 복구가 아직 돌고 있으면 새 복구를 시작하지 않아, 복구의 AI 호출이 한 번에 하나만 나간다.")
   @Test
-  void releasesClaimedAttemptWhenExecutorRejects() {
-    TaskExecutor rejecting = mock(TaskExecutor.class);
-    doThrow(new TaskRejectedException("full")).when(rejecting).execute(any());
-    List<RecoverableCorrection> candidates = List.of(recoverable(1L, 1));
-    when(feedbackService.findRecoverable()).thenReturn(candidates);
-    when(feedbackService.claimNextAttempt(1L, 1))
-        .thenReturn(Optional.of(new FreeTalkCorrectionAttempt(1L, 2, "token-2")));
+  void doesNotStartAnotherRunWhileOneIsDraining() {
+    // 넘겨받은 작업을 돌리지 않고 붙잡아 두는 실행기로 "복구가 아직 도는 중"을 만든다.
+    List<Runnable> held = new ArrayList<>();
+    FreeTalkCorrectionRecoveryService service = service(true, held::add);
+    when(feedbackService.findRecoverable()).thenReturn(List.of());
 
-    service(true, rejecting).recover();
+    service.recover();
+    service.recover();
 
-    verify(feedbackService).retryOrFail(1L, 2, "token-2");
-    verify(aiClient, never()).generateInnerThought(any());
+    assertThat(held).hasSize(1);
+    // 앞선 복구가 끝나면 다음 주기에는 다시 시작한다.
+    held.getFirst().run();
+    service.recover();
+    assertThat(held).hasSize(2);
+  }
+
+  @DisplayName("복구 스레드에 작업을 넘기지 못해도 다음 주기에 다시 시작할 수 있다.")
+  @Test
+  void canStartAgainAfterExecutorRefusedTheRun() {
+    Executor refusing = mock(Executor.class);
+    doThrow(new RejectedExecutionException("shutting down")).when(refusing).execute(any());
+    FreeTalkCorrectionRecoveryService service = service(true, refusing);
+
+    assertThatCode(service::recover).doesNotThrowAnyException();
+    service.recover();
+
+    verify(refusing, times(2)).execute(any());
+    verify(feedbackService, never()).findRecoverable();
+  }
+
+  @DisplayName("복구 대상을 찾다가 예외가 나도 다음 주기에 다시 시작할 수 있다.")
+  @Test
+  void canStartAgainAfterFindingFailed() {
+    when(feedbackService.findRecoverable()).thenThrow(new IllegalStateException("db down"));
+    FreeTalkCorrectionRecoveryService service = service(true, new SyncTaskExecutor());
+
+    assertThatCode(service::recover).doesNotThrowAnyException();
+    service.recover();
+
+    verify(feedbackService, times(2)).findRecoverable();
   }
 
   @DisplayName("AI 호출 예외의 메시지에는 사용자 발화가 섞일 수 있어 로그에는 예외 종류만 남긴다.")
@@ -109,7 +139,7 @@ class FreeTalkCorrectionRecoveryServiceTest {
         .doesNotContain("비밀");
   }
 
-  private FreeTalkCorrectionRecoveryService service(boolean enabled, TaskExecutor executor) {
+  private FreeTalkCorrectionRecoveryService service(boolean enabled, Executor executor) {
     return new FreeTalkCorrectionRecoveryService(
         feedbackService,
         requestService,
