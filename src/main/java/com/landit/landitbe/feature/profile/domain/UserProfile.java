@@ -87,6 +87,12 @@ public class UserProfile extends BaseTimeEntity {
   @Column(name = "subscription_expires_at")
   private LocalDateTime subscriptionExpiresAt;
 
+  @Column(name = "discount_offer_expires_at")
+  private LocalDateTime discountOfferExpiresAt;
+
+  @Column(name = "discount_offer_new_user")
+  private Boolean discountOfferNewUser;
+
   @Column(name = "subscription_event_at")
   private LocalDateTime subscriptionEventAt;
 
@@ -236,6 +242,19 @@ public class UserProfile extends BaseTimeEntity {
    */
   public boolean isPremium() {
     return subscriptionStatus.isPremium();
+  }
+
+  /**
+   * 프로필 잠금 아래 최초 할인 기회의 만료 시각과 혜택 구분을 기록한다.
+   *
+   * @param expiresAt 할인 만료 시각
+   * @param newUser 부여 당시 신규 사용자 혜택 여부
+   */
+  public void grantDiscountOffer(LocalDateTime expiresAt, boolean newUser) {
+    if (discountOfferExpiresAt == null) {
+      discountOfferExpiresAt = expiresAt;
+      discountOfferNewUser = newUser;
+    }
   }
 
   /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
