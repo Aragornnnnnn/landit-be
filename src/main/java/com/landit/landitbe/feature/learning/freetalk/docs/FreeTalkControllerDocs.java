@@ -215,7 +215,22 @@ public interface FreeTalkControllerDocs {
    */
   @Operation(
       summary = "지난 프리톡 상세 조회",
-      description = "인증된 사용자가 완료한 프리톡의 세션 정보와 전체 대화를 조회한다.",
+      description =
+          "인증된 사용자가 완료한 프리톡의 세션 정보와 전체 대화를 조회한다. 사용자 메시지에는 턴 교정(correction)과"
+              + " 교정 처리 상태(correctionStatus)가 함께 내려가고, correctionCount는 교정이 있는 사용자 메시지"
+              + " 수다. correction이 null이고 correctionStatus가 COMPLETED면 고칠 것이 없는 턴, PREPARING이면"
+              + " 생성 중이라 재조회가 필요한 턴, FAILED면 교정을 만들지 못한 턴이다. 생성 중인 교정은 서버가 스스로"
+              + " 끝낸다. AI가 판정을 돌려주지 못했거나 서버가 재시작되면 최대 3회까지 다시 시도하고, 그래도 만들지 못하면"
+              + " FAILED로 확정하므로 PREPARING이 끝없이 남지 않는다. 한 번 COMPLETED나 FAILED가 된 교정은 다시 바뀌지"
+              + " 않는다. AI 메시지는 세 필드가 모두"
+              + " null이다. correction.memoryTag는 장기기억을 근거로 한 교정에만 \"9/13 스몰톡에서 말한 헬스장\""
+              + " 형식(한국어 고정)으로 내려주고, 라벨을 만들지 못했으면 \"9/13 스몰톡에서 말한 내용\"으로 채운다."
+              + " 기억을 근거로 쓰지 않은 교정은 null이다. 태그는 교정과 함께 저장한 값이라 그 기억이 나중에 바뀌어도"
+              + " 달라지지 않는다. reusedExpression은 사용자가 이전에 학습을 마친 표현을 그 메시지에서 다시 썼을 때만"
+              + " 내려준다. matchedText는 content 안에 대소문자까지 그대로 들어 있는 구절이라 그 위치에 밑줄을 그으면"
+              + " 된다. 한 메시지에서 여러 표현을 썼어도 하나만 내려주고, 다시 쓴 표현이 없거나 AI 메시지면 null이다. 세션 종료 후"
+              + " expressionGenerationStatus가 PREPARING인 동안은 아직 판정 전이라 null일 수 있다. 교정은"
+              + " 진행 중인 대화의 응답에는 포함되지 않는다. 구독이 만료된 사용자도 본인이 완료한 세션은 조회할 수 있다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

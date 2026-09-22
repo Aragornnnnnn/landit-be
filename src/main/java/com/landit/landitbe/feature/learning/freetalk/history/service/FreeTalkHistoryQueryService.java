@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.content.expression.dto.ExpressionText;
 import com.landit.landitbe.feature.content.expression.service.ExpressionContentService;
 import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
+import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -17,15 +18,21 @@ import com.landit.landitbe.feature.learning.freetalk.expression.domain.Expressio
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionLearningStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkReusedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseQueryService;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionDetailResponse;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -38,12 +45,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkHistoryQueryService {
 
+  // 월/일 스몰톡에서 말한 {라벨}
+  private static final String MEMORY_TAG_FORMAT = "%d/%d 스몰톡에서 말한 %s";
+  private static final String DEFAULT_MEMORY_LABEL = "내용";
+
   private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final SessionHistoryService sessionHistoryService;
   private final ConversationMessageService conversationMessageService;
   private final FreeTalkSessionExpressionRepository sessionExpressionRepository;
   private final ExpressionContentService expressionContentService;
+  private final FreeTalkMessageFeedbackService messageFeedbackService;
+  private final FreeTalkExpressionReuseQueryService expressionReuseQueryService;
 
   /**
    * 완료 프리톡을 최신순 페이지로 조회한다.
@@ -114,21 +127,22 @@ public class FreeTalkHistoryQueryService {
             lastRecommendedAtByExpressionId);
 
     // 대화 메시지는 저장 순서대로 API 응답 형태로 변환한다.
+    // 교정과 다시 쓴 표현은 메시지마다 조회하지 않고 세션 단위로 한 번에 읽어 메시지 ID로 붙인다.
+    Map<Long, FreeTalkTurnCorrection> correctionsByMessageId =
+        messageFeedbackService.findBySessionHistoryId(history.getId());
+    Map<Long, FreeTalkReusedExpression> reusedByMessageId =
+        expressionReuseQueryService.findFirstByMessageId(session.getId());
     List<FreeTalkSessionDetailResponse.Message> messages =
         conversationMessageService.findAll(history.getId()).stream()
             .map(
                 message ->
-                    new FreeTalkSessionDetailResponse.Message(
-                        message.getId(),
-                        message.getTurnNumber(),
-                        message.getMessageSequence(),
-                        message.getRole().name(),
-                        message.getContent(),
-                        message.getTranslatedContent(),
-                        message.getEmotion(),
-                        message.getInnerThought(),
-                        message.getInnerThoughtType()))
+                    toMessageResponse(
+                        message,
+                        correctionsByMessageId.get(message.getId()),
+                        reusedByMessageId.get(message.getId())))
             .toList();
+    int correctionCount =
+        Math.toIntExact(messages.stream().filter(message -> message.correction() != null).count());
 
     return new FreeTalkSessionDetailResponse(
         learningSessionId,
@@ -137,10 +151,72 @@ public class FreeTalkHistoryQueryService {
         completedSession.learningSession().getStartedAt(),
         completedSession.learningSession().getEndedAt(),
         session.getAccumulatedSpeakingDurationMs(),
+        correctionCount,
         messages,
         session.getExpressionGenerationStatus(),
         progress.learningStatus(),
         progress.expressions());
+  }
+
+  // 교정과 다시 쓴 표현은 완료된 세션의 기록에서만 내려준다.
+  private FreeTalkSessionDetailResponse.Message toMessageResponse(
+      SessionHistoryMessageSnapshot message,
+      FreeTalkTurnCorrection turnCorrection,
+      FreeTalkReusedExpression reusedExpression) {
+    return new FreeTalkSessionDetailResponse.Message(
+        message.getId(),
+        message.getTurnNumber(),
+        message.getMessageSequence(),
+        message.getRole().name(),
+        message.getContent(),
+        message.getTranslatedContent(),
+        message.getEmotion(),
+        message.getInnerThought(),
+        message.getInnerThoughtType(),
+        turnCorrection == null ? null : turnCorrection.status(),
+        toCorrectionResponse(turnCorrection),
+        reusedExpression == null
+            ? null
+            : new FreeTalkSessionDetailResponse.ReusedExpression(
+                reusedExpression.expressionId(),
+                reusedExpression.text(),
+                reusedExpression.matchedText()));
+  }
+
+  // 고칠 것이 없거나 생성 중·실패인 턴은 교정 없이 상태만 내려준다.
+  private FreeTalkSessionDetailResponse.Correction toCorrectionResponse(
+      FreeTalkTurnCorrection turnCorrection) {
+    if (turnCorrection == null || turnCorrection.sentence() == null) {
+      return null;
+    }
+    FreeTalkTurnCorrection.Sentence sentence = turnCorrection.sentence();
+    return new FreeTalkSessionDetailResponse.Correction(
+        sentence.originalSentence(),
+        sentence.betterSentence(),
+        sentence.reason(),
+        sentence.mistakePattern(),
+        memoryTag(sentence));
+  }
+
+  /**
+   * 기억을 근거로 한 교정에 "9/13 스몰톡에서 말한 헬스장" 같은 태그를 만든다.
+   *
+   * <p>지난 기록은 조회할 때마다 같아야 하므로 교정과 함께 저장해 둔 날짜와 라벨만 쓰고 기억 테이블을 다시 읽지 않는다. AI가 라벨을 주지 못한 교정은 기본 문구로
+   * 채운다. 기억을 근거로 쓰지 않은 교정은 태그가 없다. 문구는 현재 서비스하는 기준 언어(KR)에 맞춘 한국어 고정이다.
+   */
+  private static String memoryTag(FreeTalkTurnCorrection.Sentence sentence) {
+    LocalDate observedOn = sentence.memoryObservedOn();
+    if (observedOn == null) {
+      return null;
+    }
+    String label = sentence.memoryLabel() == null ? DEFAULT_MEMORY_LABEL : sentence.memoryLabel();
+    // 서버 기본 로케일에 따라 숫자 표기가 달라지지 않게 고정한다.
+    return String.format(
+        Locale.ROOT,
+        MEMORY_TAG_FORMAT,
+        observedOn.getMonthValue(),
+        observedOn.getDayOfMonth(),
+        label);
   }
 
   private FreeTalkSessionListResponse.Item toListItem(

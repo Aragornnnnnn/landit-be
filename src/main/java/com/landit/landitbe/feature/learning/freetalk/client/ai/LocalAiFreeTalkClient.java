@@ -3,12 +3,17 @@
 package com.landit.landitbe.feature.learning.freetalk.client.ai;
 
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryEntry;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationExcerpt;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingRequest;
@@ -58,7 +63,8 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
     String innerThought = "사용자가 대화를 자연스럽게 이어가고 있다.";
-    return new AiFreeTalkInnerThoughtResult(innerThought, InnerThoughtType.GOOD);
+    return new AiFreeTalkInnerThoughtResult(
+        innerThought, InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true));
   }
 
   /** {@inheritDoc} */
@@ -90,6 +96,26 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
       AiConversationEmbeddingsRequest request) {
     return new AiConversationEmbeddingsResult(
         List.of(new AiConversationExcerpt("That sounds interesting.", firstAxisEmbedding())));
+  }
+
+  /** 로컬 테스트에서 원문 첫 사용자 발화를 요약으로 반환한다. */
+  @Override
+  public AiFreeTalkContextSummaryResult generateContextSummary(
+      AiFreeTalkContextSummaryRequest request) {
+    var userStatement =
+        request.sourceMessages().stream()
+            .filter(message -> "USER".equals(message.role()))
+            .findFirst()
+            .map(
+                message ->
+                    new AiFreeTalkSessionSummaryEntry(
+                        message.content(), List.of(message.messageId())))
+            .orElse(null);
+    List<AiFreeTalkSessionSummaryEntry> statements =
+        userStatement == null ? List.of() : List.of(userStatement);
+    var content = new AiFreeTalkSessionSummaryContent("프리톡 대화", statements, List.of(), List.of());
+    return new AiFreeTalkContextSummaryResult(
+        request.policyVersion(), request.baseRevision(), request.targetThroughSequence(), content);
   }
 
   // 테스트에서 예측할 수 있도록 첫 성분만 1인 고정 임베딩을 만든다.

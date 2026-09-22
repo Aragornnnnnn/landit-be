@@ -395,7 +395,17 @@ class NotificationJobIntegrationTests {
     adminJobs.updateSettings(USER_ID, new TrialReminderSettings(true, true));
     processor.process(mail.id());
     verifyNoInteractions(sender);
-    verify(push).sendAll(org.mockito.ArgumentMatchers.anyList());
+    verify(push)
+        .sendAll(
+            org.mockito.ArgumentMatchers.argThat(
+                commands ->
+                    commands.size() == 1
+                        && commands
+                            .getFirst()
+                            .deepLink()
+                            .equals(
+                                "/me/subscription?utm_source=push&utm_medium=notification"
+                                    + "&utm_campaign=trial_ending&utm_content=trial_ending_subscription_check")));
   }
 
   @DisplayName("푸시를 꺼도 이메일 발송은 막지 않는다.")

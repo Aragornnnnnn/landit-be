@@ -71,4 +71,13 @@ public interface UserWritingExpressionCompletionRepository
           Long userProfileId,
           Collection<Long> writingExpressionIds,
           ExpressionLearningSource learningSource);
+
+  /**
+   * 사용자가 학습을 마친 표현을 가장 최근에 마친 순으로 조회한다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @return 최근에 학습을 마친 순의 완료 이력
+   */
+  List<UserWritingExpressionCompletion> findAllByUserProfileIdOrderByLastCompletedAtDescIdDesc(
+      Long userProfileId);
 }

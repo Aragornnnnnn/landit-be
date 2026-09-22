@@ -132,7 +132,8 @@ class PushQueueMessageHandlerTest {
     Instant occurredAt = Instant.parse("2026-09-02T00:00:00Z");
     String expectedDeepLink =
         "/mailbox/received/10"
-            + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply";
+            + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply"
+            + "&utm_content=mailbox_reply_arrived";
     PushQueueMessage message =
         new PushQueueMessage(
             1,

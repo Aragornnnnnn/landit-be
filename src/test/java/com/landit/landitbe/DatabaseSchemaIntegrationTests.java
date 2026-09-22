@@ -30,6 +30,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StreamUtils;
@@ -339,6 +340,93 @@ class DatabaseSchemaIntegrationTests {
     assertColumnDoesNotExist("scenario_language_variant", "ai_opening_message_translation");
     assertColumnDoesNotExist("scenario_language_variant", "ai_opening_inner_thought");
     assertColumnDoesNotExist("scenario_language_variant", "ai_opening_inner_thought_type");
+  }
+
+  /** V112 migration은 프리톡 턴 교정을 대화 메시지와 분리한 피드백 테이블에 둔다. */
+  @DisplayName("V112 migration은 프리톡 턴 교정을 대화 메시지와 분리한 피드백 테이블에 둔다.")
+  @Test
+  void v112AddsFreeTalkMessageFeedbackTable() {
+    assertTableExists("free_talk_message_feedback");
+    assertColumnExists("free_talk_message_feedback", "session_history_message_id");
+    assertColumnExists("free_talk_message_feedback", "session_history_id");
+    assertColumnExists("free_talk_message_feedback", "processing_status");
+    assertColumnExists("free_talk_message_feedback", "reacted_to_partner");
+    assertColumnExists("free_talk_message_feedback", "original_sentence");
+    assertColumnExists("free_talk_message_feedback", "better_sentence");
+    assertColumnExists("free_talk_message_feedback", "reason");
+    assertColumnExists("free_talk_message_feedback", "mistake_pattern");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "uk_free_talk_message_feedback_message");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "chk_free_talk_message_feedback_status");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "chk_free_talk_message_feedback_sentence");
+    // 시나리오와 함께 쓰는 대화 메시지 테이블에는 프리톡 교정 컬럼을 두지 않는다.
+    assertColumnDoesNotExist("session_history_message", "correction_better");
+    assertColumnDoesNotExist("session_history_message", "correction_processing_status");
+    assertColumnDoesNotExist("session_history_message", "mistake_pattern");
+  }
+
+  /** V113 migration은 턴 교정의 근거 기억과 말한 날짜, 화면 라벨을 피드백 테이블에 추가한다. */
+  @DisplayName("V113 migration은 턴 교정의 근거 기억과 말한 날짜, 화면 라벨을 피드백 테이블에 추가한다.")
+  @Test
+  void v113AddsCorrectionMemoryToFreeTalkMessageFeedback() {
+    assertColumnExists("free_talk_message_feedback", "memory_id");
+    assertColumnExists("free_talk_message_feedback", "memory_observed_on");
+    assertColumnExists("free_talk_message_feedback", "memory_label");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "chk_free_talk_message_feedback_memory");
+  }
+
+  /** V115 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다. */
+  @DisplayName("V115 migration은 스몰톡 요약 마지막에 보여 줄 후속 질문 테이블을 추가한다.")
+  @Test
+  void v115AddsFreeTalkFollowUpTable() {
+    assertTableExists("free_talk_follow_up");
+    assertColumnExists("free_talk_follow_up", "user_profile_id");
+    assertColumnExists("free_talk_follow_up", "free_talk_session_id");
+    assertColumnExists("free_talk_follow_up", "memory_id");
+    assertColumnExists("free_talk_follow_up", "trigger_type");
+    assertColumnExists("free_talk_follow_up", "question");
+    assertColumnExists("free_talk_follow_up", "invite");
+    assertTableConstraintExists("free_talk_follow_up", "uk_free_talk_follow_up_session");
+    assertTableConstraintExists("free_talk_follow_up", "chk_free_talk_follow_up_trigger");
+    assertTableConstraintExists(
+        "free_talk_follow_up", "chk_free_talk_follow_up_none_without_memory");
+    assertTableConstraintExists("free_talk_follow_up", "chk_free_talk_follow_up_text");
+  }
+
+  /** V117 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다. */
+  @DisplayName("V117 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다.")
+  @Test
+  void v117AddsCorrectionRetryColumnsToFreeTalkMessageFeedback() {
+    assertColumnExists("free_talk_message_feedback", "attempts");
+    assertColumnExists("free_talk_message_feedback", "lease_until");
+    assertColumnExists("free_talk_message_feedback", "attempt_token");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "chk_free_talk_message_feedback_attempts");
+  }
+
+  /** V118 migration은 스몰톡에서 배운 표현을 다시 쓴 기록 테이블을 추가한다. */
+  @DisplayName("V118 migration은 스몰톡에서 배운 표현을 다시 쓴 기록 테이블을 추가한다.")
+  @Test
+  void v118AddsFreeTalkExpressionReuseTable() {
+    assertTableExists("free_talk_expression_reuse");
+    assertColumnExists("free_talk_expression_reuse", "session_history_message_id");
+    assertColumnExists("free_talk_expression_reuse", "writing_expression_id");
+    assertColumnExists("free_talk_expression_reuse", "expression_text");
+    assertColumnExists("free_talk_expression_reuse", "expression_meaning");
+    assertColumnExists("free_talk_expression_reuse", "source_type");
+    assertColumnExists("free_talk_expression_reuse", "source_title");
+    assertColumnExists("free_talk_expression_reuse", "source_learned_on");
+    assertColumnExists("free_talk_expression_reuse", "matched_text");
+    assertColumnExists("free_talk_expression_reuse", "quoted_sentence");
+    assertTableConstraintExists(
+        "free_talk_expression_reuse", "uk_free_talk_expression_reuse_message_expression");
+    assertTableConstraintExists(
+        "free_talk_expression_reuse", "chk_free_talk_expression_reuse_source");
+    assertTableConstraintExists(
+        "free_talk_expression_reuse", "chk_free_talk_expression_reuse_text");
   }
 
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
@@ -1344,6 +1432,414 @@ class DatabaseSchemaIntegrationTests {
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
+  /** 기존 프리톡 사용자 발화만 교정 실패 행으로 채우고 시나리오 발화와 AI 메시지에는 행을 만들지 않도록 V112를 적용한다. */
+  @DisplayName("기존 프리톡 사용자 발화만 교정 실패 행으로 채우고 시나리오 발화와 AI 메시지에는 행을 만들지 않도록 V112를 적용한다.")
+  @Test
+  void v112BackfillsOnlyExistingFreeTalkUserMessagesAsFailedFeedback() {
+    // H2는 제약을 만든 연결이 닫히면 IN 목록 CHECK를 평가하지 못해 정상 UPDATE까지 거부한다.
+    // 어떤 제약이 막았는지 가려내야 하므로 migration과 검증이 한 연결을 끝까지 같이 쓴다.
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, "107");
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      // 백필은 세션 유형과 화자만 보므로 사용자 프로필 없이 히스토리만 심는다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacySessionHistory(migrationJdbcTemplate, 2L, "SCENARIO");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 12L, 1L, 2, "AI");
+      insertLegacyMessage(migrationJdbcTemplate, 21L, 2L, 1, "USER");
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+
+      migrate(dataSource, null);
+
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT session_history_message_id || ':' || session_history_id || ':'"
+                      + " || processing_status FROM free_talk_message_feedback",
+                  String.class))
+          .containsExactly("11:1:FAILED");
+      // 교정문만 있고 원문·이유·실수 패턴이 없는 반쪽 교정은 저장할 수 없다.
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "UPDATE free_talk_message_feedback SET better_sentence = 'I went.',"
+                          + " processing_status = 'COMPLETED'"
+                          + " WHERE session_history_message_id = 11"))
+          .isInstanceOf(DataIntegrityViolationException.class)
+          .hasMessageContaining("chk_free_talk_message_feedback_sentence");
+      // 네 값이 모두 있는 교정은 저장된다.
+      assertThat(
+              migrationJdbcTemplate.update(
+                  "UPDATE free_talk_message_feedback SET original_sentence = 'I go.',"
+                      + " better_sentence = 'I went.', reason = '과거 일이에요.',"
+                      + " mistake_pattern = 'TENSE', processing_status = 'COMPLETED'"
+                      + " WHERE session_history_message_id = 11"))
+          .isEqualTo(1);
+      // 한 발화에 교정을 두 개 둘 수 없다.
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "INSERT INTO free_talk_message_feedback (session_history_message_id,"
+                          + " session_history_id, processing_status, created_at, updated_at)"
+                          + " VALUES (11, 1, 'PREPARING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"))
+          .isInstanceOf(DataIntegrityViolationException.class)
+          .hasMessageContaining("uk_free_talk_message_feedback_message");
+      // 교정은 메시지의 부속물이라 메시지가 지워지면 함께 지워진다.
+      migrationJdbcTemplate.update("DELETE FROM session_history_message WHERE id = 11");
+      assertThat(
+              migrationJdbcTemplate.queryForObject(
+                  "SELECT count(*) FROM free_talk_message_feedback", Integer.class))
+          .isZero();
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  /** 근거 기억은 교정 문장·말한 날짜와 함께일 때만, 라벨은 근거 기억이 있을 때만 저장되도록 V113을 적용한다. */
+  @DisplayName("근거 기억은 교정 문장·말한 날짜와 함께일 때만, 라벨은 근거 기억이 있을 때만 저장되도록 V113을 적용한다.")
+  @Test
+  void v113RejectsInconsistentCorrectionMemory() {
+    // V112 백필 검증과 같은 이유로 migration과 검증이 한 연결을 같이 쓴다.
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 12L, 1L, 3, "USER");
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      for (long messageId : new long[] {11L, 12L}) {
+        migrationJdbcTemplate.update(
+            "INSERT INTO free_talk_message_feedback (session_history_message_id,"
+                + " session_history_id, processing_status, created_at, updated_at)"
+                + " VALUES (?, 1, 'PREPARING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            messageId);
+      }
+      migrationJdbcTemplate.update(
+          "UPDATE free_talk_message_feedback SET original_sentence = 'at a gym',"
+              + " better_sentence = 'at the gym', reason = '둘 다 아는 곳이에요.',"
+              + " mistake_pattern = 'ARTICLE', processing_status = 'COMPLETED'"
+              + " WHERE session_history_message_id = 12");
+
+      // 교정 문장이 없는 발화는 근거 기억을 가질 수 없다.
+      assertCorrectionMemoryRejected(
+          migrationJdbcTemplate,
+          "UPDATE free_talk_message_feedback SET memory_id = 42,"
+              + " memory_observed_on = DATE '2026-09-13' WHERE session_history_message_id = 11");
+      // 지난 기록의 태그가 바뀌지 않으려면 근거 기억은 말한 날짜와 함께 저장되어야 한다.
+      assertCorrectionMemoryRejected(
+          migrationJdbcTemplate,
+          "UPDATE free_talk_message_feedback SET memory_id = 42"
+              + " WHERE session_history_message_id = 12");
+      assertCorrectionMemoryRejected(
+          migrationJdbcTemplate,
+          "UPDATE free_talk_message_feedback SET memory_observed_on = DATE '2026-09-13'"
+              + " WHERE session_history_message_id = 12");
+      // 근거 기억 없이 라벨만 저장할 수 없다.
+      assertCorrectionMemoryRejected(
+          migrationJdbcTemplate,
+          "UPDATE free_talk_message_feedback SET memory_label = '헬스장'"
+              + " WHERE session_history_message_id = 12");
+      // 라벨 없이 근거 기억과 날짜만 있는 교정, 셋 다 있는 교정은 저장된다.
+      assertThat(
+              migrationJdbcTemplate.update(
+                  "UPDATE free_talk_message_feedback SET memory_id = 42,"
+                      + " memory_observed_on = DATE '2026-09-13'"
+                      + " WHERE session_history_message_id = 12"))
+          .isEqualTo(1);
+      assertThat(
+              migrationJdbcTemplate.update(
+                  "UPDATE free_talk_message_feedback SET memory_label = '헬스장'"
+                      + " WHERE session_history_message_id = 12"))
+          .isEqualTo(1);
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  /** 후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V115를 적용한다. */
+  @DisplayName("후속 질문은 세션마다 하나만, 정해진 계기와 비어 있지 않은 문구로만 저장되도록 V115를 적용한다.")
+  @Test
+  void v115RejectsInvalidFollowUpsAndDeletesThemWithSession() {
+    // V112 백필 검증과 같은 이유로 migration과 검증이 한 연결을 같이 쓴다.
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      // 제약만 보므로 사용자와 학습 세션 없이 프리톡 세션만 심는다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      for (long sessionId : new long[] {31L, 32L}) {
+        migrationJdbcTemplate.update(
+            "INSERT INTO free_talk_session (id, learning_session_id, start_mode, character_id,"
+                + " conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)"
+                + " VALUES (?, ?, 'USER_FIRST', 'chloe', 'COMPLETED', 0, CURRENT_TIMESTAMP,"
+                + " CURRENT_TIMESTAMP)",
+            sessionId,
+            sessionId + 300L);
+      }
+
+      assertThat(insertFollowUp(migrationJdbcTemplate, 31L, 42L, "CONCERN", "면접 준비, 어떻게 됐어?"))
+          .isEqualTo(1);
+      assertFollowUpRejected(
+          migrationJdbcTemplate, 31L, null, "GOAL", "또 다른 질문", "uk_free_talk_follow_up_session");
+      assertFollowUpRejected(
+          migrationJdbcTemplate, 32L, 42L, "NONE", "기본 문구", "none_without_memory");
+      assertFollowUpRejected(
+          migrationJdbcTemplate,
+          32L,
+          null,
+          "UPCOMING_EVENT",
+          "질문",
+          "chk_free_talk_follow_up_trigger");
+      assertFollowUpRejected(
+          migrationJdbcTemplate, 32L, null, "MOOD", "   ", "chk_free_talk_follow_up_text");
+      // 근거 기억이 없는 기본 문구는 저장된다.
+      assertThat(insertFollowUp(migrationJdbcTemplate, 32L, null, "NONE", "요즘 빠져 있는 거 얘기해줘."))
+          .isEqualTo(1);
+
+      // 후속 질문은 세션의 부속물이라 세션이 지워지면 함께 지워진다. 삭제 전파는 참조 무결성을 켜야 동작한다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update("DELETE FROM free_talk_session WHERE id = 31");
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT free_talk_session_id FROM free_talk_follow_up", Long.class))
+          .containsExactly(32L);
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  /** 재사용 기록은 한 발화에 같은 표현을 한 번만, 정해진 출처와 비어 있지 않은 문구로만 저장되도록 V118을 적용한다. */
+  @DisplayName("재사용 기록은 한 발화에 같은 표현을 한 번만, 정해진 출처와 비어 있지 않은 문구로만 저장되고 발화나 세션이 지워지면 함께 지워진다.")
+  @Test
+  void v118RejectsInvalidExpressionReusesAndDeletesThemWithMessageOrSession() {
+    // V112 백필 검증과 같은 이유로 migration과 검증이 한 연결을 같이 쓴다.
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      // 제약만 보므로 사용자와 학습 세션 없이 프리톡 세션과 발화만 심는다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      for (long sessionId : new long[] {31L, 32L}) {
+        migrationJdbcTemplate.update(
+            "INSERT INTO free_talk_session (id, learning_session_id, start_mode, character_id,"
+                + " conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)"
+                + " VALUES (?, ?, 'USER_FIRST', 'chloe', 'COMPLETED', 0, CURRENT_TIMESTAMP,"
+                + " CURRENT_TIMESTAMP)",
+            sessionId,
+            sessionId + 300L);
+      }
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 12L, 1L, 3, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 13L, 1L, 5, "USER");
+
+      assertThat(insertReuse(migrationJdbcTemplate, 31L, 11L, 812L, "SCENARIO", "grab a coffee"))
+          .isEqualTo(1);
+      // 같은 발화의 다른 표현, 다른 발화의 같은 표현은 저장된다. 출처 제목은 없어도 된다.
+      assertThat(insertReuse(migrationJdbcTemplate, 31L, 11L, 813L, "FREE_TALK", "work out"))
+          .isEqualTo(1);
+      assertThat(insertReuse(migrationJdbcTemplate, 32L, 12L, 812L, "SCENARIO", "grab a coffee"))
+          .isEqualTo(1);
+      assertReuseRejected(
+          migrationJdbcTemplate,
+          31L,
+          11L,
+          812L,
+          "SCENARIO",
+          "grab a coffee",
+          "uk_free_talk_expression_reuse_message_expression");
+      assertReuseRejected(
+          migrationJdbcTemplate,
+          32L,
+          13L,
+          812L,
+          "REVIEW",
+          "grab a coffee",
+          "chk_free_talk_expression_reuse_source");
+      assertReuseRejected(
+          migrationJdbcTemplate,
+          32L,
+          13L,
+          812L,
+          "SCENARIO",
+          "   ",
+          "chk_free_talk_expression_reuse_text");
+
+      // 재사용 기록은 발화와 세션의 부속물이다. 삭제 전파는 참조 무결성을 켜야 동작한다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update("DELETE FROM session_history_message WHERE id = 11");
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT session_history_message_id FROM free_talk_expression_reuse", Long.class))
+          .containsExactly(12L);
+      migrationJdbcTemplate.update("DELETE FROM free_talk_session WHERE id = 32");
+      assertThat(
+              migrationJdbcTemplate.queryForObject(
+                  "SELECT count(*) FROM free_talk_expression_reuse", Integer.class))
+          .isZero();
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  private int insertReuse(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      long messageId,
+      long expressionId,
+      String sourceType,
+      String matchedText) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_expression_reuse (user_profile_id, free_talk_session_id,"
+            + " session_history_message_id, writing_expression_id, expression_text,"
+            + " expression_meaning, source_type, source_title, source_learned_on, matched_text,"
+            + " quoted_sentence, created_at, updated_at)"
+            + " VALUES (1, ?, ?, ?, 'grab a coffee', '커피 한잔하다', ?, NULL, DATE '2026-09-10', ?,"
+            + " 'Let''s grab a coffee after work.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        sessionId,
+        messageId,
+        expressionId,
+        sourceType,
+        matchedText);
+  }
+
+  private void assertReuseRejected(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      long messageId,
+      long expressionId,
+      String sourceType,
+      String matchedText,
+      String constraintName) {
+    assertThatThrownBy(
+            () ->
+                insertReuse(
+                    migrationJdbcTemplate,
+                    sessionId,
+                    messageId,
+                    expressionId,
+                    sourceType,
+                    matchedText))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining(constraintName);
+  }
+
+  private int insertFollowUp(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      Long memoryId,
+      String triggerType,
+      String question) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id,"
+            + " trigger_type, question, invite, created_at, updated_at)"
+            + " VALUES (1, ?, ?, ?, ?, '다음엔 그 얘기 하자.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        sessionId,
+        memoryId,
+        triggerType,
+        question);
+  }
+
+  private void assertFollowUpRejected(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      Long memoryId,
+      String triggerType,
+      String question,
+      String constraintName) {
+    assertThatThrownBy(
+            () -> insertFollowUp(migrationJdbcTemplate, sessionId, memoryId, triggerType, question))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining(constraintName);
+  }
+
+  /** V117 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워져 복구 대상이 된다. */
+  @DisplayName("V117 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워지고 음수 시도 횟수는 거부한다.")
+  @Test
+  void v117FillsExistingCorrectionsAsNeverAttemptedAndRejectsNegativeAttempts() {
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, "115");
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update(
+          "INSERT INTO free_talk_message_feedback (session_history_message_id,"
+              + " session_history_id, processing_status, created_at, updated_at)"
+              + " VALUES (11, 1, 'PREPARING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+      migrate(dataSource, null);
+
+      assertThat(
+              migrationJdbcTemplate.queryForMap(
+                  "SELECT attempts, lease_until, attempt_token FROM free_talk_message_feedback"
+                      + " WHERE session_history_message_id = 11"))
+          .containsEntry("ATTEMPTS", 0)
+          .containsEntry("LEASE_UNTIL", null)
+          .containsEntry("ATTEMPT_TOKEN", null);
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "UPDATE free_talk_message_feedback SET attempts = -1"
+                          + " WHERE session_history_message_id = 11"))
+          .isInstanceOf(DataIntegrityViolationException.class)
+          .hasMessageContaining("chk_free_talk_message_feedback_attempts");
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  private void assertCorrectionMemoryRejected(JdbcTemplate migrationJdbcTemplate, String sql) {
+    assertThatThrownBy(() -> migrationJdbcTemplate.update(sql))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining("chk_free_talk_message_feedback_memory");
+  }
+
+  private void insertLegacySessionHistory(
+      JdbcTemplate migrationJdbcTemplate, long sessionHistoryId, String sessionType) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO session_history (
+            id, user_profile_id, session_type, target_locale, base_locale, started_at, ended_at,
+            duration_seconds, user_message_count, created_at
+        )
+        VALUES (?, 1, ?, 'EN', 'KR', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, 1,
+                CURRENT_TIMESTAMP)
+        """,
+        sessionHistoryId,
+        sessionType);
+  }
+
+  private void insertLegacyMessage(
+      JdbcTemplate migrationJdbcTemplate,
+      long messageId,
+      long sessionHistoryId,
+      int messageSequence,
+      String role) {
+    migrationJdbcTemplate.update(
+        """
+        INSERT INTO session_history_message (
+            id, session_history_id, message_sequence, turn_number, role, content, input_type,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, 1, ?, 'hello', 'TEXT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        messageId,
+        sessionHistoryId,
+        messageSequence,
+        role);
+  }
+
   private String migrationTestDatabaseUrl() {
     return "jdbc:h2:mem:lan100-v14-"
         + UUID.randomUUID()
@@ -1357,6 +1853,18 @@ class DatabaseSchemaIntegrationTests {
         .target(targetVersion)
         .load()
         .migrate();
+  }
+
+  // 한 연결을 공유하는 검증용이다. targetVersion이 null이면 최신 버전까지 적용한다.
+  private void migrate(SingleConnectionDataSource dataSource, String targetVersion) {
+    var configuration =
+        Flyway.configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/migration", "classpath:db/h2");
+    if (targetVersion != null) {
+      configuration.target(targetVersion);
+    }
+    configuration.load().migrate();
   }
 
   private void migrateToLatestVersion(String databaseUrl) {

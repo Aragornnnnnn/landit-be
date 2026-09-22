@@ -8,9 +8,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummarySourceMessage;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkLearnedExpression;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingReason;
@@ -28,7 +36,10 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +47,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -58,6 +74,37 @@ class RemoteAiFreeTalkClientTest {
   @AfterEach
   void stopServer() {
     server.stop(0);
+  }
+
+  @Test
+  void doesNotSendInternalMessageSequenceToAi() {
+    String json =
+        jsonMapper.writeValueAsString(
+            new AiConversationHistoryMessage(101L, 1, "USER", "Hello", null, null, 30));
+    assertThat(json).doesNotContain("messageSequence");
+  }
+
+  @Test
+  void preservesContextLengthErrorFromAi() {
+    server.createContext(
+        "/api/v1/free-talk/turn",
+        exchange -> {
+          byte[] body =
+              "{\"success\":false,\"error\":{\"code\":\"FREE_TALK_CONTEXT_TOO_LARGE\"}}"
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(400, body.length);
+          try (var output = exchange.getResponseBody()) {
+            output.write(body);
+          }
+        });
+    assertThatThrownBy(() -> remoteClient().generateTurn(turnRequest()))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            error -> {
+              ApiException exception = (ApiException) error;
+              assertThat(exception.getErrorCode().name()).isEqualTo("FREE_TALK_CONTEXT_TOO_LARGE");
+              assertThat(exception.getErrorCode().getStatus().value()).isEqualTo(400);
+            });
   }
 
   @DisplayName("프리톡 시작 요청의 주제와 이름 제외 계약을 전송하고 감정을 변환한다.")
@@ -115,6 +162,9 @@ class RemoteAiFreeTalkClientTest {
     assertThat(requests.get("/api/v1/free-talk/turn").get("responseMode").asString())
         .isEqualTo("NORMAL");
     assertThat(requests.get("/api/v1/free-talk/turn").has("partnerDisplayName")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("contextPolicyVersion")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("sessionSummary")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("historyIncomplete")).isFalse();
   }
 
   @DisplayName("프리톡 속마음 응답의 평가 유형을 변환한다.")
@@ -132,6 +182,266 @@ class RemoteAiFreeTalkClientTest {
         remoteClient().generateInnerThought(innerThoughtRequest());
 
     assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
+  }
+
+  @DisplayName("AI가 교정 판정을 돌려주지 못해 교정 필드가 비어 온 응답은 속마음을 살리고 교정은 다시 해 볼 실패로 본다.")
+  @Test
+  void treatsNullCorrectionJudgmentAsRetryableFailure() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":null,"correction":null},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.innerThought()).isEqualTo("즐거웠나 보다.");
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.unavailable());
+    assertThat(result.correction().retryable()).isTrue();
+  }
+
+  @DisplayName("교정 필드가 아예 없는 구버전 속마음 응답도 속마음을 살리고 교정은 다시 해 볼 실패로 본다.")
+  @Test
+  void treatsMissingCorrectionFieldsAsRetryableFailure() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD"},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.innerThought()).isEqualTo("즐거웠나 보다.");
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.unavailable());
+  }
+
+  @DisplayName("속마음 응답의 턴 교정과 상대 반응 여부를 변환한다.")
+  @Test
+  void mapsTurnCorrectionFromInnerThoughtResponse() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":false,
+             "correction":{"originalSentence":"I go hiking yesterday.",
+                           "betterSentence":"I went hiking yesterday.",
+                           "reason":"어제 일이라 went를 써요.","mistakePattern":"TENSE"}},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.correction())
+        .isEqualTo(
+            FreeTalkTurnCorrection.completed(
+                new FreeTalkTurnCorrection.Sentence(
+                    "I go hiking yesterday.",
+                    "I went hiking yesterday.",
+                    "어제 일이라 went를 써요.",
+                    FreeTalkMistakePattern.TENSE),
+                false));
+  }
+
+  @DisplayName("속마음 요청에 요약·기억 문맥을 함께 보내고 교정의 근거 기억 ID와 라벨을 변환한다.")
+  @Test
+  void sendsMemoryContextAndMapsCorrectionMemory() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        requests,
+        correctionResponse("\"usedMemoryId\":42,\"memoryLabel\":\" 헬스장 \""));
+
+    AiFreeTalkSessionSummary summary =
+        new AiFreeTalkSessionSummary(
+            1, 2, new AiFreeTalkSessionSummaryContent("운동", List.of(), List.of(), List.of()));
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient()
+            .generateInnerThought(
+                new AiFreeTalkInnerThoughtRequest(
+                    300L,
+                    "chloe",
+                    3002L,
+                    1,
+                    "EN",
+                    "KR",
+                    null,
+                    history(),
+                    gymMemoryContext(),
+                    "v1",
+                    summary,
+                    true));
+
+    JsonNode payload = requests.get("/api/v1/free-talk/inner-thought");
+    assertThat(payload.get("contextPolicyVersion").asString()).isEqualTo("v1");
+    assertThat(payload.get("sessionSummary").get("coveredThroughSequence").asInt()).isEqualTo(2);
+    assertThat(payload.get("historyIncomplete").asBoolean()).isTrue();
+    JsonNode memoryContext = payload.get("memoryContext");
+    assertThat(memoryContext).hasSize(1);
+    assertThat(memoryContext.get(0).get("memoryId").asLong()).isEqualTo(42L);
+    assertThat(result.correction().status().name()).isEqualTo("COMPLETED");
+    assertThat(result.correction().sentence().usedMemoryId()).isEqualTo(42L);
+    // 지난 기록이 바뀌지 않도록 기억을 말한 날짜를 보낸 문맥에서 꺼내 교정과 함께 남긴다.
+    assertThat(result.correction().sentence().memoryObservedOn())
+        .isEqualTo(LocalDate.of(2026, 9, 13));
+    assertThat(result.correction().sentence().memoryLabel()).isEqualTo("헬스장");
+  }
+
+  @DisplayName("보낸 기억에 말한 날짜가 없으면 태그를 만들 수 없으므로 교정은 살리고 근거 기억만 버린다.")
+  @Test
+  @ExtendWith(OutputCaptureExtension.class)
+  void dropsCorrectionMemoryWhenProvidedMemoryHasNoObservedDate(CapturedOutput output)
+      throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        correctionResponse("\"usedMemoryId\":42,\"memoryLabel\":\"헬스장\""));
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient()
+            .generateInnerThought(
+                innerThoughtRequest(
+                    List.of(
+                        new AiFreeTalkMemoryContext(
+                            42L, ConversationMemoryType.PROFILE, "사용자는 집 앞 헬스장에 다닌다."))));
+
+    assertThat(result.correction().status().name()).isEqualTo("COMPLETED");
+    assertThat(result.correction().sentence().betterSentence()).isEqualTo("at the gym");
+    assertThat(result.correction().sentence().usedMemoryId()).isNull();
+    assertThat(result.correction().sentence().memoryObservedOn()).isNull();
+    assertThat(result.correction().sentence().memoryLabel()).isNull();
+    assertThat(output.getOut())
+        .contains("workflow=free_talk_turn_correction_memory reason=memory_without_observed_at");
+  }
+
+  @DisplayName("기억 문맥이 없는 속마음 요청은 기억 필드를 싣지 않고 근거 기억 없는 교정을 변환한다.")
+  @Test
+  void omitsMemoryContextFieldWhenNoMemoryIsAvailable() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        requests,
+        correctionResponse("\"usedMemoryId\":null,\"memoryLabel\":null"));
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    // 이 필드를 모르는 구버전 AI 서버가 요청 전체를 거부하지 않도록, 보낼 기억이 없으면 필드를 싣지 않는다.
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("memoryContext")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("contextPolicyVersion"))
+        .isFalse();
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("sessionSummary")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("historyIncomplete")).isFalse();
+    assertThat(result.correction().sentence().usedMemoryId()).isNull();
+    assertThat(result.correction().sentence().memoryLabel()).isNull();
+  }
+
+  @DisplayName("근거 기억 값이 계약과 다르면 교정 문장은 살리고 해당 값만 버린 뒤 이유를 로그로 남긴다.")
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+      delimiter = '|',
+      nullValues = "NULL",
+      value = {
+        "unknown_memory_id    | \"usedMemoryId\":99,\"memoryLabel\":\"비밀라벨\"   | NULL",
+        "label_missing        | \"usedMemoryId\":42,\"memoryLabel\":\"  \"        | 42",
+        "label_missing        | \"usedMemoryId\":42                                | 42",
+        "label_invalid        | \"usedMemoryId\":42,\"memoryLabel\":\"비밀\\n라벨\" | 42",
+        "label_without_memory | \"usedMemoryId\":null,\"memoryLabel\":\"비밀라벨\" | NULL"
+      })
+  @ExtendWith(OutputCaptureExtension.class)
+  void dropsOnlyInvalidCorrectionMemoryValues(
+      String expectedReason, String memoryFields, Long expectedMemoryId, CapturedOutput output)
+      throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        correctionResponse(memoryFields));
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest(gymMemoryContext()));
+
+    assertThat(result.correction().status().name()).isEqualTo("COMPLETED");
+    assertThat(result.correction().sentence().betterSentence()).isEqualTo("at the gym");
+    assertThat(result.correction().sentence().usedMemoryId()).isEqualTo(expectedMemoryId);
+    assertThat(result.correction().sentence().memoryLabel()).isNull();
+    assertThat(output.getOut())
+        .contains("workflow=free_talk_turn_correction_memory reason=" + expectedReason)
+        .contains("messageId=3002")
+        .doesNotContain("비밀");
+  }
+
+  @DisplayName("40자를 넘는 라벨은 버리고 40자 라벨은 그대로 둔다.")
+  @Test
+  void keepsMemoryLabelUpToColumnLength() throws Exception {
+    String fortyCharacters = "가".repeat(40);
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        correctionResponse("\"usedMemoryId\":42,\"memoryLabel\":\"" + fortyCharacters + "\""));
+    assertThat(
+            remoteClient()
+                .generateInnerThought(innerThoughtRequest(gymMemoryContext()))
+                .correction()
+                .sentence()
+                .memoryLabel())
+        .isEqualTo(fortyCharacters);
+    server.removeContext("/api/v1/free-talk/inner-thought");
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        correctionResponse("\"usedMemoryId\":42,\"memoryLabel\":\"" + fortyCharacters + "나\""));
+
+    FreeTalkTurnCorrection.Sentence sentence =
+        remoteClient()
+            .generateInnerThought(innerThoughtRequest(gymMemoryContext()))
+            .correction()
+            .sentence();
+
+    assertThat(sentence.usedMemoryId()).isEqualTo(42L);
+    assertThat(sentence.memoryLabel()).isNull();
+  }
+
+  @DisplayName("고칠 것이 없는 턴은 교정 없이 완료로 변환한다.")
+  @Test
+  void mapsNullCorrectionWithReactionAsCompleted() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,"correction":null},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.completed(null, true));
+  }
+
+  @DisplayName("모르는 실수 패턴은 임의 값으로 바꾸지 않고 교정만 실패로 본다.")
+  @Test
+  void treatsUnknownMistakePatternAsFailedCorrection() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I go.","betterSentence":"I went.",
+                           "reason":"과거예요.","mistakePattern":"BRAND_NEW_PATTERN"}},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.innerThoughtType().name()).isEqualTo("GOOD");
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
+    assertThat(result.correction().retryable()).isFalse();
   }
 
   @DisplayName("프리톡 종료 요청에 종료 사유와 제목 생성 조건을 보내고 응답을 변환한다.")
@@ -199,6 +509,64 @@ class RemoteAiFreeTalkClientTest {
                 .asLong())
         .isEqualTo(7L);
     assertThat(recommendations.recommendations()).hasSize(1);
+    // 보낼 배운 표현이 없으면 필드 자체를 싣지 않아 이 필드를 모르는 AI 서버도 요청을 받는다.
+    assertThat(
+            requests.get("/api/v1/free-talk/expression-recommendations").has("learnedExpressions"))
+        .isFalse();
+    assertThat(recommendations.usedExpressions()).isEmpty();
+  }
+
+  @DisplayName("배운 표현 후보를 요청에 싣고, 응답의 다시 쓴 표현을 빈 항목만 빼고 그대로 읽는다.")
+  @Test
+  void sendsLearnedExpressionsAndMapsUsedExpressions() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        requests,
+        """
+            {
+              "success": true,
+              "data": {
+                "recommendations": [{
+                  "displayOrder": 1,
+                  "existingExpressionId": 7
+                }],
+                "usedExpressions": [
+                  {
+                    "expressionId": 812,
+                    "messageId": 3002,
+                    "matchedText": "going hiking"
+                  },
+                  null
+                ]
+              },
+              "error": null
+            }
+        """);
+    AiFreeTalkExpressionRecommendationsRequest base = recommendationsRequest();
+
+    AiFreeTalkExpressionRecommendationsResult result =
+        remoteClient()
+            .recommendExpressions(
+                new AiFreeTalkExpressionRecommendationsRequest(
+                    base.sessionId(),
+                    base.targetLocale(),
+                    base.baseLocale(),
+                    base.conversationHistory(),
+                    base.existingExpressions(),
+                    List.of(new AiFreeTalkLearnedExpression(812L, "go hiking", "등산하러 가다"))));
+
+    JsonNode learned =
+        requests.get("/api/v1/free-talk/expression-recommendations").get("learnedExpressions");
+    assertThat(learned).hasSize(1);
+    assertThat(learned.get(0).propertyNames())
+        .containsExactlyInAnyOrder(
+            "expressionId", "targetExpressionText", "baseExpressionMeaningText");
+    assertThat(learned.get(0).get("expressionId").asLong()).isEqualTo(812L);
+    assertThat(learned.get(0).get("targetExpressionText").asString()).isEqualTo("go hiking");
+    assertThat(learned.get(0).get("baseExpressionMeaningText").asString()).isEqualTo("등산하러 가다");
+    assertThat(result.usedExpressions())
+        .containsExactly(new AiFreeTalkUsedExpression(812L, 3002L, "going hiking"));
   }
 
   @DisplayName("일반 첫 대화 요청에는 기억 조회보다 긴 대기 시간을 적용한다.")
@@ -210,6 +578,26 @@ class RemoteAiFreeTalkClientTest {
         successResponse("{\"aiMessage\":\"Hello!\",\"translatedMessage\":\"안녕!\"}"));
     assertThat(remoteClient(Duration.ofSeconds(5)).generateOpening(openingRequest()).aiMessage())
         .isEqualTo("Hello!");
+  }
+
+  @DisplayName("프리톡 컨텍스트 요약은 일반 대화 timeout보다 짧은 전용 제한 시간을 적용한다.")
+  @Test
+  void contextSummaryUsesDedicatedTimeout() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/context-summary",
+        250,
+        successResponse(
+            "{\"policyVersion\":\"v1\",\"baseRevision\":0,"
+                + "\"coveredThroughSequence\":2,\"summary\":{\"topic\":\"주말\","
+                + "\"userStatements\":[],\"openThreads\":[],\"interactionContext\":[]}}"));
+
+    assertThatThrownBy(
+            () ->
+                remoteClient(Duration.ofSeconds(2), Duration.ofMillis(50))
+                    .generateContextSummary(contextSummaryRequest()))
+        .isInstanceOf(ApiException.class)
+        .extracting(exception -> ((ApiException) exception).getErrorCode())
+        .isEqualTo(ErrorCode.AI_GENERATION_FAILED);
   }
 
   private void registerDelayedResponse(String path, long delayMillis, String response) {
@@ -227,6 +615,73 @@ class RemoteAiFreeTalkClientTest {
             exchange.close();
           }
         });
+  }
+
+  @DisplayName("AI가 먼저 배포되어 시작·발화·표현 추천 응답에 모르는 필드가 실려 와도 기존 값을 그대로 변환한다.")
+  @Test
+  void ignoresUnknownFieldsAddedByNewerAiServer() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "aiMessage": "How was your weekend?",
+                "translatedMessage": "주말 어땠어?",
+                "emotion": null,
+                "usedMemoryIds": [],
+                "followUpAsked": true,
+                "followUpId": 9
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/turn",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "userExitIntentDetected": false,
+                "inferredTitle": "주말 이야기",
+                "aiMessage": "That sounds fun.",
+                "translatedMessage": "재밌겠다.",
+                "emotion": null,
+                "usedMemoryIds": [],
+                "followUpAsked": false,
+                "followUpId": null
+              },
+              "error": null
+            }
+        """);
+    registerJsonResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        new ConcurrentHashMap<>(),
+        """
+            {
+              "success": true,
+              "data": {
+                "recommendations": [{
+                  "displayOrder": 1,
+                  "existingExpressionId": 7
+                }],
+                "usedExpressions": [{
+                  "expressionId": 7,
+                  "messageId": 10,
+                  "matchedText": "grab a coffee"
+                }]
+              },
+              "error": null
+            }
+        """);
+    RemoteAiFreeTalkClient client = remoteClient();
+
+    assertThat(client.generateOpening(openingRequest()).aiMessage())
+        .isEqualTo("How was your weekend?");
+    assertThat(client.generateTurn(turnRequest()).aiMessage()).isEqualTo("That sounds fun.");
+    assertThat(client.recommendExpressions(recommendationsRequest()).recommendations()).hasSize(1);
   }
 
   @DisplayName("첫 대화 요청에 기억 문맥을 보내고 사용된 기억 ID를 응답에서 읽는다.")
@@ -498,6 +953,21 @@ class RemoteAiFreeTalkClientTest {
         ErrorCode.AI_RESPONSE_INVALID);
   }
 
+  @DisplayName("다시 쓴 표현의 형식이 깨진 응답은 추천까지 통째로 거부한다.")
+  @Test
+  void rejectsRecommendationWhenUsedExpressionsIsMalformed() throws Exception {
+    registerRawResponse(
+        "/api/v1/free-talk/expression-recommendations",
+        200,
+        successResponse(
+            "{\"recommendations\":[{\"displayOrder\":1,\"existingExpressionId\":7}],"
+                + "\"usedExpressions\":\"oops\"}"));
+
+    assertGenerationError(
+        () -> remoteClient().recommendExpressions(recommendationsRequest()),
+        ErrorCode.AI_RESPONSE_INVALID);
+  }
+
   @DisplayName("기존 표현 ID가 빠진 추천 응답을 거부한다.")
   @Test
   void rejectsRecommendationMissingExistingExpressionId() throws Exception {
@@ -621,6 +1091,11 @@ class RemoteAiFreeTalkClientTest {
   }
 
   private RemoteAiFreeTalkClient remoteClient(Duration requestTimeout) {
+    return remoteClient(requestTimeout, Duration.ofSeconds(10));
+  }
+
+  private RemoteAiFreeTalkClient remoteClient(
+      Duration requestTimeout, Duration contextSummaryRequestTimeout) {
     return new RemoteAiFreeTalkClient(
         jsonMapper,
         new AiClientProperties(
@@ -630,7 +1105,28 @@ class RemoteAiFreeTalkClientTest {
             Duration.ofSeconds(1),
             requestTimeout,
             Duration.ofSeconds(1),
-            Duration.ofSeconds(20)));
+            Duration.ofSeconds(20),
+            "",
+            contextSummaryRequestTimeout));
+  }
+
+  private AiFreeTalkContextSummaryRequest contextSummaryRequest() {
+    return new AiFreeTalkContextSummaryRequest(
+        1L,
+        "v1",
+        0,
+        null,
+        0,
+        2,
+        "Asia/Seoul",
+        List.of(
+            new AiFreeTalkContextSummarySourceMessage(
+                1,
+                10L,
+                1,
+                "USER",
+                "주말에 등산했어.",
+                OffsetDateTime.of(2026, 9, 20, 10, 0, 0, 0, ZoneOffset.ofHours(9)))));
   }
 
   private String successResponse(String data) {
@@ -707,7 +1203,35 @@ class RemoteAiFreeTalkClientTest {
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest() {
-    return new AiFreeTalkInnerThoughtRequest(300L, "chloe", 3002L, 1, "EN", "KR", null, history());
+    return innerThoughtRequest(List.of());
+  }
+
+  private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
+      List<AiFreeTalkMemoryContext> memoryContext) {
+    return new AiFreeTalkInnerThoughtRequest(
+        300L, "chloe", 3002L, 1, "EN", "KR", null, history(), memoryContext);
+  }
+
+  private List<AiFreeTalkMemoryContext> gymMemoryContext() {
+    return List.of(
+        new AiFreeTalkMemoryContext(
+            42L,
+            ConversationMemoryType.PROFILE,
+            "사용자는 집 앞 헬스장에 다닌다.",
+            null,
+            null,
+            // 자정 직전에 말한 기억도 그날 날짜로 남아야 한다(시각은 서비스 시간대 기준으로 저장되어 있다).
+            LocalDateTime.of(2026, 9, 13, 23, 30)));
+  }
+
+  // 교정 문장은 고정하고 근거 기억 필드만 바꿔 끼운 속마음 응답을 만든다.
+  private String correctionResponse(String memoryFields) {
+    return "{\"success\":true,\"data\":{\"innerThought\":\"운동 열심히 하네.\","
+        + "\"innerThoughtType\":\"GOOD\",\"reactedToPartner\":true,"
+        + "\"correction\":{\"originalSentence\":\"at a gym\",\"betterSentence\":\"at the gym\","
+        + "\"reason\":\"둘 다 아는 곳이에요.\",\"mistakePattern\":\"ARTICLE\","
+        + memoryFields
+        + "}},\"error\":null}";
   }
 
   private AiFreeTalkExpressionRecommendationsRequest recommendationsRequest() {

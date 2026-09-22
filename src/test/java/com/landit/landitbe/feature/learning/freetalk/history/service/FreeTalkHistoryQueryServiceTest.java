@@ -21,6 +21,8 @@ import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.FreeTalkSessionExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeTalkSessionExpressionRepository;
+import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseQueryService;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionDetailResponse;
 import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSessionListResponse;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
@@ -45,6 +47,8 @@ class FreeTalkHistoryQueryServiceTest {
   @Mock private SessionHistoryMessageRepository sessionHistoryMessageRepository;
   @Mock private FreeTalkSessionExpressionRepository sessionExpressionRepository;
   @Mock private WritingExpressionRepository writingExpressionRepository;
+  @Mock private FreeTalkMessageFeedbackService messageFeedbackService;
+  @Mock private FreeTalkExpressionReuseQueryService expressionReuseQueryService;
   private FreeTalkHistoryQueryService historyQueryService;
 
   @BeforeEach
@@ -59,7 +63,9 @@ class FreeTalkHistoryQueryServiceTest {
             new com.landit.landitbe.feature.learning.conversation.history.service
                 .ConversationMessageService(sessionHistoryMessageRepository),
             sessionExpressionRepository,
-            new ExpressionContentService(writingExpressionRepository));
+            new ExpressionContentService(writingExpressionRepository),
+            messageFeedbackService,
+            expressionReuseQueryService);
   }
 
   /** 기존 표현이 비활성화돼도 과거 프리톡 상세의 스냅샷은 조회한다. */

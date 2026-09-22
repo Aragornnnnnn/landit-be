@@ -151,6 +151,7 @@ public class PushQueueMessageHandler {
   private String mailboxReplyDeepLink(Long mailboxLetterId) {
     return "/mailbox/received/"
         + mailboxLetterId
-        + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply";
+        + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply"
+        + "&utm_content=mailbox_reply_arrived";
   }
 }

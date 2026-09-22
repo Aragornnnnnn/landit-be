@@ -41,6 +41,9 @@ public class FreeTalkSessionService {
   private final com.landit.landitbe.feature.subscription.service.LearningAccessGrantService
       accessGrants;
   private final UserProfileService userProfileService;
+  private final com.landit.landitbe.feature.learning.freetalk.context.service
+          .FreeTalkContextSummaryService
+      contextSummaryService;
   private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
@@ -86,6 +89,7 @@ public class FreeTalkSessionService {
                 topic == null ? null : topic.getId(),
                 request.startMode(),
                 character));
+    contextSummaryService.initialize(userId, freeTalkSession.getId());
     if (topic != null) {
       freeTalkSession.assignTitle(topic.getDisplayName());
     }
