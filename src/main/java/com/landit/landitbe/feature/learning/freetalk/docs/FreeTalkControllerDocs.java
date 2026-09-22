@@ -259,19 +259,20 @@ public interface FreeTalkControllerDocs {
   @Operation(
       summary = "오늘의 스몰톡 요약 조회",
       description =
-          "완료된 스몰톡의 종료 후 요약(S7b)을 반환한다. 점수·별점은 없다. 총평(headline·comparison·growth·"
-              + "correctionCount)은 이 세션의 턴 교정이 모두 끝난 뒤 한 번 계산해 저장하고, 그 뒤에는 조회할 때마다 같은"
-              + " 값을 돌려준다. 계산 전이면 pending이 true이고 총평 필드는 모두 null이다. 교정이 끝나기를 세션 종료 후"
-              + " 30초까지 기다리고, 그 뒤에는 끝나지 않은 교정을 빼고 확정하므로 pending이 끝없이 남지 않는다. 그렇게 빠진"
-              + " 교정이 나중에 끝나면 지난 프리톡 상세에는 보이지만 이 요약의 correctionCount·growth에는 반영되지 않는다."
-              + " headline과 comparison은 확정 뒤 항상 있고(첫 스몰톡은 comparison.previous가 모두 0), growth는"
-              + " 직전 스몰톡에서 교정받은 패턴이 이번에 다시 나왔을 때만 있다. growth의 구절(previousWrongSpan·"
-              + "currentSpan)은 각 문장에 대소문자까지 그대로 정확히 한 번 들어 있으며 특정하지 못했으면 null이다."
-              + " reusedExpressions와 followUp은 종료 후 비동기 작업의 결과라 각자 pending을 가진다. 표현 작업이 실패로"
-              + " 끝나면 reusedExpressions는 pending 없이 빈 목록이다. 장기기억 작업이 세션 종료 후 5분이 지나도 끝나지"
-              + " 않으면 서버가 실패로 확정하므로 followUp.pending도 끝없이 남지 않고, 그때 followUp의 질문 세 필드는"
-              + " null이다. 미완료 세션은 409(SESSION_NOT_COMPLETED)다(지난 프리톡 상세 조회는 같은 경우 404를 준다)."
-              + " 구독이 만료된 사용자도 본인이 완료한 세션은 조회할 수 있다.",
+          "완료된 스몰톡의 종료 후 요약(S7b)을 반환한다. 점수·별점은 없다. 총평(headline·comparison·growth·correctionCount)은"
+              + " 이 세션의 턴 교정이 모두 끝난 뒤 한 번 계산해 저장하고, 그 뒤에는 조회할 때마다 같은 값을 돌려준다. 계산 전이면 pending이"
+              + " true이고 총평 필드는 모두 null이다. 교정이 끝나기를 세션 종료 후 30초까지 기다리고, 그 뒤에는 끝나지 않은 교정을 빼고 확정하므로"
+              + " pending이 끝없이 남지 않는다. 그렇게 빠진 교정이 나중에 끝나면 지난 프리톡 상세에는 보이지만 이 요약의"
+              + " correctionCount·growth에는 반영되지 않는다. 그렇게 교정을 빼고 확정할 때는 남은 교정이 같은 패턴일 수 있으므로 growth의"
+              + " \"오늘은 맞게 썼다\"(succeeded true)는 주장하지 않고, 또 틀린 근거가 있을 때만 growth를 둔다. headline과"
+              + " comparison은 확정 뒤 항상 있고(첫 스몰톡은 comparison.previous가 모두 0), growth는 직전 스몰톡에서 교정받은"
+              + " 패턴(많이 틀린 순 최대 3개) 중 하나가 이번에 다시 나왔을 때만 있다. growth의"
+              + " 구절(previousWrongSpan·currentSpan)은 각 문장에 대소문자까지 그대로 정확히 한 번 들어 있으며 특정하지 못했으면"
+              + " null이다. reusedExpressions와 followUp은 종료 후 비동기 작업의 결과라 각자 pending을 가진다. 표현 작업이 실패로"
+              + " 끝나면 reusedExpressions는 pending 없이 빈 목록이다. 장기기억 작업이 시작된 지(워커가 아직 집지 않았으면 세션 종료 후)"
+              + " 5분이 지나도 끝나지 않으면 서버가 실패로 확정하므로 followUp.pending도 끝없이 남지 않고, 그때 followUp의 질문 세 필드는"
+              + " null이다. 미완료 세션은 409(SESSION_NOT_COMPLETED)다(지난 프리톡 상세 조회는 같은 경우 404를 준다). 구독이 만료된"
+              + " 사용자도 본인이 완료한 세션은 조회할 수 있다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

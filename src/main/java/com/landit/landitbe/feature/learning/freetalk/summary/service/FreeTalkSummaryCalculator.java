@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.freetalk.summary.service;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.summary.domain.FreeTalkHeadlinePose;
 import com.landit.landitbe.feature.learning.freetalk.summary.domain.FreeTalkHeadlineTrigger;
 import com.landit.landitbe.feature.learning.freetalk.summary.domain.FreeTalkSessionSummary;
@@ -37,6 +38,12 @@ public class FreeTalkSummaryCalculator {
 
   /** 직전 스몰톡에서 이 일수 이상 지나면 "오랜만에 돌아옴"으로 본다. */
   static final int RETURN_AFTER_DAYS = 10;
+
+  /** 말한 시간은 비율과 별개로 이만큼은 늘어야 "늘었다"로 본다. 그보다 작은 차이는 "0초 더 말했어요"가 되므로 비슷한 것으로 본다. */
+  static final long MIN_SPEAKING_INCREASE_MS = 1_000;
+
+  /** "N번이나 주고받았어요" 문구는 이 횟수부터 쓴다. "1번이나"는 어색하다. */
+  static final int MIN_TURNS_FOR_EMPHASIS = 2;
 
   /** 이 시간 이상 말했을 때만 "N분 넘게 말했어요" 문구를 후보에 둔다. */
   static final long LONG_SPEAKING_MS = 60_000;
@@ -132,14 +139,15 @@ public class FreeTalkSummaryCalculator {
     return stripped.isEmpty() ? 0 : stripped.split("\\s+").length;
   }
 
-  // 직전 세션에서 많이 틀린 순으로 지켜볼 수 있는 패턴을 보고, 오늘 등장한 첫 패턴으로 카드를 만든다. 등장이 없으면 카드가 없다.
+  // 직전 세션에서 많이 틀린 순으로 지켜본 패턴을 보고, 오늘 등장한 첫 패턴으로 카드를 만든다. 등장이 없으면 카드가 없다.
+  // 이번 세션의 교정이 아직 다 끝나지 않았으면(상한을 넘겨 확정) 남은 교정이 그 패턴일 수 있으므로 "맞았다"는 주장하지 않는다.
   private static FreeTalkGrowthCard growthCard(
       FreeTalkSummarySource current,
       FreeTalkSessionSummary.PreviousSession previous,
       FreeTalkSummarySource previousSource) {
     for (FreeTalkMistakePattern pattern : previousPatternsByFrequency(previousSource)) {
       Optional<Appearance> today = todayAppearance(current, pattern);
-      if (today.isEmpty()) {
+      if (today.isEmpty() || (today.get().correct() && !current.correctionsComplete())) {
         continue;
       }
       FreeTalkTurnCorrection.Sentence previousCorrection =
@@ -156,6 +164,7 @@ public class FreeTalkSummaryCalculator {
     return null;
   }
 
+  // 턴마다 AI에 보낸 지켜볼 패턴(FreeTalkWatchPatternService)과 같은 순서·같은 개수다. 그 밖의 패턴은 사용례가 생기지 않아 카드가 될 수 없다.
   private static List<FreeTalkMistakePattern> previousPatternsByFrequency(
       FreeTalkSummarySource previousSource) {
     Map<FreeTalkMistakePattern, Integer> counts = new EnumMap<>(FreeTalkMistakePattern.class);
@@ -169,6 +178,7 @@ public class FreeTalkSummaryCalculator {
                 .reversed()
                 .thenComparing(Map.Entry::getKey))
         .map(Map.Entry::getKey)
+        .limit(AiFreeTalkInnerThoughtRequest.MAX_WATCH_PATTERNS)
         .toList();
   }
 
@@ -225,7 +235,8 @@ public class FreeTalkSummaryCalculator {
     if (growth != null && growth.succeeded()) {
       return FreeTalkHeadlineTrigger.GROWTH;
     }
-    if (increased(current.speakingMs(), previous.speakingMs())) {
+    if (increased(current.speakingMs(), previous.speakingMs())
+        && current.speakingMs() - previous.speakingMs() >= MIN_SPEAKING_INCREASE_MS) {
       return FreeTalkHeadlineTrigger.SPEAKING_TIME_UP;
     }
     if (increased(current.maxWordsInTurn(), previous.maxWordsInTurn())) {
@@ -238,7 +249,9 @@ public class FreeTalkSummaryCalculator {
     boolean spoke = current.speakingMs() > 0 || previous.speakingMs() > 0;
     long currentAmount = spoke ? current.speakingMs() : current.turnCount();
     long previousAmount = spoke ? previous.speakingMs() : previous.turnCount();
-    if (similar(currentAmount, previousAmount)) {
+    boolean tinyDifference =
+        spoke && Math.abs(current.speakingMs() - previous.speakingMs()) < MIN_SPEAKING_INCREASE_MS;
+    if (tinyDifference || similar(currentAmount, previousAmount)) {
       return FreeTalkHeadlineTrigger.SIMILAR;
     }
     return FreeTalkHeadlineTrigger.DECREASED;
@@ -267,8 +280,8 @@ public class FreeTalkSummaryCalculator {
     List<String[]> candidates = new ArrayList<>();
     switch (trigger) {
       case FIRST_SESSION -> {
-        // 한 마디도 안 하고 끝난 세션에 "0번이나"라고 말하지 않는다.
-        if (current.turnCount() > 0) {
+        // "0번이나"·"1번이나"라고 말하지 않는다. 두 번째 문구가 항상 남는다.
+        if (current.turnCount() >= MIN_TURNS_FOR_EMPHASIS) {
           candidates.add(
               phrase(
                   "첫 스몰톡, %d번이나 주고받았어요!".formatted(current.turnCount()), "다음부턴 지난번과 비교해서 보여줄게요."));
@@ -280,7 +293,7 @@ public class FreeTalkSummaryCalculator {
             phrase(
                 "%d일 만이네요, 감을 잃지않고 %d번 주고받았어요!".formatted(daysSincePrevious, current.turnCount()),
                 "감이 안 죽었어요."));
-        if (current.speakingMs() >= LONG_SPEAKING_MS) {
+        if (overWholeMinute(current.speakingMs())) {
           candidates.add(
               phrase(
                   "오랜만인데도 %s 넘게 말했어요!".formatted(minutesText(current.speakingMs())),
@@ -292,7 +305,7 @@ public class FreeTalkSummaryCalculator {
         candidates.add(
             phrase("지난번에 헷갈렸던 %s, 오늘은 다 맞았어요!".formatted(label), "한 번 틀린 걸 고치는 게 제일 어려운 건데요."));
         candidates.add(phrase("%s, 이제 안 헷갈리네요!".formatted(label), "지난 스몰톡이 헛되지 않았어요."));
-        candidates.add(phrase("%s 완전 정복한 거 같은데요?".formatted(label), "지난번 얘기를 기억하고 말한 거예요."));
+        candidates.add(phrase("%s 완전 정복한 거 같은데요?".formatted(label), "점점 실력이 늘어가고 있어요."));
       }
       case SPEAKING_TIME_UP -> {
         candidates.add(
@@ -300,7 +313,7 @@ public class FreeTalkSummaryCalculator {
                 "지난번보다 %s 더 말했어요!"
                     .formatted(durationText(current.speakingMs() - previous.speakingMs())),
                 "할 말이 그만큼 늘었다는 거예요."));
-        if (current.speakingMs() >= LONG_SPEAKING_MS) {
+        if (overWholeMinute(current.speakingMs())) {
           candidates.add(
               phrase(
                   "오늘 %s 넘게 말했어요!".formatted(minutesText(current.speakingMs())),
@@ -327,10 +340,12 @@ public class FreeTalkSummaryCalculator {
       }
       case TURN_COUNT_UP -> {
         int diff = current.turnCount() - previous.turnCount();
-        candidates.add(
-            phrase(
-                "%d번이나 주고받았어요!".formatted(current.turnCount()),
-                "지난번보다 %d번 더 오갔어요.".formatted(diff)));
+        if (current.turnCount() >= MIN_TURNS_FOR_EMPHASIS) {
+          candidates.add(
+              phrase(
+                  "%d번이나 주고받았어요!".formatted(current.turnCount()),
+                  "지난번보다 %d번 더 오갔어요.".formatted(diff)));
+        }
         candidates.add(phrase("대화가 지난번보다 %d번 더 이어졌어요!".formatted(diff), "끊기지 않고 받아친 거예요."));
       }
       case SIMILAR -> {
@@ -339,7 +354,11 @@ public class FreeTalkSummaryCalculator {
           candidates.add(phrase("오늘도 %d번 주고받았어요!".formatted(current.turnCount()), "리듬이 잡혔어요."));
         }
       }
-      case DECREASED -> candidates.add(phrase("오늘은 짧게 얘기했어요.", "짧아도 한 번 더 한 게 중요해요."));
+      case DECREASED -> {
+        candidates.add(phrase("오늘은 짧게 얘기했어요.", "짧아도 한 번 더 한 게 중요해요."));
+        candidates.add(phrase("지난번보다 짧게 대화했어요.", "오늘도 대화했다는 사실이 중요하죠."));
+        candidates.add(phrase("오늘은 짧게 얘기해서 아쉬워요.", "다음엔 더 길게 얘기하고 싶어요."));
+      }
       default -> throw new IllegalStateException("문구 은행이 없는 계기: " + trigger);
     }
     String[] chosen = candidates.get((int) Math.floorMod(learningSessionId, candidates.size()));
@@ -359,6 +378,11 @@ public class FreeTalkSummaryCalculator {
       return seconds + "초";
     }
     return seconds == 0 ? minutes + "분" : minutes + "분 " + seconds + "초";
+  }
+
+  // "N분 넘게"는 1분 이상이고 정확히 N분이 아닐 때만 참이다. 예: 245000 → true, 240000 → false, 59000 → false
+  static boolean overWholeMinute(long ms) {
+    return ms >= LONG_SPEAKING_MS && ms % 60_000 != 0;
   }
 
   // 예: 245000 → "4분"

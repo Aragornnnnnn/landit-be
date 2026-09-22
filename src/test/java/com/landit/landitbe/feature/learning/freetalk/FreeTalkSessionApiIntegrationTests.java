@@ -1811,18 +1811,11 @@ class FreeTalkSessionApiIntegrationTests {
                 firstSessionId))
         .isEqualTo("FIRST_SESSION");
 
-    // 두 번째 스몰톡: 지난번 TENSE를 맞게 쓴 사용례가 오고, 마지막 턴의 교정은 아직 준비 상태다.
+    // 두 번째 스몰톡: 지난번 TENSE로 또 교정받고(반복 근거), 마지막 턴의 교정은 아직 준비 상태다.
+    // 준비 상태인 교정을 빼고 확정할 때 "맞게 썼다"는 주장하지 않으므로, 반복 카드만 상한 확정에서도 그대로 나온다.
     long secondSessionId = startUserFirstSession(accessToken);
-    fakeAiFreeTalkClient.correctNextTurn(
-        FreeTalkTurnCorrection.completed(
-            null,
-            true,
-            List.of(
-                new FreeTalkPatternUsageDraft(
-                    FreeTalkMistakePattern.TENSE, "I went hiking again.", "went", true))));
-    awaitCorrectionStatus(
-        submitWithoutCorrectionFields(accessToken, secondSessionId, "I went hiking again."),
-        "COMPLETED");
+    submitCorrected(
+        accessToken, secondSessionId, "I go hiking again.", FreeTalkMistakePattern.TENSE);
     fakeAiFreeTalkClient.failNextInnerThought();
     submitWithoutCorrectionFields(accessToken, secondSessionId, "See you.");
     completeSession(secondSessionId);
@@ -1844,13 +1837,13 @@ class FreeTalkSessionApiIntegrationTests {
             .andExpect(jsonPath("$.data.comparison.current.turnCount").value(2))
             .andExpect(jsonPath("$.data.growth.pattern").value("TENSE"))
             .andExpect(jsonPath("$.data.growth.patternLabel").value("시제"))
-            .andExpect(jsonPath("$.data.growth.succeeded").value(true))
+            .andExpect(jsonPath("$.data.growth.succeeded").value(false))
             .andExpect(jsonPath("$.data.growth.previousSentence").value("I go hiking yesterday."))
             .andExpect(jsonPath("$.data.growth.previousWrongSpan").value("go"))
-            .andExpect(jsonPath("$.data.growth.currentSentence").value("I went hiking again."))
-            .andExpect(jsonPath("$.data.growth.currentSpan").value("went"))
-            .andExpect(jsonPath("$.data.headline.pose").value("POINT"))
-            .andExpect(jsonPath("$.data.correctionCount").value(0))
+            .andExpect(jsonPath("$.data.growth.currentSentence").value("I go hiking again."))
+            .andExpect(jsonPath("$.data.growth.currentSpan").value(nullValue()))
+            .andExpect(jsonPath("$.data.headline.pose").value("NORMAL"))
+            .andExpect(jsonPath("$.data.correctionCount").value(1))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -1863,7 +1856,7 @@ class FreeTalkSessionApiIntegrationTests {
                 + " AND m.role = 'USER' ORDER BY m.message_sequence LIMIT 1",
             Long.class,
             secondSessionId);
-    insertExpressionReuse(secondSessionId, secondUserMessageId, 812L, "go hiking", "went hiking");
+    insertExpressionReuse(secondSessionId, secondUserMessageId, 812L, "go hiking", "go hiking");
     jdbcTemplate.update(
         "INSERT INTO free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id,"
             + " trigger_type, question, invite, created_at, updated_at)"
@@ -1881,7 +1874,7 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.reusedExpressions.items[0].expressionId").value(812))
         .andExpect(
             jsonPath("$.data.reusedExpressions.items[0].messageId").value(secondUserMessageId))
-        .andExpect(jsonPath("$.data.reusedExpressions.items[0].matchedText").value("went hiking"))
+        .andExpect(jsonPath("$.data.reusedExpressions.items[0].matchedText").value("go hiking"))
         .andExpect(jsonPath("$.data.followUp.pending").value(false))
         .andExpect(jsonPath("$.data.followUp.triggerType").value("HOBBY"))
         .andExpect(jsonPath("$.data.followUp.question").value("요즘도 등산 다녀?"))

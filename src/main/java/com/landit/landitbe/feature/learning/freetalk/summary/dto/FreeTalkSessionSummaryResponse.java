@@ -199,7 +199,7 @@ public record FreeTalkSessionSummaryResponse(
      * @param expressionId 공통 표현 ID
      * @param text 표현 원형
      * @param meaning 한국어 뜻
-     * @param sourceLabel 배운 날과 곳. 예: "9월 10일 「주말 계획」"
+     * @param sourceLabel 배운 날과 곳(시나리오·스몰톡). 예: "9월 10일 시나리오 「카페」", "9월 12일 스몰톡 「주말 계획」"
      * @param messageId 이 표현을 쓴 사용자 발화 ID
      * @param quotedSentence 표현을 쓴 문장
      * @param matchedText 그 문장에서 굵게 처리할 구절

@@ -198,6 +198,34 @@ class FreeTalkSummaryServiceTest {
     verify(summaryRepository).save(any());
   }
 
+  @DisplayName("상한이 지나 준비 상태인 교정을 빼고 확정할 때는 지난번 패턴을 오늘 맞게 쓴 사용례가 있어도 성공 카드를 만들지 않는다.")
+  @Test
+  void doesNotClaimGrowthSuccessWhenSettlingWithPreparingCorrections() {
+    stubPreviousSessionWithTenseCard();
+    when(messageFeedbackService.findBySessionHistoryId(HISTORY_ID))
+        .thenReturn(
+            Map.of(5505L, new FreeTalkTurnCorrection(ProcessingStatus.PREPARING, null, null)));
+
+    FreeTalkSessionSummaryResponse response =
+        service(ENDED_AT.plusSeconds(30)).getSummary(USER_ID, LEARNING_SESSION_ID);
+
+    assertThat(response.pending()).isFalse();
+    assertThat(response.firstSession()).isFalse();
+    assertThat(response.growth()).isNull();
+    ArgumentCaptor<FreeTalkSessionSummary> saved =
+        ArgumentCaptor.forClass(FreeTalkSessionSummary.class);
+    verify(summaryRepository).save(saved.capture());
+    assertThat(saved.getValue().getHeadlineTrigger()).isNotEqualTo(FreeTalkHeadlineTrigger.GROWTH);
+    // 같은 재료라도 교정이 다 끝났으면 성공 카드다.
+    when(messageFeedbackService.findBySessionHistoryId(HISTORY_ID)).thenReturn(Map.of());
+    assertThat(
+            service(ENDED_AT.plusSeconds(1))
+                .getSummary(USER_ID, LEARNING_SESSION_ID)
+                .growth()
+                .succeeded())
+        .isTrue();
+  }
+
   @DisplayName("저장된 총평이 있으면 다시 계산하지 않고 그대로 돌려준다.")
   @Test
   void returnsStoredSummaryWithoutRecalculating() {
@@ -407,7 +435,7 @@ class FreeTalkSummaryServiceTest {
                         812L,
                         "grab a coffee",
                         "커피 한잔하다",
-                        "9월 10일 「주말 계획」",
+                        "9월 10일 스몰톡 「주말 계획」",
                         5504L,
                         "Let's grab a coffee.",
                         "grab a coffee"))));
@@ -426,7 +454,7 @@ class FreeTalkSummaryServiceTest {
                 812L,
                 "grab a coffee",
                 "커피 한잔하다",
-                "9월 10일 「주말 계획」",
+                "9월 10일 스몰톡 「주말 계획」",
                 5504L,
                 "Let's grab a coffee.",
                 "grab a coffee"));

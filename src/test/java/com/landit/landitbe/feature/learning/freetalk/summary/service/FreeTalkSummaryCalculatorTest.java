@@ -275,6 +275,10 @@ class FreeTalkSummaryCalculatorTest {
     "5, 90909,10,10, 100000,10,10, DECREASED",
     "5, 0,0,0, 0,0,0, SIMILAR",
     "5, 1000,1,1, 0,0,0, SPEAKING_TIME_UP",
+    // 비율로는 늘었어도 1초가 안 되는 차이는 "0초 더 말했어요"가 되므로 비슷함이다.
+    "5, 3400,10,10, 3000,10,10, SIMILAR",
+    "5, 999,1,1, 0,1,1, SIMILAR",
+    "5, 4000,10,10, 3000,10,10, SPEAKING_TIME_UP",
   })
   void picksHeadlineTriggerByPriority(
       int days,
@@ -505,6 +509,173 @@ class FreeTalkSummaryCalculatorTest {
                     metricsSource(100000, 10, 10))
                 .getHeadlineText())
         .isEqualTo("오늘은 짧게 얘기했어요.");
+  }
+
+  @DisplayName("교정이 다 끝나지 않은 채 확정하면 맞은 사용례만 있는 패턴은 건너뛰고, 또 틀린 근거가 있는 패턴만 카드가 된다.")
+  @Test
+  void doesNotClaimSuccessWhileCorrectionsRemain() {
+    FreeTalkSummarySource previous =
+        source(
+            utterances(10),
+            List.of(
+                correction(FreeTalkMistakePattern.ARTICLE, "a gym", "a gym"),
+                correction(FreeTalkMistakePattern.ARTICLE, "a apple", "a apple"),
+                correction(FreeTalkMistakePattern.TENSE, "I go yesterday.", "go")),
+            List.of());
+    List<FreeTalkPatternUsageDraft> usages =
+        List.of(
+            usage(FreeTalkMistakePattern.ARTICLE, "the gym", "the gym", true),
+            usage(FreeTalkMistakePattern.TENSE, "I go there.", "go", false));
+    FreeTalkSummarySource complete = source(utterances(10), List.of(), usages);
+    FreeTalkSummarySource incomplete =
+        new FreeTalkSummarySource(utterances(10), List.of(), usages, false);
+
+    FreeTalkSessionSummary settled =
+        calculator.calculate(1L, 30L, 3100L, 300L, complete, PREVIOUS, previous);
+    FreeTalkSessionSummary early =
+        calculator.calculate(1L, 30L, 3100L, 300L, incomplete, PREVIOUS, previous);
+
+    // 교정이 다 끝났으면 가장 많이 틀린 관사의 성공 카드다.
+    assertThat(settled.getGrowthPattern()).isEqualTo(FreeTalkMistakePattern.ARTICLE);
+    assertThat(settled.getGrowthSucceeded()).isTrue();
+    assertThat(settled.getHeadlineTrigger()).isEqualTo(FreeTalkHeadlineTrigger.GROWTH);
+    // 남은 교정이 관사일 수 있으므로 성공은 주장하지 않고, 또 틀린 근거가 있는 시제 카드로 넘어간다.
+    assertThat(early.getGrowthPattern()).isEqualTo(FreeTalkMistakePattern.TENSE);
+    assertThat(early.getGrowthSucceeded()).isFalse();
+    assertThat(early.getGrowthCurrentSentence()).isEqualTo("I go there.");
+    assertThat(early.getHeadlineTrigger()).isNotEqualTo(FreeTalkHeadlineTrigger.GROWTH);
+    assertThat(early.getHeadlinePose()).isEqualTo(FreeTalkHeadlinePose.NORMAL);
+
+    // 맞은 사용례뿐이면 카드가 없고 헤드라인도 성장을 말하지 않는다.
+    FreeTalkSummarySource onlyCorrect =
+        new FreeTalkSummarySource(
+            utterances(10),
+            List.of(),
+            List.of(usage(FreeTalkMistakePattern.ARTICLE, "the gym", "the gym", true)),
+            false);
+    FreeTalkSessionSummary none =
+        calculator.calculate(1L, 30L, 3100L, 300L, onlyCorrect, PREVIOUS, previous);
+    assertThat(none.getGrowthPattern()).isNull();
+    assertThat(none.getGrowthSucceeded()).isNull();
+    assertThat(none.getHeadlineTrigger()).isNotEqualTo(FreeTalkHeadlineTrigger.GROWTH);
+  }
+
+  @DisplayName("실수 기억 카드 후보는 턴마다 지켜본 상위 3개 패턴뿐이라, 네 번째 패턴은 오늘 맞게 썼어도 또 틀렸어도 카드가 되지 않는다.")
+  @Test
+  void limitsCardCandidatesToWatchedPatterns() {
+    FreeTalkSummarySource previous =
+        source(
+            utterances(10),
+            List.of(
+                correction(FreeTalkMistakePattern.TENSE),
+                correction(FreeTalkMistakePattern.TENSE),
+                correction(FreeTalkMistakePattern.TENSE),
+                correction(FreeTalkMistakePattern.ARTICLE),
+                correction(FreeTalkMistakePattern.ARTICLE),
+                correction(FreeTalkMistakePattern.PLURAL),
+                correction(FreeTalkMistakePattern.PLURAL),
+                correction(FreeTalkMistakePattern.PRONOUN)),
+            List.of());
+    FreeTalkSummarySource fixedFourth =
+        source(
+            utterances(10),
+            List.of(),
+            List.of(usage(FreeTalkMistakePattern.PRONOUN, "her bag", "her", true)));
+    FreeTalkSummarySource repeatedFourth =
+        source(
+            utterances(10),
+            List.of(correction(FreeTalkMistakePattern.PRONOUN, "him bag", "him")),
+            List.of());
+    FreeTalkSummarySource fixedThird =
+        source(
+            utterances(10),
+            List.of(),
+            List.of(usage(FreeTalkMistakePattern.PLURAL, "two cats", "cats", true)));
+
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, fixedFourth, PREVIOUS, previous)
+                .getGrowthPattern())
+        .isNull();
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, repeatedFourth, PREVIOUS, previous)
+                .getGrowthPattern())
+        .isNull();
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, fixedThird, PREVIOUS, previous)
+                .getGrowthPattern())
+        .isEqualTo(FreeTalkMistakePattern.PLURAL);
+  }
+
+  @DisplayName(
+      "\"N분 넘게\"는 정확히 N분이면 후보에서 빠지고, \"N번이나\"는 1번이면 쓰지 않으며, 줄어듦 문구 셋과 성장 셋째 문구의 의미 줄을 돌려 쓴다.")
+  @Test
+  void gatesBoundaryPhrasesAndRotatesDecreasedPhrases() {
+    FreeTalkSummarySource previous = metricsSource(161000, 14, 12);
+    // 정확히 4분: "4분 넘게"가 거짓이라 빠지고, 1.5배도 안 되어 차이 문구뿐이다.
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 301L, metricsSource(240000, 14, 12), PREVIOUS, previous)
+                .getHeadlineText())
+        .isEqualTo("지난번보다 1분 19초 더 말했어요!");
+    FreeTalkSessionSummary.PreviousSession longAgo =
+        new FreeTalkSessionSummary.PreviousSession(1201L, PREVIOUS_DATE, 20);
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 301L, metricsSource(120000, 14, 12), longAgo, previous)
+                .getHeadlineText())
+        .isEqualTo("20일 만이네요, 감을 잃지않고 14번 주고받았어요!");
+    // 1번: "1번이나"를 쓰지 않는다.
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, metricsSource(5000, 1, 3), null, null)
+                .getHeadlineText())
+        .isEqualTo("첫 스몰톡 완주 축하해요!");
+    assertThat(
+            calculator
+                .calculate(
+                    1L, 30L, 3100L, 300L, metricsSource(0, 1, 0), PREVIOUS, metricsSource(0, 0, 0))
+                .getHeadlineText())
+        .isEqualTo("대화가 지난번보다 1번 더 이어졌어요!");
+    // 줄어듦 문구 셋.
+    FreeTalkSummarySource shorter = metricsSource(80000, 14, 12);
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, shorter, PREVIOUS, previous)
+                .getHeadlineText())
+        .isEqualTo("오늘은 짧게 얘기했어요.");
+    FreeTalkSessionSummary second =
+        calculator.calculate(1L, 30L, 3100L, 301L, shorter, PREVIOUS, previous);
+    assertThat(second.getHeadlineText()).isEqualTo("지난번보다 짧게 대화했어요.");
+    assertThat(second.getHeadlineSubline()).isEqualTo("오늘도 대화했다는 사실이 중요하죠.");
+    FreeTalkSessionSummary third =
+        calculator.calculate(1L, 30L, 3100L, 302L, shorter, PREVIOUS, previous);
+    assertThat(third.getHeadlineText()).isEqualTo("오늘은 짧게 얘기해서 아쉬워요.");
+    assertThat(third.getHeadlineSubline()).isEqualTo("다음엔 더 길게 얘기하고 싶어요.");
+    // 성장 셋째 문구의 의미 줄.
+    FreeTalkSummarySource corrected =
+        source(
+            utterances(10),
+            List.of(correction(FreeTalkMistakePattern.ARTICLE, "a gym", "a gym")),
+            List.of());
+    FreeTalkSummarySource fixed =
+        source(
+            utterances(10),
+            List.of(),
+            List.of(usage(FreeTalkMistakePattern.ARTICLE, "the gym", "the gym", true)));
+    FreeTalkSessionSummary mastered =
+        calculator.calculate(1L, 30L, 3100L, 302L, fixed, PREVIOUS, corrected);
+    assertThat(mastered.getHeadlineText()).isEqualTo("관사 완전 정복한 거 같은데요?");
+    assertThat(mastered.getHeadlineSubline()).isEqualTo("점점 실력이 늘어가고 있어요.");
+  }
+
+  @DisplayName("\"N분 넘게\" 판정은 1분 이상이면서 정확히 N분이 아닐 때만 참이다.")
+  @ParameterizedTest
+  @CsvSource({"245000, true", "240000, false", "60000, false", "60001, true", "59999, false"})
+  void judgesOverWholeMinute(long ms, boolean expected) {
+    assertThat(FreeTalkSummaryCalculator.overWholeMinute(ms)).isEqualTo(expected);
   }
 
   @DisplayName("시간·배수 서식은 0초·정확한 분·소수 배수를 한국어로 쓴다.")

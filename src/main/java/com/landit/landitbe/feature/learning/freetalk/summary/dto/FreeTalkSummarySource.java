@@ -12,17 +12,27 @@ import java.util.List;
  * @param utterances 사용자 발화. 예: [("I went to the gym.", 4200)]
  * @param corrections 판정을 마쳐 문장이 있는 교정. 고칠 것이 없던 턴은 들어 있지 않다
  * @param patternUsages 지켜보던 실수 패턴의 사용례
+ * @param correctionsComplete 이 세션의 교정 판정이 모두 끝났으면 true. 상한을 넘겨 준비 상태인 교정을 빼고 확정할 때 false. 예: true
  */
 public record FreeTalkSummarySource(
     List<Utterance> utterances,
     List<FreeTalkTurnCorrection.Sentence> corrections,
-    List<FreeTalkPatternUsageDraft> patternUsages) {
+    List<FreeTalkPatternUsageDraft> patternUsages,
+    boolean correctionsComplete) {
 
   /** 목록을 null 없이 불변으로 보관한다. */
   public FreeTalkSummarySource {
     utterances = utterances == null ? List.of() : List.copyOf(utterances);
     corrections = corrections == null ? List.of() : List.copyOf(corrections);
     patternUsages = patternUsages == null ? List.of() : List.copyOf(patternUsages);
+  }
+
+  /** 교정이 모두 끝난 세션의 재료다. */
+  public FreeTalkSummarySource(
+      List<Utterance> utterances,
+      List<FreeTalkTurnCorrection.Sentence> corrections,
+      List<FreeTalkPatternUsageDraft> patternUsages) {
+    this(utterances, corrections, patternUsages, true);
   }
 
   /**

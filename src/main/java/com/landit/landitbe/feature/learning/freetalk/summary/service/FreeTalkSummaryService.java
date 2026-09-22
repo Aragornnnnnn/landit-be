@@ -208,7 +208,8 @@ public class FreeTalkSummaryService {
         previousSource);
   }
 
-  // 발화 순서대로 사용자 발화와 그 발화의 교정(판정을 마쳐 문장이 있는 것만)을 모은다. 상한을 넘겨 아직 준비 상태인 교정은 문장이 없어 자연히 빠진다.
+  // 발화 순서대로 사용자 발화와 그 발화의 교정(판정을 마쳐 문장이 있는 것만)을 모은다. 상한을 넘겨 아직 준비 상태인 교정은 문장이 없어 빠지고,
+  // 그 사실을 함께 넘겨 계산기가 "오늘 맞게 썼다"를 섣불리 주장하지 않게 한다.
   private FreeTalkSummarySource source(
       long sessionHistoryId, Map<Long, FreeTalkTurnCorrection> corrections) {
     List<FreeTalkSummarySource.Utterance> utterances = new ArrayList<>();
@@ -230,7 +231,10 @@ public class FreeTalkSummaryService {
         patternUsageRepository.findBySessionHistoryIdOrderByIdAsc(sessionHistoryId).stream()
             .map(FreeTalkSummaryService::draft)
             .toList();
-    return new FreeTalkSummarySource(utterances, sentences, usages);
+    boolean correctionsComplete =
+        corrections.values().stream()
+            .noneMatch(correction -> correction.status() == ProcessingStatus.PREPARING);
+    return new FreeTalkSummarySource(utterances, sentences, usages, correctionsComplete);
   }
 
   private static IllegalStateException missingPrevious(String what, long learningSessionId) {
