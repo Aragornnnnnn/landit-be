@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.profile.service;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
+import com.landit.landitbe.feature.profile.dto.ActiveUserProfileIds;
 import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.dto.UserProfilePage;
@@ -93,13 +94,14 @@ public class UserProfileService {
    * @return 존재하는 활성 사용자 ID 목록. 빈 입력은 빈 목록을 반환한다
    */
   @Transactional
-  public List<Long> findActiveIdsForUpdate(List<Long> userIds) {
+  public ActiveUserProfileIds findActiveIdsForUpdate(List<Long> userIds) {
     if (userIds.isEmpty()) {
-      return List.of();
+      return new ActiveUserProfileIds(List.of());
     }
-    return userProfileRepository.findActiveByIdsForUpdate(userIds).stream()
-        .map(UserProfile::getId)
-        .toList();
+    return new ActiveUserProfileIds(
+        userProfileRepository.findActiveByIdsForUpdate(userIds).stream()
+            .map(UserProfile::getId)
+            .toList());
   }
 
   /**

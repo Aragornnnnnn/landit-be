@@ -65,7 +65,7 @@ public class AdminMailboxDirectLetterService {
     if (new HashSet<>(requestedIds).size() != requestedIds.size()) {
       throw new ApiException(ErrorCode.INVALID_REQUEST, "수신자 ID가 중복됐습니다.");
     }
-    List<Long> activeIds = userProfileService.findActiveIdsForUpdate(requestedIds);
+    List<Long> activeIds = userProfileService.findActiveIdsForUpdate(requestedIds).ids();
     if (activeIds.size() != requestedIds.size()) {
       throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "활성 수신자를 찾을 수 없습니다.");
     }
