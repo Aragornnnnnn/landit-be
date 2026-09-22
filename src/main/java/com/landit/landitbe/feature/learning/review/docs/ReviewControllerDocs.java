@@ -68,7 +68,9 @@ public interface ReviewControllerDocs {
       summary = "복습 답안 제출",
       description =
           "currentQuestionId에 제출합니다. 허용 정답 배열과 토큰 값·순서·개수가 일치하면 정답입니다."
-              + " 오답은 큐 뒤로 이동하며 마지막 정답에서 자동 완료됩니다. 네트워크 재시도는 같은 submissionId와 내용을 사용합니다.")
+              + " 첫 오답은 큐 뒤로 이동하고 정답 또는 두 번째 오답이면 문제가 종료됩니다."
+              + " 모든 문제가 종료되면 COMPLETED이며 currentQuestionId는 null입니다."
+              + " 두 번째 오답도 correct는 false입니다. 네트워크 재시도는 같은 submissionId와 내용을 사용합니다.")
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "400",

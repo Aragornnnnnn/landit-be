@@ -239,7 +239,7 @@ public class ExpressionReviewRepository {
   }
 
   /**
-   * 정답이면 완료하고 오답이면 현재 큐의 뒤로 보낸다.
+   * 정답 또는 두 번째 오답이면 문제를 종료하고 첫 오답만 재도전 대상으로 남긴다.
    *
    * @param reviewId 복습 ID
    * @param request 제출 원문
@@ -273,8 +273,10 @@ public class ExpressionReviewRepository {
               reviewId);
       jdbc.update(
           "update expression_review_question set wrong_count = wrong_count + 1, queue_order = ?"
+              + ", completed_at = case when wrong_count + 1 >= 2 then ? else null end"
               + " where id = ? and review_id = ?",
           next,
+          now,
           request.questionId(),
           reviewId);
     }

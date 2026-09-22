@@ -144,7 +144,7 @@ public class ExpressionReviewService {
   }
 
   /**
-   * 큐의 첫 미완료 문제를 채점하고 마지막 정답에서 복습을 자동 완료한다.
+   * 현재 문제를 채점하고 모든 문제가 정답 또는 두 번째 오답으로 종료되면 복습을 완료한다.
    *
    * @param userId 로그인 사용자
    * @param id 복습 ID
