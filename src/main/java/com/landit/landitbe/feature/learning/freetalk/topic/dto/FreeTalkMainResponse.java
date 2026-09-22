@@ -5,9 +5,9 @@ package com.landit.landitbe.feature.learning.freetalk.topic.dto;
 import java.util.List;
 
 /**
- * 프리톡 메인 화면의 주제와 일일 발화 시간을 반환한다.
+ * 프리톡 메인 화면의 무작위 추천 주제와 일일 발화 시간을 반환한다.
  *
- * @param topics 활성 추천 주제
+ * @param topics 무작위로 뽑은 활성 추천 주제(최대 5개)
  * @param dailySpeakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
  * @param usedSpeakingTimeMs KST 당일 사용한 사용자 발화 시간 밀리초
  * @param remainingSpeakingTimeMs KST 당일 남은 사용자 발화 시간 밀리초
@@ -21,9 +21,9 @@ public record FreeTalkMainResponse(
     boolean canStart) {
 
   /**
-   * 활성 주제와 일일 발화 시간을 메인 응답으로 만든다.
+   * 무작위 추천 주제와 일일 발화 시간을 메인 응답으로 만든다.
    *
-   * @param topics 활성 추천 주제
+   * @param topics 무작위로 뽑은 활성 추천 주제(최대 5개)
    * @param dailySpeakingTimeLimitMs 일일 사용자 발화 시간 제한 밀리초
    * @param usedSpeakingTimeMs KST 당일 사용한 사용자 발화 시간 밀리초
    * @param remainingSpeakingTimeMs KST 당일 남은 사용자 발화 시간 밀리초

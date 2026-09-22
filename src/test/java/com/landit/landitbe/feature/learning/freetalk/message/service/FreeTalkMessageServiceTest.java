@@ -50,6 +50,7 @@ import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrie
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -202,10 +203,54 @@ class FreeTalkMessageServiceTest {
     verify(turnResultService).complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
   }
 
+  @DisplayName("속마음과 교정의 저장·실패 상태 저장이 모두 실패해도 응답을 유지하고 각 실패를 기록한다.")
+  @Test
+  void reportsPersistenceAndCompensationFailuresWithoutLosingCoreResponse() {
+    Logger logger = (Logger) LoggerFactory.getLogger(FailureObservation.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      FreeTalkTurnCorrection correction = FreeTalkTurnCorrection.failed();
+      when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+          .thenReturn(reservation());
+      when(aiFreeTalkClient.generateTurn(any())).thenReturn(turnResult());
+      FreeTalkMessageSubmitResponse response = continueResponse();
+      when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(response);
+      when(aiFreeTalkClient.generateInnerThought(any()))
+          .thenReturn(
+              new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD, correction));
+      doThrow(new IllegalStateException("save failed"))
+          .when(turnResultService)
+          .complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
+      doThrow(new IllegalStateException("compensation failed")).when(turnResultService).fail(7L);
+
+      assertThat(service.submit(1L, 300L, request())).isSameAs(response);
+
+      verify(turnResultService).fail(7L);
+      assertThat(appender.list)
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .containsExactly(
+              "failure_observation workflow=inner_thought failure_stage=persistence"
+                  + " reason=storage_failed outcome=failed",
+              "failure_observation workflow=inner_thought failure_stage=failure_state_persistence"
+                  + " reason=storage_failed outcome=failed");
+      assertThat(appender.list)
+          .allSatisfy(
+              event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                assertThat(event.getThrowableProxy()).isNotNull();
+              });
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
   @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")
   @Test
   void logsFailedInnerThoughtGenerationAsStructuredError() {
-    Logger logger = (Logger) LoggerFactory.getLogger(FreeTalkMessageService.class);
+    Logger logger = (Logger) LoggerFactory.getLogger(FailureObservation.class);
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
     logger.addAppender(appender);
@@ -227,9 +272,9 @@ class FreeTalkMessageServiceTest {
               event -> {
                 assertThat(event.getLevel()).isEqualTo(Level.ERROR);
                 assertThat(event.getFormattedMessage())
-                    .contains("workflow=free_talk_inner_thought_failed")
-                    .contains("messageId=7")
-                    .contains("errorCode=AI_RESPONSE_INVALID");
+                    .contains("workflow=inner_thought")
+                    .contains("failure_stage=generation")
+                    .contains("reason=result_missing");
                 assertThat(event.getThrowableProxy()).isNotNull();
               });
       verify(turnResultService).fail(7L);

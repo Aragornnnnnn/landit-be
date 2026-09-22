@@ -544,6 +544,7 @@ class ScenarioSessionApiIntegrationTests {
     StartedSession session = startFoodConversation("message-feedback-contract@example.com");
     final long sessionId = session.sessionId();
     fakeAiConversationClient.blockInnerThoughtGeneration();
+    fakeAiConversationClient.messageFeedbackRelease = new CountDownLatch(1);
     try {
       MvcResult result =
           requestScenarioMessage(session, "I like pizza because it is spicy.")
@@ -581,6 +582,7 @@ class ScenarioSessionApiIntegrationTests {
           .isEqualTo("I like pizza because it is spicy.");
       assertThat(fakeAiConversationClient.messageFeedbackTransactionActive()).containsOnly(false);
     } finally {
+      fakeAiConversationClient.messageFeedbackRelease.countDown();
       releaseInnerThoughtAndAwaitCompletion(sessionId);
     }
   }
@@ -4326,6 +4328,8 @@ class ScenarioSessionApiIntegrationTests {
     @Override
     public AiMessageFeedbackResult requestMessageFeedback(AiMessageFeedbackRequest request) {
       lastMessageFeedbackRequest = request;
+      messageFeedbackTransactionActive.add(
+          TransactionSynchronizationManager.isActualTransactionActive());
       messageFeedbackRequested.countDown();
       try {
         if (!messageFeedbackRelease.await(5, TimeUnit.SECONDS)) {
@@ -4335,8 +4339,6 @@ class ScenarioSessionApiIntegrationTests {
         Thread.currentThread().interrupt();
         throw new ApiException(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
       }
-      messageFeedbackTransactionActive.add(
-          TransactionSynchronizationManager.isActualTransactionActive());
       if (failMessageFeedbackRequest) {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }

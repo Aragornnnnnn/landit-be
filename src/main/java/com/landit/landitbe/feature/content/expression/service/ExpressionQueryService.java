@@ -11,6 +11,7 @@ import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,21 @@ public class ExpressionQueryService {
   private static final String EXPRESSION_NOT_FOUND_LOG =
       "추가 예문 조회 실패: 존재하지 않거나 비활성화된 표현입니다. expressionId={}";
   private final WritingExpressionRepository writingExpressionRepository;
+
+  /**
+   * 활성 표현의 콘텐츠를 조회하며 없는 표현은 예외 없이 구분한다.
+   *
+   * <p>완료 표현 중 현재 제공할 수 없는 문제를 건너뛰는 복습 조율에서 사용한다.
+   *
+   * @param expressionId 표현 ID
+   * @return 활성 표현의 콘텐츠 값, 없으면 빈 Optional
+   */
+  @Transactional(readOnly = true)
+  public Optional<ExpressionLearningMaterial> findLearningMaterial(Long expressionId) {
+    return writingExpressionRepository
+        .findByIdAndStatus(expressionId, ActiveStatus.ACTIVE)
+        .map(ExpressionLearningMaterial::from);
+  }
 
   /**
    * 학습 쪽에서 결정한 언어와 난이도로 표현을 조회한다.

@@ -54,6 +54,7 @@ class ScheduledNotificationServiceTest {
   @Mock private NotificationDispatchService notificationDispatchService;
 
   @Mock private PlatformTransactionManager transactionManager;
+  @Mock private LearningNotificationFrequencyService frequency;
 
   private ScheduledNotificationService scheduledNotificationService;
 
@@ -62,6 +63,7 @@ class ScheduledNotificationServiceTest {
   @BeforeEach
   void setUp() {
     meterRegistry = new SimpleMeterRegistry();
+    lenient().when(frequency.reserveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
     lenient()
         .when(transactionManager.getTransaction(any()))
         .thenAnswer(invocation -> new SimpleTransactionStatus());
@@ -79,7 +81,8 @@ class ScheduledNotificationServiceTest {
             userNotificationStateRepository,
             notificationDispatchService,
             transactionManager,
-            meterRegistry);
+            meterRegistry,
+            frequency);
   }
 
   /** 500명 경계에서 다음 Keyset 페이지를 조회하고 사용자별 SQS 재발행 없이 상태를 저장한다. */

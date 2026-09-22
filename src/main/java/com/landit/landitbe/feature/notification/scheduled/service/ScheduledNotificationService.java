@@ -50,6 +50,7 @@ public class ScheduledNotificationService {
   private final NotificationDispatchService notificationDispatchService;
   private final TransactionOperations pageTransactions;
   private final MeterRegistry meterRegistry;
+  private final LearningNotificationFrequencyService frequency;
 
   /**
    * 페이지별 계산과 상태 저장을 독립 트랜잭션으로 실행하도록 서비스를 구성한다.
@@ -60,6 +61,7 @@ public class ScheduledNotificationService {
    * @param notificationDispatchService 페이지 단위 Push 발송 Service
    * @param transactionManager 애플리케이션 트랜잭션 관리자
    * @param meterRegistry 예약 알림 처리 지표 저장소
+   * @param frequency 기존 학습 알림과 복습 알림의 공통 빈도 제한
    */
   public ScheduledNotificationService(
       NotificationTargetQueryRepository notificationTargetPageQueryService,
@@ -67,12 +69,14 @@ public class ScheduledNotificationService {
       UserNotificationStateRepository userNotificationStateRepository,
       NotificationDispatchService notificationDispatchService,
       PlatformTransactionManager transactionManager,
-      MeterRegistry meterRegistry) {
+      MeterRegistry meterRegistry,
+      LearningNotificationFrequencyService frequency) {
     this.notificationTargetPageQueryService = notificationTargetPageQueryService;
     this.notificationTargetSelectionService = notificationTargetSelectionService;
     this.userNotificationStateRepository = userNotificationStateRepository;
     this.notificationDispatchService = notificationDispatchService;
     this.meterRegistry = meterRegistry;
+    this.frequency = frequency;
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     this.pageTransactions = transactionTemplate;
@@ -323,11 +327,12 @@ public class ScheduledNotificationService {
                         content.title(),
                         content.body(),
                         content.deepLink()));
-                state.markSent(now);
               });
     }
+    List<SendPushNotificationCommand> reserved = frequency.reserveAll(commands);
+    reserved.forEach(command -> statesByUserId.get(command.userProfileId()).markSent(now));
     userNotificationStateRepository.saveAll(statesByUserId.values());
-    return commands;
+    return reserved;
   }
 
   /** 기존 상태를 사용자 ID별로 묶어 행마다 추가 조회하지 않도록 준비한다. */
