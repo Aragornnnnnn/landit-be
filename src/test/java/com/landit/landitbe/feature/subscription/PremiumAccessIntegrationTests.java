@@ -63,6 +63,8 @@ class PremiumAccessIntegrationTests {
   /** 시나리오 진행도가 참조할 카테고리와 시나리오를 준비한다. */
   @BeforeEach
   void seedScenario() {
+    // 요약 조회가 남긴 총평은 대화 기록 FK가 삭제 전파되지 않아, 같은 DB를 쓰는 다른 테스트의 정리를 막지 않도록 먼저 지운다.
+    jdbcTemplate.update("DELETE FROM free_talk_session_summary");
     jdbcTemplate.update("DELETE FROM user_scenario_progress WHERE scenario_id = ?", SCENARIO_ID);
     jdbcTemplate.update("DELETE FROM scenario WHERE id = ?", SCENARIO_ID);
     jdbcTemplate.update("DELETE FROM category_language_variant WHERE category_id = ?", CATEGORY_ID);
