@@ -165,4 +165,19 @@ class FreeTalkCorrectionRequestServiceTest {
     when(message.getContent()).thenReturn(content);
     return message;
   }
+
+  @DisplayName("지켜볼 패턴 조회의 실패 격리가 트랜잭션 프록시에 막히지 않도록 다시 조립은 트랜잭션을 열지 않는다.")
+  @Test
+  void doesNotOpenItsOwnTransaction() throws NoSuchMethodException {
+    assertThat(
+            FreeTalkCorrectionRequestService.class
+                .getMethod("rebuild", long.class)
+                .isAnnotationPresent(
+                    org.springframework.transaction.annotation.Transactional.class))
+        .isFalse();
+    assertThat(
+            FreeTalkCorrectionRequestService.class.isAnnotationPresent(
+                org.springframework.transaction.annotation.Transactional.class))
+        .isFalse();
+  }
 }
