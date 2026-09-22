@@ -62,7 +62,7 @@ record ScheduledNotificationContent(
     String title = scenarioTitle(variant, input);
     String body = scenarioBody(variant, input);
     return new ScheduledNotificationContent(
-        variant, title, body, "/scenario" + campaign("daily_scenario_reminder"));
+        variant, title, body, "/scenario" + campaign("daily_scenario_reminder", variant));
   }
 
   private static NotificationContentVariant scenarioVariant(
@@ -196,7 +196,7 @@ record ScheduledNotificationContent(
             + target.scenarioId()
             + "/"
             + target.targetId()
-            + campaign("continue_expression"));
+            + campaign("continue_expression", variant));
   }
 
   private static ScheduledNotificationContent smallTalkContent(
@@ -219,7 +219,7 @@ record ScheduledNotificationContent(
         variant,
         dynamic ? title : "오늘은 스몰톡 안 하시나요? 🥺",
         body,
-        "/smalltalk" + campaign("small_talk_reminder"));
+        "/smalltalk" + campaign("small_talk_reminder", variant));
   }
 
   private static boolean containsReservationMarker(String value) {
@@ -230,7 +230,10 @@ record ScheduledNotificationContent(
     return value.codePointCount(0, value.length());
   }
 
-  private static String campaign(String campaign) {
-    return "?utm_source=push&utm_medium=notification&utm_campaign=" + campaign;
+  private static String campaign(String campaign, NotificationContentVariant variant) {
+    return "?utm_source=push&utm_medium=notification&utm_campaign="
+        + campaign
+        + "&utm_content="
+        + variant.contentSlug();
   }
 }

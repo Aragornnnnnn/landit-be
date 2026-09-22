@@ -492,7 +492,12 @@ class ExpressionReviewIntegrationTests {
     var delivered = captor.getAllValues().stream().flatMap(List::stream).toList();
     assertThat(delivered).hasSize(2);
     assertThat(delivered.getFirst()).isEqualTo(delivered.getLast());
-    assertThat(delivered.getFirst().deepLink()).contains("/reviews/" + id);
+    assertThat(delivered.getFirst().deepLink())
+        .isEqualTo(
+            "/reviews/"
+                + id
+                + "?utm_source=push&utm_medium=notification&utm_campaign=expression_review"
+                + "&utm_content=expression_review_quiz");
     assertThat(delivered.getFirst().notificationType())
         .isEqualTo(NotificationType.EXPRESSION_REVIEW);
   }

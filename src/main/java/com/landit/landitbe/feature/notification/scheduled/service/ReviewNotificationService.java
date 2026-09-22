@@ -132,6 +132,7 @@ public class ReviewNotificationService {
         "표현 " + offer.questionCount() + "개를 짧은 퀴즈로 복습해 보세요.",
         "/reviews/"
             + offer.reviewId()
-            + "?utm_source=push&utm_medium=notification&utm_campaign=expression_review");
+            + "?utm_source=push&utm_medium=notification&utm_campaign=expression_review"
+            + "&utm_content=expression_review_quiz");
   }
 }
