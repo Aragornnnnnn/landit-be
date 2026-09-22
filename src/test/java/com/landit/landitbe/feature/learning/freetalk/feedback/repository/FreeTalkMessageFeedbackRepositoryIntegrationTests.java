@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -181,6 +182,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
     assertThat(feedbackRow())
         .containsEntry("PROCESSING_STATUS", "COMPLETED")
         .containsEntry("BETTER_SENTENCE", "I went to the gym.")
+        .containsEntry("WRONG_SPAN", "go")
+        .containsEntry("BETTER_SPAN", "went")
         .containsEntry("LEASE_UNTIL", null)
         .containsEntry("ATTEMPT_TOKEN", null);
     assertThat(failAttempt(2, "token-2")).isZero();
@@ -202,6 +205,22 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
                 MESSAGE_ID, attempts, token, ProcessingStatus.FAILED, ProcessingStatus.PREPARING));
   }
 
+  @DisplayName("저장한 강조 구절은 교정을 읽을 때 그대로 돌아온다.")
+  @Test
+  void roundTripsSpansThroughCorrection() {
+    seedFeedback("PREPARING", 1, null);
+    assertThat(completeWithCorrection()).isEqualTo(1);
+
+    FreeTalkTurnCorrection.Sentence sentence =
+        repository
+            .findBySessionHistoryMessageId(MESSAGE_ID)
+            .orElseThrow()
+            .toCorrection()
+            .sentence();
+    assertThat(sentence.wrongSpan()).isEqualTo("go");
+    assertThat(sentence.betterSpan()).isEqualTo("went");
+  }
+
   private int completeWithCorrection() {
     return transactionTemplate.execute(
         status ->
@@ -216,6 +235,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
                 null,
                 null,
                 null,
+                "go",
+                "went",
                 ProcessingStatus.PREPARING));
   }
 
@@ -234,7 +255,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
 
   private Map<String, Object> feedbackRow() {
     return jdbcTemplate.queryForMap(
-        "select processing_status, attempts, lease_until, attempt_token, better_sentence"
+        "select processing_status, attempts, lease_until, attempt_token, better_sentence,"
+            + " wrong_span, better_span"
             + " from free_talk_message_feedback where session_history_message_id = ?",
         MESSAGE_ID);
   }

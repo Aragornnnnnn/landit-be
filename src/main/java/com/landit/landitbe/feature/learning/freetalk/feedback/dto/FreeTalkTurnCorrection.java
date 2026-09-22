@@ -49,6 +49,8 @@ public record FreeTalkTurnCorrection(
    * @param usedMemoryId 교정의 근거가 된 장기기억 ID. 기억을 근거로 쓰지 않았으면 null
    * @param memoryObservedOn 근거 기억을 말한 날짜. 지난 기록이 바뀌지 않도록 교정을 저장하는 시점의 값을 남긴다. 근거 기억이 없으면 null
    * @param memoryLabel 근거 기억이 가리키는 대상을 나타내는 짧은 명사구. 근거 기억이 없거나 AI가 라벨을 주지 못했으면 null
+   * @param wrongSpan 원문에서 빨강 취소선을 그을 구절. 원문 안에 대소문자까지 그대로 정확히 한 번 나온다. AI가 주지 못했거나 검증에 실패하면 null
+   * @param betterSpan 교정문에서 초록으로 강조할 구절. 교정문 안에 대소문자까지 그대로 정확히 한 번 나온다. AI가 주지 못했거나 검증에 실패하면 null
    */
   public record Sentence(
       String originalSentence,
@@ -57,7 +59,9 @@ public record FreeTalkTurnCorrection(
       FreeTalkMistakePattern mistakePattern,
       Long usedMemoryId,
       LocalDate memoryObservedOn,
-      String memoryLabel) {
+      String memoryLabel,
+      String wrongSpan,
+      String betterSpan) {
 
     /**
      * 근거 기억과 날짜는 함께 있거나 함께 없고, 라벨은 근거 기억이 있을 때만 가질 수 있다(chk_free_talk_message_feedback_memory).
@@ -73,13 +77,54 @@ public record FreeTalkTurnCorrection(
       }
     }
 
-    /** 장기기억을 근거로 쓰지 않은 교정을 만든다. */
+    /** 구절 없이, 장기기억을 근거로 쓴 교정을 만든다. */
+    public Sentence(
+        String originalSentence,
+        String betterSentence,
+        String reason,
+        FreeTalkMistakePattern mistakePattern,
+        Long usedMemoryId,
+        LocalDate memoryObservedOn,
+        String memoryLabel) {
+      this(
+          originalSentence,
+          betterSentence,
+          reason,
+          mistakePattern,
+          usedMemoryId,
+          memoryObservedOn,
+          memoryLabel,
+          null,
+          null);
+    }
+
+    /** 장기기억을 근거로 쓰지 않은, 구절이 있는 교정을 만든다. */
+    public Sentence(
+        String originalSentence,
+        String betterSentence,
+        String reason,
+        FreeTalkMistakePattern mistakePattern,
+        String wrongSpan,
+        String betterSpan) {
+      this(
+          originalSentence,
+          betterSentence,
+          reason,
+          mistakePattern,
+          null,
+          null,
+          null,
+          wrongSpan,
+          betterSpan);
+    }
+
+    /** 장기기억을 근거로 쓰지 않은, 구절 없는 교정을 만든다. */
     public Sentence(
         String originalSentence,
         String betterSentence,
         String reason,
         FreeTalkMistakePattern mistakePattern) {
-      this(originalSentence, betterSentence, reason, mistakePattern, null, null, null);
+      this(originalSentence, betterSentence, reason, mistakePattern, null, null);
     }
   }
 

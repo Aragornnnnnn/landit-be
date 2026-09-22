@@ -60,6 +60,15 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
   @Column(name = "mistake_pattern", length = 40)
   private FreeTalkMistakePattern mistakePattern; // 예: ARTICLE
 
+  // 예: "a gym" (원문에서 빨강 취소선을 그을 구절. 대소문자까지 그대로 정확히 한 번 나온다)
+  // AI가 구절을 못 주거나(빠진 단어를 채운 교정) 검증에 실패하면 null
+  @Column(name = "wrong_span", columnDefinition = "text")
+  private String wrongSpan;
+
+  // 예: "the gym" (교정문에서 초록으로 강조할 구절). 단어를 지운 교정이거나 검증에 실패하면 null
+  @Column(name = "better_span", columnDefinition = "text")
+  private String betterSpan;
+
   @Column(name = "memory_id")
   private Long memoryId; // 예: 9012. 기억을 근거로 쓰지 않았으면 null
 
@@ -125,6 +134,8 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
     betterSentence = null;
     reason = null;
     mistakePattern = null;
+    wrongSpan = null;
+    betterSpan = null;
     memoryId = null;
     memoryObservedOn = null;
     memoryLabel = null;
@@ -159,7 +170,7 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
     }
     if (!hasConsistentMemory()) {
       return new FreeTalkTurnCorrection.Sentence(
-          originalSentence, betterSentence, reason, mistakePattern);
+          originalSentence, betterSentence, reason, mistakePattern, wrongSpan, betterSpan);
     }
     return new FreeTalkTurnCorrection.Sentence(
         originalSentence,
@@ -168,6 +179,8 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
         mistakePattern,
         memoryId,
         memoryObservedOn,
-        memoryLabel);
+        memoryLabel,
+        wrongSpan,
+        betterSpan);
   }
 }

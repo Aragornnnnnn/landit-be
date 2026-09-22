@@ -171,6 +171,8 @@ class FreeTalkMessageFeedbackServiceTest {
             42L,
             LocalDate.of(2026, 9, 13),
             "헬스장",
+            null,
+            null,
             ProcessingStatus.PREPARING);
   }
 
@@ -178,7 +180,8 @@ class FreeTalkMessageFeedbackServiceTest {
   @Test
   void countsFirstAttemptOutcomes() {
     when(repository.updateIfPreparing(
-            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            any()))
         .thenReturn(1);
     when(repository.failAttempt(anyLong(), anyInt(), any(), any(), any())).thenReturn(1);
 
@@ -198,7 +201,8 @@ class FreeTalkMessageFeedbackServiceTest {
     verify(repository).failAttempt(7L, 1, "", ProcessingStatus.FAILED, ProcessingStatus.PREPARING);
     verify(repository, never())
         .updateIfPreparing(
-            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            any());
     verify(repository, never()).releaseForRetry(anyLong(), anyInt(), any(), any(), any());
   }
 
@@ -215,7 +219,8 @@ class FreeTalkMessageFeedbackServiceTest {
             7L, 1, "", LocalDateTime.of(2026, 9, 21, 21, 30, 0), ProcessingStatus.PREPARING);
     verify(repository, never())
         .updateIfPreparing(
-            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+            anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            any());
   }
 
   @DisplayName("AI 호출 자체가 실패한 첫 시도도 같은 방식으로 다시 시도되게 한다.")

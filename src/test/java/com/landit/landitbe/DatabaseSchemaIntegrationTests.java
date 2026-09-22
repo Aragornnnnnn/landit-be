@@ -428,6 +428,24 @@ class DatabaseSchemaIntegrationTests {
         "free_talk_expression_reuse", "chk_free_talk_expression_reuse_text");
   }
 
+  /** V120 migration은 교정의 강조 구절 컬럼과 실수 패턴 사용례 테이블을 추가한다. */
+  @DisplayName("V120 migration은 교정의 강조 구절 컬럼과 실수 패턴 사용례 테이블을 추가한다.")
+  @Test
+  void v120AddsCorrectionSpansAndPatternUsageTable() {
+    assertColumnExists("free_talk_message_feedback", "wrong_span");
+    assertColumnExists("free_talk_message_feedback", "better_span");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "chk_free_talk_message_feedback_span");
+    assertTableExists("free_talk_pattern_usage");
+    assertColumnExists("free_talk_pattern_usage", "session_history_message_id");
+    assertColumnExists("free_talk_pattern_usage", "session_history_id");
+    assertColumnExists("free_talk_pattern_usage", "pattern");
+    assertColumnExists("free_talk_pattern_usage", "sentence");
+    assertColumnExists("free_talk_pattern_usage", "span");
+    assertColumnExists("free_talk_pattern_usage", "correct");
+    assertTableConstraintExists("free_talk_pattern_usage", "chk_free_talk_pattern_usage_text");
+  }
+
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
   @Test
   void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
@@ -1659,6 +1677,78 @@ class DatabaseSchemaIntegrationTests {
     } finally {
       dataSource.destroy();
     }
+  }
+
+  /** 구절은 교정 문장이 있을 때만, 사용례는 비어 있지 않은 문장·구절로만 저장되고 발화가 지워지면 함께 지워지도록 V120을 적용한다. */
+  @DisplayName("구절은 교정 문장이 있을 때만, 사용례는 비어 있지 않은 문장·구절로만 저장되고 발화가 지워지면 함께 지워진다.")
+  @Test
+  void v120RejectsSpansWithoutCorrectionAndBlankUsagesAndDeletesUsagesWithMessage() {
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 12L, 1L, 3, "USER");
+
+      // 교정 문장이 없는 준비 상태의 행은 구절을 가질 수 없다.
+      migrationJdbcTemplate.update(
+          "INSERT INTO free_talk_message_feedback (session_history_message_id, session_history_id,"
+              + " processing_status, created_at, updated_at)"
+              + " VALUES (11, 1, 'PREPARING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "UPDATE free_talk_message_feedback SET wrong_span = 'go'"
+                          + " WHERE session_history_message_id = 11"))
+          .hasMessageContaining("chk_free_talk_message_feedback_span");
+      // 교정 문장과 함께라면 구절은 있어도 되고 없어도 되지만, 있으면 비어 있지 않아야 한다.
+      assertThat(
+              migrationJdbcTemplate.update(
+                  "UPDATE free_talk_message_feedback SET processing_status = 'COMPLETED',"
+                      + " original_sentence = 'I go to a gym.', better_sentence = 'I went to the"
+                      + " gym.', reason = '과거형', mistake_pattern = 'TENSE', wrong_span = 'go',"
+                      + " better_span = NULL WHERE session_history_message_id = 11"))
+          .isEqualTo(1);
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "UPDATE free_talk_message_feedback SET better_span = ' '"
+                          + " WHERE session_history_message_id = 11"))
+          .hasMessageContaining("chk_free_talk_message_feedback_span");
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "UPDATE free_talk_message_feedback SET wrong_span = ''"
+                          + " WHERE session_history_message_id = 11"))
+          .hasMessageContaining("chk_free_talk_message_feedback_span");
+
+      assertThat(insertPatternUsage(migrationJdbcTemplate, 11L, "went")).isEqualTo(1);
+      assertThat(insertPatternUsage(migrationJdbcTemplate, 12L, "went")).isEqualTo(1);
+      assertThatThrownBy(() -> insertPatternUsage(migrationJdbcTemplate, 12L, "   "))
+          .hasMessageContaining("chk_free_talk_pattern_usage_text");
+
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update("DELETE FROM session_history_message WHERE id = 11");
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT session_history_message_id FROM free_talk_pattern_usage", Long.class))
+          .containsExactly(12L);
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  private int insertPatternUsage(JdbcTemplate migrationJdbcTemplate, long messageId, String span) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_pattern_usage (session_history_message_id, session_history_id,"
+            + " pattern, sentence, span, correct, created_at, updated_at)"
+            + " VALUES (?, 1, 'TENSE', 'I went to the gym.', ?, TRUE, CURRENT_TIMESTAMP,"
+            + " CURRENT_TIMESTAMP)",
+        messageId,
+        span);
   }
 
   private int insertReuse(

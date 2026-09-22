@@ -99,6 +99,8 @@ public class FreeTalkMessageFeedbackService {
         sentence == null ? null : sentence.usedMemoryId(),
         sentence == null ? null : sentence.memoryObservedOn(),
         sentence == null ? null : sentence.memoryLabel(),
+        sentence == null ? null : sentence.wrongSpan(),
+        sentence == null ? null : sentence.betterSpan(),
         ProcessingStatus.PREPARING);
   }
 

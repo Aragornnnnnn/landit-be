@@ -53,6 +53,8 @@ public interface FreeTalkMessageFeedbackRepository
                 feedback.memoryId = :memoryId,
                 feedback.memoryObservedOn = :memoryObservedOn,
                 feedback.memoryLabel = :memoryLabel,
+                feedback.wrongSpan = :wrongSpan,
+                feedback.betterSpan = :betterSpan,
                 feedback.leaseUntil = null,
                 feedback.attemptToken = null,
                 feedback.updatedAt = CURRENT_TIMESTAMP
@@ -70,6 +72,8 @@ public interface FreeTalkMessageFeedbackRepository
       @Param("memoryId") Long memoryId,
       @Param("memoryObservedOn") LocalDate memoryObservedOn,
       @Param("memoryLabel") String memoryLabel,
+      @Param("wrongSpan") String wrongSpan,
+      @Param("betterSpan") String betterSpan,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
 
   /**
