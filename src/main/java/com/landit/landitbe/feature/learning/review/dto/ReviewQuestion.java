@@ -17,7 +17,7 @@ import java.util.UUID;
  * @param displayOrder 최초 출제 순서
  * @param queueOrder 현재 재도전 순서
  * @param wrongCount 오답 횟수
- * @param completedAt 문제 완료 시각
+ * @param completedAt 정답 또는 두 번째 오답으로 문제가 종료된 시각. 정답 여부를 의미하지 않는다
  */
 public record ReviewQuestion(
     UUID questionId,
