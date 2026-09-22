@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.dto;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 프리톡 사용자 발화 한 턴의 교정 판정 결과다.
@@ -18,19 +19,35 @@ import java.time.LocalDate;
  * @param sentence 고른 한 문장의 교정. 고칠 것이 없거나 판정에 실패하면 null
  * @param reactedToPartner 직전 상대 말을 받아준 뒤 말했는지 여부. 판정에 실패하면 null
  * @param retryable 다시 시도해 볼 실패인지 여부. 실패가 아니면 항상 false
+ * @param patternUsages 지켜보던 실수 패턴이 이 턴에 등장한 사용례. 고칠 것이 없는 턴에도 있을 수 있다. 지켜볼 패턴이 없었거나 판정하지 못했거나 등장하지
+ *     않았으면 비어 있다. 판정에 실패하면 항상 비어 있다
  */
 public record FreeTalkTurnCorrection(
-    ProcessingStatus status, Sentence sentence, Boolean reactedToPartner, boolean retryable) {
+    ProcessingStatus status,
+    Sentence sentence,
+    Boolean reactedToPartner,
+    boolean retryable,
+    List<FreeTalkPatternUsageDraft> patternUsages) {
 
   /**
-   * 다시 시도할 수 있는 것은 실패뿐이다.
+   * 다시 시도할 수 있는 것은 실패뿐이고, 사용례는 판정을 마친 결과에만 있다.
    *
-   * @throws IllegalArgumentException 실패가 아닌 결과를 다시 시도할 실패로 표시했을 때
+   * @throws IllegalArgumentException 실패가 아닌 결과를 다시 시도할 실패로 표시했거나, 마치지 않은 판정에 사용례가 있을 때
    */
   public FreeTalkTurnCorrection {
     if (retryable && status != ProcessingStatus.FAILED) {
       throw new IllegalArgumentException("only a failed correction can be retryable");
     }
+    patternUsages = patternUsages == null ? List.of() : List.copyOf(patternUsages);
+    if (!patternUsages.isEmpty() && status != ProcessingStatus.COMPLETED) {
+      throw new IllegalArgumentException("only a completed correction can have pattern usages");
+    }
+  }
+
+  /** 사용례 없이 판정 결과를 만든다. */
+  public FreeTalkTurnCorrection(
+      ProcessingStatus status, Sentence sentence, Boolean reactedToPartner, boolean retryable) {
+    this(status, sentence, reactedToPartner, retryable, List.of());
   }
 
   /** 다시 시도하지 않는 판정 결과를 만든다. 저장된 교정을 읽을 때와 판정을 마쳤을 때 쓴다. */
@@ -155,5 +172,19 @@ public record FreeTalkTurnCorrection(
    */
   public static FreeTalkTurnCorrection completed(Sentence sentence, boolean reactedToPartner) {
     return new FreeTalkTurnCorrection(ProcessingStatus.COMPLETED, sentence, reactedToPartner);
+  }
+
+  /**
+   * 교정 판정과 실수 패턴 사용례 판정을 함께 마친 결과를 만든다.
+   *
+   * @param sentence 고른 한 문장의 교정. 고칠 것이 없으면 null
+   * @param reactedToPartner 직전 상대 말을 받아준 뒤 말했는지 여부
+   * @param patternUsages 지켜보던 패턴의 사용례. 없으면 빈 목록
+   * @return {@code COMPLETED} 결과
+   */
+  public static FreeTalkTurnCorrection completed(
+      Sentence sentence, boolean reactedToPartner, List<FreeTalkPatternUsageDraft> patternUsages) {
+    return new FreeTalkTurnCorrection(
+        ProcessingStatus.COMPLETED, sentence, reactedToPartner, false, patternUsages);
   }
 }

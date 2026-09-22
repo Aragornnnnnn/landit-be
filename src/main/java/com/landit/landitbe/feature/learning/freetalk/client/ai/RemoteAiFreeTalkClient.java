@@ -14,6 +14,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
@@ -80,7 +81,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
     return http.post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class)
-        .toResult(request.submittedMessageId(), request.memoryContext());
+        .toResult(request);
   }
 
   /** {@inheritDoc} */
@@ -202,36 +203,64 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String innerThought,
       InnerThoughtType innerThoughtType,
       Boolean reactedToPartner,
-      RemoteCorrection correction) {
+      RemoteCorrection correction,
+      List<RemotePatternUsage> patternUsages) {
 
     // 원격 속마음 응답을 검증해 애플리케이션 결과로 변환한다.
-    private AiFreeTalkInnerThoughtResult toResult(
-        long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
+    private AiFreeTalkInnerThoughtResult toResult(AiFreeTalkInnerThoughtRequest request) {
       if (blank(innerThought) || innerThoughtType == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
       return new AiFreeTalkInnerThoughtResult(
-          innerThought, innerThoughtType, turnCorrection(messageId, memoryContext));
+          innerThought, innerThoughtType, turnCorrection(request));
     }
 
     // 교정은 보조 판정이라 계약 위반이어도 속마음은 살리고 교정만 실패로 남긴다. 임의 값으로 채우지 않는다.
-    private FreeTalkTurnCorrection turnCorrection(
-        long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
+    private FreeTalkTurnCorrection turnCorrection(AiFreeTalkInnerThoughtRequest request) {
+      long messageId = request.submittedMessageId();
       if (reactedToPartner == null) {
         // 둘 다 없으면 AI 서버가 교정 판정을 돌려주지 못한 것(교정 호출의 타임아웃·일시 장애)이라 다시 해 볼 수 있다.
         return correction == null
             ? FreeTalkTurnCorrection.unavailable()
             : invalidCorrection(messageId, "correction_without_reaction");
       }
+      // 사용례는 교정과 별개의 부가 판정이라 고칠 것이 없는 턴에도 온다. 교정이 계약 위반이면 같은 판정을 믿지 않고 함께 버린다.
       if (correction == null) {
-        return FreeTalkTurnCorrection.completed(null, reactedToPartner);
+        return FreeTalkTurnCorrection.completed(
+            null, reactedToPartner, validPatternUsages(request));
       }
       String invalidReason = correction.invalidReason();
       if (invalidReason != null) {
         return invalidCorrection(messageId, invalidReason);
       }
       return FreeTalkTurnCorrection.completed(
-          correction.toSentence(messageId, memoryContext), reactedToPartner);
+          correction.toSentence(messageId, request.memoryContext()),
+          reactedToPartner,
+          validPatternUsages(request));
+    }
+
+    // 사용례는 항목 단위로 다시 확인해 맞지 않는 것만 버린다. 보낸 지켜볼 패턴 밖의 패턴, 원문에 없는 문장, 문장에 없는 구절은 믿지 않는다.
+    private List<FreeTalkPatternUsageDraft> validPatternUsages(
+        AiFreeTalkInnerThoughtRequest request) {
+      if (patternUsages == null || patternUsages.isEmpty()) {
+        return List.of();
+      }
+      String content = request.submittedContent();
+      List<FreeTalkPatternUsageDraft> valid = new java.util.ArrayList<>();
+      for (RemotePatternUsage usage : patternUsages) {
+        String reason =
+            usage == null ? "blank" : usage.invalidReason(request.watchPatterns(), content);
+        if (reason != null) {
+          log.warn(
+              "프리톡 실수 패턴 사용례가 계약과 달라 해당 항목만 버립니다. "
+                  + "workflow=free_talk_pattern_usage_invalid reason={} messageId={}",
+              reason,
+              request.submittedMessageId());
+          continue;
+        }
+        valid.add(usage.toDraft());
+      }
+      return valid;
     }
 
     private static FreeTalkTurnCorrection invalidCorrection(long messageId, String reason) {
@@ -244,6 +273,46 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
   }
 
+  // 지켜보던 실수 패턴이 이번 턴에 등장한 사용례 하나. 패턴은 문자열로 받아 모르는 값이 역직렬화를 실패시키지 않게 한다.
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemotePatternUsage(String pattern, String sentence, String span, Boolean correct) {
+
+    // 계약을 어긴 이유를 로그용 코드로 돌려준다. 문제가 없으면 null이다.
+    private String invalidReason(List<FreeTalkMistakePattern> watchPatterns, String content) {
+      if (blank(sentence) || blank(span) || correct == null) {
+        return "blank";
+      }
+      FreeTalkMistakePattern known = knownPattern(pattern);
+      if (known == null || !watchPatterns.contains(known)) {
+        return "unknown_pattern";
+      }
+      if (content == null || !content.contains(sentence.strip())) {
+        return "sentence_not_in_message";
+      }
+      // 화면이 구절을 대소문자까지 그대로 찾아 강조하므로 대소문자를 무시하지 않는다.
+      if (!sentence.strip().contains(span.strip())) {
+        return "span_not_in_sentence";
+      }
+      return null;
+    }
+
+    private FreeTalkPatternUsageDraft toDraft() {
+      return new FreeTalkPatternUsageDraft(
+          knownPattern(pattern), sentence.strip(), span.strip(), correct);
+    }
+  }
+
+  private static FreeTalkMistakePattern knownPattern(String pattern) {
+    if (pattern == null) {
+      return null;
+    }
+    try {
+      return FreeTalkMistakePattern.valueOf(pattern);
+    } catch (IllegalArgumentException exception) {
+      return null;
+    }
+  }
+
   // 실수 패턴은 문자열로 받아 모르는 값이 속마음 응답 전체의 역직렬화를 실패시키지 않게 한다.
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteCorrection(
@@ -252,7 +321,9 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String reason,
       String mistakePattern,
       Long usedMemoryId,
-      String memoryLabel) {
+      String memoryLabel,
+      String wrongSpan,
+      String betterSpan) {
     private static final int MAX_MEMORY_LABEL_LENGTH = 40;
 
     // 계약을 어긴 이유를 로그용 코드로 돌려준다. 문제가 없으면 null이다.
@@ -266,9 +337,16 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     private FreeTalkTurnCorrection.Sentence toSentence(
         long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
       AiFreeTalkMemoryContext memory = providedMemory(messageId, memoryContext);
+      String validWrongSpan = validSpan(messageId, wrongSpan, originalSentence, "wrong_span");
+      String validBetterSpan = validSpan(messageId, betterSpan, betterSentence, "better_span");
       if (memory == null) {
         return new FreeTalkTurnCorrection.Sentence(
-            originalSentence, betterSentence, reason, knownMistakePattern());
+            originalSentence,
+            betterSentence,
+            reason,
+            knownMistakePattern(),
+            validWrongSpan,
+            validBetterSpan);
       }
       // 지난 기록이 바뀌지 않도록 기억을 말한 날짜를 지금 보낸 문맥에서 꺼내 교정과 함께 남긴다.
       return new FreeTalkTurnCorrection.Sentence(
@@ -278,7 +356,26 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
           knownMistakePattern(),
           memory.memoryId(),
           memory.observedAt().toLocalDate(),
-          validMemoryLabel(messageId));
+          validMemoryLabel(messageId),
+          validWrongSpan,
+          validBetterSpan);
+    }
+
+    // 강조 구절은 부가 정보라 문장에 대소문자까지 그대로 들어 있지 않으면 그 구절만 버린다. AI가 구절을 주지 않은 것(null)은 정상이라 조용히 null이다.
+    private static String validSpan(long messageId, String span, String sentence, String field) {
+      if (span == null) {
+        return null;
+      }
+      String stripped = span.strip();
+      if (stripped.isEmpty() || !sentence.contains(stripped)) {
+        log.warn(
+            "프리톡 턴 교정의 강조 구절이 계약과 달라 해당 값만 버립니다. "
+                + "workflow=free_talk_turn_correction_span reason={}_not_in_sentence messageId={}",
+            field,
+            messageId);
+        return null;
+      }
+      return stripped;
     }
 
     // 근거 기억은 부가 정보라 계약과 달라도 교정 문장은 살리고 해당 값만 버린다.
