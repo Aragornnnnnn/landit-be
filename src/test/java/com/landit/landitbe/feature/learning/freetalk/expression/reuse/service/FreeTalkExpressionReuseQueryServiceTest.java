@@ -45,13 +45,20 @@ class FreeTalkExpressionReuseQueryServiceTest {
         .containsEntry(5506L, new FreeTalkReusedExpression(813L, "up to you", "Up to you"));
   }
 
-  @DisplayName("요약 카드는 표현마다 처음 쓴 한 번만, 배운 날과 출처 제목을 붙여 돌려준다.")
+  @DisplayName("요약 카드는 표현마다 처음 쓴 한 번만, 배운 날과 출처(시나리오·스몰톡)와 출처 제목을 붙여 돌려준다.")
   @Test
   void summarizesEachExpressionOnceWithSourceLabel() {
     stubReuses(
-        reuse(5504L, 812L, "grab a coffee", "주말 계획", "grabbed a coffee"),
-        reuse(5506L, 812L, "grab a coffee", "주말 계획", "grab a coffee"),
-        reuse(5506L, 813L, "up to you", null, "up to you"));
+        reuse(5504L, 812L, "grab a coffee", "카페", "grabbed a coffee"),
+        reuse(5506L, 812L, "grab a coffee", "카페", "grab a coffee"),
+        reuse(5506L, 813L, "up to you", null, "up to you"),
+        reuse(
+            5507L,
+            814L,
+            "hit it off",
+            FreeTalkExpressionReuseSource.FREE_TALK,
+            "주말 계획",
+            "hit it off"));
 
     FreeTalkExpressionReuseSummary summary =
         service.findSummary(FREE_TALK_SESSION_ID, ExpressionGenerationStatus.READY);
@@ -63,11 +70,13 @@ class FreeTalkExpressionReuseQueryServiceTest {
                 812L,
                 "grab a coffee",
                 "뜻 812",
-                "9월 10일 「주말 계획」",
+                "9월 10일 시나리오 「카페」",
                 "문장 grabbed a coffee",
                 "grabbed a coffee"),
             new FreeTalkExpressionReuseSummary.Item(
-                813L, "up to you", "뜻 813", "9월 10일", "문장 up to you", "up to you"));
+                813L, "up to you", "뜻 813", "9월 10일 시나리오", "문장 up to you", "up to you"),
+            new FreeTalkExpressionReuseSummary.Item(
+                814L, "hit it off", "뜻 814", "9월 10일 스몰톡 「주말 계획」", "문장 hit it off", "hit it off"));
   }
 
   @DisplayName("표현 작업이 아직 끝나지 않았고 기록도 없으면 기다리는 중으로 알린다.")
@@ -99,6 +108,22 @@ class FreeTalkExpressionReuseQueryServiceTest {
 
   private static FreeTalkExpressionReuse reuse(
       long messageId, long expressionId, String text, String sourceTitle, String matchedText) {
+    return reuse(
+        messageId,
+        expressionId,
+        text,
+        FreeTalkExpressionReuseSource.SCENARIO,
+        sourceTitle,
+        matchedText);
+  }
+
+  private static FreeTalkExpressionReuse reuse(
+      long messageId,
+      long expressionId,
+      String text,
+      FreeTalkExpressionReuseSource source,
+      String sourceTitle,
+      String matchedText) {
     return FreeTalkExpressionReuse.of(
         1207L,
         FREE_TALK_SESSION_ID,
@@ -106,7 +131,7 @@ class FreeTalkExpressionReuseQueryServiceTest {
         expressionId,
         text,
         "뜻 " + expressionId,
-        FreeTalkExpressionReuseSource.SCENARIO,
+        source,
         sourceTitle,
         LocalDate.of(2026, 9, 10),
         matchedText,
