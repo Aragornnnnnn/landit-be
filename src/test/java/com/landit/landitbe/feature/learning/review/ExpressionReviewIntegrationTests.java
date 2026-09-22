@@ -44,12 +44,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -232,6 +235,141 @@ class ExpressionReviewIntegrationTests {
     assertThat(failed.review().currentQuestionId()).isNotEqualTo(first.questionId());
     assertThat(reviews.answer(user.id(), id, wrong)).isEqualTo(failed);
     assertThat(failed.review().questions().getFirst().wrongCount()).isEqualTo(1);
+  }
+
+  @DisplayName("정답과 두 번째 오답을 모두 종료로 처리하며 완료 후 재진입과 재전송도 일관된다.")
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void completesReviewWithExhaustedQuestionsAndPreservesGrading(boolean includeCorrect)
+      throws Exception {
+    User user = user(3);
+    UUID id = offer(user).reviewId();
+    ReviewResponse state = reviews.start(user.id(), id);
+    if (includeCorrect) {
+      var first = current(state);
+      state =
+          reviews
+              .answer(
+                  user.id(),
+                  id,
+                  new ReviewAnswerRequest(
+                      UUID.randomUUID(),
+                      first.questionId(),
+                      first.quiz().writingSentenceAcceptedAnswers().getFirst()))
+              .review();
+    }
+    ReviewAnswerRequest last = null;
+    int wrongAttempts = includeCorrect ? 4 : 6;
+    for (int attempt = 0; attempt < wrongAttempts; attempt++) {
+      last =
+          new ReviewAnswerRequest(UUID.randomUUID(), state.currentQuestionId(), List.of("wrong"));
+      var answer = reviews.answer(user.id(), id, last);
+      assertThat(answer.correct()).isFalse();
+      state = answer.review();
+      if (attempt < wrongAttempts - 1) {
+        assertThat(state.status()).isEqualTo("IN_PROGRESS");
+        assertThat(current(state).completedAt()).isNull();
+        assertThat(current(state).wrongCount()).isLessThan(2);
+      }
+    }
+    assertThat(state.status()).isEqualTo("COMPLETED");
+    assertThat(state.currentQuestionId()).isNull();
+    assertThat(state.questions()).allSatisfy(q -> assertThat(q.completedAt()).isNotNull());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from expression_review_submission"
+                    + " where review_id = ? and correct = false",
+                Integer.class,
+                id))
+        .isEqualTo(wrongAttempts);
+    var replay = reviews.answer(user.id(), id, last);
+    assertThat(replay.correct()).isFalse();
+    assertThat(replay.review()).isEqualTo(state);
+    UUID finalQuestionId = last.questionId();
+    assertThatThrownBy(
+            () ->
+                reviews.answer(
+                    user.id(),
+                    id,
+                    new ReviewAnswerRequest(UUID.randomUUID(), finalQuestionId, List.of("wrong"))))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("현재 풀 문제");
+    now = now.plusSeconds(2 * 86400);
+    assertThat(reviews.start(user.id(), id)).isEqualTo(state);
+    mvc.perform(get("/api/v1/reviews/{id}", id).header("Authorization", "Bearer " + user.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.currentQuestionId").doesNotExist());
+  }
+
+  @DisplayName("두 번째 오답으로 종료한 표현도 실제 종료 시각부터 최근 복습 제외 기간을 적용한다.")
+  @Test
+  void exhaustedExpressionUsesCompletionTimeForNextReview() throws Exception {
+    User user = user(1);
+    UUID id = offer(user).reviewId();
+    UUID questionId = reviews.start(user.id(), id).currentQuestionId();
+    now = now.plusSeconds(23 * 3600);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      reviews.answer(
+          user.id(), id, new ReviewAnswerRequest(UUID.randomUUID(), questionId, List.of("wrong")));
+    }
+    subscribe(user, "ACTIVE", local().plusDays(30));
+    now = LAUNCH.minusSeconds(60).plusSeconds(3 * 86400);
+    assertThat(reviews.offer(user.id(), date())).isEmpty();
+    now = now.plusSeconds(23 * 3600);
+    assertThat(offer(user).reviewId()).isNotEqualTo(id);
+  }
+
+  @DisplayName("기존 오답 이력의 두 번째 시각으로 종료를 보정하고 미진행 문제와 원본 채점은 보존한다.")
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void backfillsLegacyExhaustedQuestionsWithoutCompletingUnansweredOnes(int questionCount)
+      throws Exception {
+    User user = user(questionCount);
+    UUID id = offer(user).reviewId();
+    ReviewResponse initial = reviews.start(user.id(), id);
+    UUID questionId = initial.currentQuestionId();
+    LocalDateTime startedAt = local();
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      jdbcTemplate.update(
+          """
+          insert into expression_review_submission
+          (review_id, submission_id, question_id, answer_json, correct, created_at)
+          values (?, ?, ?, '[]', false, ?)
+          """,
+          id,
+          UUID.randomUUID(),
+          questionId,
+          startedAt.plusSeconds(attempt));
+    }
+    jdbcTemplate.update(
+        "update expression_review_question set wrong_count = 3 where id = ?", questionId);
+    var migration =
+        new ResourceDatabasePopulator(
+            new ClassPathResource("db/migration/V112__complete_exhausted_expression_reviews.sql"));
+    migration.execute(jdbcTemplate.getDataSource());
+    var result = reviews.get(user.id(), id);
+    assertThat(result.questions().getFirst().completedAt()).isEqualTo(startedAt.plusSeconds(2));
+    assertThat(result.questions().getFirst().wrongCount()).isEqualTo(3);
+    if (questionCount == 1) {
+      assertThat(result.status()).isEqualTo("COMPLETED");
+      assertThat(result.completedAt()).isEqualTo(startedAt.plusSeconds(2));
+      assertThat(result.currentQuestionId()).isNull();
+    } else {
+      assertThat(result.status()).isEqualTo("IN_PROGRESS");
+      assertThat(result.completedAt()).isNull();
+      assertThat(result.currentQuestionId()).isEqualTo(initial.questions().get(1).questionId());
+      assertThat(result.questions().get(1).completedAt()).isNull();
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from expression_review_submission"
+                    + " where review_id = ? and correct = false",
+                Integer.class,
+                id))
+        .isEqualTo(3);
+    migration.execute(jdbcTemplate.getDataSource());
+    assertThat(reviews.get(user.id(), id)).isEqualTo(result);
   }
 
   @DisplayName("같은 제출 ID에 다른 답을 보내면 거부한다.")
