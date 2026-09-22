@@ -61,6 +61,17 @@ public class UserProfileService {
   }
 
   /**
+   * 파생 데이터 저장 동안 탈퇴와 직렬화할 활성 사용자 잠금을 획득한다.
+   *
+   * @param userId 잠글 사용자 ID
+   * @return 활성 사용자를 잠갔으면 true
+   */
+  @Transactional
+  public boolean lockActive(long userId) {
+    return userProfileRepository.findActiveByIdForUpdate(userId).isPresent();
+  }
+
+  /**
    * 후보 ID 가운데 실제로 존재하는 첫 사용자 프로필 ID를 찾는다.
    *
    * <p>결제 제공자 웹훅이 이력을 저장하기 전에 사용자를 확정하는 용도라, 탈퇴한 사용자도 포함한다.

@@ -9,6 +9,7 @@ public enum NotificationType {
   DAILY_SCENARIO_REMINDER,
   CONTINUE_EXPRESSION,
   SMALL_TALK_REMINDER,
+  EXPRESSION_REVIEW,
   MAILBOX_REPLY,
   /** 연간 구독 무료 체험 종료 예정 알림이다. */
   TRIAL_ENDING,

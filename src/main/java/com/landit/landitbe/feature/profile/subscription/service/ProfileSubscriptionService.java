@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.profile.exception.UserProfileErrorCode;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionExpiryExtensionResult;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionNotificationTarget;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionTransferResult;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateCommand;
@@ -61,6 +62,40 @@ public class ProfileSubscriptionService {
         command.productId(),
         command.store());
     return SubscriptionUpdateResult.APPLIED;
+  }
+
+  /**
+   * 결제 유예 종료 시각까지 사용자 구독 만료 시각을 늘린다.
+   *
+   * <p>상태·기간 종류·상품·스토어는 바꾸지 않고, 만료 시각을 늘리는 방향으로만 바꾼다. 프리미엄이 꺼진 사용자(구독 없음·만료)는 유예로 되살리지 않는다. 저장된 만료
+   * 시각이 없으면 끝이 정해지지 않은 것이므로 값을 쓰지 않는다. 갱신(RENEWAL)이 먼저 반영된 뒤 늦게 도착한 유예 이벤트가 만료를 되돌리지 않도록 이미 반영한
+   * 이벤트보다 오래된 이벤트는 무시하고, 반대로 유예 시작 전에 생성된 상태 이벤트가 늦게 도착해 연장을 되돌리지 못하도록 마지막 반영 이벤트 시각은 유예 이벤트 시각으로
+   * 갱신한다. 갱신과 같은 이유로 쓰기 잠금으로 조회하며 탈퇴한 사용자도 대상에 포함한다. 판정 순서는 오래된 이벤트 → 프리미엄 여부 → 만료 시각 비교다.
+   *
+   * @param userId 갱신할 사용자 ID
+   * @param graceExpiresAt 결제 유예 종료 시각
+   * @param eventAt 이벤트 발생 시각
+   * @return 연장 처리 결과
+   */
+  @Transactional
+  public SubscriptionExpiryExtensionResult extendSubscriptionExpiry(
+      Long userId, LocalDateTime graceExpiresAt, LocalDateTime eventAt) {
+    Optional<UserProfile> found = userProfileRepository.findByIdForUpdate(userId);
+    if (found.isEmpty()) {
+      return SubscriptionExpiryExtensionResult.USER_NOT_FOUND;
+    }
+    UserProfile userProfile = found.get();
+    if (userProfile.isSubscriptionEventStale(eventAt)) {
+      return SubscriptionExpiryExtensionResult.STALE_EVENT;
+    }
+    if (!userProfile.isPremium()) {
+      return SubscriptionExpiryExtensionResult.NOT_PREMIUM;
+    }
+    if (!userProfile.isSubscriptionExpiringBefore(graceExpiresAt)) {
+      return SubscriptionExpiryExtensionResult.NOT_LATER;
+    }
+    userProfile.extendSubscriptionExpiry(graceExpiresAt, eventAt);
+    return SubscriptionExpiryExtensionResult.EXTENDED;
   }
 
   /**

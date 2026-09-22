@@ -21,6 +21,19 @@ public class ApiException extends RuntimeException {
     this.errorCode = errorCode;
   }
 
+  /**
+   * 외부 호출이나 내부 처리 실패의 원인 체인을 보존한다.
+   *
+   * @param errorCode 응답 오류 코드
+   * @param cause 원인 예외
+   * @return 원인이 연결된 API 예외
+   */
+  public static ApiException causedBy(ApiErrorCode errorCode, Throwable cause) {
+    ApiException exception = new ApiException(errorCode);
+    exception.initCause(cause);
+    return exception;
+  }
+
   /** 예외에 대응하는 오류 코드를 반환한다. */
   public ApiErrorCode getErrorCode() {
     return errorCode;
