@@ -346,7 +346,7 @@ class ExpressionReviewIntegrationTests {
         "update expression_review_question set wrong_count = 3 where id = ?", questionId);
     var migration =
         new ResourceDatabasePopulator(
-            new ClassPathResource("db/migration/V112__complete_exhausted_expression_reviews.sql"));
+            new ClassPathResource("db/migration/V125__complete_exhausted_expression_reviews.sql"));
     migration.execute(jdbcTemplate.getDataSource());
     var result = reviews.get(user.id(), id);
     assertThat(result.questions().getFirst().completedAt()).isEqualTo(startedAt.plusSeconds(2));
