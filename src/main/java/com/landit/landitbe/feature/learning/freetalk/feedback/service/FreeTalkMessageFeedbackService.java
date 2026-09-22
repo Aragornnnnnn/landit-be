@@ -7,9 +7,12 @@ import com.landit.landitbe.config.session.FreeTalkCorrectionRetryProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMessageFeedback;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkPatternUsage;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkCorrectionAttempt;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkPatternUsageRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -37,6 +40,7 @@ public class FreeTalkMessageFeedbackService {
   private static final int FIRST_ATTEMPT = 1;
 
   private final FreeTalkMessageFeedbackRepository feedbackRepository;
+  private final FreeTalkPatternUsageRepository patternUsageRepository;
   private final ConversationMessageService conversationMessageService;
   private final AiClientProperties aiClientProperties;
   private final FreeTalkCorrectionRetryProperties retryProperties;
@@ -81,12 +85,22 @@ public class FreeTalkMessageFeedbackService {
   /**
    * 준비 상태인 교정에만 판정 결과를 반영한다. 같은 발화에 두 번 호출해도 한 번만 저장된다.
    *
+   * <p>실수 패턴 사용례는 교정이 실제로 반영된 그 트랜잭션에서만 함께 저장한다. 늦게 온 중복 결과는 교정 갱신이 0건이라 사용례도 넣지 않는다.
+   *
    * @param messageId 교정 대상 사용자 발화 ID
    * @param correction 교정 판정 결과
    * @return 갱신된 row 수. 이미 판정이 끝난 교정이면 0
    */
   @Transactional
   public int completeIfPreparing(long messageId, FreeTalkTurnCorrection correction) {
+    int completed = updateIfPreparing(messageId, correction);
+    if (completed == 1 && !correction.patternUsages().isEmpty()) {
+      savePatternUsages(messageId, correction.patternUsages());
+    }
+    return completed;
+  }
+
+  private int updateIfPreparing(long messageId, FreeTalkTurnCorrection correction) {
     FreeTalkTurnCorrection.Sentence sentence = correction.sentence();
     return feedbackRepository.updateIfPreparing(
         messageId,
@@ -102,6 +116,27 @@ public class FreeTalkMessageFeedbackService {
         sentence == null ? null : sentence.wrongSpan(),
         sentence == null ? null : sentence.betterSpan(),
         ProcessingStatus.PREPARING);
+  }
+
+  // 사용례는 교정 행의 대화 기록 ID를 물려받는다. 방금 갱신한 행이라 반드시 있다.
+  private void savePatternUsages(long messageId, List<FreeTalkPatternUsageDraft> usages) {
+    long sessionHistoryId =
+        feedbackRepository
+            .findBySessionHistoryMessageId(messageId)
+            .orElseThrow()
+            .getSessionHistoryId();
+    patternUsageRepository.saveAll(
+        usages.stream()
+            .map(
+                usage ->
+                    FreeTalkPatternUsage.of(
+                        messageId,
+                        sessionHistoryId,
+                        usage.pattern(),
+                        usage.sentence(),
+                        usage.span(),
+                        usage.correct()))
+            .toList());
   }
 
   /**

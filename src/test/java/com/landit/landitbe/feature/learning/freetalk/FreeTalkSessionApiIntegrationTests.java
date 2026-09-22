@@ -31,6 +31,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.repository.FreeT
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.dto.FreeTalkExpressionReuseSummary;
 import com.landit.landitbe.feature.learning.freetalk.expression.reuse.service.FreeTalkExpressionReuseQueryService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkCorrectionRecoveryService;
 import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
@@ -149,6 +150,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
+    jdbcTemplate.update("DELETE FROM free_talk_pattern_usage");
     jdbcTemplate.update("DELETE FROM free_talk_expression_reuse");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
     jdbcTemplate.update("DELETE FROM user_writing_expression_completion");
@@ -1603,6 +1605,104 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.messages[0].reusedExpression.text").value("make up for"))
         .andExpect(
             jsonPath("$.data.messages[0].reusedExpression.matchedText").value("made up for"));
+  }
+
+  @DisplayName(
+      "직전 스몰톡에서 많이 틀린 패턴이 다음 스몰톡의 모든 턴 교정 요청에 실리고, 응답의 강조 구절과 사용례가 검증을 거쳐 저장되며 복구 요청에도 같은 패턴이 실린다.")
+  @Test
+  void watchesPreviousSessionMistakesAndStoresSpansAndUsages() throws Exception {
+    String accessToken =
+        login("free-talk-watch-pattern@example.com").get("data").get("accessToken").asText();
+    // 첫 스몰톡: 지켜볼 것이 없어 요청에 필드가 없다. TENSE 둘, ARTICLE 하나, WORD_CHOICE 하나를 교정받는다.
+    long firstSessionId = startUserFirstSession(accessToken);
+    long firstMessageId =
+        submitCorrected(accessToken, firstSessionId, "I go hiking.", FreeTalkMistakePattern.TENSE);
+    assertThat(
+            fakeAiFreeTalkClient.innerThoughtRequestsOf(firstMessageId).getFirst().watchPatterns())
+        .isEmpty();
+    submitCorrected(accessToken, firstSessionId, "I eat at a gym.", FreeTalkMistakePattern.ARTICLE);
+    submitCorrected(
+        accessToken, firstSessionId, "I make a walk.", FreeTalkMistakePattern.WORD_CHOICE);
+    submitCorrected(accessToken, firstSessionId, "I see him.", FreeTalkMistakePattern.TENSE);
+    completeSession(firstSessionId);
+
+    // 두 번째 스몰톡: AI가 구절과 사용례를 돌려준다(원격 응답의 재검증은 클라이언트 테스트가 맡고, 여기서는 검증을 통과한 값이 온다).
+    long secondSessionId = startUserFirstSession(accessToken);
+    fakeAiFreeTalkClient.correctNextTurn(
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I went to a gym.",
+                "I went to the gym.",
+                "둘 다 아는 곳이에요.",
+                FreeTalkMistakePattern.ARTICLE,
+                "a gym",
+                "the gym"),
+            true,
+            List.of(
+                new FreeTalkPatternUsageDraft(
+                    FreeTalkMistakePattern.TENSE, "I went to a gym.", "went", true),
+                new FreeTalkPatternUsageDraft(
+                    FreeTalkMistakePattern.ARTICLE, "I went to a gym.", "a gym", false))));
+    long secondMessageId =
+        submitWithoutCorrectionFields(accessToken, secondSessionId, "Yesterday I went to a gym.");
+    awaitCorrectionStatus(secondMessageId, "COMPLETED");
+
+    assertThat(
+            fakeAiFreeTalkClient.innerThoughtRequestsOf(secondMessageId).getFirst().watchPatterns())
+        .containsExactly(FreeTalkMistakePattern.TENSE, FreeTalkMistakePattern.ARTICLE);
+    assertThat(
+            jdbcTemplate.queryForMap(
+                "SELECT wrong_span, better_span FROM free_talk_message_feedback"
+                    + " WHERE session_history_message_id = ?",
+                secondMessageId))
+        .containsEntry("WRONG_SPAN", "a gym")
+        .containsEntry("BETTER_SPAN", "the gym");
+    assertThat(
+            jdbcTemplate.queryForList(
+                "SELECT pattern || ':' || correct FROM free_talk_pattern_usage"
+                    + " WHERE session_history_message_id = ? ORDER BY id",
+                String.class,
+                secondMessageId))
+        .containsExactly("TENSE:TRUE", "ARTICLE:FALSE");
+
+    // 속마음 호출이 실패해 복구가 다시 조립한 요청에도 같은 지켜볼 패턴이 실린다.
+    fakeAiFreeTalkClient.failNextInnerThought();
+    long recoveredMessageId =
+        submitWithoutCorrectionFields(accessToken, secondSessionId, "I saw him there.");
+    awaitFirstCorrectionAttemptReleased(recoveredMessageId);
+    fakeAiFreeTalkClient.correctNextTurn(
+        FreeTalkTurnCorrection.completed(
+            null,
+            true,
+            List.of(
+                new FreeTalkPatternUsageDraft(
+                    FreeTalkMistakePattern.TENSE, "I saw him there.", "saw", true))));
+    recoverUntilCorrected(recoveredMessageId);
+
+    assertThat(fakeAiFreeTalkClient.innerThoughtRequestsOf(recoveredMessageId))
+        .hasSize(2)
+        .allSatisfy(
+            request ->
+                assertThat(request.watchPatterns())
+                    .containsExactly(FreeTalkMistakePattern.TENSE, FreeTalkMistakePattern.ARTICLE));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM free_talk_pattern_usage WHERE session_history_message_id = ?",
+                Integer.class,
+                recoveredMessageId))
+        .isEqualTo(1);
+  }
+
+  private long submitCorrected(
+      String accessToken, long sessionId, String content, FreeTalkMistakePattern pattern)
+      throws Exception {
+    fakeAiFreeTalkClient.correctNextTurn(
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(content, content + " (fixed)", "이유", pattern),
+            true));
+    long messageId = submitWithoutCorrectionFields(accessToken, sessionId, content);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    return messageId;
   }
 
   @DisplayName("학습자 난이도보다 높은 표현 후보를 제외한다.")

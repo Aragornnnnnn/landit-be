@@ -20,6 +20,7 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMes
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository;
+import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkPatternUsageRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -45,6 +46,8 @@ class FreeTalkMessageFeedbackServiceTest {
 
   private final FreeTalkMessageFeedbackRepository repository =
       mock(FreeTalkMessageFeedbackRepository.class);
+  private final FreeTalkPatternUsageRepository patternUsageRepository =
+      mock(FreeTalkPatternUsageRepository.class);
   private final ConversationMessageService conversationMessageService =
       mock(ConversationMessageService.class);
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -55,6 +58,7 @@ class FreeTalkMessageFeedbackServiceTest {
   private final FreeTalkMessageFeedbackService service =
       new FreeTalkMessageFeedbackService(
           repository,
+          patternUsageRepository,
           conversationMessageService,
           aiClientProperties,
           new FreeTalkCorrectionRetryProperties(
