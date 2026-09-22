@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 BEGIN;
 CREATE SCHEMA lan546_verification;
-SET LOCAL search_path TO lan546_verification;
+SET search_path TO lan546_verification;
 
 -- 편지함 외부 의존성은 사용자 PK만 제공한다. 애플리케이션 전체 schema 검증은 아니다.
 CREATE TABLE user_profile (id BIGINT PRIMARY KEY);
@@ -35,7 +35,20 @@ UNION ALL SELECT 'feedback', to_jsonb(t) FROM mailbox_feedback t
 UNION ALL SELECT 'recipient', to_jsonb(t) FROM mailbox_letter_recipient t
 UNION ALL SELECT 'read', to_jsonb(t) FROM mailbox_letter_read t;
 
-\ir ../../../src/main/resources/db/migration/V119__add_direct_mailbox_letters.sql
+COMMIT;
+BEGIN;
+\ir ../../../src/main/resources/db/postgresql/V119__add_direct_mailbox_letters.sql
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM pg_constraint
+        WHERE conrelid = 'mailbox_letter'::regclass
+          AND conname IN ('chk_mailbox_letter_type', 'chk_mailbox_letter_payload')
+          AND NOT convalidated) <> 2 THEN
+        RAISE EXCEPTION 'V119가 기존 행 검증을 지연하지 않았다.';
+    END IF;
+END $$;
+COMMIT;
+BEGIN;
 
 DO $$
 DECLARE actual JSONB;
@@ -170,5 +183,27 @@ BEGIN
 END $$;
 
 SELECT version() AS verified_postgresql_version;
-ROLLBACK;
-\echo 'LAN-546 PostgreSQL verification passed; all fixture data rolled back.'
+COMMIT;
+BEGIN;
+\ir ../../../src/main/resources/db/postgresql/V122__validate_direct_mailbox_letters.sql
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM pg_constraint
+        WHERE conrelid = 'mailbox_letter'::regclass
+          AND conname IN ('chk_mailbox_letter_type', 'chk_mailbox_letter_payload')
+          AND convalidated) <> 2 THEN
+        RAISE EXCEPTION 'V122가 기존 행 검증을 완료하지 않았다.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_locks WHERE pid = pg_backend_pid()
+        AND relation = 'mailbox_letter'::regclass AND mode = 'AccessExclusiveLock') THEN
+        RAISE EXCEPTION '검증 트랜잭션에 제약 추가의 강한 잠금이 남았다.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_locks WHERE pid = pg_backend_pid()
+        AND relation = 'mailbox_letter'::regclass AND mode = 'ShareUpdateExclusiveLock') THEN
+        RAISE EXCEPTION '검증 잠금 모드를 확인할 수 없다.';
+    END IF;
+    RAISE NOTICE 'PASS: V119 미검증 제약의 쓰기 보호 및 별도 V122 검증 잠금 확인';
+END $$;
+COMMIT;
+DROP SCHEMA lan546_verification CASCADE;
+\echo 'LAN-546 PostgreSQL verification passed; verification schema removed.'
