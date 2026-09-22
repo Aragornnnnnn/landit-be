@@ -37,7 +37,7 @@ public interface AdminMailboxControllerDocs {
    * @param principal 인증된 관리자
    * @param request 수신자 ID 목록과 제목·본문
    * @return 생성된 편지 ID, 수신자 수와 발송 시각
-   * @throws ApiException 발송이 비활성화됐거나 중복되거나 유효하지 않은 수신자가 있는 경우
+   * @throws ApiException 중복되거나 유효하지 않은 수신자가 있는 경우
    */
   @Operation(
       summary = "특정 사용자에게 직접 편지 발송",
@@ -46,13 +46,9 @@ public interface AdminMailboxControllerDocs {
               + "중복 ID는 400 INVALID_REQUEST, 잘못된 입력은 400 VALIDATION_FAILED, "
               + "존재하지 않거나 탈퇴한 수신자는 404 RESOURCE_NOT_FOUND다. "
               + "수신자 하나라도 유효하지 않으면 전체 발송을 취소한다. "
-              + "같은 요청을 다시 보내면 새 편지가 생성된다. "
-              + "발송은 기본 비활성화이며 프런트 DIRECT 지원 후 활성화한다. 비활성 상태는 503이다.",
+              + "같은 요청을 다시 보내면 새 편지가 생성된다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "발송 완료")
-  @io.swagger.v3.oas.annotations.responses.ApiResponse(
-      responseCode = "503",
-      description = "직접 편지 발송 비활성화")
   ResponseEntity<ApiResponse<AdminMailboxDirectLetterResponse>> sendDirectLetter(
       AuthUserPrincipal principal, @Valid AdminMailboxDirectLetterRequest request);
 

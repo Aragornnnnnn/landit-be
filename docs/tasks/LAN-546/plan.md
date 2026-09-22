@@ -10,7 +10,7 @@
 - 받은 편지 목록·상세·안 읽은 개수는 수신자에게만 공개하고 최초 읽음 시각을 보존한다. 직접 편지의 `contentBlocks`, `feedbackType`, `quotedFeedbackContent`는 null이다.
 - 공지·업데이트 관리 API는 해당 두 유형만 허용한다. 직접 편지를 공지로 바꾸거나 전역으로 공개할 수 없게 한다.
 - 편지·수신자·감사 로그는 같은 트랜잭션으로 저장한다. 활성 수신자 프로필을 ID 순서로 잠가 탈퇴와의 상태 변경을 직렬화한다.
-- 직접 발송은 `LANDIT_MAILBOX_DIRECT_LETTER_ENABLED` 기본값 false로 차단하며 API는 503을 반환한다. 앱의 `MailboxLetterType`·배지 매핑·일반 텍스트 상세 렌더링 지원을 배포하고 확인한 뒤 true로 활성화한다. 공지·업데이트·문의 답장은 이 설정의 영향을 받지 않는다.
+- 직접 발송 API는 관리자 권한으로 제공하며 별도 활성화 설정을 두지 않는다. API를 배포하는 것만으로 편지가 발송되지는 않는다. 실제 발송 시 수신자 앱에 `DIRECT`가 노출되므로 앱의 유형·배지·본문 렌더링은 프런트 연동 사항으로 남긴다.
 - 앱은 `DIRECT`를 일반 텍스트 편지로 렌더링하고, 어드민은 기존 사용자 목록의 ID로 발송 API를 연동해야 한다. 이 저장소의 작업 범위는 BE다.
 
 ## 추가 범위: 사용자 문의 이미지
@@ -78,6 +78,8 @@ curl -X POST "$API_BASE/api/v1/mailbox/feedbacks" \
 ## 리뷰 수정
 
 - 프로필의 활성 수신자 조회는 `ActiveUserProfileIds` record를 반환한다. 내부 목록은 복사해 불변으로 전달하며 기존 필터링과 프로필 잠금은 유지한다.
-- DIRECT 지원이 없는 현재 프런트와의 호환을 위해 기본 비활성 발송 설정과 503 OpenAPI 응답을 추가했다. 활성 상태의 기존 API 통합 테스트와 비활성 상태의 부수 효과 차단 테스트를 함께 실행한다.
+- 사용자 결정에 따라 직접 편지 발송의 기본 비활성 설정·503 차단·전용 차단 테스트를 제거했다. 관리자 발송 API와 기존 권한·수신자 검증을 유지한다. DIRECT 표시 지원은 프런트 연동 사항으로 관리한다.
 
-- 2026-09-22 리뷰 수정 후 `./gradlew spotlessApply check --offline --no-daemon --console=plain` 통과. Spotless·Checkstyle 포함, JUnit 1,372개, 실패·오류 0개, 환경 조건 생략 9개. `git diff --check` 통과. 운영 배포와 실기기 검증은 수행하지 않았다.
+- 발송 차단 제거 전 검증: 2026-09-22 `./gradlew spotlessApply check --offline --no-daemon --console=plain` 통과. Spotless·Checkstyle 포함, JUnit 1,372개, 실패·오류 0개, 환경 조건 생략 9개. `git diff --check` 통과. 운영 배포와 실기기 검증은 수행하지 않았다.
+
+- 발송 차단 제거 후 `./gradlew check --offline --no-daemon --console=plain` 통과. Spotless·Checkstyle 포함, JUnit 1,371개, 실패·오류 0개, 환경 조건 생략 9개. 기존 관리자 발송·권한·수신자별 공개 범위 테스트를 별도 활성화 설정 없이 통과했다.

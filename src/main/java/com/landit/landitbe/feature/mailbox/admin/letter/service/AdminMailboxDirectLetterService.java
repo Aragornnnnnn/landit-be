@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.mailbox.admin.letter.service;
 
-import com.landit.landitbe.config.mailbox.MailboxDeliveryProperties;
 import com.landit.landitbe.feature.audit.domain.AdminAction;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterRequest;
@@ -33,7 +32,6 @@ public class AdminMailboxDirectLetterService {
   private final AdminMailboxLetterRecipientRepository recipientRepository;
   private final UserProfileService userProfileService;
   private final AdminAuditService adminAuditService;
-  private final MailboxDeliveryProperties deliveryProperties;
 
   /**
    * 검증된 요청의 수신자 전원에게 동일한 직접 편지를 즉시 발송한다. 푸시는 보내지 않는다.
@@ -41,14 +39,11 @@ public class AdminMailboxDirectLetterService {
    * @param adminUserProfileId 작업 관리자 ID
    * @param request Bean Validation을 통과한 발송 요청
    * @return 편지 ID와 수신자 수, 발송 시각
-   * @throws ApiException 발송이 비활성화됐거나 수신자가 중복되거나 존재하지 않거나 탈퇴한 경우
+   * @throws ApiException 수신자가 중복되거나 존재하지 않거나 탈퇴한 경우
    */
   @Transactional
   public AdminMailboxDirectLetterResponse sendLetter(
       Long adminUserProfileId, AdminMailboxDirectLetterRequest request) {
-    if (!deliveryProperties.directLetterEnabled()) {
-      throw new ApiException(ErrorCode.SERVICE_UNAVAILABLE, "직접 편지 발송이 아직 활성화되지 않았습니다.");
-    }
     List<Long> recipientIds = requireActiveRecipients(request.userProfileIds());
     MailboxLetter letter = createLetter(request);
     recipientRepository.saveAll(
