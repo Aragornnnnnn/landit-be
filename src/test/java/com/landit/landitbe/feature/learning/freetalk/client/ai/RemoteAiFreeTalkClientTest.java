@@ -226,6 +226,83 @@ class RemoteAiFreeTalkClientTest {
     assertThat(sentence.betterSpan()).isEqualTo("went and");
   }
 
+  @DisplayName("구절은 단어 경계로 세므로 관사 a나 her처럼 다른 단어 안에 또 나오는 글자는 버리지 않고, 단어 일부(don)만 같은 구절은 버린다.")
+  @Test
+  void countsSpansByWordBoundary() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"고양이.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I have a cat and I don't go.",
+               "betterSentence":"I have the cat and I don't go.","reason":"관사",
+               "mistakePattern":"ARTICLE","wrongSpan":"a","betterSpan":"the"},
+             "patternUsages":[
+               {"pattern":"PRONOUN","sentence":"Where is her bag?","span":"her","correct":true},
+               {"pattern":"PRONOUN","sentence":"Where is her bag?","span":"Where","correct":true},
+               {"pattern":"TENSE","sentence":"I have a cat and I don't go.","span":"don","correct":false},
+               {"pattern":"TENSE","sentence":"I have a cat and I don't go.","span":"go","correct":false},
+               {"pattern":"TENSE","sentence":"I go to go-karts.","span":"go","correct":true}
+             ]},"error":null}
+        """);
+    AiFreeTalkInnerThoughtRequest request =
+        new AiFreeTalkInnerThoughtRequest(
+            300L,
+            "chloe",
+            3002L,
+            1,
+            "EN",
+            "KR",
+            null,
+            List.of(
+                new AiConversationHistoryMessage(
+                    3002L,
+                    1,
+                    "USER",
+                    "I have a cat and I don't go. Where is her bag? I go to go-karts.",
+                    null)),
+            List.of(),
+            List.of(FreeTalkMistakePattern.TENSE, FreeTalkMistakePattern.PRONOUN));
+
+    FreeTalkTurnCorrection correction = remoteClient().generateInnerThought(request).correction();
+
+    // have·cat 안의 a는 단어가 아니므로 관사 a는 한 번이다.
+    assertThat(correction.sentence().wrongSpan()).isEqualTo("a");
+    assertThat(correction.sentence().betterSpan()).isEqualTo("the");
+    // her는 Where 안의 her와 겹치지 않고, don은 don't의 일부라 없는 구절이며, go-karts의 go는 하이픈에 붙어 단어가 아니라 go는 한 번이다.
+    assertThat(correction.patternUsages())
+        .containsExactly(
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.PRONOUN, "Where is her bag?", "her", true),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.PRONOUN, "Where is her bag?", "Where", true),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.TENSE, "I have a cat and I don't go.", "go", false),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.TENSE, "I go to go-karts.", "go", true));
+  }
+
+  @DisplayName("교정 원문이 제출한 발화에 없으면 교정을 실패로 기록한다.")
+  @Test
+  void failsCorrectionWhoseSentenceIsNotInMessage() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I goes home.","betterSentence":"I go home.",
+                           "reason":"주어","mistakePattern":"SUBJECT_VERB_AGREEMENT"}},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
+    assertThat(result.correction().retryable()).isFalse();
+  }
+
   @DisplayName("고칠 것이 없는 턴에도 사용례는 붙고, 지켜볼 패턴이 없으면 요청에 필드를 싣지 않는다.")
   @Test
   void keepsUsagesWithoutCorrectionAndOmitsEmptyWatchPatterns() throws Exception {
@@ -1252,8 +1329,15 @@ class RemoteAiFreeTalkClientTest {
                 7L, EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE)));
   }
 
+  // 교정 원문은 제출한 발화 안의 조각이어야 하므로, 각 테스트가 쓰는 원문을 모두 담은 발화를 둔다.
   private List<AiConversationHistoryMessage> history() {
     return List.of(
-        new AiConversationHistoryMessage(3002L, 1, "USER", "I'm going hiking with friends.", null));
+        new AiConversationHistoryMessage(
+            3002L,
+            1,
+            "USER",
+            "I'm going hiking with friends. I go. I go hiking yesterday. I go and go."
+                + " I was at a gym.",
+            null));
   }
 }

@@ -31,6 +31,8 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -238,7 +240,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
         return FreeTalkTurnCorrection.completed(
             null, reactedToPartner, validPatternUsages(request));
       }
-      String invalidReason = correction.invalidReason();
+      String invalidReason = correction.invalidReason(request.submittedContent());
       if (invalidReason != null) {
         return invalidCorrection(messageId, invalidReason);
       }
@@ -308,13 +310,21 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     }
   }
 
-  // 구절이 문장에 대소문자까지 그대로 정확히 한 번 나오지 않으면 그 이유를, 나오면 null을 돌려준다.
+  // 단어의 일부로 보는 글자다. AI의 구절 규칙(correction_rules._span_matches)과 같이 아포스트로피(곧은 것·둥근 것)와 하이픈도 단어 글자로
+  // 본다.
+  private static final String WORD_CHARACTER = "[\\p{L}\\p{N}_'’-]";
+
+  // 구절이 문장에 대소문자까지 그대로, 단어 경계 기준으로 정확히 한 번 나오지 않으면 그 이유를, 나오면 null을 돌려준다.
+  // 글자 단위로 세면 "I have a cat."의 관사 a가 have·cat 안의 a와 겹쳐 버려지므로 AI와 같은 단어 경계로 센다.
   private static String spanRejection(String sentence, String span, String field) {
-    int first = sentence.indexOf(span);
-    if (first < 0) {
+    Matcher matcher =
+        Pattern.compile(
+                "(?<!" + WORD_CHARACTER + ")" + Pattern.quote(span) + "(?!" + WORD_CHARACTER + ")")
+            .matcher(sentence);
+    if (!matcher.find()) {
       return field + "_not_in_sentence";
     }
-    return sentence.indexOf(span, first + 1) < 0 ? null : field + "_not_unique";
+    return matcher.find() ? field + "_not_unique" : null;
   }
 
   private static FreeTalkMistakePattern knownPattern(String pattern) {
@@ -341,10 +351,13 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String betterSpan) {
     private static final int MAX_MEMORY_LABEL_LENGTH = 40;
 
-    // 계약을 어긴 이유를 로그용 코드로 돌려준다. 문제가 없으면 null이다.
-    private String invalidReason() {
+    // 계약을 어긴 이유를 로그용 코드로 돌려준다. 문제가 없으면 null이다. 원문은 제출한 발화 안의 조각이어야 화면이 그 자리에 카드를 붙일 수 있다.
+    private String invalidReason(String content) {
       if (blank(originalSentence) || blank(betterSentence) || blank(reason)) {
         return "blank_correction_text";
+      }
+      if (content != null && !content.contains(originalSentence.strip())) {
+        return "sentence_not_in_message";
       }
       return knownMistakePattern() == null ? "unknown_mistake_pattern" : null;
     }
