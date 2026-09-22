@@ -55,7 +55,6 @@ landit:
   free-talk:
     context:
       enabled: ${LANDIT_FREE_TALK_CONTEXT_ENABLED:false}
-      allowed-user-ids: ${LANDIT_FREE_TALK_CONTEXT_ALLOWED_USER_IDS:}
       recent-rounds: ${LANDIT_FREE_TALK_CONTEXT_RECENT_ROUNDS:8}
       summary-trigger-rounds: ${LANDIT_FREE_TALK_CONTEXT_SUMMARY_TRIGGER_ROUNDS:12}
       summary-source-max-bytes: ${LANDIT_FREE_TALK_CONTEXT_SUMMARY_SOURCE_MAX_BYTES:6000}

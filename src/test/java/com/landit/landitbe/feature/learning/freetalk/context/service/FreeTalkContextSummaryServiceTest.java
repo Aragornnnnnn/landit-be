@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -47,6 +49,13 @@ class FreeTalkContextSummaryServiceTest {
   final Instant now = Instant.parse("2026-09-20T00:00:00Z");
 
   FreeTalkContextSummaryServiceTest() {
+    service = contextService(true);
+    when(lifecycle.lockActive(1L, 300L, 30L)).thenReturn(true);
+    when(repo.currentTime()).thenReturn(now);
+    when(repo.findByIdForUpdate(30L)).thenReturn(Optional.of(state));
+  }
+
+  private FreeTalkContextSummaryService contextService(boolean enabled) {
     PlatformTransactionManager tx = mock(PlatformTransactionManager.class);
     when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     var execution = mock(FreeTalkContextExecutionService.class);
@@ -57,18 +66,39 @@ class FreeTalkContextSummaryServiceTest {
             })
         .when(execution)
         .execute(any());
-    service =
-        new FreeTalkContextSummaryService(
-            repo,
-            messages,
-            ai,
-            new FreeTalkContextProperties(true, List.of(1L), 8, 12, 6000, 30, 30),
-            tx,
-            execution,
-            lifecycle);
-    when(lifecycle.lockActive(1L, 300L, 30L)).thenReturn(true);
-    when(repo.currentTime()).thenReturn(now);
-    when(repo.findByIdForUpdate(30L)).thenReturn(Optional.of(state));
+    return new FreeTalkContextSummaryService(
+        repo,
+        messages,
+        ai,
+        new FreeTalkContextProperties(enabled, 8, 12, 6000, 30, 30),
+        tx,
+        execution,
+        lifecycle);
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {1L, 98765L})
+  void enabledContextAppliesToAnyUser(long userId) {
+    service.initialize(userId, 30L);
+    verify(repo).save(any(FreeTalkContextSummary.class));
+    when(repo.findById(30L)).thenReturn(Optional.of(state));
+    assertEquals("v1", service.snapshot(userId, 30L).contextPolicyVersion());
+  }
+
+  @Test
+  void disabledContextSkipsInitializationReadAndGeneration() {
+    var disabledService = contextService(false);
+    disabledService.initialize(1L, 30L);
+    assertNull(disabledService.snapshot(1L, 30L).contextPolicyVersion());
+    disabledService.dispatchIfNeeded(reservation());
+    verifyNoInteractions(repo, messages, ai, lifecycle);
+  }
+
+  @Test
+  void enabledContextKeepsExistingSessionWithoutPolicyDisabled() {
+    when(repo.findById(30L)).thenReturn(Optional.empty());
+    assertNull(service.snapshot(1L, 30L).contextPolicyVersion());
+    verify(repo, never()).save(any());
   }
 
   List<SessionHistoryMessageSnapshot> rounds(int count, int size) {

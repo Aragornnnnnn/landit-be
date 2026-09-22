@@ -83,7 +83,7 @@ public class FreeTalkContextSummaryService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void initialize(long userId, long freeTalkSessionId) {
-    if (eligible(userId)) {
+    if (properties.enabled()) {
       repository.save(
           FreeTalkContextSummary.start(
               freeTalkSessionId, "v1", properties.summarySourceMaxBytes()));
@@ -91,14 +91,14 @@ public class FreeTalkContextSummaryService {
   }
 
   /**
-   * 활성화된 사용자에게 저장된 요약 문맥을 제공한다.
+   * 기능이 활성화되어 있으면 저장된 세션 요약 문맥을 제공한다.
    *
    * @param userId 세션 소유 사용자 ID
    * @param freeTalkSessionId 조회할 프리톡 세션 ID
    * @return 저장된 요약 문맥 또는 비활성화된 전체 원문 문맥
    */
   public AiFreeTalkContextWindow snapshot(long userId, long freeTalkSessionId) {
-    if (!eligible(userId)) {
+    if (!properties.enabled()) {
       return AiFreeTalkContextWindow.disabled();
     }
     return repository
@@ -113,7 +113,7 @@ public class FreeTalkContextSummaryService {
    * @param reservation 완료된 응답의 세션 및 원문 이력 문맥
    */
   public void dispatchIfNeeded(FreeTalkMessageReservation reservation) {
-    if (!eligible(reservation.userId())) {
+    if (!properties.enabled()) {
       return;
     }
     try {
@@ -152,7 +152,7 @@ public class FreeTalkContextSummaryService {
       FreeTalkMessageReservation reservation, List<SessionHistoryMessageSnapshot> messages) {
     return transactionTemplate.execute(
         status -> {
-          if (!eligible(reservation.userId())
+          if (!properties.enabled()
               || !lifecycle.lockActive(
                   reservation.userId(),
                   reservation.learningSessionId(),
@@ -210,7 +210,7 @@ public class FreeTalkContextSummaryService {
     }
     transactionTemplate.executeWithoutResult(
         status -> {
-          if (!eligible(pending.userId())
+          if (!properties.enabled()
               || !lifecycle.lockActive(
                   pending.userId(), pending.learningSessionId(), pending.sessionId())) {
             return;
@@ -343,10 +343,6 @@ public class FreeTalkContextSummaryService {
     } catch (com.fasterxml.jackson.core.JacksonException exception) {
       return null;
     }
-  }
-
-  private boolean eligible(long userId) {
-    return properties.enabled() && properties.allowedUserIds().contains(userId);
   }
 
   private boolean activeLease(FreeTalkContextSummary state, Instant now) {
