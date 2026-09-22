@@ -235,8 +235,9 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     private FreeTalkTurnCorrection turnCorrection(
         long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
       if (reactedToPartner == null) {
+        // 둘 다 없으면 AI 서버가 교정 판정을 돌려주지 못한 것(교정 호출의 타임아웃·일시 장애)이라 다시 해 볼 수 있다.
         return correction == null
-            ? FreeTalkTurnCorrection.failed()
+            ? FreeTalkTurnCorrection.unavailable()
             : invalidCorrection(messageId, "correction_without_reaction");
       }
       if (correction == null) {

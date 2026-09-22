@@ -396,6 +396,17 @@ class DatabaseSchemaIntegrationTests {
     assertTableConstraintExists("free_talk_follow_up", "chk_free_talk_follow_up_text");
   }
 
+  /** V117 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다. */
+  @DisplayName("V117 migration은 턴 교정을 재시도 작업으로 다루는 시도 횟수와 임대 정보를 피드백 테이블에 추가한다.")
+  @Test
+  void v117AddsCorrectionRetryColumnsToFreeTalkMessageFeedback() {
+    assertColumnExists("free_talk_message_feedback", "attempts");
+    assertColumnExists("free_talk_message_feedback", "lease_until");
+    assertColumnExists("free_talk_message_feedback", "attempt_token");
+    assertTableConstraintExists(
+        "free_talk_message_feedback", "chk_free_talk_message_feedback_attempts");
+  }
+
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
   @Test
   void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
@@ -1608,6 +1619,45 @@ class DatabaseSchemaIntegrationTests {
             () -> insertFollowUp(migrationJdbcTemplate, sessionId, memoryId, triggerType, question))
         .isInstanceOf(DataIntegrityViolationException.class)
         .hasMessageContaining(constraintName);
+  }
+
+  /** V117 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워져 복구 대상이 된다. */
+  @DisplayName("V117 이전에 준비 상태로 남아 있던 교정은 시도 0회·임대 없음으로 채워지고 음수 시도 횟수는 거부한다.")
+  @Test
+  void v117FillsExistingCorrectionsAsNeverAttemptedAndRejectsNegativeAttempts() {
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, "115");
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update(
+          "INSERT INTO free_talk_message_feedback (session_history_message_id,"
+              + " session_history_id, processing_status, created_at, updated_at)"
+              + " VALUES (11, 1, 'PREPARING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+      migrate(dataSource, null);
+
+      assertThat(
+              migrationJdbcTemplate.queryForMap(
+                  "SELECT attempts, lease_until, attempt_token FROM free_talk_message_feedback"
+                      + " WHERE session_history_message_id = 11"))
+          .containsEntry("ATTEMPTS", 0)
+          .containsEntry("LEASE_UNTIL", null)
+          .containsEntry("ATTEMPT_TOKEN", null);
+      assertThatThrownBy(
+              () ->
+                  migrationJdbcTemplate.update(
+                      "UPDATE free_talk_message_feedback SET attempts = -1"
+                          + " WHERE session_history_message_id = 11"))
+          .isInstanceOf(DataIntegrityViolationException.class)
+          .hasMessageContaining("chk_free_talk_message_feedback_attempts");
+    } finally {
+      dataSource.destroy();
+    }
   }
 
   private void assertCorrectionMemoryRejected(JdbcTemplate migrationJdbcTemplate, String sql) {

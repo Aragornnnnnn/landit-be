@@ -27,7 +27,8 @@ public class FreeTalkTurnResultService {
    * @param messageId 사용자 발화 ID
    * @param innerThought 생성된 속마음
    * @param innerThoughtType 속마음 유형
-   * @param correction 턴 교정 판정. 판정 실패({@code FAILED})여도 속마음은 완료로 저장한다
+   * @param correction 턴 교정 판정. 판정 실패({@code FAILED})여도 속마음은 완료로 저장한다. AI가 판정을 돌려주지 못한 실패면 교정은 준비
+   *     상태로 남아 다시 시도된다
    */
   @Transactional
   public void complete(
@@ -36,17 +37,19 @@ public class FreeTalkTurnResultService {
       InnerThoughtType innerThoughtType,
       FreeTalkTurnCorrection correction) {
     conversationMessageService.completeInnerThought(messageId, innerThought, innerThoughtType);
-    messageFeedbackService.completeIfPreparing(messageId, correction);
+    messageFeedbackService.completeFirstAttempt(messageId, correction);
   }
 
   /**
-   * AI 판정에 실패한 발화의 속마음과, 함께 기다리던 턴 교정을 실패로 확정한다.
+   * AI 호출에 실패한 발화의 속마음을 실패로 확정한다. 함께 기다리던 턴 교정은 실패로 끝내지 않고 다음 시도를 기다리게 한다.
+   *
+   * <p>속마음은 대화 중에만 의미가 있어 다시 만들지 않는다. 교정은 세션이 끝난 뒤에 보이므로 늦더라도 만들어지는 쪽이 낫다.
    *
    * @param messageId 사용자 발화 ID
    */
   @Transactional
   public void fail(long messageId) {
     conversationMessageService.failInnerThought(messageId);
-    messageFeedbackService.failIfPreparing(messageId);
+    messageFeedbackService.failFirstAttempt(messageId);
   }
 }
