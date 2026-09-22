@@ -448,10 +448,10 @@ class DatabaseSchemaIntegrationTests {
     assertIndexExists("idx_free_talk_pattern_usage_history_pattern");
   }
 
-  /** V121 migration은 스몰톡 총평 테이블을 추가한다. */
-  @DisplayName("V121 migration은 스몰톡 총평 테이블을 추가한다.")
+  /** V124 migration은 스몰톡 총평 테이블을 추가한다. */
+  @DisplayName("V124 migration은 스몰톡 총평 테이블을 추가한다.")
   @Test
-  void v121AddsFreeTalkSessionSummaryTable() {
+  void v124AddsFreeTalkSessionSummaryTable() {
     assertTableExists("free_talk_session_summary");
     for (String column :
         List.of(
@@ -1805,10 +1805,10 @@ class DatabaseSchemaIntegrationTests {
         span);
   }
 
-  /** 총평은 세션당 하나이고, 첫 스몰톡·실수 기억 카드의 값 묶음이 짝이 맞을 때만 저장되도록 V121을 적용한다. */
+  /** 총평은 세션당 하나이고, 첫 스몰톡·실수 기억 카드의 값 묶음이 짝이 맞을 때만 저장되도록 V124을 적용한다. */
   @DisplayName("총평은 세션당 하나이고, 첫 스몰톡과 실수 기억 카드의 값 묶음이 짝이 맞을 때만 저장되며 세션이 지워지면 함께 지워진다.")
   @Test
-  void v121RejectsInconsistentSummariesAndDeletesThemWithSession() {
+  void v124RejectsInconsistentSummariesAndDeletesThemWithSession() {
     SingleConnectionDataSource dataSource =
         new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
     try {
