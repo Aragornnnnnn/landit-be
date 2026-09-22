@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionPeriodType;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
 import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStore;
+import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionExpiryExtensionResult;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionTransferResult;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateCommand;
 import com.landit.landitbe.feature.profile.subscription.dto.SubscriptionUpdateResult;
@@ -20,6 +21,7 @@ import com.landit.landitbe.feature.subscription.event.dto.SubscriptionChangedEve
 import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionErrorCode;
 import com.landit.landitbe.feature.subscription.exception.SubscriptionException;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -44,6 +46,12 @@ public class RevenueCatWebhookService {
   /** RevenueCat은 환불을 별도 이벤트 대신 이 해지 사유를 가진 CANCELLATION으로 보낸다. */
   private static final String CANCEL_REASON_REFUND = "CUSTOMER_SUPPORT";
 
+  /**
+   * 스토어가 갱신 결제 실패를 알릴 때 BILLING_ISSUE와 함께 보내는 CANCELLATION의 해지 사유. 자동 갱신은 켜진 채 스토어가 재시도하므로 구독 상태를
+   * 바꾸지 않는다.
+   */
+  private static final String CANCEL_REASON_BILLING_ERROR = "BILLING_ERROR";
+
   private final RevenueCatProperties revenueCatProperties;
   private final UserProfileService userProfileService;
   private final ProfileSubscriptionService profileSubscriptionService;
@@ -57,19 +65,21 @@ public class RevenueCatWebhookService {
    * <p>이력 저장과 상태 갱신은 한 트랜잭션으로 묶어 한쪽만 반영되지 않게 한다. 이력·상태 모두와 무관한 이벤트 타입, Landit 사용자와 연결할 수 없는 이벤트, 이미
    * 저장한 이벤트 ID의 재전송은 로그만 남기고 정상 처리로 응답해 RevenueCat이 재시도하지 않게 한다. TRANSFER는 app_user_id 대신
    * transferred_from·transferred_to로 계정을 찾아 구독 상태를 옮긴다. 인증을 통과한 웹훅은 처리 전에 API 버전과 함께 수신 로그를 남기고,
-   * 샌드박스 이벤트 반영이 꺼져 있으면 SANDBOX 이벤트는 로그만 남기고 끝낸다.
+   * 샌드박스 이벤트 반영이 꺼져 있으면 SANDBOX 이벤트는 로그만 남기고 끝낸다. BILLING_ISSUE는 이력을 남기고, 결제 유예 종료 시각이 있으면 프리미엄
+   * 사용자의 만료 시각만 그 시각까지 늘린다.
    *
    * @param authorization 요청의 Authorization 헤더 값. 없으면 null
    * @param request 웹훅 요청 본문
-   * @throws SubscriptionException Authorization 헤더가 설정값과 다르거나 설정값이 비어 있을 때
+   * @throws SubscriptionException Authorization 헤더가 설정값과 다를 때
+   * @throws com.landit.landitbe.shared.exception.ApiException 서버 인증 설정이 누락됐을 때
    */
   @Transactional
   public void handle(String authorization, RevenueCatWebhookRequest request) {
     verifyAuthorization(authorization);
     RevenueCatWebhookEvent event = request.event();
-    logReceived(request.apiVersion(), event);
+    log.info("RevenueCat webhook received");
     if (!revenueCatProperties.applySandboxEvents() && "SANDBOX".equals(event.environment())) {
-      log.info("RevenueCat sandbox event ignored: eventId={}", event.id());
+      log.info("RevenueCat sandbox event ignored");
       return;
     }
     Optional<SubscriptionEventType> eventType = SubscriptionEventType.fromRevenueCat(event.type());
@@ -79,7 +89,8 @@ public class RevenueCatWebhookService {
     }
     Optional<SubscriptionStatus> targetStatus = resolveTargetStatus(event);
     if (eventType.isEmpty() && targetStatus.isEmpty()) {
-      log.info("RevenueCat 웹훅 무시: 구독 상태와 무관한 이벤트. eventId={}, type={}", event.id(), event.type());
+      FailureObservation.observed(
+          "subscription_webhook", "routing", "unsupported_event", "expected_rejection");
       return;
     }
     Optional<Long> userId = resolveUserId(event);
@@ -87,29 +98,64 @@ public class RevenueCatWebhookService {
       return;
     }
     if (subscriptionEventRepository.existsByEventId(event.id())) {
-      log.info(
-          "RevenueCat 웹훅 무시: 이미 저장한 이벤트의 재전송. eventId={}, type={}, userId={}",
-          event.id(),
-          event.type(),
-          userId.get());
+      log.info("RevenueCat duplicate event ignored");
       return;
     }
-    eventType.ifPresent(type -> saveEvent(event, type, userId.get()));
-    targetStatus.ifPresent(status -> applyToUser(event, status, userId.get()));
+    applyEvent(event, eventType, targetStatus, userId.get());
   }
 
   /**
-   * 인증을 통과한 웹훅의 수신 사실을 API 버전과 함께 남긴다. 이후 처리 로그와는 eventId로 이어 본다.
+   * 이벤트를 결제 이력으로 저장하고 사용자 구독 상태에 반영한다.
    *
-   * @param apiVersion RevenueCat 웹훅 API 버전
+   * <p>BILLING_ISSUE는 목표 상태가 없어 상태 갱신 대신 결제 유예 반영만 거친다.
+   *
    * @param event 웹훅 이벤트
+   * @param eventType 결제 이력 이벤트 타입. 이력으로 남기지 않는 타입이면 빈 값
+   * @param targetStatus 목표 구독 상태. 구독 상태와 무관한 타입이면 빈 값
+   * @param userId 반영할 사용자 ID
    */
-  private void logReceived(String apiVersion, RevenueCatWebhookEvent event) {
+  private void applyEvent(
+      RevenueCatWebhookEvent event,
+      Optional<SubscriptionEventType> eventType,
+      Optional<SubscriptionStatus> targetStatus,
+      Long userId) {
+    eventType.ifPresent(type -> saveEvent(event, type, userId));
+    targetStatus.ifPresent(status -> applyToUser(event, status, userId));
+    if (eventType.filter(SubscriptionEventType.BILLING_ISSUE::equals).isPresent()) {
+      applyGracePeriod(event, userId);
+    }
+  }
+
+  /**
+   * BILLING_ISSUE의 결제 유예 종료 시각까지 사용자 구독 만료 시각을 늘린다.
+   *
+   * <p>grace_period_expiration_at_ms가 없으면(스토어 유예 기간 미설정, Google 계정 보류 등) 아무것도 바꾸지 않는다. 구독 상태 전환이
+   * 아니므로 구독 변경 이벤트는 발행하지 않는다. 체험 전환 결제가 실패한 경우에도 유예 종료 시각을 체험 종료로 알리면 안 되므로 체험 알림은 다시 예약하지 않는다. 결제가
+   * 복구되면 RevenueCat이 RENEWAL을 보내고, 유예가 끝나도 복구되지 않으면 EXPIRATION을 보낸다.
+   *
+   * @param event BILLING_ISSUE 웹훅 이벤트
+   * @param userId 반영할 사용자 ID
+   */
+  private void applyGracePeriod(RevenueCatWebhookEvent event, Long userId) {
+    Optional<LocalDateTime> graceExpiresAt = toLocalDateTime(event.gracePeriodExpirationAtMs());
+    if (graceExpiresAt.isEmpty()) {
+      log.info(
+          "RevenueCat 웹훅 처리: BILLING_ISSUE에 유예 종료 시각이 없어 만료 시각을 유지한다. userId={}, eventId={}",
+          userId,
+          event.id());
+      return;
+    }
+    LocalDateTime eventAt =
+        toLocalDateTime(event.eventTimestampMs()).orElseGet(() -> LocalDateTime.now(clock));
+    SubscriptionExpiryExtensionResult result =
+        profileSubscriptionService.extendSubscriptionExpiry(userId, graceExpiresAt.get(), eventAt);
     log.info(
-        "RevenueCat 웹훅 수신: apiVersion={}, eventId={}, type={}, environment={}",
-        apiVersion,
+        "RevenueCat 웹훅 처리: BILLING_ISSUE 유예 반영 result={}, userId={}, graceExpiresAt={}, eventId={},"
+            + " environment={}",
+        result,
+        userId,
+        graceExpiresAt.get(),
         event.id(),
-        event.type(),
         event.environment());
   }
 
@@ -117,16 +163,22 @@ public class RevenueCatWebhookService {
    * Authorization 헤더가 설정된 웹훅 인증값과 같은지 확인한다.
    *
    * @param authorization 요청의 Authorization 헤더 값. 없으면 null
-   * @throws SubscriptionException 설정값이 비어 있거나 헤더가 설정값과 다를 때
+   * @throws SubscriptionException 헤더가 설정값과 다를 때
+   * @throws com.landit.landitbe.shared.exception.ApiException 서버 인증 설정이 누락됐을 때
    */
   private void verifyAuthorization(String authorization) {
     if (!revenueCatProperties.hasWebhookAuthorization()) {
-      log.warn("RevenueCat 웹훅 거절: LANDIT_REVENUECAT_WEBHOOK_AUTHORIZATION이 설정되지 않았다.");
-      throw new SubscriptionException(SubscriptionErrorCode.WEBHOOK_UNAUTHORIZED);
+      var exception =
+          new com.landit.landitbe.shared.exception.ApiException(
+              com.landit.landitbe.shared.exception.ErrorCode.SERVICE_UNAVAILABLE);
+      FailureObservation.failed(
+          "subscription_webhook", "configuration", "authentication_not_configured", exception);
+      throw exception;
     }
     if (authorization == null
         || !constantTimeEquals(authorization, revenueCatProperties.webhookAuthorization())) {
-      log.warn("RevenueCat 웹훅 거절: Authorization 헤더가 설정값과 다르다.");
+      FailureObservation.observed(
+          "subscription_webhook", "authentication", "invalid_credentials", "expected_rejection");
       throw new SubscriptionException(SubscriptionErrorCode.WEBHOOK_UNAUTHORIZED);
     }
   }
@@ -147,9 +199,11 @@ public class RevenueCatWebhookService {
    * 이벤트 타입을 목표 구독 상태로 변환한다. 구독 상태와 무관한 타입이면 빈 값을 반환한다.
    *
    * <p>환불은 RevenueCat이 별도 이벤트 대신 cancel_reason이 CUSTOMER_SUPPORT인 CANCELLATION으로 보내므로, 이 경우 해지 예약이
-   * 아니라 즉시 종료(EXPIRED)로 처리한다. BILLING_ISSUE와 PRODUCT_CHANGE는 결제 이력으로만 남기고 상태는 바꾸지 않는다.
-   * NON_RENEWING_PURCHASE는 RevenueCat 대시보드에서 프로모션 권한을 부여했을 때 오므로 구매와 같이 ACTIVE로 처리하고, 만료는 다른 구독처럼
-   * EXPIRATION으로 온다.
+   * 아니라 즉시 종료(EXPIRED)로 처리한다. cancel_reason이 BILLING_ERROR인 CANCELLATION은 갱신 결제 실패와 함께 오는 스토어 재시도
+   * 알림이라 이력만 남기고 상태는 유지한다. 실제 종료는 유예가 끝난 뒤 EXPIRATION(expiration_reason=BILLING_ERROR)으로 온다.
+   * BILLING_ISSUE와 PRODUCT_CHANGE는 결제 이력으로만 남기고 상태는 바꾸지 않는다. 단, BILLING_ISSUE에 유예 종료 시각이 있으면 만료 시각만
+   * 늘린다. NON_RENEWING_PURCHASE는 RevenueCat 대시보드에서 프로모션 권한을 부여했을 때 오므로 구매와 같이 ACTIVE로 처리하고, 만료는 다른
+   * 구독처럼 EXPIRATION으로 온다.
    *
    * @param event 웹훅 이벤트
    * @return 목표 구독 상태. 구독 상태와 무관한 타입이면 빈 값
@@ -161,14 +215,26 @@ public class RevenueCatWebhookService {
                 switch (type) {
                   case INITIAL_PURCHASE, RENEWAL, UNCANCELLATION, NON_RENEWING_PURCHASE ->
                       Optional.of(SubscriptionStatus.ACTIVE);
-                  case CANCELLATION ->
-                      Optional.of(
-                          CANCEL_REASON_REFUND.equals(event.cancelReason())
-                              ? SubscriptionStatus.EXPIRED
-                              : SubscriptionStatus.CANCELED);
+                  case CANCELLATION -> resolveCancellationStatus(event.cancelReason());
                   case EXPIRATION -> Optional.of(SubscriptionStatus.EXPIRED);
                   case BILLING_ISSUE, PRODUCT_CHANGE, TRANSFER -> Optional.empty();
                 });
+  }
+
+  /**
+   * CANCELLATION 이벤트의 해지 사유를 목표 구독 상태로 변환한다.
+   *
+   * @param cancelReason RevenueCat cancel_reason 값. 없으면 null
+   * @return 환불이면 EXPIRED, 갱신 결제 실패면 빈 값(상태 유지), 그 외에는 CANCELED
+   */
+  private static Optional<SubscriptionStatus> resolveCancellationStatus(String cancelReason) {
+    if (CANCEL_REASON_BILLING_ERROR.equals(cancelReason)) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        CANCEL_REASON_REFUND.equals(cancelReason)
+            ? SubscriptionStatus.EXPIRED
+            : SubscriptionStatus.CANCELED);
   }
 
   /**
@@ -181,7 +247,7 @@ public class RevenueCatWebhookService {
    */
   private void handleTransfer(RevenueCatWebhookEvent event) {
     if (subscriptionEventRepository.existsByEventId(event.id())) {
-      log.debug("RevenueCat 웹훅 무시: 이미 저장한 TRANSFER의 재전송. eventId={}", event.id());
+      log.debug("RevenueCat duplicate transfer ignored");
       return;
     }
 
@@ -212,12 +278,8 @@ public class RevenueCatWebhookService {
    * @param event TRANSFER 웹훅 이벤트
    */
   private void logUnresolvedTransfer(RevenueCatWebhookEvent event) {
-    log.warn(
-        "RevenueCat 웹훅 무시: TRANSFER 대상 계정을 찾지 못했다. eventId={}, transferredFrom={},"
-            + " transferredTo={}",
-        event.id(),
-        event.transferredFrom(),
-        event.transferredTo());
+    FailureObservation.observed(
+        "subscription_webhook", "identity", "transfer_identity_unresolved", "expected_rejection");
   }
 
   /**
@@ -264,16 +326,7 @@ public class RevenueCatWebhookService {
       Long toUserId,
       SubscriptionTransferResult transfer,
       boolean saved) {
-    log.info(
-        "RevenueCat 웹훅 처리: TRANSFER result={}, saved={}, fromUserId={}, toUserId={}, status={},"
-            + " eventId={}, environment={}",
-        transfer.result(),
-        saved,
-        fromUserId,
-        toUserId,
-        transfer.moved() == null ? null : transfer.moved().subscriptionStatus(),
-        event.id(),
-        event.environment());
+    log.info("RevenueCat transfer result={} saved={}", transfer.result(), saved);
   }
 
   /**
@@ -305,21 +358,14 @@ public class RevenueCatWebhookService {
   private Optional<Long> resolveUserId(RevenueCatWebhookEvent event) {
     List<Long> candidateUserIds = resolveCandidateUserIds(event);
     if (candidateUserIds.isEmpty()) {
-      log.warn(
-          "RevenueCat 웹훅 무시: Landit 사용자 ID로 해석할 수 없는 app_user_id. eventId={}, type={},"
-              + " appUserId={}",
-          event.id(),
-          event.type(),
-          event.appUserId());
+      FailureObservation.observed(
+          "subscription_webhook", "identity", "invalid_user_id", "expected_rejection");
       return Optional.empty();
     }
     Optional<Long> userId = userProfileService.findExistingUserId(candidateUserIds);
     if (userId.isEmpty()) {
-      log.warn(
-          "RevenueCat 웹훅 무시: 일치하는 사용자 프로필이 없다. eventId={}, type={}, candidateUserIds={}",
-          event.id(),
-          event.type(),
-          candidateUserIds);
+      FailureObservation.observed(
+          "subscription_webhook", "identity", "user_not_found", "expected_rejection");
     }
     return userId;
   }
@@ -367,18 +413,7 @@ public class RevenueCatWebhookService {
     if (result == SubscriptionUpdateResult.APPLIED) {
       eventPublisher.publishEvent(new SubscriptionChangedEvent(userId, event.environment()));
     }
-    log.info(
-        "RevenueCat 웹훅 처리: result={}, userId={}, status={}, periodType={}, productId={}, store={},"
-            + " eventId={}, type={}, environment={}",
-        result,
-        userId,
-        command.status(),
-        command.periodType(),
-        command.productId(),
-        command.store(),
-        event.id(),
-        event.type(),
-        event.environment());
+    log.info("RevenueCat webhook result={} status={}", result, command.status());
   }
 
   /**
@@ -416,10 +451,8 @@ public class RevenueCatWebhookService {
     Optional<SubscriptionPeriodType> periodType =
         SubscriptionPeriodType.fromRevenueCat(event.periodType());
     if (periodType.isEmpty() && event.periodType() != null) {
-      log.warn(
-          "RevenueCat 웹훅 period_type 해석 실패: 알 수 없는 값이라 기간 종류를 비운다. eventId={}, periodType={}",
-          event.id(),
-          event.periodType());
+      FailureObservation.observed(
+          "subscription_webhook", "normalization", "unknown_period_type", "recovered");
     }
     return periodType.orElse(null);
   }
@@ -433,10 +466,8 @@ public class RevenueCatWebhookService {
   private static SubscriptionStore resolveStore(RevenueCatWebhookEvent event) {
     Optional<SubscriptionStore> store = SubscriptionStore.fromRevenueCat(event.store());
     if (store.isEmpty() && event.store() != null) {
-      log.warn(
-          "RevenueCat 웹훅 store 해석 실패: 알 수 없는 값이라 스토어를 비운다. eventId={}, store={}",
-          event.id(),
-          event.store());
+      FailureObservation.observed(
+          "subscription_webhook", "normalization", "unknown_store", "recovered");
     }
     return store.orElse(null);
   }

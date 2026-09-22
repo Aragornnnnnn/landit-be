@@ -75,7 +75,11 @@ public interface ExpressionControllerDocs {
    */
   @Operation(
       summary = "원어민 표현 학습 추가 예문 조회",
-      description = "눈으로 익히는 추가 예문 2건과 직접 푸는 작문 문제 2건(영어·한국어 각 1건)을 조회한다.",
+      description =
+          "눈으로 익히는 추가 예문 2건과 직접 푸는 작문 문제 2건(영어·한국어 각 1건)을 조회한다. "
+              + "writingSentenceAcceptedAnswers는 허용 정답의 2차원 토큰 배열이다. "
+              + "한국어는 복수 정답을, 영어와 추가 정답이 없는 예문은 기존 정답 하나를 담는다. "
+              + "기존 writingSentenceWords와 writingSentenceWordChoices도 함께 유지한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

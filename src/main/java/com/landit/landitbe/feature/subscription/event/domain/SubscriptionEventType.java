@@ -14,13 +14,16 @@ public enum SubscriptionEventType {
   INITIAL_PURCHASE,
   /** 갱신 결제. 무료 체험이 끝나고 처음 결제된 경우도 포함한다. */
   RENEWAL,
-  /** 해지 예약 또는 환불. 환불이면 cancel_reason이 CUSTOMER_SUPPORT다. */
+  /**
+   * 해지 예약 또는 환불. 환불이면 cancel_reason이 CUSTOMER_SUPPORT다. 갱신 결제 실패 시에는 BILLING_ISSUE와 함께
+   * cancel_reason이 BILLING_ERROR로 오며 이때는 구독 상태를 바꾸지 않는다.
+   */
   CANCELLATION,
   /** 해지 예약 취소. */
   UNCANCELLATION,
   /** 구독 만료. */
   EXPIRATION,
-  /** 결제 실패. */
+  /** 갱신 결제 실패. 스토어 유예 기간이 있으면 grace_period_expiration_at_ms로 유예 종료 시각이 함께 오고, 그때까지 프리미엄을 유지한다. */
   BILLING_ISSUE,
   /** 플랜 변경. */
   PRODUCT_CHANGE,

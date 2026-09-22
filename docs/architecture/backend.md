@@ -96,7 +96,7 @@ com.landit.landitbe
 │   │   ├── scheduled
 │   │   └── campaign
 │   ├── memory              # planning / retrieval
-│   ├── profile             # authentication / learning / preference / subscription
+│   ├── profile             # alarm / authentication / learning / preference / subscription
 │   ├── subscription        # event
 │   ├── mailbox             # feedback / letter
 │   ├── admin
@@ -113,6 +113,7 @@ com.landit.landitbe
 복습은 서로 다른 경계입니다. 나머지 기능은 `content`, `profile` 등 feature 바로 아래
 패키지를 업무 단위로 검사합니다. 같은 learning 폴더에 있어도 타 업무 Entity·Repository
 직접 접근과 순환은 금지합니다.
+`profile.alarm`도 자체 알람 저장소를 소유하는 별도 업무로 검사합니다.
 
 | 업무 단위 | 소유 책임과 의존 방향 |
 | --- | --- |
@@ -162,6 +163,7 @@ Entity는 콘텐츠 정의가 `content.*.domain`, 시나리오 실행이 `learni
 | 연습 예문·표현 추천 검색 | `content.expression.practice`, `content.expression.recommendation` |
 | 시나리오 질문·일별 콘텐츠 조회 | `content.scenario.question`, `content.scenario.schedule` |
 | 사용자별 시나리오 선택·목록·달력 | `learning.scenario.selection` |
+| 사용자 일일 알람 설정 | `profile.alarm` 아래 Controller·docs·dto·service·domain·repository |
 | 프로필 인증·학습·설정·구독 처리 | `profile.authentication`, `profile.learning`, `profile.preference`, `profile.subscription` |
 | 우편함 문의·답장 / 편지 발행·조회 | `mailbox.feedback`, `mailbox.letter` |
 | 기억 후보 판정·검색 | `memory.planning`, `memory.retrieval` |
@@ -183,6 +185,8 @@ Controller가 없는 업무는 공개 Service로 다른 업무와 협력할 수 
 프리톡 세션의 공통 Entity·Repository와 여러 AI 요청을 처리하는 클라이언트는 freetalk 상위에 유지합니다.
 `innerthought.client.ai`는 속마음 생성 요청·응답 계약만 분류하며, 호출 조율은 message Service와 저장 책임은 conversation Service가 담당합니다.
 하위 패키지는 프리톡 내부의 탐색 단위입니다. 각각을 별도 모듈로 검사하거나 모든 Service를 Controller 전용으로 제한하는 규칙은 아닙니다.
+
+`UserAlarmController`는 `profile.alarm`의 전용 진입점입니다. 알람 Entity·Repository는 이 업무만 소유하며, 활성 사용자 확인과 최초 등록 직렬화에는 공통 `UserProfileService`의 공개 조회·잠금 계약을 사용합니다. 알람 패키지가 프로필 Entity·Repository에 직접 접근하거나 다른 프로필 업무가 알람 저장소에 접근하지 않도록 경계 검사로 확인합니다.
 
 시나리오 메시지 처리와 기억 후보 판정의 package-private helper는 각각 구현 Service와 같은 패키지에 둡니다. 패키지 이동을 위해 공개 범위를 넓히지 않습니다. 여러 대화 유형이 사용하는 `learning.conversation.domain`의 상태·종료·입력 타입과 기능 독립적인 `shared.domain`은 공통 위치를 유지합니다.
 
@@ -289,6 +293,8 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | learning.scenario.session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 시나리오 실행 업무가 소유합니다. |
 | learning.scenario.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 대화/콘텐츠 테이블을 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
+| learning.review의 ExpressionReviewRepository | 학습 완료 이력·활성 콘텐츠·사용자 언어를 읽어 복습 후보를 선정합니다. 복습 스냅샷·진행·제출 테이블만 씁니다. |
+| notification.scheduled의 LearningNotificationSlotRepository | 활성 프로필을 ID 순서로 잠그고 알림 슬롯을 묶음 예약합니다. 기존 알림 상태는 읽기만 하며, 프로필 필드를 변경하지 않습니다. |
 | memory의 검색/원본 계보 저장 | 공유 DB의 기억 원본 메시지·세션 FK 관계를 유지합니다. |
 
 공통 메시지 테이블에는 시나리오 생성 선점·응답과 프리톡 처리 결과 칼럼이 남습니다. `FreeTalkTurnStatus`는 저장·응답에 사용하는 값 계약으로 conversation에 두며 종료 판단 로직은 freetalk에 둡니다. 이를 옮겼다고 테이블이 독립된 것은 아닙니다.

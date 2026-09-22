@@ -10,8 +10,10 @@ package com.landit.landitbe.feature.profile.subscription.domain;
  *
  * <ul>
  *   <li>INITIAL_PURCHASE, RENEWAL, UNCANCELLATION → {@link #ACTIVE}
- *   <li>CANCELLATION → {@link #CANCELED}. 단, cancel_reason이 CUSTOMER_SUPPORT(환불)이면 {@link #EXPIRED}
- *   <li>EXPIRATION → {@link #EXPIRED}
+ *   <li>CANCELLATION → {@link #CANCELED}. 단, cancel_reason이 CUSTOMER_SUPPORT(환불)이면 {@link
+ *       #EXPIRED}, BILLING_ERROR(갱신 결제 실패)이면 상태 유지
+ *   <li>BILLING_ISSUE → 상태 유지. 결제 유예 종료 시각이 있으면 만료 시각만 그 시각까지 늘린다
+ *   <li>EXPIRATION → {@link #EXPIRED}. 유예가 끝나도 결제되지 않으면 expiration_reason이 BILLING_ERROR로 온다
  * </ul>
  *
  * <p>프리미엄 혜택 적용 여부는 상태 이름이 아니라 {@link #isPremium()}으로 판단한다. {@link #CANCELED}는 이름과 달리 만료 전까지 {@code

@@ -25,10 +25,12 @@ import java.util.List;
  * @param store 결제한 스토어. APP_STORE, PLAY_STORE 등
  * @param priceInPurchasedCurrency 결제 통화 기준 금액. price는 USD 환산값이라 쓰지 않는다. 체험이면 0, 모르면 null
  * @param currency priceInPurchasedCurrency의 ISO 4217 통화 코드
- * @param cancelReason CANCELLATION 이벤트의 해지 사유. 환불이면 CUSTOMER_SUPPORT
+ * @param cancelReason CANCELLATION 이벤트의 해지 사유. 환불이면 CUSTOMER_SUPPORT, 갱신 결제 실패면 BILLING_ERROR
  * @param expirationReason EXPIRATION 이벤트의 만료 사유
  * @param purchasedAtMs 결제 시각(epoch ms)
- * @param expirationAtMs 구독 만료 시각(epoch ms)
+ * @param expirationAtMs 구독 만료 시각(epoch ms). BILLING_ISSUE에서는 유예와 무관한 원래 만료 시각이다
+ * @param gracePeriodExpirationAtMs BILLING_ISSUE 이벤트의 결제 유예 종료 시각(epoch ms). 스토어 유예 기간이 없거나 다른 타입이면
+ *     null
  * @param eventTimestampMs 이벤트 생성 시각(epoch ms)
  * @param transferredFrom TRANSFER 이벤트에서 구독을 넘겨준 App User ID 목록
  * @param transferredTo TRANSFER 이벤트에서 구독을 넘겨받은 App User ID 목록
@@ -53,6 +55,7 @@ public record RevenueCatWebhookEvent(
     @JsonProperty("expiration_reason") String expirationReason,
     @JsonProperty("purchased_at_ms") Long purchasedAtMs,
     @JsonProperty("expiration_at_ms") Long expirationAtMs,
+    @JsonProperty("grace_period_expiration_at_ms") Long gracePeriodExpirationAtMs,
     @JsonProperty("event_timestamp_ms") Long eventTimestampMs,
     @JsonProperty("transferred_from") List<String> transferredFrom,
     @JsonProperty("transferred_to") List<String> transferredTo) {}

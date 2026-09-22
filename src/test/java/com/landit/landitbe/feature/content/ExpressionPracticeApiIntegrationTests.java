@@ -10,9 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.time.LocalDateTime;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.landit.landitbe.support.ExpressionPracticeFixture;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -23,8 +22,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -132,10 +129,53 @@ class ExpressionPracticeApiIntegrationTests {
           .isEqualTo("질문해석-" + index);
 
       assertWordChoicesMatchQuizLanguage(writingSentence, index);
+      assertThat(writingSentence.get("writingSentenceAcceptedAnswers").size()).isEqualTo(1);
+      assertThat(writingSentence.get("writingSentenceAcceptedAnswers").get(0))
+          .isEqualTo(writingSentence.get("writingSentenceWords"));
     }
 
     assertThat(pickedTexts).doesNotHaveDuplicates();
     assertThat(quizLanguages).containsExactlyInAnyOrder("EN", "KR");
+  }
+
+  @DisplayName("한국어 작문은 모든 허용 정답을 반환하고 영어 작문은 정답 하나를 반환한다.")
+  @Test
+  void practiceReturnsAllKoreanAcceptedAnswersAndSingleEnglishAnswer() throws Exception {
+    JsonNode payload = examplesWithAlternativeKoreanWordOrder();
+    JsonNode writings = getWritingsWithAcceptedAnswers(payload);
+    assertThat(writings.size()).isEqualTo(2);
+    for (int index = 0; index < 2; index++) {
+      JsonNode writing = writings.get(index);
+      boolean korean = writing.path("quizLanguage").asText().equals("KR");
+      JsonNode expected =
+          korean
+              ? payload.get(index).get("sentenceTranslateAcceptedAnswers")
+              : objectMapper.createArrayNode().add(payload.get(index).get("sentenceWords"));
+      assertThat(writing.get("writingSentenceAcceptedAnswers")).isEqualTo(expected);
+      assertThat(writing.get("writingSentenceWords")).isEqualTo(expected.get(0));
+      assertThat(writing.get("writingSentenceWordChoices"))
+          .isEqualTo(
+              payload
+                  .get(index)
+                  .get(korean ? "sentenceTranslateWordChoices" : "sentenceWordChoices"));
+    }
+  }
+
+  @DisplayName("OpenAPI에 중첩 정답 배열을 명시하고 기존 단어 배열 스키마를 유지한다.")
+  @Test
+  void practiceOpenApiDescribesNestedAnswersAndPreservesLegacyArraySchemas() throws Exception {
+    String properties = "$.components.schemas.WritingSentenceResponse.properties.";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(properties + "writingSentenceAcceptedAnswers.type").value("array"))
+        .andExpect(
+            jsonPath(properties + "writingSentenceAcceptedAnswers.items.type").value("array"))
+        .andExpect(
+            jsonPath(properties + "writingSentenceAcceptedAnswers.items.items.type")
+                .value("string"))
+        .andExpect(jsonPath(properties + "writingSentenceWords.items.type").value("string"))
+        .andExpect(jsonPath(properties + "writingSentenceWordChoices.items.type").value("string"));
   }
 
   @DisplayName("사용자 학습 수준보다 어려운 표현의 연습 조회를 거부한다.")
@@ -275,50 +315,7 @@ class ExpressionPracticeApiIntegrationTests {
 
   /** Payload JSON까지 지정해 표현을 심는 버전. 불량 예문 케이스 검증에 사용한다. */
   private Long seedExpressionWithPracticeExamples(String status, String payloadJson) {
-    LocalDateTime now = LocalDateTime.now();
-
-    // 1) 최상위 부모: category
-    Long categoryId =
-        insertAndGetId(
-            "INSERT INTO category (display_order, status, created_at, updated_at) "
-                + "VALUES (?, 'ACTIVE', ?, ?)",
-            nextDisplayOrder("category"),
-            now,
-            now);
-
-    // 2) 중간 부모: scenario (category FK 필요)
-    Long scenarioId =
-        insertAndGetId(
-            "INSERT INTO scenario "
-                + "(category_id, ai_role, difficulty, first_speaker, total_question_count, "
-                + "display_order, status, created_at, updated_at) "
-                + "VALUES (?, 'barista', 'NORMAL', 'AI', 5, ?, 'ACTIVE', ?, ?)",
-            categoryId,
-            nextDisplayOrder("scenario"),
-            now,
-            now);
-
-    // 3) 표현 + 추가 예문 payload (인덱스 0~3으로 구분되는 예문 4개)
-    return insertAndGetId(
-        "INSERT INTO writing_expression "
-            + "(scenario_id, expression_type, usage_frequency_level, difficulty_level, "
-            + "target_locale, base_locale, "
-            + "display_order, target_expression_text, base_expression_meaning_text, usage_summary, "
-            + "usage_description, representative_sentence_text, "
-            + "representative_sentence_translation, "
-            + "representative_sentence_words, representative_sentence_word_choices, "
-            + "practice_examples_payload, status, created_at, updated_at) "
-            // H2에서 CAST(? AS jsonb)는 문자열을 "JSON 문자열 값"으로 저장해버려서(배열로 파싱 안 됨)
-            // 진짜 JSON으로 파싱해 저장하는 H2 문법인 "? FORMAT JSON"을 쓴다.
-            + "VALUES (?, 'DAILY_ROUTINE', 'BASIC', 4, 'EN', 'KR', 1, 'blow my mind', '끝내주게 놀랍다', "
-            + "'usage summary', '강렬한 인상을 받았을 때 최고의 리액션이에요.', "
-            + "'representative sentence', '대표 예문 해석', ARRAY['sample'], ARRAY['sample','choice'], "
-            + "? FORMAT JSON, ?, ?, ?)",
-        scenarioId,
-        payloadJson,
-        status,
-        now,
-        now);
+    return new ExpressionPracticeFixture(jdbcTemplate).seed(status, payloadJson);
   }
 
   /** 추가 예문 4개짜리 payload JSON 문자열을 만든다. (= practice_examples_payload) */
@@ -346,37 +343,6 @@ class ExpressionPracticeApiIntegrationTests {
               .formatted(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i));
     }
     return json.append("]").toString();
-  }
-
-  /**
-   * INSERT를 실행하고 DB가 자동 생성한 PK(id)를 돌려주는 유틸. H2가 PostgreSQL의 "RETURNING id" 문법을 지원하지 않아서 스프링의
-   * GeneratedKeyHolder로 생성된 키를 받는 방식을 쓴다.
-   */
-  private Long insertAndGetId(String sql, Object... args) {
-    KeyHolder keyHolder = new GeneratedKeyHolder(); // 생성된 PK가 담길 그릇
-
-    jdbcTemplate.update(
-        connection -> {
-          // RETURN_GENERATED_KEYS: 실행 후 자동 생성 키를 돌려달라는 옵션
-          PreparedStatement statement =
-              connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-          // SQL의 ? 자리(1번부터 시작)에 가변인자로 받은 값들을 순서대로 채운다
-          for (int i = 0; i < args.length; i++) {
-            statement.setObject(i + 1, args[i]);
-          }
-          return statement;
-        },
-        keyHolder);
-
-    return keyHolder.getKey().longValue(); // 그릇에서 생성된 PK를 꺼낸다
-  }
-
-  /** Display_order에 UNIQUE 제약이 있어, 다른 테스트와 겹치지 않게 현재 최댓값+1을 반환한다. */
-  private int nextDisplayOrder(String tableName) {
-    Integer maxOrder =
-        jdbcTemplate.queryForObject(
-            "SELECT COALESCE(MAX(display_order), 0) FROM " + tableName, Integer.class);
-    return maxOrder + 1;
   }
 
   /**
@@ -557,5 +523,44 @@ class ExpressionPracticeApiIntegrationTests {
             .andExpect(status().isOk())
             .andReturn();
     return objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("data");
+  }
+
+  private JsonNode examplesWithAlternativeKoreanWordOrder() throws Exception {
+    JsonNode payload = objectMapper.readTree(practiceExamplesPayloadJson());
+    for (int index = 0; index < 2; index++) {
+      ObjectNode example = (ObjectNode) payload.get(index);
+      JsonNode canonical = example.get("sentenceTranslateWords");
+      example
+          .putArray("sentenceTranslateAcceptedAnswers")
+          .add(canonical)
+          .add(objectMapper.createArrayNode().add(canonical.get(1)).add(canonical.get(0)));
+    }
+    return payload;
+  }
+
+  private JsonNode getWritingsWithAcceptedAnswers(JsonNode payload) throws Exception {
+    Long expressionId = seedExpressionWithPracticeExamples("ACTIVE", payload.toString());
+    String token =
+        login(
+            "google-practice-multiple",
+            "practice-multiple@example.com",
+            "Multiple Answers",
+            "practice-multiple-nonce");
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/expressions/{expressionId}/practice", expressionId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(
+                jsonPath("$.data.practiceSentence[0].sentenceTranslateAcceptedAnswers")
+                    .doesNotExist())
+            .andReturn();
+    JsonNode writings =
+        objectMapper
+            .readTree(result.getResponse().getContentAsByteArray())
+            .path("data")
+            .path("writingSentence");
+    return writings;
   }
 }

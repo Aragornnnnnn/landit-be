@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationReques
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
 import com.landit.landitbe.feature.memory.planning.service.ConversationMemoryPlanningService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,14 +35,16 @@ public class FreeTalkMemoryGenerationService {
 
   /** 장기기억 생성 문맥으로 후보를 판정하고 저장한다. */
   private void generate(ConversationMemoryGenerationRequest request) {
+    String stage = "generation";
     try {
       ConversationMemoryPlanningResult planning = planningService.createPlans(request);
+      stage = "persistence";
       if (contextService.persistAndComplete(request, planning)
           == ConversationMemoryWriteService.PersistenceResult.STALE) {
         throw new IllegalStateException("장기기억 비교 snapshot이 변경됐습니다.");
       }
     } catch (RuntimeException exception) {
-      failSafely(request.learningSessionId(), exception);
+      failSafely(request.learningSessionId(), stage, exception);
     }
   }
 
@@ -49,7 +52,7 @@ public class FreeTalkMemoryGenerationService {
     try {
       return contextService.claim(learningSessionId);
     } catch (RuntimeException exception) {
-      failSafely(learningSessionId, exception);
+      failSafely(learningSessionId, "claim", exception);
       return null;
     }
   }
@@ -60,18 +63,21 @@ public class FreeTalkMemoryGenerationService {
    * @param learningSessionId 학습 세션 ID
    */
   public void markFailed(long learningSessionId) {
-    failSafely(learningSessionId, null);
+    failSafely(learningSessionId, "dispatch", null);
   }
 
   /** 실패 상태 전환 자체의 예외가 후속 작업 실패 처리를 막지 않도록 삼킨다. */
-  private void failSafely(long learningSessionId, RuntimeException cause) {
+  private void failSafely(long learningSessionId, String stage, RuntimeException cause) {
     try {
       contextService.fail(learningSessionId);
     } catch (RuntimeException compensationFailure) {
-      log.warn("프리톡 장기기억 실패 상태 전환도 실패했습니다. learningSessionId={}", learningSessionId);
+      FailureObservation.failed(
+          "memory", "failure_state_persistence", "storage_failed", compensationFailure);
     }
-    if (cause != null) {
-      log.warn("프리톡 장기기억 생성에 실패했습니다. learningSessionId={}", learningSessionId);
-    }
+    FailureObservation.failed(
+        "memory",
+        stage,
+        "persistence".equals(stage) ? "storage_failed" : "operation_failed",
+        cause);
   }
 }

@@ -16,6 +16,7 @@ import com.landit.landitbe.feature.learning.scenario.session.message.feedback.do
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.repository.MessageFeedbackWorkRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -97,7 +98,14 @@ public class MessageFeedbackWorkService {
    * @return 현재 실행 시도의 처리 상태
    */
   public ProcessingStatus generate(long messageId) {
-    Claim claim = claim(messageId);
+    Claim claim;
+    try {
+      claim = claim(messageId);
+    } catch (RuntimeException exception) {
+      FailureObservation.failed(
+          "message_feedback", "claim", "storage_or_contract_failed", exception);
+      throw exception;
+    }
     if (claim == null) {
       return repository.existsById(messageId)
           ? ProcessingStatus.PREPARING
@@ -142,6 +150,11 @@ public class MessageFeedbackWorkService {
             if (!messages.lockForFeedbackResult(exhausted.getMessageId())) {
               return;
             }
+            MessageFeedbackWork current =
+                repository.findById(exhausted.getMessageId()).orElse(null);
+            if (current == null || current.isTerminalFailed()) {
+              return;
+            }
             if (repository.finish(
                     exhausted.getMessageId(),
                     exhausted.getAttemptToken(),
@@ -151,6 +164,8 @@ public class MessageFeedbackWorkService {
                     LocalDateTime.now(clock))
                 > 0) {
               messages.failFeedback(exhausted.getMessageId());
+              FailureObservation.afterCommit(
+                  "message_feedback", "recovery", "attempts_exhausted", null);
             }
           });
     }
@@ -161,7 +176,8 @@ public class MessageFeedbackWorkService {
         try {
           executor.execute(() -> execute(claim));
         } catch (RuntimeException exception) {
-          log.warn("message feedback executor unavailable: messageId={}", work.getMessageId());
+          FailureObservation.failed(
+              "message_feedback", "dispatch", "executor_unavailable", exception);
         }
       }
     }
@@ -207,7 +223,7 @@ public class MessageFeedbackWorkService {
         recovery.add(CompletableFuture.runAsync(() -> recoverOrWarmCache(id), executor));
       }
     } catch (TaskRejectedException exception) {
-      throw new ApiException(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
+      throw ApiException.causedBy(SessionErrorCode.FEEDBACK_GENERATION_FAILED, exception);
     }
     while (System.nanoTime() < deadline) {
       if (recovery.stream().anyMatch(CompletableFuture::isCompletedExceptionally)) {
@@ -228,7 +244,7 @@ public class MessageFeedbackWorkService {
                 TimeUnit.MILLISECONDS.toNanos(100), Math.max(0, deadline - System.nanoTime())));
       } catch (InterruptedException exception) {
         Thread.currentThread().interrupt();
-        throw new ApiException(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
+        throw ApiException.causedBy(SessionErrorCode.FEEDBACK_GENERATION_FAILED, exception);
       }
     }
     throw new ApiException(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
@@ -270,6 +286,7 @@ public class MessageFeedbackWorkService {
     String payload = null;
     boolean failed = false;
     boolean legacy = false;
+    RuntimeException cause = null;
     try {
       AiMessageFeedbackResult result = client.requestMessageFeedback(claim.request());
       validate(result, claim.request());
@@ -281,35 +298,62 @@ public class MessageFeedbackWorkService {
       }
     } catch (RuntimeException exception) {
       failed = true;
-      log.warn(
-          "message feedback attempt failed: messageId={}, attempt={}",
-          claim.request().messageId(),
-          claim.attempt());
+      cause = exception;
+      if (hasDefect(exception)) {
+        FailureObservation.failed(
+            "message_feedback", "generation", "code_or_configuration_defect", exception);
+      }
     }
     String completed = payload;
     boolean legacyCompleted = legacy;
     boolean attemptFailed = failed;
     boolean exhausted = failed && claim.attempt() >= 3;
-    transaction.executeWithoutResult(
-        status -> {
-          if (!messages.lockForFeedbackResult(claim.request().messageId())) {
-            return;
-          }
-          int updated =
-              repository.finish(
-                  claim.request().messageId(),
-                  claim.token(),
-                  completed,
-                  legacyCompleted,
-                  exhausted,
-                  LocalDateTime.now(clock).plusSeconds(30));
-          if (updated > 0 && attemptFailed) {
-            messages.failFeedback(claim.request().messageId());
-          } else if (updated > 0 && (completed != null || legacyCompleted)) {
-            messages.retryFeedback(claim.request().messageId());
-          }
-        });
+    RuntimeException failure = cause;
+    try {
+      transaction.executeWithoutResult(
+          status -> {
+            if (!messages.lockForFeedbackResult(claim.request().messageId())) {
+              return;
+            }
+            int updated =
+                repository.finish(
+                    claim.request().messageId(),
+                    claim.token(),
+                    completed,
+                    legacyCompleted,
+                    exhausted,
+                    LocalDateTime.now(clock).plusSeconds(30));
+            if (updated > 0 && attemptFailed) {
+              messages.failFeedback(claim.request().messageId());
+              if (exhausted) {
+                FailureObservation.afterCommit(
+                    "message_feedback", "generation", "attempts_exhausted", failure);
+              } else {
+                FailureObservation.observed(
+                    "message_feedback", "generation", "attempt_failed", "retrying");
+              }
+            } else if (updated > 0 && (completed != null || legacyCompleted)) {
+              messages.retryFeedback(claim.request().messageId());
+            }
+          });
+    } catch (RuntimeException exception) {
+      FailureObservation.failed("message_feedback", "persistence", "storage_failed", exception);
+      throw exception;
+    }
     return attemptFailed ? ProcessingStatus.FAILED : ProcessingStatus.PREPARING;
+  }
+
+  private boolean hasDefect(RuntimeException exception) {
+    if (!(exception instanceof ApiException api)
+        || (api.getErrorCode() != ErrorCode.AI_GENERATION_FAILED
+            && api.getErrorCode() != ErrorCode.AI_RESPONSE_INVALID)) {
+      return true;
+    }
+    Throwable cause = exception.getCause();
+    return cause != null
+        && !(cause instanceof java.io.IOException)
+        && !(cause instanceof InterruptedException)
+        && !(cause instanceof tools.jackson.core.JacksonException);
   }
 
   private void validate(AiMessageFeedbackResult result, AiMessageFeedbackRequest request) {
