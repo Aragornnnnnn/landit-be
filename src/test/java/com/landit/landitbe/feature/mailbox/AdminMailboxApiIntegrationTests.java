@@ -53,6 +53,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageResponse;
 @Import(AdminMailboxApiIntegrationTests.TestSqsClientConfiguration.class)
 @TestPropertySource(
     properties = {
+      "landit.mailbox-delivery.direct-letter-enabled=true",
       "landit.auth.oidc.fake-enabled=true",
       "landit.auth.token.secret=landit-test-token-secret-that-is-long-enough",
       "landit.notification.consumer-enabled=true",
