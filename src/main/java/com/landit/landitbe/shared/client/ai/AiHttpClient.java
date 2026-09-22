@@ -89,9 +89,9 @@ public class AiHttpClient {
       throw exception;
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
-      throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      throw ApiException.causedBy(ErrorCode.AI_GENERATION_FAILED, exception);
     } catch (IOException | IllegalArgumentException exception) {
-      throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      throw ApiException.causedBy(ErrorCode.AI_GENERATION_FAILED, exception);
     } finally {
       // 성공과 실패를 가리지 않고 왕복 시간을 남겨 지연 구간을 특정한다.
       log.info(
@@ -126,13 +126,15 @@ public class AiHttpClient {
     } catch (ApiException exception) {
       throw exception;
     } catch (JacksonException exception) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      throw ApiException.causedBy(ErrorCode.AI_RESPONSE_INVALID, exception);
     }
   }
 
   private URI aiUri(String path) {
     if (properties.baseUrl() == null || properties.baseUrl().isBlank()) {
-      throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      throw ApiException.causedBy(
+          ErrorCode.AI_GENERATION_FAILED,
+          new IllegalStateException("AI base URL is not configured"));
     }
     return URI.create(properties.baseUrl()).resolve(path);
   }

@@ -179,7 +179,10 @@ class FreeTalkMessageServiceTest {
   @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")
   @Test
   void logsFailedInnerThoughtGenerationAsStructuredError() {
-    Logger logger = (Logger) LoggerFactory.getLogger(FreeTalkMessageService.class);
+    Logger logger =
+        (Logger)
+            LoggerFactory.getLogger(
+                com.landit.landitbe.shared.observability.FailureObservation.class);
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
     logger.addAppender(appender);
@@ -201,9 +204,9 @@ class FreeTalkMessageServiceTest {
               event -> {
                 assertThat(event.getLevel()).isEqualTo(Level.ERROR);
                 assertThat(event.getFormattedMessage())
-                    .contains("workflow=free_talk_inner_thought_failed")
-                    .contains("messageId=7")
-                    .contains("errorCode=AI_RESPONSE_INVALID");
+                    .contains("workflow=inner_thought")
+                    .contains("failure_stage=generation")
+                    .contains("reason=result_missing");
                 assertThat(event.getThrowableProxy()).isNotNull();
               });
       verify(sessionMessageService).failInnerThought(7L);
