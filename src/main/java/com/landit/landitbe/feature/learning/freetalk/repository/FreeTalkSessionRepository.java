@@ -5,12 +5,14 @@ package com.landit.landitbe.feature.learning.freetalk.repository;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -92,4 +94,29 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
       """)
   List<FreeTalkSession> findPreviousCompleted(
       @Param("learningSessionId") Long learningSessionId, Pageable pageable);
+
+  /**
+   * 멈춘 장기기억 작업을 실패로 확정한다. 준비 상태일 때만 바꾸므로 그사이 끝난 작업과 경합하면 먼저 끝낸 쪽이 이긴다.
+   *
+   * <p>장기기억 작업은 실행 중 서버가 재시작되면 준비 상태로 남고 되살리는 장치가 없다. 요약을 조회할 때 시간 상한을 넘긴 작업을 여기로 확정해, 후속 질문이 끝없이
+   * "준비 중"으로 남지 않게 한다. 응답에서만 꾸미지 않고 DB에 확정하므로 이후 조회도 같은 값을 돌려준다.
+   *
+   * <p>갱신 시각은 DB가 아니라 앱 Clock에서 받는다. 이 테이블의 다른 시각과 같은 기준을 쓰기 위함이다.
+   *
+   * @param freeTalkSessionId 프리톡 세션 ID
+   * @param now 앱 Clock의 현재 시각
+   * @return 갱신된 row 수. 이미 끝났으면 0
+   */
+  @Modifying
+  @Query(
+      """
+          update FreeTalkSession session
+          set session.memoryGenerationStatus = com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus.FAILED,
+              session.memoryGenerationStartedAt = null,
+              session.updatedAt = :now
+          where session.id = :freeTalkSessionId
+            and session.memoryGenerationStatus = com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus.PREPARING
+      """)
+  int failStaleMemoryGeneration(
+      @Param("freeTalkSessionId") Long freeTalkSessionId, @Param("now") LocalDateTime now);
 }

@@ -16,6 +16,8 @@ import com.landit.landitbe.feature.learning.freetalk.message.service.FreeTalkMes
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse;
 import com.landit.landitbe.feature.learning.freetalk.start.service.FreeTalkSessionStartService;
+import com.landit.landitbe.feature.learning.freetalk.summary.dto.FreeTalkSessionSummaryResponse;
+import com.landit.landitbe.feature.learning.freetalk.summary.service.FreeTalkSummaryService;
 import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.learning.freetalk.topic.service.FreeTalkTopicService;
 import com.landit.landitbe.shared.response.ApiResponse;
@@ -41,6 +43,7 @@ public class FreeTalkController implements FreeTalkControllerDocs {
   private final FreeTalkSessionStartService freeTalkSessionStartService;
   private final FreeTalkMessageService freeTalkMessageService;
   private final FreeTalkHistoryQueryService freeTalkHistoryQueryService;
+  private final FreeTalkSummaryService freeTalkSummaryService;
   private final FreeTalkExpressionRetryService freeTalkExpressionRetryService;
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
 
@@ -109,6 +112,15 @@ public class FreeTalkController implements FreeTalkControllerDocs {
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
     return ResponseEntity.ok(
         ApiResponse.success(freeTalkHistoryQueryService.getSession(principal.userId(), sessionId)));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/free-talk/sessions/{sessionId}/summary")
+  public ResponseEntity<ApiResponse<FreeTalkSessionSummaryResponse>> getSummary(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(freeTalkSummaryService.getSummary(principal.userId(), sessionId)));
   }
 
   /** {@inheritDoc} */

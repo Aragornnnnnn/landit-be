@@ -9,28 +9,39 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.domain;
  * 선택·자연스러움처럼 모든 문장이 사용례가 되는 유형은 지켜볼 수 없다.
  */
 public enum FreeTalkMistakePattern {
-  TENSE(true),
-  SUBJECT_VERB_AGREEMENT(true),
-  VERB_FORM(true),
-  ARTICLE(true),
-  PLURAL(true),
-  PRONOUN(true),
-  PREPOSITION(true),
-  NEGATION(true),
-  QUESTION_FORM(true),
-  WORD_ORDER(false),
-  MISSING_WORD(false),
-  REDUNDANCY(false),
-  WORD_CHOICE(false),
-  LITERAL_TRANSLATION(false),
-  REGISTER(false),
-  NATURALNESS(false),
-  OTHER(false);
+  TENSE(true, "시제"),
+  SUBJECT_VERB_AGREEMENT(true, "주어-동사 일치"),
+  VERB_FORM(true, "동사 형태"),
+  ARTICLE(true, "관사"),
+  PLURAL(true, "복수형"),
+  PRONOUN(true, "대명사"),
+  PREPOSITION(true, "전치사"),
+  NEGATION(true, "부정문"),
+  QUESTION_FORM(true, "의문문"),
+  WORD_ORDER(false, "어순"),
+  MISSING_WORD(false, "빠진 단어"),
+  REDUNDANCY(false, "군더더기"),
+  WORD_CHOICE(false, "단어 선택"),
+  LITERAL_TRANSLATION(false, "직역"),
+  REGISTER(false, "말투"),
+  NATURALNESS(false, "자연스러움"),
+  OTHER(false, "기타");
 
   private final boolean watchable;
+  private final String koreanLabel;
 
-  FreeTalkMistakePattern(boolean watchable) {
+  FreeTalkMistakePattern(boolean watchable, String koreanLabel) {
     this.watchable = watchable;
+    this.koreanLabel = koreanLabel;
+  }
+
+  /**
+   * 화면에 쓰는 한국어 이름을 돌려준다. 기준 언어와 무관하게 한국어로 고정한다(요약 화면 문구가 전부 한국어다).
+   *
+   * @return 예: "시제"
+   */
+  public String koreanLabel() {
+    return koreanLabel;
   }
 
   /**

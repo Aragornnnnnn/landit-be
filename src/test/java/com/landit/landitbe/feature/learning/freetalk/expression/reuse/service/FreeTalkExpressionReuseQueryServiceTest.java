@@ -71,12 +71,19 @@ class FreeTalkExpressionReuseQueryServiceTest {
                 "grab a coffee",
                 "뜻 812",
                 "9월 10일 시나리오 「카페」",
+                5504L,
                 "문장 grabbed a coffee",
                 "grabbed a coffee"),
             new FreeTalkExpressionReuseSummary.Item(
-                813L, "up to you", "뜻 813", "9월 10일 시나리오", "문장 up to you", "up to you"),
+                813L, "up to you", "뜻 813", "9월 10일 시나리오", 5506L, "문장 up to you", "up to you"),
             new FreeTalkExpressionReuseSummary.Item(
-                814L, "hit it off", "뜻 814", "9월 10일 스몰톡 「주말 계획」", "문장 hit it off", "hit it off"));
+                814L,
+                "hit it off",
+                "뜻 814",
+                "9월 10일 스몰톡 「주말 계획」",
+                5507L,
+                "문장 hit it off",
+                "hit it off"));
   }
 
   @DisplayName("표현 작업이 아직 끝나지 않았고 기록도 없으면 기다리는 중으로 알린다.")

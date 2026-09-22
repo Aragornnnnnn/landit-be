@@ -449,6 +449,58 @@ class DatabaseSchemaIntegrationTests {
     assertIndexExists("idx_free_talk_pattern_usage_history_pattern");
   }
 
+  /** V124 migration은 스몰톡 총평 테이블을 추가한다. */
+  @DisplayName("V124 migration은 스몰톡 총평 테이블을 추가한다.")
+  @Test
+  void v124AddsFreeTalkSessionSummaryTable() {
+    assertTableExists("free_talk_session_summary");
+    for (String column :
+        List.of(
+            "user_profile_id",
+            "free_talk_session_id",
+            "session_history_id",
+            "first_session",
+            "days_since_previous",
+            "headline_trigger",
+            "headline_text",
+            "headline_subline",
+            "headline_pose",
+            "previous_learning_session_id",
+            "previous_date",
+            "current_speaking_ms",
+            "current_turn_count",
+            "current_max_words_in_turn",
+            "previous_speaking_ms",
+            "previous_turn_count",
+            "previous_max_words_in_turn",
+            "growth_pattern",
+            "growth_succeeded",
+            "growth_previous_date",
+            "growth_previous_sentence",
+            "growth_previous_wrong_span",
+            "growth_current_sentence",
+            "growth_current_span",
+            "correction_count")) {
+      assertColumnExists("free_talk_session_summary", column);
+    }
+    assertTableConstraintExists(
+        "free_talk_session_summary", "uk_free_talk_session_summary_session");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "fk_free_talk_session_summary_session");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "chk_free_talk_session_summary_headline");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "chk_free_talk_session_summary_previous");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "chk_free_talk_session_summary_metrics");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "chk_free_talk_session_summary_growth");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "fk_free_talk_session_summary_user_profile");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "fk_free_talk_session_summary_history");
+  }
+
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
   @Test
   void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
@@ -1779,6 +1831,213 @@ class DatabaseSchemaIntegrationTests {
             + " CURRENT_TIMESTAMP)",
         messageId,
         span);
+  }
+
+  /** 총평은 세션당 하나이고, 첫 스몰톡·실수 기억 카드의 값 묶음이 짝이 맞을 때만 저장되도록 V124을 적용한다. */
+  @DisplayName("총평은 세션당 하나이고, 첫 스몰톡과 실수 기억 카드의 값 묶음이 짝이 맞을 때만 저장되며 세션이 지워지면 함께 지워진다.")
+  @Test
+  void v124RejectsInconsistentSummariesAndDeletesThemWithSession() {
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      for (long sessionId : new long[] {31L, 32L}) {
+        migrationJdbcTemplate.update(
+            "INSERT INTO free_talk_session (id, learning_session_id, start_mode, character_id,"
+                + " conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)"
+                + " VALUES (?, ?, 'USER_FIRST', 'chloe', 'COMPLETED', 0, CURRENT_TIMESTAMP,"
+                + " CURRENT_TIMESTAMP)",
+            sessionId,
+            sessionId + 300L);
+      }
+
+      // 첫 스몰톡: 직전 값 없음·직전 지표 0·카드 없음.
+      assertThat(insertSummary(migrationJdbcTemplate, 31L, "TRUE", "NULL, NULL, NULL", "0", "NULL"))
+          .isEqualTo(1);
+      // 비교 스몰톡: 직전 값과 카드(구절은 없어도 됨).
+      assertThat(
+              insertSummary(
+                  migrationJdbcTemplate,
+                  32L,
+                  "FALSE",
+                  "1201, DATE '2026-09-10', 5",
+                  "161000",
+                  "'TENSE', TRUE, DATE '2026-09-10', 'I go to gym.', NULL, 'I went to the gym.',"
+                      + " 'went'"))
+          .isEqualTo(1);
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          32L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "NULL",
+          "uk_free_talk_session_summary_session");
+      // 첫 스몰톡인데 직전 값이 있거나, 비교인데 직전 값이 없으면 거부한다.
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "TRUE",
+          "1201, DATE '2026-09-10', 5",
+          "0",
+          "NULL",
+          "chk_free_talk_session_summary_previous");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "NULL, NULL, NULL",
+          "161000",
+          "NULL",
+          "chk_free_talk_session_summary_previous");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "TRUE",
+          "1201, NULL, NULL",
+          "0",
+          "NULL",
+          "chk_free_talk_session_summary_previous");
+      // 카드의 필수 값이 반만 있거나, 지켜볼 수 없는 패턴이면 거부한다.
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "'TENSE', NULL, DATE '2026-09-10', 'I go to gym.', NULL, 'I went.', NULL",
+          "chk_free_talk_session_summary_growth");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "'WORD_CHOICE', TRUE, DATE '2026-09-10', 'I go to gym.', NULL, 'I went.', NULL",
+          "chk_free_talk_session_summary_growth");
+      // NULL은 SQL에서 "거짓"이 아니라 "모름"이라 조건을 통과하기 쉽다. 문장이 NULL인 카드도 거부되는지 따로 본다.
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "'TENSE', TRUE, DATE '2026-09-10', NULL, NULL, 'I went.', NULL",
+          "chk_free_talk_session_summary_growth");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "TRUE",
+          "NULL, NULL, NULL",
+          "0",
+          "NULL, TRUE, NULL, NULL, NULL, NULL, NULL",
+          "chk_free_talk_session_summary_previous");
+      // 첫 스몰톡의 직전 지표는 0이어야 하고, 지표는 음수일 수 없으며, 구절은 있으면 비어 있지 않아야 한다.
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "TRUE",
+          "NULL, NULL, NULL",
+          "1",
+          "NULL",
+          "chk_free_talk_session_summary_previous");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', -1",
+          "161000",
+          "NULL",
+          "chk_free_talk_session_summary_metrics");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "'TENSE', TRUE, DATE '2026-09-10', 'I go to gym.', ' ', 'I went.', NULL",
+          "chk_free_talk_session_summary_growth");
+      // 헤드라인의 계기·포즈는 정해진 값만, 문구는 비어 있지 않아야 한다.
+      assertThatThrownBy(() -> insertHeadline(migrationJdbcTemplate, "NOPE", "더"))
+          .hasMessageContaining("chk_free_talk_session_summary_headline");
+      assertThatThrownBy(() -> insertHeadline(migrationJdbcTemplate, "FIRST_SESSION", " "))
+          .hasMessageContaining("chk_free_talk_session_summary_headline");
+
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update("DELETE FROM free_talk_session WHERE id = 32");
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT free_talk_session_id FROM free_talk_session_summary", Long.class))
+          .containsExactly(31L);
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  private int insertHeadline(JdbcTemplate migrationJdbcTemplate, String trigger, String text) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_session_summary (user_profile_id, free_talk_session_id,"
+            + " session_history_id, first_session, headline_trigger, headline_text,"
+            + " headline_subline, headline_pose, current_speaking_ms, current_turn_count,"
+            + " current_max_words_in_turn, previous_speaking_ms, previous_turn_count,"
+            + " previous_max_words_in_turn, correction_count, created_at, updated_at)"
+            + " VALUES (1, 33, 1, TRUE, ?, ?, '늘', 'POINT', 0, 0, 0, 0, 0, 0, 0,"
+            + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        trigger,
+        text);
+  }
+
+  private int insertSummary(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      String firstSession,
+      String previousValues,
+      String previousSpeakingMs,
+      String growthValues) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_session_summary (user_profile_id, free_talk_session_id,"
+            + " session_history_id, first_session, previous_learning_session_id, previous_date,"
+            + " days_since_previous, headline_trigger, headline_text, headline_subline,"
+            + " headline_pose, current_speaking_ms, current_turn_count, current_max_words_in_turn,"
+            + " previous_speaking_ms, previous_turn_count, previous_max_words_in_turn,"
+            + " growth_pattern, growth_succeeded, growth_previous_date, growth_previous_sentence,"
+            + " growth_previous_wrong_span, growth_current_sentence, growth_current_span,"
+            + " correction_count, created_at, updated_at)"
+            + " VALUES (1, "
+            + sessionId
+            + ", 1, "
+            + firstSession
+            + ", "
+            + previousValues
+            + ", 'SPEAKING_TIME_UP', '더 말했어요!', '늘었어요.', 'POINT', 245000, 18, 23, "
+            + previousSpeakingMs
+            + ", 0, 0, "
+            + (growthValues.equals("NULL")
+                ? "NULL, NULL, NULL, NULL, NULL, NULL, NULL"
+                : growthValues)
+            + ", 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+  }
+
+  private void assertSummaryRejected(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      String firstSession,
+      String previousValues,
+      String previousSpeakingMs,
+      String growthValues,
+      String constraintName) {
+    assertThatThrownBy(
+            () ->
+                insertSummary(
+                    migrationJdbcTemplate,
+                    sessionId,
+                    firstSession,
+                    previousValues,
+                    previousSpeakingMs,
+                    growthValues))
+        .hasMessageContaining(constraintName);
   }
 
   private int insertReuse(

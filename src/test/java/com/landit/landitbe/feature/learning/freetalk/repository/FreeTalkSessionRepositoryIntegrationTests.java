@@ -41,6 +41,9 @@ class FreeTalkSessionRepositoryIntegrationTests {
 
   @Autowired private FreeTalkSessionRepository repository;
 
+  @Autowired
+  private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
   @BeforeEach
   void seed() {
     seedUser(USER_ID);
@@ -85,6 +88,47 @@ class FreeTalkSessionRepositoryIntegrationTests {
   @Test
   void returnsEmptyForFirstSession() {
     assertThat(previousOf(OLDER)).isEmpty();
+  }
+
+  @DisplayName("멈춘 장기기억 작업은 준비 상태일 때만 실패로 확정하고 시작 시각을 비우며, 이미 끝난 작업은 건드리지 않는다.")
+  @Test
+  void failsStaleMemoryGenerationOnlyWhilePreparing() {
+    jdbcTemplate.update(
+        "update free_talk_session set memory_generation_status = 'PREPARING',"
+            + " memory_generation_started_at = CURRENT_TIMESTAMP where id = ?",
+        LATEST_BEFORE + 1);
+    jdbcTemplate.update(
+        "update free_talk_session set memory_generation_status = 'READY' where id = ?", OLDER + 1);
+
+    assertThat(failStale(LATEST_BEFORE + 1)).isEqualTo(1);
+    assertThat(failStale(LATEST_BEFORE + 1)).isZero();
+    assertThat(failStale(OLDER + 1)).isZero();
+    assertThat(
+            jdbcTemplate.queryForMap(
+                "select memory_generation_status, memory_generation_started_at"
+                    + " from free_talk_session where id = ?",
+                LATEST_BEFORE + 1))
+        .containsEntry("MEMORY_GENERATION_STATUS", "FAILED")
+        .containsEntry("MEMORY_GENERATION_STARTED_AT", null);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select updated_at from free_talk_session where id = ?",
+                java.sql.Timestamp.class,
+                LATEST_BEFORE + 1))
+        .isEqualTo(java.sql.Timestamp.valueOf(LocalDateTime.of(2026, 9, 15, 12, 0)));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select memory_generation_status from free_talk_session where id = ?",
+                String.class,
+                OLDER + 1))
+        .isEqualTo("READY");
+  }
+
+  private int failStale(long freeTalkSessionId) {
+    return transactionTemplate.execute(
+        status ->
+            repository.failStaleMemoryGeneration(
+                freeTalkSessionId, LocalDateTime.of(2026, 9, 15, 12, 0)));
   }
 
   private List<Long> previousOf(long learningSessionId) {

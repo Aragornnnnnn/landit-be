@@ -86,6 +86,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ActiveProfiles("test")
@@ -150,6 +151,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
+    jdbcTemplate.update("DELETE FROM free_talk_session_summary");
     jdbcTemplate.update("DELETE FROM free_talk_pattern_usage");
     jdbcTemplate.update("DELETE FROM free_talk_expression_reuse");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
@@ -1598,6 +1600,9 @@ class FreeTalkSessionApiIntegrationTests {
             "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
             Long.class,
             sessionId);
+    long reusedMessageId =
+        jdbcTemplate.queryForObject(
+            "SELECT session_history_message_id FROM free_talk_expression_reuse", Long.class);
     FreeTalkExpressionReuseSummary expectedSummary =
         new FreeTalkExpressionReuseSummary(
             false,
@@ -1607,6 +1612,7 @@ class FreeTalkSessionApiIntegrationTests {
                     "make up for",
                     "만회하다",
                     "9월 10일 시나리오 「주말 계획」",
+                    reusedMessageId,
                     "I made up for it today!",
                     "made up for")));
     assertThat(
@@ -1744,6 +1750,235 @@ class FreeTalkSessionApiIntegrationTests {
     long messageId = submitWithoutCorrectionFields(accessToken, sessionId, content);
     awaitCorrectionStatus(messageId, "COMPLETED");
     return messageId;
+  }
+
+  @DisplayName(
+      "요약 조회는 진행 중이면 409, 남의 세션이면 403, 없는 세션이면 404, 인증이 없으면 401이고, 교정이 끝나기 전에는 총평 없이 pending이다.")
+  @Test
+  void summaryRejectsUnfinishedForeignMissingAndUnauthenticatedRequestsAndPendsBeforeSettling()
+      throws Exception {
+    String accessToken =
+        login("free-talk-summary-gate@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("SESSION_NOT_COMPLETED"));
+    mockMvc
+        .perform(get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", 999999L)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound());
+
+    // 마지막 발화의 교정이 아직 준비 상태인 채로 세션이 끝나면 총평은 비어 있고 pending이다.
+    fakeAiFreeTalkClient.failNextInnerThought();
+    submitWithoutCorrectionFields(accessToken, sessionId, "I go hiking yesterday.");
+    completeSession(sessionId);
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sessionId").value(sessionId))
+        .andExpect(jsonPath("$.data.pending").value(true))
+        .andExpect(jsonPath("$.data.headline").value(nullValue()))
+        .andExpect(jsonPath("$.data.comparison").value(nullValue()))
+        .andExpect(jsonPath("$.data.growth").value(nullValue()))
+        .andExpect(jsonPath("$.data.correctionCount").value(nullValue()))
+        .andExpect(jsonPath("$.data.reusedExpressions.pending").value(false))
+        .andExpect(jsonPath("$.data.followUp.pending").value(false));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM free_talk_session_summary", Integer.class))
+        .isZero();
+
+    String otherToken =
+        login("free-talk-summary-other@example.com").get("data").get("accessToken").asText();
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isForbidden());
+  }
+
+  @DisplayName(
+      "첫 스몰톡과 두 번째 스몰톡의 요약이 교정이 끝난 뒤 한 번 확정되어 언제 조회해도 같고, 출처가 바뀌어도 그대로이며, 멈춘 장기기억 작업은 상한 뒤 실패로"
+          + " 확정된다.")
+  @Test
+  void settlesSummaryOnceAndKeepsItAcrossReadsAndSourceChanges() throws Exception {
+    String accessToken =
+        login("free-talk-summary-flow@example.com").get("data").get("accessToken").asText();
+
+    // 첫 스몰톡: TENSE 교정 하나, 깨끗한 턴 하나.
+    long firstSessionId = startUserFirstSession(accessToken);
+    long firstCorrectedMessageId =
+        submitCorrected(
+            accessToken, firstSessionId, "I go hiking yesterday.", FreeTalkMistakePattern.TENSE);
+    fakeAiFreeTalkClient.correctNextTurn(FreeTalkTurnCorrection.completed(null, true));
+    awaitCorrectionStatus(
+        submitWithoutCorrectionFields(accessToken, firstSessionId, "It was fun."), "COMPLETED");
+    jdbcTemplate.update(
+        "UPDATE free_talk_message_feedback SET wrong_span = 'go'"
+            + " WHERE session_history_message_id = ?",
+        firstCorrectedMessageId);
+    completeSession(firstSessionId);
+
+    mockMvc
+        .perform(summary(firstSessionId, accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false))
+        .andExpect(jsonPath("$.data.firstSession").value(true))
+        .andExpect(jsonPath("$.data.headline.pose").value("WAVE_SMILE"))
+        .andExpect(
+            jsonPath("$.data.headline.text")
+                .value(org.hamcrest.Matchers.oneOf("첫 스몰톡, 2번이나 주고받았어요!", "첫 스몰톡 완주 축하해요!")))
+        .andExpect(jsonPath("$.data.comparison.previousSessionId").value(nullValue()))
+        .andExpect(jsonPath("$.data.comparison.current.turnCount").value(2))
+        .andExpect(jsonPath("$.data.comparison.previous.turnCount").value(0))
+        .andExpect(jsonPath("$.data.growth").value(nullValue()))
+        .andExpect(jsonPath("$.data.correctionCount").value(1));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT headline_trigger FROM free_talk_session_summary"
+                    + " WHERE free_talk_session_id = (SELECT id FROM free_talk_session"
+                    + " WHERE learning_session_id = ?)",
+                String.class,
+                firstSessionId))
+        .isEqualTo("FIRST_SESSION");
+
+    // 두 번째 스몰톡: 지난번 TENSE로 또 교정받고(반복 근거), 마지막 턴의 교정은 아직 준비 상태다.
+    // 준비 상태인 교정을 빼고 확정할 때 "맞게 썼다"는 주장하지 않으므로, 반복 카드만 상한 확정에서도 그대로 나온다.
+    long secondSessionId = startUserFirstSession(accessToken);
+    submitCorrected(
+        accessToken, secondSessionId, "I go hiking again.", FreeTalkMistakePattern.TENSE);
+    fakeAiFreeTalkClient.failNextInnerThought();
+    submitWithoutCorrectionFields(accessToken, secondSessionId, "See you.");
+    completeSession(secondSessionId);
+
+    mockMvc
+        .perform(summary(secondSessionId, accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(true));
+    // 종료 후 30초가 지나면 끝나지 않은 교정을 빼고 확정한다.
+    shiftEndedAt(secondSessionId, 31);
+    final String settled =
+        mockMvc
+            .perform(summary(secondSessionId, accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.pending").value(false))
+            .andExpect(jsonPath("$.data.firstSession").value(false))
+            .andExpect(jsonPath("$.data.comparison.previousSessionId").value(firstSessionId))
+            .andExpect(jsonPath("$.data.comparison.previous.turnCount").value(2))
+            .andExpect(jsonPath("$.data.comparison.current.turnCount").value(2))
+            .andExpect(jsonPath("$.data.growth.pattern").value("TENSE"))
+            .andExpect(jsonPath("$.data.growth.patternLabel").value("시제"))
+            .andExpect(jsonPath("$.data.growth.succeeded").value(false))
+            .andExpect(jsonPath("$.data.growth.previousSentence").value("I go hiking yesterday."))
+            .andExpect(jsonPath("$.data.growth.previousWrongSpan").value("go"))
+            .andExpect(jsonPath("$.data.growth.currentSentence").value("I go hiking again."))
+            .andExpect(jsonPath("$.data.growth.currentSpan").value(nullValue()))
+            .andExpect(jsonPath("$.data.headline.pose").value("NORMAL"))
+            .andExpect(jsonPath("$.data.correctionCount").value(1))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // 재사용 기록과 후속 질문까지 있으면 다섯 블록이 모두 채워진다(둘은 각자의 작업이 저장하는 값이라 여기서는 행을 심는다).
+    long secondUserMessageId =
+        jdbcTemplate.queryForObject(
+            "SELECT m.id FROM session_history_message m JOIN session_history h"
+                + " ON h.id = m.session_history_id WHERE h.learning_session_id = ?"
+                + " AND m.role = 'USER' ORDER BY m.message_sequence LIMIT 1",
+            Long.class,
+            secondSessionId);
+    insertExpressionReuse(secondSessionId, secondUserMessageId, 812L, "go hiking", "go hiking");
+    jdbcTemplate.update(
+        "INSERT INTO free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id,"
+            + " trigger_type, question, invite, created_at, updated_at)"
+            + " SELECT l.user_profile_id, f.id, NULL, 'HOBBY', '요즘도 등산 다녀?', '다음엔 산 얘기 하자.',"
+            + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM free_talk_session f"
+            + " JOIN learning_session l ON l.id = f.learning_session_id WHERE l.id = ?",
+        secondSessionId);
+    mockMvc
+        .perform(summary(secondSessionId, accessToken))
+        .andExpect(jsonPath("$.data.pending").value(false))
+        .andExpect(jsonPath("$.data.headline.text").isNotEmpty())
+        .andExpect(jsonPath("$.data.comparison.previous.turnCount").value(2))
+        .andExpect(jsonPath("$.data.growth.pattern").value("TENSE"))
+        .andExpect(jsonPath("$.data.reusedExpressions.pending").value(false))
+        .andExpect(jsonPath("$.data.reusedExpressions.items[0].expressionId").value(812))
+        .andExpect(
+            jsonPath("$.data.reusedExpressions.items[0].messageId").value(secondUserMessageId))
+        .andExpect(jsonPath("$.data.reusedExpressions.items[0].matchedText").value("go hiking"))
+        .andExpect(jsonPath("$.data.followUp.pending").value(false))
+        .andExpect(jsonPath("$.data.followUp.triggerType").value("HOBBY"))
+        .andExpect(jsonPath("$.data.followUp.question").value("요즘도 등산 다녀?"))
+        .andExpect(jsonPath("$.data.followUp.invite").value("다음엔 산 얘기 하자."));
+    jdbcTemplate.update("DELETE FROM free_talk_expression_reuse");
+    jdbcTemplate.update("DELETE FROM free_talk_follow_up");
+
+    // 지난 세션의 교정이 바뀌거나, 준비 상태였던 교정이 나중에 끝나 교정이 하나 늘어도 요약은 같다.
+    jdbcTemplate.update(
+        "UPDATE free_talk_message_feedback SET original_sentence = 'changed'"
+            + " WHERE session_history_message_id = ?",
+        firstCorrectedMessageId);
+    jdbcTemplate.update(
+        "UPDATE free_talk_message_feedback SET processing_status = 'COMPLETED', lease_until = NULL,"
+            + " reacted_to_partner = TRUE, original_sentence = 'See you.', better_sentence = 'See"
+            + " ya.', reason = '이유', mistake_pattern = 'TENSE' WHERE processing_status ="
+            + " 'PREPARING' AND session_history_id = (SELECT id FROM session_history WHERE"
+            + " learning_session_id = ?)",
+        secondSessionId);
+    assertThat(
+            mockMvc
+                .perform(summary(secondSessionId, accessToken))
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+        .isEqualTo(settled);
+
+    // 장기기억 작업이 준비 상태면 후속 질문은 기다리는 중이고, 상한이 지나면 실패로 확정되어 그 뒤로도 같다.
+    jdbcTemplate.update(
+        "UPDATE free_talk_session SET memory_generation_status = 'PREPARING',"
+            + " memory_generation_started_at = NULL WHERE learning_session_id = ?",
+        secondSessionId);
+    mockMvc
+        .perform(summary(secondSessionId, accessToken))
+        .andExpect(jsonPath("$.data.followUp.pending").value(true));
+    shiftEndedAt(secondSessionId, 6 * 60);
+    mockMvc
+        .perform(summary(secondSessionId, accessToken))
+        .andExpect(jsonPath("$.data.followUp.pending").value(false))
+        .andExpect(jsonPath("$.data.followUp.question").value(nullValue()));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT memory_generation_status FROM free_talk_session"
+                    + " WHERE learning_session_id = ?",
+                String.class,
+                secondSessionId))
+        .isEqualTo("FAILED");
+    mockMvc
+        .perform(summary(secondSessionId, accessToken))
+        .andExpect(jsonPath("$.data.followUp.pending").value(false));
+  }
+
+  private MockHttpServletRequestBuilder summary(long sessionId, String accessToken) {
+    return get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
+  }
+
+  // 세션이 끝난 시각을 과거로 밀어 종료 후 시간 상한을 넘긴 상태를 만든다.
+  private void shiftEndedAt(long learningSessionId, int secondsAgo) {
+    jdbcTemplate.update(
+        "UPDATE learning_session SET ended_at = ? WHERE id = ?",
+        java.sql.Timestamp.valueOf(java.time.LocalDateTime.now(clock).minusSeconds(secondsAgo)),
+        learningSessionId);
   }
 
   @DisplayName("학습자 난이도보다 높은 표현 후보를 제외한다.")
@@ -2491,10 +2726,12 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update(
         """
         UPDATE learning_session
-        SET status = 'COMPLETED', ended_at = CURRENT_TIMESTAMP,
+        SET status = 'COMPLETED', ended_at = ?,
             ended_by = 'USER', completion_reason = 'USER_ENDED'
         WHERE id = ?
         """,
+        // 요약이 종료 후 경과를 앱 Clock으로 재므로 DB 시각이 아니라 같은 Clock으로 적는다.
+        java.sql.Timestamp.valueOf(java.time.LocalDateTime.now(clock)),
         learningSessionId);
     jdbcTemplate.update(
         """
