@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 이번 세션의 턴 교정 요청에 실을 "지켜볼 실수 패턴"을 고른다.
@@ -40,12 +39,12 @@ public class FreeTalkWatchPatternService {
   /**
    * 세션의 턴 교정 요청에 실을 지켜볼 실수 패턴을 고른다.
    *
-   * <p>부가 판정의 재료라 고르다 실패해도 교정 요청을 막지 않는다. 그 턴은 지켜볼 패턴 없이 나간다.
+   * <p>부가 판정의 재료라 고르다 실패해도 교정 요청을 막지 않는다. 그 턴은 지켜볼 패턴 없이 나간다. 그래서 이 메서드는 트랜잭션을 열지 않는다. 트랜잭션을 열면 연결을
+   * 얻지 못하는 실패가 프록시에서 나 아래 catch를 지나쳐 사용자의 턴까지 실패시킨다. 읽는 두 값은 끝난 세션의 것이라 한 트랜잭션으로 묶을 이유도 없다.
    *
    * @param learningSessionId 지금 진행 중이거나 다시 교정하는 프리톡 학습 세션 ID
    * @return 많이 틀린 순의 지켜볼 패턴. 직전 스몰톡이 없거나 지켜볼 교정이 없으면 비어 있다
    */
-  @Transactional(readOnly = true)
   public List<FreeTalkMistakePattern> watchPatterns(long learningSessionId) {
     try {
       return freeTalkSessionRepository

@@ -74,8 +74,8 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
    * 같은 직전 세션을 보게 하기 위함이다. 사용자는 기준 세션에서 읽으므로 따로 받지 않는다.
    *
    * @param learningSessionId 기준이 되는 프리톡 학습 세션 ID
-   * @param pageable 페이지 요청 정보. 직전 하나만 필요하면 크기 1
-   * @return 직전 완료 프리톡 세션 페이지. 첫 프리톡이면 비어 있다
+   * @param pageable 페이지 요청 정보. 직전 하나만 필요하면 크기 1. 턴마다 부르는 조회라 개수는 세지 않는다
+   * @return 직전 완료 프리톡 세션 목록. 첫 프리톡이면 비어 있다
    */
   @Query(
       """
@@ -90,6 +90,6 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
             and learningSession.endedAt <= current.startedAt
           order by learningSession.endedAt desc, learningSession.id desc
       """)
-  Page<FreeTalkSession> findPreviousCompleted(
+  List<FreeTalkSession> findPreviousCompleted(
       @Param("learningSessionId") Long learningSessionId, Pageable pageable);
 }

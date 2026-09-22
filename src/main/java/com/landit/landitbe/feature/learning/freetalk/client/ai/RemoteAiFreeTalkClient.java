@@ -219,6 +219,15 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
     private FreeTalkTurnCorrection turnCorrection(AiFreeTalkInnerThoughtRequest request) {
       long messageId = request.submittedMessageId();
       if (reactedToPartner == null) {
+        // 교정 판정이 없는 응답에 사용례가 실려 오는 것은 계약 밖이다. 같이 버리되 흔적은 남긴다.
+        if (patternUsages != null && !patternUsages.isEmpty()) {
+          log.warn(
+              "프리톡 실수 패턴 사용례가 교정 판정 없이 실려 와 버립니다. "
+                  + "workflow=free_talk_pattern_usage_invalid reason=usages_without_judgment"
+                  + " messageId={} count={}",
+              messageId,
+              patternUsages.size());
+        }
         // 둘 다 없으면 AI 서버가 교정 판정을 돌려주지 못한 것(교정 호출의 타임아웃·일시 장애)이라 다시 해 볼 수 있다.
         return correction == null
             ? FreeTalkTurnCorrection.unavailable()
@@ -289,17 +298,23 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       if (content == null || !content.contains(sentence.strip())) {
         return "sentence_not_in_message";
       }
-      // 화면이 구절을 대소문자까지 그대로 찾아 강조하므로 대소문자를 무시하지 않는다.
-      if (!sentence.strip().contains(span.strip())) {
-        return "span_not_in_sentence";
-      }
-      return null;
+      // 화면이 구절을 대소문자까지 그대로 찾아 강조하므로 대소문자를 무시하지 않고, 자리가 하나로 정해져야 하므로 정확히 한 번 나와야 한다.
+      return spanRejection(sentence.strip(), span.strip(), "span");
     }
 
     private FreeTalkPatternUsageDraft toDraft() {
       return new FreeTalkPatternUsageDraft(
           knownPattern(pattern), sentence.strip(), span.strip(), correct);
     }
+  }
+
+  // 구절이 문장에 대소문자까지 그대로 정확히 한 번 나오지 않으면 그 이유를, 나오면 null을 돌려준다.
+  private static String spanRejection(String sentence, String span, String field) {
+    int first = sentence.indexOf(span);
+    if (first < 0) {
+      return field + "_not_in_sentence";
+    }
+    return sentence.indexOf(span, first + 1) < 0 ? null : field + "_not_unique";
   }
 
   private static FreeTalkMistakePattern knownPattern(String pattern) {
@@ -361,17 +376,21 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
           validBetterSpan);
     }
 
-    // 강조 구절은 부가 정보라 문장에 대소문자까지 그대로 들어 있지 않으면 그 구절만 버린다. AI가 구절을 주지 않은 것(null)은 정상이라 조용히 null이다.
+    // 강조 구절은 부가 정보라 문장에 대소문자까지 그대로 정확히 한 번 나오지 않으면 그 구절만 버린다. AI가 구절을 주지 않은 것(null)은 정상이라 조용히
+    // null이다.
     private static String validSpan(long messageId, String span, String sentence, String field) {
       if (span == null) {
         return null;
       }
       String stripped = span.strip();
-      if (stripped.isEmpty() || !sentence.contains(stripped)) {
+      // 문장은 DB의 원문이거나 같은 응답의 교정문이라, 문장에 없는 제어문자가 구절에 있으면 여기서 함께 걸러진다.
+      String reason =
+          stripped.isEmpty() ? field + "_blank" : spanRejection(sentence, stripped, field);
+      if (reason != null) {
         log.warn(
             "프리톡 턴 교정의 강조 구절이 계약과 달라 해당 값만 버립니다. "
-                + "workflow=free_talk_turn_correction_span reason={}_not_in_sentence messageId={}",
-            field,
+                + "workflow=free_talk_turn_correction_span reason={} messageId={}",
+            reason,
             messageId);
         return null;
       }

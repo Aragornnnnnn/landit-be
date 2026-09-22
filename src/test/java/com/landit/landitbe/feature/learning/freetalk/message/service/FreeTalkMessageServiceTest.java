@@ -282,6 +282,8 @@ class FreeTalkMessageServiceTest {
     List<AiFreeTalkMemoryContext> retrieved =
         List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
     when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(watchPatternService.watchPatterns(300L))
+        .thenReturn(List.of(FreeTalkMistakePattern.ARTICLE));
     when(submittedMessageService.reserveDecision(
             any(Long.class), any(Long.class), any(Long.class), any()))
         .thenReturn(decisionReservation());
@@ -291,7 +293,13 @@ class FreeTalkMessageServiceTest {
     service.decideExit(1L, 300L, new FreeTalkExitDecisionRequest(7L, FreeTalkExitDecision.END));
 
     verify(aiFreeTalkClient)
-        .generateInnerThought(argThat(request -> request.memoryContext().equals(retrieved)));
+        .generateInnerThought(
+            argThat(
+                request ->
+                    request.memoryContext().equals(retrieved)
+                        && request
+                            .watchPatterns()
+                            .equals(List.of(FreeTalkMistakePattern.ARTICLE))));
     verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
   }
 

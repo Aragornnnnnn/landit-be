@@ -444,6 +444,8 @@ class DatabaseSchemaIntegrationTests {
     assertColumnExists("free_talk_pattern_usage", "span");
     assertColumnExists("free_talk_pattern_usage", "correct");
     assertTableConstraintExists("free_talk_pattern_usage", "chk_free_talk_pattern_usage_text");
+    assertTableConstraintExists("free_talk_pattern_usage", "fk_free_talk_pattern_usage_history");
+    assertIndexExists("idx_free_talk_pattern_usage_history_pattern");
   }
 
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")

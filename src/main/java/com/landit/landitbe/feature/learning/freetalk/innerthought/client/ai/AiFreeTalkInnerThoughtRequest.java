@@ -23,7 +23,8 @@ import java.util.List;
  * @param memoryContext 턴 교정의 근거로만 쓰는 장기기억 문맥. 최대 3개. 비어 있으면 요청 JSON에 싣지 않는다. 이 필드를 모르는 구버전 AI
  *     서버(`extra="forbid"`)가 요청 전체를 거부해 속마음까지 실패시키는 일을, 보낼 기억이 없는 요청에서는 피하기 위함이다
  * @param watchPatterns 직전 스몰톡에서 교정받아 이번 턴에서 지켜볼 실수 패턴. 턴 교정에만 쓴다. 최대 3개이며 서로 달라야 한다. 비어 있으면 요청
- *     JSON에 싣지 않는다(이유는 memoryContext와 같다)
+ *     JSON에 싣지 않는다(이유는 memoryContext와 같다). 그래서 이 필드를 보내는 BE는 AI 서버가 먼저 배포된 뒤에 나가야 한다. 직전 스몰톡에서 교정받은
+ *     사용자가 하나라도 있으면 구버전 AI는 그 요청을 거부해 속마음·교정이 모두 실패한다
  */
 public record AiFreeTalkInnerThoughtRequest(
     Long sessionId,

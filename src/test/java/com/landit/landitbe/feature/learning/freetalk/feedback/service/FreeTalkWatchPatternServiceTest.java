@@ -20,8 +20,6 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 /** 직전 스몰톡의 교정에서 지켜볼 실수 패턴을 많이 틀린 순으로 최대 세 개 고르는지 검증한다. */
@@ -68,8 +66,7 @@ class FreeTalkWatchPatternServiceTest {
   @DisplayName("첫 스몰톡이거나 직전 스몰톡에 지켜볼 교정이 없으면 비어 있다.")
   @Test
   void returnsEmptyWithoutPreviousSessionOrWatchableCorrections() {
-    when(freeTalkSessionRepository.findPreviousCompleted(anyLong(), any()))
-        .thenReturn(Page.empty());
+    when(freeTalkSessionRepository.findPreviousCompleted(anyLong(), any())).thenReturn(List.of());
     assertThat(service.watchPatterns(LEARNING_SESSION_ID)).isEmpty();
 
     stubPreviousSession();
@@ -82,15 +79,35 @@ class FreeTalkWatchPatternServiceTest {
   void returnsEmptyWhenLookupFails() {
     when(freeTalkSessionRepository.findPreviousCompleted(anyLong(), any()))
         .thenThrow(new IllegalStateException("db down"));
-
     assertThat(service.watchPatterns(LEARNING_SESSION_ID)).isEmpty();
+
+    org.mockito.Mockito.reset(freeTalkSessionRepository);
+    stubPreviousSession();
+    when(messageFeedbackService.findBySessionHistoryId(PREVIOUS_HISTORY_ID))
+        .thenThrow(new IllegalStateException("db down"));
+    assertThat(service.watchPatterns(LEARNING_SESSION_ID)).isEmpty();
+  }
+
+  @DisplayName("연결을 얻지 못하는 실패가 catch를 지나치지 않도록 트랜잭션을 열지 않는다.")
+  @Test
+  void doesNotOpenItsOwnTransaction() throws NoSuchMethodException {
+    assertThat(
+            FreeTalkWatchPatternService.class
+                .getMethod("watchPatterns", long.class)
+                .isAnnotationPresent(
+                    org.springframework.transaction.annotation.Transactional.class))
+        .isFalse();
+    assertThat(
+            FreeTalkWatchPatternService.class.isAnnotationPresent(
+                org.springframework.transaction.annotation.Transactional.class))
+        .isFalse();
   }
 
   private void stubPreviousSession() {
     FreeTalkSession previous = mock(FreeTalkSession.class);
     when(previous.getLearningSessionId()).thenReturn(PREVIOUS_LEARNING_SESSION_ID);
     when(freeTalkSessionRepository.findPreviousCompleted(LEARNING_SESSION_ID, PageRequest.of(0, 1)))
-        .thenReturn(new PageImpl<>(List.of(previous)));
+        .thenReturn(List.of(previous));
     SessionHistorySnapshot history = mock(SessionHistorySnapshot.class);
     when(history.getId()).thenReturn(PREVIOUS_HISTORY_ID);
     when(sessionHistoryService.findByLearningSessionId(PREVIOUS_LEARNING_SESSION_ID))

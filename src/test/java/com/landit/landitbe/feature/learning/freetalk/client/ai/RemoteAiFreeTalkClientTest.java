@@ -160,6 +160,8 @@ class RemoteAiFreeTalkClientTest {
                "mistakePattern":"TENSE","wrongSpan":" go ","betterSpan":"Went"},
              "patternUsages":[
                {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"go","correct":false},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"y","correct":false},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"g\\u0000o","correct":false},
                {"pattern":"ARTICLE","sentence":"I go to a gym yesterday.","span":"a gym","correct":false},
                {"pattern":"PLURAL","sentence":"I go to a gym yesterday.","span":"gym","correct":true},
                {"pattern":"TENSE","sentence":"I went there.","span":"went","correct":true},
@@ -193,13 +195,35 @@ class RemoteAiFreeTalkClientTest {
     // 구절은 앞뒤 공백을 떼어 저장하고, 문장에 대소문자까지 그대로 없으면 그 구절만 버린다.
     assertThat(correction.sentence().wrongSpan()).isEqualTo("go");
     assertThat(correction.sentence().betterSpan()).isNull();
-    // 보낸 패턴 밖(PLURAL)·원문에 없는 문장·대소문자가 다른 구절·빈 구절·맞음 여부 없음·모르는 패턴·null 항목은 버린다.
+    // 보낸 패턴 밖(PLURAL)·원문에 없는 문장·대소문자가 다른 구절·두 번 나오는 구절(y)·문장에 없는 제어문자·빈 구절·맞음 여부 없음·모르는 패턴·null 항목은
+    // 버린다.
     assertThat(correction.patternUsages())
         .containsExactly(
             new FreeTalkPatternUsageDraft(
                 FreeTalkMistakePattern.TENSE, "I go to a gym yesterday.", "go", false),
             new FreeTalkPatternUsageDraft(
                 FreeTalkMistakePattern.ARTICLE, "I go to a gym yesterday.", "a gym", false));
+  }
+
+  @DisplayName("문장에 두 번 나오는 강조 구절은 자리를 정할 수 없어 그 구절만 버린다.")
+  @Test
+  void dropsSpanThatAppearsTwice() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"운동하네.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I go and go.","betterSentence":"I went and went.",
+               "reason":"과거형","mistakePattern":"TENSE","wrongSpan":"go","betterSpan":"went and"}},
+             "error":null}
+        """);
+
+    FreeTalkTurnCorrection.Sentence sentence =
+        remoteClient().generateInnerThought(innerThoughtRequest()).correction().sentence();
+
+    assertThat(sentence.wrongSpan()).isNull();
+    assertThat(sentence.betterSpan()).isEqualTo("went and");
   }
 
   @DisplayName("고칠 것이 없는 턴에도 사용례는 붙고, 지켜볼 패턴이 없으면 요청에 필드를 싣지 않는다.")
