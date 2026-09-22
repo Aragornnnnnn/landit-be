@@ -136,13 +136,15 @@ class ScenarioHistoryApiIntegrationTests {
   }
 
   @Test
-  @DisplayName("메시지 ID와 무관하게 실제 대화 순서로 속마음과 번역을 복원한다.")
-  void restoresOrderedMessagesAndInnerThoughts() throws Exception {
+  @DisplayName("메시지 ID와 무관하게 실제 대화 순서로 속마음·번역·회차별 피드백을 연결한다.")
+  void restoresOrderedMessagesAndStoredFeedback() throws Exception {
     session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
     session(5550102L, USER, SCENARIO, "COMPLETED", START.plusMinutes(2));
     message(5550203L, 5550101L, 1, "AI", "Old question?");
     message(5550201L, 5550101L, 2, "USER", "My answer.");
     message(5550202L, 5550101L, 3, "AI", "Goodbye.");
+    summary(5550101L, "COMPLETED");
+    feedback(5550101L, 5550201L);
     history(USER, SCENARIO)
         .andExpect(jsonPath("$.data.sessions[0].feedback").value(nullValue()))
         .andExpect(jsonPath("$.data.sessions[1].messages", hasSize(3)))
@@ -156,7 +158,70 @@ class ScenarioHistoryApiIntegrationTests {
         .andExpect(
             jsonPath("$.data.sessions[1].messages[1].innerThoughtProcessingStatus")
                 .value("COMPLETED"))
-        .andExpect(jsonPath("$.data.sessions[1].messages[2].content").value("Goodbye."));
+        .andExpect(jsonPath("$.data.sessions[1].messages[2].content").value("Goodbye."))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.sessionId").value(5550101L))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.nativeScore").value(80))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.starRating").value(2.5))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.summaryMessage").value("저장된 요약"))
+        .andExpect(
+            jsonPath("$.data.sessions[1].feedback.messageFeedbacks[0].messageId").value(5550201L))
+        .andExpect(
+            jsonPath("$.data.sessions[1].feedback.messageFeedbacks[0].correctionExpression")
+                .value("Better answer."))
+        .andExpect(
+            jsonPath("$.data.sessions[1].feedback.messageFeedbacks[0].evaluationContext.content")
+                .value("Old question?"))
+        .andExpect(
+            jsonPath(
+                    "$.data.sessions[1].feedback.messageFeedbacks[0]"
+                        + ".evaluationContext.translatedContent")
+                .value("저장된 번역"));
+  }
+
+  @Test
+  @DisplayName("사용자 선톡은 시작 안내 스냅샷을 복원하고 미완료 피드백은 null로 반환한다.")
+  void restoresUserFirstSnapshotAndDoesNotExposeUnfinishedSummary() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    message(5550201L, 5550101L, 1, "USER", "Hello.");
+    summary(5550101L, "COMPLETED");
+    feedback(5550101L, 5550201L);
+    session(5550102L, USER, SCENARIO, "COMPLETED", START.plusMinutes(2));
+    summary(5550102L, "PREPARING");
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.sessions[0].feedback").value(nullValue()))
+        .andExpect(
+            jsonPath("$.data.sessions[1].feedback.messageFeedbacks[0].evaluationContext.type")
+                .value("SCENARIO_OPENING_INSTRUCTION"))
+        .andExpect(
+            jsonPath("$.data.sessions[1].feedback.messageFeedbacks[0].evaluationContext.content")
+                .value("당시의 시작 안내"));
+  }
+
+  @Test
+  @DisplayName("무료 첫 완료 회차만 상세 피드백을 공개하고 재완료 회차는 대화·요약을 유지하며 잠근다.")
+  void appliesExistingFeedbackPolicyPerRound() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    session(5550102L, USER, SCENARIO, "COMPLETED", START.plusMinutes(2));
+    for (long id : new long[] {5550101L, 5550102L}) {
+      message(id, id, 1, "USER", "Hello.");
+      summary(id, "COMPLETED");
+      feedback(id, id);
+    }
+    jdbc.update(
+        """
+        INSERT INTO free_scenario_reservation (user_id, session_id, scenario_id, reserved_at)
+        VALUES (?, 5550101, ?, ?)
+        """,
+        USER,
+        SCENARIO,
+        START);
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.sessions[0].feedback.detailFeedbackLocked").value(true))
+        .andExpect(jsonPath("$.data.sessions[0].feedback.messageFeedbacks", hasSize(0)))
+        .andExpect(jsonPath("$.data.sessions[0].feedback.summaryMessage").value("저장된 요약"))
+        .andExpect(jsonPath("$.data.sessions[0].messages", hasSize(1)))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.detailFeedbackLocked").value(false))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.messageFeedbacks", hasSize(1)));
   }
 
   private ResultActions history(long userId, long scenarioId) throws Exception {
@@ -218,5 +283,30 @@ class ScenarioHistoryApiIntegrationTests {
         role.equals("USER") ? "잘 전달됐네." : null,
         role.equals("USER") ? "GOOD" : null,
         role.equals("USER") ? "COMPLETED" : null);
+  }
+
+  private void summary(long historyId, String processingStatus) {
+    jdbc.update(
+        """
+        INSERT INTO session_history_summary_feedback (id, session_history_id, processing_status,
+            native_score, star_rating, total_message_count, native_like_message_count,
+            highlight_message, summary_message, created_at, updated_at)
+        VALUES (?, ?, ?, 80, 2.5, 1, 1, '저장된 강조', '저장된 요약', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        historyId,
+        historyId,
+        processingStatus);
+  }
+
+  private void feedback(long summaryId, long messageId) {
+    jdbc.update(
+        """
+        INSERT INTO session_history_message_feedback (session_history_summary_feedback_id,
+            session_history_message_id, target_locale, base_locale, processing_status,
+            feedback_type, correction_expression, correction_reason, created_at, updated_at)
+        VALUES (?, ?, 'EN', 'KR', 'COMPLETED', 'NEEDS_IMPROVEMENT', 'Better answer.', '저장된 이유', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        summaryId,
+        messageId);
   }
 }
