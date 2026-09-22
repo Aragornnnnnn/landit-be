@@ -428,10 +428,10 @@ class DatabaseSchemaIntegrationTests {
         "free_talk_expression_reuse", "chk_free_talk_expression_reuse_text");
   }
 
-  /** V120 migration은 교정의 강조 구절 컬럼과 실수 패턴 사용례 테이블을 추가한다. */
-  @DisplayName("V120 migration은 교정의 강조 구절 컬럼과 실수 패턴 사용례 테이블을 추가한다.")
+  /** V123 migration은 교정의 강조 구절 컬럼과 실수 패턴 사용례 테이블을 추가한다. */
+  @DisplayName("V123 migration은 교정의 강조 구절 컬럼과 실수 패턴 사용례 테이블을 추가한다.")
   @Test
-  void v120AddsCorrectionSpansAndPatternUsageTable() {
+  void v123AddsCorrectionSpansAndPatternUsageTable() {
     assertColumnExists("free_talk_message_feedback", "wrong_span");
     assertColumnExists("free_talk_message_feedback", "better_span");
     assertTableConstraintExists(
@@ -1681,10 +1681,10 @@ class DatabaseSchemaIntegrationTests {
     }
   }
 
-  /** 구절은 교정 문장이 있을 때만, 사용례는 비어 있지 않은 문장·구절로만 저장되고 발화가 지워지면 함께 지워지도록 V120을 적용한다. */
+  /** 구절은 교정 문장이 있을 때만, 사용례는 비어 있지 않은 문장·구절로만 저장되고 발화가 지워지면 함께 지워지도록 V123을 적용한다. */
   @DisplayName("구절은 교정 문장이 있을 때만, 사용례는 비어 있지 않은 문장·구절로만 저장되고 발화가 지워지면 함께 지워진다.")
   @Test
-  void v120RejectsSpansWithoutCorrectionAndBlankUsagesAndDeletesUsagesWithMessage() {
+  void v123RejectsSpansWithoutCorrectionAndBlankUsagesAndDeletesUsagesWithMessage() {
     SingleConnectionDataSource dataSource =
         new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
     try {
