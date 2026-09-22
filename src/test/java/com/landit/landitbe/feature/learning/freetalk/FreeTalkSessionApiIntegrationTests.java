@@ -1611,7 +1611,7 @@ class FreeTalkSessionApiIntegrationTests {
                     learnedExpressionId,
                     "make up for",
                     "만회하다",
-                    "9월 10일 시나리오 「주말 계획」",
+                    "9월 10일 - 시나리오",
                     reusedMessageId,
                     "I made up for it today!",
                     "made up for")));

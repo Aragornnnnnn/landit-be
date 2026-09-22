@@ -45,7 +45,7 @@ class FreeTalkExpressionReuseQueryServiceTest {
         .containsEntry(5506L, new FreeTalkReusedExpression(813L, "up to you", "Up to you"));
   }
 
-  @DisplayName("요약 카드는 표현마다 처음 쓴 한 번만, 배운 날과 출처(시나리오·스몰톡)와 출처 제목을 붙여 돌려준다.")
+  @DisplayName("요약 카드는 표현마다 처음 쓴 한 번만, 배운 날과 출처(시나리오·스몰톡)를 붙여 돌려주고 출처 제목은 라벨에 넣지 않는다.")
   @Test
   void summarizesEachExpressionOnceWithSourceLabel() {
     stubReuses(
@@ -70,20 +70,14 @@ class FreeTalkExpressionReuseQueryServiceTest {
                 812L,
                 "grab a coffee",
                 "뜻 812",
-                "9월 10일 시나리오 「카페」",
+                "9월 10일 - 시나리오",
                 5504L,
                 "문장 grabbed a coffee",
                 "grabbed a coffee"),
             new FreeTalkExpressionReuseSummary.Item(
-                813L, "up to you", "뜻 813", "9월 10일 시나리오", 5506L, "문장 up to you", "up to you"),
+                813L, "up to you", "뜻 813", "9월 10일 - 시나리오", 5506L, "문장 up to you", "up to you"),
             new FreeTalkExpressionReuseSummary.Item(
-                814L,
-                "hit it off",
-                "뜻 814",
-                "9월 10일 스몰톡 「주말 계획」",
-                5507L,
-                "문장 hit it off",
-                "hit it off"));
+                814L, "hit it off", "뜻 814", "9월 10일 - 스몰톡", 5507L, "문장 hit it off", "hit it off"));
   }
 
   @DisplayName("표현 작업이 아직 끝나지 않았고 기록도 없으면 기다리는 중으로 알린다.")

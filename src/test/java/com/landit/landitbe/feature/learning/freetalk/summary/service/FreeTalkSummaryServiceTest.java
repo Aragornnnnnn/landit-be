@@ -435,7 +435,7 @@ class FreeTalkSummaryServiceTest {
                         812L,
                         "grab a coffee",
                         "커피 한잔하다",
-                        "9월 10일 스몰톡 「주말 계획」",
+                        "9월 10일 - 스몰톡",
                         5504L,
                         "Let's grab a coffee.",
                         "grab a coffee"))));
@@ -454,7 +454,7 @@ class FreeTalkSummaryServiceTest {
                 812L,
                 "grab a coffee",
                 "커피 한잔하다",
-                "9월 10일 스몰톡 「주말 계획」",
+                "9월 10일 - 스몰톡",
                 5504L,
                 "Let's grab a coffee.",
                 "grab a coffee"));
