@@ -18,10 +18,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
+import org.hibernate.annotations.DynamicUpdate;
 
 /** 서비스 사용자 프로필과 학습 기본 설정을 저장한다. */
 @Getter
 @Entity
+// 다른 트랜잭션이 부여한 할인 기록을 오래된 프로필 값으로 덮어쓰지 않는다.
+@DynamicUpdate
 @Table(name = "user_profile")
 public class UserProfile extends BaseTimeEntity {
 
@@ -86,6 +89,12 @@ public class UserProfile extends BaseTimeEntity {
 
   @Column(name = "subscription_expires_at")
   private LocalDateTime subscriptionExpiresAt;
+
+  @Column(name = "discount_offer_expires_at")
+  private LocalDateTime discountOfferExpiresAt;
+
+  @Column(name = "discount_offer_new_user")
+  private Boolean discountOfferNewUser;
 
   @Column(name = "subscription_event_at")
   private LocalDateTime subscriptionEventAt;
@@ -263,6 +272,19 @@ public class UserProfile extends BaseTimeEntity {
    */
   public boolean isPremium() {
     return subscriptionStatus.isPremium();
+  }
+
+  /**
+   * 프로필 잠금 아래 최초 할인 기회의 만료 시각과 혜택 구분을 기록한다.
+   *
+   * @param expiresAt 할인 만료 시각
+   * @param newUser 부여 당시 신규 사용자 혜택 여부
+   */
+  public void grantDiscountOffer(LocalDateTime expiresAt, boolean newUser) {
+    if (discountOfferExpiresAt == null) {
+      discountOfferExpiresAt = expiresAt;
+      discountOfferNewUser = newUser;
+    }
   }
 
   /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
