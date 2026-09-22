@@ -93,7 +93,9 @@ public class FreeTalkCorrectionRequestService {
                     candidate.getTurnNumber(),
                     candidate.getRole().name(),
                     candidate.getContent(),
-                    candidate.getTranslatedContent()))
+                    candidate.getTranslatedContent(),
+                    null,
+                    candidate.getMessageSequence()))
         .toList();
   }
 

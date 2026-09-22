@@ -100,8 +100,8 @@ class FreeTalkCorrectionRequestServiceTest {
     // 그 뒤에 이어진 AI 답과 다음 발화는 첫 시도 때 없던 입력이라 싣지 않는다. 마지막은 교정 대상 발화여야 AI 서버가 받는다.
     assertThat(request.conversationHistory())
         .containsExactly(
-            new AiConversationHistoryMessage(55018L, 1, "AI", "Hi!", null),
-            new AiConversationHistoryMessage(55019L, 1, "USER", "I go to a gym.", null));
+            new AiConversationHistoryMessage(55018L, 1, "AI", "Hi!", null, null, 1),
+            new AiConversationHistoryMessage(55019L, 1, "USER", "I go to a gym.", null, null, 2));
   }
 
   @DisplayName("주제로 시작한 세션은 주제의 이름과 설명을 함께 싣는다.")
