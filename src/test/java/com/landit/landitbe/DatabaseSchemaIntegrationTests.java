@@ -407,6 +407,28 @@ class DatabaseSchemaIntegrationTests {
         "free_talk_message_feedback", "chk_free_talk_message_feedback_attempts");
   }
 
+  /** V118 migration은 스몰톡에서 배운 표현을 다시 쓴 기록 테이블을 추가한다. */
+  @DisplayName("V118 migration은 스몰톡에서 배운 표현을 다시 쓴 기록 테이블을 추가한다.")
+  @Test
+  void v118AddsFreeTalkExpressionReuseTable() {
+    assertTableExists("free_talk_expression_reuse");
+    assertColumnExists("free_talk_expression_reuse", "session_history_message_id");
+    assertColumnExists("free_talk_expression_reuse", "writing_expression_id");
+    assertColumnExists("free_talk_expression_reuse", "expression_text");
+    assertColumnExists("free_talk_expression_reuse", "expression_meaning");
+    assertColumnExists("free_talk_expression_reuse", "source_type");
+    assertColumnExists("free_talk_expression_reuse", "source_title");
+    assertColumnExists("free_talk_expression_reuse", "source_learned_on");
+    assertColumnExists("free_talk_expression_reuse", "matched_text");
+    assertColumnExists("free_talk_expression_reuse", "quoted_sentence");
+    assertTableConstraintExists(
+        "free_talk_expression_reuse", "uk_free_talk_expression_reuse_message_expression");
+    assertTableConstraintExists(
+        "free_talk_expression_reuse", "chk_free_talk_expression_reuse_source");
+    assertTableConstraintExists(
+        "free_talk_expression_reuse", "chk_free_talk_expression_reuse_text");
+  }
+
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
   @Test
   void v20AddsInnerThoughtProcessingStatusToSessionHistoryMessage() {
@@ -1590,6 +1612,123 @@ class DatabaseSchemaIntegrationTests {
     } finally {
       dataSource.destroy();
     }
+  }
+
+  /** 재사용 기록은 한 발화에 같은 표현을 한 번만, 정해진 출처와 비어 있지 않은 문구로만 저장되도록 V118을 적용한다. */
+  @DisplayName("재사용 기록은 한 발화에 같은 표현을 한 번만, 정해진 출처와 비어 있지 않은 문구로만 저장되고 발화나 세션이 지워지면 함께 지워진다.")
+  @Test
+  void v118RejectsInvalidExpressionReusesAndDeletesThemWithMessageOrSession() {
+    // V112 백필 검증과 같은 이유로 migration과 검증이 한 연결을 같이 쓴다.
+    SingleConnectionDataSource dataSource =
+        new SingleConnectionDataSource(migrationTestDatabaseUrl(), "sa", "", true);
+    try {
+      migrate(dataSource, null);
+      JdbcTemplate migrationJdbcTemplate = new JdbcTemplate(dataSource);
+      // 제약만 보므로 사용자와 학습 세션 없이 프리톡 세션과 발화만 심는다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+      for (long sessionId : new long[] {31L, 32L}) {
+        migrationJdbcTemplate.update(
+            "INSERT INTO free_talk_session (id, learning_session_id, start_mode, character_id,"
+                + " conversation_status, accumulated_speaking_duration_ms, created_at, updated_at)"
+                + " VALUES (?, ?, 'USER_FIRST', 'chloe', 'COMPLETED', 0, CURRENT_TIMESTAMP,"
+                + " CURRENT_TIMESTAMP)",
+            sessionId,
+            sessionId + 300L);
+      }
+      insertLegacySessionHistory(migrationJdbcTemplate, 1L, "FREE_TALK");
+      insertLegacyMessage(migrationJdbcTemplate, 11L, 1L, 1, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 12L, 1L, 3, "USER");
+      insertLegacyMessage(migrationJdbcTemplate, 13L, 1L, 5, "USER");
+
+      assertThat(insertReuse(migrationJdbcTemplate, 31L, 11L, 812L, "SCENARIO", "grab a coffee"))
+          .isEqualTo(1);
+      // 같은 발화의 다른 표현, 다른 발화의 같은 표현은 저장된다. 출처 제목은 없어도 된다.
+      assertThat(insertReuse(migrationJdbcTemplate, 31L, 11L, 813L, "FREE_TALK", "work out"))
+          .isEqualTo(1);
+      assertThat(insertReuse(migrationJdbcTemplate, 32L, 12L, 812L, "SCENARIO", "grab a coffee"))
+          .isEqualTo(1);
+      assertReuseRejected(
+          migrationJdbcTemplate,
+          31L,
+          11L,
+          812L,
+          "SCENARIO",
+          "grab a coffee",
+          "uk_free_talk_expression_reuse_message_expression");
+      assertReuseRejected(
+          migrationJdbcTemplate,
+          32L,
+          13L,
+          812L,
+          "REVIEW",
+          "grab a coffee",
+          "chk_free_talk_expression_reuse_source");
+      assertReuseRejected(
+          migrationJdbcTemplate,
+          32L,
+          13L,
+          812L,
+          "SCENARIO",
+          "   ",
+          "chk_free_talk_expression_reuse_text");
+
+      // 재사용 기록은 발화와 세션의 부속물이다. 삭제 전파는 참조 무결성을 켜야 동작한다.
+      migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+      migrationJdbcTemplate.update("DELETE FROM session_history_message WHERE id = 11");
+      assertThat(
+              migrationJdbcTemplate.queryForList(
+                  "SELECT session_history_message_id FROM free_talk_expression_reuse", Long.class))
+          .containsExactly(12L);
+      migrationJdbcTemplate.update("DELETE FROM free_talk_session WHERE id = 32");
+      assertThat(
+              migrationJdbcTemplate.queryForObject(
+                  "SELECT count(*) FROM free_talk_expression_reuse", Integer.class))
+          .isZero();
+    } finally {
+      dataSource.destroy();
+    }
+  }
+
+  private int insertReuse(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      long messageId,
+      long expressionId,
+      String sourceType,
+      String matchedText) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_expression_reuse (user_profile_id, free_talk_session_id,"
+            + " session_history_message_id, writing_expression_id, expression_text,"
+            + " expression_meaning, source_type, source_title, source_learned_on, matched_text,"
+            + " quoted_sentence, created_at, updated_at)"
+            + " VALUES (1, ?, ?, ?, 'grab a coffee', '커피 한잔하다', ?, NULL, DATE '2026-09-10', ?,"
+            + " 'Let''s grab a coffee after work.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        sessionId,
+        messageId,
+        expressionId,
+        sourceType,
+        matchedText);
+  }
+
+  private void assertReuseRejected(
+      JdbcTemplate migrationJdbcTemplate,
+      long sessionId,
+      long messageId,
+      long expressionId,
+      String sourceType,
+      String matchedText,
+      String constraintName) {
+    assertThatThrownBy(
+            () ->
+                insertReuse(
+                    migrationJdbcTemplate,
+                    sessionId,
+                    messageId,
+                    expressionId,
+                    sourceType,
+                    matchedText))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining(constraintName);
   }
 
   private int insertFollowUp(

@@ -8,8 +8,11 @@ import com.landit.landitbe.feature.content.scenario.repository.ScenarioListQuery
 import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioDetail;
 import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioSummary;
 import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioThumbnail;
+import com.landit.landitbe.feature.content.scenario.schedule.dto.ScenarioTitle;
 import com.landit.landitbe.feature.content.scenario.schedule.repository.DailyScenarioQueryRepository;
 import com.landit.landitbe.feature.content.scenario.schedule.repository.ScenarioSequenceQueryRepository;
+import com.landit.landitbe.shared.domain.Locale;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +74,23 @@ public class ScenarioCatalogService {
   @Transactional(readOnly = true)
   public List<ScenarioThumbnail> findThumbnails(List<Long> scenarioIds) {
     return sequenceRepository.findThumbnailsByScenarioIds(scenarioIds);
+  }
+
+  /**
+   * 지난 기록에 출처로 남길 시나리오 제목을 일괄 조회한다.
+   *
+   * @param scenarioIds 시나리오 ID 목록
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @return ID별 제목 목록. 그 언어 조합이 없는 시나리오는 빠진다
+   */
+  @Transactional(readOnly = true)
+  public List<ScenarioTitle> findTitles(
+      Collection<Long> scenarioIds, Locale targetLocale, Locale baseLocale) {
+    if (scenarioIds.isEmpty()) {
+      return List.of();
+    }
+    return sequenceRepository.findTitlesByScenarioIds(scenarioIds, targetLocale, baseLocale);
   }
 
   /**

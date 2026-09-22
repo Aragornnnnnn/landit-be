@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
@@ -32,6 +33,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -377,7 +379,8 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteExpressionRecommendationsResponse(
-      List<AiFreeTalkExpressionRecommendation> recommendations) {
+      List<AiFreeTalkExpressionRecommendation> recommendations,
+      List<AiFreeTalkUsedExpression> usedExpressions) {
 
     // 원격 표현 추천 응답을 검증해 애플리케이션 결과로 변환한다.
     private AiFreeTalkExpressionRecommendationsResult toResult(
@@ -389,7 +392,17 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
           || hasInvalidRecommendation(recommendations, request.existingExpressions())) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiFreeTalkExpressionRecommendationsResult(recommendations);
+      return new AiFreeTalkExpressionRecommendationsResult(
+          recommendations, presentUsedExpressions());
+    }
+
+    // 다시 쓴 표현은 부가 결과라 없거나 빈 항목이 섞여도 추천을 실패시키지 않는다. 내용 검증은 저장하는 쪽에서 한다.
+    // 목록이 아닌 값처럼 형식 자체가 깨진 응답은 추천과 한 본문이라 함께 거부된다. AI 서버의 응답 모델이 형식을 보장한다.
+    private List<AiFreeTalkUsedExpression> presentUsedExpressions() {
+      if (usedExpressions == null) {
+        return List.of();
+      }
+      return usedExpressions.stream().filter(Objects::nonNull).toList();
     }
   }
 

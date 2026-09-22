@@ -11,6 +11,7 @@ import com.landit.landitbe.shared.domain.ActiveStatus;
 import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -84,6 +85,27 @@ public class ExpressionContentService {
   @Transactional(readOnly = true)
   public List<ExpressionText> findExpressionTexts(List<Long> expressionIds) {
     return writingExpressionRepository.findAllById(expressionIds).stream()
+        .map(ExpressionText::from)
+        .toList();
+  }
+
+  /**
+   * 지금 활성 상태이고 학습 언어·기준 언어가 맞는 표현의 본문만 일괄 조회한다. 조건에 맞지 않는 ID는 결과에서 제외한다.
+   *
+   * @param expressionIds 표현 ID 목록
+   * @param targetLocale 학습 언어 locale
+   * @param baseLocale 기준 언어 locale
+   * @return 표현 본문 목록 (순서 보장 없음)
+   */
+  @Transactional(readOnly = true)
+  public List<ExpressionText> findActiveExpressionTexts(
+      Collection<Long> expressionIds, Locale targetLocale, Locale baseLocale) {
+    if (expressionIds.isEmpty()) {
+      return List.of();
+    }
+    return writingExpressionRepository
+        .findByIdsAndLocales(expressionIds, targetLocale, baseLocale, ActiveStatus.ACTIVE)
+        .stream()
         .map(ExpressionText::from)
         .toList();
   }

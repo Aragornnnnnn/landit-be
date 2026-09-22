@@ -226,7 +226,10 @@ public interface FreeTalkControllerDocs {
               + " null이다. correction.memoryTag는 장기기억을 근거로 한 교정에만 \"9/13 스몰톡에서 말한 헬스장\""
               + " 형식(한국어 고정)으로 내려주고, 라벨을 만들지 못했으면 \"9/13 스몰톡에서 말한 내용\"으로 채운다."
               + " 기억을 근거로 쓰지 않은 교정은 null이다. 태그는 교정과 함께 저장한 값이라 그 기억이 나중에 바뀌어도"
-              + " 달라지지 않는다. reusedExpression은 아직 제공하지 않아 항상 null이다. 교정은"
+              + " 달라지지 않는다. reusedExpression은 사용자가 이전에 학습을 마친 표현을 그 메시지에서 다시 썼을 때만"
+              + " 내려준다. matchedText는 content 안에 대소문자까지 그대로 들어 있는 구절이라 그 위치에 밑줄을 그으면"
+              + " 된다. 한 메시지에서 여러 표현을 썼어도 하나만 내려주고, 다시 쓴 표현이 없거나 AI 메시지면 null이다. 세션 종료 후"
+              + " expressionGenerationStatus가 PREPARING인 동안은 아직 판정 전이라 null일 수 있다. 교정은"
               + " 진행 중인 대화의 응답에는 포함되지 않는다. 구독이 만료된 사용자도 본인이 완료한 세션은 조회할 수 있다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
