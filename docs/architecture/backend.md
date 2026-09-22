@@ -78,6 +78,7 @@ com.landit.landitbe
 │   │   │   ├── progress    # 시나리오 진행·완료 이력
 │   │   │   ├── level       # 사용자별 콘텐츠 수준 결정 / 과거 수준 조회
 │   │   │   ├── session     # start / message / innerthought / admin
+│   │   │   ├── history     # 전체 완료 회차 대화·피드백 조회
 │   │   │   ├── feedback    # 최종 피드백
 │   │   │   └── assessment  # 수준 평가
 │   │   ├── freetalk         # start / message / topic / usage / innerthought
@@ -291,6 +292,7 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | content의 시나리오/표현 조회 Repository | 사용자 언어·학습 진행을 함께 조회하는 JPQL/SQL. 기존 정렬·필터와 일괄 조회를 유지합니다. |
 | learning.scenario.level의 ScenarioLearningHistoryQueryRepository | 최초 완료한 세션·수준 평가를 읽어 과거 복습 콘텐츠 수준을 보존합니다. 기존 SQL을 유지합니다. |
 | learning.scenario.session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 시나리오 실행 업무가 소유합니다. |
+| learning.scenario.history의 ScenarioHistoryQueryRepository | 로그인 사용자의 완료 회차를 조회하기 위해 세션·대화 이력·시나리오 언어 테이블을 JOIN합니다. 메시지는 conversation의 공개 Service로 일괄 조회합니다. |
 | learning.scenario.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 대화/콘텐츠 테이블을 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
 | learning.review의 ExpressionReviewRepository | 학습 완료 이력·활성 콘텐츠·사용자 언어를 읽어 복습 후보를 선정합니다. 복습 스냅샷·진행·제출 테이블만 씁니다. |
