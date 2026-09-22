@@ -29,6 +29,7 @@ import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkWatchPatternService;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
@@ -77,6 +78,8 @@ class FreeTalkMessageServiceTest {
       mock(FreeTalkMemoryGenerationDispatchService.class);
   private final FreeTalkMemoryRetrievalService memoryRetrievalService =
       mock(FreeTalkMemoryRetrievalService.class);
+  private final FreeTalkWatchPatternService watchPatternService =
+      mock(FreeTalkWatchPatternService.class);
   private final TaskExecutor directExecutor = Runnable::run;
   private final FreeTalkMessageService service =
       new FreeTalkMessageService(
@@ -87,7 +90,8 @@ class FreeTalkMessageServiceTest {
           directExecutor,
           expressionGenerationDispatcher,
           memoryGenerationDispatchService,
-          memoryRetrievalService);
+          memoryRetrievalService,
+          watchPatternService);
 
   @DisplayName("사용자의 첫 발화에서만 기억을 조회하고 응답에서 사용한 기억을 기록한다.")
   @Test
@@ -217,10 +221,16 @@ class FreeTalkMessageServiceTest {
             new AiFreeTalkInnerThoughtResult(
                 "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true)));
 
+    when(watchPatternService.watchPatterns(300L)).thenReturn(List.of(FreeTalkMistakePattern.TENSE));
+
     service.submit(1L, 300L, request());
 
     verify(aiFreeTalkClient)
-        .generateInnerThought(argThat(request -> request.memoryContext().equals(retrieved)));
+        .generateInnerThought(
+            argThat(
+                request ->
+                    request.memoryContext().equals(retrieved)
+                        && request.watchPatterns().equals(List.of(FreeTalkMistakePattern.TENSE))));
   }
 
   @DisplayName("속마음 요청의 기억은 이 턴의 기억 검색보다 먼저 읽는다. 사용자가 먼저 말을 건 세션의 첫 턴은 빈 문맥으로 나간다.")
@@ -475,7 +485,8 @@ class FreeTalkMessageServiceTest {
         taskExecutor,
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,
-        memoryRetrievalService);
+        memoryRetrievalService,
+        watchPatternService);
   }
 
   private FreeTalkMessageReservation reservation() {

@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnaps
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.conversation.history.service.SessionHistoryService;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
@@ -46,13 +47,16 @@ class FreeTalkCorrectionRequestServiceTest {
       mock(FreeTalkTopicRepository.class);
   private final FreeTalkMemoryRetrievalService memoryRetrievalService =
       mock(FreeTalkMemoryRetrievalService.class);
+  private final FreeTalkWatchPatternService watchPatternService =
+      mock(FreeTalkWatchPatternService.class);
   private final FreeTalkCorrectionRequestService service =
       new FreeTalkCorrectionRequestService(
           conversationMessageService,
           sessionHistoryService,
           freeTalkSessionRepository,
           freeTalkTopicRepository,
-          memoryRetrievalService);
+          memoryRetrievalService,
+          watchPatternService);
 
   private final FreeTalkSession session = mock(FreeTalkSession.class);
   private final SessionHistoryMessageSnapshot opening = message(55018L, 1, 1, "AI", "Hi!");
@@ -71,6 +75,7 @@ class FreeTalkCorrectionRequestServiceTest {
     when(history.getBaseLocale()).thenReturn(Locale.KR);
     when(sessionHistoryService.findHistory(HISTORY_ID)).thenReturn(Optional.of(history));
     when(session.getId()).thenReturn(FREE_TALK_SESSION_ID);
+    when(session.getLearningSessionId()).thenReturn(LEARNING_SESSION_ID);
     when(session.getCharacterId()).thenReturn("chloe");
     when(session.getTitle()).thenReturn("헬스장 이야기");
     when(freeTalkSessionRepository.findByLearningSessionId(LEARNING_SESSION_ID))
@@ -87,6 +92,8 @@ class FreeTalkCorrectionRequestServiceTest {
         List.of(new AiFreeTalkMemoryContext(9012L, ConversationMemoryType.PROFILE, "헬스장에 다닌다."));
     when(memoryRetrievalService.retrievedContexts(FREE_TALK_SESSION_ID, USER_ID))
         .thenReturn(memories);
+    when(watchPatternService.watchPatterns(LEARNING_SESSION_ID))
+        .thenReturn(List.of(FreeTalkMistakePattern.ARTICLE));
 
     AiFreeTalkInnerThoughtRequest request = service.rebuild(55019L).orElseThrow();
 
@@ -97,6 +104,7 @@ class FreeTalkCorrectionRequestServiceTest {
     assertThat(request.targetLocale()).isEqualTo("EN");
     assertThat(request.baseLocale()).isEqualTo("KR");
     assertThat(request.memoryContext()).isEqualTo(memories);
+    assertThat(request.watchPatterns()).containsExactly(FreeTalkMistakePattern.ARTICLE);
     // 그 뒤에 이어진 AI 답과 다음 발화는 첫 시도 때 없던 입력이라 싣지 않는다. 마지막은 교정 대상 발화여야 AI 서버가 받는다.
     assertThat(request.conversationHistory())
         .containsExactly(

@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkWatchPatternService;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
@@ -50,6 +51,7 @@ public class FreeTalkMessageService {
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService;
   private final FreeTalkMemoryRetrievalService memoryRetrievalService;
+  private final FreeTalkWatchPatternService watchPatternService;
 
   FreeTalkMessageService(
       FreeTalkSubmittedMessageService submittedMessageService,
@@ -59,7 +61,8 @@ public class FreeTalkMessageService {
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
-      FreeTalkMemoryRetrievalService memoryRetrievalService) {
+      FreeTalkMemoryRetrievalService memoryRetrievalService,
+      FreeTalkWatchPatternService watchPatternService) {
     this.submittedMessageService = submittedMessageService;
     this.replayService = replayService;
     this.aiFreeTalkClient = aiFreeTalkClient;
@@ -68,6 +71,7 @@ public class FreeTalkMessageService {
     this.expressionGenerationDispatcher = expressionGenerationDispatcher;
     this.memoryGenerationDispatchService = memoryGenerationDispatchService;
     this.memoryRetrievalService = memoryRetrievalService;
+    this.watchPatternService = watchPatternService;
   }
 
   /**
@@ -339,7 +343,8 @@ public class FreeTalkMessageService {
         reservation.baseLocale(),
         reservation.topic(),
         reservation.history(),
-        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()));
+        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()),
+        watchPatternService.watchPatterns(reservation.learningSessionId()));
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
@@ -353,7 +358,8 @@ public class FreeTalkMessageService {
         reservation.baseLocale(),
         reservation.topic(),
         reservation.history(),
-        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()));
+        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()),
+        watchPatternService.watchPatterns(reservation.learningSessionId()));
   }
 
   // 속마음 호출은 턴 처리와 병렬로 먼저 출발하므로, 이 턴에서 검색할 기억은 아직 없다.

@@ -38,6 +38,7 @@ public class FreeTalkCorrectionRequestService {
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final FreeTalkMemoryRetrievalService memoryRetrievalService;
+  private final FreeTalkWatchPatternService watchPatternService;
 
   /**
    * 교정 대상 발화의 AI 요청을 다시 조립한다.
@@ -79,7 +80,9 @@ public class FreeTalkCorrectionRequestService {
         history.getBaseLocale().name(),
         topic(session),
         historyThrough(message),
-        memoryRetrievalService.retrievedContexts(session.getId(), history.getUserProfileId()));
+        memoryRetrievalService.retrievedContexts(session.getId(), history.getUserProfileId()),
+        // 직전 세션은 끝난 세션이라 첫 시도와 같은 값이 나온다.
+        watchPatternService.watchPatterns(session.getLearningSessionId()));
   }
 
   // AI 서버는 제출한 발화가 이력의 마지막이어야 받는다. 그 뒤에 이어진 대화는 첫 시도 때 없던 입력이라 넣지 않는다.

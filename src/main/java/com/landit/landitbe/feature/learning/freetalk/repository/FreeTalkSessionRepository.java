@@ -66,4 +66,30 @@ public interface FreeTalkSessionRepository extends JpaRepository<FreeTalkSession
       """)
   Page<FreeTalkSession> findCompletedByUserProfileId(
       @Param("userProfileId") Long userProfileId, Pageable pageable);
+
+  /**
+   * 어느 세션의 직전 완료 프리톡을 조회한다. 같은 사용자의 완료 프리톡 중 그 세션이 시작하기 전에 끝난 것을 완료 시각 내림차순으로 돌려준다.
+   *
+   * <p>기준 세션이 진행 중이든 끝났든 같은 결과가 나오도록 "그 세션의 시작 시각보다 먼저 끝난" 것으로 정한다. 교정을 다시 요청할 때와 요약을 만들 때가 첫 시도와
+   * 같은 직전 세션을 보게 하기 위함이다. 사용자는 기준 세션에서 읽으므로 따로 받지 않는다.
+   *
+   * @param learningSessionId 기준이 되는 프리톡 학습 세션 ID
+   * @param pageable 페이지 요청 정보. 직전 하나만 필요하면 크기 1
+   * @return 직전 완료 프리톡 세션 페이지. 첫 프리톡이면 비어 있다
+   */
+  @Query(
+      """
+          select freeTalkSession
+          from FreeTalkSession freeTalkSession, LearningSession learningSession, LearningSession current
+          where current.id = :learningSessionId
+            and learningSession.id = freeTalkSession.learningSessionId
+            and learningSession.id <> current.id
+            and learningSession.userProfileId = current.userProfileId
+            and learningSession.status = com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus.COMPLETED
+            and freeTalkSession.conversationStatus = com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus.COMPLETED
+            and learningSession.endedAt <= current.startedAt
+          order by learningSession.endedAt desc, learningSession.id desc
+      """)
+  Page<FreeTalkSession> findPreviousCompleted(
+      @Param("learningSessionId") Long learningSessionId, Pageable pageable);
 }
