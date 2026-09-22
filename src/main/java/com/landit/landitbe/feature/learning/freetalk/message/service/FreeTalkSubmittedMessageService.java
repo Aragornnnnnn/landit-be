@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversation
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionReservation;
@@ -57,6 +58,7 @@ public class FreeTalkSubmittedMessageService {
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final SessionHistoryService sessionHistoryService;
   private final ConversationMessageService conversationMessageService;
+  private final FreeTalkMessageFeedbackService messageFeedbackService;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
   private final StreakService streakService;
   private final MemoryProperties memoryProperties;
@@ -252,8 +254,7 @@ public class FreeTalkSubmittedMessageService {
               records.learningSession().getUserProfileId());
     } else {
       userMessage =
-          conversationMessageService.recordFreeTalkTurnResult(
-              userMessage.getId(), FreeTalkTurnStatus.CONTINUE, true);
+          recordTurnResultAndPrepareFeedback(userMessage.getId(), FreeTalkTurnStatus.CONTINUE);
       SessionHistoryMessageSnapshot aiMessage =
           conversationMessageService.recordFreeTalkAi(
               records.history().getId(),
@@ -294,8 +295,7 @@ public class FreeTalkSubmittedMessageService {
     session.addSpeakingDuration(reservation.utteranceDurationMs());
     assignClosingTitle(session, result, reservation.titleGenerationRequired());
     userMessage =
-        conversationMessageService.recordFreeTalkTurnResult(
-            userMessage.getId(), FreeTalkTurnStatus.COMPLETED, true);
+        recordTurnResultAndPrepareFeedback(userMessage.getId(), FreeTalkTurnStatus.COMPLETED);
     session.completeByTimeLimit();
     prepareMemoryGeneration(session);
     session.clearProcessing();
@@ -414,8 +414,8 @@ public class FreeTalkSubmittedMessageService {
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     records =
         records.withUserMessage(
-            conversationMessageService.recordFreeTalkTurnResult(
-                records.userMessage().getId(), FreeTalkTurnStatus.CONTINUE, true));
+            recordTurnResultAndPrepareFeedback(
+                records.userMessage().getId(), FreeTalkTurnStatus.CONTINUE));
     SessionHistoryMessageSnapshot aiMessage =
         conversationMessageService.recordFreeTalkAi(
             records.history().getId(),
@@ -455,8 +455,8 @@ public class FreeTalkSubmittedMessageService {
     assignClosingTitle(records.freeTalkSession(), result, reservation.titleGenerationRequired());
     records =
         records.withUserMessage(
-            conversationMessageService.recordFreeTalkTurnResult(
-                records.userMessage().getId(), FreeTalkTurnStatus.COMPLETED, true));
+            recordTurnResultAndPrepareFeedback(
+                records.userMessage().getId(), FreeTalkTurnStatus.COMPLETED));
     final SessionHistoryMessageSnapshot aiMessage =
         conversationMessageService.recordFreeTalkAi(
             records.history().getId(),
@@ -501,6 +501,15 @@ public class FreeTalkSubmittedMessageService {
                 decisionProcessingClientMessageId(reservation)
                     .equals(session.getProcessingClientMessageId()))
         .ifPresent(FreeTalkSession::clearProcessing);
+  }
+
+  // 속마음과 턴 교정은 같은 AI 응답으로 오므로 준비도 같은 트랜잭션에서 함께 건다.
+  private SessionHistoryMessageSnapshot recordTurnResultAndPrepareFeedback(
+      long userMessageId, FreeTalkTurnStatus status) {
+    SessionHistoryMessageSnapshot userMessage =
+        conversationMessageService.recordFreeTalkTurnResult(userMessageId, status, true);
+    messageFeedbackService.prepareCorrection(userMessageId);
+    return userMessage;
   }
 
   private ManagedRecords managedRecords(FreeTalkMessageReservation reservation) {

@@ -82,6 +82,7 @@ com.landit.landitbe
 │   │   │   └── assessment  # 수준 평가
 │   │   ├── freetalk         # start / message / topic / usage / innerthought
 │   │   │   ├── expression
+│   │   │   ├── feedback    # 턴 교정(메시지별 피드백)
 │   │   │   ├── memory
 │   │   │   └── history
 │   │   ├── expression      # 표현 목록 / 시작 / 완료 조율

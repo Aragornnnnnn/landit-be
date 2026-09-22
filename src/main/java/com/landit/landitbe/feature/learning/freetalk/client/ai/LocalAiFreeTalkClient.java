@@ -9,6 +9,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConv
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingRequest;
@@ -58,7 +59,8 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
     String innerThought = "사용자가 대화를 자연스럽게 이어가고 있다.";
-    return new AiFreeTalkInnerThoughtResult(innerThought, InnerThoughtType.GOOD);
+    return new AiFreeTalkInnerThoughtResult(
+        innerThought, InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true));
   }
 
   /** {@inheritDoc} */

@@ -23,11 +23,12 @@ import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.SessionMessageInputType;
-import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkConversationStatus;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
@@ -49,6 +50,7 @@ import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrie
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -69,8 +71,7 @@ class FreeTalkMessageServiceTest {
   private final FreeTalkSubmittedMessageService submittedMessageService =
       mock(FreeTalkSubmittedMessageService.class);
   private final AiFreeTalkClient aiFreeTalkClient = mock(AiFreeTalkClient.class);
-  private final ConversationMessageService sessionMessageService =
-      mock(ConversationMessageService.class);
+  private final FreeTalkTurnResultService turnResultService = mock(FreeTalkTurnResultService.class);
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher =
       mock(FreeTalkExpressionGenerationDispatcher.class);
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService =
@@ -83,7 +84,7 @@ class FreeTalkMessageServiceTest {
           submittedMessageService,
           replayService,
           aiFreeTalkClient,
-          sessionMessageService,
+          turnResultService,
           directExecutor,
           expressionGenerationDispatcher,
           memoryGenerationDispatchService,
@@ -162,27 +163,94 @@ class FreeTalkMessageServiceTest {
                 false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
     when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
     when(aiFreeTalkClient.generateInnerThought(any()))
-        .thenReturn(new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD));
+        .thenReturn(
+            new AiFreeTalkInnerThoughtResult(
+                "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed()));
     doThrow(new IllegalStateException("save failed"))
-        .when(sessionMessageService)
-        .completeInnerThought(7L, "즐거웠나 보다.", InnerThoughtType.GOOD);
+        .when(turnResultService)
+        .complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed());
 
     service.submit(1L, 300L, request());
 
-    verify(sessionMessageService).failInnerThought(7L);
+    verify(turnResultService).fail(7L);
     verify(aiFreeTalkClient)
         .generateTurn(argThat(request -> request.characterId().equals("chloe")));
     verify(aiFreeTalkClient)
         .generateInnerThought(argThat(request -> request.characterId().equals("chloe")));
   }
 
+  @DisplayName("속마음과 같은 응답에 실려 온 턴 교정을 한 번의 저장으로 함께 넘긴다.")
+  @Test
+  void persistsTurnCorrectionTogetherWithInnerThought() {
+    FreeTalkTurnCorrection correction =
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I go hiking.", "I went hiking.", "과거 일이에요.", FreeTalkMistakePattern.TENSE),
+            true);
+    when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+        .thenReturn(reservation());
+    when(aiFreeTalkClient.generateTurn(any()))
+        .thenReturn(
+            new AiFreeTalkTurnResult(
+                false, null, "That sounds fun!", "재밌겠다!", CharacterEmotion.HAPPY, List.of()));
+    when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(continueResponse());
+    when(aiFreeTalkClient.generateInnerThought(any()))
+        .thenReturn(
+            new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD, correction));
+
+    service.submit(1L, 300L, request());
+
+    verify(turnResultService).complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
+  }
+
+  @DisplayName("속마음과 교정의 저장·실패 상태 저장이 모두 실패해도 응답을 유지하고 각 실패를 기록한다.")
+  @Test
+  void reportsPersistenceAndCompensationFailuresWithoutLosingCoreResponse() {
+    Logger logger = (Logger) LoggerFactory.getLogger(FailureObservation.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      FreeTalkTurnCorrection correction = FreeTalkTurnCorrection.failed();
+      when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
+          .thenReturn(reservation());
+      when(aiFreeTalkClient.generateTurn(any())).thenReturn(turnResult());
+      FreeTalkMessageSubmitResponse response = continueResponse();
+      when(submittedMessageService.finalizeTurn(any(), any())).thenReturn(response);
+      when(aiFreeTalkClient.generateInnerThought(any()))
+          .thenReturn(
+              new AiFreeTalkInnerThoughtResult("즐거웠나 보다.", InnerThoughtType.GOOD, correction));
+      doThrow(new IllegalStateException("save failed"))
+          .when(turnResultService)
+          .complete(7L, "즐거웠나 보다.", InnerThoughtType.GOOD, correction);
+      doThrow(new IllegalStateException("compensation failed")).when(turnResultService).fail(7L);
+
+      assertThat(service.submit(1L, 300L, request())).isSameAs(response);
+
+      verify(turnResultService).fail(7L);
+      assertThat(appender.list)
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .containsExactly(
+              "failure_observation workflow=inner_thought failure_stage=persistence"
+                  + " reason=storage_failed outcome=failed",
+              "failure_observation workflow=inner_thought failure_stage=failure_state_persistence"
+                  + " reason=storage_failed outcome=failed");
+      assertThat(appender.list)
+          .allSatisfy(
+              event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                assertThat(event.getThrowableProxy()).isNotNull();
+              });
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
   @DisplayName("속마음 생성 실패를 구조화된 오류 로그로 기록한다.")
   @Test
   void logsFailedInnerThoughtGenerationAsStructuredError() {
-    Logger logger =
-        (Logger)
-            LoggerFactory.getLogger(
-                com.landit.landitbe.shared.observability.FailureObservation.class);
+    Logger logger = (Logger) LoggerFactory.getLogger(FailureObservation.class);
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
     logger.addAppender(appender);
@@ -209,7 +277,7 @@ class FreeTalkMessageServiceTest {
                     .contains("reason=result_missing");
                 assertThat(event.getThrowableProxy()).isNotNull();
               });
-      verify(sessionMessageService).failInnerThought(7L);
+      verify(turnResultService).fail(7L);
     } finally {
       logger.detachAppender(appender);
       appender.stop();
@@ -257,7 +325,7 @@ class FreeTalkMessageServiceTest {
 
     verify(aiFreeTalkClient).generateTurn(any());
     verify(submittedMessageService).finalizeTurn(any(), any());
-    verify(sessionMessageService).failInnerThought(7L);
+    verify(turnResultService).fail(7L);
   }
 
   /** 완료 응답이 트랜잭션 확정 뒤에만 기억 생성 dispatcher로 전달되는지 확인한다. */
@@ -365,7 +433,7 @@ class FreeTalkMessageServiceTest {
         submittedMessageService,
         replayService,
         aiFreeTalkClient,
-        sessionMessageService,
+        turnResultService,
         taskExecutor,
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,
