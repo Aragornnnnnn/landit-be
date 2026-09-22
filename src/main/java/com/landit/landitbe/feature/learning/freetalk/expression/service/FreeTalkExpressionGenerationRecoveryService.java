@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.freetalk.expression.service;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.freetalk.expression.domain.ExpressionGenerationStatus;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -81,6 +82,8 @@ public class FreeTalkExpressionGenerationRecoveryService {
                               }
                               session.failExpressionGeneration();
                               if (session.getExpressionGenerationAttempt() >= 3) {
+                                FailureObservation.afterCommit(
+                                    "expression", "recovery", "attempts_exhausted", null);
                                 return false;
                               }
                               session.retryExpressionGeneration();

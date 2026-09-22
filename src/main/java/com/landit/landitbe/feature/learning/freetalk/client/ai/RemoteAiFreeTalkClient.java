@@ -15,6 +15,8 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingRequest;
@@ -30,11 +32,13 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Duration;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 /** 원격 AI 호출 계약을 구현한다. */
+@Slf4j
 @Component
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
 public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
@@ -80,7 +84,8 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request) {
-    return http.post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class).toResult();
+    return http.post(INNER_THOUGHT_PATH, request, RemoteInnerThoughtResponse.class)
+        .toResult(request.submittedMessageId(), request.memoryContext());
   }
 
   /** {@inheritDoc} */
@@ -211,14 +216,147 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteInnerThoughtResponse(
-      String innerThought, InnerThoughtType innerThoughtType) {
+      String innerThought,
+      InnerThoughtType innerThoughtType,
+      Boolean reactedToPartner,
+      RemoteCorrection correction) {
 
     // 원격 속마음 응답을 검증해 애플리케이션 결과로 변환한다.
-    private AiFreeTalkInnerThoughtResult toResult() {
+    private AiFreeTalkInnerThoughtResult toResult(
+        long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
       if (blank(innerThought) || innerThoughtType == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return new AiFreeTalkInnerThoughtResult(innerThought, innerThoughtType);
+      return new AiFreeTalkInnerThoughtResult(
+          innerThought, innerThoughtType, turnCorrection(messageId, memoryContext));
+    }
+
+    // 교정은 보조 판정이라 계약 위반이어도 속마음은 살리고 교정만 실패로 남긴다. 임의 값으로 채우지 않는다.
+    private FreeTalkTurnCorrection turnCorrection(
+        long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
+      if (reactedToPartner == null) {
+        return correction == null
+            ? FreeTalkTurnCorrection.failed()
+            : invalidCorrection(messageId, "correction_without_reaction");
+      }
+      if (correction == null) {
+        return FreeTalkTurnCorrection.completed(null, reactedToPartner);
+      }
+      String invalidReason = correction.invalidReason();
+      if (invalidReason != null) {
+        return invalidCorrection(messageId, invalidReason);
+      }
+      return FreeTalkTurnCorrection.completed(
+          correction.toSentence(messageId, memoryContext), reactedToPartner);
+    }
+
+    private static FreeTalkTurnCorrection invalidCorrection(long messageId, String reason) {
+      log.warn(
+          "프리톡 턴 교정 응답이 계약과 달라 교정을 실패로 기록합니다. "
+              + "workflow=free_talk_turn_correction_invalid reason={} messageId={}",
+          reason,
+          messageId);
+      return FreeTalkTurnCorrection.failed();
+    }
+  }
+
+  // 실수 패턴은 문자열로 받아 모르는 값이 속마음 응답 전체의 역직렬화를 실패시키지 않게 한다.
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteCorrection(
+      String originalSentence,
+      String betterSentence,
+      String reason,
+      String mistakePattern,
+      Long usedMemoryId,
+      String memoryLabel) {
+    private static final int MAX_MEMORY_LABEL_LENGTH = 40;
+
+    // 계약을 어긴 이유를 로그용 코드로 돌려준다. 문제가 없으면 null이다.
+    private String invalidReason() {
+      if (blank(originalSentence) || blank(betterSentence) || blank(reason)) {
+        return "blank_correction_text";
+      }
+      return knownMistakePattern() == null ? "unknown_mistake_pattern" : null;
+    }
+
+    private FreeTalkTurnCorrection.Sentence toSentence(
+        long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
+      AiFreeTalkMemoryContext memory = providedMemory(messageId, memoryContext);
+      if (memory == null) {
+        return new FreeTalkTurnCorrection.Sentence(
+            originalSentence, betterSentence, reason, knownMistakePattern());
+      }
+      // 지난 기록이 바뀌지 않도록 기억을 말한 날짜를 지금 보낸 문맥에서 꺼내 교정과 함께 남긴다.
+      return new FreeTalkTurnCorrection.Sentence(
+          originalSentence,
+          betterSentence,
+          reason,
+          knownMistakePattern(),
+          memory.memoryId(),
+          memory.observedAt().toLocalDate(),
+          validMemoryLabel(messageId));
+    }
+
+    // 근거 기억은 부가 정보라 계약과 달라도 교정 문장은 살리고 해당 값만 버린다.
+    private AiFreeTalkMemoryContext providedMemory(
+        long messageId, List<AiFreeTalkMemoryContext> memoryContext) {
+      if (usedMemoryId == null) {
+        if (!blank(memoryLabel)) {
+          droppedCorrectionMemory(messageId, "label_without_memory");
+        }
+        return null;
+      }
+      AiFreeTalkMemoryContext memory =
+          memoryContext == null
+              ? null
+              : memoryContext.stream()
+                  .filter(context -> usedMemoryId.equals(context.memoryId()))
+                  .findFirst()
+                  .orElse(null);
+      if (memory == null) {
+        droppedCorrectionMemory(messageId, "unknown_memory_id");
+        return null;
+      }
+      if (memory.observedAt() == null) {
+        droppedCorrectionMemory(messageId, "memory_without_observed_at");
+        return null;
+      }
+      return memory;
+    }
+
+    // 라벨이 없으면 조회할 때 기본 문구를 쓰므로 임의 값으로 채우지 않고 null로 남긴다.
+    private String validMemoryLabel(long messageId) {
+      if (blank(memoryLabel)) {
+        droppedCorrectionMemory(messageId, "label_missing");
+        return null;
+      }
+      String label = memoryLabel.strip();
+      // 줄바꿈뿐 아니라 NUL 같은 제어문자도 DB가 거부해 속마음 저장까지 실패시키므로 여기서 거른다.
+      if (label.codePointCount(0, label.length()) > MAX_MEMORY_LABEL_LENGTH
+          || label.codePoints().anyMatch(Character::isISOControl)) {
+        droppedCorrectionMemory(messageId, "label_invalid");
+        return null;
+      }
+      return label;
+    }
+
+    private static void droppedCorrectionMemory(long messageId, String reason) {
+      log.warn(
+          "프리톡 턴 교정의 근거 기억 값이 계약과 달라 해당 값만 버립니다. "
+              + "workflow=free_talk_turn_correction_memory reason={} messageId={}",
+          reason,
+          messageId);
+    }
+
+    private FreeTalkMistakePattern knownMistakePattern() {
+      if (mistakePattern == null) {
+        return null;
+      }
+      try {
+        return FreeTalkMistakePattern.valueOf(mistakePattern);
+      } catch (IllegalArgumentException exception) {
+        return null;
+      }
     }
   }
 

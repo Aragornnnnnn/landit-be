@@ -58,6 +58,12 @@ class FreeTalkSubmittedMessageServiceTest {
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService =
       mock(FreeTalkDailySpeakingUsageService.class);
   private final StreakService streakService = mock(StreakService.class);
+  private final com.landit.landitbe.feature.learning.freetalk.feedback.service
+          .FreeTalkMessageFeedbackService
+      messageFeedbackService =
+          mock(
+              com.landit.landitbe.feature.learning.freetalk.feedback.service
+                  .FreeTalkMessageFeedbackService.class);
   private final FreeTalkSubmittedMessageService service =
       service(new MemoryProperties(false, false));
 
@@ -77,6 +83,7 @@ class FreeTalkSubmittedMessageServiceTest {
             sessionHistoryRepository),
         new com.landit.landitbe.feature.learning.conversation.history.service
             .ConversationMessageService(sessionHistoryMessageRepository),
+        messageFeedbackService,
         dailySpeakingUsageService,
         streakService,
         memoryProperties,
@@ -126,6 +133,28 @@ class FreeTalkSubmittedMessageServiceTest {
     var response = service.finalizeTimeLimit(messageReservation(), closingResult());
 
     assertThat(response.progress().speakingTimeLimitMs()).isEqualTo(9_999_999L);
+  }
+
+  @DisplayName("발화 시간 제한으로 끝나는 턴도 속마음과 함께 턴 교정을 준비한다.")
+  @Test
+  void preparesTurnCorrectionWhenFinalizingByTimeLimit() {
+    stubSuccessfulFinalization("old-owner");
+    realFinalizationSession("old-owner");
+
+    service.finalizeTimeLimit(messageReservation(), closingResult());
+
+    verify(messageFeedbackService).prepareCorrection(7L);
+  }
+
+  @DisplayName("사용자가 종료를 선택한 턴도 속마음과 함께 턴 교정을 준비한다.")
+  @Test
+  void preparesTurnCorrectionWhenFinalizingUserConfirmedEnd() {
+    stubSuccessfulFinalization("decision-7");
+    realFinalizationSession("decision-7");
+
+    service.finalizeEnd(decisionReservation(), closingResult());
+
+    verify(messageFeedbackService).prepareCorrection(7L);
   }
 
   @DisplayName("사용자 확인으로 종료해도 기억 저장이 꺼져 있으면 생성 작업을 준비하지 않는다.")

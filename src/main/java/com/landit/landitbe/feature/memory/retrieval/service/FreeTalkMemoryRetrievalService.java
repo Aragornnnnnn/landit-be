@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.retrieval.repository.FreeTalkMemoryRetrievalTraceRepository;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
@@ -27,7 +28,7 @@ import org.springframework.stereotype.Service;
 public class FreeTalkMemoryRetrievalService {
 
   static final String POLICY_VERSION = "memory-retrieval-v2";
-  private static final int MAX_RESULTS = 3;
+  private static final int MAX_RESULTS = AiFreeTalkMemoryContext.MAX_CONTEXTS;
   private static final double MAX_DISTANCE = 0.8;
   private static final int EMBEDDING_DIMENSION = 1536;
   private static final String EMBEDDING_MODEL = "openai/text-embedding-3-small";
@@ -51,8 +52,32 @@ public class FreeTalkMemoryRetrievalService {
     try {
       return retrieveWhenEnabled(request);
     } catch (RuntimeException exception) {
+      FailureObservation.failed("memory_retrieval", "retrieval", "context_unavailable", exception);
       meterRegistry.counter("landit.memory.fallback", "stage", request.stage().name()).increment();
       return fallback(request);
+    }
+  }
+
+  /**
+   * 세션 시작 때 이미 검색한 기억을 새 검색 없이 다시 돌려준다.
+   *
+   * <p>턴 교정처럼 매 턴 기억이 필요한 호출이 임베딩 요청과 지연을 더하지 않게 한다. 조회 실패는 빈 문맥으로 전환한다.
+   *
+   * @param sessionId 프리톡 세션 ID
+   * @param userProfileId 세션 소유 사용자 프로필 ID
+   * @return 가까운 순으로 최대 3개인 기억 문맥. 기억 사용이 꺼져 있거나 검색된 기억이 없으면 빈 목록
+   */
+  public List<AiFreeTalkMemoryContext> retrievedContexts(long sessionId, long userProfileId) {
+    if (!memoryProperties.useEnabled()) {
+      return List.of();
+    }
+    try {
+      return traceRepository.findRetrievedContexts(sessionId, userProfileId, MAX_RESULTS);
+    } catch (RuntimeException exception) {
+      // 조회 실패가 조용히 묻히면 기억 근거 교정이 통째로 꺼진 것을 알 수 없으므로 원인과 지표를 남긴다.
+      meterRegistry.counter("landit.memory.fallback", "stage", "RETRIEVED_CONTEXT").increment();
+      log.warn("프리톡 세션의 검색된 장기기억을 읽지 못해 빈 문맥으로 진행합니다. sessionId={}", sessionId, exception);
+      return List.of();
     }
   }
 
@@ -115,10 +140,8 @@ public class FreeTalkMemoryRetrievalService {
       traceRepository.recordUsage(
           result.sessionId(), result.stage(), normalized, responseMessageId);
     } catch (RuntimeException exception) {
-      log.warn(
-          "프리톡 장기기억 사용 trace를 저장하지 못했습니다. stage={} policyVersion={}",
-          result.stage(),
-          POLICY_VERSION);
+      FailureObservation.failed(
+          "memory_retrieval", "trace_persistence", "storage_failed", exception);
     }
   }
 

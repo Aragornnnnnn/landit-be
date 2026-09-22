@@ -4,7 +4,6 @@ package com.landit.landitbe.feature.learning.freetalk.message.service;
 
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
-import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkResponseMode;
 import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextWindow;
@@ -29,7 +28,7 @@ import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
-import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -50,7 +49,7 @@ public class FreeTalkMessageService {
   private final FreeTalkSubmittedMessageService submittedMessageService;
   private final FreeTalkMessageReplayService replayService;
   private final AiFreeTalkClient aiFreeTalkClient;
-  private final ConversationMessageService conversationMessageService;
+  private final FreeTalkTurnResultService turnResultService;
   private final TaskExecutor taskExecutor;
   private final FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher;
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService;
@@ -62,7 +61,7 @@ public class FreeTalkMessageService {
       FreeTalkSubmittedMessageService submittedMessageService,
       FreeTalkMessageReplayService replayService,
       AiFreeTalkClient aiFreeTalkClient,
-      ConversationMessageService conversationMessageService,
+      FreeTalkTurnResultService turnResultService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
@@ -71,7 +70,7 @@ public class FreeTalkMessageService {
     this.submittedMessageService = submittedMessageService;
     this.replayService = replayService;
     this.aiFreeTalkClient = aiFreeTalkClient;
-    this.conversationMessageService = conversationMessageService;
+    this.turnResultService = turnResultService;
     this.taskExecutor = taskExecutor;
     this.expressionGenerationDispatcher = expressionGenerationDispatcher;
     this.memoryGenerationDispatchService = memoryGenerationDispatchService;
@@ -84,7 +83,7 @@ public class FreeTalkMessageService {
       FreeTalkSubmittedMessageService submittedMessageService,
       FreeTalkMessageReplayService replayService,
       AiFreeTalkClient aiFreeTalkClient,
-      ConversationMessageService conversationMessageService,
+      FreeTalkTurnResultService turnResultService,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
@@ -93,7 +92,7 @@ public class FreeTalkMessageService {
         submittedMessageService,
         replayService,
         aiFreeTalkClient,
-        conversationMessageService,
+        turnResultService,
         taskExecutor,
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,
@@ -410,6 +409,7 @@ public class FreeTalkMessageService {
         reservation.baseLocale(),
         reservation.topic(),
         modelHistory(reservation.history(), context),
+        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()),
         context.contextPolicyVersion(),
         context.sessionSummary(),
         context.historyIncomplete());
@@ -426,9 +426,16 @@ public class FreeTalkMessageService {
         reservation.baseLocale(),
         reservation.topic(),
         modelHistory(reservation.history(), context),
+        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()),
         context.contextPolicyVersion(),
         context.sessionSummary(),
         context.historyIncomplete());
+  }
+
+  // 속마음 호출은 턴 처리와 병렬로 먼저 출발하므로, 이 턴에서 검색할 기억은 아직 없다.
+  // 사용자가 먼저 말을 건 세션의 첫 턴은 빈 문맥으로 나가고 다음 턴부터 기억이 실린다.
+  private List<AiFreeTalkMemoryContext> correctionMemoryContext(long sessionId, long userId) {
+    return memoryRetrievalService.retrievedContexts(sessionId, userId);
   }
 
   private AiFreeTalkContextWindow contextWindow(
@@ -481,7 +488,7 @@ public class FreeTalkMessageService {
     try {
       return submitCancellableAsync(() -> aiFreeTalkClient.generateInnerThought(request));
     } catch (RuntimeException exception) {
-      log.warn("프리톡 속마음 작업을 시작하지 못했습니다. messageId={}", request.submittedMessageId(), exception);
+      // 실패한 Future의 최종 처리 경계에서 한 번 관측한다.
       return CompletableFuture.failedFuture(exception);
     }
   }
@@ -489,36 +496,36 @@ public class FreeTalkMessageService {
   private void recordInnerThought(
       AiFreeTalkInnerThoughtRequest request,
       CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture) {
-    innerThoughtFuture.whenComplete(
+    innerThoughtFuture.handle(
         (result, exception) -> {
-          if (exception == null) {
-            try {
-              conversationMessageService.completeInnerThought(
-                  request.submittedMessageId(), result.innerThought(), result.innerThoughtType());
-            } catch (RuntimeException persistenceException) {
-              log.warn(
-                  "프리톡 속마음 저장에 실패했습니다. messageId={}",
-                  request.submittedMessageId(),
-                  persistenceException);
-              conversationMessageService.failInnerThought(request.submittedMessageId());
-            }
-            return;
+          if (exception != null) {
+            FailureObservation.failed("inner_thought", "generation", "result_missing", exception);
           }
-          log.error(
-              "프리톡 속마음 생성에 실패했습니다. "
-                  + "workflow=free_talk_inner_thought_failed messageId={} errorCode={}",
-              request.submittedMessageId(),
-              errorCode(exception),
-              exception);
-          conversationMessageService.failInnerThought(request.submittedMessageId());
+          try {
+            if (exception == null) {
+              turnResultService.complete(
+                  request.submittedMessageId(),
+                  result.innerThought(),
+                  result.innerThoughtType(),
+                  result.correction());
+            } else {
+              turnResultService.fail(request.submittedMessageId());
+            }
+          } catch (RuntimeException persistenceException) {
+            FailureObservation.failed(
+                "inner_thought", "persistence", "storage_failed", persistenceException);
+            try {
+              turnResultService.fail(request.submittedMessageId());
+            } catch (RuntimeException compensationException) {
+              FailureObservation.failed(
+                  "inner_thought",
+                  "failure_state_persistence",
+                  "storage_failed",
+                  compensationException);
+            }
+          }
+          return null;
         });
-  }
-
-  private String errorCode(Throwable exception) {
-    if (exception instanceof ApiException apiException) {
-      return apiException.getErrorCode().name();
-    }
-    return exception.getClass().getSimpleName();
   }
 
   private void cancelInnerThought(

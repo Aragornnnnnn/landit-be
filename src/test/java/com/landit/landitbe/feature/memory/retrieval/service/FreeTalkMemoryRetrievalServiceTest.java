@@ -147,6 +147,42 @@ class FreeTalkMemoryRetrievalServiceTest {
     verify(searchRepository, never()).searchActive(anyLong(), anyString(), any(), anyInt());
   }
 
+  @DisplayName("세션에서 이미 검색한 기억은 임베딩 요청이나 새 검색 없이 최대 3개를 다시 돌려준다.")
+  @Test
+  void returnsAlreadyRetrievedContextsWithoutSearchingAgain() {
+    List<AiFreeTalkMemoryContext> retrieved =
+        List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
+    when(traceRepository.findRetrievedContexts(10L, 20L, 3)).thenReturn(retrieved);
+
+    assertThat(service.retrievedContexts(10L, 20L)).isEqualTo(retrieved);
+    verify(aiClient, never()).embedMemoryQuery(any());
+    verify(searchRepository, never()).searchActive(anyLong(), anyString(), any(), anyInt());
+  }
+
+  @DisplayName("검색한 기억을 다시 읽다 실패하면 대화를 막지 않고 빈 문맥으로 전환한다.")
+  @Test
+  void returnsEmptyRetrievedContextsWhenLookupFails() {
+    when(traceRepository.findRetrievedContexts(10L, 20L, 3))
+        .thenThrow(new IllegalStateException("database unavailable"));
+
+    assertThat(service.retrievedContexts(10L, 20L)).isEmpty();
+  }
+
+  @DisplayName("기억 사용이 꺼져 있으면 검색한 기억을 읽지 않고 빈 문맥을 돌려준다.")
+  @Test
+  void returnsEmptyRetrievedContextsWhenMemoryUseIsDisabled() {
+    FreeTalkMemoryRetrievalService disabledService =
+        new FreeTalkMemoryRetrievalService(
+            aiClient,
+            searchRepository,
+            traceRepository,
+            new MemoryProperties(false, false),
+            meterRegistry);
+
+    assertThat(disabledService.retrievedContexts(10L, 20L)).isEmpty();
+    verify(traceRepository, never()).findRetrievedContexts(anyLong(), anyLong(), anyInt());
+  }
+
   private ConversationMemoryMatch match(long memoryId, double distance) {
     return new ConversationMemoryMatch(
         memoryId,
