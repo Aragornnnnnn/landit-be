@@ -28,6 +28,15 @@ public interface SessionHistoryMessageRepository
   List<SessionHistoryMessage> findBySessionHistoryIdOrderByMessageSequenceAsc(
       Long sessionHistoryId);
 
+  /**
+   * 여러 회차의 메시지를 회차와 대화 순서대로 일괄 조회한다.
+   *
+   * @param sessionHistoryIds 조회할 이력 ID 목록
+   * @return 회차별 대화 순서가 보존된 메시지 목록
+   */
+  List<SessionHistoryMessage> findBySessionHistoryIdInOrderBySessionHistoryIdAscMessageSequenceAsc(
+      List<Long> sessionHistoryIds);
+
   /** 세션 히스토리에 속한 특정 메시지를 조회한다. */
   Optional<SessionHistoryMessage> findByIdAndSessionHistoryId(Long id, Long sessionHistoryId);
 
