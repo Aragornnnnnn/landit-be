@@ -33,6 +33,7 @@ import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkWatchPatternService;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
@@ -87,6 +88,8 @@ class FreeTalkMessageServiceTest {
       mock(FreeTalkMemoryGenerationDispatchService.class);
   private final FreeTalkMemoryRetrievalService memoryRetrievalService =
       mock(FreeTalkMemoryRetrievalService.class);
+  private final FreeTalkWatchPatternService watchPatternService =
+      mock(FreeTalkWatchPatternService.class);
   private final FreeTalkContextSummaryService contextSummaryService =
       mock(FreeTalkContextSummaryService.class);
   private final TaskExecutor directExecutor = Runnable::run;
@@ -99,7 +102,8 @@ class FreeTalkMessageServiceTest {
           directExecutor,
           expressionGenerationDispatcher,
           memoryGenerationDispatchService,
-          memoryRetrievalService);
+          memoryRetrievalService,
+          watchPatternService);
 
   @Test
   void compensatesReservationWhenSummarySnapshotFails() {
@@ -144,6 +148,7 @@ class FreeTalkMessageServiceTest {
     List<AiFreeTalkMemoryContext> retrieved =
         List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
     when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(watchPatternService.watchPatterns(300L)).thenReturn(List.of(FreeTalkMistakePattern.TENSE));
     when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
         .thenReturn(reservation);
     when(contextSummaryService.snapshot(1L, 30L))
@@ -182,6 +187,8 @@ class FreeTalkMessageServiceTest {
     assertThat(innerThoughtCaptor.getValue().conversationHistory())
         .isEqualTo(captor.getValue().conversationHistory());
     assertThat(innerThoughtCaptor.getValue().memoryContext()).isEqualTo(retrieved);
+    assertThat(innerThoughtCaptor.getValue().watchPatterns())
+        .containsExactly(FreeTalkMistakePattern.TENSE);
     verify(turnResultService)
         .complete(106L, "좋은 대화다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.failed());
   }
@@ -214,6 +221,7 @@ class FreeTalkMessageServiceTest {
     when(contextSummaryService.snapshot(1L, 30L))
         .thenReturn(new AiFreeTalkContextWindow("v1", summary, false));
     when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(watchPatternService.watchPatterns(300L)).thenReturn(List.of(FreeTalkMistakePattern.TENSE));
     when(aiFreeTalkClient.generateInnerThought(any()))
         .thenReturn(
             new AiFreeTalkInnerThoughtResult(
@@ -234,6 +242,7 @@ class FreeTalkMessageServiceTest {
     assertThat(captor.getValue().sessionSummary()).isSameAs(summary);
     assertThat(captor.getValue().contextPolicyVersion()).isEqualTo("v1");
     assertThat(captor.getValue().memoryContext()).isEqualTo(retrieved);
+    assertThat(captor.getValue().watchPatterns()).containsExactly(FreeTalkMistakePattern.TENSE);
     assertThat(captor.getValue().conversationHistory())
         .extracting(AiConversationHistoryMessage::messageId)
         .containsExactly(104L, 105L, 106L);
@@ -369,6 +378,7 @@ class FreeTalkMessageServiceTest {
     List<AiFreeTalkMemoryContext> retrieved =
         List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
     when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(watchPatternService.watchPatterns(300L)).thenReturn(List.of(FreeTalkMistakePattern.TENSE));
     when(submittedMessageService.reserve(any(Long.class), any(Long.class), any()))
         .thenReturn(reservation());
     when(aiFreeTalkClient.generateTurn(any())).thenReturn(turnResult());
@@ -378,10 +388,16 @@ class FreeTalkMessageServiceTest {
             new AiFreeTalkInnerThoughtResult(
                 "즐거웠나 보다.", InnerThoughtType.GOOD, FreeTalkTurnCorrection.completed(null, true)));
 
+    when(watchPatternService.watchPatterns(300L)).thenReturn(List.of(FreeTalkMistakePattern.TENSE));
+
     service.submit(1L, 300L, request());
 
     verify(aiFreeTalkClient)
-        .generateInnerThought(argThat(request -> request.memoryContext().equals(retrieved)));
+        .generateInnerThought(
+            argThat(
+                request ->
+                    request.memoryContext().equals(retrieved)
+                        && request.watchPatterns().equals(List.of(FreeTalkMistakePattern.TENSE))));
   }
 
   @DisplayName("속마음 요청의 기억은 이 턴의 기억 검색보다 먼저 읽는다. 사용자가 먼저 말을 건 세션의 첫 턴은 빈 문맥으로 나간다.")
@@ -433,6 +449,9 @@ class FreeTalkMessageServiceTest {
     List<AiFreeTalkMemoryContext> retrieved =
         List.of(new AiFreeTalkMemoryContext(42L, ConversationMemoryType.PROFILE, "집 앞 헬스장에 다닌다."));
     when(memoryRetrievalService.retrievedContexts(30L, 1L)).thenReturn(retrieved);
+    when(watchPatternService.watchPatterns(300L)).thenReturn(List.of(FreeTalkMistakePattern.TENSE));
+    when(watchPatternService.watchPatterns(300L))
+        .thenReturn(List.of(FreeTalkMistakePattern.ARTICLE));
     when(submittedMessageService.reserveDecision(
             any(Long.class), any(Long.class), any(Long.class), any()))
         .thenReturn(decisionReservation());
@@ -442,7 +461,13 @@ class FreeTalkMessageServiceTest {
     service.decideExit(1L, 300L, new FreeTalkExitDecisionRequest(7L, FreeTalkExitDecision.END));
 
     verify(aiFreeTalkClient)
-        .generateInnerThought(argThat(request -> request.memoryContext().equals(retrieved)));
+        .generateInnerThought(
+            argThat(
+                request ->
+                    request.memoryContext().equals(retrieved)
+                        && request
+                            .watchPatterns()
+                            .equals(List.of(FreeTalkMistakePattern.ARTICLE))));
     verify(memoryRetrievalService, org.mockito.Mockito.never()).retrieve(any());
   }
 
@@ -680,7 +705,8 @@ class FreeTalkMessageServiceTest {
         taskExecutor,
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,
-        memoryRetrievalService);
+        memoryRetrievalService,
+        watchPatternService);
   }
 
   private FreeTalkMessageService contextAwareService() {
@@ -693,6 +719,7 @@ class FreeTalkMessageServiceTest {
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,
         memoryRetrievalService,
+        watchPatternService,
         contextSummaryService);
   }
 

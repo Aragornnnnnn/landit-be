@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkLearnedExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkUsedExpression;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
@@ -184,6 +185,200 @@ class RemoteAiFreeTalkClientTest {
     assertThat(innerThought.innerThoughtType().name()).isEqualTo("GOOD");
   }
 
+  @DisplayName("지켜볼 패턴을 요청에 싣고, 응답의 강조 구절과 사용례를 원문과 맞춰 본 뒤 통과한 것만 교정에 붙인다.")
+  @Test
+  void sendsWatchPatternsAndMapsSpansAndUsages() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        requests,
+        """
+            {"success":true,"data":{"innerThought":"운동 열심히 하네.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I go to a gym yesterday.",
+               "betterSentence":"I went to the gym yesterday.","reason":"어제 일이에요.",
+               "mistakePattern":"TENSE","wrongSpan":" go ","betterSpan":"Went"},
+             "patternUsages":[
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"go","correct":false},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"y","correct":false},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"g\\u0000o","correct":false},
+               {"pattern":"ARTICLE","sentence":"I go to a gym yesterday.","span":"a gym","correct":false},
+               {"pattern":"PLURAL","sentence":"I go to a gym yesterday.","span":"gym","correct":true},
+               {"pattern":"TENSE","sentence":"I went there.","span":"went","correct":true},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"Go","correct":false},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":" ","correct":true},
+               {"pattern":"TENSE","sentence":"I go to a gym yesterday.","span":"go","correct":null},
+               {"pattern":"NOPE","sentence":"I go to a gym yesterday.","span":"go","correct":true},
+               null
+             ]},"error":null}
+        """);
+    AiFreeTalkInnerThoughtRequest request =
+        new AiFreeTalkInnerThoughtRequest(
+            300L,
+            "chloe",
+            3002L,
+            1,
+            "EN",
+            "KR",
+            null,
+            List.of(
+                new AiConversationHistoryMessage(
+                    3002L, 1, "USER", "Hi. I go to a gym yesterday. It was fun.", null)),
+            List.of(),
+            List.of(FreeTalkMistakePattern.TENSE, FreeTalkMistakePattern.ARTICLE));
+
+    FreeTalkTurnCorrection correction = remoteClient().generateInnerThought(request).correction();
+
+    JsonNode sent = requests.get("/api/v1/free-talk/inner-thought").get("watchPatterns");
+    assertThat(sent).hasSize(2);
+    assertThat(sent.get(0).asString()).isEqualTo("TENSE");
+    // 구절은 앞뒤 공백을 떼어 저장하고, 문장에 대소문자까지 그대로 없으면 그 구절만 버린다.
+    assertThat(correction.sentence().wrongSpan()).isEqualTo("go");
+    assertThat(correction.sentence().betterSpan()).isNull();
+    // 보낸 패턴 밖(PLURAL)·원문에 없는 문장·대소문자가 다른 구절·두 번 나오는 구절(y)·문장에 없는 제어문자·빈 구절·맞음 여부 없음·모르는 패턴·null 항목은
+    // 버린다.
+    assertThat(correction.patternUsages())
+        .containsExactly(
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.TENSE, "I go to a gym yesterday.", "go", false),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.ARTICLE, "I go to a gym yesterday.", "a gym", false));
+  }
+
+  @DisplayName("문장에 두 번 나오는 강조 구절은 자리를 정할 수 없어 그 구절만 버린다.")
+  @Test
+  void dropsSpanThatAppearsTwice() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"운동하네.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I go and go.","betterSentence":"I went and went.",
+               "reason":"과거형","mistakePattern":"TENSE","wrongSpan":"go","betterSpan":"went and"}},
+             "error":null}
+        """);
+
+    FreeTalkTurnCorrection.Sentence sentence =
+        remoteClient().generateInnerThought(innerThoughtRequest()).correction().sentence();
+
+    assertThat(sentence.wrongSpan()).isNull();
+    assertThat(sentence.betterSpan()).isEqualTo("went and");
+  }
+
+  @DisplayName("구절은 단어 경계로 세므로 관사 a나 her처럼 다른 단어 안에 또 나오는 글자는 버리지 않고, 단어 일부(don)만 같은 구절은 버린다.")
+  @Test
+  void countsSpansByWordBoundary() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"고양이.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I have a cat and I don't go.",
+               "betterSentence":"I have the cat and I don't go.","reason":"관사",
+               "mistakePattern":"ARTICLE","wrongSpan":"a","betterSpan":"the"},
+             "patternUsages":[
+               {"pattern":"PRONOUN","sentence":"Where is her bag?","span":"her","correct":true},
+               {"pattern":"PRONOUN","sentence":"Where is her bag?","span":"Where","correct":true},
+               {"pattern":"TENSE","sentence":"I have a cat and I don't go.","span":"don","correct":false},
+               {"pattern":"TENSE","sentence":"I have a cat and I don't go.","span":"go","correct":false},
+               {"pattern":"TENSE","sentence":"I go to go-karts.","span":"go","correct":true}
+             ]},"error":null}
+        """);
+    AiFreeTalkInnerThoughtRequest request =
+        new AiFreeTalkInnerThoughtRequest(
+            300L,
+            "chloe",
+            3002L,
+            1,
+            "EN",
+            "KR",
+            null,
+            List.of(
+                new AiConversationHistoryMessage(
+                    3002L,
+                    1,
+                    "USER",
+                    "I have a cat and I don't go. Where is her bag? I go to go-karts.",
+                    null)),
+            List.of(),
+            List.of(FreeTalkMistakePattern.TENSE, FreeTalkMistakePattern.PRONOUN));
+
+    FreeTalkTurnCorrection correction = remoteClient().generateInnerThought(request).correction();
+
+    // have·cat 안의 a는 단어가 아니므로 관사 a는 한 번이다.
+    assertThat(correction.sentence().wrongSpan()).isEqualTo("a");
+    assertThat(correction.sentence().betterSpan()).isEqualTo("the");
+    // her는 Where 안의 her와 겹치지 않고, don은 don't의 일부라 없는 구절이며, go-karts의 go는 하이픈에 붙어 단어가 아니라 go는 한 번이다.
+    assertThat(correction.patternUsages())
+        .containsExactly(
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.PRONOUN, "Where is her bag?", "her", true),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.PRONOUN, "Where is her bag?", "Where", true),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.TENSE, "I have a cat and I don't go.", "go", false),
+            new FreeTalkPatternUsageDraft(
+                FreeTalkMistakePattern.TENSE, "I go to go-karts.", "go", true));
+  }
+
+  @DisplayName("교정 원문이 제출한 발화에 없으면 교정을 실패로 기록한다.")
+  @Test
+  void failsCorrectionWhoseSentenceIsNotInMessage() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        new ConcurrentHashMap<>(),
+        """
+            {"success":true,"data":{"innerThought":"즐거웠나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,
+             "correction":{"originalSentence":"I goes home.","betterSentence":"I go home.",
+                           "reason":"주어","mistakePattern":"SUBJECT_VERB_AGREEMENT"}},"error":null}
+        """);
+
+    AiFreeTalkInnerThoughtResult result =
+        remoteClient().generateInnerThought(innerThoughtRequest());
+
+    assertThat(result.correction()).isEqualTo(FreeTalkTurnCorrection.failed());
+    assertThat(result.correction().retryable()).isFalse();
+  }
+
+  @DisplayName("고칠 것이 없는 턴에도 사용례는 붙고, 지켜볼 패턴이 없으면 요청에 필드를 싣지 않는다.")
+  @Test
+  void keepsUsagesWithoutCorrectionAndOmitsEmptyWatchPatterns() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/inner-thought",
+        requests,
+        """
+            {"success":true,"data":{"innerThought":"좋았나 보다.","innerThoughtType":"GOOD",
+             "reactedToPartner":true,"correction":null,
+             "patternUsages":[{"pattern":"TENSE","sentence":"I'm going hiking with friends.",
+               "span":"going","correct":true}]},"error":null}
+        """);
+    AiFreeTalkInnerThoughtRequest request =
+        new AiFreeTalkInnerThoughtRequest(
+            300L,
+            "chloe",
+            3002L,
+            1,
+            "EN",
+            "KR",
+            null,
+            history(),
+            List.of(),
+            List.of(FreeTalkMistakePattern.TENSE));
+
+    FreeTalkTurnCorrection correction = remoteClient().generateInnerThought(request).correction();
+
+    assertThat(correction.sentence()).isNull();
+    assertThat(correction.patternUsages()).hasSize(1);
+    assertThat(correction.patternUsages().getFirst().correct()).isTrue();
+
+    remoteClient().generateInnerThought(innerThoughtRequest());
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("watchPatterns")).isFalse();
+  }
+
   @DisplayName("AI가 교정 판정을 돌려주지 못해 교정 필드가 비어 온 응답은 속마음을 살리고 교정은 다시 해 볼 실패로 본다.")
   @Test
   void treatsNullCorrectionJudgmentAsRetryableFailure() throws Exception {
@@ -273,12 +468,14 @@ class RemoteAiFreeTalkClientTest {
                     null,
                     history(),
                     gymMemoryContext(),
+                    List.of(FreeTalkMistakePattern.TENSE),
                     "v1",
                     summary,
                     true));
 
     JsonNode payload = requests.get("/api/v1/free-talk/inner-thought");
     assertThat(payload.get("contextPolicyVersion").asString()).isEqualTo("v1");
+    assertThat(payload.get("watchPatterns").get(0).asString()).isEqualTo("TENSE");
     assertThat(payload.get("sessionSummary").get("coveredThroughSequence").asInt()).isEqualTo(2);
     assertThat(payload.get("historyIncomplete").asBoolean()).isTrue();
     JsonNode memoryContext = payload.get("memoryContext");
@@ -1245,8 +1442,15 @@ class RemoteAiFreeTalkClientTest {
                 7L, EXPRESSION_TEXT, EXPRESSION_MEANING, EXPRESSION_USAGE)));
   }
 
+  // 교정 원문은 제출한 발화 안의 조각이어야 하므로, 각 테스트가 쓰는 원문을 모두 담은 발화를 둔다.
   private List<AiConversationHistoryMessage> history() {
     return List.of(
-        new AiConversationHistoryMessage(3002L, 1, "USER", "I'm going hiking with friends.", null));
+        new AiConversationHistoryMessage(
+            3002L,
+            1,
+            "USER",
+            "I'm going hiking with friends. I go. I go hiking yesterday. I go and go."
+                + " I was at a gym.",
+            null));
   }
 }

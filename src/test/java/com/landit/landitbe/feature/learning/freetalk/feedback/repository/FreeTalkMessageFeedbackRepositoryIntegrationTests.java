@@ -6,8 +6,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
+import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +38,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private FreeTalkMessageFeedbackRepository repository;
+
+  @Autowired private FreeTalkMessageFeedbackService feedbackService;
 
   @Autowired private TransactionTemplate transactionTemplate;
 
@@ -86,6 +92,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
 
   @AfterEach
   void clearFixtures() {
+    jdbcTemplate.update(
+        "delete from free_talk_pattern_usage where session_history_message_id = ?", MESSAGE_ID);
     jdbcTemplate.update(
         "delete from free_talk_message_feedback where session_history_message_id = ?", MESSAGE_ID);
     jdbcTemplate.update("delete from session_history_message where id = ?", MESSAGE_ID);
@@ -181,6 +189,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
     assertThat(feedbackRow())
         .containsEntry("PROCESSING_STATUS", "COMPLETED")
         .containsEntry("BETTER_SENTENCE", "I went to the gym.")
+        .containsEntry("WRONG_SPAN", "go")
+        .containsEntry("BETTER_SPAN", "went")
         .containsEntry("LEASE_UNTIL", null)
         .containsEntry("ATTEMPT_TOKEN", null);
     assertThat(failAttempt(2, "token-2")).isZero();
@@ -202,6 +212,56 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
                 MESSAGE_ID, attempts, token, ProcessingStatus.FAILED, ProcessingStatus.PREPARING));
   }
 
+  @DisplayName("저장한 강조 구절은 교정을 읽을 때 그대로 돌아온다.")
+  @Test
+  void roundTripsSpansThroughCorrection() {
+    seedFeedback("PREPARING", 1, null);
+    assertThat(completeWithCorrection()).isEqualTo(1);
+
+    FreeTalkTurnCorrection.Sentence sentence =
+        repository
+            .findBySessionHistoryMessageId(MESSAGE_ID)
+            .orElseThrow()
+            .toCorrection()
+            .sentence();
+    assertThat(sentence.wrongSpan()).isEqualTo("go");
+    assertThat(sentence.betterSpan()).isEqualTo("went");
+  }
+
+  @DisplayName("사용례는 교정이 실제로 반영된 트랜잭션에서만 저장되고, 늦게 온 중복 결과는 교정도 사용례도 넣지 않는다.")
+  @Test
+  void savesUsagesOnlyWithTheCompletionThatTookEffect() {
+    seedFeedback("PREPARING", 1, null);
+    FreeTalkTurnCorrection correction =
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I go to a gym.", "I went to the gym.", "과거형", FreeTalkMistakePattern.TENSE),
+            true,
+            List.of(
+                new FreeTalkPatternUsageDraft(
+                    FreeTalkMistakePattern.TENSE, "I go to a gym.", "go", false),
+                new FreeTalkPatternUsageDraft(
+                    FreeTalkMistakePattern.ARTICLE, "I go to a gym.", "a gym", false)));
+
+    assertThat(feedbackService.completeIfPreparing(MESSAGE_ID, correction)).isEqualTo(1);
+    assertThat(feedbackService.completeIfPreparing(MESSAGE_ID, correction)).isZero();
+
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select pattern from free_talk_pattern_usage where session_history_message_id = ?"
+                    + " order by id",
+                String.class,
+                MESSAGE_ID))
+        .containsExactly("TENSE", "ARTICLE");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select session_history_id from free_talk_pattern_usage"
+                    + " where session_history_message_id = ? limit 1",
+                Long.class,
+                MESSAGE_ID))
+        .isEqualTo(SESSION_HISTORY_ID);
+  }
+
   private int completeWithCorrection() {
     return transactionTemplate.execute(
         status ->
@@ -216,6 +276,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
                 null,
                 null,
                 null,
+                "go",
+                "went",
                 ProcessingStatus.PREPARING));
   }
 
@@ -234,7 +296,8 @@ class FreeTalkMessageFeedbackRepositoryIntegrationTests {
 
   private Map<String, Object> feedbackRow() {
     return jdbcTemplate.queryForMap(
-        "select processing_status, attempts, lease_until, attempt_token, better_sentence"
+        "select processing_status, attempts, lease_until, attempt_token, better_sentence,"
+            + " wrong_span, better_span"
             + " from free_talk_message_feedback where session_history_message_id = ?",
         MESSAGE_ID);
   }

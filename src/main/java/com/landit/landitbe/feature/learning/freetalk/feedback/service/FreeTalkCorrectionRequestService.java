@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 턴 교정을 다시 시도할 때 쓸 속마음·교정 요청을 저장된 기록에서 다시 만든다.
@@ -38,14 +37,17 @@ public class FreeTalkCorrectionRequestService {
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final FreeTalkMemoryRetrievalService memoryRetrievalService;
+  private final FreeTalkWatchPatternService watchPatternService;
 
   /**
    * 교정 대상 발화의 AI 요청을 다시 조립한다.
    *
+   * <p>트랜잭션을 열지 않는다. 열면 안에서 부르는 지켜볼 패턴 조회가 실패할 때 그 조회의 트랜잭션 프록시가 이 트랜잭션을 롤백 전용으로 표시해, 조회 쪽이 예외를 잡고
+   * 빈 목록을 돌려줘도 커밋에서 실패한다. 읽는 값은 모두 끝난 발화·세션의 것이라 한 트랜잭션으로 묶을 이유가 없다.
+   *
    * @param messageId 교정 대상 사용자 발화 ID
    * @return 다시 보낼 요청. 발화·대화 기록·프리톡 세션을 찾을 수 없거나 사용자 발화가 아니면 비어 있다
    */
-  @Transactional(readOnly = true)
   public Optional<AiFreeTalkInnerThoughtRequest> rebuild(long messageId) {
     Optional<SessionHistoryMessageSnapshot> message =
         conversationMessageService
@@ -79,7 +81,9 @@ public class FreeTalkCorrectionRequestService {
         history.getBaseLocale().name(),
         topic(session),
         historyThrough(message),
-        memoryRetrievalService.retrievedContexts(session.getId(), history.getUserProfileId()));
+        memoryRetrievalService.retrievedContexts(session.getId(), history.getUserProfileId()),
+        // 직전 세션은 끝난 세션이라 첫 시도와 같은 값이 나온다.
+        watchPatternService.watchPatterns(session.getLearningSessionId()));
   }
 
   // AI 서버는 제출한 발화가 이력의 마지막이어야 받는다. 그 뒤에 이어진 대화는 첫 시도 때 없던 입력이라 넣지 않는다.

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
+import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +36,24 @@ class FreeTalkTurnCorrectionTest {
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(
             () -> new FreeTalkTurnCorrection(ProcessingStatus.PREPARING, null, null, true))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @DisplayName("사용례는 판정을 마친 결과에만 붙고, 실패 결과에 붙이면 거부한다.")
+  @Test
+  void allowsPatternUsagesOnlyOnCompletedJudgment() {
+    FreeTalkPatternUsageDraft usage =
+        new FreeTalkPatternUsageDraft(
+            FreeTalkMistakePattern.TENSE, "I went to the gym.", "went", true);
+
+    assertThat(FreeTalkTurnCorrection.completed(null, true, List.of(usage)).patternUsages())
+        .containsExactly(usage);
+    assertThat(FreeTalkTurnCorrection.completed(null, true).patternUsages()).isEmpty();
+    assertThat(FreeTalkTurnCorrection.unavailable().patternUsages()).isEmpty();
+    assertThatThrownBy(
+            () ->
+                new FreeTalkTurnCorrection(
+                    ProcessingStatus.FAILED, null, null, false, List.of(usage)))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

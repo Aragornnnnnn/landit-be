@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.context.service.FreeTalkContextSummaryService;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkExitDecision;
 import com.landit.landitbe.feature.learning.freetalk.expression.service.FreeTalkExpressionGenerationDispatcher;
+import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkWatchPatternService;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationDispatchService;
@@ -55,6 +56,7 @@ public class FreeTalkMessageService {
   private final FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService;
   private final FreeTalkMemoryRetrievalService memoryRetrievalService;
   private final FreeTalkContextSummaryService contextSummaryService;
+  private final FreeTalkWatchPatternService watchPatternService;
 
   @Autowired
   FreeTalkMessageService(
@@ -66,6 +68,7 @@ public class FreeTalkMessageService {
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
       FreeTalkMemoryRetrievalService memoryRetrievalService,
+      FreeTalkWatchPatternService watchPatternService,
       FreeTalkContextSummaryService contextSummaryService) {
     this.submittedMessageService = submittedMessageService;
     this.replayService = replayService;
@@ -76,6 +79,7 @@ public class FreeTalkMessageService {
     this.memoryGenerationDispatchService = memoryGenerationDispatchService;
     this.memoryRetrievalService = memoryRetrievalService;
     this.contextSummaryService = contextSummaryService;
+    this.watchPatternService = watchPatternService;
   }
 
   /** 기존 단위 테스트와 로컬 조합을 위한 컨텍스트 비활성 생성자다. */
@@ -87,7 +91,8 @@ public class FreeTalkMessageService {
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       FreeTalkExpressionGenerationDispatcher expressionGenerationDispatcher,
       FreeTalkMemoryGenerationDispatchService memoryGenerationDispatchService,
-      FreeTalkMemoryRetrievalService memoryRetrievalService) {
+      FreeTalkMemoryRetrievalService memoryRetrievalService,
+      FreeTalkWatchPatternService watchPatternService) {
     this(
         submittedMessageService,
         replayService,
@@ -97,6 +102,7 @@ public class FreeTalkMessageService {
         expressionGenerationDispatcher,
         memoryGenerationDispatchService,
         memoryRetrievalService,
+        watchPatternService,
         null);
   }
 
@@ -410,6 +416,7 @@ public class FreeTalkMessageService {
         reservation.topic(),
         modelHistory(reservation.history(), context),
         correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()),
+        watchPatternService.watchPatterns(reservation.learningSessionId()),
         context.contextPolicyVersion(),
         context.sessionSummary(),
         context.historyIncomplete());
@@ -427,6 +434,7 @@ public class FreeTalkMessageService {
         reservation.topic(),
         modelHistory(reservation.history(), context),
         correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()),
+        watchPatternService.watchPatterns(reservation.learningSessionId()),
         context.contextPolicyVersion(),
         context.sessionSummary(),
         context.historyIncomplete());
