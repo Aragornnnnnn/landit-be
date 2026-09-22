@@ -29,6 +29,7 @@ public record ScenarioHistoryResponse(Long scenarioId, List<Session> sessions) {
    * @param messages 메시지 순서 오름차순의 대화 내역
    * @param feedback 저장된 완료 피드백. 아직 없으면 null
    */
+  @Schema(name = "ScenarioHistorySession")
   public record Session(
       Long sessionId,
       LocalDateTime startedAt,
@@ -51,6 +52,7 @@ public record ScenarioHistoryResponse(Long scenarioId, List<Session> sessions) {
    * @param innerThoughtType 속마음 유형
    * @param innerThoughtProcessingStatus 속마음 처리 상태. 대상이 아니면 null
    */
+  @Schema(name = "ScenarioHistoryMessage")
   public record Message(
       Long messageId,
       int messageSequence,

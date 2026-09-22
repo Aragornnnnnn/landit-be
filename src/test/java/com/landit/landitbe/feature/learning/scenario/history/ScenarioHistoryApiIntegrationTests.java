@@ -224,6 +224,28 @@ class ScenarioHistoryApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessions[1].feedback.messageFeedbacks", hasSize(1)));
   }
 
+  @Test
+  @DisplayName("OpenAPI는 인증과 시나리오 전용 메시지 스키마를 제공한다.")
+  void documentsHistoryWithoutCollidingWithFreeTalkMessages() throws Exception {
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/scenarios/{scenarioId}/history']"
+                        + ".get.security[0].bearerAuth")
+                .isArray())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.ScenarioHistorySession"
+                        + ".properties.messages.items['$ref']")
+                .value("#/components/schemas/ScenarioHistoryMessage"))
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.ScenarioHistoryMessage"
+                        + ".properties.innerThoughtProcessingStatus")
+                .exists());
+  }
+
   private ResultActions history(long userId, long scenarioId) throws Exception {
     return mvc.perform(
             get("/api/v1/scenarios/{id}/history", scenarioId)
