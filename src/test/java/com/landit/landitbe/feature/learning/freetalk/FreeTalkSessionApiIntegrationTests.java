@@ -1557,6 +1557,9 @@ class FreeTalkSessionApiIntegrationTests {
             "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
             Long.class,
             sessionId);
+    long reusedMessageId =
+        jdbcTemplate.queryForObject(
+            "SELECT session_history_message_id FROM free_talk_expression_reuse", Long.class);
     FreeTalkExpressionReuseSummary expectedSummary =
         new FreeTalkExpressionReuseSummary(
             false,
@@ -1566,6 +1569,7 @@ class FreeTalkSessionApiIntegrationTests {
                     "make up for",
                     "만회하다",
                     "9월 10일 시나리오 「주말 계획」",
+                    reusedMessageId,
                     "I made up for it today!",
                     "made up for")));
     assertThat(

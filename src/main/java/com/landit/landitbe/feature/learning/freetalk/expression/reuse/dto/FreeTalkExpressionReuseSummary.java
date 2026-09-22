@@ -35,6 +35,7 @@ public record FreeTalkExpressionReuseSummary(boolean pending, List<Item> items) 
    * @param meaning 저장 시점의 표현 뜻. 예: "커피 한잔하다"
    * @param sourceLabel 그 표현을 배운 날과 곳(한국어 고정). 곳은 시나리오·스몰톡 중 하나이고, 출처 제목을 남기지 못했으면 제목을 뺀다. 예: "9월
    *     10일 시나리오 「카페」", "9월 12일 스몰톡 「주말 계획」", "9월 10일 시나리오"
+   * @param messageId 이 표현을 처음 쓴 사용자 발화 ID. 예: 55020
    * @param quotedSentence 표현을 쓴 문장. 예: "I grabbed a coffee with a friend."
    * @param matchedText 그 문장에서 강조할 조각. 예: "grabbed a coffee"
    */
@@ -43,6 +44,7 @@ public record FreeTalkExpressionReuseSummary(boolean pending, List<Item> items) 
       String text,
       String meaning,
       String sourceLabel,
+      long messageId,
       String quotedSentence,
       String matchedText) {
 
@@ -53,6 +55,7 @@ public record FreeTalkExpressionReuseSummary(boolean pending, List<Item> items) 
           reuse.getExpressionText(),
           reuse.getExpressionMeaning(),
           sourceLabel(reuse),
+          reuse.getSessionHistoryMessageId(),
           reuse.getQuotedSentence(),
           reuse.getMatchedText());
     }
