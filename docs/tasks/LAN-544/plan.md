@@ -35,3 +35,13 @@
 - `git diff --check` 통과. 운영 PostgreSQL·스토어 결제·실기기·CI·배포는 검증하지 않았다.
 
 - 리뷰에서 확인한 억양 변경과 할인 부여의 갱신 유실을 수정했다. 실제 H2의 별도 트랜잭션에서 할인 기록·신규 혜택·억양 설정 보존과 재부여 방지를 검증했다. 수정 후 전체 테스트가 통과했고, 테스트 변수의 final 표기 보완 후 `./gradlew check --console=plain`도 통과했다.
+
+## 리뷰 수정: PostgreSQL 제약 검증 분리
+
+- V116을 H2·PostgreSQL 런타임 경로로 분리했다. H2는 기존 SQL 그대로이며 PostgreSQL은 CHECK를 `NOT VALID`로 추가한다. 새 쓰기는 즉시 검사하지만 기존 행 스캔은 별도 V121에서 수행한다.
+- 2026-09-22 develop V111 및 열린 PR의 세 런타임 migration 경로를 재확인했다. #213의 V120 다음 번호 V121을 사용하며 #212의 별도 검증은 V122다. V121 적용 전 V112~V120을 모두 포함하거나 이미 적용해야 한다. 병합·배포 직전 번호와 대상 DB 이력을 다시 확인한다.
+- Flyway `group` 기본값 false를 유지해 V116과 V121 사이에 커밋한다. 미배포 V116의 PostgreSQL SQL을 수정했으므로 이전 PR 버전을 적용한 개발 DB는 체크섬 차이를 별도로 처리해야 한다. 운영 이력은 조회하거나 변경하지 않았다.
+- PostgreSQL 15.18에서 [재실행 SQL](verify-discount-postgres.sql)을 통과했다. 기존 사용자 보존, 검증 전 잘못된 null 조합 2건 거부, 정상 상태 저장, V121 이후 `convalidated=true`, 검증 트랜잭션의 `ShareUpdateExclusiveLock`과 `AccessExclusiveLock` 부재를 확인했다. 전용 schema는 삭제했다.
+- 이 SQL 검증은 최소 사용자 테이블을 사용하는 제약 검증이며 운영 DB·전체 PostgreSQL Flyway 이력·JPA/API 동작을 증명하지 않는다.
+
+- 2026-09-22 리뷰 수정 후 `./gradlew check --offline --no-daemon --console=plain` 통과. Spotless·Checkstyle 포함, JUnit 1,365개, 실패·오류 0개, 환경 조건 생략 9개. `git diff --check` 통과. 운영 배포와 실기기 검증은 수행하지 않았다.
