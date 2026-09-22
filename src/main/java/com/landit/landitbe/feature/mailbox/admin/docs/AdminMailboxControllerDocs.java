@@ -6,6 +6,8 @@ import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedba
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyRequest;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterRequest;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterListResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterPatchRequest;
@@ -28,6 +30,27 @@ import org.springframework.http.ResponseEntity;
 /** 편지함 어드민 API의 OpenAPI 문서를 정의한다. */
 @Tag(name = "Admin Mailbox", description = "편지함 어드민 API")
 public interface AdminMailboxControllerDocs {
+
+  /**
+   * 지정한 활성 사용자에게 문의 연결 없이 직접 편지를 발송한다.
+   *
+   * @param principal 인증된 관리자
+   * @param request 수신자 ID 목록과 제목·본문
+   * @return 생성된 편지 ID, 수신자 수와 발송 시각
+   * @throws ApiException 중복되거나 유효하지 않은 수신자가 있는 경우
+   */
+  @Operation(
+      summary = "특정 사용자에게 직접 편지 발송",
+      description =
+          "활성 사용자 1~100명에게 DIRECT 편지를 즉시 발송한다. 푸시는 보내지 않는다. "
+              + "중복 ID는 400 INVALID_REQUEST, 잘못된 입력은 400 VALIDATION_FAILED, "
+              + "존재하지 않거나 탈퇴한 수신자는 404 RESOURCE_NOT_FOUND다. "
+              + "수신자 하나라도 유효하지 않으면 전체 발송을 취소한다. "
+              + "같은 요청을 다시 보내면 새 편지가 생성된다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "발송 완료")
+  ResponseEntity<ApiResponse<AdminMailboxDirectLetterResponse>> sendDirectLetter(
+      AuthUserPrincipal principal, @Valid AdminMailboxDirectLetterRequest request);
 
   /**
    * 공지·업데이트 목록을 조회한다.

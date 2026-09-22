@@ -8,6 +8,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummarySourceMessage;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
@@ -35,6 +39,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,6 +75,37 @@ class RemoteAiFreeTalkClientTest {
   @AfterEach
   void stopServer() {
     server.stop(0);
+  }
+
+  @Test
+  void doesNotSendInternalMessageSequenceToAi() {
+    String json =
+        jsonMapper.writeValueAsString(
+            new AiConversationHistoryMessage(101L, 1, "USER", "Hello", null, null, 30));
+    assertThat(json).doesNotContain("messageSequence");
+  }
+
+  @Test
+  void preservesContextLengthErrorFromAi() {
+    server.createContext(
+        "/api/v1/free-talk/turn",
+        exchange -> {
+          byte[] body =
+              "{\"success\":false,\"error\":{\"code\":\"FREE_TALK_CONTEXT_TOO_LARGE\"}}"
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(400, body.length);
+          try (var output = exchange.getResponseBody()) {
+            output.write(body);
+          }
+        });
+    assertThatThrownBy(() -> remoteClient().generateTurn(turnRequest()))
+        .isInstanceOf(ApiException.class)
+        .satisfies(
+            error -> {
+              ApiException exception = (ApiException) error;
+              assertThat(exception.getErrorCode().name()).isEqualTo("FREE_TALK_CONTEXT_TOO_LARGE");
+              assertThat(exception.getErrorCode().getStatus().value()).isEqualTo(400);
+            });
   }
 
   @DisplayName("프리톡 시작 요청의 주제와 이름 제외 계약을 전송하고 감정을 변환한다.")
@@ -126,6 +163,9 @@ class RemoteAiFreeTalkClientTest {
     assertThat(requests.get("/api/v1/free-talk/turn").get("responseMode").asString())
         .isEqualTo("NORMAL");
     assertThat(requests.get("/api/v1/free-talk/turn").has("partnerDisplayName")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("contextPolicyVersion")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("sessionSummary")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/turn").has("historyIncomplete")).isFalse();
   }
 
   @DisplayName("프리톡 속마음 응답의 평가 유형을 변환한다.")
@@ -403,7 +443,7 @@ class RemoteAiFreeTalkClientTest {
                 false));
   }
 
-  @DisplayName("속마음 요청에 기억 문맥을 보내고 교정의 근거 기억 ID와 라벨을 변환한다.")
+  @DisplayName("속마음 요청에 요약·기억 문맥을 함께 보내고 교정의 근거 기억 ID와 라벨을 변환한다.")
   @Test
   void sendsMemoryContextAndMapsCorrectionMemory() throws Exception {
     Map<String, JsonNode> requests = new ConcurrentHashMap<>();
@@ -412,10 +452,33 @@ class RemoteAiFreeTalkClientTest {
         requests,
         correctionResponse("\"usedMemoryId\":42,\"memoryLabel\":\" 헬스장 \""));
 
+    AiFreeTalkSessionSummary summary =
+        new AiFreeTalkSessionSummary(
+            1, 2, new AiFreeTalkSessionSummaryContent("운동", List.of(), List.of(), List.of()));
     AiFreeTalkInnerThoughtResult result =
-        remoteClient().generateInnerThought(innerThoughtRequest(gymMemoryContext()));
+        remoteClient()
+            .generateInnerThought(
+                new AiFreeTalkInnerThoughtRequest(
+                    300L,
+                    "chloe",
+                    3002L,
+                    1,
+                    "EN",
+                    "KR",
+                    null,
+                    history(),
+                    gymMemoryContext(),
+                    List.of(FreeTalkMistakePattern.TENSE),
+                    "v1",
+                    summary,
+                    true));
 
-    JsonNode memoryContext = requests.get("/api/v1/free-talk/inner-thought").get("memoryContext");
+    JsonNode payload = requests.get("/api/v1/free-talk/inner-thought");
+    assertThat(payload.get("contextPolicyVersion").asString()).isEqualTo("v1");
+    assertThat(payload.get("watchPatterns").get(0).asString()).isEqualTo("TENSE");
+    assertThat(payload.get("sessionSummary").get("coveredThroughSequence").asInt()).isEqualTo(2);
+    assertThat(payload.get("historyIncomplete").asBoolean()).isTrue();
+    JsonNode memoryContext = payload.get("memoryContext");
     assertThat(memoryContext).hasSize(1);
     assertThat(memoryContext.get(0).get("memoryId").asLong()).isEqualTo(42L);
     assertThat(result.correction().status().name()).isEqualTo("COMPLETED");
@@ -467,6 +530,10 @@ class RemoteAiFreeTalkClientTest {
 
     // 이 필드를 모르는 구버전 AI 서버가 요청 전체를 거부하지 않도록, 보낼 기억이 없으면 필드를 싣지 않는다.
     assertThat(requests.get("/api/v1/free-talk/inner-thought").has("memoryContext")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("contextPolicyVersion"))
+        .isFalse();
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("sessionSummary")).isFalse();
+    assertThat(requests.get("/api/v1/free-talk/inner-thought").has("historyIncomplete")).isFalse();
     assertThat(result.correction().sentence().usedMemoryId()).isNull();
     assertThat(result.correction().sentence().memoryLabel()).isNull();
   }
@@ -708,6 +775,26 @@ class RemoteAiFreeTalkClientTest {
         successResponse("{\"aiMessage\":\"Hello!\",\"translatedMessage\":\"안녕!\"}"));
     assertThat(remoteClient(Duration.ofSeconds(5)).generateOpening(openingRequest()).aiMessage())
         .isEqualTo("Hello!");
+  }
+
+  @DisplayName("프리톡 컨텍스트 요약은 일반 대화 timeout보다 짧은 전용 제한 시간을 적용한다.")
+  @Test
+  void contextSummaryUsesDedicatedTimeout() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/context-summary",
+        250,
+        successResponse(
+            "{\"policyVersion\":\"v1\",\"baseRevision\":0,"
+                + "\"coveredThroughSequence\":2,\"summary\":{\"topic\":\"주말\","
+                + "\"userStatements\":[],\"openThreads\":[],\"interactionContext\":[]}}"));
+
+    assertThatThrownBy(
+            () ->
+                remoteClient(Duration.ofSeconds(2), Duration.ofMillis(50))
+                    .generateContextSummary(contextSummaryRequest()))
+        .isInstanceOf(ApiException.class)
+        .extracting(exception -> ((ApiException) exception).getErrorCode())
+        .isEqualTo(ErrorCode.AI_GENERATION_FAILED);
   }
 
   private void registerDelayedResponse(String path, long delayMillis, String response) {
@@ -1201,6 +1288,11 @@ class RemoteAiFreeTalkClientTest {
   }
 
   private RemoteAiFreeTalkClient remoteClient(Duration requestTimeout) {
+    return remoteClient(requestTimeout, Duration.ofSeconds(10));
+  }
+
+  private RemoteAiFreeTalkClient remoteClient(
+      Duration requestTimeout, Duration contextSummaryRequestTimeout) {
     return new RemoteAiFreeTalkClient(
         jsonMapper,
         new AiClientProperties(
@@ -1210,7 +1302,28 @@ class RemoteAiFreeTalkClientTest {
             Duration.ofSeconds(1),
             requestTimeout,
             Duration.ofSeconds(1),
-            Duration.ofSeconds(20)));
+            Duration.ofSeconds(20),
+            "",
+            contextSummaryRequestTimeout));
+  }
+
+  private AiFreeTalkContextSummaryRequest contextSummaryRequest() {
+    return new AiFreeTalkContextSummaryRequest(
+        1L,
+        "v1",
+        0,
+        null,
+        0,
+        2,
+        "Asia/Seoul",
+        List.of(
+            new AiFreeTalkContextSummarySourceMessage(
+                1,
+                10L,
+                1,
+                "USER",
+                "주말에 등산했어.",
+                OffsetDateTime.of(2026, 9, 20, 10, 0, 0, 0, ZoneOffset.ofHours(9)))));
   }
 
   private String successResponse(String data) {

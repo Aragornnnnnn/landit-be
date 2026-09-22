@@ -237,6 +237,10 @@ class FeatureBoundaryTest {
       return "";
     }
     String[] parts = name.substring(FEATURE.length()).split("\\.");
+    // 알람은 자체 저장소를 소유하고 공통 프로필 서비스만 호출하는 별도 업무다.
+    if (name.startsWith(FEATURE + "profile.alarm.")) {
+      return "profile.alarm";
+    }
     // learning 내부에서도 데이터 소유와 요청 조율의 경계를 별도로 검사한다.
     for (String unit :
         List.of(

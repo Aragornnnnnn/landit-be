@@ -4,6 +4,9 @@ package com.landit.landitbe.feature.mailbox;
 
 import com.landit.landitbe.feature.mailbox.docs.MailboxControllerDocs;
 import com.landit.landitbe.feature.mailbox.dto.MailboxUnreadCountResponse;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.dto.MailboxAttachmentImage;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.service.MailboxFeedbackAttachmentService;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.service.MailboxFeedbackSubmissionService;
 import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxFeedbackSubmitRequest;
 import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackListResponse;
@@ -14,8 +17,11 @@ import com.landit.landitbe.feature.mailbox.letter.service.MailboxLetterService;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +29,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 편지함 사용자 API의 HTTP 요청을 처리한다. */
 @RestController
@@ -32,15 +40,45 @@ public class MailboxController implements MailboxControllerDocs {
 
   private final MailboxFeedbackService mailboxFeedbackService;
   private final MailboxLetterService mailboxLetterService;
+  private final MailboxFeedbackSubmissionService mailboxFeedbackSubmissionService;
+  private final MailboxFeedbackAttachmentService mailboxFeedbackAttachmentService;
 
   /** {@inheritDoc} */
   @Override
-  @PostMapping("/api/v1/mailbox/feedbacks")
+  @PostMapping(value = "/api/v1/mailbox/feedbacks", consumes = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<ApiResponse<Void>> submitFeedback(
       @AuthenticationPrincipal AuthUserPrincipal principal,
       @Valid @RequestBody MailboxFeedbackSubmitRequest request) {
     mailboxFeedbackService.submitFeedback(principal.userId(), request);
     return ApiResponse.success(HttpStatus.CREATED, null);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping(value = "/api/v1/mailbox/feedbacks", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ApiResponse<Void>> submitFeedbackWithImages(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @Valid @RequestPart("feedback") MailboxFeedbackSubmitRequest request,
+      @RequestPart(name = "images", required = false) List<MultipartFile> images) {
+    mailboxFeedbackSubmissionService.submit(principal.userId(), request, images);
+    return ApiResponse.success(HttpStatus.CREATED, null);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/mailbox/feedbacks/{feedbackId}/attachments/{attachmentId}")
+  public ResponseEntity<byte[]> getFeedbackAttachment(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable Long feedbackId,
+      @PathVariable Long attachmentId) {
+    MailboxAttachmentImage image =
+        mailboxFeedbackAttachmentService.download(principal.userId(), feedbackId, attachmentId);
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(image.contentType()))
+        .contentLength(image.content().length)
+        .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+        .header("X-Content-Type-Options", "nosniff")
+        .body(image.content());
   }
 
   /** {@inheritDoc} */

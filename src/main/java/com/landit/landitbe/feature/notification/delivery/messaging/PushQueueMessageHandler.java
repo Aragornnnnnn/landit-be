@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.notification.delivery.dto.SendPushNotificatio
 import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.delivery.service.PushReceiptService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
+import com.landit.landitbe.feature.notification.scheduled.service.ReviewNotificationService;
 import com.landit.landitbe.feature.notification.scheduled.service.ScheduledNotificationService;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class PushQueueMessageHandler {
   private final PushReceiptService pushReceiptService;
   private final ScheduledNotificationService scheduledNotificationService;
   private final NotificationDispatchService notificationDispatchService;
+  private final ReviewNotificationService reviewNotificationService;
 
   private final com.landit.landitbe.feature.notification.campaign.service.AdminPushProcessingService
       adminPushProcessingService;
@@ -80,6 +82,9 @@ public class PushQueueMessageHandler {
       case PushQueueMessage.PUSH_RECEIPT_CHECK -> handleReceiptCheck(message.payload());
       case SCHEDULED_NOTIFICATION_BATCH ->
           scheduledNotificationService.process(
+              message.messageId(), message.occurredAt(), visibilityExtender);
+      case PushQueueMessage.REVIEW_NOTIFICATION_BATCH ->
+          reviewNotificationService.process(
               message.messageId(), message.occurredAt(), visibilityExtender);
       default -> throw new IllegalArgumentException("지원하지 않는 Push 메시지 유형입니다.");
     }
@@ -146,6 +151,7 @@ public class PushQueueMessageHandler {
   private String mailboxReplyDeepLink(Long mailboxLetterId) {
     return "/mailbox/received/"
         + mailboxLetterId
-        + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply";
+        + "?utm_source=push&utm_medium=notification&utm_campaign=mailbox_reply"
+        + "&utm_content=mailbox_reply_arrived";
   }
 }

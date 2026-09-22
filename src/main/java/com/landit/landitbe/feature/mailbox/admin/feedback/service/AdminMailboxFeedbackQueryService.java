@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.mailbox.admin.feedback.service;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackDetailResponse;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackResponse;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.service.MailboxFeedbackAttachmentService;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
@@ -34,6 +35,7 @@ public class AdminMailboxFeedbackQueryService {
 
   private final AdminMailboxLetterRepository letterRepository;
   private final AdminMailboxFeedbackRepository feedbackRepository;
+  private final MailboxFeedbackAttachmentService attachmentService;
 
   /**
    * 어드민 피드백을 검색·필터링해 페이지로 조회한다.
@@ -113,7 +115,8 @@ public class AdminMailboxFeedbackQueryService {
         feedback.getResolvedByFeedbackId(),
         feedback.getCreatedAt(),
         feedback.getUpdatedAt(),
-        toFeedbackReply(reply));
+        toFeedbackReply(reply),
+        attachmentService.getAttachments(feedbackId));
   }
 
   private Page<AdminMailboxFeedbackSummary> findFeedbacks(

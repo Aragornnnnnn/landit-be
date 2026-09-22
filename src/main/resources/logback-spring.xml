@@ -6,7 +6,7 @@
 	<springProperty scope="context" name="sentryDsn" source="sentry.dsn" defaultValue=""/>
 	<springProperty scope="context" name="sentryEnvironment" source="sentry.environment" defaultValue="local"/>
 
-	<appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+	<appender name="SENTRY" class="com.landit.landitbe.shared.observability.SafeSentryAppender">
 		<options>
 			<dsn>${sentryDsn}</dsn>
 			<environment>${sentryEnvironment}</environment>

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.mailbox.feedback.service;
 
+import com.landit.landitbe.feature.mailbox.feedback.attachment.service.MailboxFeedbackAttachmentService;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedback;
 import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxFeedbackSubmitRequest;
 import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackDetailResponse;
@@ -38,6 +39,7 @@ public class MailboxFeedbackService {
 
   private final MailboxFeedbackRepository mailboxFeedbackRepository;
   private final MailboxLetterRepository mailboxLetterRepository;
+  private final MailboxFeedbackAttachmentService attachmentService;
   private final MailboxLetterRecipientRepository mailboxLetterRecipientRepository;
 
   /**
@@ -109,7 +111,8 @@ public class MailboxFeedbackService {
         feedback.getResolvedByFeedbackId(),
         feedback.getCreatedAt(),
         feedback.getUpdatedAt(),
-        getPublishedReplies(feedback.getId(), userProfileId));
+        getPublishedReplies(feedback.getId(), userProfileId),
+        attachmentService.getAttachments(feedback.getId()));
   }
 
   private static MailboxSentFeedbackListResponse.Item toSentFeedbackItem(MailboxFeedback feedback) {

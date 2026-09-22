@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionChangedEvent;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
@@ -24,6 +25,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -32,6 +35,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @SpringBootTest
+@RecordApplicationEvents
 @TestPropertySource(
     properties = {
       "landit.auth.oidc.fake-enabled=true",
@@ -45,10 +49,14 @@ class RevenueCatWebhookApiIntegrationTests {
 
   private static final long BASE_EVENT_TIMESTAMP_MS = 1_756_000_000_000L;
   private static final long EXPIRATION_MS = BASE_EVENT_TIMESTAMP_MS + 30L * 24 * 60 * 60 * 1000;
+  private static final long GRACE_EXPIRATION_MS = EXPIRATION_MS + 3L * 24 * 60 * 60 * 1000;
+  private static final long RENEWED_EXPIRATION_MS = EXPIRATION_MS + 30L * 24 * 60 * 60 * 1000;
 
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private ApplicationEvents applicationEvents;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -480,8 +488,8 @@ class RevenueCatWebhookApiIntegrationTests {
             });
   }
 
-  /** 결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태는 바꾸지 않는다. */
-  @DisplayName("결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태는 바꾸지 않는다.")
+  /** 유예 종료 시각이 없는 결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태와 만료 시각은 바꾸지 않는다. */
+  @DisplayName("유예 종료 시각이 없는 결제 실패와 플랜 변경 이벤트는 이력으로만 남기고 구독 상태와 만료 시각은 바꾸지 않는다.")
   @Test
   void recordsBillingIssueAndProductChangeWithoutStatusChange() throws Exception {
     Long userId = createUser("rc-history-only");
@@ -494,9 +502,275 @@ class RevenueCatWebhookApiIntegrationTests {
         .andExpect(status().isOk());
 
     assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(EXPIRATION_MS);
     assertThat(subscriptionEvents(userId))
         .extracting(row -> row.get("type"))
         .containsExactly("INITIAL_PURCHASE", "BILLING_ISSUE", "PRODUCT_CHANGE");
+  }
+
+  /** 유예 종료 시각이 있는 결제 실패 이벤트는 상태와 나머지 구독 정보를 두고 만료 시각을 유예 종료 시각으로 늘리며 마지막 반영 이벤트 시각을 갱신한다. */
+  @DisplayName(
+      "유예 종료 시각이 있는 결제 실패 이벤트는 상태와 나머지 구독 정보를 두고 만료 시각을 유예 종료 시각으로 늘리며 마지막 반영 이벤트 시각을 갱신한다.")
+  @Test
+  void extendsExpiryToGracePeriodEndOnBillingIssue() throws Exception {
+    Long userId = createUser("rc-grace");
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "INITIAL_PURCHASE",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS,
+                Map.of("period_type", "NORMAL")))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 1_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(GRACE_EXPIRATION_MS);
+    assertThat(subscriptionPeriodType(userId)).isEqualTo("NORMAL");
+    assertThat(subscriptionProductId(userId)).isEqualTo("landit_premium_monthly");
+    assertThat(subscriptionStore(userId)).isEqualTo("APP_STORE");
+    assertThat(subscriptionEventAt(userId).getTime()).isEqualTo(BASE_EVENT_TIMESTAMP_MS + 1_000);
+    // 구독 변경 이벤트는 최초 구매 한 번만 발행되고 유예 연장으로는 발행되지 않는다.
+    assertThat(applicationEvents.stream(SubscriptionChangedEvent.class)).hasSize(1);
+    List<Map<String, Object>> events = subscriptionEvents(userId);
+    assertThat(events)
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE", "BILLING_ISSUE");
+    assertThat(((Timestamp) events.get(1).get("expires_at")).getTime()).isEqualTo(EXPIRATION_MS);
+  }
+
+  /** 프리미엄이 꺼진 사용자에게 온 결제 실패 이벤트는 유예 종료 시각이 있어도 만료 시각을 만들지 않는다. */
+  @DisplayName("프리미엄이 꺼진 사용자에게 온 결제 실패 이벤트는 유예 종료 시각이 있어도 만료 시각을 만들지 않는다.")
+  @Test
+  void keepsExpiryWhenBillingIssueArrivesForNonPremiumUser() throws Exception {
+    Long neverSubscribed = createUser("rc-grace-none");
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(neverSubscribed, BASE_EVENT_TIMESTAMP_MS, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+    assertThat(subscriptionStatus(neverSubscribed)).isEqualTo("NONE");
+    assertThat(subscriptionExpiresAt(neverSubscribed)).isNull();
+    assertThat(subscriptionEvents(neverSubscribed))
+        .extracting(row -> row.get("type"))
+        .containsExactly("BILLING_ISSUE");
+
+    Long expired = createUser("rc-grace-expired");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", expired, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(WEBHOOK_SECRET, event("EXPIRATION", expired, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(expired, BASE_EVENT_TIMESTAMP_MS + 2_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+    assertThat(subscriptionStatus(expired)).isEqualTo("EXPIRED");
+    assertThat(subscriptionExpiresAt(expired)).isNull();
+    assertThat(subscriptionEvents(expired))
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE", "EXPIRATION", "BILLING_ISSUE");
+  }
+
+  /** 유예 종료 시각이 저장된 만료 시각보다 늦지 않으면 만료 시각을 바꾸지 않는다. */
+  @DisplayName("유예 종료 시각이 저장된 만료 시각보다 늦지 않으면 만료 시각을 바꾸지 않는다.")
+  @Test
+  void keepsExpiryWhenGracePeriodEndsNotAfterStoredExpiry() throws Exception {
+    Long userId = createUser("rc-grace-not-later");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 1_000, EXPIRATION_MS - 1_000))
+        .andExpect(status().isOk());
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(EXPIRATION_MS);
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 2_000, EXPIRATION_MS))
+        .andExpect(status().isOk());
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(EXPIRATION_MS);
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+  }
+
+  /** 갱신 결제 실패 사유의 해지 이벤트는 이력만 남기고 구독 상태·만료 시각·이벤트 시각을 바꾸지 않는다. */
+  @DisplayName("갱신 결제 실패 사유의 해지 이벤트는 이력만 남기고 구독 상태·만료 시각·이벤트 시각을 바꾸지 않는다.")
+  @Test
+  void recordsBillingErrorCancellationWithoutStatusChange() throws Exception {
+    Long userId = createUser("rc-billing-error");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(WEBHOOK_SECRET, billingErrorCancellation(userId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(EXPIRATION_MS);
+    assertThat(subscriptionEventAt(userId).getTime()).isEqualTo(BASE_EVENT_TIMESTAMP_MS);
+    List<Map<String, Object>> events = subscriptionEvents(userId);
+    assertThat(events)
+        .extracting(row -> row.get("type"))
+        .containsExactly("INITIAL_PURCHASE", "CANCELLATION");
+    assertThat(events.get(1).get("cancel_reason")).isEqualTo("BILLING_ERROR");
+  }
+
+  /** 결제 실패와 결제 실패 사유의 해지가 어느 순서로 와도 상태는 유지되고 만료 시각은 유예 종료 시각이 된다. */
+  @DisplayName("결제 실패와 결제 실패 사유의 해지가 어느 순서로 와도 상태는 유지되고 만료 시각은 유예 종료 시각이 된다.")
+  @Test
+  void extendsExpiryRegardlessOfBillingIssueAndBillingErrorCancellationOrder() throws Exception {
+    Long issueFirst = createUser("rc-grace-issue-first");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", issueFirst, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(issueFirst, BASE_EVENT_TIMESTAMP_MS + 1_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET, billingErrorCancellation(issueFirst, BASE_EVENT_TIMESTAMP_MS + 1_500))
+        .andExpect(status().isOk());
+    assertThat(subscriptionStatus(issueFirst)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(issueFirst).getTime()).isEqualTo(GRACE_EXPIRATION_MS);
+
+    Long cancellationFirst = createUser("rc-grace-cancel-first");
+    postWebhook(
+            WEBHOOK_SECRET, event("INITIAL_PURCHASE", cancellationFirst, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingErrorCancellation(cancellationFirst, BASE_EVENT_TIMESTAMP_MS + 1_500))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(
+                cancellationFirst, BASE_EVENT_TIMESTAMP_MS + 1_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+    assertThat(subscriptionStatus(cancellationFirst)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(cancellationFirst).getTime()).isEqualTo(GRACE_EXPIRATION_MS);
+    assertThat(subscriptionEvents(cancellationFirst))
+        .extracting(row -> row.get("type"))
+        .containsExactlyInAnyOrder("INITIAL_PURCHASE", "CANCELLATION", "BILLING_ISSUE");
+  }
+
+  /** 유예 중 결제가 복구되면 갱신 이벤트가 만료 시각을 다음 기간으로 옮긴다. */
+  @DisplayName("유예 중 결제가 복구되면 갱신 이벤트가 만료 시각을 다음 기간으로 옮긴다.")
+  @Test
+  void movesExpiryForwardOnRenewalAfterGraceExtension() throws Exception {
+    Long userId = createUser("rc-grace-renewal");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 1_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "RENEWAL",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 2_000,
+                RENEWED_EXPIRATION_MS,
+                Map.of()))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(RENEWED_EXPIRATION_MS);
+  }
+
+  /** 유예가 끝나도 결제되지 않으면 결제 실패 사유의 만료 이벤트가 프리미엄을 끄고 구독 정보를 비운다. */
+  @DisplayName("유예가 끝나도 결제되지 않으면 결제 실패 사유의 만료 이벤트가 프리미엄을 끄고 구독 정보를 비운다.")
+  @Test
+  void expiresAfterGraceExtensionOnBillingErrorExpiration() throws Exception {
+    Long userId = createUser("rc-grace-expire");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 1_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "EXPIRATION",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 2_000,
+                Map.of("expiration_reason", "BILLING_ERROR")))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("EXPIRED");
+    assertThat(subscriptionExpiresAt(userId)).isNull();
+    assertThat(subscriptionPeriodType(userId)).isNull();
+    assertThat(subscriptionProductId(userId)).isNull();
+    assertThat(subscriptionStore(userId)).isNull();
+  }
+
+  /** 해지 예약 상태도 만료 전까지 프리미엄이므로 결제 실패 유예 연장을 똑같이 받고 상태는 해지 예약으로 남는다. */
+  @DisplayName("해지 예약 상태도 만료 전까지 프리미엄이므로 결제 실패 유예 연장을 똑같이 받고 상태는 해지 예약으로 남는다.")
+  @Test
+  void extendsExpiryForCanceledSubscriptionOnBillingIssue() throws Exception {
+    Long userId = createUser("rc-grace-canceled");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(WEBHOOK_SECRET, event("CANCELLATION", userId, BASE_EVENT_TIMESTAMP_MS + 1_000))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 2_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("CANCELED");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(GRACE_EXPIRATION_MS);
+  }
+
+  /** 유예 연장 뒤에 도착한, 유예 시작 전에 생성된 상태 이벤트는 오래된 이벤트로 무시되어 연장을 되돌리지 못한다. */
+  @DisplayName("유예 연장 뒤에 도착한, 유예 시작 전에 생성된 상태 이벤트는 오래된 이벤트로 무시되어 연장을 되돌리지 못한다.")
+  @Test
+  void ignoresStatusEventOlderThanGraceExtension() throws Exception {
+    Long userId = createUser("rc-grace-late-status");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(userId, BASE_EVENT_TIMESTAMP_MS + 5_000, GRACE_EXPIRATION_MS))
+        .andExpect(status().isOk());
+
+    postWebhook(WEBHOOK_SECRET, event("CANCELLATION", userId, BASE_EVENT_TIMESTAMP_MS + 2_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(GRACE_EXPIRATION_MS);
+  }
+
+  /** 갱신이 먼저 반영된 뒤 늦게 도착한 결제 실패 이벤트는 유예 종료 시각이 더 늦어도 무시한다. */
+  @DisplayName("갱신이 먼저 반영된 뒤 늦게 도착한 결제 실패 이벤트는 유예 종료 시각이 더 늦어도 무시한다.")
+  @Test
+  void ignoresBillingIssueOlderThanLastStatusEvent() throws Exception {
+    Long userId = createUser("rc-grace-stale");
+    postWebhook(WEBHOOK_SECRET, event("INITIAL_PURCHASE", userId, BASE_EVENT_TIMESTAMP_MS))
+        .andExpect(status().isOk());
+    postWebhook(
+            WEBHOOK_SECRET,
+            event(
+                "RENEWAL",
+                userId,
+                BASE_EVENT_TIMESTAMP_MS + 5_000,
+                RENEWED_EXPIRATION_MS,
+                Map.of()))
+        .andExpect(status().isOk());
+
+    postWebhook(
+            WEBHOOK_SECRET,
+            billingIssueEvent(
+                userId, BASE_EVENT_TIMESTAMP_MS + 1_000, RENEWED_EXPIRATION_MS + 1_000))
+        .andExpect(status().isOk());
+
+    assertThat(subscriptionStatus(userId)).isEqualTo("ACTIVE");
+    assertThat(subscriptionExpiresAt(userId).getTime()).isEqualTo(RENEWED_EXPIRATION_MS);
   }
 
   /** 구독 이전 이벤트를 받으면 넘겨준 계정은 구독 없음이 되고 넘겨받은 계정이 같은 구독 정보를 갖는다. */
@@ -787,9 +1061,24 @@ class RevenueCatWebhookApiIntegrationTests {
   }
 
   private static String event(
-      String type, Long userId, long eventTimestampMs, Map<String, String> extraFields) {
+      String type, Long userId, long eventTimestampMs, Map<String, ?> extraFields) {
+    return event(type, userId, eventTimestampMs, EXPIRATION_MS, extraFields);
+  }
+
+  /** 웹훅 이벤트 본문을 만든다. 추가 필드는 문자열이면 따옴표로 감싸고 그 외 값은 그대로 넣어 숫자 필드를 실제 형식으로 보낼 수 있다. */
+  private static String event(
+      String type,
+      Long userId,
+      long eventTimestampMs,
+      long expirationMs,
+      Map<String, ?> extraFields) {
     StringBuilder extra = new StringBuilder();
-    extraFields.forEach((key, value) -> extra.append(",\"%s\":\"%s\"".formatted(key, value)));
+    extraFields.forEach(
+        (key, value) ->
+            extra.append(
+                value instanceof String
+                    ? ",\"%s\":\"%s\"".formatted(key, value)
+                    : ",\"%s\":%s".formatted(key, value)));
     String template =
         """
         {
@@ -821,8 +1110,23 @@ class RevenueCatWebhookApiIntegrationTests {
         userId,
         eventTimestampMs,
         eventTimestampMs,
-        EXPIRATION_MS,
+        expirationMs,
         extra);
+  }
+
+  /** 유예 종료 시각을 가진 결제 실패 이벤트 본문을 만든다. */
+  private static String billingIssueEvent(Long userId, long eventTimestampMs, long graceMs) {
+    return event(
+        "BILLING_ISSUE",
+        userId,
+        eventTimestampMs,
+        Map.of("grace_period_expiration_at_ms", graceMs));
+  }
+
+  /** 갱신 결제 실패 사유의 해지 이벤트 본문을 만든다. */
+  private static String billingErrorCancellation(Long userId, long eventTimestampMs) {
+    return event(
+        "CANCELLATION", userId, eventTimestampMs, Map.of("cancel_reason", "BILLING_ERROR"));
   }
 
   private String subscriptionStatus(Long userId) {
@@ -855,6 +1159,11 @@ class RevenueCatWebhookApiIntegrationTests {
   private Timestamp subscriptionExpiresAt(Long userId) {
     return jdbcTemplate.queryForObject(
         "select subscription_expires_at from user_profile where id = ?", Timestamp.class, userId);
+  }
+
+  private Timestamp subscriptionEventAt(Long userId) {
+    return jdbcTemplate.queryForObject(
+        "select subscription_event_at from user_profile where id = ?", Timestamp.class, userId);
   }
 
   /** 가짜 소셜 로그인으로 사용자를 만들고 user_profile ID를 반환한다. */

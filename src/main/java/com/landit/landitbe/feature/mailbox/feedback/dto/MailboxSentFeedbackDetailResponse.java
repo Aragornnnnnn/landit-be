@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.mailbox.feedback.dto;
 
+import com.landit.landitbe.feature.mailbox.feedback.attachment.dto.MailboxFeedbackAttachmentResponse;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -20,6 +21,7 @@ import java.util.List;
  * @param createdAt 등록 시각
  * @param updatedAt 수정 시각
  * @param replies 연결된 답장 목록
+ * @param attachments 첨부 순서대로 정렬한 이미지 목록. 첨부가 없으면 빈 배열
  */
 @Schema(description = "보낸 편지함 피드백 상세 응답")
 public record MailboxSentFeedbackDetailResponse(
@@ -31,7 +33,8 @@ public record MailboxSentFeedbackDetailResponse(
     @Schema(description = "대표 피드백 ID. 없으면 null") Long resolvedByFeedbackId,
     @Schema(description = "등록 시각") LocalDateTime createdAt,
     @Schema(description = "수정 시각") LocalDateTime updatedAt,
-    @Schema(description = "연결된 답장 목록") List<Reply> replies) {
+    @Schema(description = "연결된 답장 목록") List<Reply> replies,
+    @Schema(description = "첨부 이미지 목록") List<MailboxFeedbackAttachmentResponse> attachments) {
 
   /**
    * 피드백에 연결된 답장 요약이다.

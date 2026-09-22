@@ -5,6 +5,9 @@ package com.landit.landitbe.feature.learning.freetalk.client.ai;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.CharacterEmotion;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationExcerpt;
@@ -29,6 +32,7 @@ import com.landit.landitbe.shared.client.ai.AiHttpClient;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -44,6 +48,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnProperty(prefix = "landit.ai", name = "client-mode", havingValue = "remote")
 public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   private final AiHttpClient http;
+  private final Duration contextSummaryRequestTimeout;
 
   /**
    * JSON 변환기와 AI 서버 설정으로 원격 프리톡 클라이언트를 구성한다.
@@ -53,6 +58,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
    */
   public RemoteAiFreeTalkClient(JsonMapper jsonMapper, AiClientProperties properties) {
     this.http = new AiHttpClient(jsonMapper, properties);
+    this.contextSummaryRequestTimeout = properties.contextSummaryRequestTimeout();
   }
 
   private static final String OPENING_PATH = "/api/v1/free-talk/opening";
@@ -63,6 +69,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       "/api/v1/free-talk/expression-recommendations";
   private static final String CONVERSATION_EMBEDDINGS_PATH =
       "/api/v1/free-talk/conversation-embeddings";
+  private static final String CONTEXT_SUMMARY_PATH = "/api/v1/free-talk/context-summary";
   private static final int MAX_CONVERSATION_EXCERPTS = 4;
 
   /** {@inheritDoc} */
@@ -119,6 +126,18 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       AiConversationEmbeddingsRequest request) {
     return http.post(
             CONVERSATION_EMBEDDINGS_PATH, request, RemoteConversationEmbeddingsResponse.class)
+        .toResult();
+  }
+
+  /** 요약 전용 AI API를 일반 프리톡 생성 timeout과 분리해 호출한다. */
+  @Override
+  public AiFreeTalkContextSummaryResult generateContextSummary(
+      AiFreeTalkContextSummaryRequest request) {
+    return http.post(
+            CONTEXT_SUMMARY_PATH,
+            request,
+            RemoteContextSummaryResponse.class,
+            contextSummaryRequestTimeout)
         .toResult();
   }
 
@@ -564,6 +583,22 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
           || excerpt.embedding() == null
           || excerpt.embedding().size() != AiConversationExcerpt.EMBEDDING_DIMENSION
           || excerpt.embedding().contains(null);
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record RemoteContextSummaryResponse(
+      String policyVersion,
+      int baseRevision,
+      int coveredThroughSequence,
+      AiFreeTalkSessionSummaryContent summary) {
+
+    private AiFreeTalkContextSummaryResult toResult() {
+      if (summary == null || blank(policyVersion) || coveredThroughSequence <= 0) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
+      return new AiFreeTalkContextSummaryResult(
+          policyVersion, baseRevision, coveredThroughSequence, summary);
     }
   }
 

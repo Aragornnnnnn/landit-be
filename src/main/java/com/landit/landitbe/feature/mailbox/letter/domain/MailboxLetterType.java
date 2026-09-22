@@ -6,5 +6,6 @@ package com.landit.landitbe.feature.mailbox.letter.domain;
 public enum MailboxLetterType {
   NOTICE,
   UPDATE,
-  REPLY
+  REPLY,
+  DIRECT
 }

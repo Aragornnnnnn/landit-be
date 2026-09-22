@@ -122,7 +122,10 @@ class UserSubscriptionServiceTest {
         scenarioProgressService,
         mock(SubscriptionEventRepository.class),
         new SubscriptionLaunchPolicyService(new SubscriptionProperties(launchedAt), clock),
-        grants);
+        grants,
+        mock(
+            com.landit.landitbe.feature.profile.subscription.service.ProfileDiscountOfferService
+                .class));
   }
 
   private UserSubscriptionSnapshot snapshot(boolean premium) {

@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.retrieval.repository.FreeTalkMemoryRetrievalTraceRepository;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +52,7 @@ public class FreeTalkMemoryRetrievalService {
     try {
       return retrieveWhenEnabled(request);
     } catch (RuntimeException exception) {
+      FailureObservation.failed("memory_retrieval", "retrieval", "context_unavailable", exception);
       meterRegistry.counter("landit.memory.fallback", "stage", request.stage().name()).increment();
       return fallback(request);
     }
@@ -138,10 +140,8 @@ public class FreeTalkMemoryRetrievalService {
       traceRepository.recordUsage(
           result.sessionId(), result.stage(), normalized, responseMessageId);
     } catch (RuntimeException exception) {
-      log.warn(
-          "프리톡 장기기억 사용 trace를 저장하지 못했습니다. stage={} policyVersion={}",
-          result.stage(),
-          POLICY_VERSION);
+      FailureObservation.failed(
+          "memory_retrieval", "trace_persistence", "storage_failed", exception);
     }
   }
 

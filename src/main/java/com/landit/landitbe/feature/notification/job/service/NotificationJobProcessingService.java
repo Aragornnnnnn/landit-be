@@ -125,7 +125,8 @@ public class NotificationJobProcessingService {
                 NotificationType.TRIAL_ENDING,
                 "무료 체험 종료 예정 안내",
                 "무료 체험이 곧 종료돼요. 결제 전 구독 정보를 확인해 주세요.",
-                "/me/subscription")));
+                "/me/subscription?utm_source=push&utm_medium=notification"
+                    + "&utm_campaign=trial_ending&utm_content=trial_ending_subscription_check")));
     // 중복 재시도에서 신규 Ticket이 0개여도 기존 Push Delivery가 최종 전달 상태를 소유한다.
     jobs.finish(job, "PROCESSED", "PUSH_DELIVERY_TRACKED", null);
   }

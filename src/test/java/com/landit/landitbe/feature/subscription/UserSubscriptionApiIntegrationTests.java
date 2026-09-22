@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.subscription;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,8 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileDiscountOfferService;
+import com.landit.landitbe.shared.domain.AccentLocale;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +34,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 사용자 구독 상태·결제 이력 조회 API의 인증·계약, 웹훅 반영 결과, 도입 이후 대화 완료 판정을 검증한다. */
 @ActiveProfiles("test")
@@ -53,6 +65,14 @@ class UserSubscriptionApiIntegrationTests {
   @Autowired private MockMvc mockMvc;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  @Autowired private ProfileDiscountOfferService discountOffers;
+
+  @Autowired private Clock clock;
+
+  @Autowired private PlatformTransactionManager transactionManager;
+
+  @Autowired private ProfilePreferenceService preferences;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -357,6 +377,7 @@ class UserSubscriptionApiIntegrationTests {
   @DisplayName("인증되지 않은 사용자는 구독 상태를 조회할 수 없다.")
   @Test
   void rejectsUnauthenticatedSubscriptionRequest() throws Exception {
+    mockMvc.perform(post("/api/v1/me/paywall/dismiss")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/me/subscription")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/me/subscription/events")).andExpect(status().isUnauthorized());
   }
@@ -368,6 +389,13 @@ class UserSubscriptionApiIntegrationTests {
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/me/paywall/dismiss'].post.responses['401']").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.promo").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.price").exists())
+        .andExpect(
+            jsonPath("$.components.schemas.UserSubscriptionResponse.properties.currency").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.tags[0]").value("Subscription"))
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.responses['200']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/me/subscription'].get.responses['401']").exists())
@@ -442,6 +470,248 @@ class UserSubscriptionApiIntegrationTests {
         lastClearedAt == null ? 0 : 1,
         lastClearedAt,
         lastClearedAt);
+  }
+
+  @Test
+  @DisplayName("조회는 할인을 만들지 않고 최초 이탈만 5분을 부여하며 재조회·재로그인에도 유지한다.")
+  void grantsPromoOnceAndSharesItWithSubscription() throws Exception {
+    String token = login("promo-once");
+    long userId = userIdOf("promo-once");
+    subscription(token)
+        .andExpect(jsonPath("$.data.promo").isEmpty())
+        .andExpect(jsonPath("$.data.price").isEmpty())
+        .andExpect(jsonPath("$.data.currency").isEmpty());
+    assertThat(storedPromoExpiry(userId)).isNull();
+    JsonNode first = dismissPromo(token);
+    assertThat(first.path("remainingSeconds").asInt()).isEqualTo(300);
+    assertThat(first.path("newUser").asBoolean()).isTrue();
+    String expiresAt = first.path("expiresAt").asText();
+    assertThat(dismissPromo(login("promo-once")).path("expiresAt").asText()).isEqualTo(expiresAt);
+    subscription(token)
+        .andExpect(jsonPath("$.data.promo.expiresAt").value(expiresAt))
+        .andExpect(jsonPath("$.data.promo.newUser").value(true));
+    jdbcTemplate.update(
+        "UPDATE user_profile SET created_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).minusDays(30),
+        userId);
+    assertThat(dismissPromo(token).path("newUser").asBoolean()).isTrue();
+  }
+
+  @Test
+  @DisplayName("만료된 할인은 조회와 재이탈 모두 null이며 기존 기록을 유지한다.")
+  void neverRestartsExpiredPromo() throws Exception {
+    String token = login("promo-expired");
+    long userId = userIdOf("promo-expired");
+    dismissPromo(token);
+    LocalDateTime expired = LocalDateTime.now(clock).minusMinutes(1).withNano(0);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET discount_offer_expires_at = ? WHERE id = ?", expired, userId);
+    assertThat(dismissPromo(token).isNull()).isTrue();
+    subscription(token).andExpect(jsonPath("$.data.promo").isEmpty());
+    assertThat(storedPromoExpiry(userId)).isEqualTo(expired);
+  }
+
+  @Test
+  @DisplayName("기존 사용자도 첫 이탈 할인을 받지만 신규 혜택 라벨은 받지 않는다.")
+  void grantsOldUserWithoutNewUserLabel() throws Exception {
+    String token = login("promo-old");
+    jdbcTemplate.update(
+        "UPDATE user_profile SET created_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).minusDays(30),
+        userIdOf("promo-old"));
+    assertThat(dismissPromo(token).path("newUser").asBoolean()).isFalse();
+    assertThat(storedPromoExpiry(userIdOf("promo-old"))).isNotNull();
+  }
+
+  @Test
+  @DisplayName("무료 체험·해지 예약을 포함한 프리미엄은 할인을 소진하지 않고 기존 할인도 숨긴다.")
+  void suppressesPromoForPremiumWithoutConsumingIt() throws Exception {
+    String token = login("promo-premium");
+    long userId = userIdOf("promo-premium");
+    jdbcTemplate.update(
+        """
+        UPDATE user_profile SET subscription_status = 'CANCELED', subscription_period_type = 'TRIAL',
+          subscription_expires_at = ? WHERE id = ?
+        """,
+        LocalDateTime.now(clock).plusDays(1),
+        userId);
+    assertThat(dismissPromo(token).isNull()).isTrue();
+    assertThat(storedPromoExpiry(userId)).isNull();
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_expires_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).minusDays(1),
+        userId);
+    JsonNode promo = dismissPromo(token);
+    assertThat(promo.isObject()).isTrue();
+    final LocalDateTime expiry = storedPromoExpiry(userId);
+    jdbcTemplate.update(
+        "UPDATE user_profile SET subscription_expires_at = ? WHERE id = ?",
+        LocalDateTime.now(clock).plusDays(1),
+        userId);
+    assertThat(dismissPromo(token).isNull()).isTrue();
+    subscription(token).andExpect(jsonPath("$.data.promo").isEmpty());
+    assertThat(storedPromoExpiry(userId)).isEqualTo(expiry);
+  }
+
+  @Test
+  @DisplayName("동시 최초 이탈 요청은 하나의 만료 시각만 저장하고 동일한 값을 반환한다.")
+  void concurrentDismissalsKeepOneExpiry() throws Exception {
+    login("promo-concurrent");
+    long userId = userIdOf("promo-concurrent");
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      java.util.concurrent.Callable<LocalDateTime> dismiss =
+          () -> {
+            ready.countDown();
+            if (!start.await(5, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("동시 요청 시작 대기 실패");
+            }
+            return discountOffers.dismiss(userId).expiresAt();
+          };
+      var first = executor.submit(dismiss);
+      var second = executor.submit(dismiss);
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      LocalDateTime expiry = first.get(10, TimeUnit.SECONDS);
+      assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(expiry);
+      assertThat(storedPromoExpiry(userId)).isEqualTo(expiry);
+    }
+  }
+
+  @Test
+  @DisplayName("결제 없는 후속 이벤트 50건 이상을 건너뛰고 최신 결제액을 사용자별로 조회한다.")
+  void returnsLatestPaymentBeyondEventListLimit() throws Exception {
+    final String token = login("promo-price");
+    long userId = userIdOf("promo-price");
+    insertPayment(userId, "INITIAL_PURCHASE", "NORMAL", 58500, "KRW", 0);
+    insertPayment(userId, "RENEWAL", "NORMAL", 94800, "KRW", 1);
+    insertPayment(userId, "PRODUCT_CHANGE", "INTRO", 14900, "KRW", 2);
+    insertPayment(userId, "RENEWAL", "NORMAL", 12900, null, 2);
+    for (int index = 0; index < 55; index++) {
+      insertPayment(userId, "CANCELLATION", "NORMAL", 99999, "USD", 3 + index);
+    }
+    insertPayment(userId, "EXPIRATION", "NORMAL", null, null, 60);
+    insertPayment(userId, "INITIAL_PURCHASE", "TRIAL", 0, "KRW", 61);
+    insertPayment(userId, "INITIAL_PURCHASE", "PROMOTIONAL", 100, "KRW", 62);
+    insertPayment(userId, "RENEWAL", "NORMAL", null, "USD", 63);
+    login("promo-other-price");
+    insertPayment(userIdOf("promo-other-price"), "RENEWAL", "NORMAL", 777, "USD", 64);
+    subscription(token)
+        .andExpect(jsonPath("$.data.price").value(12900))
+        .andExpect(jsonPath("$.data.currency").isEmpty());
+  }
+
+  @Test
+  @DisplayName("웹훅의 실제 결제액·통화와 Play 베이스 플랜 ID를 그대로 반환한다.")
+  void preservesPlayBasePlanAndWebhookPrice() throws Exception {
+    String token = login("promo-play-price");
+    long userId = userIdOf("promo-play-price");
+    postWebhook(
+        webhookEvent(
+            UUID.randomUUID().toString(),
+            "INITIAL_PURCHASE",
+            userId,
+            EVENT_TIMESTAMP_MS,
+            "\"period_type\":\"TRIAL\",\"price_in_purchased_currency\":0,\"currency\":\"KRW\","));
+    subscription(token).andExpect(jsonPath("$.data.price").isEmpty());
+    String event =
+        webhookEvent(
+                UUID.randomUUID().toString(),
+                "RENEWAL",
+                userId,
+                EVENT_TIMESTAMP_MS + 1000,
+                "\"period_type\":\"NORMAL\",\"price_in_purchased_currency\":58500,"
+                    + "\"currency\":\"KRW\",")
+            .replace("APP_STORE", "PLAY_STORE")
+            .replace("com.saynow.app.premium.yearly", "com.saynow.app.premium.yearly:promo");
+    postWebhook(event);
+    subscription(token)
+        .andExpect(jsonPath("$.data.productId").value("com.saynow.app.premium.yearly:promo"))
+        .andExpect(jsonPath("$.data.price").value(58500))
+        .andExpect(jsonPath("$.data.currency").value("KRW"));
+  }
+
+  @Test
+  @DisplayName("할인 부여 전 읽은 억양 변경 트랜잭션은 할인 기록을 보존하고 재부여하지 않는다.")
+  void preservesDiscountWhenStalePreferenceTransactionCommitsLater() throws Exception {
+    final String token = login("promo-stale-preference");
+    long userId = userIdOf("promo-stale-preference");
+    var grantedExpiry = new AtomicReference<LocalDateTime>();
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      new TransactionTemplate(transactionManager)
+          .executeWithoutResult(
+              status -> {
+                preferences.updateAccentLocale(userId, AccentLocale.EN_GB);
+                try {
+                  grantedExpiry.set(
+                      executor
+                          .submit(() -> discountOffers.dismiss(userId).expiresAt())
+                          .get(10, TimeUnit.SECONDS));
+                } catch (Exception exception) {
+                  throw new IllegalStateException(exception);
+                }
+              });
+    }
+    assertThat(grantedExpiry.get()).isNotNull();
+    assertThat(storedPromoExpiry(userId)).isEqualTo(grantedExpiry.get());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT discount_offer_new_user FROM user_profile WHERE id = ?",
+                Boolean.class,
+                userId))
+        .isTrue();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accent_locale FROM user_profile WHERE id = ?", String.class, userId))
+        .isEqualTo("EN_GB");
+    assertThat(LocalDateTime.parse(dismissPromo(token).path("expiresAt").asText()))
+        .isEqualTo(grantedExpiry.get());
+  }
+
+  private void insertPayment(
+      long userId, String type, String period, Integer price, String currency, int second) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO subscription_event
+          (event_id, user_profile_id, type, period_type, price, currency, occurred_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        UUID.randomUUID().toString(),
+        userId,
+        type,
+        period,
+        price,
+        currency,
+        AFTER_LAUNCH.plusSeconds(second));
+  }
+
+  private LocalDateTime storedPromoExpiry(long userId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT discount_offer_expires_at FROM user_profile WHERE id = ?",
+        LocalDateTime.class,
+        userId);
+  }
+
+  private ResultActions subscription(String token) throws Exception {
+    return mockMvc
+        .perform(
+            get("/api/v1/me/subscription").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+  }
+
+  private JsonNode dismissPromo(String token) throws Exception {
+    var result =
+        mockMvc
+            .perform(
+                post("/api/v1/me/paywall/dismiss")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper
+        .readTree(result.getResponse().getContentAsByteArray())
+        .path("data")
+        .path("promo");
   }
 
   private Long userIdOf(String userKey) {

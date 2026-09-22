@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummary;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
@@ -25,6 +26,9 @@ import java.util.List;
  * @param watchPatterns 직전 스몰톡에서 교정받아 이번 턴에서 지켜볼 실수 패턴. 턴 교정에만 쓴다. 최대 3개이며 서로 달라야 한다. 비어 있으면 요청
  *     JSON에 싣지 않는다(이유는 memoryContext와 같다). 그래서 이 필드를 보내는 BE는 AI 서버가 먼저 배포된 뒤에 나가야 한다. 직전 스몰톡에서 교정받은
  *     사용자가 하나라도 있으면 구버전 AI는 그 요청을 거부해 속마음·교정이 모두 실패한다
+ * @param contextPolicyVersion 컨텍스트 정책 버전. 비활성화이면 null
+ * @param sessionSummary 요청에 사용할 세션 요약. 없으면 null
+ * @param historyIncomplete 전달 이력에 요약으로 보완하지 못한 누락 구간이 있는지 여부
  */
 public record AiFreeTalkInnerThoughtRequest(
     Long sessionId,
@@ -36,7 +40,10 @@ public record AiFreeTalkInnerThoughtRequest(
     AiFreeTalkTopic topic,
     List<AiConversationHistoryMessage> conversationHistory,
     @JsonInclude(JsonInclude.Include.NON_EMPTY) List<AiFreeTalkMemoryContext> memoryContext,
-    @JsonInclude(JsonInclude.Include.NON_EMPTY) List<FreeTalkMistakePattern> watchPatterns) {
+    @JsonInclude(JsonInclude.Include.NON_EMPTY) List<FreeTalkMistakePattern> watchPatterns,
+    @JsonInclude(JsonInclude.Include.NON_NULL) String contextPolicyVersion,
+    @JsonInclude(JsonInclude.Include.NON_NULL) AiFreeTalkSessionSummary sessionSummary,
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT) boolean historyIncomplete) {
 
   /** AI 서버가 받는 지켜볼 실수 패턴 상한이다. */
   public static final int MAX_WATCH_PATTERNS = 3;
@@ -44,6 +51,19 @@ public record AiFreeTalkInnerThoughtRequest(
   /**
    * 기억 문맥과 지켜볼 패턴은 null 없이 상한 안에서만 전달한다.
    *
+   * @param sessionId 프리톡 학습 세션 ID
+   * @param characterId 캐릭터 식별자
+   * @param submittedMessageId 대상 사용자 메시지 ID
+   * @param submittedTurnNumber 대상 사용자 메시지 턴 번호
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param topic 프리톡 주제
+   * @param conversationHistory 대화 문맥
+   * @param memoryContext 장기기억 문맥
+   * @param watchPatterns 지켜볼 실수 패턴
+   * @param contextPolicyVersion 컨텍스트 정책 버전. 비활성화이면 null
+   * @param sessionSummary 요청에 사용할 세션 요약. 없으면 null
+   * @param historyIncomplete 전달 이력에 요약으로 보완하지 못한 누락 구간이 있는지 여부
    * @throws IllegalArgumentException 기억 문맥이나 지켜볼 패턴이 AI 서버 계약의 상한을 넘거나 패턴이 겹칠 때
    */
   public AiFreeTalkInnerThoughtRequest {
@@ -61,7 +81,61 @@ public record AiFreeTalkInnerThoughtRequest(
     }
   }
 
-  /** 지켜볼 실수 패턴 없이 요청을 만든다. */
+  /**
+   * 컨텍스트 요약 없이 전체 이력으로 요청을 생성한다.
+   *
+   * @param sessionId 프리톡 학습 세션 ID
+   * @param characterId 캐릭터 식별자
+   * @param submittedMessageId 대상 사용자 메시지 ID
+   * @param submittedTurnNumber 대상 사용자 메시지 턴 번호
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param topic 프리톡 주제
+   * @param conversationHistory 대화 문맥
+   * @param memoryContext 장기기억 문맥
+   * @param watchPatterns 지켜볼 실수 패턴
+   * @throws IllegalArgumentException 기억 문맥이나 실수 패턴이 계약을 위반할 때
+   */
+  public AiFreeTalkInnerThoughtRequest(
+      Long sessionId,
+      String characterId,
+      Long submittedMessageId,
+      int submittedTurnNumber,
+      String targetLocale,
+      String baseLocale,
+      AiFreeTalkTopic topic,
+      List<AiConversationHistoryMessage> conversationHistory,
+      List<AiFreeTalkMemoryContext> memoryContext,
+      List<FreeTalkMistakePattern> watchPatterns) {
+    this(
+        sessionId,
+        characterId,
+        submittedMessageId,
+        submittedTurnNumber,
+        targetLocale,
+        baseLocale,
+        topic,
+        conversationHistory,
+        memoryContext,
+        watchPatterns,
+        null,
+        null,
+        false);
+  }
+
+  /**
+   * 지켜볼 실수 패턴 없이 요청을 만든다.
+   *
+   * @param sessionId 프리톡 학습 세션 ID
+   * @param characterId 캐릭터 식별자
+   * @param submittedMessageId 대상 사용자 메시지 ID
+   * @param submittedTurnNumber 대상 사용자 메시지 턴 번호
+   * @param targetLocale 학습 대상 언어
+   * @param baseLocale 사용자 기준 언어
+   * @param topic 프리톡 주제
+   * @param conversationHistory 대화 문맥
+   * @param memoryContext 장기기억 문맥
+   */
   public AiFreeTalkInnerThoughtRequest(
       Long sessionId,
       String characterId,

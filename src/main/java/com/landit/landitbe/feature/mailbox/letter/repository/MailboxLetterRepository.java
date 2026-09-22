@@ -25,7 +25,7 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
       Long id, MailboxPublicationStatus publicationStatus);
 
   /**
-   * 전역 편지와 사용자 답장을 합쳐 받은 편지 커서 페이지를 조회한다.
+   * 전역 편지와 사용자 답장·직접 편지를 합쳐 받은 편지 커서 페이지를 조회한다.
    *
    * <p>고정 여부, 발송 시각, 편지 ID의 내림차순으로 정렬한다.
    *
@@ -65,7 +65,7 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
               FROM mailbox_letter letter
               JOIN mailbox_letter_recipient recipient ON recipient.letter_id = letter.id
               WHERE letter.publication_status = 'PUBLISHED'
-                AND letter.letter_type = 'REPLY'
+                AND letter.letter_type IN ('REPLY', 'DIRECT')
                 AND recipient.user_profile_id = :userProfileId
           ) received
           WHERE CASE WHEN received.is_pinned THEN 1 ELSE 0 END < :cursorPinned
@@ -85,7 +85,7 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
       @Param("limit") int limit);
 
   /**
-   * 사용자가 읽지 않은 전역 편지와 답장의 합계를 조회한다.
+   * 사용자가 읽지 않은 전역 편지와 답장·직접 편지의 합계를 조회한다.
    *
    * @param userProfileId 사용자 ID
    * @return 안 읽은 편지 개수
@@ -111,7 +111,7 @@ public interface MailboxLetterRepository extends JpaRepository<MailboxLetter, Lo
              WHERE recipient.user_profile_id = :userProfileId
                AND recipient.read_at IS NULL
                AND letter.publication_status = 'PUBLISHED'
-               AND letter.letter_type = 'REPLY')
+               AND letter.letter_type IN ('REPLY', 'DIRECT'))
           """,
       nativeQuery = true)
   long countUnreadLetters(@Param("userProfileId") Long userProfileId);
