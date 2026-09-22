@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.repository;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMessageFeedback;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -47,6 +48,9 @@ public interface FreeTalkMessageFeedbackRepository
                 feedback.betterSentence = :betterSentence,
                 feedback.reason = :reason,
                 feedback.mistakePattern = :mistakePattern,
+                feedback.memoryId = :memoryId,
+                feedback.memoryObservedOn = :memoryObservedOn,
+                feedback.memoryLabel = :memoryLabel,
                 feedback.updatedAt = CURRENT_TIMESTAMP
             where feedback.sessionHistoryMessageId = :messageId
               and feedback.processingStatus = :preparingStatus
@@ -59,5 +63,8 @@ public interface FreeTalkMessageFeedbackRepository
       @Param("betterSentence") String betterSentence,
       @Param("reason") String reason,
       @Param("mistakePattern") FreeTalkMistakePattern mistakePattern,
+      @Param("memoryId") Long memoryId,
+      @Param("memoryObservedOn") LocalDate memoryObservedOn,
+      @Param("memoryLabel") String memoryLabel,
       @Param("preparingStatus") ProcessingStatus preparingStatus);
 }

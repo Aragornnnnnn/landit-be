@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.learning.freetalk.feedback.dto;
 
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
+import java.time.LocalDate;
 
 /**
  * 프리톡 사용자 발화 한 턴의 교정 판정 결과다.
@@ -24,12 +25,42 @@ public record FreeTalkTurnCorrection(
    * @param betterSentence 더 자연스러운 문장
    * @param reason 기준 언어로 쓴 이유
    * @param mistakePattern 대표 실수 유형
+   * @param usedMemoryId 교정의 근거가 된 장기기억 ID. 기억을 근거로 쓰지 않았으면 null
+   * @param memoryObservedOn 근거 기억을 말한 날짜. 지난 기록이 바뀌지 않도록 교정을 저장하는 시점의 값을 남긴다. 근거 기억이 없으면 null
+   * @param memoryLabel 근거 기억이 가리키는 대상을 나타내는 짧은 명사구. 근거 기억이 없거나 AI가 라벨을 주지 못했으면 null
    */
   public record Sentence(
       String originalSentence,
       String betterSentence,
       String reason,
-      FreeTalkMistakePattern mistakePattern) {}
+      FreeTalkMistakePattern mistakePattern,
+      Long usedMemoryId,
+      LocalDate memoryObservedOn,
+      String memoryLabel) {
+
+    /**
+     * 근거 기억과 날짜는 함께 있거나 함께 없고, 라벨은 근거 기억이 있을 때만 가질 수 있다(chk_free_talk_message_feedback_memory).
+     *
+     * @throws IllegalArgumentException 근거 기억 값의 짝이 맞지 않을 때
+     */
+    public Sentence {
+      if ((usedMemoryId == null) != (memoryObservedOn == null)) {
+        throw new IllegalArgumentException("usedMemoryId and memoryObservedOn must come together");
+      }
+      if (usedMemoryId == null && memoryLabel != null) {
+        throw new IllegalArgumentException("memoryLabel requires usedMemoryId");
+      }
+    }
+
+    /** 장기기억을 근거로 쓰지 않은 교정을 만든다. */
+    public Sentence(
+        String originalSentence,
+        String betterSentence,
+        String reason,
+        FreeTalkMistakePattern mistakePattern) {
+      this(originalSentence, betterSentence, reason, mistakePattern, null, null, null);
+    }
+  }
 
   /**
    * 교정 판정에 실패한 결과를 만든다.

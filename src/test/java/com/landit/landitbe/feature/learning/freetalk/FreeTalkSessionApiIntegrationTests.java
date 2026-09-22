@@ -677,6 +677,77 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo("FAILED");
   }
 
+  @DisplayName("기억을 근거로 한 교정의 태그는 교정과 함께 저장한 날짜와 라벨로만 만들어 조회할 때마다 같다.")
+  @Test
+  void exposesCorrectionMemoryTagFromValuesStoredWithCorrection() throws Exception {
+    String accessToken =
+        login("free-talk-memory-tag@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    // 진행 중 응답에는 교정이 통째로 없으므로 근거 기억과 태그도 새지 않는다.
+    long labeledMessageId = submitGymCorrection(accessToken, sessionId, 995101L, "헬스장");
+    assertThat(
+            jdbcTemplate.queryForMap(
+                "SELECT memory_id, memory_observed_on, memory_label"
+                    + " FROM free_talk_message_feedback WHERE session_history_message_id = ?",
+                labeledMessageId))
+        .containsEntry("memory_id", 995101L)
+        .containsEntry("memory_observed_on", java.sql.Date.valueOf("2026-09-13"))
+        .containsEntry("memory_label", "헬스장");
+    submitGymCorrection(accessToken, sessionId, 995102L, null);
+    fakeAiFreeTalkClient.correctNextTurn(
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "I go.", "I went.", "과거 일이에요.", FreeTalkMistakePattern.TENSE),
+            true));
+    long plainMessageId = submitWithoutCorrectionFields(accessToken, sessionId, "I go.");
+    awaitCorrectionStatus(plainMessageId, "COMPLETED");
+    // 근거 기억이 기억 테이블에 없어도(덮어쓰였거나 지워졌어도) 지난 기록의 태그는 그대로다.
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM conversation_memory WHERE id IN (995101, 995102)",
+                Integer.class))
+        .isZero();
+
+    completeSession(sessionId);
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.correctionCount").value(3))
+          .andExpect(jsonPath("$.data.messages[0].correction.memoryTag").value("9/13 스몰톡에서 말한 헬스장"))
+          // AI가 라벨을 주지 못한 교정은 기본 문구로 채운다.
+          .andExpect(jsonPath("$.data.messages[2].correction.memoryTag").value("9/13 스몰톡에서 말한 내용"))
+          // 기억을 근거로 쓰지 않은 교정은 태그가 없다.
+          .andExpect(jsonPath("$.data.messages[4].correction.betterSentence").value("I went."))
+          .andExpect(jsonPath("$.data.messages[4].correction.memoryTag").value(nullValue()))
+          .andExpect(jsonPath("$.data.messages[0].correction.usedMemoryId").doesNotExist())
+          .andExpect(jsonPath("$.data.messages[0].correction.memoryObservedOn").doesNotExist())
+          .andExpect(jsonPath("$.data.messages[0].correction.memoryLabel").doesNotExist());
+    }
+  }
+
+  private long submitGymCorrection(
+      String accessToken, long sessionId, long usedMemoryId, String memoryLabel) throws Exception {
+    fakeAiFreeTalkClient.correctNextTurn(
+        FreeTalkTurnCorrection.completed(
+            new FreeTalkTurnCorrection.Sentence(
+                "at a gym",
+                "at the gym",
+                "둘 다 아는 곳엔 the를 붙여요.",
+                FreeTalkMistakePattern.ARTICLE,
+                usedMemoryId,
+                java.time.LocalDate.of(2026, 9, 13),
+                memoryLabel),
+            true));
+    long messageId = submitWithoutCorrectionFields(accessToken, sessionId, "I work out at a gym.");
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    return messageId;
+  }
+
   private long submitWithoutCorrectionFields(String accessToken, long sessionId, String content)
       throws Exception {
     MvcResult result =

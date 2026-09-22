@@ -90,9 +90,10 @@ public class FreeTalkMessageService {
     }
     FreeTalkMessageReservation reservation =
         submittedMessageService.reserve(userId, learningSessionId, request);
-    AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
+      // 기억 문맥을 읽는 요청 조립이 실패해도 예약을 되돌릴 수 있게 보상 경계 안에서 만든다.
+      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response;
       if (reservation.dailyLimitReached()) {
@@ -173,9 +174,9 @@ public class FreeTalkMessageService {
   /** 속마음·결정 확정·보상 순서를 한 예외 경계에서 보존한다. */
   private FreeTalkMessageSubmitResponse processExitDecision(
       FreeTalkExitDecisionReservation reservation) {
-    AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
+      AiFreeTalkInnerThoughtRequest innerThoughtRequest = innerThoughtRequest(reservation);
       innerThoughtFuture = startInnerThought(innerThoughtRequest);
       FreeTalkMessageSubmitResponse response = finalizeDecision(reservation);
       recordInnerThought(innerThoughtRequest, innerThoughtFuture);
@@ -337,7 +338,8 @@ public class FreeTalkMessageService {
         reservation.targetLocale(),
         reservation.baseLocale(),
         reservation.topic(),
-        reservation.history());
+        reservation.history(),
+        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()));
   }
 
   private AiFreeTalkInnerThoughtRequest innerThoughtRequest(
@@ -350,7 +352,14 @@ public class FreeTalkMessageService {
         reservation.targetLocale(),
         reservation.baseLocale(),
         reservation.topic(),
-        reservation.history());
+        reservation.history(),
+        correctionMemoryContext(reservation.freeTalkSessionId(), reservation.userId()));
+  }
+
+  // 속마음 호출은 턴 처리와 병렬로 먼저 출발하므로, 이 턴에서 검색할 기억은 아직 없다.
+  // 사용자가 먼저 말을 건 세션의 첫 턴은 빈 문맥으로 나가고 다음 턴부터 기억이 실린다.
+  private List<AiFreeTalkMemoryContext> correctionMemoryContext(long sessionId, long userId) {
+    return memoryRetrievalService.retrievedContexts(sessionId, userId);
   }
 
   private CompletableFuture<AiFreeTalkInnerThoughtResult> startInnerThought(

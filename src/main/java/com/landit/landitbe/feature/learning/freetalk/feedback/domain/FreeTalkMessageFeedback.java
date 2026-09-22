@@ -13,6 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import lombok.Getter;
 
 /**
@@ -55,6 +56,15 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
   @Column(name = "mistake_pattern", length = 40)
   private FreeTalkMistakePattern mistakePattern;
 
+  @Column(name = "memory_id")
+  private Long memoryId;
+
+  @Column(name = "memory_observed_on")
+  private LocalDate memoryObservedOn;
+
+  @Column(name = "memory_label", length = 40)
+  private String memoryLabel;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkMessageFeedback() {}
 
@@ -93,6 +103,9 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
     betterSentence = null;
     reason = null;
     mistakePattern = null;
+    memoryId = null;
+    memoryObservedOn = null;
+    memoryLabel = null;
   }
 
   /**
@@ -101,11 +114,35 @@ public class FreeTalkMessageFeedback extends BaseTimeEntity {
    * @return 고칠 것이 없거나 생성 중·실패면 문장이 null인 판정 결과
    */
   public FreeTalkTurnCorrection toCorrection() {
-    FreeTalkTurnCorrection.Sentence sentence =
-        betterSentence == null
-            ? null
-            : new FreeTalkTurnCorrection.Sentence(
-                originalSentence, betterSentence, reason, mistakePattern);
-    return new FreeTalkTurnCorrection(processingStatus, sentence, reactedToPartner);
+    return new FreeTalkTurnCorrection(processingStatus, sentence(), reactedToPartner);
+  }
+
+  /**
+   * 근거 기억 값의 짝이 맞는지 돌려준다. 근거 기억과 날짜는 함께 있거나 함께 없고, 라벨은 근거 기억이 있을 때만 있다.
+   *
+   * @return DB 제약(chk_free_talk_message_feedback_memory)과 같은 규칙을 만족하면 true
+   */
+  public boolean hasConsistentMemory() {
+    return (memoryId == null) == (memoryObservedOn == null)
+        && (memoryId != null || memoryLabel == null);
+  }
+
+  // 지난 기록을 읽는 길이라 근거 기억 값이 어긋난 행이 있어도 세션 상세 전체를 막지 않고 근거 기억만 뺀다.
+  private FreeTalkTurnCorrection.Sentence sentence() {
+    if (betterSentence == null) {
+      return null;
+    }
+    if (!hasConsistentMemory()) {
+      return new FreeTalkTurnCorrection.Sentence(
+          originalSentence, betterSentence, reason, mistakePattern);
+    }
+    return new FreeTalkTurnCorrection.Sentence(
+        originalSentence,
+        betterSentence,
+        reason,
+        mistakePattern,
+        memoryId,
+        memoryObservedOn,
+        memoryLabel);
   }
 }

@@ -220,7 +220,10 @@ public interface FreeTalkControllerDocs {
               + " 교정 처리 상태(correctionStatus)가 함께 내려가고, correctionCount는 교정이 있는 사용자 메시지"
               + " 수다. correction이 null이고 correctionStatus가 COMPLETED면 고칠 것이 없는 턴, PREPARING이면"
               + " 생성 중이라 재조회가 필요한 턴, FAILED면 교정을 만들지 못한 턴이다. AI 메시지는 세 필드가 모두"
-              + " null이다. correction.memoryTag와 reusedExpression은 아직 제공하지 않아 항상 null이다. 교정은"
+              + " null이다. correction.memoryTag는 장기기억을 근거로 한 교정에만 \"9/13 스몰톡에서 말한 헬스장\""
+              + " 형식(한국어 고정)으로 내려주고, 라벨을 만들지 못했으면 \"9/13 스몰톡에서 말한 내용\"으로 채운다."
+              + " 기억을 근거로 쓰지 않은 교정은 null이다. 태그는 교정과 함께 저장한 값이라 그 기억이 나중에 바뀌어도"
+              + " 달라지지 않는다. reusedExpression은 아직 제공하지 않아 항상 null이다. 교정은"
               + " 진행 중인 대화의 응답에는 포함되지 않는다. 구독이 만료된 사용자도 본인이 완료한 세션은 조회할 수 있다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({

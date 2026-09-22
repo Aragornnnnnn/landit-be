@@ -25,10 +25,12 @@ import com.landit.landitbe.feature.learning.freetalk.history.dto.FreeTalkSession
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,6 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Service
 public class FreeTalkHistoryQueryService {
+
+  // 월/일 스몰톡에서 말한 {라벨}
+  private static final String MEMORY_TAG_FORMAT = "%d/%d 스몰톡에서 말한 %s";
+  private static final String DEFAULT_MEMORY_LABEL = "내용";
 
   private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
@@ -160,7 +166,7 @@ public class FreeTalkHistoryQueryService {
         null);
   }
 
-  // 고칠 것이 없거나 생성 중·실패인 턴은 교정 없이 상태만 내려준다. 기억 태그는 아직 생성하지 않아 null이다.
+  // 고칠 것이 없거나 생성 중·실패인 턴은 교정 없이 상태만 내려준다.
   private FreeTalkSessionDetailResponse.Correction toCorrectionResponse(
       FreeTalkTurnCorrection turnCorrection) {
     if (turnCorrection == null || turnCorrection.sentence() == null) {
@@ -172,7 +178,28 @@ public class FreeTalkHistoryQueryService {
         sentence.betterSentence(),
         sentence.reason(),
         sentence.mistakePattern(),
-        null);
+        memoryTag(sentence));
+  }
+
+  /**
+   * 기억을 근거로 한 교정에 "9/13 스몰톡에서 말한 헬스장" 같은 태그를 만든다.
+   *
+   * <p>지난 기록은 조회할 때마다 같아야 하므로 교정과 함께 저장해 둔 날짜와 라벨만 쓰고 기억 테이블을 다시 읽지 않는다. AI가 라벨을 주지 못한 교정은 기본 문구로
+   * 채운다. 기억을 근거로 쓰지 않은 교정은 태그가 없다. 문구는 현재 서비스하는 기준 언어(KR)에 맞춘 한국어 고정이다.
+   */
+  private static String memoryTag(FreeTalkTurnCorrection.Sentence sentence) {
+    LocalDate observedOn = sentence.memoryObservedOn();
+    if (observedOn == null) {
+      return null;
+    }
+    String label = sentence.memoryLabel() == null ? DEFAULT_MEMORY_LABEL : sentence.memoryLabel();
+    // 서버 기본 로케일에 따라 숫자 표기가 달라지지 않게 고정한다.
+    return String.format(
+        Locale.ROOT,
+        MEMORY_TAG_FORMAT,
+        observedOn.getMonthValue(),
+        observedOn.getDayOfMonth(),
+        label);
   }
 
   private FreeTalkSessionListResponse.Item toListItem(

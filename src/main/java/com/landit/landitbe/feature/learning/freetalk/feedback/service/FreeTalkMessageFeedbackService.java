@@ -10,11 +10,13 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTal
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 프리톡 턴 교정의 저장과 조회를 담당한다. */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class FreeTalkMessageFeedbackService {
@@ -62,6 +64,9 @@ public class FreeTalkMessageFeedbackService {
         sentence == null ? null : sentence.betterSentence(),
         sentence == null ? null : sentence.reason(),
         sentence == null ? null : sentence.mistakePattern(),
+        sentence == null ? null : sentence.usedMemoryId(),
+        sentence == null ? null : sentence.memoryObservedOn(),
+        sentence == null ? null : sentence.memoryLabel(),
         ProcessingStatus.PREPARING);
   }
 
@@ -85,9 +90,20 @@ public class FreeTalkMessageFeedbackService {
   @Transactional(readOnly = true)
   public Map<Long, FreeTalkTurnCorrection> findBySessionHistoryId(long sessionHistoryId) {
     return feedbackRepository.findBySessionHistoryId(sessionHistoryId).stream()
+        .peek(FreeTalkMessageFeedbackService::warnInconsistentMemory)
         .collect(
             Collectors.toMap(
                 FreeTalkMessageFeedback::getSessionHistoryMessageId,
                 FreeTalkMessageFeedback::toCorrection));
+  }
+
+  // DB 제약이 막는 상태라 정상적으로는 없다. 있으면 교정은 내려주되 근거 기억 태그만 빠지므로 흔적을 남긴다.
+  private static void warnInconsistentMemory(FreeTalkMessageFeedback feedback) {
+    if (!feedback.hasConsistentMemory()) {
+      log.warn(
+          "프리톡 턴 교정의 근거 기억 값이 어긋나 태그 없이 내려줍니다. workflow=free_talk_turn_correction_memory"
+              + " reason=inconsistent_stored_memory messageId={}",
+          feedback.getSessionHistoryMessageId());
+    }
   }
 }
