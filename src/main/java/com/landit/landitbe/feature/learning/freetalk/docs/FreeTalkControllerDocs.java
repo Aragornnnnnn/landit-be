@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessage
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageSubmitResponse;
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse;
+import com.landit.landitbe.feature.learning.freetalk.summary.dto.FreeTalkSessionSummaryResponse;
 import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkMainResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
@@ -245,6 +246,50 @@ public interface FreeTalkControllerDocs {
         description = "완료된 프리톡 세션 없음")
   })
   ResponseEntity<ApiResponse<FreeTalkSessionDetailResponse>> getSession(
+      AuthUserPrincipal principal,
+      @Parameter(description = "조회할 프리톡 학습 세션 ID", example = "123") long sessionId);
+
+  /**
+   * 완료된 프리톡의 종료 후 요약을 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 프리톡 학습 세션 ID
+   * @return 오늘의 스몰톡 요약
+   */
+  @Operation(
+      summary = "오늘의 스몰톡 요약 조회",
+      description =
+          "완료된 스몰톡의 종료 후 요약(S7b)을 반환한다. 점수·별점은 없다. 총평(headline·comparison·growth·"
+              + "correctionCount)은 이 세션의 턴 교정이 모두 끝난 뒤 한 번 계산해 저장하고, 그 뒤에는 조회할 때마다 같은"
+              + " 값을 돌려준다. 계산 전이면 pending이 true이고 총평 필드는 모두 null이다. 교정이 끝나기를 세션 종료 후"
+              + " 30초까지 기다리고, 그 뒤에는 끝나지 않은 교정을 빼고 확정하므로 pending이 끝없이 남지 않는다."
+              + " headline과 comparison은 확정 뒤 항상 있고(첫 스몰톡은 comparison.previous가 모두 0), growth는"
+              + " 직전 스몰톡에서 교정받은 패턴이 이번에 다시 나왔을 때만 있다. growth의 구절(previousWrongSpan·"
+              + "currentSpan)은 각 문장에 대소문자까지 그대로 정확히 한 번 들어 있으며 특정하지 못했으면 null이다."
+              + " reusedExpressions와 followUp은 종료 후 비동기 작업의 결과라 각자 pending을 가진다. 표현 작업이 실패로"
+              + " 끝나면 reusedExpressions는 pending 없이 빈 목록이다. 장기기억 작업이 세션 종료 후 5분이 지나도 끝나지"
+              + " 않으면 서버가 실패로 확정하므로 followUp.pending도 끝없이 남지 않고, 그때 followUp의 질문 세 필드는"
+              + " null이다. 미완료 세션은 409(SESSION_NOT_COMPLETED)다(지난 프리톡 상세 조회는 같은 경우 404를 준다)."
+              + " 구독이 만료된 사용자도 본인이 완료한 세션은 조회할 수 있다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "조회 성공"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "세션 소유자 아님"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "프리톡 세션 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "완료되지 않은 세션 (SESSION_NOT_COMPLETED)")
+  })
+  ResponseEntity<ApiResponse<FreeTalkSessionSummaryResponse>> getSummary(
       AuthUserPrincipal principal,
       @Parameter(description = "조회할 프리톡 학습 세션 ID", example = "123") long sessionId);
 

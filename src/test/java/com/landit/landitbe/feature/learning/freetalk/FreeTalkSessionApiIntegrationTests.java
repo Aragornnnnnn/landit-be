@@ -150,6 +150,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM user_daily_activity");
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
+    jdbcTemplate.update("DELETE FROM free_talk_session_summary");
     jdbcTemplate.update("DELETE FROM free_talk_pattern_usage");
     jdbcTemplate.update("DELETE FROM free_talk_expression_reuse");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
@@ -1707,6 +1708,61 @@ class FreeTalkSessionApiIntegrationTests {
     long messageId = submitWithoutCorrectionFields(accessToken, sessionId, content);
     awaitCorrectionStatus(messageId, "COMPLETED");
     return messageId;
+  }
+
+  @DisplayName(
+      "요약 조회는 진행 중이면 409, 남의 세션이면 403, 없는 세션이면 404, 인증이 없으면 401이고, 교정이 끝나기 전에는 총평 없이 pending이다.")
+  @Test
+  void summaryRejectsUnfinishedForeignMissingAndUnauthenticatedRequestsAndPendsBeforeSettling()
+      throws Exception {
+    String accessToken =
+        login("free-talk-summary-gate@example.com").get("data").get("accessToken").asText();
+    long sessionId = startUserFirstSession(accessToken);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("SESSION_NOT_COMPLETED"));
+    mockMvc
+        .perform(get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", 999999L)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isNotFound());
+
+    // 마지막 발화의 교정이 아직 준비 상태인 채로 세션이 끝나면 총평은 비어 있고 pending이다.
+    fakeAiFreeTalkClient.failNextInnerThought();
+    submitWithoutCorrectionFields(accessToken, sessionId, "I go hiking yesterday.");
+    completeSession(sessionId);
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sessionId").value(sessionId))
+        .andExpect(jsonPath("$.data.pending").value(true))
+        .andExpect(jsonPath("$.data.headline").value(nullValue()))
+        .andExpect(jsonPath("$.data.comparison").value(nullValue()))
+        .andExpect(jsonPath("$.data.growth").value(nullValue()))
+        .andExpect(jsonPath("$.data.correctionCount").value(nullValue()))
+        .andExpect(jsonPath("$.data.reusedExpressions.pending").value(false))
+        .andExpect(jsonPath("$.data.followUp.pending").value(false));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM free_talk_session_summary", Integer.class))
+        .isZero();
+
+    String otherToken =
+        login("free-talk-summary-other@example.com").get("data").get("accessToken").asText();
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}/summary", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherToken))
+        .andExpect(status().isForbidden());
   }
 
   @DisplayName("학습자 난이도보다 높은 표현 후보를 제외한다.")

@@ -247,6 +247,14 @@ class PremiumAccessIntegrationTests {
         .andExpect(jsonPath("$.data.correctionCount").value(1))
         .andExpect(jsonPath("$.data.messages[0].correctionStatus").value("COMPLETED"))
         .andExpect(jsonPath("$.data.messages[0].correction.betterSentence").value("I went home."));
+    // 종료 후 요약도 지난 기록 조회와 같은 비게이트다.
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/" + sessionId + "/summary")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false))
+        .andExpect(jsonPath("$.data.correctionCount").value(1));
     mockMvc
         .perform(
             post("/api/v1/free-talk/sessions")
