@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.profile.service;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
+import com.landit.landitbe.feature.profile.dto.ActiveUserProfileIds;
 import com.landit.landitbe.feature.profile.dto.UserProfileDetails;
 import com.landit.landitbe.feature.profile.dto.UserProfileNickname;
 import com.landit.landitbe.feature.profile.dto.UserProfilePage;
@@ -93,6 +94,25 @@ public class UserProfileService {
   @Transactional(readOnly = true)
   public boolean existsActive(Long userId) {
     return userProfileRepository.existsByIdAndStatus(userId, UserProfileStatus.ACTIVE);
+  }
+
+  /**
+   * 일괄 작업 대상 활성 프로필을 잠그고 해당 ID만 반환한다.
+   *
+   * <p>호출자의 쓰기 트랜잭션 안에서 사용해야 작업이 끝날 때까지 잠금이 유지된다.
+   *
+   * @param userIds 확인할 사용자 ID 목록
+   * @return 존재하는 활성 사용자 ID 목록. 빈 입력은 빈 목록을 반환한다
+   */
+  @Transactional
+  public ActiveUserProfileIds findActiveIdsForUpdate(List<Long> userIds) {
+    if (userIds.isEmpty()) {
+      return new ActiveUserProfileIds(List.of());
+    }
+    return new ActiveUserProfileIds(
+        userProfileRepository.findActiveByIdsForUpdate(userIds).stream()
+            .map(UserProfile::getId)
+            .toList());
   }
 
   /**

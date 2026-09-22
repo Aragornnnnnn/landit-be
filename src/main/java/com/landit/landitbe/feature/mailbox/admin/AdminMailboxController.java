@@ -9,10 +9,13 @@ import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyR
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.admin.feedback.service.AdminMailboxFeedbackQueryService;
 import com.landit.landitbe.feature.mailbox.admin.feedback.service.AdminMailboxReplyService;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterRequest;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterListResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterPatchRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.service.AdminMailboxDirectLetterService;
 import com.landit.landitbe.feature.mailbox.admin.letter.service.AdminMailboxLetterService;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
 import com.landit.landitbe.feature.mailbox.feedback.domain.UserFeedbackStatus;
@@ -44,6 +47,18 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
   private final AdminMailboxFeedbackQueryService adminMailboxFeedbackQueryService;
   private final AdminMailboxReplyService adminMailboxReplyService;
   private final AdminMailboxLetterService adminMailboxLetterService;
+  private final AdminMailboxDirectLetterService adminMailboxDirectLetterService;
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/admin/mailbox/direct-letters")
+  public ResponseEntity<ApiResponse<AdminMailboxDirectLetterResponse>> sendDirectLetter(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @Valid @RequestBody AdminMailboxDirectLetterRequest request) {
+    return ApiResponse.success(
+        HttpStatus.CREATED,
+        adminMailboxDirectLetterService.sendLetter(principal.userId(), request));
+  }
 
   /** {@inheritDoc} */
   @Override

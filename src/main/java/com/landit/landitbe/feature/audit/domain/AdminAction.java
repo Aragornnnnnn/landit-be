@@ -32,6 +32,9 @@ public enum AdminAction {
   /** 편지함 답장 발송 작업이다. */
   MAILBOX_REPLY_SENT,
 
+  /** 특정 사용자에게 직접 편지를 발송한 작업이다. */
+  MAILBOX_DIRECT_LETTER_SENT,
+
   /** 발음 평가 자산 일괄 임포트 작업이다. */
   EXPRESSION_PRONUNCIATION_ASSET_IMPORTED
 }

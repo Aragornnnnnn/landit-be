@@ -47,7 +47,7 @@ public class MailboxLetterService {
   private final MailboxLetterReadRepository mailboxLetterReadRepository;
 
   /**
-   * 사용자의 전역 편지와 답장을 최신순으로 조회한다.
+   * 사용자의 전역 편지와 답장·직접 편지를 최신순으로 조회한다.
    *
    * @param userProfileId 사용자 ID
    * @param cursor 다음 페이지 커서
@@ -92,18 +92,21 @@ public class MailboxLetterService {
     MailboxLetter letter = findPublishedLetter(letterId);
     LocalDateTime readAt;
     MailboxFeedback quotedFeedback = null;
-    if (letter.getLetterType() == MailboxLetterType.REPLY) {
-      // 답장은 사용자별 수신 정보에 최초 읽은 시각을 직접 기록한다.
+    if (letter.getLetterType() == MailboxLetterType.REPLY
+        || letter.getLetterType() == MailboxLetterType.DIRECT) {
+      // 개인 편지는 사용자별 수신 정보에 최초 읽은 시각을 직접 기록한다.
       mailboxLetterRecipientRepository.markReadIfUnread(letterId, userProfileId);
       MailboxLetterRecipient recipient =
           mailboxLetterRecipientRepository
               .findByLetterIdAndUserProfileId(letterId, userProfileId)
               .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
       readAt = recipient.getReadAt();
-      quotedFeedback =
-          mailboxFeedbackRepository
-              .findByIdAndUserProfileId(recipient.getRepresentativeFeedbackId(), userProfileId)
-              .orElseThrow(() -> new IllegalStateException("답장과 연결된 대표 피드백을 찾을 수 없습니다."));
+      if (letter.getLetterType() == MailboxLetterType.REPLY) {
+        quotedFeedback =
+            mailboxFeedbackRepository
+                .findByIdAndUserProfileId(recipient.getRepresentativeFeedbackId(), userProfileId)
+                .orElseThrow(() -> new IllegalStateException("답장과 연결된 대표 피드백을 찾을 수 없습니다."));
+      }
     } else {
       // 전역 편지는 사용자마다 읽음 행을 한 번만 생성한다.
       mailboxLetterReadRepository.insertIfAbsent(letterId, userProfileId);

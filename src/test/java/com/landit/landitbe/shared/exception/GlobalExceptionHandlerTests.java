@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
@@ -157,6 +158,24 @@ class GlobalExceptionHandlerTests {
                 "POST", List.of("GET")));
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
     assertThat(response.getHeaders().getAllow()).containsExactly(HttpMethod.GET);
+    assertThat(errorLogs()).isEmpty();
+  }
+
+  @DisplayName("지원하지 않는 본문·파트 형식은 단일 처리기로 415와 Accept 헤더를 보존한다.")
+  @Test
+  void unsupportedMediaTypePreservesStatusAndAcceptHeader() throws Exception {
+    var exception =
+        new org.springframework.web.HttpMediaTypeNotSupportedException(
+            MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON));
+
+    var response = resolveException(exception);
+
+    assertError(
+        response,
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "INVALID_REQUEST",
+        ErrorCode.INVALID_REQUEST.getMessage());
+    assertThat(response.getHeaders().getAccept()).containsExactly(MediaType.APPLICATION_JSON);
     assertThat(errorLogs()).isEmpty();
   }
 

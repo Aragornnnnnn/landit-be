@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.profile.domain.UserProfile;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,6 +55,22 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, Long> 
               and userProfile.status = com.landit.landitbe.feature.profile.domain.UserProfileStatus.ACTIVE
       """)
   Optional<UserProfile> findActiveByIdForUpdate(@Param("id") Long id);
+
+  /**
+   * 활성 사용자들을 ID 순서로 잠가 일괄 작업과 탈퇴를 직렬화한다.
+   *
+   * @param ids 조회할 사용자 ID 목록
+   * @return ID 오름차순으로 잠근 활성 프로필 목록
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select profile from UserProfile profile
+      where profile.id in :ids
+        and profile.status = com.landit.landitbe.feature.profile.domain.UserProfileStatus.ACTIVE
+      order by profile.id
+      """)
+  List<UserProfile> findActiveByIdsForUpdate(@Param("ids") List<Long> ids);
 
   /**
    * 상태와 무관하게 사용자 프로필을 PK로 조회하면서 구독 상태 변경을 직렬화한다.

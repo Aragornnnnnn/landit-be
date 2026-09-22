@@ -1,4 +1,4 @@
-// 편지함에 표시되는 공지·업데이트·답장을 저장하는 Entity다.
+// 편지함에 표시되는 공지·업데이트·답장·직접 편지를 저장하는 Entity다.
 
 package com.landit.landitbe.feature.mailbox.letter.domain;
 
@@ -17,7 +17,7 @@ import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** 편지함에 표시되는 공지·업데이트·답장을 저장하는 Entity다. */
+/** 편지함에 표시되는 공지·업데이트·답장·직접 편지를 저장하는 Entity다. */
 @Getter
 @Entity
 @Table(name = "mailbox_letter")

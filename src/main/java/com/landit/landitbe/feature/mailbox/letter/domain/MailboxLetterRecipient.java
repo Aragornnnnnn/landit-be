@@ -1,4 +1,4 @@
-// 답장 편지를 사용자별로 전달하고 읽음 상태를 저장하는 Entity다.
+// 답장과 직접 편지를 사용자별로 전달하고 읽음 상태를 저장하는 Entity다.
 
 package com.landit.landitbe.feature.mailbox.letter.domain;
 
@@ -12,7 +12,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 
-/** 답장 편지를 사용자별로 전달하고 읽음 상태를 저장하는 Entity다. */
+/** 답장과 직접 편지를 사용자별로 전달하고 읽음 상태를 저장하는 Entity다. */
 @Getter
 @Entity
 @Table(name = "mailbox_letter_recipient")
@@ -28,7 +28,7 @@ public class MailboxLetterRecipient extends BaseCreatedAtEntity {
   @Column(name = "user_profile_id", nullable = false)
   private Long userProfileId;
 
-  @Column(name = "representative_feedback_id", nullable = false)
+  @Column(name = "representative_feedback_id")
   private Long representativeFeedbackId;
 
   @Column(name = "read_at")
@@ -38,11 +38,11 @@ public class MailboxLetterRecipient extends BaseCreatedAtEntity {
   protected MailboxLetterRecipient() {}
 
   /**
-   * 답장 수신 정보를 생성한다.
+   * 개별 편지 수신 정보를 생성한다.
    *
-   * @param letterId 답장 편지 ID
+   * @param letterId 편지 ID
    * @param userProfileId 수신 사용자 ID
-   * @param representativeFeedbackId 답장과 연결할 대표 피드백 ID
+   * @param representativeFeedbackId 답장과 연결할 대표 피드백 ID. 직접 편지는 {@code null}
    */
   public MailboxLetterRecipient(Long letterId, Long userProfileId, Long representativeFeedbackId) {
     this.letterId = letterId;
