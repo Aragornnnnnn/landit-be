@@ -38,6 +38,15 @@ public class FreeTalkSummaryCalculator {
   /** 직전 스몰톡에서 이 일수 이상 지나면 "오랜만에 돌아옴"으로 본다. */
   static final int RETURN_AFTER_DAYS = 10;
 
+  /** 이 시간 이상 말했을 때만 "N분 넘게 말했어요" 문구를 후보에 둔다. */
+  static final long LONG_SPEAKING_MS = 60_000;
+
+  /** 말한 시간이 직전의 이 배수 이상일 때만 "N배예요" 문구를 후보에 둔다. */
+  static final double NOTABLE_RATIO = 1.5;
+
+  /** 최장 턴이 직전의 이 배수 이상일 때만 "두 배 길어졌어요" 문구를 후보에 둔다. */
+  static final int DOUBLED = 2;
+
   /**
    * 총평을 계산한다.
    *
@@ -225,7 +234,11 @@ public class FreeTalkSummaryCalculator {
     if (increased(current.turnCount(), previous.turnCount())) {
       return FreeTalkHeadlineTrigger.TURN_COUNT_UP;
     }
-    if (similar(current.speakingMs(), previous.speakingMs())) {
+    // 둘 다 말한 시간이 없으면(글자로만 대화) 주고받은 말로 비슷한지 본다. 0과 0을 "지난번만큼 말했다"로 부르지 않기 위함이다.
+    boolean spoke = current.speakingMs() > 0 || previous.speakingMs() > 0;
+    long currentAmount = spoke ? current.speakingMs() : current.turnCount();
+    long previousAmount = spoke ? previous.speakingMs() : previous.turnCount();
+    if (similar(currentAmount, previousAmount)) {
       return FreeTalkHeadlineTrigger.SIMILAR;
     }
     return FreeTalkHeadlineTrigger.DECREASED;
@@ -254,8 +267,12 @@ public class FreeTalkSummaryCalculator {
     List<String[]> candidates = new ArrayList<>();
     switch (trigger) {
       case FIRST_SESSION -> {
-        candidates.add(
-            phrase("첫 스몰톡, %d번이나 주고받았어요!".formatted(current.turnCount()), "다음부턴 지난번과 비교해서 보여줄게요."));
+        // 한 마디도 안 하고 끝난 세션에 "0번이나"라고 말하지 않는다.
+        if (current.turnCount() > 0) {
+          candidates.add(
+              phrase(
+                  "첫 스몰톡, %d번이나 주고받았어요!".formatted(current.turnCount()), "다음부턴 지난번과 비교해서 보여줄게요."));
+        }
         candidates.add(phrase("첫 스몰톡 완주 축하해요!", "다음엔 오늘 얘기를 이어서 할 수 있어요."));
       }
       case RETURN_AFTER_BREAK -> {
@@ -263,7 +280,7 @@ public class FreeTalkSummaryCalculator {
             phrase(
                 "%d일 만이네요, 감을 잃지않고 %d번 주고받았어요!".formatted(daysSincePrevious, current.turnCount()),
                 "감이 안 죽었어요."));
-        if (current.speakingMs() >= 60_000) {
+        if (current.speakingMs() >= LONG_SPEAKING_MS) {
           candidates.add(
               phrase(
                   "오랜만인데도 %s 넘게 말했어요!".formatted(minutesText(current.speakingMs())),
@@ -283,13 +300,14 @@ public class FreeTalkSummaryCalculator {
                 "지난번보다 %s 더 말했어요!"
                     .formatted(durationText(current.speakingMs() - previous.speakingMs())),
                 "할 말이 그만큼 늘었다는 거예요."));
-        if (current.speakingMs() >= 60_000) {
+        if (current.speakingMs() >= LONG_SPEAKING_MS) {
           candidates.add(
               phrase(
                   "오늘 %s 넘게 말했어요!".formatted(minutesText(current.speakingMs())),
                   "지난번엔 %s였어요.".formatted(durationText(previous.speakingMs()))));
         }
-        if (previous.speakingMs() > 0 && current.speakingMs() * 2 >= previous.speakingMs() * 3) {
+        if (previous.speakingMs() > 0
+            && current.speakingMs() >= previous.speakingMs() * NOTABLE_RATIO) {
           candidates.add(
               phrase(
                   "말한 시간이 지난번의 %s배예요!"
@@ -303,7 +321,7 @@ public class FreeTalkSummaryCalculator {
                 "한 번에 %d단어까지 말했어요!".formatted(current.maxWordsInTurn()),
                 "지난번 최장은 %d단어였어요.".formatted(previous.maxWordsInTurn())));
         if (previous.maxWordsInTurn() > 0
-            && current.maxWordsInTurn() >= previous.maxWordsInTurn() * 2) {
+            && current.maxWordsInTurn() >= previous.maxWordsInTurn() * DOUBLED) {
           candidates.add(phrase("제일 긴 문장이 두 배 길어졌어요!", "막힘 없이 이어 말한 거예요."));
         }
       }

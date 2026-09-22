@@ -66,6 +66,9 @@ CREATE TABLE free_talk_session_summary (
                 AND previous_turn_count = 0
                 AND previous_max_words_in_turn = 0
                 AND growth_pattern IS NULL
+                AND growth_succeeded IS NULL
+                AND growth_previous_sentence IS NULL
+                AND growth_current_sentence IS NULL
             )
             OR (
                 first_session = FALSE
@@ -100,7 +103,9 @@ CREATE TABLE free_talk_session_summary (
                 )
                 AND growth_succeeded IS NOT NULL
                 AND growth_previous_date IS NOT NULL
+                AND growth_previous_sentence IS NOT NULL
                 AND TRIM(growth_previous_sentence) <> ''
+                AND growth_current_sentence IS NOT NULL
                 AND TRIM(growth_current_sentence) <> ''
                 AND (growth_previous_wrong_span IS NULL OR TRIM(growth_previous_wrong_span) <> '')
                 AND (growth_current_span IS NULL OR TRIM(growth_current_span) <> '')

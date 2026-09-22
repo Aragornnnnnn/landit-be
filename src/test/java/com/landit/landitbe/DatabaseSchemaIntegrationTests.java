@@ -494,6 +494,10 @@ class DatabaseSchemaIntegrationTests {
         "free_talk_session_summary", "chk_free_talk_session_summary_metrics");
     assertTableConstraintExists(
         "free_talk_session_summary", "chk_free_talk_session_summary_growth");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "fk_free_talk_session_summary_user_profile");
+    assertTableConstraintExists(
+        "free_talk_session_summary", "fk_free_talk_session_summary_history");
   }
 
   @DisplayName("V20 migration은 사용자 메시지 속마음 처리 상태를 추가한다.")
@@ -1885,6 +1889,53 @@ class DatabaseSchemaIntegrationTests {
           "161000",
           "'WORD_CHOICE', TRUE, DATE '2026-09-10', 'I go to gym.', NULL, 'I went.', NULL",
           "chk_free_talk_session_summary_growth");
+      // NULL은 SQL에서 "거짓"이 아니라 "모름"이라 조건을 통과하기 쉽다. 문장이 NULL인 카드도 거부되는지 따로 본다.
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "'TENSE', TRUE, DATE '2026-09-10', NULL, NULL, 'I went.', NULL",
+          "chk_free_talk_session_summary_growth");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "TRUE",
+          "NULL, NULL, NULL",
+          "0",
+          "NULL, TRUE, NULL, NULL, NULL, NULL, NULL",
+          "chk_free_talk_session_summary_previous");
+      // 첫 스몰톡의 직전 지표는 0이어야 하고, 지표는 음수일 수 없으며, 구절은 있으면 비어 있지 않아야 한다.
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "TRUE",
+          "NULL, NULL, NULL",
+          "1",
+          "NULL",
+          "chk_free_talk_session_summary_previous");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', -1",
+          "161000",
+          "NULL",
+          "chk_free_talk_session_summary_metrics");
+      assertSummaryRejected(
+          migrationJdbcTemplate,
+          33L,
+          "FALSE",
+          "1201, DATE '2026-09-10', 5",
+          "161000",
+          "'TENSE', TRUE, DATE '2026-09-10', 'I go to gym.', ' ', 'I went.', NULL",
+          "chk_free_talk_session_summary_growth");
+      // 헤드라인의 계기·포즈는 정해진 값만, 문구는 비어 있지 않아야 한다.
+      assertThatThrownBy(() -> insertHeadline(migrationJdbcTemplate, "NOPE", "더"))
+          .hasMessageContaining("chk_free_talk_session_summary_headline");
+      assertThatThrownBy(() -> insertHeadline(migrationJdbcTemplate, "FIRST_SESSION", " "))
+          .hasMessageContaining("chk_free_talk_session_summary_headline");
 
       migrationJdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
       migrationJdbcTemplate.update("DELETE FROM free_talk_session WHERE id = 32");
@@ -1895,6 +1946,19 @@ class DatabaseSchemaIntegrationTests {
     } finally {
       dataSource.destroy();
     }
+  }
+
+  private int insertHeadline(JdbcTemplate migrationJdbcTemplate, String trigger, String text) {
+    return migrationJdbcTemplate.update(
+        "INSERT INTO free_talk_session_summary (user_profile_id, free_talk_session_id,"
+            + " session_history_id, first_session, headline_trigger, headline_text,"
+            + " headline_subline, headline_pose, current_speaking_ms, current_turn_count,"
+            + " current_max_words_in_turn, previous_speaking_ms, previous_turn_count,"
+            + " previous_max_words_in_turn, correction_count, created_at, updated_at)"
+            + " VALUES (1, 33, 1, TRUE, ?, ?, '늘', 'POINT', 0, 0, 0, 0, 0, 0, 0,"
+            + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        trigger,
+        text);
   }
 
   private int insertSummary(

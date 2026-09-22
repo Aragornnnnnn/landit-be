@@ -112,6 +112,12 @@ class FreeTalkSessionRepositoryIntegrationTests {
         .containsEntry("MEMORY_GENERATION_STARTED_AT", null);
     assertThat(
             jdbcTemplate.queryForObject(
+                "select updated_at from free_talk_session where id = ?",
+                java.sql.Timestamp.class,
+                LATEST_BEFORE + 1))
+        .isEqualTo(java.sql.Timestamp.valueOf(LocalDateTime.of(2026, 9, 15, 12, 0)));
+    assertThat(
+            jdbcTemplate.queryForObject(
                 "select memory_generation_status from free_talk_session where id = ?",
                 String.class,
                 OLDER + 1))
@@ -120,7 +126,9 @@ class FreeTalkSessionRepositoryIntegrationTests {
 
   private int failStale(long freeTalkSessionId) {
     return transactionTemplate.execute(
-        status -> repository.failStaleMemoryGeneration(freeTalkSessionId));
+        status ->
+            repository.failStaleMemoryGeneration(
+                freeTalkSessionId, LocalDateTime.of(2026, 9, 15, 12, 0)));
   }
 
   private List<Long> previousOf(long learningSessionId) {

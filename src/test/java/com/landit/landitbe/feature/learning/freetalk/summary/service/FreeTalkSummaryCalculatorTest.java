@@ -64,6 +64,31 @@ class FreeTalkSummaryCalculatorTest {
     assertThat(summary.getGrowthPattern()).isNull();
   }
 
+  @DisplayName("한 마디도 안 한 첫 스몰톡은 \"0번이나\"라고 말하지 않고, 둘 다 말한 시간이 없는 세션은 주고받은 말로 비슷한지 본다.")
+  @Test
+  void avoidsMisleadingPhrasesForEmptySessions() {
+    FreeTalkSessionSummary emptyFirst =
+        calculator.calculate(
+            1L, 30L, 3100L, 300L, source(List.of(), List.of(), List.of()), null, null);
+    assertThat(emptyFirst.getHeadlineText()).isEqualTo("첫 스몰톡 완주 축하해요!");
+
+    FreeTalkSummarySource textOnly =
+        source(
+            List.of(new Utterance("hi", null), new Utterance("bye", null)), List.of(), List.of());
+    FreeTalkSummarySource textOnlyShorter =
+        source(List.of(new Utterance("hi", null)), List.of(), List.of());
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, textOnly, PREVIOUS, textOnly)
+                .getHeadlineTrigger())
+        .isEqualTo(FreeTalkHeadlineTrigger.SIMILAR);
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, textOnlyShorter, PREVIOUS, textOnly)
+                .getHeadlineTrigger())
+        .isEqualTo(FreeTalkHeadlineTrigger.DECREASED);
+  }
+
   @DisplayName("같은 세션은 언제 계산해도 같은 문구이고, 세션 ID가 다르면 은행의 다른 문구를 돌려 쓴다.")
   @Test
   void rotatesPhrasesBySessionIdDeterministically() {
@@ -238,12 +263,16 @@ class FreeTalkSummaryCalculatorTest {
     // days | cur ms,turns,words | prev ms,turns,words | trigger
     "10, 100000,10,10, 100000,10,10, RETURN_AFTER_BREAK",
     "9, 110000,10,10, 100000,10,10, SPEAKING_TIME_UP",
-    "5, 109000,20,10, 100000,10,10, LONGEST_TURN_UP_NOT_THIS_ONE",
+    // 9% 증가는 "늘었다"가 아니고, 우선순위상 주고받은 말 증가가 비슷함보다 앞선다.
+    "5, 109000,20,10, 100000,10,10, TURN_COUNT_UP",
     "5, 100000,10,20, 100000,10,10, LONGEST_TURN_UP",
     "5, 100000,11,10, 100000,10,10, TURN_COUNT_UP",
     "5, 105000,10,10, 100000,10,10, SIMILAR",
     "5, 95000,10,10, 100000,10,10, SIMILAR",
     "5, 80000,10,10, 100000,10,10, DECREASED",
+    // 비슷함의 아래 경계: 직전의 100/110 이상이면 비슷, 그 아래는 줄어듦.
+    "5, 90910,10,10, 100000,10,10, SIMILAR",
+    "5, 90909,10,10, 100000,10,10, DECREASED",
     "5, 0,0,0, 0,0,0, SIMILAR",
     "5, 1000,1,1, 0,0,0, SPEAKING_TIME_UP",
   })
@@ -266,13 +295,112 @@ class FreeTalkSummaryCalculatorTest {
             new FreeTalkSessionSummary.PreviousSession(1201L, PREVIOUS_DATE, days),
             metricsSource(previousMs, previousTurns, previousWords));
 
-    // 9% 증가는 "늘었다"가 아니라 "비슷하다"이고, 그때는 주고받은 말이 두 배여도 말한 시간이 비슷해 비슷함이 먼저가 아니다:
-    // 우선순위상 주고받은 말 증가가 비슷함보다 앞선다.
-    FreeTalkHeadlineTrigger expectedTrigger =
-        expected.equals("LONGEST_TURN_UP_NOT_THIS_ONE")
-            ? FreeTalkHeadlineTrigger.TURN_COUNT_UP
-            : FreeTalkHeadlineTrigger.valueOf(expected);
-    assertThat(summary.getHeadlineTrigger()).isEqualTo(expectedTrigger);
+    assertThat(summary.getHeadlineTrigger()).isEqualTo(FreeTalkHeadlineTrigger.valueOf(expected));
+  }
+
+  @DisplayName("오랜만 복귀는 성장 성공보다 먼저이고, 성장 성공은 지표가 늘었어도 그보다 먼저다.")
+  @Test
+  void ordersReturnBeforeGrowthAndGrowthBeforeMetrics() {
+    FreeTalkSummarySource previous =
+        source(
+            utterances(10),
+            List.of(correction(FreeTalkMistakePattern.TENSE, "I go.", "go")),
+            List.of());
+    FreeTalkSummarySource current =
+        source(
+            java.util.Collections.nCopies(30, new Utterance("I went.", 9000L)),
+            List.of(),
+            List.of(usage(FreeTalkMistakePattern.TENSE, "I went.", "went", true)));
+
+    assertThat(
+            calculator
+                .calculate(
+                    1L,
+                    30L,
+                    3100L,
+                    300L,
+                    current,
+                    new FreeTalkSessionSummary.PreviousSession(1201L, PREVIOUS_DATE, 10),
+                    previous)
+                .getHeadlineTrigger())
+        .isEqualTo(FreeTalkHeadlineTrigger.RETURN_AFTER_BREAK);
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, current, PREVIOUS, previous)
+                .getHeadlineTrigger())
+        .isEqualTo(FreeTalkHeadlineTrigger.GROWTH);
+  }
+
+  @DisplayName("문구 은행의 둘째·셋째 문구도 세션 ID로 고를 수 있고, 조건이 안 맞으면 후보에서 빠진다.")
+  @Test
+  void reachesEveryPhraseAndDropsUnfillableOnes() {
+    FreeTalkSummarySource previous = metricsSource(100000, 10, 10);
+    // 오랜만 복귀 둘째 문구: 1분 이상 말했을 때만.
+    FreeTalkSessionSummary.PreviousSession longAgo =
+        new FreeTalkSessionSummary.PreviousSession(1201L, PREVIOUS_DATE, 20);
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 301L, metricsSource(245000, 14, 10), longAgo, previous)
+                .getHeadlineText())
+        .isEqualTo("오랜만인데도 4분 넘게 말했어요!");
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 301L, metricsSource(50000, 14, 10), longAgo, previous)
+                .getHeadlineText())
+        .isEqualTo("20일 만이네요, 감을 잃지않고 14번 주고받았어요!");
+    // 주고받은 말 첫 문구.
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 300L, metricsSource(100000, 18, 10), PREVIOUS, previous)
+                .getHeadlineText())
+        .isEqualTo("18번이나 주고받았어요!");
+    // 비슷함 둘째 문구는 턴 수가 같고 0이 아닐 때만. 0턴이면 첫 문구뿐이다.
+    assertThat(
+            calculator
+                .calculate(
+                    1L, 30L, 3100L, 301L, metricsSource(0, 0, 0), PREVIOUS, metricsSource(0, 0, 0))
+                .getHeadlineText())
+        .isEqualTo("지난번만큼 얘기했어요!");
+    // 성장 성공 둘째 문구.
+    FreeTalkSummarySource corrected =
+        source(
+            utterances(10),
+            List.of(correction(FreeTalkMistakePattern.ARTICLE, "a gym", "a gym")),
+            List.of());
+    FreeTalkSummarySource fixed =
+        source(
+            utterances(10),
+            List.of(),
+            List.of(usage(FreeTalkMistakePattern.ARTICLE, "the gym", "the gym", true)));
+    assertThat(
+            calculator
+                .calculate(1L, 30L, 3100L, 301L, fixed, PREVIOUS, corrected)
+                .getHeadlineText())
+        .isEqualTo("관사, 이제 안 헷갈리네요!");
+  }
+
+  @DisplayName("직전 교정에 실수 패턴이 없으면 세지 않는다.")
+  @Test
+  void ignoresPreviousCorrectionsWithoutPattern() {
+    List<FreeTalkTurnCorrection.Sentence> unpatterned =
+        List.of(new FreeTalkTurnCorrection.Sentence("a", "b", "c", null));
+
+    assertThat(
+            calculator
+                .calculate(
+                    1L,
+                    30L,
+                    3100L,
+                    300L,
+                    // 오늘 TENSE 사용례가 있어도, 직전에 패턴 없는 교정뿐이면 카드가 없다.
+                    source(
+                        utterances(10),
+                        List.of(),
+                        List.of(usage(FreeTalkMistakePattern.TENSE, "I went.", "went", true))),
+                    PREVIOUS,
+                    source(utterances(10), unpatterned, List.of()))
+                .getGrowthPattern())
+        .isNull();
   }
 
   @DisplayName("말한 시간 헤드라인은 차이·총량·배수 문구를 값이 채워질 때만 후보로 두고 숫자를 한국어 서식으로 쓴다.")

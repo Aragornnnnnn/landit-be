@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,7 @@ import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkPat
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkPatternUsageRepository;
 import com.landit.landitbe.feature.learning.freetalk.feedback.service.FreeTalkMessageFeedbackService;
+import com.landit.landitbe.feature.learning.freetalk.followup.domain.FreeTalkFollowUpTriggerType;
 import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollowUpSummary;
 import com.landit.landitbe.feature.learning.freetalk.followup.service.FreeTalkFollowUpService;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
@@ -51,6 +53,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -66,9 +70,9 @@ class FreeTalkSummaryServiceTest {
   private static final long PREVIOUS_LEARNING_SESSION_ID = 200L;
   private static final long PREVIOUS_HISTORY_ID = 2100L;
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
-  // 세션은 서울 시간 2026-09-15 10:00에 시작해 10:20에 끝났다.
-  private static final LocalDateTime STARTED_AT = LocalDateTime.of(2026, 9, 15, 10, 0);
-  private static final LocalDateTime ENDED_AT = LocalDateTime.of(2026, 9, 15, 10, 20);
+  // 세션은 서울 시간 2026-09-15 23:50에 시작해 자정을 넘겨 09-16 00:10에 끝났다. 지난 일수는 시작 날짜 기준이어야 한다.
+  private static final LocalDateTime STARTED_AT = LocalDateTime.of(2026, 9, 15, 23, 50);
+  private static final LocalDateTime ENDED_AT = LocalDateTime.of(2026, 9, 16, 0, 10);
 
   private final LearningSessionService learningSessionService = mock(LearningSessionService.class);
   private final FreeTalkSessionRepository freeTalkSessionRepository =
@@ -204,7 +208,7 @@ class FreeTalkSummaryServiceTest {
     FreeTalkSessionSummaryResponse response =
         service(ENDED_AT.plusDays(3)).getSummary(USER_ID, LEARNING_SESSION_ID);
 
-    assertThat(response.headline().text()).isEqualTo("첫 스몰톡, 2번이나 주고받았어요!");
+    assertThat(response.headline().text()).isEqualTo("첫 스몰톡 완주 축하해요!");
     verify(messageFeedbackService, never()).findBySessionHistoryId(anyLong());
     verify(summaryRepository, never()).save(any());
   }
@@ -221,7 +225,7 @@ class FreeTalkSummaryServiceTest {
         service(ENDED_AT.plusSeconds(1)).getSummary(USER_ID, LEARNING_SESSION_ID);
 
     assertThat(response.pending()).isFalse();
-    assertThat(response.headline().text()).isEqualTo("첫 스몰톡, 2번이나 주고받았어요!");
+    assertThat(response.headline().text()).isEqualTo("첫 스몰톡 완주 축하해요!");
   }
 
   @DisplayName("직전 스몰톡이 있으면 그 세션의 발화·교정·사용례를 읽어 비교하고 직전 날짜와 지난 일수를 계산한다.")
@@ -290,19 +294,41 @@ class FreeTalkSummaryServiceTest {
   @Test
   void failsStaleMemoryGenerationAfterWait() {
     when(session.getMemoryGenerationStatus()).thenReturn(MemoryGenerationStatus.PREPARING);
-    when(freeTalkSessionRepository.failStaleMemoryGeneration(FREE_TALK_SESSION_ID)).thenReturn(1);
+    when(freeTalkSessionRepository.failStaleMemoryGeneration(eq(FREE_TALK_SESSION_ID), any()))
+        .thenReturn(1);
+    // 다시 읽은 세션은 제목·표현 상태도 달라져 있어, 응답이 옛 객체가 아니라 다시 읽은 쪽을 쓰는지 드러난다.
     FreeTalkSession refreshed = mock(FreeTalkSession.class);
     when(refreshed.getId()).thenReturn(FREE_TALK_SESSION_ID);
-    when(refreshed.getTitle()).thenReturn("카페 얘기");
-    when(refreshed.getExpressionGenerationStatus()).thenReturn(ExpressionGenerationStatus.READY);
+    when(refreshed.getTitle()).thenReturn("다시 읽은 제목");
+    when(refreshed.getExpressionGenerationStatus()).thenReturn(ExpressionGenerationStatus.FAILED);
     when(refreshed.getMemoryGenerationStatus()).thenReturn(MemoryGenerationStatus.FAILED);
     when(freeTalkSessionRepository.findById(FREE_TALK_SESSION_ID))
         .thenReturn(Optional.of(refreshed));
 
-    service(ENDED_AT.plusMinutes(5)).getSummary(USER_ID, LEARNING_SESSION_ID);
+    FreeTalkSessionSummaryResponse response =
+        service(ENDED_AT.plusMinutes(5)).getSummary(USER_ID, LEARNING_SESSION_ID);
 
-    verify(freeTalkSessionRepository).failStaleMemoryGeneration(FREE_TALK_SESSION_ID);
+    verify(freeTalkSessionRepository)
+        .failStaleMemoryGeneration(FREE_TALK_SESSION_ID, ENDED_AT.plusMinutes(5));
     verify(followUpService).findSummary(FREE_TALK_SESSION_ID, MemoryGenerationStatus.FAILED);
+    verify(expressionReuseQueryService)
+        .findSummary(FREE_TALK_SESSION_ID, ExpressionGenerationStatus.FAILED);
+    assertThat(response.title()).isEqualTo("다시 읽은 제목");
+  }
+
+  @DisplayName("작업이 이미 선점됐으면 상한은 종료가 아니라 선점 시각부터 세어, 늦게 선점된 정상 작업을 죽이지 않는다.")
+  @Test
+  void anchorsMemoryWaitOnClaimTimeWhenClaimed() {
+    when(session.getMemoryGenerationStatus()).thenReturn(MemoryGenerationStatus.PREPARING);
+    // 종료 4분 뒤에 선점됐다. 종료 기준으로는 5분이 지났지만 선점 기준으로는 2분밖에 안 지났다.
+    when(session.getMemoryGenerationStartedAt()).thenReturn(ENDED_AT.plusMinutes(4));
+
+    service(ENDED_AT.plusMinutes(6)).getSummary(USER_ID, LEARNING_SESSION_ID);
+    verify(freeTalkSessionRepository, never()).failStaleMemoryGeneration(anyLong(), any());
+
+    service(ENDED_AT.plusMinutes(9)).getSummary(USER_ID, LEARNING_SESSION_ID);
+    verify(freeTalkSessionRepository)
+        .failStaleMemoryGeneration(FREE_TALK_SESSION_ID, ENDED_AT.plusMinutes(9));
   }
 
   @DisplayName("장기기억 작업이 상한 전이거나 이미 끝났으면 확정하지 않는다.")
@@ -314,8 +340,196 @@ class FreeTalkSummaryServiceTest {
     when(session.getMemoryGenerationStatus()).thenReturn(MemoryGenerationStatus.READY);
     service(ENDED_AT.plusDays(1)).getSummary(USER_ID, LEARNING_SESSION_ID);
 
-    verify(freeTalkSessionRepository, never()).failStaleMemoryGeneration(anyLong());
+    verify(freeTalkSessionRepository, never()).failStaleMemoryGeneration(anyLong(), any());
     verify(followUpService).findSummary(FREE_TALK_SESSION_ID, MemoryGenerationStatus.PREPARING);
+  }
+
+  @DisplayName("프리톡이 아닌 학습 세션이면 404이고, 남의 세션은 완료 전이어도 409가 아니라 403이다.")
+  @Test
+  void rejectsNonFreeTalkSessionAndChecksOwnershipBeforeCompletion() {
+    when(freeTalkSessionRepository.findByLearningSessionId(LEARNING_SESSION_ID))
+        .thenReturn(Optional.empty());
+    assertThatThrownBy(() -> service(ENDED_AT).getSummary(USER_ID, LEARNING_SESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(SessionErrorCode.SESSION_NOT_FOUND);
+
+    when(freeTalkSessionRepository.findByLearningSessionId(LEARNING_SESSION_ID))
+        .thenReturn(Optional.of(session));
+    when(session.getConversationStatus()).thenReturn(FreeTalkConversationStatus.IN_PROGRESS);
+    assertThatThrownBy(() -> service(ENDED_AT).getSummary(USER_ID + 1, LEARNING_SESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.FORBIDDEN);
+  }
+
+  @DisplayName("완료 세션인데 대화 기록이 없으면 404다.")
+  @Test
+  void rejectsCompletedSessionWithoutHistory() {
+    when(sessionHistoryService.findByLearningSessionId(LEARNING_SESSION_ID))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service(ENDED_AT).getSummary(USER_ID, LEARNING_SESSION_ID))
+        .isInstanceOf(ApiException.class)
+        .extracting("errorCode")
+        .isEqualTo(SessionErrorCode.SESSION_NOT_FOUND);
+  }
+
+  @DisplayName("상한이 지났지만 그사이 장기기억 작업이 끝났으면 확정은 0건이고, 다시 읽은 최신 상태로 후속 질문을 읽는다.")
+  @Test
+  void rereadsSessionWhenMemoryGenerationFinishedMeanwhile() {
+    when(session.getMemoryGenerationStatus()).thenReturn(MemoryGenerationStatus.PREPARING);
+    when(freeTalkSessionRepository.failStaleMemoryGeneration(eq(FREE_TALK_SESSION_ID), any()))
+        .thenReturn(0);
+    FreeTalkSession refreshed = mock(FreeTalkSession.class);
+    when(refreshed.getId()).thenReturn(FREE_TALK_SESSION_ID);
+    when(refreshed.getTitle()).thenReturn("카페 얘기");
+    when(refreshed.getExpressionGenerationStatus()).thenReturn(ExpressionGenerationStatus.READY);
+    when(refreshed.getMemoryGenerationStatus()).thenReturn(MemoryGenerationStatus.READY);
+    when(freeTalkSessionRepository.findById(FREE_TALK_SESSION_ID))
+        .thenReturn(Optional.of(refreshed));
+
+    service(ENDED_AT.plusMinutes(6)).getSummary(USER_ID, LEARNING_SESSION_ID);
+
+    verify(followUpService).findSummary(FREE_TALK_SESSION_ID, MemoryGenerationStatus.READY);
+  }
+
+  @DisplayName("표현 재사용과 후속 질문은 저장된 값을 필드 그대로 응답에 옮긴다.")
+  @Test
+  void passesReusedExpressionsAndFollowUpThrough() {
+    when(expressionReuseQueryService.findSummary(
+            FREE_TALK_SESSION_ID, ExpressionGenerationStatus.READY))
+        .thenReturn(
+            new FreeTalkExpressionReuseSummary(
+                false,
+                List.of(
+                    new FreeTalkExpressionReuseSummary.Item(
+                        812L,
+                        "grab a coffee",
+                        "커피 한잔하다",
+                        "9월 10일 「주말 계획」",
+                        5504L,
+                        "Let's grab a coffee.",
+                        "grab a coffee"))));
+    when(followUpService.findSummary(FREE_TALK_SESSION_ID, MemoryGenerationStatus.READY))
+        .thenReturn(
+            new FreeTalkFollowUpSummary(
+                false, FreeTalkFollowUpTriggerType.CONCERN, "면접은 어떻게 됐어?", "다음엔 그 얘기 하자."));
+
+    FreeTalkSessionSummaryResponse response =
+        service(ENDED_AT.plusSeconds(1)).getSummary(USER_ID, LEARNING_SESSION_ID);
+
+    assertThat(response.reusedExpressions().pending()).isFalse();
+    assertThat(response.reusedExpressions().items())
+        .containsExactly(
+            new FreeTalkSessionSummaryResponse.ReusedExpressions.Item(
+                812L,
+                "grab a coffee",
+                "커피 한잔하다",
+                "9월 10일 「주말 계획」",
+                5504L,
+                "Let's grab a coffee.",
+                "grab a coffee"));
+    assertThat(response.followUp())
+        .isEqualTo(
+            new FreeTalkSessionSummaryResponse.FollowUp(
+                false, FreeTalkFollowUpTriggerType.CONCERN, "면접은 어떻게 됐어?", "다음엔 그 얘기 하자."));
+  }
+
+  @DisplayName("헤드라인과 비교는 항상 있고, 실수 기억 카드·표현 재사용·후속 질문은 각자 있을 때만 있으며 서로 영향을 주지 않는다.")
+  @ParameterizedTest(name = "growth={0} reused={1} followUp={2}")
+  @CsvSource({
+    "false,false,false",
+    "true,false,false",
+    "false,true,false",
+    "false,false,true",
+    "true,true,false",
+    "true,false,true",
+    "false,true,true",
+    "true,true,true",
+  })
+  void combinesOptionalBlocksIndependently(boolean growth, boolean reused, boolean followUp) {
+    if (growth) {
+      stubPreviousSessionWithTenseCard();
+    }
+    when(expressionReuseQueryService.findSummary(anyLong(), any()))
+        .thenReturn(
+            reused
+                ? new FreeTalkExpressionReuseSummary(
+                    false,
+                    List.of(
+                        new FreeTalkExpressionReuseSummary.Item(
+                            812L,
+                            "grab a coffee",
+                            "커피 한잔하다",
+                            "9월 10일",
+                            5504L,
+                            "Let's grab a coffee.",
+                            "grab a coffee")))
+                : new FreeTalkExpressionReuseSummary(false, List.of()));
+    when(followUpService.findSummary(anyLong(), any()))
+        .thenReturn(
+            followUp
+                ? new FreeTalkFollowUpSummary(
+                    false, FreeTalkFollowUpTriggerType.HOBBY, "요즘도 등산 다녀?", "다음엔 산 얘기 하자.")
+                : FreeTalkFollowUpSummary.none());
+
+    FreeTalkSessionSummaryResponse response =
+        service(ENDED_AT.plusSeconds(1)).getSummary(USER_ID, LEARNING_SESSION_ID);
+
+    assertThat(response.pending()).isFalse();
+    assertThat(response.headline()).isNotNull();
+    assertThat(response.comparison()).isNotNull();
+    assertThat(response.comparison().current().turnCount()).isEqualTo(2);
+    assertThat(response.correctionCount()).isZero();
+    assertThat(response.firstSession()).isEqualTo(!growth);
+    assertThat(response.growth() != null).isEqualTo(growth);
+    assertThat(response.reusedExpressions().items().isEmpty()).isEqualTo(!reused);
+    assertThat(response.reusedExpressions().pending()).isFalse();
+    assertThat(response.followUp().question() != null).isEqualTo(followUp);
+    assertThat(response.followUp().pending()).isFalse();
+  }
+
+  // 직전 세션에 TENSE 교정이 있고 오늘 TENSE를 맞게 쓴 사용례가 있어 실수 기억 카드가 생기는 상황을 꾸민다.
+  private void stubPreviousSessionWithTenseCard() {
+    FreeTalkSession previousSession = mock(FreeTalkSession.class);
+    when(previousSession.getLearningSessionId()).thenReturn(PREVIOUS_LEARNING_SESSION_ID);
+    when(freeTalkSessionRepository.findPreviousCompleted(LEARNING_SESSION_ID, PageRequest.of(0, 1)))
+        .thenReturn(List.of(previousSession));
+    LearningSessionSnapshot previousLearning = mock(LearningSessionSnapshot.class);
+    when(previousLearning.getEndedAt()).thenReturn(LocalDateTime.of(2026, 9, 10, 23, 50));
+    when(learningSessionService.findSession(PREVIOUS_LEARNING_SESSION_ID))
+        .thenReturn(Optional.of(previousLearning));
+    SessionHistorySnapshot previousHistory = mock(SessionHistorySnapshot.class);
+    when(previousHistory.getId()).thenReturn(PREVIOUS_HISTORY_ID);
+    when(sessionHistoryService.findByLearningSessionId(PREVIOUS_LEARNING_SESSION_ID))
+        .thenReturn(Optional.of(previousHistory));
+    List<SessionHistoryMessageSnapshot> previousMessages =
+        List.of(message(4504L, ConversationSpeaker.USER, "I go to gym.", 3000L));
+    when(conversationMessageService.findAll(PREVIOUS_HISTORY_ID)).thenReturn(previousMessages);
+    when(messageFeedbackService.findBySessionHistoryId(PREVIOUS_HISTORY_ID))
+        .thenReturn(
+            Map.of(
+                4504L,
+                FreeTalkTurnCorrection.completed(
+                    new FreeTalkTurnCorrection.Sentence(
+                        "I go to gym.",
+                        "I went to the gym.",
+                        "과거",
+                        FreeTalkMistakePattern.TENSE,
+                        "go",
+                        "went"),
+                    true)));
+    when(patternUsageRepository.findBySessionHistoryIdOrderByIdAsc(HISTORY_ID))
+        .thenReturn(
+            List.of(
+                FreeTalkPatternUsage.of(
+                    5504L,
+                    HISTORY_ID,
+                    FreeTalkMistakePattern.TENSE,
+                    "I went to the gym.",
+                    "went",
+                    true)));
   }
 
   private FreeTalkSummaryService service(LocalDateTime now) {
@@ -340,7 +554,8 @@ class FreeTalkSummaryServiceTest {
             USER_ID,
             FREE_TALK_SESSION_ID,
             HISTORY_ID,
-            LEARNING_SESSION_ID,
+            // 지금 다시 계산하면 나올 값과 구별되도록 다른 세션 ID로 만든 문구를 저장된 총평으로 쓴다.
+            LEARNING_SESSION_ID + 1,
             new FreeTalkSummarySource(
                 List.of(
                     new FreeTalkSummarySource.Utterance("a", 1L),

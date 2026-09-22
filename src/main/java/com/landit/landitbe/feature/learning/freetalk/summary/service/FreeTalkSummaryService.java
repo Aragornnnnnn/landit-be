@@ -61,7 +61,10 @@ public class FreeTalkSummaryService {
   /** 세션 종료 후 턴 교정이 끝나기를 기다려 주는 상한. 교정은 보통 몇 초 안에 끝나고, 재시도까지 기다리면 요약 화면이 멈춘다. */
   static final Duration CORRECTION_WAIT = Duration.ofSeconds(30);
 
-  /** 세션 종료 후 장기기억 작업을 기다려 주는 상한. 넘기면 멈춘 것으로 보고 실패로 확정한다. */
+  /**
+   * 장기기억 작업을 기다려 주는 상한. 작업이 선점된 뒤에는 선점 시각부터, 아직 선점되지 않았으면 세션 종료부터 센다. 넘기면 멈춘 것으로 보고 실패로 확정한다. 종료
+   * 시각만 기준으로 하면 실행기 대기로 늦게 선점된 정상 작업을 죽이고, 그 작업이 저장하는 기억과 후속 질문까지 함께 잃는다.
+   */
   static final Duration MEMORY_WAIT = Duration.ofMinutes(5);
 
   private final LearningSessionService learningSessionService;
@@ -90,7 +93,7 @@ public class FreeTalkSummaryService {
         learningSessionService
             .findSession(learningSessionId)
             .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
-    if (!Long.valueOf(userId).equals(learningSession.getUserProfileId())) {
+    if (!Objects.equals(learningSession.getUserProfileId(), userId)) {
       throw new ApiException(ErrorCode.FORBIDDEN);
     }
     FreeTalkSession session =
@@ -176,9 +179,13 @@ public class FreeTalkSummaryService {
     }
     long previousLearningSessionId = previousSession.get().getLearningSessionId();
     LearningSessionSnapshot previousLearning =
-        learningSessionService.findSession(previousLearningSessionId).orElseThrow();
+        learningSessionService
+            .findSession(previousLearningSessionId)
+            .orElseThrow(() -> missingPrevious("학습 세션", previousLearningSessionId));
     SessionHistorySnapshot previousHistory =
-        sessionHistoryService.findByLearningSessionId(previousLearningSessionId).orElseThrow();
+        sessionHistoryService
+            .findByLearningSessionId(previousLearningSessionId)
+            .orElseThrow(() -> missingPrevious("대화 기록", previousLearningSessionId));
     FreeTalkSummarySource previousSource =
         source(
             previousHistory.getId(),
@@ -226,28 +233,46 @@ public class FreeTalkSummaryService {
     return new FreeTalkSummarySource(utterances, sentences, usages);
   }
 
+  private static IllegalStateException missingPrevious(String what, long learningSessionId) {
+    return new IllegalStateException(
+        "직전 스몰톡의 " + what + "이 없습니다. learningSessionId=" + learningSessionId);
+  }
+
   private static FreeTalkPatternUsageDraft draft(FreeTalkPatternUsage usage) {
     return new FreeTalkPatternUsageDraft(
         usage.getPattern(), usage.getSentence(), usage.getSpan(), usage.isCorrect());
   }
 
-  // 종료 후 상한을 넘긴 장기기억 작업은 멈춘 것으로 보고 DB에 실패로 확정한다. 그사이 끝났으면 0건이라 그대로 두고, 어느 쪽이든 최신 상태를 다시 읽는다.
+  // 상한을 넘긴 장기기억 작업은 멈춘 것으로 보고 DB에 실패로 확정한다. 그사이 끝났으면 0건이라 그대로 두고, 어느 쪽이든 최신 상태를 다시 읽는다.
   private FreeTalkSession confirmStaleMemoryGeneration(
       LearningSessionSnapshot learningSession, FreeTalkSession session) {
-    if (session.getMemoryGenerationStatus() != MemoryGenerationStatus.PREPARING
-        || before(learningSession.getEndedAt().plus(MEMORY_WAIT))) {
+    if (session.getMemoryGenerationStatus() != MemoryGenerationStatus.PREPARING) {
+      return session;
+    }
+    LocalDateTime anchor =
+        session.getMemoryGenerationStartedAt() == null
+            ? learningSession.getEndedAt()
+            : session.getMemoryGenerationStartedAt();
+    if (before(anchor.plus(MEMORY_WAIT))) {
       return session;
     }
     Integer failed =
         new TransactionTemplate(transactionManager)
             .execute(
-                status -> freeTalkSessionRepository.failStaleMemoryGeneration(session.getId()));
-    log.warn(
-        "workflow=free_talk_summary outcome={} learningSessionId={}",
-        Objects.equals(failed, 1)
-            ? "memory_generation_timed_out"
-            : "memory_generation_settled_meanwhile",
-        learningSession.getId());
+                status ->
+                    freeTalkSessionRepository.failStaleMemoryGeneration(
+                        session.getId(), LocalDateTime.now(clock)));
+    if (Objects.equals(failed, 1)) {
+      log.warn(
+          "workflow=free_talk_summary outcome=memory_generation_timed_out learningSessionId={}",
+          learningSession.getId());
+    } else {
+      log.info(
+          "workflow=free_talk_summary outcome=memory_generation_settled_meanwhile"
+              + " learningSessionId={}",
+          learningSession.getId());
+    }
+    // 이 메서드는 트랜잭션 밖이라 새 영속성 컨텍스트로 읽어 방금 UPDATE한 값이 보인다. 트랜잭션 안에서 부르게 되면 지워진 캐시가 아니라 옛 엔티티를 볼 수 있다.
     return freeTalkSessionRepository.findById(session.getId()).orElse(session);
   }
 
