@@ -13,9 +13,8 @@ import java.util.List;
  */
 public record FreeTalkExpressionReuseSummary(boolean pending, List<Item> items) {
 
-  // 월 일 출처 「출처 제목」. 출처는 시나리오·스몰톡 중 하나
-  private static final String SOURCE_LABEL_WITH_TITLE = "%d월 %d일 %s 「%s」";
-  private static final String SOURCE_LABEL_WITHOUT_TITLE = "%d월 %d일 %s";
+  // 월 일 - 출처. 출처는 시나리오·스몰톡 중 하나. 출처 제목은 저장만 하고 라벨에는 넣지 않는다(제목이 길어 칩 옆에 들어가지 않음)
+  private static final String SOURCE_LABEL = "%d월 %d일 - %s";
 
   /** 목록을 불변으로 보관한다. */
   public FreeTalkExpressionReuseSummary {
@@ -33,8 +32,7 @@ public record FreeTalkExpressionReuseSummary(boolean pending, List<Item> items) 
    * @param expressionId 표현 ID. 예: 812
    * @param text 저장 시점의 표현 원문. 예: "grab a coffee"
    * @param meaning 저장 시점의 표현 뜻. 예: "커피 한잔하다"
-   * @param sourceLabel 그 표현을 배운 날과 곳(한국어 고정). 곳은 시나리오·스몰톡 중 하나이고, 출처 제목을 남기지 못했으면 제목을 뺀다. 예: "9월
-   *     10일 시나리오 「카페」", "9월 12일 스몰톡 「주말 계획」", "9월 10일 시나리오"
+   * @param sourceLabel 그 표현을 배운 날과 곳(한국어 고정). 곳은 시나리오·스몰톡 중 하나다. 예: "9월 10일 - 시나리오", "9월 12일 - 스몰톡"
    * @param messageId 이 표현을 처음 쓴 사용자 발화 ID. 예: 55020
    * @param quotedSentence 표현을 쓴 문장. 예: "I grabbed a coffee with a friend."
    * @param matchedText 그 문장에서 강조할 조각. 예: "grabbed a coffee"
@@ -63,10 +61,7 @@ public record FreeTalkExpressionReuseSummary(boolean pending, List<Item> items) 
     private static String sourceLabel(FreeTalkExpressionReuse reuse) {
       int month = reuse.getSourceLearnedOn().getMonthValue();
       int day = reuse.getSourceLearnedOn().getDayOfMonth();
-      String source = reuse.getSourceType().koreanLabel();
-      return reuse.getSourceTitle() == null
-          ? SOURCE_LABEL_WITHOUT_TITLE.formatted(month, day, source)
-          : SOURCE_LABEL_WITH_TITLE.formatted(month, day, source, reuse.getSourceTitle());
+      return SOURCE_LABEL.formatted(month, day, reuse.getSourceType().koreanLabel());
     }
   }
 }
