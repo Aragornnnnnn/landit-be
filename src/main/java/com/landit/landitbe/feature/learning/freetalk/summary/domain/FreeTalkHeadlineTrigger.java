@@ -9,7 +9,7 @@ package com.landit.landitbe.feature.learning.freetalk.summary.domain;
 public enum FreeTalkHeadlineTrigger {
   /** 예외: 사용자의 첫 스몰톡. */
   FIRST_SESSION,
-  /** 예외: 직전 스몰톡에서 14일 이상 지나 돌아옴. */
+  /** 예외: 직전 스몰톡에서 10일 이상 지나 돌아옴. */
   RETURN_AFTER_BREAK,
   /** 1. 지난번에 틀렸던 패턴을 오늘 맞게 씀. */
   GROWTH,
