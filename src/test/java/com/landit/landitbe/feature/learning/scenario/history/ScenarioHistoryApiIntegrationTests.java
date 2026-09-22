@@ -135,6 +135,30 @@ class ScenarioHistoryApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessions[0].feedback").value(nullValue()));
   }
 
+  @Test
+  @DisplayName("메시지 ID와 무관하게 실제 대화 순서로 속마음과 번역을 복원한다.")
+  void restoresOrderedMessagesAndInnerThoughts() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    session(5550102L, USER, SCENARIO, "COMPLETED", START.plusMinutes(2));
+    message(5550203L, 5550101L, 1, "AI", "Old question?");
+    message(5550201L, 5550101L, 2, "USER", "My answer.");
+    message(5550202L, 5550101L, 3, "AI", "Goodbye.");
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.sessions[0].feedback").value(nullValue()))
+        .andExpect(jsonPath("$.data.sessions[1].messages", hasSize(3)))
+        .andExpect(jsonPath("$.data.sessions[1].messages[0].messageId").value(5550203L))
+        .andExpect(jsonPath("$.data.sessions[1].messages[0].content").value("Old question?"))
+        .andExpect(jsonPath("$.data.sessions[1].messages[1].role").value("USER"))
+        .andExpect(jsonPath("$.data.sessions[1].messages[1].messageSequence").value(2))
+        .andExpect(jsonPath("$.data.sessions[1].messages[1].turnNumber").value(1))
+        .andExpect(jsonPath("$.data.sessions[1].messages[1].innerThought").value("잘 전달됐네."))
+        .andExpect(jsonPath("$.data.sessions[1].messages[1].innerThoughtType").value("GOOD"))
+        .andExpect(
+            jsonPath("$.data.sessions[1].messages[1].innerThoughtProcessingStatus")
+                .value("COMPLETED"))
+        .andExpect(jsonPath("$.data.sessions[1].messages[2].content").value("Goodbye."));
+  }
+
   private ResultActions history(long userId, long scenarioId) throws Exception {
     return mvc.perform(
             get("/api/v1/scenarios/{id}/history", scenarioId)
@@ -176,5 +200,23 @@ class ScenarioHistoryApiIntegrationTests {
         userId,
         START,
         endedAt == null ? START : endedAt);
+  }
+
+  private void message(long id, long historyId, int sequence, String role, String content) {
+    jdbc.update(
+        """
+        INSERT INTO session_history_message (id, session_history_id, message_sequence, turn_number,
+            role, content, translated_content, input_type, inner_thought, inner_thought_type,
+            inner_thought_processing_status, created_at, updated_at)
+        VALUES (?, ?, ?, 1, ?, ?, '저장된 번역', 'TEXT', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        id,
+        historyId,
+        sequence,
+        role,
+        content,
+        role.equals("USER") ? "잘 전달됐네." : null,
+        role.equals("USER") ? "GOOD" : null,
+        role.equals("USER") ? "COMPLETED" : null);
   }
 }
