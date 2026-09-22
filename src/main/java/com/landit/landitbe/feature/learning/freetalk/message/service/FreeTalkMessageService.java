@@ -25,7 +25,7 @@ import com.landit.landitbe.feature.memory.retrieval.domain.MemoryRetrievalStage;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
-import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -367,7 +367,7 @@ public class FreeTalkMessageService {
     try {
       return submitCancellableAsync(() -> aiFreeTalkClient.generateInnerThought(request));
     } catch (RuntimeException exception) {
-      log.warn("프리톡 속마음 작업을 시작하지 못했습니다. messageId={}", request.submittedMessageId(), exception);
+      // 실패한 Future의 최종 처리 경계에서 한 번 관측한다.
       return CompletableFuture.failedFuture(exception);
     }
   }
@@ -375,39 +375,36 @@ public class FreeTalkMessageService {
   private void recordInnerThought(
       AiFreeTalkInnerThoughtRequest request,
       CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture) {
-    innerThoughtFuture.whenComplete(
+    innerThoughtFuture.handle(
         (result, exception) -> {
-          if (exception == null) {
-            try {
+          if (exception != null) {
+            FailureObservation.failed("inner_thought", "generation", "result_missing", exception);
+          }
+          try {
+            if (exception == null) {
               turnResultService.complete(
                   request.submittedMessageId(),
                   result.innerThought(),
                   result.innerThoughtType(),
                   result.correction());
-            } catch (RuntimeException persistenceException) {
-              log.warn(
-                  "프리톡 속마음 저장에 실패했습니다. messageId={}",
-                  request.submittedMessageId(),
-                  persistenceException);
+            } else {
               turnResultService.fail(request.submittedMessageId());
             }
-            return;
+          } catch (RuntimeException persistenceException) {
+            FailureObservation.failed(
+                "inner_thought", "persistence", "storage_failed", persistenceException);
+            try {
+              turnResultService.fail(request.submittedMessageId());
+            } catch (RuntimeException compensationException) {
+              FailureObservation.failed(
+                  "inner_thought",
+                  "failure_state_persistence",
+                  "storage_failed",
+                  compensationException);
+            }
           }
-          log.error(
-              "프리톡 속마음 생성에 실패했습니다. "
-                  + "workflow=free_talk_inner_thought_failed messageId={} errorCode={}",
-              request.submittedMessageId(),
-              errorCode(exception),
-              exception);
-          turnResultService.fail(request.submittedMessageId());
+          return null;
         });
-  }
-
-  private String errorCode(Throwable exception) {
-    if (exception instanceof ApiException apiException) {
-      return apiException.getErrorCode().name();
-    }
-    return exception.getClass().getSimpleName();
   }
 
   private void cancelInnerThought(

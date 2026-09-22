@@ -186,9 +186,9 @@ public class RemoteAiConversationClient implements AiConversationClient {
       throw exception;
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
-      throw new ApiException(defaultErrorCode);
+      throw ApiException.causedBy(defaultErrorCode, exception);
     } catch (IOException exception) {
-      throw new ApiException(defaultErrorCode);
+      throw ApiException.causedBy(defaultErrorCode, exception);
     }
   }
 
@@ -222,7 +222,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
     } catch (ApiException exception) {
       throw exception;
     } catch (JacksonException exception) {
-      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      throw ApiException.causedBy(ErrorCode.AI_RESPONSE_INVALID, exception);
     }
   }
 
@@ -253,7 +253,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   private URI aiBaseUri(ApiErrorCode defaultErrorCode) {
     if (properties.baseUrl() == null || properties.baseUrl().isBlank()) {
-      throw new ApiException(defaultErrorCode);
+      throw ApiException.causedBy(
+          defaultErrorCode, new IllegalStateException("AI base URL is not configured"));
     }
     return URI.create(properties.baseUrl());
   }
