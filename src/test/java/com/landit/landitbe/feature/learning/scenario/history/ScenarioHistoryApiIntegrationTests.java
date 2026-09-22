@@ -1,0 +1,180 @@
+// 시나리오 히스토리의 소유권·회차 정렬·저장 데이터 복원과 피드백 잠금을 검증한다.
+
+package com.landit.landitbe.feature.learning.scenario.history;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.landit.landitbe.feature.auth.service.LanditTokenService;
+import com.landit.landitbe.feature.learning.scenario.session.client.ai.AiConversationClient;
+import java.time.LocalDateTime;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.annotation.Transactional;
+
+/** 실제 DB와 인증 필터를 거쳐 시나리오 히스토리 조회 계약을 검증한다. */
+@ActiveProfiles("test")
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+@TestPropertySource(properties = "landit.subscription.launched-at=2020-01-01T00:00:00+09:00")
+class ScenarioHistoryApiIntegrationTests {
+  private static final long USER = 5550001L;
+  private static final long OTHER_USER = 5550002L;
+  private static final long SCENARIO = 5550001L;
+  private static final LocalDateTime START = LocalDateTime.of(2026, 9, 20, 10, 0);
+
+  @Autowired private MockMvc mvc;
+  @Autowired private JdbcTemplate jdbc;
+  @Autowired private LanditTokenService tokens;
+  @MockitoBean private AiConversationClient ai;
+
+  @BeforeEach
+  void seed() {
+    jdbc.update(
+        """
+        INSERT INTO ai_tutor (id, accent_locale, target_locale, status, created_at, updated_at)
+        VALUES (5550001, 'EN_US', 'EN', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    for (long userId : new long[] {USER, OTHER_USER}) {
+      jdbc.update(
+          """
+          INSERT INTO user_profile (id, nickname, target_locale, base_locale, current_level,
+              push_permission_status, status, created_at, updated_at)
+          VALUES (?, '히스토리 사용자', 'EN', 'KR', 1, 'NOT_DETERMINED', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          """,
+          userId);
+    }
+    jdbc.update(
+        """
+        INSERT INTO category (id, display_order, status, created_at, updated_at)
+        VALUES (5550001, 5550001, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """);
+    for (long scenarioId : new long[] {SCENARIO, SCENARIO + 1}) {
+      jdbc.update(
+          """
+          INSERT INTO scenario (id, category_id, ai_role, difficulty, first_speaker,
+              total_question_count, display_order, status, created_at, updated_at)
+          VALUES (?, 5550001, 'tutor', 'EASY', 'AI', 3, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          """,
+          scenarioId,
+          scenarioId);
+      jdbc.update(
+          """
+          INSERT INTO scenario_language_variant (id, scenario_id, target_locale, base_locale,
+              title, briefing, conversation_goal, status, created_at, updated_at)
+          VALUES (?, ?, 'EN', 'KR', '현재 제목', '현재 설명', '현재 목표', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          """,
+          scenarioId,
+          scenarioId);
+    }
+  }
+
+  @AfterEach
+  void neverGeneratesAiResults() {
+    verifyNoInteractions(ai);
+  }
+
+  @Test
+  @DisplayName("히스토리는 인증이 필요하며 잘못된 시나리오 ID 형식은 거부한다.")
+  void requiresAuthenticationAndNumericScenarioId() throws Exception {
+    mvc.perform(get("/api/v1/scenarios/{id}/history", SCENARIO))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/api/v1/scenarios/invalid/history")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.createAccessToken(USER)))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @DisplayName("본인 기록이 없거나 시나리오가 없으면 빈 회차 목록을 반환한다.")
+  void returnsEmptyWithoutOwnedHistory() throws Exception {
+    session(5550101L, OTHER_USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    history(USER, SCENARIO).andExpect(jsonPath("$.data.sessions", hasSize(0)));
+    history(USER, 99999999L).andExpect(jsonPath("$.data.sessions", hasSize(0)));
+  }
+
+  @Test
+  @DisplayName("전체 완료 회차는 완료 시각과 ID 역순이며 타인·다른 시나리오·미완료 회차를 제외한다.")
+  void returnsAllOwnedCompletedRoundsInStableOrder() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    session(5550102L, USER, SCENARIO, "COMPLETED", START.plusMinutes(3));
+    session(5550103L, USER, SCENARIO, "COMPLETED", START.plusMinutes(3));
+    session(5550104L, USER, SCENARIO, "IN_PROGRESS", null);
+    session(5550105L, USER, SCENARIO, "INTERRUPTED", START.plusMinutes(4));
+    session(5550106L, OTHER_USER, SCENARIO, "COMPLETED", START.plusMinutes(5));
+    session(5550107L, USER, SCENARIO + 1, "COMPLETED", START.plusMinutes(6));
+    // 콘텐츠가 비활성화되거나 사용자 언어가 변경돼도 과거 기록은 유지된다.
+    jdbc.update("UPDATE scenario SET status = 'INACTIVE' WHERE id = ?", SCENARIO);
+    jdbc.update("UPDATE scenario_language_variant SET status = 'INACTIVE' WHERE id = ?", SCENARIO);
+    jdbc.update("UPDATE user_profile SET target_locale = 'KR' WHERE id = ?", USER);
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.scenarioId").value(SCENARIO))
+        .andExpect(jsonPath("$.data.sessions", hasSize(3)))
+        .andExpect(jsonPath("$.data.sessions[0].sessionId").value(5550103L))
+        .andExpect(jsonPath("$.data.sessions[1].sessionId").value(5550102L))
+        .andExpect(jsonPath("$.data.sessions[2].sessionId").value(5550101L))
+        .andExpect(jsonPath("$.data.sessions[0].startedAt").value("2026-09-20T10:00:00"))
+        .andExpect(jsonPath("$.data.sessions[0].endedAt").value("2026-09-20T10:03:00"))
+        .andExpect(jsonPath("$.data.sessions[0].feedback").value(nullValue()));
+  }
+
+  private ResultActions history(long userId, long scenarioId) throws Exception {
+    return mvc.perform(
+            get("/api/v1/scenarios/{id}/history", scenarioId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.createAccessToken(userId)))
+        .andExpect(status().isOk());
+  }
+
+  private void session(long id, long userId, long scenarioId, String state, LocalDateTime endedAt) {
+    jdbc.update(
+        """
+        INSERT INTO learning_session (id, user_profile_id, session_type, ai_tutor_id,
+            target_locale, base_locale, input_mode, status, started_at, ended_at, ended_by,
+            completion_reason, created_at, updated_at)
+        VALUES (?, ?, 'SCENARIO', 5550001, 'EN', 'KR', 'MIXED', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        id,
+        userId,
+        state,
+        START,
+        endedAt,
+        endedAt == null ? null : "SYSTEM",
+        endedAt == null ? null : "GOAL_COMPLETED");
+    jdbc.update(
+        """
+        INSERT INTO scenario_session (learning_session_id, scenario_language_variant_id,
+            question_level_group, user_opening_instruction_snapshot, created_at, updated_at)
+        VALUES (?, ?, 'LEVEL_1', '당시의 시작 안내', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        id,
+        scenarioId);
+    jdbc.update(
+        """
+        INSERT INTO session_history (id, learning_session_id, user_profile_id, session_type,
+            target_locale, base_locale, started_at, ended_at, duration_seconds, user_message_count, created_at)
+        VALUES (?, ?, ?, 'SCENARIO', 'EN', 'KR', ?, ?, 60, 1, CURRENT_TIMESTAMP)
+        """,
+        id,
+        id,
+        userId,
+        START,
+        endedAt == null ? START : endedAt);
+  }
+}
