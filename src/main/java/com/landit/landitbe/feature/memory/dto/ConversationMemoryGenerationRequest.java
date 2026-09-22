@@ -13,7 +13,28 @@ public record ConversationMemoryGenerationRequest(
     String targetLocale,
     String baseLocale,
     String timezone,
-    List<ConversationMemoryHistoryMessage> history) {
+    List<ConversationMemoryHistoryMessage> history,
+    ConversationMemoryFollowUpContext followUpContext) {
+
+  /** 후속 질문 문맥이 없는 장기기억 생성 문맥을 만든다. */
+  public ConversationMemoryGenerationRequest(
+      long learningSessionId,
+      long userProfileId,
+      String characterId,
+      String targetLocale,
+      String baseLocale,
+      String timezone,
+      List<ConversationMemoryHistoryMessage> history) {
+    this(
+        learningSessionId,
+        userProfileId,
+        characterId,
+        targetLocale,
+        baseLocale,
+        timezone,
+        history,
+        ConversationMemoryFollowUpContext.none());
+  }
 
   /** 장기기억 생성 문맥의 ID·필수 값과 이력 불변식을 검증한다. */
   public ConversationMemoryGenerationRequest {
@@ -27,5 +48,7 @@ public record ConversationMemoryGenerationRequest(
       throw new IllegalArgumentException("장기기억 생성 문맥이 유효하지 않습니다.");
     }
     history = List.copyOf(history);
+    followUpContext =
+        followUpContext == null ? ConversationMemoryFollowUpContext.none() : followUpContext;
   }
 }

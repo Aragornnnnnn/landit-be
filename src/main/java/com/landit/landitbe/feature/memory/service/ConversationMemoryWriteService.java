@@ -4,6 +4,7 @@ package com.landit.landitbe.feature.memory.service;
 
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPersistence;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepository;
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
@@ -12,9 +13,12 @@ import com.landit.landitbe.feature.profile.learning.service.ProfileLearningServi
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 장기기억의 snapshot 재검증과 상태 변경을 하나의 트랜잭션으로 수행한다. */
@@ -42,13 +46,13 @@ public class ConversationMemoryWriteService {
    *
    * @param userProfileId 잠글 사용자 프로필 ID
    * @param plans 후보별 상태 판정과 비교 검색 snapshot
-   * @return snapshot이 같아 저장을 완료했으면 STORED, 달라졌으면 STALE
+   * @return snapshot이 같아 저장을 완료했으면 STORED와 계획 순번별 새 기억 ID, 달라졌으면 STALE
    * @throws ApiException 활성 사용자 프로필이 없을 때
    * @throws IllegalArgumentException 후보 계획이 사용자 범위 또는 상태 계약에 맞지 않을 때
    * @throws IllegalStateException 대체 대상이 활성 상태가 아닐 때
    */
   @Transactional
-  public PersistenceResult persistIfSnapshotCurrent(
+  public ConversationMemoryPersistence persistIfSnapshotCurrent(
       long userProfileId, List<ConversationMemoryResolutionPlan> plans) {
     requirePositive(userProfileId, "사용자 프로필 ID");
     if (plans == null) {
@@ -60,13 +64,31 @@ public class ConversationMemoryWriteService {
         .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND));
     validatePlans(userProfileId, plans);
     if (snapshotChanged(plans)) {
-      return PersistenceResult.STALE;
+      return new ConversationMemoryPersistence(PersistenceResult.STALE, Map.of());
     }
 
-    for (ConversationMemoryResolutionPlan plan : plans) {
-      persistPlan(plan);
+    Map<Integer, Long> savedMemoryIdsByPlanIndex = new HashMap<>();
+    for (int planIndex = 0; planIndex < plans.size(); planIndex++) {
+      Long savedMemoryId = persistPlan(plans.get(planIndex));
+      if (savedMemoryId != null) {
+        savedMemoryIdsByPlanIndex.put(planIndex, savedMemoryId);
+      }
     }
-    return PersistenceResult.STORED;
+    return new ConversationMemoryPersistence(PersistenceResult.STORED, savedMemoryIdsByPlanIndex);
+  }
+
+  /**
+   * 기억 저장과 같은 트랜잭션에서, 저장을 마친 뒤에도 그 기억이 활성 상태인지 확인한다.
+   *
+   * <p>사용자 잠금을 쥔 저장 트랜잭션 안에서만 부른다. 이번 저장 계획이나 그사이 끝난 다른 작업이 그 기억을 대체했는지를 저장 이후 기준으로 알 수 있다.
+   *
+   * @param userProfileId 기억 소유 사용자 프로필 ID
+   * @param memoryId 확인할 장기기억 ID
+   * @return 본인 소유의 활성 기억이면 true
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean isActiveAfterPersistence(long userProfileId, long memoryId) {
+    return memoryRepository.existsActive(userProfileId, memoryId);
   }
 
   /** 사용자 잠금 안에서 비교 목록을 다시 조회해 AI 판정 시점 이후 변경을 차단한다. */
@@ -91,15 +113,15 @@ public class ConversationMemoryWriteService {
     return false;
   }
 
-  /** 상태 판정 결과에 따라 신규 기억 저장과 기존 기억 대체를 순서대로 계획한다. */
-  private void persistPlan(ConversationMemoryResolutionPlan plan) {
+  /** 상태 판정 결과에 따라 신규 기억 저장과 기존 기억 대체를 순서대로 수행하고 새 기억 ID를 돌려준다. IGNORE면 null이다. */
+  private Long persistPlan(ConversationMemoryResolutionPlan plan) {
     if (plan.operation() == AiMemoryOperation.IGNORE) {
-      return;
+      return null;
     }
 
     long newMemoryId = memoryRepository.save(plan.memory(), plan.sourceMessageIds());
     if (plan.operation() == AiMemoryOperation.ADD) {
-      return;
+      return newMemoryId;
     }
 
     LocalDateTime supersededAt = LocalDateTime.now();
@@ -109,6 +131,7 @@ public class ConversationMemoryWriteService {
         throw new IllegalStateException("대체할 활성 장기기억이 없습니다.");
       }
     }
+    return newMemoryId;
   }
 
   /** 저장 계획은 잠금한 사용자와 snapshot 범위 안에서만 실행할 수 있다. */

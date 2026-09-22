@@ -2,11 +2,14 @@
 
 package com.landit.landitbe.feature.memory.planning.service;
 
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.client.ai.AiMemoryClient;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesRequest;
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryCandidatesResult;
+import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,26 +18,43 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ConversationMemoryPlanningService {
+
   private final AiMemoryClient aiClient;
   private final FreeTalkMemoryCandidateMapper candidateMapper;
   private final FreeTalkMemoryResolutionService resolutionService;
+  private final ConversationMemoryRepository memoryRepository;
+  private final ConversationMemoryFollowUpResolver followUpResolver;
 
   /**
-   * 대화에서 기억 후보를 추출하고 저장 가능한 계획으로 검증한다.
+   * AI 후보 추출과 충돌 해결을 실행해 저장 계획을 만들고, 같은 응답의 후속 질문을 계획과 연결한다.
    *
-   * @param request 생성에 필요한 사용자와 대화 정보
-   * @return 검증된 기억 저장 계획
-   * @throws IllegalArgumentException AI 응답이 기억 계약을 위반할 때
+   * @param request 장기기억 생성 문맥
+   * @return 검증된 기억 저장 계획과 후속 질문
    */
-  public List<ConversationMemoryResolutionPlan> createPlans(
-      ConversationMemoryGenerationRequest request) {
-    AiMemoryCandidatesResult extraction = extractMemoryCandidates(request);
+  public ConversationMemoryPlanningResult createPlans(ConversationMemoryGenerationRequest request) {
+    // 후속 질문의 근거로 쓸 수 있도록 이번 세션의 기억을 저장하기 전의 기존 기억을 함께 보낸다.
+    // 이미 질문에 쓴 기억은 AI 서버가 어차피 고르지 않으므로, 상한만큼의 자리를 아직 묻지 않은 기억으로 채운다.
+    List<AiFreeTalkMemoryContext> existingMemories =
+        memoryRepository.findRecentActiveContexts(
+            request.userProfileId(),
+            request.characterId(),
+            request.followUpContext().askedMemoryIds(),
+            AiMemoryCandidatesRequest.MAX_EXISTING_MEMORIES);
+    AiMemoryCandidatesResult extraction = extractMemoryCandidates(request, existingMemories);
     List<FreeTalkMemoryCandidate> candidates = candidateMapper.mapCandidates(request, extraction);
-    return resolutionService.plan(request, candidates);
+    List<ConversationMemoryResolutionPlan> plans = resolutionService.plan(request, candidates);
+    return new ConversationMemoryPlanningResult(
+        plans,
+        followUpResolver.resolve(
+            request.learningSessionId(),
+            extraction.followUpQuestion(),
+            existingMemories,
+            candidates,
+            plans.size()));
   }
 
   private AiMemoryCandidatesResult extractMemoryCandidates(
-      ConversationMemoryGenerationRequest request) {
+      ConversationMemoryGenerationRequest request, List<AiFreeTalkMemoryContext> existingMemories) {
     return aiClient.extractMemoryCandidates(
         new AiMemoryCandidatesRequest(
             request.learningSessionId(),
@@ -42,6 +62,9 @@ public class ConversationMemoryPlanningService {
             request.targetLocale(),
             request.baseLocale(),
             request.timezone(),
-            request.history()));
+            request.history(),
+            existingMemories,
+            request.followUpContext().askedMemoryIds(),
+            request.followUpContext().sessionEndedBy()));
   }
 }

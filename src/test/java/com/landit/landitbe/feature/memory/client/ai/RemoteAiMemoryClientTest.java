@@ -74,15 +74,15 @@ class RemoteAiMemoryClientTest {
         .isEqualTo("openai/text-embedding-3-small");
   }
 
-  @DisplayName("AI가 먼저 배포되어 기억 후보 응답에 모르는 후속 질문 필드가 실려 와도 후보를 그대로 변환한다.")
+  @DisplayName("기억 후보 응답에 실려 온 후속 질문을 읽고, 그 밖의 모르는 필드는 무시한다.")
   @Test
-  void ignoresUnknownFollowUpQuestionInMemoryCandidateResponse() throws Exception {
+  void readsFollowUpQuestionAndIgnoresUnknownFields() throws Exception {
     String candidatesWithFollowUp =
         "{\"extractorVersion\":\"memory-candidate-v10\",\"candidates\":["
             + memoryCandidateJson(0, "EVENT")
             + "],\"followUpQuestion\":{\"memoryId\":null,\"candidateIndex\":0,"
             + "\"triggerType\":\"PAST_EVENT\",\"question\":\"면접 어떻게 됐어?\","
-            + "\"invite\":\"다음엔 그 얘기 하자.\"}}";
+            + "\"invite\":\"다음엔 그 얘기 하자.\",\"addedLater\":1},\"addedLater\":{\"x\":1}}";
     registerJsonResponse(
         "/api/v1/free-talk/memory-candidates",
         new ConcurrentHashMap<>(),
@@ -91,9 +91,70 @@ class RemoteAiMemoryClientTest {
     AiMemoryCandidatesResult result =
         memoryClient().extractMemoryCandidates(memoryCandidatesRequest());
 
-    assertThat(result.extractorVersion()).isEqualTo("memory-candidate-v10");
     assertThat(result.candidates()).hasSize(1);
-    assertThat(result.candidates().getFirst().candidateIndex()).isZero();
+    assertThat(result.followUpQuestion())
+        .isEqualTo(
+            new AiMemoryCandidatesResult.FollowUpQuestion(
+                null, 0, "PAST_EVENT", "면접 어떻게 됐어?", "다음엔 그 얘기 하자."));
+  }
+
+  @DisplayName("모르는 계기 값이 와도 기억 후보 응답 전체의 변환은 실패하지 않는다.")
+  @Test
+  void keepsUnknownTriggerTypeAsTextWithoutFailingCandidates() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/memory-candidates",
+        new ConcurrentHashMap<>(),
+        successResponse(
+            "{\"extractorVersion\":\"memory-candidate-v10\",\"candidates\":[],"
+                + "\"followUpQuestion\":{\"memoryId\":42,\"candidateIndex\":null,"
+                + "\"triggerType\":\"BRAND_NEW\",\"question\":\"q\",\"invite\":\"i\"}}"));
+
+    AiMemoryCandidatesResult result =
+        memoryClient().extractMemoryCandidates(memoryCandidatesRequest());
+
+    assertThat(result.followUpQuestion().triggerType()).isEqualTo("BRAND_NEW");
+  }
+
+  @DisplayName("후속 질문 문맥이 있으면 기존 기억·이미 쓴 기억·종료 방식을 보내고, 없으면 그 필드들을 싣지 않는다.")
+  @Test
+  void sendsFollowUpContextOnlyWhenPresent() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/memory-candidates",
+        requests,
+        successResponse(memoryCandidateData("memory-candidate-v10", 0, "EVENT")));
+    AiMemoryCandidatesRequest plain = memoryCandidatesRequest();
+
+    memoryClient().extractMemoryCandidates(plain);
+
+    JsonNode plainRequest = requests.get("/api/v1/free-talk/memory-candidates");
+    // 이 필드들을 모르는 구버전 AI 서버가 보낼 것이 없는 요청까지 거부하지 않게 한다.
+    assertThat(plainRequest.has("existingMemories")).isFalse();
+    assertThat(plainRequest.has("askedMemoryIds")).isFalse();
+    assertThat(plainRequest.has("sessionEndedBy")).isFalse();
+
+    memoryClient()
+        .extractMemoryCandidates(
+            new AiMemoryCandidatesRequest(
+                plain.sessionId(),
+                plain.characterId(),
+                plain.targetLocale(),
+                plain.baseLocale(),
+                plain.timezone(),
+                plain.conversationHistory(),
+                List.of(
+                    new com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext(
+                        42L, ConversationMemoryType.EVENT, "다음 주에 면접이 있다.")),
+                List.of(7L, 9L),
+                "TIME_LIMIT_REACHED"));
+
+    JsonNode request = requests.get("/api/v1/free-talk/memory-candidates");
+    assertThat(request.get("existingMemories").get(0).get("memoryId").asLong()).isEqualTo(42L);
+    assertThat(request.get("existingMemories").get(0).get("memoryType").asText())
+        .isEqualTo("EVENT");
+    assertThat(request.get("askedMemoryIds")).hasSize(2);
+    assertThat(request.get("askedMemoryIds").get(1).asLong()).isEqualTo(9L);
+    assertThat(request.get("sessionEndedBy").asText()).isEqualTo("TIME_LIMIT_REACHED");
   }
 
   @DisplayName("기억 충돌 해결 계약을 AI에 전송하고 성공 응답을 변환한다.")
