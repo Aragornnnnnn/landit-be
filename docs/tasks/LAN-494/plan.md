@@ -9,7 +9,7 @@
 
 ## 범위와 기준
 
-- 기준 브랜치는 `feat/LAN-491`(PR #191), 작업 브랜치는 `feat/LAN-494`다.
+- 최초 구현은 `feat/LAN-491`(PR #191)을 기준으로 했다. PR #193 병합 이후 종료 정책 변경은 최신 `develop` 기준의 `feat/LAN-494`에서 진행한다.
 - BE에서 복습 선정·스냅샷·진행·채점·완료 API와 기존 Push SQS의 별도 복습 배치를 구현한다. FE 화면 및 배포는 별도다.
 - 완료한 표현 최대 3개를 사용한다. 3개면 EN 2/KR 1, 2개면 EN 1/KR 1, 1개면 무작위 언어다. LAN-491의 한국어 복수 정답을 보존한다.
 - 푸시 URL만 제공하며 목록·임의 생성 API는 제공하지 않는다. API는 로그인 사용자와 복습 소유자를 검증한다. HTTP 요청만으로 OS 알림 클릭을 증명하지는 않는다.
@@ -23,7 +23,7 @@
 - 기존 학습 알림과 복습 알림은 별도 이벤트이며 발송 예약을 합산해 하루 최대 2건, 서로 최소 3시간 간격을 둔다. 기기별 중복은 기존 push_delivery가 처리한다.
 - 생성 후 7일 안에 시작하며, 시작 후에는 24시간 동안 진행한다. 완료 결과는 이후에도 조회할 수 있다.
 - 오래 학습·복습한 순서로 후보를 30개씩 조회하고 각 묶음에서 무작위 선정한다. 유효한 문제가 없는 표현은 건너뛰며, 유효한 표현 3개를 채우거나 후보가 소진될 때까지 다음 묶음을 확인한다.
-- 표현과 문제·정답 배열을 스냅샷으로 저장한다. 서버가 토큰 순서·중복 개수를 포함해 채점하며 오답은 큐 뒤로 보낸다. 제출 UUID로 재전송을 멱등 처리한다.
+- 표현과 문제·정답 배열을 스냅샷으로 저장한다. 서버가 토큰 순서·중복 개수를 포함해 채점한다. 첫 오답은 큐 뒤로 보내고, 정답 또는 두 번째 오답이면 해당 문제를 종료한다. 제출 UUID로 재전송을 멱등 처리한다.
 
 ## 구현 및 검증 기록
 
@@ -44,6 +44,15 @@
 - 스냅샷은 JDBC 저장소와 값 record로 관리한다. 문제 JSON은 조회 조건에 사용하지 않는 TEXT이며, 원본 표현·기존 학습 완료 이력은 수정하지 않는다. 새 교차 조회의 소유 경계는 `docs/architecture/backend.md`에 반영했다.
 - Ponytail 점검 후 표현 API·복습 테스트의 동일한 콘텐츠 생성 코드를 `ExpressionPracticeFixture`로 추출했다. 테스트별 문제 데이터와 검증문은 유지했다.
 - 단일 호출자인 문제 선정 Service를 제거하고 `ExpressionReviewService`의 private 메서드로 옮겼다. 두 정리로 Java 코드는 순수 78줄 줄었으며, 각 변경 후 `./gradlew spotlessApply check`가 통과했다. 수정은 테스트 fixture와 운영 코드 정리의 두 커밋으로 나눴다.
+
+## 2026-09-22 종료 정책 변경
+
+- 답안·정오답·오답 횟수의 기존 저장을 유지한다. 오답 우선 재출제나 새로운 재복습 정책은 추가하지 않는다.
+- V112는 미완료이면서 오답이 2회 이상인 문제의 실제 두 번째 오답 시각을 복원한다. 이미 완료된 문제의 시각과 원본 제출 이력은 보존하고, 모든 문제가 종료된 복습만 마지막 문제 종료 시각으로 완료 처리한다.
+- 기존 미완료 상태가 다음 복습 생성을 영구 차단하지는 않는다. 발송 간격은 생성 시각 기준이며, 표현 제외·정렬은 문제의 완료 시각도 사용하므로 이를 보정한다. 현재 BE에는 복습 완료율을 집계하는 별도 지표가 없다.
+- 신규 채점은 완료 시각을 저장하므로 기존 `currentQuestionId` 계산에서도 종료한 문제가 제외된다. 같은 제출 재전송은 오답 횟수를 늘리지 않으며 완료 뒤 신규 제출은 거부한다.
+- `./gradlew spotlessApply check` 통과. 전체 1,358건 중 실패·오류 0건, 생략 9건이다. 전체 오답·정오답 혼합 완료, 재진입·재전송·추가 제출 차단, 다음 출제 제외 기간, 기존 이력 보정 회귀 사례 5건을 추가했다.
+- PostgreSQL 15에서 V112의 두 번째 오답 시각 복원, 부분 진행 유지, 첫 오답 유지, 기존 완료 시각·정오답 이력 보존 및 재실행 결과를 검증했다. 운영 DB에는 적용하지 않았다.
 
 ## FE 연결 계약
 
@@ -77,7 +86,7 @@
 | `currentQuestionId` | 현재 풀 문제 ID. 시작 전·완료·만료이면 null |
 | `questions` | 최초 출제 순서의 고정 문제. 시작 전·만료이면 빈 배열 |
 
-각 문제에는 `questionId`, `expressionId`, `targetExpressionText`, `baseExpressionMeaningText`, `quiz`, `displayOrder`, `queueOrder`, `wrongCount`, `completedAt`이 있다. `quiz`는 기존 `WritingSentenceResponse`와 같으며 `writingSentenceAcceptedAnswers`의 한국어 복수 정답을 보존한다. 마지막 정답에서 자동 완료되므로 별도 완료 요청은 없다. 완료 화면은 `questions`의 표현과 뜻을 표시한다.
+각 문제에는 `questionId`, `expressionId`, `targetExpressionText`, `baseExpressionMeaningText`, `quiz`, `displayOrder`, `queueOrder`, `wrongCount`, `completedAt`이 있다. `quiz`는 기존 `WritingSentenceResponse`와 같으며 `writingSentenceAcceptedAnswers`의 한국어 복수 정답을 보존한다. 정답 또는 두 번째 오답으로 모든 문제가 종료되면 `COMPLETED`이며 `currentQuestionId`는 null이다. 별도 완료 요청은 없다. FE는 전체 종료 여부를 `status`로 판단한다. 두 번째 오답의 `correct`는 false로 유지하며, 문제의 `completedAt`은 정답 여부가 아닌 종료 시각이다. 완료 화면은 `questions`의 표현과 뜻을 표시한다.
 
 | HTTP 상태 | 조건 |
 | --- | --- |
