@@ -2,18 +2,26 @@
 
 package com.landit.landitbe.feature.mailbox;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.mailbox.docs.MailboxControllerDocs;
-import com.landit.landitbe.feature.mailbox.dto.MailboxFeedbackSubmitRequest;
-import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedListResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.MailboxUnreadCountResponse;
-import com.landit.landitbe.feature.mailbox.service.MailboxService;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.dto.MailboxAttachmentImage;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.service.MailboxFeedbackAttachmentService;
+import com.landit.landitbe.feature.mailbox.feedback.attachment.service.MailboxFeedbackSubmissionService;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxFeedbackSubmitRequest;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackDetailResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackListResponse;
+import com.landit.landitbe.feature.mailbox.feedback.service.MailboxFeedbackService;
+import com.landit.landitbe.feature.mailbox.letter.dto.MailboxReceivedDetailResponse;
+import com.landit.landitbe.feature.mailbox.letter.dto.MailboxReceivedListResponse;
+import com.landit.landitbe.feature.mailbox.letter.service.MailboxLetterService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,31 +29,56 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 편지함 사용자 API의 HTTP 요청을 처리한다. */
 @RestController
+@RequiredArgsConstructor
 public class MailboxController implements MailboxControllerDocs {
 
-  private final MailboxService mailboxService;
+  private final MailboxFeedbackService mailboxFeedbackService;
+  private final MailboxLetterService mailboxLetterService;
+  private final MailboxFeedbackSubmissionService mailboxFeedbackSubmissionService;
+  private final MailboxFeedbackAttachmentService mailboxFeedbackAttachmentService;
 
-  /**
-   * 편지함 Service를 주입받는다.
-   *
-   * @param mailboxService 편지함 Service
-   */
-  public MailboxController(MailboxService mailboxService) {
-    this.mailboxService = mailboxService;
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping(value = "/api/v1/mailbox/feedbacks", consumes = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity<ApiResponse<Void>> submitFeedback(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @Valid @RequestBody MailboxFeedbackSubmitRequest request) {
+    mailboxFeedbackService.submitFeedback(principal.userId(), request);
+    return ApiResponse.success(HttpStatus.CREATED, null);
   }
 
   /** {@inheritDoc} */
   @Override
-  @PostMapping("/api/v1/mailbox/feedbacks")
-  public ResponseEntity<ApiResponse<Void>> submitFeedback(
+  @PostMapping(value = "/api/v1/mailbox/feedbacks", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ApiResponse<Void>> submitFeedbackWithImages(
       @AuthenticationPrincipal AuthUserPrincipal principal,
-      @Valid @RequestBody MailboxFeedbackSubmitRequest request) {
-    mailboxService.submitFeedback(principal.userId(), request);
+      @Valid @RequestPart("feedback") MailboxFeedbackSubmitRequest request,
+      @RequestPart(name = "images", required = false) List<MultipartFile> images) {
+    mailboxFeedbackSubmissionService.submit(principal.userId(), request, images);
     return ApiResponse.success(HttpStatus.CREATED, null);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/mailbox/feedbacks/{feedbackId}/attachments/{attachmentId}")
+  public ResponseEntity<byte[]> getFeedbackAttachment(
+      @AuthenticationPrincipal AuthUserPrincipal principal,
+      @PathVariable Long feedbackId,
+      @PathVariable Long attachmentId) {
+    MailboxAttachmentImage image =
+        mailboxFeedbackAttachmentService.download(principal.userId(), feedbackId, attachmentId);
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(image.contentType()))
+        .contentLength(image.content().length)
+        .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+        .header("X-Content-Type-Options", "nosniff")
+        .body(image.content());
   }
 
   /** {@inheritDoc} */
@@ -56,7 +89,8 @@ public class MailboxController implements MailboxControllerDocs {
       @RequestParam(required = false) String cursor,
       @RequestParam(defaultValue = "20") int size) {
     return ResponseEntity.ok(
-        ApiResponse.success(mailboxService.getSentFeedbacks(principal.userId(), cursor, size)));
+        ApiResponse.success(
+            mailboxFeedbackService.getSentFeedbacks(principal.userId(), cursor, size)));
   }
 
   /** {@inheritDoc} */
@@ -65,7 +99,8 @@ public class MailboxController implements MailboxControllerDocs {
   public ResponseEntity<ApiResponse<MailboxSentFeedbackDetailResponse>> getSentFeedback(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long feedbackId) {
     return ResponseEntity.ok(
-        ApiResponse.success(mailboxService.getSentFeedback(principal.userId(), feedbackId)));
+        ApiResponse.success(
+            mailboxFeedbackService.getSentFeedback(principal.userId(), feedbackId)));
   }
 
   /** {@inheritDoc} */
@@ -76,7 +111,8 @@ public class MailboxController implements MailboxControllerDocs {
       @RequestParam(required = false) String cursor,
       @RequestParam(defaultValue = "20") int size) {
     return ResponseEntity.ok(
-        ApiResponse.success(mailboxService.getReceivedLetters(principal.userId(), cursor, size)));
+        ApiResponse.success(
+            mailboxLetterService.getReceivedLetters(principal.userId(), cursor, size)));
   }
 
   /** {@inheritDoc} */
@@ -85,7 +121,7 @@ public class MailboxController implements MailboxControllerDocs {
   public ResponseEntity<ApiResponse<MailboxReceivedDetailResponse>> getReceivedLetter(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long letterId) {
     return ResponseEntity.ok(
-        ApiResponse.success(mailboxService.getReceivedLetter(principal.userId(), letterId)));
+        ApiResponse.success(mailboxLetterService.getReceivedLetter(principal.userId(), letterId)));
   }
 
   /** {@inheritDoc} */
@@ -94,6 +130,6 @@ public class MailboxController implements MailboxControllerDocs {
   public ResponseEntity<ApiResponse<MailboxUnreadCountResponse>> getUnreadCount(
       @AuthenticationPrincipal AuthUserPrincipal principal) {
     return ResponseEntity.ok(
-        ApiResponse.success(mailboxService.getUnreadCount(principal.userId())));
+        ApiResponse.success(mailboxLetterService.getUnreadCount(principal.userId())));
   }
 }

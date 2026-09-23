@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** IOS와 Android 정책은 서로 독립적으로 최신 및 최소 지원 버전을 판단한다. */
+  @DisplayName("IOS와 Android 정책은 서로 독립적으로 최신 및 최소 지원 버전을 판단한다.")
   @Test
   void iosAndAndroidPoliciesAreQueriedIndependentlyWithoutAuthentication() throws Exception {
     insertPolicy("IOS", "1.4.0", "1.2.0", 18);
@@ -56,6 +58,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 최소 지원 버전보다 낮은 앱은 빌드 번호와 무관하게 강제 업데이트를 받는다. */
+  @DisplayName("최소 지원 버전보다 낮은 앱은 빌드 번호와 무관하게 강제 업데이트를 받는다.")
   @Test
   void versionBelowMinimumReturnsForce() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
@@ -67,6 +70,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 최소 지원 이상이면서 최신 버전보다 낮은 앱은 소프트 업데이트를 받는다. */
+  @DisplayName("최소 지원 이상이면서 최신 버전보다 낮은 앱은 소프트 업데이트를 받는다.")
   @Test
   void supportedVersionBelowLatestReturnsSoft() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
@@ -81,6 +85,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** Minor와 Patch 버전은 문자열이 아닌 숫자 순서로 비교한다. */
+  @DisplayName("Minor와 Patch 버전은 문자열이 아닌 숫자 순서로 비교한다.")
   @Test
   void versionNamesAreComparedNumerically() throws Exception {
     insertPolicy("IOS", "1.10.0", "1.9.0", 100);
@@ -94,6 +99,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 최신 버전 이상 앱은 빌드 번호와 관계없이 업데이트가 필요 없다. */
+  @DisplayName("최신 버전 이상 앱은 빌드 번호와 관계없이 업데이트가 필요 없다.")
   @Test
   void latestOrHigherVersionReturnsNone() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
@@ -107,6 +113,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 플랫폼 정책이 없으면 설정 오류를 반환한다. */
+  @DisplayName("플랫폼 정책이 없으면 설정 오류를 반환한다.")
   @Test
   void missingPolicyReturnsConfigurationError() throws Exception {
     check("IOS", "1.0.0")
@@ -117,6 +124,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 형식이 맞지 않는 앱 버전명은 요청 오류로 거절한다. */
+  @DisplayName("형식이 맞지 않는 앱 버전명은 요청 오류로 거절한다.")
   @Test
   void invalidVersionNameReturnsValidationFailed() throws Exception {
     check("IOS", "1.0")
@@ -125,6 +133,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 빌드 번호 없이도 앱 버전 업데이트 확인을 수행한다. */
+  @DisplayName("빌드 번호 없이도 앱 버전 업데이트 확인을 수행한다.")
   @Test
   void buildNumberIsNotRequiredForVersionCheck() throws Exception {
     insertPolicy("IOS", "1.3.0", "1.1.0", 100);
@@ -139,6 +148,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 빌드 번호가 없는 요청에서 버전명이 누락되면 요청 오류로 거절한다. */
+  @DisplayName("빌드 번호가 없는 요청에서 버전명이 누락되면 요청 오류로 거절한다.")
   @Test
   void missingVersionNameWithoutBuildNumberReturnsValidationFailed() throws Exception {
     mockMvc
@@ -148,6 +158,7 @@ class AppVersionApiIntegrationTests {
   }
 
   /** 공개 OpenAPI 문서는 플랫폼과 앱 버전명 요청값만 노출한다. */
+  @DisplayName("공개 OpenAPI 문서는 플랫폼과 앱 버전명 요청값만 노출한다.")
   @Test
   void openApiDocumentsAppVersionCheckContract() throws Exception {
     mockMvc

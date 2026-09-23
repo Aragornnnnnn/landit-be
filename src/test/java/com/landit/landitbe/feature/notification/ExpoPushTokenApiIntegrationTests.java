@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.notification;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.putJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -12,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.landit.landitbe.feature.notification.dto.ExpoPushTokenUpdateRequest;
-import com.landit.landitbe.feature.notification.service.ExpoPushTokenService;
+import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateRequest;
+import com.landit.landitbe.feature.notification.token.service.ExpoPushTokenService;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDateTime;
@@ -25,11 +26,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -57,6 +58,7 @@ class ExpoPushTokenApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 인증된 사용자는 PUT 요청으로 Expo Push Token을 등록하고 비활성화할 수 있다. */
+  @DisplayName("인증된 사용자는 PUT 요청으로 Expo Push Token을 등록하고 비활성화할 수 있다.")
   @Test
   void upsertsAndRevokesExpoPushToken() throws Exception {
     String userKey = "expo-push-token-owner";
@@ -77,6 +79,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** Expo Push Token을 활성화하면 사용자의 푸시 권한을 허용 상태로 기록한다. */
+  @DisplayName("Expo Push Token을 활성화하면 사용자의 푸시 권한을 허용 상태로 기록한다.")
   @Test
   void grantsPushPermissionWhenExpoPushTokenIsEnabled() throws Exception {
     String userKey = "expo-push-permission-granted";
@@ -92,6 +95,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 다른 사용자는 본인 소유가 아닌 Expo Push Token을 비활성화할 수 없다. */
+  @DisplayName("다른 사용자는 본인 소유가 아닌 Expo Push Token을 비활성화할 수 없다.")
   @Test
   void doesNotRevokeAnotherUsersExpoPushToken() throws Exception {
     String ownerAccessToken = login("expo-push-token-real-owner");
@@ -101,24 +105,24 @@ class ExpoPushTokenApiIntegrationTests {
 
     mockMvc
         .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherAccessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":false
-                    }
-                    """
-                        .formatted(expoPushToken)))
+            putJsonWithToken(
+                "/api/v1/me/expo-push-token",
+                otherAccessToken,
+                """
+                {
+                  "platform":"IOS",
+                  "expoPushToken":"%s",
+                  "enabled":false
+                }
+                """
+                    .formatted(expoPushToken)))
         .andExpect(status().isOk());
 
     assertTokenStatus(expoPushToken, "ACTIVE");
   }
 
   /** 인증되지 않은 요청은 Expo Push Token 상태를 변경할 수 없다. */
+  @DisplayName("인증되지 않은 요청은 Expo Push Token 상태를 변경할 수 없다.")
   @Test
   void rejectsUnauthenticatedExpoPushTokenUpdate() throws Exception {
     mockMvc
@@ -137,6 +141,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** APNs나 FCM 형식의 Token은 Expo Push Token으로 저장할 수 없다. */
+  @DisplayName("APNs나 FCM 형식의 Token은 Expo Push Token으로 저장할 수 없다.")
   @Test
   void rejectsNonExpoPushToken() throws Exception {
     String accessToken = login("expo-push-token-invalid-format");
@@ -144,18 +149,17 @@ class ExpoPushTokenApiIntegrationTests {
 
     mockMvc
         .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "platform":"IOS",
-                      "expoPushToken":"%s",
-                      "enabled":true
-                    }
-                    """
-                        .formatted(nativePushToken)))
+            putJsonWithToken(
+                "/api/v1/me/expo-push-token",
+                accessToken,
+                """
+                {
+                  "platform":"IOS",
+                  "expoPushToken":"%s",
+                  "enabled":true
+                }
+                """
+                    .formatted(nativePushToken)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
 
@@ -163,6 +167,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 같은 신규 Token의 동시 PUT 요청은 모두 성공하고 하나의 행만 저장한다. */
+  @DisplayName("같은 신규 Token의 동시 PUT 요청은 모두 성공하고 하나의 행만 저장한다.")
   @Test
   void handlesConcurrentUpsertsIdempotently() throws Exception {
     String userKey = "expo-push-token-concurrent-owner";
@@ -200,6 +205,7 @@ class ExpoPushTokenApiIntegrationTests {
   }
 
   /** 사용자 프로필 권한 갱신에 실패하면 Expo Push Token 등록도 함께 롤백한다. */
+  @DisplayName("사용자 프로필 권한 갱신에 실패하면 Expo Push Token 등록도 함께 롤백한다.")
   @Test
   void rollsBackExpoPushTokenWhenPermissionGrantFails() throws Exception {
     String userKey = "expo-push-permission-grant-failure";
@@ -249,12 +255,11 @@ class ExpoPushTokenApiIntegrationTests {
       throws Exception {
     mockMvc
         .perform(
-            put("/api/v1/me/expo-push-token")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        new ExpoPushTokenUpdateRequest(platform, expoPushToken, enabled))))
+            putJsonWithToken(
+                "/api/v1/me/expo-push-token",
+                accessToken,
+                objectMapper.writeValueAsString(
+                    new ExpoPushTokenUpdateRequest(platform, expoPushToken, enabled))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
   }

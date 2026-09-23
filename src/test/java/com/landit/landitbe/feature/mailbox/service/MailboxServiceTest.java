@@ -9,12 +9,14 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.landit.landitbe.feature.mailbox.repository.MailboxFeedbackRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterReadRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterRecipientRepository;
-import com.landit.landitbe.feature.mailbox.repository.MailboxLetterRepository;
+import com.landit.landitbe.feature.mailbox.feedback.repository.MailboxFeedbackRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterReadRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterRecipientRepository;
+import com.landit.landitbe.feature.mailbox.letter.repository.MailboxLetterRepository;
+import com.landit.landitbe.feature.mailbox.letter.service.MailboxLetterService;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,9 +32,10 @@ class MailboxServiceTest {
   @Mock private MailboxLetterRepository mailboxLetterRepository;
   @Mock private MailboxLetterRecipientRepository mailboxLetterRecipientRepository;
   @Mock private MailboxLetterReadRepository mailboxLetterReadRepository;
-  @InjectMocks private MailboxService mailboxService;
+  @InjectMocks private MailboxLetterService mailboxLetterService;
 
   /** 첫 페이지 조회도 PostgreSQL이 타입을 결정할 수 있도록 null이 아닌 커서를 전달한다. */
+  @DisplayName("첫 페이지 조회도 PostgreSQL이 타입을 결정할 수 있도록 null이 아닌 커서를 전달한다.")
   @Test
   void passesNonNullCursorValuesForFirstReceivedPage() {
     when(mailboxLetterRepository.findReceivedLetters(
@@ -42,7 +45,7 @@ class MailboxServiceTest {
     ArgumentCaptor<LocalDateTime> sentAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
     ArgumentCaptor<Long> letterIdCaptor = ArgumentCaptor.forClass(Long.class);
 
-    mailboxService.getReceivedLetters(1L, null, 20);
+    mailboxLetterService.getReceivedLetters(1L, null, 20);
 
     verify(mailboxLetterRepository)
         .findReceivedLetters(

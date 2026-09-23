@@ -1,0 +1,92 @@
+// 프리톡에 필요한 AI 서버 호출을 추상화한다.
+
+package com.landit.landitbe.feature.learning.freetalk.client.ai;
+
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsRequest;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiConversationEmbeddingsResult;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsResult;
+import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingRequest;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingResult;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningResult;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnRequest;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
+
+/** 프리톡에 필요한 AI 서버 호출을 추상화한다. */
+public interface AiFreeTalkClient {
+
+  /**
+   * 프리톡 첫 AI 메시지를 생성한다.
+   *
+   * @param request 첫 메시지 생성에 필요한 세션과 주제 정보
+   * @return 생성된 첫 AI 메시지
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request);
+
+  /**
+   * 사용자 발화에 대한 프리톡 응답을 생성한다.
+   *
+   * @param request 사용자 발화와 누적 대화 정보
+   * @return 종료 의사 또는 생성된 AI 응답
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiFreeTalkTurnResult generateTurn(AiFreeTalkTurnRequest request);
+
+  /**
+   * 사용자 발화에 대한 상대 역할의 속마음을 생성한다.
+   *
+   * @param request 사용자 발화와 누적 대화 정보
+   * @return 생성된 속마음과 속마음 유형
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiFreeTalkInnerThoughtResult generateInnerThought(AiFreeTalkInnerThoughtRequest request);
+
+  /**
+   * 프리톡의 마지막 AI 메시지를 생성한다.
+   *
+   * @param request 종료 사유와 누적 대화 정보
+   * @return 생성된 마무리 메시지
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiFreeTalkClosingResult generateClosing(AiFreeTalkClosingRequest request);
+
+  /**
+   * 완료된 프리톡에 맞는 학습 표현을 추천한다.
+   *
+   * @param request 완료 대화와 기존 표현 후보
+   * @return 추천된 표현 목록
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiFreeTalkExpressionRecommendationsResult recommendExpressions(
+      AiFreeTalkExpressionRecommendationsRequest request);
+
+  /**
+   * 완료된 프리톡 대화에서 학습 가치가 있는 사용자 발화를 추출하고 임베딩한다.
+   *
+   * @param request 완료 대화와 언어 정보
+   * @return 추출된 핵심 발화와 임베딩 목록
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  AiConversationEmbeddingsResult extractConversationEmbeddings(
+      AiConversationEmbeddingsRequest request);
+
+  /**
+   * 프리톡 원문 구간을 요약해 다음 생성 요청에 사용할 파생 맥락을 만든다.
+   *
+   * @param request 요약할 원문과 기존 요약 범위
+   * @return AI가 생성한 세션 요약
+   * @throws ApiException AI 생성에 실패하거나 응답 형식이 올바르지 않을 때
+   */
+  default AiFreeTalkContextSummaryResult generateContextSummary(
+      AiFreeTalkContextSummaryRequest request) {
+    throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+  }
+}

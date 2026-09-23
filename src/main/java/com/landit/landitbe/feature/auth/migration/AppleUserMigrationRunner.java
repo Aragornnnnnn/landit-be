@@ -3,6 +3,14 @@
 package com.landit.landitbe.feature.auth.migration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.auth.migration.client.AppleUserMigrationClient;
+import com.landit.landitbe.feature.auth.migration.client.HttpAppleUserMigrationClient;
+import com.landit.landitbe.feature.auth.migration.config.AppleUserMigrationSettings;
+import com.landit.landitbe.feature.auth.migration.domain.AppleUserMigrationPhase;
+import com.landit.landitbe.feature.auth.migration.dto.AppleUserMigrationSummary;
+import com.landit.landitbe.feature.auth.migration.exception.AppleUserMigrationException;
+import com.landit.landitbe.feature.auth.migration.repository.AppleUserMigrationRepository;
+import com.landit.landitbe.feature.auth.migration.service.AppleUserMigrationService;
 import java.time.Duration;
 import java.util.Map;
 

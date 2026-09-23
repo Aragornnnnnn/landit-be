@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 사전 생성한 프리톡 표현과 임베딩 migration의 구조를 검증한다. */
@@ -17,6 +18,7 @@ class FreeTalkExpressionEmbeddingMigrationTests {
   private static final String MIGRATION =
       "db/postgresql/V52__insert_free_talk_expressions_with_embeddings.sql";
 
+  @DisplayName("모든 프리톡 표현을 미리 계산한 임베딩과 함께 적재한다.")
   @Test
   void insertsAllFreeTalkExpressionsWithPrecomputedEmbeddings() throws IOException {
     String sql =

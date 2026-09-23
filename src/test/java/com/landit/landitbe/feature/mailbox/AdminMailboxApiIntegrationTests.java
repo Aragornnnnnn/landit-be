@@ -2,16 +2,18 @@
 
 package com.landit.landitbe.feature.mailbox;
 
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.patchJsonWithToken;
+import static com.landit.landitbe.support.AuthenticatedJsonRequests.postJsonWithToken;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,7 +24,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,24 +80,24 @@ class AdminMailboxApiIntegrationTests {
     jdbcTemplate.update("delete from mailbox_feedback");
   }
 
+  @DisplayName("관리자는 공지 편지의 초안을 생성할 수 있다.")
   @Test
   void adminCanCreateDraftNotice() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-create");
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "type":"NOTICE",
-                      "title":"새 공지",
-                      "contentBlocks":[{"type":"TEXT","text":"공지 본문"}],
-                      "preview":"공지 본문"
-                    }
-                    """))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                """
+                {
+                  "type":"NOTICE",
+                  "title":"새 공지",
+                  "contentBlocks":[{"type":"TEXT","text":"공지 본문"}],
+                  "preview":"공지 본문"
+                }
+                """))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.data.publicationStatus").value("DRAFT"))
         .andExpect(jsonPath("$.data.title").value("새 공지"))
@@ -101,46 +105,26 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.contentBlocks[0].text").value("공지 본문"));
   }
 
+  @DisplayName("관리자는 이미지 콘텐츠 블록을 생성하고 수정할 수 있다.")
   @Test
   void adminCanCreateAndUpdateImageContentBlock() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-image-block");
-    MvcResult created =
-        mockMvc
-            .perform(
-                post("/api/v1/admin/mailbox/letters")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        """
-                        {
-                          "type":"UPDATE",
-                          "title":"이미지 업데이트",
-                          "contentBlocks":[{
-                            "type":"image",
-                            "url":"https://content.example.com/content/inbox/image.webp",
-                            "altText":"업데이트 화면 예시"
-                          }],
-                          "preview":"업데이트 화면"
-                        }
-                        """))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.contentBlocks[0].altText").value("업데이트 화면 예시"))
-            .andReturn();
+    MvcResult created = createImageLetter(accessToken);
     long letterId = responseData(created).get("letterId").asLong();
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"contentBlocks":[{
-                      "type":"image",
-                      "url":"https://content.example.com/content/inbox/image.webp",
-                      "altText":"수정된 대체 텍스트"
-                    }]}
-                    """))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                """
+                {"contentBlocks":[{
+                  "type":"image",
+                  "url":"https://content.example.com/content/inbox/image.webp",
+                  "altText":"수정된 대체 텍스트"
+                }]}
+                """,
+                letterId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.contentBlocks[0].type").value("image"))
         .andExpect(jsonPath("$.data.contentBlocks[0].url").value(endsWith("/image.webp")))
@@ -156,6 +140,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].contentBlocks[0].altText").value("수정된 대체 텍스트"));
   }
 
+  @DisplayName("관리자는 편지를 수정하고 게시하거나 게시를 취소할 수 있다.")
   @Test
   void adminCanUpdatePublishAndUnpublishLetter() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-publish");
@@ -164,28 +149,30 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"title":"게시 공지","publicationStatus":"PUBLISHED","pinned":true}
-                    """))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                """
+                {"title":"게시 공지","publicationStatus":"PUBLISHED","pinned":true}
+                """,
+                letterId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publicationStatus").value("PUBLISHED"))
         .andExpect(jsonPath("$.data.pinned").value(true));
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"publicationStatus\":\"UNPUBLISHED\"}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"publicationStatus\":\"UNPUBLISHED\"}",
+                letterId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.publicationStatus").value("UNPUBLISHED"))
         .andExpect(jsonPath("$.data.pinned").value(false));
   }
 
+  @DisplayName("허용하지 않는 편지 상태 변경을 거부한다.")
   @Test
   void adminRejectsInvalidLetterStateChanges() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-invalid-state");
@@ -193,23 +180,26 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"publicationStatus\":\"UNPUBLISHED\"}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"publicationStatus\":\"UNPUBLISHED\"}",
+                letterId))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"pinned\":true}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"pinned\":true}",
+                letterId))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("편지 수정 응답에 DB에 저장된 수정 시각을 반환한다.")
   @Test
   void adminLetterUpdateReturnsPersistedUpdatedAt() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-updated-at");
@@ -221,10 +211,11 @@ class AdminMailboxApiIntegrationTests {
     MvcResult result =
         mockMvc
             .perform(
-                patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"title\":\"수정된 공지\"}"))
+                patchJsonWithToken(
+                    "/api/v1/admin/mailbox/letters/{letterId}",
+                    accessToken,
+                    "{\"title\":\"수정된 공지\"}",
+                    letterId))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -236,6 +227,7 @@ class AdminMailboxApiIntegrationTests {
     assertThat(responseUpdatedAt).isEqualTo(persistedUpdatedAt).isAfter(oldUpdatedAt);
   }
 
+  @DisplayName("편지 콘텐츠 수정 시 변경한 필드를 감사 로그에 기록한다.")
   @Test
   void adminLetterContentUpdateRecordsChangedFields() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-audit-fields");
@@ -243,10 +235,11 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", letterId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"변경된 감사 로그 공지\"}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"title\":\"변경된 감사 로그 공지\"}",
+                letterId))
         .andExpect(status().isOk());
 
     Map<String, Object> auditLog =
@@ -263,6 +256,7 @@ class AdminMailboxApiIntegrationTests {
     assertThat(auditLog.get("AFTER_VALUE")).asString().contains("changedFields=title");
   }
 
+  @DisplayName("관리자 편지 목록을 게시 상태와 고정 여부로 필터링한다.")
   @Test
   void adminLetterListFiltersByPublicationStatusAndPinned() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-letter-list");
@@ -272,10 +266,11 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            patch("/api/v1/admin/mailbox/letters/{letterId}", publishedId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"publicationStatus\":\"PUBLISHED\",\"pinned\":true}"))
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                accessToken,
+                "{\"publicationStatus\":\"PUBLISHED\",\"pinned\":true}",
+                publishedId))
         .andExpect(status().isOk());
 
     mockMvc
@@ -289,6 +284,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].title").value("게시된 고정 공지"));
   }
 
+  @DisplayName("관리자 편지 목록에서 답장을 제외한다.")
   @Test
   void adminLetterListExcludesReplies() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-letter-reply-filter");
@@ -306,6 +302,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].type").value("NOTICE"));
   }
 
+  @DisplayName("관리자 편지 목록의 답장 유형 필터를 거부한다.")
   @Test
   void adminLetterListRejectsReplyType() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-type-filter");
@@ -319,32 +316,32 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
   }
 
+  @DisplayName("편지 생성 시 유형과 콘텐츠 블록을 검증한다.")
   @Test
   void adminLetterCreationValidatesTypeAndContentBlocks() throws Exception {
     String accessToken = loginAsAdmin("mailbox-admin-letter-validation");
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"type\":\"REPLY\",\"title\":\"답장\","
-                        + "\"contentBlocks\":[{}],\"preview\":\"답장\"}"))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                "{\"type\":\"REPLY\",\"title\":\"답장\","
+                    + "\"contentBlocks\":[{}],\"preview\":\"답장\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"type\":\"NOTICE\",\"title\":\"빈 본문\",\"contentBlocks\":[],\"preview\":\"빈"
-                        + " 본문\"}"))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                "{\"type\":\"NOTICE\",\"title\":\"빈 본문\",\"contentBlocks\":[],\"preview\":\"빈"
+                    + " 본문\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
+  @DisplayName("관리자는 사용자 의견을 검색 및 필터링하고 페이지로 조회할 수 있다.")
   @Test
   void adminCanSearchFilterAndPaginateFeedbacks() throws Exception {
     final String adminToken = loginAsAdmin("mailbox-admin-search");
@@ -371,6 +368,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.totalPages").value(2));
   }
 
+  @DisplayName("검색어가 없어도 관리자 사용자 의견 목록을 조회한다.")
   @Test
   void adminCanListFeedbacksWithoutKeyword() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-empty-feedback-search");
@@ -386,6 +384,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].content").value("검색어 없는 문의"));
   }
 
+  @DisplayName("미답변 사용자 의견의 관리자 상세 조회는 의견과 null 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsFeedbackAndNullReplyWhenUnanswered() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-unanswered");
@@ -409,6 +408,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply").value(nullValue()));
   }
 
+  @DisplayName("대표 사용자 의견의 관리자 상세 조회는 최신 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsLatestReplyForRepresentativeFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-latest");
@@ -436,6 +436,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply.sentAt").isNotEmpty());
   }
 
+  @DisplayName("일괄 답변의 비대표 사용자 의견을 조회해도 대표 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsRepresentativeReplyForBatchNonRepresentativeFeedback()
       throws Exception {
@@ -465,6 +466,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply.title").value("일괄 답장"));
   }
 
+  @DisplayName("존재하지 않는 사용자 의견의 관리자 상세 조회는 404를 반환한다.")
   @Test
   void adminFeedbackDetailReturnsNotFoundForMissingFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-feedback-detail-missing");
@@ -477,6 +479,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
   }
 
+  @DisplayName("사용자 의견 검색에 종료 날짜가 없으면 해당 조건을 생략한다.")
   @Test
   void adminFeedbackSearchOmitsMissingCreatedToCondition() throws Exception {
     String adminToken = loginAsAdmin("mailbox-feedback-created-from-only");
@@ -492,6 +495,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items.length()").value(0));
   }
 
+  @DisplayName("사용자 의견 검색에 시작 날짜가 없으면 해당 조건을 생략한다.")
   @Test
   void adminFeedbackSearchOmitsMissingCreatedFromCondition() throws Exception {
     String adminToken = loginAsAdmin("mailbox-feedback-created-to-only");
@@ -507,6 +511,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items.length()").value(0));
   }
 
+  @DisplayName("검색어가 공백이어도 관리자 사용자 의견 목록을 조회한다.")
   @Test
   void adminCanListFeedbacksWithBlankKeyword() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-blank-feedback-search");
@@ -523,6 +528,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.items[0].content").value("빈 검색어 문의"));
   }
 
+  @DisplayName("사용자 의견 검색의 LIKE 와일드카드를 일반 문자로 취급한다.")
   @Test
   void adminFeedbackSearchTreatsLikeWildcardsAsText() throws Exception {
     final String adminToken = loginAsAdmin("mailbox-admin-literal-search");
@@ -535,6 +541,7 @@ class AdminMailboxApiIntegrationTests {
     assertFeedbackSearchResult(adminToken, "_", "설정_key 문의");
   }
 
+  @DisplayName("사용자별 답장 하나를 보내고 대기 중인 사용자 의견들을 완료 처리한다.")
   @Test
   void adminSendsOneReplyPerUserAndCompletesPendingFeedbacks() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply");
@@ -557,6 +564,7 @@ class AdminMailboxApiIntegrationTests {
     assertReplyStoredAndAudited(replyId, 2);
   }
 
+  @DisplayName("답장 트랜잭션이 커밋된 후에만 푸시 이벤트를 발행한다.")
   @Test
   void publishesPushOnlyAfterCommittedReply() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-notification");
@@ -565,15 +573,14 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", List.of(feedbackId, 999999L),
-                            "title", "실패 답장",
-                            "bodyText", "저장되면 안 됩니다."))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                adminToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", List.of(feedbackId, 999999L),
+                        "title", "실패 답장",
+                        "bodyText", "저장되면 안 됩니다."))))
         .andExpect(status().isNotFound());
 
     MvcResult result = sendReply(adminToken, List.of(feedbackId), "답변 제목");
@@ -593,6 +600,7 @@ class AdminMailboxApiIntegrationTests {
     assertThat(message.get("payload").get("replyTitle").asText()).isEqualTo("답변 제목");
   }
 
+  @DisplayName("푸시 큐 발행이 실패해도 이미 커밋된 답장을 유지한다.")
   @Test
   void preservesCommittedReplyWhenPushQueuePublicationFails() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-push-failure");
@@ -608,6 +616,7 @@ class AdminMailboxApiIntegrationTests {
     verify(sqsAsyncClient).sendMessage(any(SendMessageRequest.class));
   }
 
+  @DisplayName("이미 완료된 사용자 의견과 답장의 연결을 보존한다.")
   @Test
   void adminPreservesExistingCompletedFeedbackRelation() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-completed-relation");
@@ -625,6 +634,7 @@ class AdminMailboxApiIntegrationTests {
     assertCompletedFeedback(completedFeedbackId, representativeId);
   }
 
+  @DisplayName("비대표 사용자 의견의 관리자 상세 조회는 최신 추가 답장을 반환한다.")
   @Test
   void adminFeedbackDetailReturnsLatestAdditionalReplyForNonRepresentativeFeedback()
       throws Exception {
@@ -656,6 +666,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.reply.title").value("비대표 추가 답변"));
   }
 
+  @DisplayName("사용자에게는 대표 의견에만 답장을 표시한다.")
   @Test
   void userSeesReplyOnlyOnRepresentativeFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-visible-reply");
@@ -689,6 +700,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(jsonPath("$.data.replies.length()").value(0));
   }
 
+  @DisplayName("관리자는 이미 완료한 사용자 의견에도 추가 답장을 보낼 수 있다.")
   @Test
   void adminCanSendAdditionalReplyToCompletedFeedback() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-additional-reply");
@@ -704,6 +716,7 @@ class AdminMailboxApiIntegrationTests {
         .isEqualTo(2);
   }
 
+  @DisplayName("DB 컬럼 제한보다 긴 답장 제목을 거부한다.")
   @Test
   void adminReplyRejectsTitleLongerThanColumnLimit() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-long-reply-title");
@@ -712,19 +725,19 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", List.of(feedbackId),
-                            "title", "가".repeat(201),
-                            "bodyText", "답장 본문"))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                adminToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", List.of(feedbackId),
+                        "title", "가".repeat(201),
+                        "bodyText", "답장 본문"))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
   }
 
+  @DisplayName("일괄 답변 대상 중 하나라도 없으면 전체 답변을 롤백한다.")
   @Test
   void adminBatchReplyRollsBackWhenAnyFeedbackIsMissing() throws Exception {
     String adminToken = loginAsAdmin("mailbox-admin-reply-rollback");
@@ -733,15 +746,14 @@ class AdminMailboxApiIntegrationTests {
 
     mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", List.of(feedbackId, 999999L),
-                            "title", "답변",
-                            "bodyText", "문의 확인했습니다."))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                adminToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", List.of(feedbackId, 999999L),
+                        "title", "답변",
+                        "bodyText", "문의 확인했습니다."))))
         .andExpect(status().isNotFound());
 
     assertThat(feedback(feedbackId).get("PROCESSING_STATUS")).isEqualTo("PENDING");
@@ -751,6 +763,7 @@ class AdminMailboxApiIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("OpenAPI 문서에서 관리자 편지의 콘텐츠 블록을 배열로 정의한다.")
   @Test
   void documentsAdminMailboxContentBlocksAsArray() throws Exception {
     String schemas = "$.components.schemas.";
@@ -768,6 +781,7 @@ class AdminMailboxApiIntegrationTests {
                 .value("array"));
   }
 
+  @DisplayName("OpenAPI 문서에서 사용자 의견의 답장을 nullable 객체로 정의한다.")
   @Test
   void documentsAdminFeedbackDetailReplyAsNullableObject() throws Exception {
     String schemas = "$.components.schemas.";
@@ -783,17 +797,249 @@ class AdminMailboxApiIntegrationTests {
                 .value("null"));
   }
 
+  @DisplayName("문의 없이 직접 편지를 받고 수신자별 최초 읽음 상태를 유지한다.")
+  @Test
+  void directLettersArePrivateAndTrackReadsWithoutFeedbackOrPush() throws Exception {
+    String adminToken = loginAsAdmin("direct-admin");
+    LoginResult first = login("direct-first");
+    LoginResult second = login("direct-second");
+    final LoginResult other = login("direct-other");
+    MvcResult sent =
+        sendDirectLetter(adminToken, List.of(first.userProfileId(), second.userProfileId()));
+    long letterId = responseData(sent).get("letterId").asLong();
+    assertThat(responseData(sent).get("recipientCount").asInt()).isEqualTo(2);
+    assertThat(LocalDateTime.parse(responseData(sent).get("sentAt").asText()))
+        .isEqualTo(
+            jdbcTemplate.queryForObject(
+                "select published_at from mailbox_letter where id = ?",
+                LocalDateTime.class,
+                letterId));
+    for (LoginResult user : List.of(first, second)) {
+      mockMvc
+          .perform(
+              get("/api/v1/mailbox/received")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + user.accessToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.items.length()").value(1))
+          .andExpect(jsonPath("$.data.items[0].letterType").value("DIRECT"))
+          .andExpect(jsonPath("$.data.items[0].unread").value(true));
+      assertUnreadCount(user, 1);
+    }
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/received")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + other.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/received/{letterId}", letterId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + other.accessToken()))
+        .andExpect(status().isNotFound());
+    assertUnreadCount(other, 0);
+    MvcResult detail =
+        mockMvc
+            .perform(
+                get("/api/v1/mailbox/received/{letterId}", letterId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + first.accessToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.bodyText").value("직접 편지 본문"))
+            .andExpect(jsonPath("$.data.contentBlocks").value(nullValue()))
+            .andExpect(jsonPath("$.data.feedbackType").value(nullValue()))
+            .andExpect(jsonPath("$.data.quotedFeedbackContent").value(nullValue()))
+            .andReturn();
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/received/{letterId}", letterId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + first.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.readAt").value(responseData(detail).get("readAt").asText()));
+    assertUnreadCount(first, 0);
+    assertUnreadCount(second, 1);
+    assertThat(jdbcTemplate.queryForObject("select count(*) from mailbox_feedback", Integer.class))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from mailbox_letter_recipient where letter_id = ?"
+                    + " and representative_feedback_id is null",
+                Integer.class,
+                letterId))
+        .isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select after_value from admin_audit_log"
+                    + " where action = 'MAILBOX_DIRECT_LETTER_SENT' and target_id = ?",
+                String.class,
+                String.valueOf(letterId)))
+        .isEqualTo("recipientCount=2");
+    verify(sqsAsyncClient, never()).sendMessage(any(SendMessageRequest.class));
+  }
+
+  @DisplayName("직접 편지의 수신자나 입력이 잘못되면 아무 편지도 저장하지 않는다.")
+  @Test
+  void directLetterRejectsInvalidRecipientsAndPayloadsAtomically() throws Exception {
+    String adminToken = loginAsAdmin("direct-invalid-admin");
+    long activeId = loginAndFindUserId("direct-valid");
+    long withdrawnId = loginAndFindUserId("direct-withdrawn");
+    jdbcTemplate.update("update user_profile set status = 'WITHDRAWN' where id = ?", withdrawnId);
+    for (long invalidId : List.of(withdrawnId, Long.MAX_VALUE)) {
+      mockMvc
+          .perform(
+              postJsonWithToken(
+                  "/api/v1/admin/mailbox/direct-letters",
+                  adminToken,
+                  directLetterBody(List.of(activeId, invalidId))))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/direct-letters",
+                adminToken,
+                directLetterBody(List.of(activeId, activeId))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    for (String body :
+        List.of(
+            "{}",
+            directLetterBody(List.of()),
+            directLetterBody(List.of(0L)),
+            directLetterBody(List.of(-1L)),
+            directLetterBody(LongStream.rangeClosed(1, 101).boxed().toList()),
+            "{\"userProfileIds\":[null],\"title\":\"제목\",\"bodyText\":\"본문\"}",
+            directLetterBody(List.of(activeId)).replace("직접 편지 제목", " "),
+            directLetterBody(List.of(activeId)).replace("직접 편지 제목", "가".repeat(201)),
+            directLetterBody(List.of(activeId)).replace("직접 편지 본문", " "))) {
+      mockMvc
+          .perform(postJsonWithToken("/api/v1/admin/mailbox/direct-letters", adminToken, body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+    assertThat(jdbcTemplate.queryForObject("select count(*) from mailbox_letter", Integer.class))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from mailbox_letter_recipient", Integer.class))
+        .isZero();
+  }
+
+  @DisplayName("관리자만 직접 편지를 발송하고 공지 관리 API로는 직접 편지를 공개할 수 없다.")
+  @Test
+  void directLettersRequireAdminAndCannotBecomeGlobalNotices() throws Exception {
+    String adminToken = loginAsAdmin("direct-guard-admin");
+    LoginResult recipient = login("direct-guard-user");
+    String requestBody = directLetterBody(List.of(recipient.userProfileId()));
+    mockMvc
+        .perform(
+            post("/api/v1/admin/mailbox/direct-letters")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/direct-letters", recipient.accessToken(), requestBody))
+        .andExpect(status().isForbidden());
+    long letterId =
+        responseData(sendDirectLetter(adminToken, List.of(recipient.userProfileId())))
+            .get("letterId")
+            .asLong();
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/letters")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+    for (String body :
+        List.of(
+            "{\"type\":\"NOTICE\"}",
+            "{\"pinned\":true}",
+            "{\"publicationStatus\":\"UNPUBLISHED\"}")) {
+      mockMvc
+          .perform(
+              patchJsonWithToken(
+                  "/api/v1/admin/mailbox/letters/{letterId}", adminToken, body, letterId))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                adminToken,
+                "{\"type\":\"DIRECT\",\"title\":\"제목\",\"contentBlocks\":[{}],\"preview\":\"본문\"}"))
+        .andExpect(status().isBadRequest());
+    long noticeId = responseData(createNotice(adminToken, "직접 편지 변환 금지")).get("letterId").asLong();
+    mockMvc
+        .perform(
+            patchJsonWithToken(
+                "/api/v1/admin/mailbox/letters/{letterId}",
+                adminToken,
+                "{\"type\":\"DIRECT\"}",
+                noticeId))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/letters")
+                .param("type", "DIRECT")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+        .andExpect(status().isBadRequest());
+  }
+
+  @DisplayName("OpenAPI에 직접 편지 발송 계약과 DIRECT 유형을 노출한다.")
+  @Test
+  void documentsDirectLetterContract() throws Exception {
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/mailbox/direct-letters'].post.responses['201']")
+                .exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.AdminMailboxDirectLetterRequest"
+                        + ".properties.userProfileIds.maxItems")
+                .value(100))
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.MailboxReceivedDetailResponse.properties.letterType.enum")
+                .value(org.hamcrest.Matchers.hasItem("DIRECT")));
+  }
+
+  private MvcResult sendDirectLetter(String adminToken, List<Long> userIds) throws Exception {
+    return mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/direct-letters", adminToken, directLetterBody(userIds)))
+        .andExpect(status().isCreated())
+        .andReturn();
+  }
+
+  private String directLetterBody(List<Long> userIds) throws Exception {
+    return objectMapper.writeValueAsString(
+        Map.of("userProfileIds", userIds, "title", "직접 편지 제목", "bodyText", "직접 편지 본문"));
+  }
+
+  private void assertUnreadCount(LoginResult user, int count) throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/mailbox/unread-count")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + user.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.unreadCount").value(count));
+  }
+
   private MvcResult createNotice(String accessToken, String title) throws Exception {
     return mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/letters")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"type":"NOTICE","title":"%s","contentBlocks":[{"type":"TEXT","text":"본문"}],"preview":"본문"}
-                    """
-                        .formatted(title)))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/letters",
+                accessToken,
+                """
+                {"type":"NOTICE","title":"%s","contentBlocks":[{"type":"TEXT","text":"본문"}],"preview":"본문"}
+                """
+                    .formatted(title)))
         .andExpect(status().isCreated())
         .andReturn();
   }
@@ -802,15 +1048,14 @@ class AdminMailboxApiIntegrationTests {
       throws Exception {
     return mockMvc
         .perform(
-            post("/api/v1/admin/mailbox/replies")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of(
-                            "feedbackIds", feedbackIds,
-                            "title", title,
-                            "bodyText", "답장 본문"))))
+            postJsonWithToken(
+                "/api/v1/admin/mailbox/replies",
+                accessToken,
+                objectMapper.writeValueAsString(
+                    Map.of(
+                        "feedbackIds", feedbackIds,
+                        "title", title,
+                        "bodyText", "답장 본문"))))
         .andExpect(status().isCreated())
         .andReturn();
   }
@@ -932,5 +1177,30 @@ class AdminMailboxApiIntegrationTests {
     SqsAsyncClient sqsAsyncClient() {
       return mock(SqsAsyncClient.class);
     }
+  }
+
+  private MvcResult createImageLetter(String accessToken) throws Exception {
+    MvcResult created =
+        mockMvc
+            .perform(
+                postJsonWithToken(
+                    "/api/v1/admin/mailbox/letters",
+                    accessToken,
+                    """
+                    {
+                      "type":"UPDATE",
+                      "title":"이미지 업데이트",
+                      "contentBlocks":[{
+                        "type":"image",
+                        "url":"https://content.example.com/content/inbox/image.webp",
+                        "altText":"업데이트 화면 예시"
+                      }],
+                      "preview":"업데이트 화면"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.contentBlocks[0].altText").value("업데이트 화면 예시"))
+            .andReturn();
+    return created;
   }
 }

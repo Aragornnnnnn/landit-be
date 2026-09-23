@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.memory.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
 import java.time.LocalDateTime;
@@ -13,6 +14,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,6 +74,7 @@ class ConversationMemoryRepositoryIntegrationTests {
     jdbcTemplate.update("delete from user_profile where id between ? and ?", USER_ID, USER_ID + 2);
   }
 
+  @DisplayName("활성 기억과 출처의 유효 기간을 저장하고 대체 및 무효화 정보는 비워 둔다.")
   @Test
   void savesActiveMemoryAndItsSourceWithValidityAndNullableStateUnset() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
@@ -104,6 +107,7 @@ class ConversationMemoryRepositoryIntegrationTests {
         .isTrue();
   }
 
+  @DisplayName("출처 ID가 비어 있거나 중복이거나 0 이하이면 기억 저장 전에 거부한다.")
   @Test
   void rejectsEmptyDuplicateAndNonPositiveSourceIdsBeforeInsert() {
     seedConversation(
@@ -124,6 +128,7 @@ class ConversationMemoryRepositoryIntegrationTests {
     assertThat(countMemoriesForUser(USER_ID + 1)).isEqualTo(before);
   }
 
+  @DisplayName("출처 외래 키 저장이 실패하면 기억 저장도 롤백한다.")
   @Test
   void rollsBackMemoryWhenSourceForeignKeyFails() {
     seedConversation(
@@ -136,6 +141,7 @@ class ConversationMemoryRepositoryIntegrationTests {
     assertThat(countMemoriesForUser(USER_ID + 2)).isZero();
   }
 
+  @DisplayName("탈퇴 시 기억과 출처 및 프리톡 기억 검색 이력을 삭제한다.")
   @Test
   void deletesMemorySourceAndFreeTalkRetrievalTraceOnUserWithdrawal() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
@@ -171,6 +177,7 @@ class ConversationMemoryRepositoryIntegrationTests {
         .isZero();
   }
 
+  @DisplayName("활성 기억만 대체하며 새 기억 시작 시각으로 기존 유효 기간을 닫는다.")
   @Test
   void supersedesOnlyActiveMemoryAndClosesItsValidityAtNewMemoryStart() {
     seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
@@ -198,6 +205,58 @@ class ConversationMemoryRepositoryIntegrationTests {
             repository.supersedeActive(
                 oldMemoryId, newMemoryId, NOW.plusDays(1), NOW.plusDays(1).plusMinutes(2)))
         .isFalse();
+  }
+
+  @DisplayName("후속 질문의 근거로 보낼 기억은 본인의 활성 기억 중 이 캐릭터와 나눌 수 있는 것만 최근에 말한 순으로 읽는다.")
+  @Test
+  void findsRecentActiveContextsWithinCharacterScope() {
+    seedConversation(USER_ID, LEARNING_SESSION_ID, SESSION_HISTORY_ID, SOURCE_MESSAGE_ID);
+    long older = saveMemory(USER_ID, "chloe", ConversationMemoryType.EVENT, NOW.minusDays(3));
+    long shared = saveMemory(USER_ID, null, ConversationMemoryType.PROFILE, NOW.minusDays(1));
+    long newest = saveMemory(USER_ID, "chloe", ConversationMemoryType.EVENT, NOW);
+    long otherCharacter = saveMemory(USER_ID, "marco", ConversationMemoryType.EVENT, NOW);
+    long superseded = saveMemory(USER_ID, "chloe", ConversationMemoryType.EVENT, NOW.minusDays(2));
+    repository.supersedeActive(superseded, newest, NOW, NOW);
+
+    List<AiFreeTalkMemoryContext> contexts =
+        repository.findRecentActiveContexts(USER_ID, "chloe", List.of(), 20);
+
+    assertThat(contexts)
+        .extracting(AiFreeTalkMemoryContext::memoryId)
+        .containsExactly(newest, shared, older)
+        .doesNotContain(otherCharacter, superseded);
+    assertThat(contexts.getFirst().observedAt()).isEqualTo(NOW);
+    assertThat(repository.findRecentActiveContexts(USER_ID, "chloe", List.of(), 2))
+        .extracting(AiFreeTalkMemoryContext::memoryId)
+        .containsExactly(newest, shared);
+    // 뺄 기억을 주면 그 자리를 다음으로 최근인 기억이 채운다.
+    assertThat(repository.findRecentActiveContexts(USER_ID, "chloe", List.of(newest, 999999L), 2))
+        .extracting(AiFreeTalkMemoryContext::memoryId)
+        .containsExactly(shared, older);
+    assertThat(repository.findRecentActiveContexts(USER_ID + 1, "chloe", List.of(), 20)).isEmpty();
+  }
+
+  private long saveMemory(
+      long userProfileId,
+      String characterId,
+      ConversationMemoryType memoryType,
+      LocalDateTime observedAt) {
+    return repository.save(
+        new NewConversationMemory(
+            userProfileId,
+            characterId,
+            memoryType,
+            "remembered content",
+            Locale.ENGLISH,
+            0.8,
+            observedAt,
+            null,
+            observedAt,
+            observedAt,
+            "extractor-v1",
+            "embedding-v1",
+            validEmbedding()),
+        List.of(SOURCE_MESSAGE_ID));
   }
 
   private NewConversationMemory validEventMemory() {

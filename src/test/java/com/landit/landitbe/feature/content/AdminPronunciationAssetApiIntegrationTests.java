@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -92,6 +93,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     jdbcTemplate.update("delete from writing_expression where id = ?", PATTERN_EXPRESSION_ID);
   }
 
+  @DisplayName("발음 기준 데이터를 최초 적재한 뒤 재요청하면 단어를 갱신한다.")
   @Test
   void referenceImportInsertsThenUpdatesWords() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-upsert");
@@ -127,6 +129,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     assertThat(sentenceAudioUrl).isNull();
   }
 
+  @DisplayName("발음 기준 데이터의 문장이 현재 문장과 다르면 적재를 거부한다.")
   @Test
   void referenceImportRejectsStaleSentenceText() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-stale");
@@ -141,6 +144,7 @@ class AdminPronunciationAssetApiIntegrationTests {
                 .value("기준 데이터의 문장이 DB의 대표 예문과 다릅니다. 최신 문장으로 재생성이 필요합니다."));
   }
 
+  @DisplayName("발음 기준 데이터에 문장이 없으면 적재를 거부한다.")
   @Test
   void referenceImportRejectsMissingSentenceText() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-no-sentence");
@@ -153,6 +157,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(jsonPath("$.data.failures[0].reason").value("필수 값이 누락됐습니다."));
   }
 
+  @DisplayName("발음 기준 데이터의 단어 순서가 중복되면 적재를 거부한다.")
   @Test
   void referenceImportRejectsDuplicatedWordOrder() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-dup-order");
@@ -165,6 +170,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(jsonPath("$.data.failures[0].reason").value("words 항목의 order가 중복됩니다."));
   }
 
+  @DisplayName("발음 기준 데이터의 단어가 비어 있으면 적재를 거부한다.")
   @Test
   void referenceImportRejectsBlankWord() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-blank-word");
@@ -177,6 +183,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(jsonPath("$.data.failures[0].reason").value("words 항목에 word가 없습니다."));
   }
 
+  @DisplayName("발음 기준 데이터를 다시 적재하면 TTS 상태를 초기화해 누락을 감지한다.")
   @Test
   void referenceReimportResetsTtsStateSoCoverageCatchesIt() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-reimport-reset");
@@ -206,6 +213,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .contains(EXPRESSION_ID);
   }
 
+  @DisplayName("존재하지 않는 표현의 발음 기준 적재는 실패로 집계한다.")
   @Test
   void referenceImportReportsUnknownExpressionAsFailure() throws Exception {
     String accessToken = loginAsAdmin("pron-ref-unknown");
@@ -217,6 +225,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(jsonPath("$.data.failures[0].reason").value("존재하지 않는 표현입니다."));
   }
 
+  @DisplayName("발음 기준 데이터가 없으면 TTS 적재에 실패한다.")
   @Test
   void ttsImportFailsWithoutReferenceData() throws Exception {
     String accessToken = loginAsAdmin("pron-tts-no-ref");
@@ -230,6 +239,7 @@ class AdminPronunciationAssetApiIntegrationTests {
             jsonPath("$.data.failures[0].reason").value("기준 데이터가 없습니다. 기준 데이터 임포트를 먼저 실행하세요."));
   }
 
+  @DisplayName("TTS 적재 시 음성 URL을 연결하고 단어 음성을 결합한다.")
   @Test
   void ttsImportAttachesUrlsAndJoinsWordAudio() throws Exception {
     String accessToken = loginAsAdmin("pron-tts-join");
@@ -262,6 +272,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .contains("accentContrast"); // 기준 데이터의 기존 필드가 조인 후에도 보존돼야 한다.
   }
 
+  @DisplayName("필요한 단어 순서가 없으면 TTS 적재에 실패한다.")
   @Test
   void ttsImportFailsWhenWordOrderIsMissing() throws Exception {
     String accessToken = loginAsAdmin("pron-tts-missing-word");
@@ -277,6 +288,7 @@ class AdminPronunciationAssetApiIntegrationTests {
             jsonPath("$.data.failures[0].reason").value("TTS 매니페스트의 단어 order가 기준 데이터와 맞지 않습니다."));
   }
 
+  @DisplayName("발음 자산 점검에서 기준 데이터 누락과 음성 누락을 구분한다.")
   @Test
   void coverageSeparatesReferenceAndAudioMissing() throws Exception {
     String accessToken = loginAsAdmin("pron-coverage");
@@ -301,6 +313,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     assertThat(missingOf(afterTts, "EN_US", "audioMissing")).doesNotContain(EXPRESSION_ID);
   }
 
+  @DisplayName("적재할 매니페스트가 없으면 404를 반환한다.")
   @Test
   void importReturnsNotFoundForMissingManifest() throws Exception {
     String accessToken = loginAsAdmin("pron-missing-manifest");
@@ -310,6 +323,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(status().isNotFound());
   }
 
+  @DisplayName("매니페스트 형식이 잘못되면 400을 반환한다.")
   @Test
   void importReturnsBadRequestForMalformedManifest() throws Exception {
     String accessToken = loginAsAdmin("pron-malformed");
@@ -319,6 +333,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(status().isBadRequest());
   }
 
+  @DisplayName("일반 사용자의 발음 자산 적재 요청을 거부한다.")
   @Test
   void importIsForbiddenForNonAdminUser() throws Exception {
     String accessToken = login("pron-normal-user").accessToken();
@@ -328,6 +343,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(status().isForbidden());
   }
 
+  @DisplayName("발음 자산 적재에는 인증이 필요하다.")
   @Test
   void importRequiresAuthentication() throws Exception {
     mockMvc
@@ -335,6 +351,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(status().isUnauthorized());
   }
 
+  @DisplayName("패턴형 표현은 표현 전체의 TTS 음성이 없어도 적재한다.")
   @Test
   void ttsImportAllowsNullExpressionAudioForTemplatedExpression() throws Exception {
     String accessToken = loginAsAdmin("pron-pattern-null-ok");
@@ -369,6 +386,7 @@ class AdminPronunciationAssetApiIntegrationTests {
     assertThat(sentenceAudioUrl).isEqualTo("https://cdn.example.com/pattern/sentence.mp3");
   }
 
+  @DisplayName("직접 발화하는 표현에 전체 TTS 음성이 없으면 적재를 거부한다.")
   @Test
   void ttsImportRejectsNullExpressionAudioForSpeakableExpression() throws Exception {
     String accessToken = loginAsAdmin("pron-speakable-null");
@@ -387,6 +405,7 @@ class AdminPronunciationAssetApiIntegrationTests {
                 .value("발화 가능한 표현인데 표현 음성(expressionAudioUrl)이 없습니다."));
   }
 
+  @DisplayName("단어 음성 URL이 null이면 TTS 적재를 거부한다.")
   @Test
   void ttsImportRejectsNullWordAudioUrl() throws Exception {
     String accessToken = loginAsAdmin("pron-word-audio-null");
@@ -403,6 +422,7 @@ class AdminPronunciationAssetApiIntegrationTests {
             jsonPath("$.data.failures[0].reason").value("TTS 매니페스트 words 항목에 audioUrl이 없습니다."));
   }
 
+  @DisplayName("단어 순서가 중복되면 TTS 적재를 거부한다.")
   @Test
   void ttsImportRejectsDuplicateWordOrder() throws Exception {
     String accessToken = loginAsAdmin("pron-tts-dup-order");
@@ -418,6 +438,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(jsonPath("$.data.failures[0].reason").value("TTS 매니페스트 words의 order가 중복됩니다."));
   }
 
+  @DisplayName("정의되지 않은 단어 순서가 있으면 TTS 적재를 거부한다.")
   @Test
   void ttsImportRejectsExtraWordOrder() throws Exception {
     String accessToken = loginAsAdmin("pron-tts-extra-order");
@@ -434,6 +455,7 @@ class AdminPronunciationAssetApiIntegrationTests {
             jsonPath("$.data.failures[0].reason").value("TTS 매니페스트의 단어 order가 기준 데이터와 맞지 않습니다."));
   }
 
+  @DisplayName("단어 항목이 null이면 TTS 적재를 거부한다.")
   @Test
   void ttsImportRejectsNullWordEntry() throws Exception {
     String accessToken = loginAsAdmin("pron-tts-null-word");
@@ -449,6 +471,7 @@ class AdminPronunciationAssetApiIntegrationTests {
         .andExpect(jsonPath("$.data.failures[0].reason").value("TTS 매니페스트 words에 빈 항목이 있습니다."));
   }
 
+  @DisplayName("매니페스트 키가 비어 있으면 적재를 거부한다.")
   @Test
   void importRejectsBlankManifestKey() throws Exception {
     String accessToken = loginAsAdmin("pron-blank-key");

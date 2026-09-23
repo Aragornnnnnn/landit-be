@@ -2,13 +2,17 @@
 
 package com.landit.landitbe.feature.subscription.service;
 
-import com.landit.landitbe.feature.learning.service.LearningProgressService;
-import com.landit.landitbe.feature.profile.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.learning.scenario.progress.service.ScenarioProgressService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.feature.profile.subscription.dto.UserSubscriptionSnapshot;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileDiscountOfferService;
+import com.landit.landitbe.feature.profile.subscription.service.ProfileSubscriptionService;
+import com.landit.landitbe.feature.subscription.dto.PaywallDismissResponse;
 import com.landit.landitbe.feature.subscription.dto.PremiumAccess;
-import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
+import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
-import com.landit.landitbe.feature.subscription.repository.SubscriptionEventRepository;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
+import com.landit.landitbe.feature.subscription.event.repository.SubscriptionEventRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,31 +22,39 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserSubscriptionService {
 
   private final UserProfileService userProfileService;
-  private final LearningProgressService learningProgressService;
+  private final ProfileSubscriptionService profileSubscriptionService;
+  private final ScenarioProgressService scenarioProgressService;
   private final SubscriptionEventRepository subscriptionEventRepository;
   private final SubscriptionLaunchPolicyService policies;
   private final LearningAccessGrantService grants;
+  private final ProfileDiscountOfferService discountOffers;
 
   /**
    * 구독 상태와 동일한 실행 정책을 조회할 협력 Service를 주입받는다.
    *
-   * @param userProfileService 구독 상태 스냅샷을 제공하는 프로필 Service
-   * @param learningProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
+   * @param userProfileService 활성 사용자 여부를 확인하는 프로필 Service
+   * @param profileSubscriptionService 구독 상태 스냅샷을 제공하는 프로필 Service
+   * @param scenarioProgressService 시나리오 완료 이력을 제공하는 학습 진행 Service
    * @param subscriptionEventRepository 결제 이력 Repository
    * @param policies 서버 실행 정책
+   * @param discountOffers 계정별 할인 기회 Service
    * @param grants 저장된 학습 권한
    */
   public UserSubscriptionService(
       UserProfileService userProfileService,
-      LearningProgressService learningProgressService,
+      ProfileSubscriptionService profileSubscriptionService,
+      ScenarioProgressService scenarioProgressService,
       SubscriptionEventRepository subscriptionEventRepository,
       SubscriptionLaunchPolicyService policies,
-      LearningAccessGrantService grants) {
+      LearningAccessGrantService grants,
+      ProfileDiscountOfferService discountOffers) {
     this.userProfileService = userProfileService;
-    this.learningProgressService = learningProgressService;
+    this.profileSubscriptionService = profileSubscriptionService;
+    this.scenarioProgressService = scenarioProgressService;
     this.subscriptionEventRepository = subscriptionEventRepository;
     this.policies = policies;
     this.grants = grants;
+    this.discountOffers = discountOffers;
   }
 
   /**
@@ -57,12 +69,13 @@ public class UserSubscriptionService {
    */
   @Transactional(readOnly = true)
   public UserSubscriptionResponse getSubscription(Long userId) {
-    UserSubscriptionSnapshot snapshot = userProfileService.getSubscription(userId);
+    UserSubscriptionSnapshot snapshot = profileSubscriptionService.getSubscription(userId);
     var policy = policies.current();
     boolean enabled = policies.enabledFor(policy, userId);
     boolean premium = grants.premium(userId);
     var reservation = grants.freeReservation(userId).orElse(null);
     boolean completed = hasCompletedConversationSinceLaunch(userId, policy);
+    var payment = subscriptionEventRepository.findLatestPayment(userId).orElse(null);
     return UserSubscriptionResponse.of(snapshot, completed)
         .withAccess(
             premium,
@@ -70,7 +83,22 @@ public class UserSubscriptionService {
             policy.version(),
             policy.newStartsPaused(),
             !policy.newStartsPaused(),
-            reservation == null ? null : reservation.getSessionId());
+            reservation == null ? null : reservation.sessionId())
+        .withPaymentDetails(
+            discountOffers.findActive(userId),
+            payment == null ? null : payment.getPrice(),
+            payment == null ? null : payment.getCurrency());
+  }
+
+  /**
+   * 페이월 이탈 시 계정별 할인 기회를 부여하거나 기존 기회를 반환한다.
+   *
+   * @param userId 인증된 사용자 ID
+   * @return 할인 기회가 포함된 이탈 응답
+   * @throws com.landit.landitbe.feature.profile.exception.UserProfileException 활성 프로필이 없을 때
+   */
+  public PaywallDismissResponse dismissPaywall(Long userId) {
+    return new PaywallDismissResponse(discountOffers.dismiss(userId));
   }
 
   /**
@@ -110,8 +138,8 @@ public class UserSubscriptionService {
   }
 
   private boolean hasCompletedConversationSinceLaunch(
-      Long userId, SubscriptionLaunchPolicyService.Policy policy) {
+      Long userId, SubscriptionLaunchPolicy policy) {
     return policies.enabledFor(policy, userId)
-        && learningProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
+        && scenarioProgressService.hasClearedScenarioSince(userId, policy.effectiveAt());
   }
 }

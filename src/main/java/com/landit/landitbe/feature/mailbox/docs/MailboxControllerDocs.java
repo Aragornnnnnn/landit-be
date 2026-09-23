@@ -2,20 +2,24 @@
 
 package com.landit.landitbe.feature.mailbox.docs;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
-import com.landit.landitbe.feature.mailbox.dto.MailboxFeedbackSubmitRequest;
-import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxReceivedListResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackDetailResponse;
-import com.landit.landitbe.feature.mailbox.dto.MailboxSentFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.dto.MailboxUnreadCountResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxFeedbackSubmitRequest;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackDetailResponse;
+import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxSentFeedbackListResponse;
+import com.landit.landitbe.feature.mailbox.letter.dto.MailboxReceivedDetailResponse;
+import com.landit.landitbe.feature.mailbox.letter.dto.MailboxReceivedListResponse;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 편지함 사용자 API의 OpenAPI 문서를 정의한다. */
 @Tag(name = "Mailbox", description = "편지함 API")
@@ -45,6 +49,59 @@ public interface MailboxControllerDocs {
   })
   ResponseEntity<ApiResponse<Void>> submitFeedback(
       AuthUserPrincipal principal, MailboxFeedbackSubmitRequest request);
+
+  /**
+   * 문의 JSON과 이미지 파일을 multipart로 함께 등록한다.
+   *
+   * @param principal 인증된 사용자
+   * @param request feedback 파트의 JSON 문의 본문
+   * @param images images 파트의 이미지 목록
+   * @return 기존 문의 등록과 같은 201 응답
+   */
+  @Operation(
+      summary = "피드백 등록",
+      description =
+          "JSON 문의 등록을 유지하며 multipart/form-data도 지원한다. "
+              + "feedback 파트는 application/json의 type·content, images 파트는 PNG/JPEG 파일이다. "
+              + "최대 3장, 장당 5 MiB, 합계 10 MiB, 이미지당 2천만 픽셀까지 허용한다. "
+              + "본문은 필수이고 첨부는 생략할 수 있다. 업로드나 저장 실패 시 문의 전체를 취소한다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공")
+  ResponseEntity<ApiResponse<Void>> submitFeedbackWithImages(
+      AuthUserPrincipal principal,
+      MailboxFeedbackSubmitRequest request,
+      List<MultipartFile> images);
+
+  /**
+   * 문의 작성자와 관리자만 이미지 바이트를 조회한다.
+   *
+   * @param principal 인증된 사용자
+   * @param feedbackId 문의 ID
+   * @param attachmentId 첨부 ID
+   * @return 비공개 이미지 바이트
+   */
+  @Operation(
+      summary = "문의 첨부 이미지 조회",
+      description =
+          "작성자 또는 관리자 Bearer 인증이 필요하다. 다른 사용자는 404를 반환한다. "
+              + "응답은 API JSON 래퍼가 아닌 이미지 바이트이며 캐시하지 않는다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        content = {
+          @Content(mediaType = "image/png", schema = @Schema(type = "string", format = "binary")),
+          @Content(mediaType = "image/jpeg", schema = @Schema(type = "string", format = "binary"))
+        }),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "첨부 없음 또는 접근 불가")
+  })
+  ResponseEntity<byte[]> getFeedbackAttachment(
+      AuthUserPrincipal principal, Long feedbackId, Long attachmentId);
 
   /**
    * 인증된 사용자의 피드백 목록을 커서로 조회한다.
@@ -109,7 +166,7 @@ public interface MailboxControllerDocs {
    */
   @Operation(
       summary = "받은 편지 목록 조회",
-      description = "공지·업데이트와 답장을 최신순으로 조회한다.",
+      description = "공지·업데이트와 본인이 수신한 답장·직접 편지(DIRECT)를 최신순으로 조회한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -136,7 +193,9 @@ public interface MailboxControllerDocs {
    */
   @Operation(
       summary = "받은 편지 상세 조회",
-      description = "공지·업데이트와 답장을 조회하고 읽음 처리한다.",
+      description =
+          "공지·업데이트와 본인이 수신한 답장·직접 편지(DIRECT)를 조회하고 읽음 처리한다. "
+              + "DIRECT는 bodyText로 표시하며 피드백 인용 필드는 null이다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

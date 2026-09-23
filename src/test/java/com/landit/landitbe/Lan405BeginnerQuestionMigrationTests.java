@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -54,6 +55,7 @@ class Lan405BeginnerQuestionMigrationTests {
               + "expression-pronunciation-audio/\\1/\\2/sentence/[^']+\\.mp3',",
           Pattern.MULTILINE);
 
+  @DisplayName("초급 수준 그룹과 시나리오마다 질문 3개를 적재한다.")
   @Test
   void insertsThreeQuestionsForEachBeginnerLevelGroupAndScenario() throws Exception {
     Matcher matcher = QUESTION_ROW_PATTERN.matcher(readMigrationSql());
@@ -83,6 +85,7 @@ class Lan405BeginnerQuestionMigrationTests {
             groups -> assertThat(groups).containsExactlyInAnyOrder("LEVEL_1", "LEVEL_2_TO_3"));
   }
 
+  @DisplayName("모든 언어 변형에 변경되지 않는 음성 URL을 적재한다.")
   @Test
   void insertsCompleteLanguageVariantsWithImmutableAudioUrls() throws Exception {
     String migrationSql = readMigrationSql();
@@ -120,6 +123,7 @@ class Lan405BeginnerQuestionMigrationTests {
         .doesNotContain("UPDATE scenario_question", "DELETE FROM scenario_question");
   }
 
+  @DisplayName("초급 수준 그룹과 시나리오마다 표현 4개를 적재한다.")
   @Test
   void insertsFourExpressionsForEachBeginnerLevelGroupAndScenario() throws Exception {
     Matcher matcher = EXPRESSION_ROW_PATTERN.matcher(readMigrationSql());
@@ -147,6 +151,7 @@ class Lan405BeginnerQuestionMigrationTests {
             "WHEN difficulty_level BETWEEN 2 AND 3 THEN 'LEVEL_2_TO_3'");
   }
 
+  @DisplayName("검토를 마친 대표 이미지와 연습 이미지를 적재한다.")
   @Test
   void insertsVerifiedRepresentativeAndPracticeImages() throws Exception {
     String migrationSql = readMigrationSql();
@@ -183,6 +188,7 @@ class Lan405BeginnerQuestionMigrationTests {
     assertThat(migrationSql.split("\\\"imageUrl\\\": null", -1)).hasSize(641);
   }
 
+  @DisplayName("모든 표현에 억양 세 종류의 발음 자산을 적재한다.")
   @Test
   void insertsThreePronunciationAccentsForEveryExpression() throws Exception {
     String migrationSql = readMigrationSql();

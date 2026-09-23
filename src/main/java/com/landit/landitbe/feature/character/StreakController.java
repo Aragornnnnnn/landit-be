@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.character;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.character.docs.StreakControllerDocs;
 import com.landit.landitbe.feature.character.dto.CurrentStreakResponse;
 import com.landit.landitbe.feature.character.dto.StreakCalendarResponse;
@@ -10,6 +9,7 @@ import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

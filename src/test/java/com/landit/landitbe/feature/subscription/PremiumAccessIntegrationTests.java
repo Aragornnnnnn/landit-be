@@ -15,6 +15,7 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -62,6 +63,8 @@ class PremiumAccessIntegrationTests {
   /** 시나리오 진행도가 참조할 카테고리와 시나리오를 준비한다. */
   @BeforeEach
   void seedScenario() {
+    // 요약 조회가 남긴 총평은 대화 기록 FK가 삭제 전파되지 않아, 같은 DB를 쓰는 다른 테스트의 정리를 막지 않도록 먼저 지운다.
+    jdbcTemplate.update("DELETE FROM free_talk_session_summary");
     jdbcTemplate.update("DELETE FROM user_scenario_progress WHERE scenario_id = ?", SCENARIO_ID);
     jdbcTemplate.update("DELETE FROM scenario WHERE id = ?", SCENARIO_ID);
     jdbcTemplate.update("DELETE FROM category_language_variant WHERE category_id = ?", CATEGORY_ID);
@@ -94,6 +97,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 비프리미엄 사용자는 대화 완료 전이라도 프리톡 시작·표현 학습·발음 평가를 쓸 수 없다. */
+  @DisplayName("비프리미엄 사용자는 대화 완료 전이라도 프리톡 시작·표현 학습·발음 평가를 쓸 수 없다.")
   @Test
   void blocksPremiumOnlyFeaturesForNonPremium() throws Exception {
     String accessToken = login("premium-gate-basic");
@@ -121,6 +125,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 경로를 퍼센트 인코딩해도 컨트롤러 매핑과 같은 디코딩 기준으로 게이트에 걸린다. 매트릭스 변수(;)는 Spring Security 방화벽이 400으로 거절한다. */
+  @DisplayName("경로를 퍼센트 인코딩해도 컨트롤러 매핑과 같은 디코딩 기준으로 게이트에 걸린다.")
   @Test
   void blocksEncodedAndMatrixVariantsOfGatedPaths() throws Exception {
     String accessToken = login("premium-gate-encoded");
@@ -139,6 +144,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 비프리미엄 사용자도 대화 완료 전에는 시나리오 세션 시작·메시지 전송과 조회 API가 게이트를 통과한다. */
+  @DisplayName("비프리미엄 사용자도 대화 완료 전에는 시나리오 세션 시작·메시지 전송과 조회 API가 게이트를 통과한다.")
   @Test
   void allowsScenarioConversationScopeBeforeCompletion() throws Exception {
     String accessToken = login("premium-gate-free");
@@ -155,6 +161,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 도입 이후 대화를 완료한 비프리미엄 사용자도 새 세션 시작·메시지 전송·속마음 조회가 게이트를 통과한다. */
+  @DisplayName("도입 이후 대화를 완료한 비프리미엄 사용자도 새 세션 시작·메시지 전송·속마음 조회가 게이트를 통과한다.")
   @Test
   void allowsNewConversationAfterCompletionForNonPremium() throws Exception {
     String userKey = "premium-gate-completed";
@@ -172,6 +179,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 대화를 완료한 비프리미엄 사용자도 완료한 세션의 결과 보기와 마이페이지·스트릭·메일함은 쓸 수 있다. */
+  @DisplayName("대화를 완료한 비프리미엄 사용자도 완료한 세션의 결과 보기와 마이페이지·스트릭·메일함은 쓸 수 있다.")
   @Test
   void allowsResultsAndMyPageAfterCompletionForNonPremium() throws Exception {
     String userKey = "premium-gate-results";
@@ -189,6 +197,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** 프리미엄 사용자는 대화를 완료했어도 모든 유료 기능 게이트를 통과한다. */
+  @DisplayName("프리미엄 사용자는 대화를 완료했어도 모든 유료 기능 게이트를 통과한다.")
   @Test
   void allowsEverythingForPremiumUser() throws Exception {
     String userKey = "premium-gate-paid";
@@ -207,7 +216,59 @@ class PremiumAccessIntegrationTests {
         get("/api/v1/expressions/" + MISSING_ID + "/learning-start"), accessToken);
   }
 
+  /** 구독이 만료된 사용자도 구독 중에 끝낸 프리톡의 교정은 조회할 수 있고, 새 프리톡은 시작할 수 없다. */
+  @DisplayName("구독이 만료된 사용자도 구독 중에 끝낸 프리톡의 교정은 조회할 수 있고, 새 프리톡은 시작할 수 없다.")
+  @Test
+  void allowsExpiredUserToReadCompletedFreeTalkCorrectionsButNotStartNewSession() throws Exception {
+    String userKey = "premium-gate-correction";
+    String accessToken = login(userKey);
+    Long userId = userIdOf(userKey);
+    activatePremium(userId);
+    MvcResult started =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(started.getResponse().getContentAsByteArray())
+            .at("/data/sessionId")
+            .asLong();
+    seedCompletedFreeTalkWithCorrection(sessionId);
+    expirePremium(userId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/" + sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.correctionCount").value(1))
+        .andExpect(jsonPath("$.data.messages[0].correctionStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.messages[0].correction.betterSentence").value("I went home."));
+    // 종료 후 요약도 지난 기록 조회와 같은 비게이트다.
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/" + sessionId + "/summary")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false))
+        .andExpect(jsonPath("$.data.correctionCount").value(1));
+    mockMvc
+        .perform(
+            post("/api/v1/free-talk/sessions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
+  }
+
   /** 인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다. */
+  @DisplayName("인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다.")
   @Test
   void rejectsUnauthenticatedWithUnauthorizedNotForbidden() throws Exception {
     mockMvc
@@ -219,6 +280,7 @@ class PremiumAccessIntegrationTests {
   }
 
   /** OpenAPI 문서에 게이트 대상 API의 403 응답과 피드백 응답의 상세 피드백 잠금 필드가 기술된다. */
+  @DisplayName("OpenAPI 문서에 게이트 대상 API의 403 응답과 피드백 응답의 상세 피드백 잠금 필드가 기술된다.")
   @Test
   void openApiDocsDescribePremiumRequired() throws Exception {
     mockMvc
@@ -291,6 +353,71 @@ class PremiumAccessIntegrationTests {
                 userId,
                 EVENT_TIMESTAMP_MS,
                 EVENT_TIMESTAMP_MS + 30L * 24 * 60 * 60 * 1000);
+    mockMvc
+        .perform(
+            post("/webhooks/revenuecat")
+                .header(HttpHeaders.AUTHORIZATION, WEBHOOK_SECRET)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+  }
+
+  private void seedCompletedFreeTalkWithCorrection(long learningSessionId) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO session_history_message (
+            session_history_id, message_sequence, turn_number, role, content, input_type,
+            created_at, updated_at
+        )
+        SELECT id, 1, 1, 'USER', 'I go home.', 'TEXT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM session_history
+        WHERE learning_session_id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO free_talk_message_feedback (
+            session_history_message_id, session_history_id, processing_status,
+            reacted_to_partner, original_sentence, better_sentence, reason, mistake_pattern,
+            created_at, updated_at
+        )
+        SELECT message.id, message.session_history_id, 'COMPLETED', TRUE, 'I go home.',
+               'I went home.', '과거 일이에요.', 'TENSE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM session_history_message message
+        JOIN session_history history ON history.id = message.session_history_id
+        WHERE history.learning_session_id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        """
+        UPDATE learning_session
+        SET status = 'COMPLETED', ended_at = CURRENT_TIMESTAMP,
+            ended_by = 'USER', completion_reason = 'USER_ENDED'
+        WHERE id = ?
+        """,
+        learningSessionId);
+    jdbcTemplate.update(
+        "UPDATE free_talk_session SET conversation_status = 'COMPLETED' WHERE learning_session_id ="
+            + " ?",
+        learningSessionId);
+  }
+
+  private void expirePremium(Long userId) throws Exception {
+    String body =
+        """
+        {
+          "api_version": "1.0",
+          "event": {
+            "id": "%s",
+            "type": "EXPIRATION",
+            "app_user_id": "%d",
+            "period_type": "NORMAL",
+            "event_timestamp_ms": %d,
+            "expiration_at_ms": %d
+          }
+        }
+        """
+            .formatted(UUID.randomUUID(), userId, EVENT_TIMESTAMP_MS + 1, EVENT_TIMESTAMP_MS + 1);
     mockMvc
         .perform(
             post("/webhooks/revenuecat")

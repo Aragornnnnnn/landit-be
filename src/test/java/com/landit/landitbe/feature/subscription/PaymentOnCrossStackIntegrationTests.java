@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,7 @@ class PaymentOnCrossStackIntegrationTests {
     registry.add("landit.ai.base-url", () -> System.getenv("LAN474_AI_URL"));
   }
 
+  @DisplayName("기존 프런트엔드가 실제 백엔드와 AI를 연결해 구독 도입 흐름을 수행한다.")
   @Test
   void unchangedFrontendUsesRealBackendAndAi() throws Exception {
     seedContent();

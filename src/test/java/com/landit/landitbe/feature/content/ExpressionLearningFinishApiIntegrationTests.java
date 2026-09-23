@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -44,6 +45,7 @@ class ExpressionLearningFinishApiIntegrationTests {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   /** 토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다. */
+  @DisplayName("토큰 없이 호출하면 401(INVALID_TOKEN)로 거절되는지 검증한다.")
   @Test
   void learningFinishRejectsMissingAccessToken() throws Exception {
     // given: 완료 대상 표현이 DB에 존재
@@ -60,6 +62,7 @@ class ExpressionLearningFinishApiIntegrationTests {
   }
 
   /** 해금된 표현을 완료하면 200 + 빈 객체 응답이 오고, DB에 완료 기록이 1건 생성되는지 검증한다. */
+  @DisplayName("해금된 표현을 완료하면 200 + 빈 객체 응답이 오고, DB에 완료 기록이 1건 생성되는지 검증한다.")
   @Test
   void learningFinishCreatesCompletionForUnlockedExpression() throws Exception {
     // given: 표현 5개짜리 시나리오 + 로그인 (아무것도 완료 안 함 → 1번 표현이 해금 상태)
@@ -85,6 +88,7 @@ class ExpressionLearningFinishApiIntegrationTests {
     assertThat(countCompletions(userProfileId, firstExpressionId)).isEqualTo(1);
   }
 
+  @DisplayName("사용자 학습 수준보다 어려운 표현의 학습 완료를 거부한다.")
   @Test
   void learningFinishRejectsExpressionAboveLearningLevel() throws Exception {
     Long scenarioId = seedScenarioWithExpressions();
@@ -113,6 +117,7 @@ class ExpressionLearningFinishApiIntegrationTests {
    * 이미 완료한 표현을 다시 완료하면 새 기록 없이(1건 유지), 최초 완료 시각(completed_at)은 보존하고 마지막 완료 시각(last_completed_at)만
    * 갱신하는지 검증한다.
    */
+  @DisplayName("표현을 다시 완료하면 기존 기록과 최초 완료 시각을 유지하고 마지막 완료 시각만 갱신한다.")
   @Test
   void learningFinishRenewsLastCompletedAtForAlreadyCompletedExpression() throws Exception {
     // given: 표현 시나리오 + 로그인 + 1번 표현을 과거 시각으로 이미 완료해 둔 상태
@@ -142,6 +147,7 @@ class ExpressionLearningFinishApiIntegrationTests {
   }
 
   /** 아직 잠긴 표현을 완료하려 하면 403(EXPRESSION_LOCKED)로 막고, 완료 기록도 생기지 않는지 검증한다. */
+  @DisplayName("아직 잠긴 표현을 완료하려 하면 403(EXPRESSION_LOCKED)로 막고, 완료 기록도 생기지 않는지 검증한다.")
   @Test
   void learningFinishRejectsLockedExpression() throws Exception {
     // given: 아무것도 완료 안 한 사용자 (1번만 해금, 3번은 잠김)
@@ -166,6 +172,7 @@ class ExpressionLearningFinishApiIntegrationTests {
   }
 
   /** 존재하지 않는 표현 ID로 완료하려 하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다. */
+  @DisplayName("존재하지 않는 표현 ID로 완료하려 하면 404(RESOURCE_NOT_FOUND)로 거절되는지 검증한다.")
   @Test
   void learningFinishRejectsUnknownExpression() throws Exception {
     // given: 로그인만 하고, 표현은 심지 않은 상태

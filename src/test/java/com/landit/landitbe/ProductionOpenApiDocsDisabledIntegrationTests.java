@@ -5,6 +5,7 @@ package com.landit.landitbe;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,31 +21,37 @@ class ProductionOpenApiDocsDisabledIntegrationTests {
 
   @Autowired private MockMvc mockMvc;
 
+  @DisplayName("운영 환경에서는 OpenAPI 문서 루트 요청에 404를 반환한다.")
   @Test
   void openApiDocsRootIsNotFound() throws Exception {
     mockMvc.perform(get("/v3/api-docs")).andExpect(status().isNotFound());
   }
 
+  @DisplayName("운영 환경에서는 OpenAPI 문서 하위 경로 요청에 404를 반환한다.")
   @Test
   void openApiDocsSubPathIsNotFound() throws Exception {
     mockMvc.perform(get("/v3/api-docs/swagger-config")).andExpect(status().isNotFound());
   }
 
+  @DisplayName("운영 환경에서는 Swagger UI 요청에 404를 반환한다.")
   @Test
   void swaggerUiIsNotFound() throws Exception {
     mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isNotFound());
   }
 
+  @DisplayName("운영 환경에서는 Actuator 탐색 요청에 404를 반환한다.")
   @Test
   void actuatorDiscoveryIsNotFound() throws Exception {
     mockMvc.perform(get("/actuator")).andExpect(status().isNotFound());
   }
 
+  @DisplayName("운영 환경에서는 Actuator info 요청에 404를 반환한다.")
   @Test
   void actuatorInfoIsNotFound() throws Exception {
     mockMvc.perform(get("/actuator/info")).andExpect(status().isNotFound());
   }
 
+  @DisplayName("운영 환경에서도 Actuator health 조회는 허용한다.")
   @Test
   void actuatorHealthRemainsAvailable() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());

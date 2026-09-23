@@ -4,9 +4,10 @@ package com.landit.landitbe.feature.mailbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.landit.landitbe.feature.mailbox.repository.AdminMailboxFeedbackRepository;
+import com.landit.landitbe.feature.mailbox.feedback.repository.AdminMailboxFeedbackRepository;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
 
@@ -14,6 +15,7 @@ import org.springframework.data.jpa.repository.Query;
 class AdminMailboxFeedbackRepositoryContractTest {
 
   /** 날짜가 없을 때 PostgreSQL이 타입을 추론할 날짜 파라미터 자체가 쿼리에 없어야 한다. */
+  @DisplayName("날짜가 없을 때 PostgreSQL이 타입을 추론할 날짜 파라미터 자체가 쿼리에 없어야 한다.")
   @Test
   void exposesSearchQueryWithoutCreatedDatePredicates() {
     Method searchMethod =

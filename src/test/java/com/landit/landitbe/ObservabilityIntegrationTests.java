@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier;
@@ -57,6 +58,7 @@ class ObservabilityIntegrationTests {
 
   @Autowired private OtlpMeterRegistry otlpMeterRegistry;
 
+  @DisplayName("OTLP 메트릭 레지스트리가 구성된다.")
   @Test
   void otlpMeterRegistryIsConfigured() {
     assertThat(
@@ -68,6 +70,7 @@ class ObservabilityIntegrationTests {
         .anyMatch(beanName -> beanName.toLowerCase().contains("otlp"));
   }
 
+  @DisplayName("HTTP 요청 메트릭에 요청 수와 지연 시간 및 응답 상태를 기록한다.")
   @Test
   void httpServerRequestMetricRecordsRequestCountLatencyAndStatus() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
@@ -87,6 +90,7 @@ class ObservabilityIntegrationTests {
     assertThat(timer.totalTime(timer.baseTimeUnit())).isPositive();
   }
 
+  @DisplayName("HTTP 히스토그램은 설정된 버킷만 사용하며 느린 요청도 보존한다.")
   @Test
   void exportedHttpHistogramPreservesSlowRequestsWithOnlyConfiguredBuckets() {
     Timer timer =
@@ -130,6 +134,7 @@ class ObservabilityIntegrationTests {
     assertThat(point.getSum()).isEqualTo(121100.0);
   }
 
+  @DisplayName("사용하지 않는 요청 및 Repository 메트릭을 등록하지 않는다.")
   @Test
   void unusedRequestAndRepositoryMetersAreNotRegistered() {
     meterRegistry.more().longTaskTimer("http.server.requests.active").start().stop();
@@ -139,6 +144,7 @@ class ObservabilityIntegrationTests {
     assertThat(meterRegistry.find("spring.data.repository.invocations").meters()).isEmpty();
   }
 
+  @DisplayName("JVM 메모리와 GC 및 스레드 메트릭을 등록한다.")
   @Test
   void jvmMemoryGcAndThreadMetricsAreRegistered() {
     assertThat(meterRegistry.find("jvm.memory.used").meters()).isNotEmpty();
@@ -146,6 +152,7 @@ class ObservabilityIntegrationTests {
     assertThat(meterRegistry.find("jvm.threads.live").meters()).isNotEmpty();
   }
 
+  @DisplayName("Hikari 커넥션 풀 메트릭을 등록한다.")
   @Test
   void hikariConnectionPoolMetricsAreRegistered() {
     assertThat(meterRegistry.find("hikaricp.connections.active").meters()).isNotEmpty();
@@ -155,6 +162,7 @@ class ObservabilityIntegrationTests {
     assertThat(meterRegistry.find("hikaricp.connections.timeout").meters()).isNotEmpty();
   }
 
+  @DisplayName("Tomcat 스레드 풀 메트릭을 등록한다.")
   @Test
   void tomcatThreadPoolMetricsAreRegistered() {
     assertThat(meterRegistry.find("tomcat.threads.busy").meters()).isNotEmpty();
@@ -162,12 +170,14 @@ class ObservabilityIntegrationTests {
     assertThat(meterRegistry.find("tomcat.threads.config.max").meters()).isNotEmpty();
   }
 
+  @DisplayName("메트릭에 배포 버전을 첨부한다.")
   @Test
   void deploymentVersionIsAttachedToMetrics() {
     assertThat(meterRegistry.find("jvm.memory.used").tag("service.version", "be-v1.2.3").meters())
         .isNotEmpty();
   }
 
+  @DisplayName("메트릭 조회용 Actuator 엔드포인트를 외부에 노출하지 않는다.")
   @Test
   void metricActuatorEndpointsAreNotExposed() {
     Set<String> exposedEndpointIds =

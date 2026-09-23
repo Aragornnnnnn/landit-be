@@ -2,6 +2,9 @@
 
 package com.landit.landitbe.feature.profile.domain;
 
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionPeriodType;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStatus;
+import com.landit.landitbe.feature.profile.subscription.domain.SubscriptionStore;
 import com.landit.landitbe.shared.domain.AccentLocale;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import com.landit.landitbe.shared.domain.Locale;
@@ -15,10 +18,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
+import org.hibernate.annotations.DynamicUpdate;
 
 /** 서비스 사용자 프로필과 학습 기본 설정을 저장한다. */
 @Getter
 @Entity
+// 다른 트랜잭션이 부여한 할인 기록을 오래된 프로필 값으로 덮어쓰지 않는다.
+@DynamicUpdate
 @Table(name = "user_profile")
 public class UserProfile extends BaseTimeEntity {
 
@@ -83,6 +89,12 @@ public class UserProfile extends BaseTimeEntity {
 
   @Column(name = "subscription_expires_at")
   private LocalDateTime subscriptionExpiresAt;
+
+  @Column(name = "discount_offer_expires_at")
+  private LocalDateTime discountOfferExpiresAt;
+
+  @Column(name = "discount_offer_new_user")
+  private Boolean discountOfferNewUser;
 
   @Column(name = "subscription_event_at")
   private LocalDateTime subscriptionEventAt;
@@ -227,12 +239,52 @@ public class UserProfile extends BaseTimeEntity {
   }
 
   /**
+   * 저장된 구독 만료 시각이 주어진 시각보다 이른지 확인한다.
+   *
+   * <p>만료 시각을 모르면(null) 끝이 정해지지 않은 것으로 보므로 {@code false}다. 학습 접근 판정도 null 만료 시각을 만료 전으로 취급하므로, 여기에
+   * 값을 쓰면 접근이 늘어나는 게 아니라 끝이 새로 생긴다.
+   *
+   * @param at 비교할 시각
+   * @return 만료 시각이 있고 주어진 시각보다 이르면 {@code true}
+   */
+  public boolean isSubscriptionExpiringBefore(LocalDateTime at) {
+    return subscriptionExpiresAt != null && subscriptionExpiresAt.isBefore(at);
+  }
+
+  /**
+   * 결제 유예 종료 시각까지 구독 만료 시각을 늘리고 마지막 반영 이벤트 시각을 갱신한다.
+   *
+   * <p>상태·기간 종류·상품·스토어는 그대로 둔다. 이벤트 시각을 갱신해 두면 유예 시작 전에 생성됐지만 늦게 도착한 상태 이벤트가 원래 만료 시각으로 되돌리지 못한다.
+   * 늘리는 방향인지는 호출자가 확인한다.
+   *
+   * @param expiresAt 새 구독 만료 시각
+   * @param eventAt 유예 이벤트 발생 시각
+   */
+  public void extendSubscriptionExpiry(LocalDateTime expiresAt, LocalDateTime eventAt) {
+    this.subscriptionExpiresAt = expiresAt;
+    this.subscriptionEventAt = eventAt;
+  }
+
+  /**
    * 프리미엄 혜택이 켜진 사용자인지 확인한다.
    *
    * @return 프리미엄이 켜져 있으면 {@code true}
    */
   public boolean isPremium() {
     return subscriptionStatus.isPremium();
+  }
+
+  /**
+   * 프로필 잠금 아래 최초 할인 기회의 만료 시각과 혜택 구분을 기록한다.
+   *
+   * @param expiresAt 할인 만료 시각
+   * @param newUser 부여 당시 신규 사용자 혜택 여부
+   */
+  public void grantDiscountOffer(LocalDateTime expiresAt, boolean newUser) {
+    if (discountOfferExpiresAt == null) {
+      discountOfferExpiresAt = expiresAt;
+      discountOfferNewUser = newUser;
+    }
   }
 
   /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */

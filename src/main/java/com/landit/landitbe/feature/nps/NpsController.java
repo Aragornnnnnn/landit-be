@@ -2,11 +2,11 @@
 
 package com.landit.landitbe.feature.nps;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.nps.docs.NpsControllerDocs;
 import com.landit.landitbe.feature.nps.dto.NpsSubmitRequest;
 import com.landit.landitbe.feature.nps.service.NpsService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

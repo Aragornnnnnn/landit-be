@@ -20,6 +20,10 @@ management:
         enabled: false
 
 landit:
+  # 주기 복구가 다른 테스트가 남긴 준비 상태 교정을 넘겨받지 않도록 끄고, 복구 테스트는 직접 호출한다.
+  free-talk:
+    correction-retry:
+      scheduling-enabled: false
   # H2에는 vector 타입과 <=> 연산자가 없어 자바 코사인 계산 구현을 사용한다.
   expression-search:
     mode: in-memory

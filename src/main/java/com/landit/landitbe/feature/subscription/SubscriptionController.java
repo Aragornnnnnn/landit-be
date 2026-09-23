@@ -2,16 +2,18 @@
 
 package com.landit.landitbe.feature.subscription;
 
-import com.landit.landitbe.feature.auth.security.AuthUserPrincipal;
 import com.landit.landitbe.feature.subscription.docs.SubscriptionControllerDocs;
-import com.landit.landitbe.feature.subscription.dto.SubscriptionEventResponse;
+import com.landit.landitbe.feature.subscription.dto.PaywallDismissResponse;
 import com.landit.landitbe.feature.subscription.dto.UserSubscriptionResponse;
+import com.landit.landitbe.feature.subscription.event.dto.SubscriptionEventResponse;
 import com.landit.landitbe.feature.subscription.service.UserSubscriptionService;
 import com.landit.landitbe.shared.response.ApiResponse;
+import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /** 인증된 사용자의 구독 상태와 결제 이력 조회 요청을 처리한다. */
@@ -20,6 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class SubscriptionController implements SubscriptionControllerDocs {
 
   private final UserSubscriptionService userSubscriptionService;
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/me/paywall/dismiss")
+  public ApiResponse<PaywallDismissResponse> dismissPaywall(
+      @AuthenticationPrincipal AuthUserPrincipal principal) {
+    return ApiResponse.success(userSubscriptionService.dismissPaywall(principal.userId()));
+  }
 
   /** {@inheritDoc} */
   @Override

@@ -18,20 +18,21 @@ import com.landit.landitbe.feature.auth.domain.RefreshToken;
 import com.landit.landitbe.feature.auth.dto.LogoutRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshRequest;
 import com.landit.landitbe.feature.auth.dto.TokenRefreshResponse;
+import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
-import com.landit.landitbe.feature.content.service.AiTutorService;
+import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
+import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
-import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
@@ -42,7 +43,8 @@ class AuthServiceTest {
   private static final String CURRENT_TOKEN = "current-refresh-token";
   private static final String CURRENT_TOKEN_HASH = "current-refresh-token-hash";
 
-  private final UserProfileService userProfileService = mock(UserProfileService.class);
+  private final ProfileAuthenticationService userProfileService =
+      mock(ProfileAuthenticationService.class);
   private final AiTutorService aiTutorService = mock(AiTutorService.class);
   private final OauthIdentityRepository oauthIdentityRepository =
       mock(OauthIdentityRepository.class);
@@ -70,6 +72,7 @@ class AuthServiceTest {
   }
 
   /** 프로필을 먼저 잠근 뒤 기존 Refresh Token을 조건부 폐기하고 새 토큰을 발급한다. */
+  @DisplayName("프로필을 먼저 잠근 뒤 기존 Refresh Token을 조건부 폐기하고 새 토큰을 발급한다.")
   @Test
   void refreshLocksProfileBeforeRevokingToken() {
     AuthProfile authProfile =
@@ -101,6 +104,7 @@ class AuthServiceTest {
   }
 
   /** 이미 소비된 Refresh Token이면 새 자격증명을 발급하지 않는다. */
+  @DisplayName("이미 소비된 Refresh Token이면 새 자격증명을 발급하지 않는다.")
   @Test
   void refreshRejectsConcurrentlyConsumedToken() {
     AuthProfile authProfile =
@@ -118,12 +122,13 @@ class AuthServiceTest {
     assertThatThrownBy(() -> authService.refresh(new TokenRefreshRequest(CURRENT_TOKEN)))
         .isInstanceOf(ApiException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.REFRESH_TOKEN_INVALID);
+        .isEqualTo(AuthErrorCode.REFRESH_TOKEN_INVALID);
     verify(tokenService, never()).createAccessToken(any());
     verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
   }
 
   /** 로그아웃도 프로필을 먼저 잠근 뒤 Refresh Token을 조건부 폐기한다. */
+  @DisplayName("로그아웃도 프로필을 먼저 잠근 뒤 Refresh Token을 조건부 폐기한다.")
   @Test
   void logoutLocksProfileBeforeRevokingToken() {
     AuthProfile authProfile =
@@ -145,6 +150,7 @@ class AuthServiceTest {
         .revokeActiveByTokenHash(eq(CURRENT_TOKEN_HASH), any(LocalDateTime.class));
   }
 
+  @DisplayName("탈퇴 시 인증 정보를 폐기하기 전에 기억 데이터를 삭제한다.")
   @Test
   void withdrawDeletesMemoryBeforeRevokingAuthenticationArtifacts() {
     when(userProfileService.withdrawIfActiveForUpdate(USER_ID)).thenReturn(true);

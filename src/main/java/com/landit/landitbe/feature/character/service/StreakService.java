@@ -4,6 +4,9 @@ package com.landit.landitbe.feature.character.service;
 
 import com.landit.landitbe.feature.character.domain.UserDailyActivity;
 import com.landit.landitbe.feature.character.domain.UserLearningActivitySummary;
+import com.landit.landitbe.feature.character.dto.CurrentStreak;
+import com.landit.landitbe.feature.character.dto.LearningActivitySummary;
+import com.landit.landitbe.feature.character.dto.StreakCalendar;
 import com.landit.landitbe.feature.character.repository.UserDailyActivityRepository;
 import com.landit.landitbe.feature.character.repository.UserLearningActivitySummaryRepository;
 import java.time.Clock;
@@ -144,54 +147,4 @@ public class StreakService {
         totalActiveDays,
         activeDates);
   }
-
-  /**
-   * 현재 스트릭 조회 결과다.
-   *
-   * @param currentStreakDays 현재 유효 스트릭 일수
-   * @param activeToday 오늘 정상 완료 여부
-   * @param today 스트릭 계산에 사용한 KST 기준 오늘 날짜
-   */
-  public record CurrentStreak(int currentStreakDays, boolean activeToday, LocalDate today) {
-
-    // 저장된 마지막 활동일을 기준으로 현재 유효 스트릭을 계산한다.
-    private static CurrentStreak from(UserLearningActivitySummary summary, LocalDate today) {
-      LocalDate lastActivityDate = summary.getLastActivityDate();
-      if (lastActivityDate == null || lastActivityDate.isBefore(today.minusDays(1))) {
-        return new CurrentStreak(0, false, today);
-      }
-      return new CurrentStreak(
-          summary.getCurrentStreakDays(), lastActivityDate.equals(today), today);
-    }
-  }
-
-  /**
-   * 관리자 사용자 상세에 제공할 학습 활동 요약이다.
-   *
-   * @param currentStreakDays 현재 스트릭 일수
-   * @param lastActivityDate 마지막 학습일
-   */
-  public record LearningActivitySummary(int currentStreakDays, LocalDate lastActivityDate) {}
-
-  /**
-   * 월별 스트릭 조회 결과다.
-   *
-   * @param yearMonth 조회한 연·월
-   * @param currentStreakDays 현재 유효 스트릭 일수
-   * @param activeToday 오늘 정상 완료 여부
-   * @param today 스트릭 계산에 사용한 KST 기준 오늘 날짜
-   * @param firstActiveDate 기능 출시 후 첫 완료일
-   * @param longestStreakDays 최장 스트릭 일수
-   * @param totalActiveDays 전체 활성 학습일 수
-   * @param activeDates 요청한 월의 완료 날짜
-   */
-  public record StreakCalendar(
-      YearMonth yearMonth,
-      int currentStreakDays,
-      boolean activeToday,
-      LocalDate today,
-      LocalDate firstActiveDate,
-      int longestStreakDays,
-      int totalActiveDays,
-      List<LocalDate> activeDates) {}
 }

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,6 +24,7 @@ class OpenApiDocsEncodingTests {
 
   @Autowired private MockMvc mockMvc;
 
+  @DisplayName("OpenAPI 문서 응답에 UTF-8 문자셋을 명시한다.")
   @Test
   void openApiDocsDeclareUtf8Charset() throws Exception {
     mockMvc
@@ -31,6 +33,7 @@ class OpenApiDocsEncodingTests {
         .andExpect(header().string("Content-Type", containsString("charset=UTF-8")));
   }
 
+  @DisplayName("프리톡 중첩 응답 스키마는 서로 다른 컴포넌트 이름을 사용한다.")
   @Test
   void freeTalkNestedResponseSchemasHaveDistinctComponentNames() throws Exception {
     mockMvc
@@ -75,6 +78,7 @@ class OpenApiDocsEncodingTests {
                 .exists());
   }
 
+  @DisplayName("공용 캐릭터 스키마에 nullable TTS 음성 계약을 명시한다.")
   @Test
   void conversationCharacterSchemaDocumentsSharedNullableTtsVoiceContract() throws Exception {
     String schemas = "$.components.schemas.";

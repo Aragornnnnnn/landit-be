@@ -2,7 +2,7 @@
 
 package com.landit.landitbe.config.ai;
 
-import com.landit.landitbe.feature.session.client.ai.AiConversationSettings;
+import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationSettings;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param requestTimeout 일반 AI 요청 제한 시간
  * @param sessionFeedbackRequestTimeout 최종 피드백 AI 요청 제한 시간
  * @param pronunciationRequestTimeout 발음 평가 AI 요청 제한 시간
+ * @param contextSummaryRequestTimeout 프리톡 컨텍스트 요약 제한 시간
  */
 @ConfigurationProperties(prefix = "landit.ai")
 public record AiClientProperties(
@@ -26,7 +27,8 @@ public record AiClientProperties(
     Duration requestTimeout,
     Duration sessionFeedbackRequestTimeout,
     Duration pronunciationRequestTimeout,
-    String internalToken)
+    String internalToken,
+    Duration contextSummaryRequestTimeout)
     implements AiConversationSettings {
 
   /** 기존 클라이언트 설정은 내부 인증 토큰 없이 초기화한다. */
@@ -46,7 +48,30 @@ public record AiClientProperties(
         requestTimeout,
         sessionFeedbackRequestTimeout,
         pronunciationRequestTimeout,
-        "");
+        "",
+        Duration.ofSeconds(10));
+  }
+
+  /** 내부 토큰을 포함한 기존 생성 호출과 호환되는 생성자다. */
+  public AiClientProperties(
+      String baseUrl,
+      String clientMode,
+      String serviceAudience,
+      Duration connectTimeout,
+      Duration requestTimeout,
+      Duration sessionFeedbackRequestTimeout,
+      Duration pronunciationRequestTimeout,
+      String internalToken) {
+    this(
+        baseUrl,
+        clientMode,
+        serviceAudience,
+        connectTimeout,
+        requestTimeout,
+        sessionFeedbackRequestTimeout,
+        pronunciationRequestTimeout,
+        internalToken,
+        Duration.ofSeconds(10));
   }
 
   /** 비어 있는 AI 클라이언트 모드와 서비스 대상, 발음 평가 제한 시간을 기본값으로 정규화한다. */
@@ -62,10 +87,17 @@ public record AiClientProperties(
     if (pronunciationRequestTimeout == null) {
       pronunciationRequestTimeout = Duration.ofSeconds(20);
     }
+    if (contextSummaryRequestTimeout == null) {
+      contextSummaryRequestTimeout = Duration.ofSeconds(10);
+    }
   }
 
   /** 모든 AI HTTP 클라이언트가 같은 내부 인증 헤더를 전달한다. */
   public java.net.http.HttpRequest.Builder authorize(java.net.http.HttpRequest.Builder builder) {
+    String requestId = org.slf4j.MDC.get("request_id");
+    if (requestId != null) {
+      builder.header("X-Request-Id", requestId);
+    }
     return internalToken.isBlank()
         ? builder
         : builder.header("X-Landit-Internal-Token", internalToken);

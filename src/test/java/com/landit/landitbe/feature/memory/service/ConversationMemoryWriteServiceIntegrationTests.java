@@ -5,16 +5,22 @@ package com.landit.landitbe.feature.memory.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.feature.learning.freetalk.memory.service.FreeTalkMemoryGenerationContextService;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryResolutionPlan;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import com.landit.landitbe.feature.memory.domain.NewConversationMemory;
-import com.landit.landitbe.feature.session.client.ai.AiMemoryOperation;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryGenerationRequest;
+import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
+import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryOperation;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,10 +42,14 @@ class ConversationMemoryWriteServiceIntegrationTests {
   private static final long OTHER_USER_ID = 996006L;
   private static final long OTHER_USER_MEMORY_ID = 996103L;
   private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 25, 12, 0);
+  private static final String QUESTION = "저번에 말한 면접 준비, 어떻게 됐어?";
+  private static final String INVITE = "다음엔 그 얘기 하자. 궁금해.";
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private ConversationMemoryWriteService writeService;
+
+  @Autowired private FreeTalkMemoryGenerationContextService contextService;
 
   @AfterEach
   void clearFixtures() {
@@ -56,6 +66,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
         OTHER_USER_ID);
     jdbcTemplate.update("delete from conversation_memory where user_profile_id = ?", USER_ID);
     jdbcTemplate.update("delete from conversation_memory where user_profile_id = ?", OTHER_USER_ID);
+    jdbcTemplate.update(
+        "delete from free_talk_follow_up where free_talk_session_id = ?", FREE_TALK_SESSION_ID);
     jdbcTemplate.update("delete from free_talk_session where id = ?", FREE_TALK_SESSION_ID);
     jdbcTemplate.update("delete from session_history_message where id = ?", SOURCE_MESSAGE_ID);
     jdbcTemplate.update("delete from session_history where id = ?", SESSION_HISTORY_ID);
@@ -64,15 +76,14 @@ class ConversationMemoryWriteServiceIntegrationTests {
     jdbcTemplate.update("delete from user_profile where id = ?", OTHER_USER_ID);
   }
 
+  @DisplayName("기억 추가와 출처 계보를 원자적으로 저장한다.")
   @Test
-  void storesAddAndSourceLineageThenCompletesSessionAtomically() {
+  void storesAddAndSourceLineageAtomically() {
     seedCompletedPreparingSession();
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+        persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
     assertThat(countMemories()).isEqualTo(1);
@@ -80,21 +91,21 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @DisplayName("기억 무시 계획은 새 기억 없이 준비 완료로 저장한다.")
   @Test
   void storesIgnoreAsReadyWithoutAddingMemory() {
     seedCompletedPreparingSession();
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())));
+        persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
     assertThat(countMemories()).isZero();
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @DisplayName("활성 기억 여러 개를 대체하고 새 기억의 출처 계보를 저장한다.")
   @Test
   void supersedesMultipleActiveMemoriesAndStoresTheNewSourceLineage() {
     seedCompletedPreparingSession();
@@ -102,9 +113,8 @@ class ConversationMemoryWriteServiceIntegrationTests {
     seedMemory(SECOND_OLD_MEMORY_ID, "second old memory", "ACTIVE");
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
+        persistAndComplete(
+            generationRequest(),
             List.of(
                 plan(
                     AiMemoryOperation.SUPERSEDE,
@@ -130,22 +140,22 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThat(memoryGenerationStatus()).isEqualTo("READY");
   }
 
+  @DisplayName("조회했던 기억 ID와 순서가 바뀌면 오래된 계획으로 판단하고 아무것도 저장하지 않는다.")
   @Test
   void returnsStaleAndWritesNothingWhenOrderedSnapshotIdsChanged() {
     seedCompletedPreparingSession();
     seedMemory(FIRST_OLD_MEMORY_ID, "new comparable memory", "ACTIVE");
 
     ConversationMemoryWriteService.PersistenceResult result =
-        writeService.persistIfSnapshotCurrent(
-            LEARNING_SESSION_ID,
-            USER_ID,
-            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
+        persistAndComplete(
+            generationRequest(), List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())));
 
     assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STALE);
     assertThat(countMemories()).isEqualTo(1);
     assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
   }
 
+  @DisplayName("대체 대상 하나라도 잘못되면 새 기억과 앞선 대체 작업을 모두 롤백한다.")
   @Test
   void rollsBackNewMemoryAndEarlierSupersedesWhenOneTargetIsInvalid() {
     seedCompletedPreparingSession();
@@ -154,7 +164,6 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThatThrownBy(
             () ->
                 writeService.persistIfSnapshotCurrent(
-                    LEARNING_SESSION_ID,
                     USER_ID,
                     List.of(
                         plan(
@@ -169,9 +178,32 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
     assertThat(countMemories()).isEqualTo(1);
     assertThat(statusOf(FIRST_OLD_MEMORY_ID)).isEqualTo("ACTIVE");
-    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
   }
 
+  @DisplayName("기억 저장 후 세션 완료 처리에 실패하면 기억 저장도 롤백한다.")
+  @Test
+  void rollsBackMemoryWhenSessionCompletionFailsAfterMemoryWrite() {
+    seedCompletedPreparingSession();
+    jdbcTemplate.update(
+        "update free_talk_session set memory_generation_status = 'READY', "
+            + "memory_generation_started_at = null where id = ?",
+        FREE_TALK_SESSION_ID);
+
+    ConversationMemoryGenerationRequest request =
+        new ConversationMemoryGenerationRequest(
+            LEARNING_SESSION_ID, USER_ID, "chloe", "EN", "KR", "Asia/Seoul", List.of());
+
+    assertThatThrownBy(
+            () ->
+                persistAndComplete(
+                    request, List.of(plan(AiMemoryOperation.ADD, List.of(), List.of()))))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(countMemories()).isZero();
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("스냅샷이나 사용자 범위를 벗어난 대체 대상은 저장 전에 거부한다.")
   @Test
   void rejectsSupersedeTargetOutsideSnapshotAndUserScopeBeforeWriting() {
     seedCompletedPreparingSession();
@@ -181,7 +213,6 @@ class ConversationMemoryWriteServiceIntegrationTests {
     assertThatThrownBy(
             () ->
                 writeService.persistIfSnapshotCurrent(
-                    LEARNING_SESSION_ID,
                     USER_ID,
                     List.of(
                         plan(
@@ -192,13 +223,281 @@ class ConversationMemoryWriteServiceIntegrationTests {
 
     assertThat(countMemories()).isZero();
     assertThat(statusOf(OTHER_USER_MEMORY_ID)).isEqualTo("ACTIVE");
-    assertThat(memoryGenerationStatus()).isEqualTo("PREPARING");
+  }
+
+  @DisplayName("이번 후보를 근거로 한 후속 질문은 방금 저장한 새 기억 ID와 함께 저장한다.")
+  @Test
+  void storesFollowUpWithTheNewMemoryIdOfItsSourcePlan() {
+    seedCompletedPreparingSession();
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(
+            plan(AiMemoryOperation.IGNORE, List.of(), List.of()),
+            plan(AiMemoryOperation.ADD, List.of(), List.of())),
+        new ConversationMemoryFollowUpDraft(null, 1, "CONCERN", QUESTION, INVITE));
+
+    Long newMemoryId =
+        jdbcTemplate.queryForObject(
+            "select id from conversation_memory where user_profile_id = ?", Long.class, USER_ID);
+    assertThat(followUpRow())
+        .containsEntry("USER_PROFILE_ID", USER_ID)
+        .containsEntry("MEMORY_ID", newMemoryId)
+        .containsEntry("TRIGGER_TYPE", "CONCERN")
+        .containsEntry("QUESTION", QUESTION)
+        .containsEntry("INVITE", INVITE);
+  }
+
+  @DisplayName("기존 기억을 대체하는 후보가 근거면 대체한 새 기억 ID와 함께 저장한다.")
+  @Test
+  void storesFollowUpWithTheSupersedingMemoryId() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "first old memory", "ACTIVE");
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(
+            plan(
+                AiMemoryOperation.SUPERSEDE,
+                List.of(FIRST_OLD_MEMORY_ID),
+                List.of(FIRST_OLD_MEMORY_ID))),
+        new ConversationMemoryFollowUpDraft(null, 0, "GOAL", QUESTION, INVITE));
+
+    Long newMemoryId =
+        jdbcTemplate.queryForObject(
+            "select id from conversation_memory where user_profile_id = ? and status = 'ACTIVE'",
+            Long.class,
+            USER_ID);
+    assertThat(newMemoryId).isNotEqualTo(FIRST_OLD_MEMORY_ID);
+    assertThat(followUpRow()).containsEntry("MEMORY_ID", newMemoryId);
+  }
+
+  @DisplayName("그 세션의 후속 질문이 이미 있으면 기존 질문을 그대로 두고 기억 저장과 완료는 그대로 한다.")
+  @Test
+  void keepsTheRecordedFollowUpAndStillStoresMemory() {
+    seedCompletedPreparingSession();
+    jdbcTemplate.update(
+        "insert into free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id, "
+            + "trigger_type, question, invite, created_at, updated_at) "
+            + "values (?, ?, NULL, 'NONE', '먼저 저장된 질문', '먼저 저장된 초대', "
+            + "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        USER_ID,
+        FREE_TALK_SESSION_ID);
+
+    ConversationMemoryWriteService.PersistenceResult result =
+        persistAndComplete(
+            generationRequest(),
+            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())),
+            new ConversationMemoryFollowUpDraft(null, 0, "CONCERN", QUESTION, INVITE));
+
+    assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
+    assertThat(followUpRow())
+        .containsEntry("TRIGGER_TYPE", "NONE")
+        .containsEntry("QUESTION", "먼저 저장된 질문");
+    assertThat(countMemories()).isEqualTo(1);
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("기존 기억을 근거로 한 후속 질문은 그 기억이 저장 뒤에도 활성이면 그 ID를 그대로 저장한다.")
+  @Test
+  void storesFollowUpWithTheExistingMemoryId() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "interview next week", "ACTIVE");
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(),
+        new ConversationMemoryFollowUpDraft(FIRST_OLD_MEMORY_ID, null, "GOAL", QUESTION, INVITE));
+
+    assertThat(followUpRow())
+        .containsEntry("MEMORY_ID", FIRST_OLD_MEMORY_ID)
+        .containsEntry("TRIGGER_TYPE", "GOAL");
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("이번 저장 계획이 질문의 근거 기억을 대체하면 질문만 버리고 기억 저장과 완료는 그대로 한다.")
+  @Test
+  void skipsFollowUpWhoseSourceMemoryIsSupersededByThisPersistence() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "preparing for an interview", "ACTIVE");
+
+    ConversationMemoryWriteService.PersistenceResult result =
+        persistAndComplete(
+            generationRequest(),
+            List.of(
+                plan(
+                    AiMemoryOperation.SUPERSEDE,
+                    List.of(FIRST_OLD_MEMORY_ID),
+                    List.of(FIRST_OLD_MEMORY_ID))),
+            new ConversationMemoryFollowUpDraft(
+                FIRST_OLD_MEMORY_ID, null, "CONCERN", QUESTION, INVITE));
+
+    assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
+    assertThat(statusOf(FIRST_OLD_MEMORY_ID)).isEqualTo("SUPERSEDED");
+    assertThat(countFollowUps()).isZero();
+    assertThat(countMemories()).isEqualTo(2);
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("질문을 만드는 사이 다른 작업이 근거 기억을 이미 대체했으면 질문만 버린다.")
+  @Test
+  void skipsFollowUpWhoseSourceMemoryWasAlreadySuperseded() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "preparing for an interview", "ACTIVE");
+    seedMemory(SECOND_OLD_MEMORY_ID, "the interview was cancelled", "ACTIVE");
+    jdbcTemplate.update(
+        "update conversation_memory set status = 'SUPERSEDED', valid_to = ?, "
+            + "superseded_at = ?, superseded_by_id = ? where id = ?",
+        NOW,
+        NOW,
+        SECOND_OLD_MEMORY_ID,
+        FIRST_OLD_MEMORY_ID);
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(),
+        new ConversationMemoryFollowUpDraft(
+            FIRST_OLD_MEMORY_ID, null, "CONCERN", QUESTION, INVITE));
+
+    assertThat(countFollowUps()).isZero();
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("다른 사용자의 기억을 근거로 한 질문은 저장하지 않는다.")
+  @Test
+  void skipsFollowUpGroundedInAnotherUsersMemory() {
+    seedCompletedPreparingSession();
+    seedUser(OTHER_USER_ID);
+    seedMemory(OTHER_USER_MEMORY_ID, OTHER_USER_ID, "other user's memory", "ACTIVE");
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(),
+        new ConversationMemoryFollowUpDraft(
+            OTHER_USER_MEMORY_ID, null, "CONCERN", QUESTION, INVITE));
+
+    assertThat(countFollowUps()).isZero();
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("근거 후보가 기억으로 저장되지 않았으면 문구는 남기고 근거 기억만 비운다.")
+  @Test
+  void storesFollowUpWithoutMemoryWhenItsSourcePlanIsIgnored() {
+    seedCompletedPreparingSession();
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(plan(AiMemoryOperation.IGNORE, List.of(), List.of())),
+        new ConversationMemoryFollowUpDraft(null, 0, "HOBBY", QUESTION, INVITE));
+
+    assertThat(followUpRow())
+        .containsEntry("MEMORY_ID", null)
+        .containsEntry("TRIGGER_TYPE", "HOBBY")
+        .containsEntry("QUESTION", QUESTION);
+  }
+
+  @DisplayName("근거가 없는 기본 문구도 저장한다.")
+  @Test
+  void storesDefaultFollowUpWithoutMemory() {
+    seedCompletedPreparingSession();
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(),
+        new ConversationMemoryFollowUpDraft(null, null, "NONE", QUESTION, INVITE));
+
+    assertThat(followUpRow())
+        .containsEntry("MEMORY_ID", null)
+        .containsEntry("TRIGGER_TYPE", "NONE");
+  }
+
+  @DisplayName("모르는 계기의 후속 질문은 건너뛰고 기억 저장과 완료는 그대로 한다.")
+  @Test
+  void skipsFollowUpWithUnknownTriggerTypeButStillStoresMemory() {
+    seedCompletedPreparingSession();
+
+    ConversationMemoryWriteService.PersistenceResult result =
+        persistAndComplete(
+            generationRequest(),
+            List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())),
+            new ConversationMemoryFollowUpDraft(null, 0, "BIRTHDAY", QUESTION, INVITE));
+
+    assertThat(result).isEqualTo(ConversationMemoryWriteService.PersistenceResult.STORED);
+    assertThat(countFollowUps()).isZero();
+    assertThat(countMemories()).isEqualTo(1);
+    assertThat(memoryGenerationStatus()).isEqualTo("READY");
+  }
+
+  @DisplayName("오래된 계획이라 기억을 저장하지 않았으면 후속 질문도 저장하지 않는다.")
+  @Test
+  void storesNoFollowUpWhenSnapshotIsStale() {
+    seedCompletedPreparingSession();
+    seedMemory(FIRST_OLD_MEMORY_ID, "new comparable memory", "ACTIVE");
+
+    persistAndComplete(
+        generationRequest(),
+        List.of(plan(AiMemoryOperation.ADD, List.of(), List.of())),
+        new ConversationMemoryFollowUpDraft(null, 0, "CONCERN", QUESTION, INVITE));
+
+    assertThat(countFollowUps()).isZero();
+  }
+
+  @DisplayName("세션 완료 처리에 실패하면 후속 질문도 남지 않는다.")
+  @Test
+  void storesNoFollowUpWhenSessionCompletionFails() {
+    seedCompletedPreparingSession();
+    jdbcTemplate.update(
+        "update free_talk_session set memory_generation_status = 'READY', "
+            + "memory_generation_started_at = null where id = ?",
+        FREE_TALK_SESSION_ID);
+
+    assertThatThrownBy(
+            () ->
+                persistAndComplete(
+                    generationRequest(),
+                    List.of(),
+                    new ConversationMemoryFollowUpDraft(null, null, "NONE", QUESTION, INVITE)))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(countFollowUps()).isZero();
+  }
+
+  private ConversationMemoryWriteService.PersistenceResult persistAndComplete(
+      ConversationMemoryGenerationRequest request, List<ConversationMemoryResolutionPlan> plans) {
+    return persistAndComplete(request, plans, null);
+  }
+
+  private ConversationMemoryWriteService.PersistenceResult persistAndComplete(
+      ConversationMemoryGenerationRequest request,
+      List<ConversationMemoryResolutionPlan> plans,
+      ConversationMemoryFollowUpDraft followUp) {
+    return contextService.persistAndComplete(
+        request, new ConversationMemoryPlanningResult(plans, followUp));
+  }
+
+  private Map<String, Object> followUpRow() {
+    return jdbcTemplate.queryForMap(
+        "select user_profile_id, memory_id, trigger_type, question, invite "
+            + "from free_talk_follow_up where free_talk_session_id = ?",
+        FREE_TALK_SESSION_ID);
+  }
+
+  private int countFollowUps() {
+    return jdbcTemplate.queryForObject(
+        "select count(*) from free_talk_follow_up where free_talk_session_id = ?",
+        Integer.class,
+        FREE_TALK_SESSION_ID);
   }
 
   private ConversationMemoryResolutionPlan plan(
       AiMemoryOperation operation, List<Long> supersededMemoryIds, List<Long> snapshotMemoryIds) {
     return new ConversationMemoryResolutionPlan(
         newMemory(), List.of(SOURCE_MESSAGE_ID), snapshotMemoryIds, operation, supersededMemoryIds);
+  }
+
+  private ConversationMemoryGenerationRequest generationRequest() {
+    return new ConversationMemoryGenerationRequest(
+        LEARNING_SESSION_ID, USER_ID, "chloe", "EN", "KR", "Asia/Seoul", List.of());
   }
 
   private NewConversationMemory newMemory() {

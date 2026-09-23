@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.subscription.service;
 
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
+import com.landit.landitbe.feature.subscription.dto.SubscriptionLaunchPolicy;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -20,13 +21,13 @@ public class SubscriptionLaunchPolicyService {
    *
    * @return 기존 설정의 공개 정책. 버전과 새 시작 중지는 이번 범위에서 사용하지 않는다.
    */
-  public Policy current() {
+  public SubscriptionLaunchPolicy current() {
     LocalDateTime at =
         properties
             .launchedAtOrEmpty()
             .map(value -> value.atZoneSameInstant(clock.getZone()).toLocalDateTime())
             .orElse(null);
-    return new Policy(0, at, false);
+    return new SubscriptionLaunchPolicy(0, at, false);
   }
 
   /**
@@ -36,7 +37,7 @@ public class SubscriptionLaunchPolicyService {
    * @param userId 학습 사용자 ID
    * @return 실제 활성 시각에 도달했으면 true
    */
-  public boolean enabledFor(Policy policy, long userId) {
+  public boolean enabledFor(SubscriptionLaunchPolicy policy, long userId) {
     return active(policy);
   }
 
@@ -46,10 +47,7 @@ public class SubscriptionLaunchPolicyService {
    * @param policy 같은 요청에서 조회한 공개 정책
    * @return 실제 활성 시각에 도달했으면 true
    */
-  public boolean active(Policy policy) {
+  public boolean active(SubscriptionLaunchPolicy policy) {
     return policy.effectiveAt() != null && !LocalDateTime.now(clock).isBefore(policy.effectiveAt());
   }
-
-  /** 환경변수로 읽은 공개 정책이며 별도 DB 스위치와 신규 시작 중지를 제공하지 않는다. */
-  public record Policy(long version, LocalDateTime effectiveAt, boolean newStartsPaused) {}
 }

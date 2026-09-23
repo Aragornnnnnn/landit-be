@@ -1,0 +1,324 @@
+// LAN-531 리뷰에서 경계 결함을 재현한다.
+
+package com.landit.landitbe.feature.learning.freetalk.context.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import com.landit.landitbe.config.learning.FreeTalkContextProperties;
+import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
+import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
+import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
+import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryRequest;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkContextSummaryResult;
+import com.landit.landitbe.feature.learning.freetalk.context.client.ai.AiFreeTalkSessionSummaryContent;
+import com.landit.landitbe.feature.learning.freetalk.context.domain.FreeTalkContextSummary;
+import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalkContextSummaryRepository;
+import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
+import com.landit.landitbe.shared.domain.ConversationSpeaker;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+
+class FreeTalkContextSummaryServiceTest {
+  final FreeTalkContextSummaryRepository repo = mock(FreeTalkContextSummaryRepository.class);
+  final ConversationMessageService messages = mock(ConversationMessageService.class);
+  final AiFreeTalkClient ai = mock(AiFreeTalkClient.class);
+  final FreeTalkContextSummary state = FreeTalkContextSummary.start(30L, "v1", 6000);
+  final FreeTalkContextSummaryService service;
+  final FreeTalkContextLifecycleService lifecycle = mock(FreeTalkContextLifecycleService.class);
+  final Instant now = Instant.parse("2026-09-20T00:00:00Z");
+
+  FreeTalkContextSummaryServiceTest() {
+    service = contextService(true);
+    when(lifecycle.lockActive(1L, 300L, 30L)).thenReturn(true);
+    when(repo.currentTime()).thenReturn(now);
+    when(repo.findByIdForUpdate(30L)).thenReturn(Optional.of(state));
+  }
+
+  private FreeTalkContextSummaryService contextService(boolean enabled) {
+    PlatformTransactionManager tx = mock(PlatformTransactionManager.class);
+    when(tx.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+    var execution = mock(FreeTalkContextExecutionService.class);
+    doAnswer(
+            call -> {
+              call.<Runnable>getArgument(0).run();
+              return null;
+            })
+        .when(execution)
+        .execute(any());
+    return new FreeTalkContextSummaryService(
+        repo,
+        messages,
+        ai,
+        new FreeTalkContextProperties(enabled, 8, 12, 6000, 30, 30),
+        tx,
+        execution,
+        lifecycle);
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {1L, 98765L})
+  void enabledContextAppliesToAnyUser(long userId) {
+    service.initialize(userId, 30L);
+    verify(repo).save(any(FreeTalkContextSummary.class));
+    when(repo.findById(30L)).thenReturn(Optional.of(state));
+    assertEquals("v1", service.snapshot(userId, 30L).contextPolicyVersion());
+  }
+
+  @Test
+  void disabledContextSkipsInitializationReadAndGeneration() {
+    var disabledService = contextService(false);
+    disabledService.initialize(1L, 30L);
+    assertNull(disabledService.snapshot(1L, 30L).contextPolicyVersion());
+    disabledService.dispatchIfNeeded(reservation());
+    verifyNoInteractions(repo, messages, ai, lifecycle);
+  }
+
+  @Test
+  void enabledContextKeepsExistingSessionWithoutPolicyDisabled() {
+    when(repo.findById(30L)).thenReturn(Optional.empty());
+    assertNull(service.snapshot(1L, 30L).contextPolicyVersion());
+    verify(repo, never()).save(any());
+  }
+
+  List<SessionHistoryMessageSnapshot> rounds(int count, int size) {
+    List<SessionHistoryMessageSnapshot> result = new ArrayList<>();
+    for (int i = 1; i <= count * 2; i++) {
+      SessionHistoryMessageSnapshot m = mock(SessionHistoryMessageSnapshot.class);
+      when(m.getId()).thenReturn((long) i);
+      when(m.getMessageSequence()).thenReturn(i);
+      when(m.getTurnNumber()).thenReturn((i + 1) / 2);
+      when(m.getRole()).thenReturn(i % 2 == 1 ? ConversationSpeaker.USER : ConversationSpeaker.AI);
+      when(m.getFreeTalkTurnStatus()).thenReturn(i % 2 == 1 ? FreeTalkTurnStatus.CONTINUE : null);
+      when(m.getContent()).thenReturn("x".repeat(size));
+      when(m.getCreatedAt()).thenReturn(LocalDateTime.now());
+      result.add(m);
+    }
+    return result;
+  }
+
+  @Test
+  void waitsForTwelveUnsummarizedRounds() {
+    var twelve = rounds(12, 10);
+    var thirteen = rounds(13, 10);
+    when(messages.findAll(3L)).thenReturn(twelve, thirteen);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            inv -> {
+              AiFreeTalkContextSummaryRequest req = inv.getArgument(0);
+              return new AiFreeTalkContextSummaryResult(
+                  "v1",
+                  req.baseRevision(),
+                  req.targetThroughSequence(),
+                  new AiFreeTalkSessionSummaryContent("topic", List.of(), List.of(), List.of()));
+            });
+    FreeTalkMessageReservation reservation = reservation();
+    service.dispatchIfNeeded(reservation);
+    assertEquals(8, state.getCoveredThroughSequence());
+    service.dispatchIfNeeded(reservation);
+    verify(ai, times(1)).generateContextSummary(any());
+    assertEquals(8, state.getCoveredThroughSequence());
+  }
+
+  @Test
+  void byteLimitPreservesMinimumCompletedPair() {
+    List<SessionHistoryMessageSnapshot> all = rounds(12, 4000);
+    List<SessionHistoryMessageSnapshot> source =
+        ReflectionTestUtils.invokeMethod(service, "sourceMessages", all, state);
+    assertEquals(2, source.size());
+    assertEquals(ConversationSpeaker.AI, source.getLast().getRole());
+  }
+
+  @Test
+  void oversizedMinimumPairSuspendsAfterAiRejection() {
+    when(ai.generateContextSummary(any()))
+        .thenThrow(
+            new com.landit.landitbe.shared.exception.ApiException(
+                com.landit.landitbe.shared.exception.ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE));
+    List<SessionHistoryMessageSnapshot> all = rounds(12, 6001);
+    when(messages.findAll(3L)).thenReturn(all);
+    FreeTalkMessageReservation reservation = reservation();
+    service.dispatchIfNeeded(reservation);
+    service.dispatchIfNeeded(reservation);
+    verify(ai, times(1)).generateContextSummary(any());
+    assertEquals(0, state.getCoveredThroughSequence());
+    assertEquals("OVERSIZED_UNIT", state.getSuspendedReason());
+  }
+
+  @Test
+  void expiredLeaseCannotPersist() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            inv -> {
+              AiFreeTalkContextSummaryRequest req = inv.getArgument(0);
+              state.claim(state.getLeaseToken(), now.minusSeconds(1));
+              return new AiFreeTalkContextSummaryResult(
+                  "v1",
+                  req.baseRevision(),
+                  req.targetThroughSequence(),
+                  new AiFreeTalkSessionSummaryContent("topic", List.of(), List.of(), List.of()));
+            });
+    FreeTalkMessageReservation reservation = reservation();
+    service.dispatchIfNeeded(reservation);
+    assertEquals(0, state.getRevision());
+  }
+
+  @Test
+  void ignoresResultWhenLifecycleChangedDuringAiCall() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            call -> {
+              when(lifecycle.lockActive(1L, 300L, 30L)).thenReturn(false);
+              return result(call.getArgument(0));
+            });
+    service.dispatchIfNeeded(reservation());
+    assertEquals(0, state.getRevision());
+    assertNull(state.getSummaryContent());
+  }
+
+  @Test
+  void staleWorkerCannotReplaceNewLease() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenAnswer(
+            call -> {
+              state.claim("newer-worker", now.plusSeconds(30));
+              return result(call.getArgument(0));
+            });
+    service.dispatchIfNeeded(reservation());
+    assertEquals(0, state.getRevision());
+    assertEquals("newer-worker", state.getLeaseToken());
+  }
+
+  @Test
+  void doesNotEnrollExistingSessionOnDispatch() {
+    var all = rounds(12, 10);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(repo.findByIdForUpdate(30L)).thenReturn(Optional.empty());
+    service.dispatchIfNeeded(reservation());
+    verifyNoInteractions(ai);
+    verify(repo, never()).save(any());
+  }
+
+  @Test
+  void usesByteTriggerBeforeTwelveRounds() {
+    var all = rounds(10, 1000);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any())).thenAnswer(call -> result(call.getArgument(0)));
+    service.dispatchIfNeeded(reservation());
+    assertEquals(4, state.getCoveredThroughSequence());
+  }
+
+  @Test
+  void sequenceGapsDoNotChangeRetainedRoundCount() {
+    var all = rounds(12, 10);
+    for (int i = 0; i < all.size(); i++) {
+      when(all.get(i).getMessageSequence()).thenReturn((i + 1) * 3);
+    }
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any())).thenAnswer(call -> result(call.getArgument(0)));
+    service.dispatchIfNeeded(reservation());
+    assertEquals(24, state.getCoveredThroughSequence());
+  }
+
+  @Test
+  void openingAndPendingUserDoNotCountAsCompletedRounds() {
+    var all = new ArrayList<>(rounds(12, 10));
+    var opening = mock(SessionHistoryMessageSnapshot.class);
+    when(opening.getMessageSequence()).thenReturn(1);
+    when(opening.getRole()).thenReturn(ConversationSpeaker.AI);
+    for (int i = 0; i < all.size(); i++) {
+      when(all.get(i).getMessageSequence()).thenReturn(i + 2);
+    }
+    all.addFirst(opening);
+    when(all.get(23).getFreeTalkTurnStatus())
+        .thenReturn(FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED);
+    var completed = FreeTalkSummaryWindow.rounds(all, 0);
+    assertEquals(11, completed.size());
+    assertEquals(3, completed.getFirst().size());
+    assertEquals(ConversationSpeaker.AI, completed.getFirst().getFirst().getRole());
+  }
+
+  @Test
+  void registeredSessionHasPolicyBeforeFirstSummary() {
+    when(repo.findById(30L)).thenReturn(Optional.of(state));
+    assertEquals("v1", service.snapshot(1L, 30L).contextPolicyVersion());
+    assertNull(service.snapshot(1L, 30L).sessionSummary());
+  }
+
+  @Test
+  void inputOverflowReducesNextAttemptAndHonorsRetryDelay() {
+    var all = rounds(12, 100);
+    when(messages.findAll(3L)).thenReturn(all);
+    when(ai.generateContextSummary(any()))
+        .thenThrow(
+            new com.landit.landitbe.shared.exception.ApiException(
+                com.landit.landitbe.shared.exception.ErrorCode.FREE_TALK_SUMMARY_INPUT_TOO_LARGE));
+    service.dispatchIfNeeded(reservation());
+    assertTrue(state.getSourceByteLimit() < 3000);
+    assertEquals(now.plusSeconds(30), state.getNextAttemptAt());
+    service.dispatchIfNeeded(reservation());
+    verify(ai, times(1)).generateContextSummary(any());
+    when(repo.currentTime()).thenReturn(now.plusSeconds(31));
+    doAnswer(call -> result(call.getArgument(0))).when(ai).generateContextSummary(any());
+    service.dispatchIfNeeded(reservation());
+    var captured = org.mockito.ArgumentCaptor.forClass(AiFreeTalkContextSummaryRequest.class);
+    verify(ai, times(2)).generateContextSummary(captured.capture());
+    assertTrue(
+        captured.getAllValues().get(1).sourceMessages().size()
+            < captured.getAllValues().get(0).sourceMessages().size());
+    assertEquals(6000, state.getSourceByteLimit());
+  }
+
+  private AiFreeTalkContextSummaryResult result(AiFreeTalkContextSummaryRequest request) {
+    return new AiFreeTalkContextSummaryResult(
+        "v1",
+        request.baseRevision(),
+        request.targetThroughSequence(),
+        new AiFreeTalkSessionSummaryContent("topic", List.of(), List.of(), List.of()));
+  }
+
+  private FreeTalkMessageReservation reservation() {
+    return new FreeTalkMessageReservation(
+        1L,
+        LocalDate.now(),
+        300L,
+        30L,
+        "chloe",
+        3L,
+        24L,
+        "client-id",
+        1000L,
+        false,
+        false,
+        "EN",
+        "KO",
+        null,
+        List.of());
+  }
+}
