@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.LoggingEvent;
 import com.landit.landitbe.shared.client.ai.AiUpstreamException;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -177,6 +178,46 @@ class FailureObservationTests {
     assertThat(events).hasSize(1);
     assertThat(events.getFirst().getTag("upstream_status")).isEqualTo("502");
     assertThat(events.getFirst().getTag("error_code")).isEqualTo("AI_RESPONSE_INVALID");
+  }
+
+  @Test
+  void logAndSdkCaptureRetainOnlyAuthenticatedInternalId() throws Exception {
+    User scopeUser = new User();
+    scopeUser.setId("999");
+    scopeUser.setEmail("secret-email");
+    scopeUser.setIpAddress("secret-ip");
+    scopeUser.setUsername("secret-name");
+    Sentry.setUser(scopeUser);
+    MDC.put("user_id", "42");
+    FailureObservation.failed("feedback", "generation", "result_missing", null);
+    Sentry.captureException(new IllegalStateException("secret-body"));
+    assertThat(events).hasSize(2);
+    assertThat(events).allSatisfy(event -> assertThat(event.getUser().getId()).isEqualTo("42"));
+    assertThat(serialized()).doesNotContain("secret-");
+    MDC.remove("user_id");
+    Sentry.captureException(new IllegalStateException("next-request"));
+    assertThat(events.getLast().getUser()).isNull();
+  }
+
+  @Test
+  void loggingSnapshotKeepsOriginalActorWhenProcessedOnAnotherThread() {
+    MDC.put("user_id", "42");
+    LoggingEvent log = new LoggingEvent();
+    log.setLoggerName("test");
+    log.setLevel(ch.qos.logback.classic.Level.ERROR);
+    log.setMessage("failure");
+    log.setLoggerContext(logger.getLoggerContext());
+    log.prepareForDeferredProcessing();
+    MDC.put("user_id", "7");
+    Sentry.captureEvent(appender.createEvent(log));
+    assertThat(events.getFirst().getUser().getId()).isEqualTo("42");
+  }
+
+  @Test
+  void invalidMdcUserValueIsDropped() {
+    MDC.put("user_id", "secret-email");
+    Sentry.captureException(new IllegalStateException("failure"));
+    assertThat(events.getFirst().getUser()).isNull();
   }
 
   @Test

@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.learning.freetalk.context.service;
 
 import jakarta.annotation.PreDestroy;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
@@ -11,12 +12,17 @@ import org.springframework.stereotype.Service;
 public class FreeTalkContextExecutionService {
   private final ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
 
-  /** 동시 2개·대기 8개를 넘으면 호출자 스레드에서 실행하지 않고 거부한다. */
-  public FreeTalkContextExecutionService() {
+  /**
+   * 동시 2개·대기 8개를 넘으면 호출자 스레드에서 실행하지 않고 거부한다.
+   *
+   * @param observationTaskDecorator 요청과 사용자 ID를 전파하는 작업 래퍼
+   */
+  public FreeTalkContextExecutionService(TaskDecorator observationTaskDecorator) {
     executor.setCorePoolSize(2);
     executor.setMaxPoolSize(2);
     executor.setQueueCapacity(8);
     executor.setThreadNamePrefix("free-talk-summary-");
+    executor.setTaskDecorator(observationTaskDecorator);
     executor.initialize();
   }
 

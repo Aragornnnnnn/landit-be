@@ -1,4 +1,4 @@
-// 모든 Sentry 오류 이벤트에서 사용자 값과 시크릿을 제거한다.
+// Sentry 오류에서 인증된 내부 사용자 ID와 진단 정보만 보존한다.
 
 package com.landit.landitbe.shared.observability;
 
@@ -8,8 +8,10 @@ import io.sentry.SentryOptions;
 import io.sentry.logback.SentryAppender;
 import io.sentry.protocol.Message;
 import io.sentry.protocol.SentryException;
+import io.sentry.protocol.User;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.MDC;
 
 /** Logback 및 SDK 자동 오류를 전송 직전에 동일하게 정제한다. */
 public class SafeSentryAppender extends SentryAppender {
@@ -47,6 +49,8 @@ public class SafeSentryAppender extends SentryAppender {
   @Override
   protected SentryEvent createEvent(ILoggingEvent loggingEvent) {
     SentryEvent event = super.createEvent(loggingEvent);
+    // 비동기 Logback에서도 보고 시점이 아닌 로그 발생 시점의 사용자를 보존한다.
+    event.setTag("user_id", loggingEvent.getMDCPropertyMap().getOrDefault("user_id", ""));
     loggingEvent
         .getMDCPropertyMap()
         .forEach(
@@ -81,6 +85,14 @@ public class SafeSentryAppender extends SentryAppender {
     safe.setPlatform(event.getPlatform());
     safe.setLogger(event.getLogger());
     safe.setSdk(event.getSdk());
+    String userId =
+        ObservationUserId.validate(
+            event.getTag("user_id") == null ? MDC.get("user_id") : event.getTag("user_id"));
+    if (userId != null) {
+      User user = new User();
+      user.setId(userId);
+      safe.setUser(user);
+    }
     Map<String, String> tags = event.getTags();
     if (tags != null) {
       tags.forEach(
