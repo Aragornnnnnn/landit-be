@@ -24,6 +24,9 @@ class ObservationTaskConfigurationTest {
   void workerReceivesOnlySelectedIdsAndCleansUpAfterExecution() throws Exception {
     MDC.put("request_id", "request-1");
     MDC.put("user_id", "42");
+    MDC.put("learning_session_id", "100");
+    MDC.put("free_talk_session_id", "7");
+    MDC.put("message_id", "23");
     MDC.put("token", "secret-token");
     Runnable task =
         decorator.decorate(
@@ -31,6 +34,9 @@ class ObservationTaskConfigurationTest {
               assertThat(MDC.get("request_id")).isEqualTo("request-1");
               assertThat(MDC.get("user_id")).isEqualTo("42");
               assertThat(MDC.get("token")).isNull();
+              assertThat(MDC.get("learning_session_id")).isEqualTo("100");
+              assertThat(MDC.get("free_talk_session_id")).isEqualTo("7");
+              assertThat(MDC.get("message_id")).isEqualTo("23");
             });
     try (var executor = Executors.newSingleThreadExecutor()) {
       executor.submit(task).get();
@@ -39,6 +45,9 @@ class ObservationTaskConfigurationTest {
               () -> {
                 assertThat(MDC.get("request_id")).isNull();
                 assertThat(MDC.get("user_id")).isNull();
+                assertThat(MDC.get("learning_session_id")).isNull();
+                assertThat(MDC.get("free_talk_session_id")).isNull();
+                assertThat(MDC.get("message_id")).isNull();
               })
           .get();
     }

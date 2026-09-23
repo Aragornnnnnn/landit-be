@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.FilterChain;
@@ -62,6 +63,9 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     MDC.remove("user_id");
     try {
       authenticateAndContinue(request, response, filterChain);
+    } catch (ServletException | IOException | RuntimeException failure) {
+      ObservationContext.remember(failure);
+      throw failure;
     } finally {
       if (previousUserId == null) {
         MDC.remove("user_id");

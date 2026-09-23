@@ -77,6 +77,97 @@ class FailureObservationTests {
   }
 
   @Test
+  void lateWrappedExceptionKeepsDistinctSessionIdsAndActor() throws Exception {
+    MDC.put("user_id", "42");
+    RuntimeException failure = new RuntimeException("secret-body");
+    try {
+      ObservationContext.run(
+          100L,
+          7L,
+          23L,
+          () -> {
+            throw failure;
+          });
+    } catch (RuntimeException ignored) {
+      assertThat(ignored).isSameAs(failure);
+    }
+    MDC.put("user_id", "99");
+    MDC.put("learning_session_id", "200");
+    Sentry.captureException(new RuntimeException("secret-wrapper", failure));
+    SentryEvent event = events.getFirst();
+    assertThat(event.getUser().getId()).isEqualTo("42");
+    assertThat(event.getTag("learning_session_id")).isEqualTo("100");
+    assertThat(event.getTag("free_talk_session_id")).isEqualTo("7");
+    assertThat(event.getTag("message_id")).isEqualTo("23");
+    assertThat(MDC.get("learning_session_id")).isEqualTo("200");
+    assertThat(serialized()).doesNotContain("secret-");
+  }
+
+  @Test
+  void afterCommitUsesRegistrationContextAndRollbackDoesNotEmit() {
+    org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+    try {
+      ObservationContext.run(
+          100L,
+          7L,
+          null,
+          () -> FailureObservation.afterCommit("expression", "result", "failed", null));
+      var callbacks =
+          org.springframework.transaction.support.TransactionSynchronizationManager
+              .getSynchronizations();
+      MDC.put("learning_session_id", "200");
+      callbacks.forEach(callback -> callback.afterCommit());
+      assertThat(events).hasSize(1);
+      assertThat(events.getFirst().getTag("learning_session_id")).isEqualTo("100");
+      assertThat(events.getFirst().getTag("free_talk_session_id")).isEqualTo("7");
+      assertThat(events.getFirst().getTag("message_id")).isNull();
+      assertThat(events.getFirst().getFingerprints()).doesNotContain("100", "7");
+      assertThat(MDC.get("learning_session_id")).isEqualTo("200");
+    } finally {
+      org.springframework.transaction.support.TransactionSynchronizationManager
+          .clearSynchronization();
+    }
+    org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+    try {
+      ObservationContext.run(
+          300L,
+          9L,
+          null,
+          () -> FailureObservation.afterCommit("expression", "result", "failed", null));
+      org.springframework.transaction.support.TransactionSynchronizationManager
+          .getSynchronizations()
+          .forEach(
+              callback ->
+                  callback.afterCompletion(
+                      org.springframework.transaction.support.TransactionSynchronization
+                          .STATUS_ROLLED_BACK));
+      assertThat(events).hasSize(1);
+    } finally {
+      org.springframework.transaction.support.TransactionSynchronizationManager
+          .clearSynchronization();
+    }
+  }
+
+  @Test
+  void delayedLogUsesFrozenWorkContextRatherThanLaterWorker() {
+    Logger source = (Logger) LoggerFactory.getLogger("frozen-work");
+    MDC.put("learning_session_id", "100");
+    MDC.put("http_route", "/sessions/{sessionId}/messages");
+    LoggingEvent logging = new LoggingEvent();
+    logging.setLoggerName(source.getName());
+    logging.setLevel(ch.qos.logback.classic.Level.ERROR);
+    logging.setMessage("secret-text");
+    logging.setMDCPropertyMap(MDC.getCopyOfContextMap());
+    SentryEvent event = appender.createEvent(logging);
+    MDC.put("learning_session_id", "200");
+    MDC.put("free_talk_session_id", "9");
+    Sentry.captureEvent(event);
+    assertThat(events.getFirst().getTag("learning_session_id")).isEqualTo("100");
+    assertThat(events.getFirst().getTag("free_talk_session_id")).isNull();
+    assertThat(events.getFirst().getTag("http_route")).isEqualTo("/sessions/{sessionId}/messages");
+  }
+
+  @Test
   void recoveredAndExpectedRejectionRetainMetricsWithoutEvents() {
     FailureObservation.observed("closing", "validation", "safe_fallback", "recovered");
     FailureObservation.observed("api", "authentication", "invalid_token", "expected_rejection");

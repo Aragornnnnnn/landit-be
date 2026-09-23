@@ -11,7 +11,6 @@ import io.sentry.protocol.SentryException;
 import io.sentry.protocol.User;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.MDC;
 
 /** Logback 및 SDK 자동 오류를 전송 직전에 동일하게 정제한다. */
 public class SafeSentryAppender extends SentryAppender {
@@ -24,6 +23,11 @@ public class SafeSentryAppender extends SentryAppender {
           "recovered",
           "attempt",
           "request_id",
+          "learning_session_id",
+          "free_talk_session_id",
+          "message_id",
+          "http_method",
+          "http_route",
           "error_code",
           "upstream_status");
 
@@ -51,6 +55,7 @@ public class SafeSentryAppender extends SentryAppender {
     SentryEvent event = super.createEvent(loggingEvent);
     // 비동기 Logback에서도 보고 시점이 아닌 로그 발생 시점의 사용자를 보존한다.
     event.setTag("user_id", loggingEvent.getMDCPropertyMap().getOrDefault("user_id", ""));
+    event.setTag("observation_snapshot", "true");
     loggingEvent
         .getMDCPropertyMap()
         .forEach(
@@ -85,9 +90,10 @@ public class SafeSentryAppender extends SentryAppender {
     safe.setPlatform(event.getPlatform());
     safe.setLogger(event.getLogger());
     safe.setSdk(event.getSdk());
+    Map<String, String> context = ObservationContext.forFailure(event.getThrowable());
     String userId =
         ObservationUserId.validate(
-            event.getTag("user_id") == null ? MDC.get("user_id") : event.getTag("user_id"));
+            event.getTag("user_id") == null ? context.get("user_id") : event.getTag("user_id"));
     if (userId != null) {
       User user = new User();
       user.setId(userId);
@@ -102,6 +108,21 @@ public class SafeSentryAppender extends SentryAppender {
             }
           });
     }
+    Map<String, String> observation =
+        "true".equals(event.getTag("observation_snapshot"))
+            ? (tags == null ? Map.of() : tags)
+            : context;
+    context.keySet().stream()
+        .filter(key -> !"user_id".equals(key))
+        .forEach(
+            key -> {
+              String value = ObservationContext.validate(key, observation.get(key));
+              if (value == null) {
+                safe.removeTag(key);
+              } else {
+                safe.setTag(key, value);
+              }
+            });
     FailureDiagnostics.tags(event.getThrowable()).forEach(safe::setTag);
     safe.setTag("outcome", "failed");
     Message message = new Message();
