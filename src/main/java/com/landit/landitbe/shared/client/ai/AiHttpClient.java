@@ -82,7 +82,11 @@ public class AiHttpClient {
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
-        throw toApiException(response.statusCode(), response.body());
+        ApiException failure = toApiException(response.statusCode(), response.body());
+        if (failure.getStatus().is5xxServerError()) {
+          failure.initCause(new AiUpstreamException(response.statusCode()));
+        }
+        throw failure;
       }
       return readData(response.body(), responseType);
     } catch (ApiException exception) {

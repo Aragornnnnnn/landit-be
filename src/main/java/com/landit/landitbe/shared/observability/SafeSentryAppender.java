@@ -15,7 +15,15 @@ import java.util.Set;
 public class SafeSentryAppender extends SentryAppender {
   private static final Set<String> TAGS =
       Set.of(
-          "workflow", "failure_stage", "reason", "outcome", "recovered", "attempt", "request_id");
+          "workflow",
+          "failure_stage",
+          "reason",
+          "outcome",
+          "recovered",
+          "attempt",
+          "request_id",
+          "error_code",
+          "upstream_status");
 
   /**
    * SDK 초기화 전에 모든 오류 수집 경로의 필터를 등록한다.
@@ -82,11 +90,18 @@ public class SafeSentryAppender extends SentryAppender {
             }
           });
     }
+    FailureDiagnostics.tags(event.getThrowable()).forEach(safe::setTag);
     safe.setTag("outcome", "failed");
     Message message = new Message();
-    message.setFormatted("functional_failure");
+    String summary =
+        String.join(
+            " / ",
+            safe.getTag("workflow") == null ? "unclassified" : safe.getTag("workflow"),
+            safe.getTag("failure_stage") == null ? "execution" : safe.getTag("failure_stage"),
+            safe.getTag("reason") == null ? "unexpected" : safe.getTag("reason"));
+    message.setFormatted(summary);
     safe.setMessage(message);
-    if (event.getExceptions() != null) {
+    if (event.getExceptions() != null && !event.getExceptions().isEmpty()) {
       for (SentryException exception : event.getExceptions()) {
         if (exception.getType() != null && exception.getType().endsWith("SanitizedFailure")) {
           exception.setType(exception.getValue());
@@ -109,12 +124,15 @@ public class SafeSentryAppender extends SentryAppender {
                   });
         }
       }
+      SentryException outer = event.getExceptions().getLast();
+      outer.setValue(summary);
       safe.setExceptions(event.getExceptions());
     }
     if (safe.getExceptions() == null || safe.getExceptions().isEmpty()) {
       safe.setFingerprints(
           java.util.List.of(
               "functional_failure",
+              safe.getLogger() == null ? "unknown_logger" : safe.getLogger(),
               safe.getTag("workflow") == null ? "unclassified" : safe.getTag("workflow"),
               safe.getTag("failure_stage") == null ? "execution" : safe.getTag("failure_stage"),
               safe.getTag("reason") == null ? "unexpected" : safe.getTag("reason")));

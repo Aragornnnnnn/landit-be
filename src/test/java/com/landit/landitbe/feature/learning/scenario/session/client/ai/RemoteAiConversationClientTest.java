@@ -24,6 +24,7 @@ import com.landit.landitbe.feature.learning.scenario.session.message.feedback.cl
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackResult;
+import com.landit.landitbe.shared.client.ai.AiUpstreamException;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
@@ -56,6 +57,34 @@ class RemoteAiConversationClientTest {
   @AfterEach
   void stopServer() {
     server.stop(0);
+  }
+
+  @Test
+  void preservesUpstreamStatusWithoutChangingPublicErrorOrKeepingBody() {
+    for (int status : new int[] {401, 429, 500, 503}) {
+      server.createContext(
+          "/api/v1/conversation/session-level-assessment",
+          exchange -> {
+            byte[] body = "secret-upstream-body".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+          });
+      assertThatThrownBy(
+              () -> remoteClient().generateSessionLevelAssessment(aiSessionFeedbackRequest()))
+          .isInstanceOfSatisfying(
+              ApiException.class,
+              failure -> {
+                assertThat(failure.getErrorCode())
+                    .isEqualTo(SessionErrorCode.FEEDBACK_GENERATION_FAILED);
+                assertThat(failure.getCause())
+                    .isInstanceOfSatisfying(
+                        AiUpstreamException.class,
+                        upstream -> assertThat(upstream.statusCode()).isEqualTo(status));
+                assertThat(failure.getCause().getMessage()).doesNotContain("secret-");
+              });
+      server.removeContext("/api/v1/conversation/session-level-assessment");
+    }
   }
 
   @DisplayName("수준 평가 요청에는 최종 피드백이 소유한 필드를 보내지 않는다.")
@@ -566,9 +595,10 @@ class RemoteAiConversationClientTest {
     assertThatThrownBy(() -> remoteClient().generateSessionFeedback(aiSessionFeedbackRequest()))
         .isInstanceOfSatisfying(
             ApiException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(SessionErrorCode.FEEDBACK_NOT_READY));
+            exception -> {
+              assertThat(exception.getErrorCode()).isEqualTo(SessionErrorCode.FEEDBACK_NOT_READY);
+              assertThat(exception).hasNoCause();
+            });
   }
 
   @DisplayName("최종 피드백의 AI 응답 형식 오류를 그대로 유지한다.")

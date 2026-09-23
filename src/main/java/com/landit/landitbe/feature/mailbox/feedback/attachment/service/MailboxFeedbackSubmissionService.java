@@ -10,10 +10,10 @@ import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedback;
 import com.landit.landitbe.feature.mailbox.feedback.dto.MailboxFeedbackSubmitRequest;
 import com.landit.landitbe.feature.mailbox.feedback.repository.MailboxFeedbackRepository;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -21,7 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 /** 이미지 업로드와 문의 DB 확정을 조율하고 실패 시 해당 요청의 객체만 정리한다. */
-@Slf4j
 @Service
 public class MailboxFeedbackSubmissionService {
 
@@ -106,7 +105,7 @@ public class MailboxFeedbackSubmissionService {
     try {
       attachmentClient.delete(key);
     } catch (RuntimeException exception) {
-      log.error("미완료 문의 첨부 정리에 실패했습니다. objectKey={}", key);
+      FailureObservation.failed("mailbox_attachment", "cleanup", "storage_failed", exception);
     }
   }
 }

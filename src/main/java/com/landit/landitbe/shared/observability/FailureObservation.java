@@ -112,6 +112,9 @@ public final class FailureObservation {
       String workflow, String stage, String reason, String outcome, Throwable cause) {
     Map<String, String> previous = MDC.getCopyOfContextMap();
     try {
+      MDC.remove("error_code");
+      MDC.remove("upstream_status");
+      FailureDiagnostics.tags(cause).forEach(MDC::put);
       MDC.put("workflow", workflow);
       MDC.put("failure_stage", stage);
       MDC.put("reason", reason);

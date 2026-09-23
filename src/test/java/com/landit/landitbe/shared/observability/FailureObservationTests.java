@@ -8,12 +8,16 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import ch.qos.logback.classic.Logger;
+import com.landit.landitbe.shared.client.ai.AiUpstreamException;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import io.sentry.Hint;
 import io.sentry.Sentry;
 import io.sentry.SentryEnvelope;
 import io.sentry.SentryEvent;
 import io.sentry.SentryItemType;
 import io.sentry.SentryOptions;
+import io.sentry.protocol.Message;
 import io.sentry.protocol.Request;
 import io.sentry.protocol.User;
 import io.sentry.transport.ITransport;
@@ -145,6 +149,51 @@ class FailureObservationTests {
     assertThat(events).hasSize(2);
     assertThat(events.get(0).getFingerprints()).isNotEqualTo(events.get(1).getFingerprints());
     assertThat(MDC.get("outcome")).isEqualTo("previous");
+  }
+
+  @Test
+  void upstreamStatusAndApiCodeSurviveSanitizationAndMdcIsRestored() throws Exception {
+    MDC.put("upstream_status", "old");
+    ApiException exception =
+        ApiException.causedBy(ErrorCode.AI_GENERATION_FAILED, new AiUpstreamException(429));
+    FailureObservation.failed("inner_thought", "generation", "result_missing", exception);
+    SentryEvent event = events.getFirst();
+    assertThat(event.getTag("upstream_status")).isEqualTo("429");
+    assertThat(event.getTag("error_code")).isEqualTo("AI_GENERATION_FAILED");
+    assertThat(event.getMessage().getFormatted()).contains("inner_thought", "result_missing");
+    assertThat(event.getExceptions().getLast().getValue()).contains("result_missing");
+    assertThat(event.getExceptions().getFirst().getStacktrace().getFrames()).isNotEmpty();
+    assertThat(MDC.get("upstream_status")).isEqualTo("old");
+    FailureObservation.failed(
+        "storage", "save", "storage_failed", new IllegalStateException("secret-body"));
+    assertThat(events.getLast().getTag("upstream_status")).isNull();
+    assertThat(serialized()).doesNotContain("secret-body");
+  }
+
+  @Test
+  void directSdkCaptureAlsoRetainsUpstreamStatus() {
+    Sentry.captureException(
+        ApiException.causedBy(ErrorCode.AI_RESPONSE_INVALID, new AiUpstreamException(502)));
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getTag("upstream_status")).isEqualTo("502");
+    assertThat(events.getFirst().getTag("error_code")).isEqualTo("AI_RESPONSE_INVALID");
+  }
+
+  @Test
+  void unrelatedUntaggedLoggersHaveDifferentFingerprints() {
+    SentryEvent reservation = untaggedLog("NotificationJobReservationService");
+    SentryEvent attachment = untaggedLog("MailboxFeedbackSubmissionService");
+    assertThat(reservation.getFingerprints()).isNotEqualTo(attachment.getFingerprints());
+    assertThat(reservation.getMessage().getFormatted()).doesNotContain("secret-");
+  }
+
+  private SentryEvent untaggedLog(String loggerName) {
+    SentryEvent raw = new SentryEvent();
+    raw.setLogger(loggerName);
+    Message message = new Message();
+    message.setFormatted("secret-object-key");
+    raw.setMessage(message);
+    return SafeSentryAppender.sanitize(raw);
   }
 
   private String serialized() throws Exception {
