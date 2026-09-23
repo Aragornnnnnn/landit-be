@@ -15,6 +15,7 @@ import com.landit.landitbe.feature.learning.scenario.feedback.service.SessionFee
 import com.landit.landitbe.feature.learning.scenario.session.client.ai.AiConversationClient;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.observability.FailureObservation;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -69,6 +70,11 @@ public class SessionLevelAssessmentGenerationService {
 
   /** 완료 트랜잭션에서 예약한 평가를 서버 내부 실행기로 시작한다. */
   private void dispatch(long userId, LoadedSessionFeedbackContext context) {
+    ObservationContext.run(
+        context.sessionId(), null, null, () -> dispatchInContext(userId, context));
+  }
+
+  private void dispatchInContext(long userId, LoadedSessionFeedbackContext context) {
     try {
       taskExecutor.execute(() -> generateAndPersist(userId, context));
     } catch (RuntimeException exception) {
@@ -126,6 +132,11 @@ public class SessionLevelAssessmentGenerationService {
   }
 
   private void generateAndPersist(long userId, LoadedSessionFeedbackContext context) {
+    ObservationContext.run(
+        context.sessionId(), null, null, () -> generateAndPersistInContext(userId, context));
+  }
+
+  private void generateAndPersistInContext(long userId, LoadedSessionFeedbackContext context) {
     AiSessionLevelAssessment aiAssessment = null;
     boolean reported = false;
     try {
@@ -148,6 +159,18 @@ public class SessionLevelAssessmentGenerationService {
   }
 
   private void persist(
+      long userId,
+      LoadedSessionFeedbackContext context,
+      AiSessionLevelAssessment aiAssessment,
+      boolean reported) {
+    ObservationContext.run(
+        context.sessionId(),
+        null,
+        null,
+        () -> persistInContext(userId, context, aiAssessment, reported));
+  }
+
+  private void persistInContext(
       long userId,
       LoadedSessionFeedbackContext context,
       AiSessionLevelAssessment aiAssessment,

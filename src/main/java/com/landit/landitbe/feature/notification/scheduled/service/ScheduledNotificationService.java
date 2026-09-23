@@ -10,6 +10,7 @@ import com.landit.landitbe.feature.notification.scheduled.dto.NotificationTarget
 import com.landit.landitbe.feature.notification.scheduled.dto.NotificationTargetSelectionInput;
 import com.landit.landitbe.feature.notification.scheduled.repository.NotificationTargetQueryRepository;
 import com.landit.landitbe.feature.notification.scheduled.repository.UserNotificationStateRepository;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
@@ -225,7 +226,8 @@ public class ScheduledNotificationService {
       RuntimeException exception) {
     long durationNanos = System.nanoTime() - batchStartedAt;
     recordBatchDuration("failure", durationNanos);
-    log.error(
+    FailureObservation.failed("scheduled_notification", failureStage, "batch_failed", exception);
+    log.warn(
         "scheduled_notification_batch_failed messageId={} attemptId={} scheduledDate={} "
             + "policyVersion={} failureStage={} pageCount={} scannedUsers={} selectedUsers={} "
             + "durationMs={} exception={}",
@@ -238,8 +240,7 @@ public class ScheduledNotificationService {
         summary.scannedUsers(),
         summary.selectedUsers(),
         TimeUnit.NANOSECONDS.toMillis(durationNanos),
-        exception.getClass().getSimpleName(),
-        exception);
+        exception.getClass().getSimpleName());
   }
 
   /** 예약 배치 시간을 성공 여부별로 기록한다. */

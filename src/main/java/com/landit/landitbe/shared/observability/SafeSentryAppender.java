@@ -1,4 +1,4 @@
-// 모든 Sentry 오류 이벤트에서 사용자 값과 시크릿을 제거한다.
+// Sentry 오류에서 인증된 내부 사용자 ID와 진단 정보만 보존한다.
 
 package com.landit.landitbe.shared.observability;
 
@@ -8,6 +8,7 @@ import io.sentry.SentryOptions;
 import io.sentry.logback.SentryAppender;
 import io.sentry.protocol.Message;
 import io.sentry.protocol.SentryException;
+import io.sentry.protocol.User;
 import java.util.Map;
 import java.util.Set;
 
@@ -15,7 +16,20 @@ import java.util.Set;
 public class SafeSentryAppender extends SentryAppender {
   private static final Set<String> TAGS =
       Set.of(
-          "workflow", "failure_stage", "reason", "outcome", "recovered", "attempt", "request_id");
+          "workflow",
+          "failure_stage",
+          "reason",
+          "outcome",
+          "recovered",
+          "attempt",
+          "request_id",
+          "learning_session_id",
+          "free_talk_session_id",
+          "message_id",
+          "http_method",
+          "http_route",
+          "error_code",
+          "upstream_status");
 
   /**
    * SDK 초기화 전에 모든 오류 수집 경로의 필터를 등록한다.
@@ -39,6 +53,9 @@ public class SafeSentryAppender extends SentryAppender {
   @Override
   protected SentryEvent createEvent(ILoggingEvent loggingEvent) {
     SentryEvent event = super.createEvent(loggingEvent);
+    // 비동기 Logback에서도 보고 시점이 아닌 로그 발생 시점의 사용자를 보존한다.
+    event.setTag("user_id", loggingEvent.getMDCPropertyMap().getOrDefault("user_id", ""));
+    event.setTag("observation_snapshot", "true");
     loggingEvent
         .getMDCPropertyMap()
         .forEach(
@@ -73,6 +90,15 @@ public class SafeSentryAppender extends SentryAppender {
     safe.setPlatform(event.getPlatform());
     safe.setLogger(event.getLogger());
     safe.setSdk(event.getSdk());
+    Map<String, String> context = ObservationContext.forFailure(event.getThrowable());
+    String userId =
+        ObservationUserId.validate(
+            event.getTag("user_id") == null ? context.get("user_id") : event.getTag("user_id"));
+    if (userId != null) {
+      User user = new User();
+      user.setId(userId);
+      safe.setUser(user);
+    }
     Map<String, String> tags = event.getTags();
     if (tags != null) {
       tags.forEach(
@@ -82,11 +108,33 @@ public class SafeSentryAppender extends SentryAppender {
             }
           });
     }
+    Map<String, String> observation =
+        "true".equals(event.getTag("observation_snapshot"))
+            ? (tags == null ? Map.of() : tags)
+            : context;
+    context.keySet().stream()
+        .filter(key -> !"user_id".equals(key))
+        .forEach(
+            key -> {
+              String value = ObservationContext.validate(key, observation.get(key));
+              if (value == null) {
+                safe.removeTag(key);
+              } else {
+                safe.setTag(key, value);
+              }
+            });
+    FailureDiagnostics.tags(event.getThrowable()).forEach(safe::setTag);
     safe.setTag("outcome", "failed");
     Message message = new Message();
-    message.setFormatted("functional_failure");
+    String summary =
+        String.join(
+            " / ",
+            safe.getTag("workflow") == null ? "unclassified" : safe.getTag("workflow"),
+            safe.getTag("failure_stage") == null ? "execution" : safe.getTag("failure_stage"),
+            safe.getTag("reason") == null ? "unexpected" : safe.getTag("reason"));
+    message.setFormatted(summary);
     safe.setMessage(message);
-    if (event.getExceptions() != null) {
+    if (event.getExceptions() != null && !event.getExceptions().isEmpty()) {
       for (SentryException exception : event.getExceptions()) {
         if (exception.getType() != null && exception.getType().endsWith("SanitizedFailure")) {
           exception.setType(exception.getValue());
@@ -109,12 +157,15 @@ public class SafeSentryAppender extends SentryAppender {
                   });
         }
       }
+      SentryException outer = event.getExceptions().getLast();
+      outer.setValue(summary);
       safe.setExceptions(event.getExceptions());
     }
     if (safe.getExceptions() == null || safe.getExceptions().isEmpty()) {
       safe.setFingerprints(
           java.util.List.of(
               "functional_failure",
+              safe.getLogger() == null ? "unknown_logger" : safe.getLogger(),
               safe.getTag("workflow") == null ? "unclassified" : safe.getTag("workflow"),
               safe.getTag("failure_stage") == null ? "execution" : safe.getTag("failure_stage"),
               safe.getTag("reason") == null ? "unexpected" : safe.getTag("reason")));

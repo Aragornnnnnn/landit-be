@@ -6,6 +6,7 @@ import com.landit.landitbe.feature.auth.exception.AuthErrorCode;
 import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import com.landit.landitbe.shared.security.SecurityFailureResponseWriter;
 import jakarta.servlet.FilterChain;
@@ -13,6 +14,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
@@ -57,6 +59,25 @@ public class AuthTokenFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
+    String previousUserId = MDC.get("user_id");
+    MDC.remove("user_id");
+    try {
+      authenticateAndContinue(request, response, filterChain);
+    } catch (ServletException | IOException | RuntimeException failure) {
+      ObservationContext.remember(failure);
+      throw failure;
+    } finally {
+      if (previousUserId == null) {
+        MDC.remove("user_id");
+      } else {
+        MDC.put("user_id", previousUserId);
+      }
+    }
+  }
+
+  private void authenticateAndContinue(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
     String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
     if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
       filterChain.doFilter(request, response);
@@ -82,6 +103,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     securityContext.setAuthentication(
         new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
     SecurityContextHolder.setContext(securityContext);
+    MDC.put("user_id", userId.toString());
     try {
       filterChain.doFilter(request, response);
     } finally {

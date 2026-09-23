@@ -3,8 +3,8 @@
 package com.landit.landitbe.feature.notification.job.service;
 
 import com.landit.landitbe.feature.notification.job.messaging.NotificationJobScheduler;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 /** 사용자 목록이 아닌 저장된 예약 미등록 건만 재시도한다. */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 @ConditionalOnProperty(
     prefix = "landit.notification",
     name = "consumer-enabled",
@@ -34,8 +33,8 @@ public class NotificationJobReservationService {
         scheduler.schedule(job);
         jobs.registered(job.id());
       } catch (RuntimeException exception) {
-        log.error(
-            "알림 예약 등록 실패: jobId={}, errorType={}", job.id(), exception.getClass().getSimpleName());
+        FailureObservation.failed(
+            "notification_reservation", "registration", "schedule_failed", exception);
       }
     }
   }

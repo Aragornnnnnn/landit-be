@@ -48,7 +48,14 @@ class MessageFeedbackObservationTest {
   private final AiConversationClient client = mock(AiConversationClient.class);
   private final ConversationMessageService messages = mock(ConversationMessageService.class);
   private final Logger logger = (Logger) LoggerFactory.getLogger(FailureObservation.class);
-  private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+  private final ListAppender<ILoggingEvent> appender =
+      new ListAppender<>() {
+        @Override
+        protected void append(ILoggingEvent event) {
+          event.prepareForDeferredProcessing();
+          super.append(event);
+        }
+      };
   private final JsonMapper mapper = new JsonMapper();
   private final AiMessageFeedbackRequest request =
       new AiMessageFeedbackRequest(1L, 2L, 1, 1, null, null, "private-message");
@@ -163,6 +170,26 @@ class MessageFeedbackObservationTest {
     when(repository.findRecoverable(any(), any())).thenReturn(List.of());
     service.recover();
     assertThat(errors()).isEmpty();
+  }
+
+  @Test
+  void recoveryReportsEachDatabaseItemWithoutLeakingThePreviousSession() {
+    MessageFeedbackWork second = new MessageFeedbackWork(4L, 3L, "{}", LocalDateTime.now());
+    when(repository.findById(4L)).thenReturn(Optional.of(second));
+    when(messages.lockForFeedbackResult(4L)).thenReturn(true);
+    when(repository.findExhausted(any(), any())).thenReturn(List.of(work, second));
+    when(repository.findRecoverable(any(), any())).thenReturn(List.of());
+    service.recover();
+    assertThat(errors()).hasSize(2);
+    assertThat(errors().get(0).getMDCPropertyMap())
+        .containsEntry("learning_session_id", "1")
+        .containsEntry("message_id", "2");
+    assertThat(errors().get(1).getMDCPropertyMap())
+        .containsEntry("learning_session_id", "3")
+        .containsEntry("message_id", "4")
+        .doesNotContainKeys("user_id", "free_talk_session_id");
+    assertThat(org.slf4j.MDC.get("learning_session_id")).isNull();
+    assertThat(org.slf4j.MDC.get("message_id")).isNull();
   }
 
   private void finishReturns(int count) {

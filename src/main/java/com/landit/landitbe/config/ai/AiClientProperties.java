@@ -3,6 +3,7 @@
 package com.landit.landitbe.config.ai;
 
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationSettings;
+import com.landit.landitbe.shared.observability.ObservationUserId;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -98,9 +99,14 @@ public record AiClientProperties(
     if (requestId != null) {
       builder.header("X-Request-Id", requestId);
     }
-    return internalToken.isBlank()
-        ? builder
-        : builder.header("X-Landit-Internal-Token", internalToken);
+    if (internalToken.isBlank()) {
+      return builder;
+    }
+    String userId = ObservationUserId.validate(org.slf4j.MDC.get("user_id"));
+    if (userId != null) {
+      builder.header("X-Landit-User-Id", userId);
+    }
+    return builder.header("X-Landit-Internal-Token", internalToken);
   }
 
   /** 설정 객체를 출력하더라도 내부 토큰은 노출하지 않는다. */

@@ -77,11 +77,14 @@ public final class FailureObservation {
       failed(workflow, stage, reason, cause);
       return;
     }
+    Map<String, String> context = ObservationContext.forFailure(cause);
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override
           public void afterCommit() {
-            failed(workflow, stage, reason, cause);
+            try (var ignored = ObservationContext.open(context)) {
+              failed(workflow, stage, reason, cause);
+            }
           }
         });
   }
@@ -111,7 +114,10 @@ public final class FailureObservation {
   private static void record(
       String workflow, String stage, String reason, String outcome, Throwable cause) {
     Map<String, String> previous = MDC.getCopyOfContextMap();
-    try {
+    try (var ignored = ObservationContext.open(ObservationContext.forFailure(cause))) {
+      MDC.remove("error_code");
+      MDC.remove("upstream_status");
+      FailureDiagnostics.tags(cause).forEach(MDC::put);
       MDC.put("workflow", workflow);
       MDC.put("failure_stage", stage);
       MDC.put("reason", reason);
