@@ -30,6 +30,7 @@ import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalRequest;
 import com.landit.landitbe.feature.memory.retrieval.dto.MemoryRetrievalResult;
 import com.landit.landitbe.feature.memory.retrieval.service.FreeTalkMemoryRetrievalService;
 import com.landit.landitbe.shared.observability.FailureObservation;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -126,6 +127,14 @@ public class FreeTalkMessageService {
     }
     FreeTalkMessageReservation reservation =
         submittedMessageService.reserve(userId, learningSessionId, request);
+    return ObservationContext.call(
+        reservation.learningSessionId(),
+        reservation.freeTalkSessionId(),
+        reservation.userMessageId(),
+        () -> processSubmission(reservation));
+  }
+
+  private FreeTalkMessageSubmitResponse processSubmission(FreeTalkMessageReservation reservation) {
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
       AiFreeTalkContextWindow context =
@@ -213,6 +222,15 @@ public class FreeTalkMessageService {
 
   /** 속마음·결정 확정·보상 순서를 한 예외 경계에서 보존한다. */
   private FreeTalkMessageSubmitResponse processExitDecision(
+      FreeTalkExitDecisionReservation reservation) {
+    return ObservationContext.call(
+        reservation.learningSessionId(),
+        reservation.freeTalkSessionId(),
+        reservation.userMessageId(),
+        () -> processExitDecisionInContext(reservation));
+  }
+
+  private FreeTalkMessageSubmitResponse processExitDecisionInContext(
       FreeTalkExitDecisionReservation reservation) {
     CompletableFuture<AiFreeTalkInnerThoughtResult> innerThoughtFuture = null;
     try {
@@ -546,7 +564,15 @@ public class FreeTalkMessageService {
   private <T> CompletableFuture<T> submitCancellableAsync(Callable<T> task) {
     CancellableCompletableFuture<T> result = new CancellableCompletableFuture<>();
     FutureTask<T> futureTask =
-        new FutureTask<>(task) {
+        new FutureTask<>(
+            () -> {
+              try {
+                return task.call();
+              } catch (Exception failure) {
+                ObservationContext.remember(failure);
+                throw failure;
+              }
+            }) {
           @Override
           protected void done() {
             if (isCancelled()) {

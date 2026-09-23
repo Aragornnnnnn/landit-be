@@ -38,6 +38,7 @@ import com.landit.landitbe.shared.domain.Locale;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.observability.FailureObservation;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +109,16 @@ public class FreeTalkExpressionGenerationService {
       return;
     }
 
+    ObservationContext.run(
+        context.learningSessionId(),
+        context.freeTalkSessionId(),
+        null,
+        () -> generateInContext(context, transactionTemplate));
+  }
+
+  private void generateInContext(
+      GenerationContext context, TransactionTemplate transactionTemplate) {
+    long learningSessionId = context.learningSessionId();
     StageTimings timings = new StageTimings();
     long startNanos = System.nanoTime();
     try {
@@ -144,6 +155,11 @@ public class FreeTalkExpressionGenerationService {
    * @param learningSessionId 실패로 전환할 학습 세션 ID
    */
   public void markFailed(long learningSessionId) {
+    ObservationContext.run(
+        learningSessionId, null, null, () -> markFailedInContext(learningSessionId));
+  }
+
+  private void markFailedInContext(long learningSessionId) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     FailureObservation.failed("expression", "dispatch", "executor_unavailable", null);
     try {

@@ -19,6 +19,7 @@ import com.landit.landitbe.feature.learning.freetalk.context.repository.FreeTalk
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageReservation;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -132,6 +133,14 @@ public class FreeTalkContextSummaryService {
   }
 
   private void summarize(FreeTalkMessageReservation reservation) {
+    ObservationContext.run(
+        reservation.learningSessionId(),
+        reservation.freeTalkSessionId(),
+        null,
+        () -> summarizeInContext(reservation));
+  }
+
+  private void summarizeInContext(FreeTalkMessageReservation reservation) {
     List<SessionHistoryMessageSnapshot> messages =
         conversationMessageService.findAll(reservation.historyId());
     PendingSummary pending = prepare(reservation, messages);

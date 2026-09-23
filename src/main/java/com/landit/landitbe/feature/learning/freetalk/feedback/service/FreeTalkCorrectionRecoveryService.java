@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.learning.freetalk.client.ai.AiFreeTalkClient;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkCorrectionAttempt;
 import com.landit.landitbe.feature.learning.freetalk.feedback.repository.FreeTalkMessageFeedbackRepository.RecoverableCorrection;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import jakarta.annotation.PreDestroy;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -151,8 +152,13 @@ public class FreeTalkCorrectionRecoveryService {
         feedbackService.failUnrebuildableAttempt(attempt);
         return;
       }
-      feedbackService.completeAttempt(
-          attempt, aiFreeTalkClient.generateInnerThought(request.get()).correction());
+      ObservationContext.run(
+          null,
+          request.get().sessionId(),
+          attempt.messageId(),
+          () ->
+              feedbackService.completeAttempt(
+                  attempt, aiFreeTalkClient.generateInnerThought(request.get()).correction()));
     } catch (RuntimeException exception) {
       // 예외 메시지에 사용자 발화가 섞일 수 있어 예외 종류만 남긴다.
       log.warn(
