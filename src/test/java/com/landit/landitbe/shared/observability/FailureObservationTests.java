@@ -8,12 +8,17 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.LoggingEvent;
+import com.landit.landitbe.shared.client.ai.AiUpstreamException;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import io.sentry.Hint;
 import io.sentry.Sentry;
 import io.sentry.SentryEnvelope;
 import io.sentry.SentryEvent;
 import io.sentry.SentryItemType;
 import io.sentry.SentryOptions;
+import io.sentry.protocol.Message;
 import io.sentry.protocol.Request;
 import io.sentry.protocol.User;
 import io.sentry.transport.ITransport;
@@ -69,6 +74,97 @@ class FailureObservationTests {
     appender.stop();
     Sentry.close();
     MDC.clear();
+  }
+
+  @Test
+  void lateWrappedExceptionKeepsDistinctSessionIdsAndActor() throws Exception {
+    MDC.put("user_id", "42");
+    RuntimeException failure = new RuntimeException("secret-body");
+    try {
+      ObservationContext.run(
+          100L,
+          7L,
+          23L,
+          () -> {
+            throw failure;
+          });
+    } catch (RuntimeException ignored) {
+      assertThat(ignored).isSameAs(failure);
+    }
+    MDC.put("user_id", "99");
+    MDC.put("learning_session_id", "200");
+    Sentry.captureException(new RuntimeException("secret-wrapper", failure));
+    SentryEvent event = events.getFirst();
+    assertThat(event.getUser().getId()).isEqualTo("42");
+    assertThat(event.getTag("learning_session_id")).isEqualTo("100");
+    assertThat(event.getTag("free_talk_session_id")).isEqualTo("7");
+    assertThat(event.getTag("message_id")).isEqualTo("23");
+    assertThat(MDC.get("learning_session_id")).isEqualTo("200");
+    assertThat(serialized()).doesNotContain("secret-");
+  }
+
+  @Test
+  void afterCommitUsesRegistrationContextAndRollbackDoesNotEmit() {
+    org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+    try {
+      ObservationContext.run(
+          100L,
+          7L,
+          null,
+          () -> FailureObservation.afterCommit("expression", "result", "failed", null));
+      var callbacks =
+          org.springframework.transaction.support.TransactionSynchronizationManager
+              .getSynchronizations();
+      MDC.put("learning_session_id", "200");
+      callbacks.forEach(callback -> callback.afterCommit());
+      assertThat(events).hasSize(1);
+      assertThat(events.getFirst().getTag("learning_session_id")).isEqualTo("100");
+      assertThat(events.getFirst().getTag("free_talk_session_id")).isEqualTo("7");
+      assertThat(events.getFirst().getTag("message_id")).isNull();
+      assertThat(events.getFirst().getFingerprints()).doesNotContain("100", "7");
+      assertThat(MDC.get("learning_session_id")).isEqualTo("200");
+    } finally {
+      org.springframework.transaction.support.TransactionSynchronizationManager
+          .clearSynchronization();
+    }
+    org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+    try {
+      ObservationContext.run(
+          300L,
+          9L,
+          null,
+          () -> FailureObservation.afterCommit("expression", "result", "failed", null));
+      org.springframework.transaction.support.TransactionSynchronizationManager
+          .getSynchronizations()
+          .forEach(
+              callback ->
+                  callback.afterCompletion(
+                      org.springframework.transaction.support.TransactionSynchronization
+                          .STATUS_ROLLED_BACK));
+      assertThat(events).hasSize(1);
+    } finally {
+      org.springframework.transaction.support.TransactionSynchronizationManager
+          .clearSynchronization();
+    }
+  }
+
+  @Test
+  void delayedLogUsesFrozenWorkContextRatherThanLaterWorker() {
+    Logger source = (Logger) LoggerFactory.getLogger("frozen-work");
+    MDC.put("learning_session_id", "100");
+    MDC.put("http_route", "/sessions/{sessionId}/messages");
+    LoggingEvent logging = new LoggingEvent();
+    logging.setLoggerName(source.getName());
+    logging.setLevel(ch.qos.logback.classic.Level.ERROR);
+    logging.setMessage("secret-text");
+    logging.setMDCPropertyMap(MDC.getCopyOfContextMap());
+    SentryEvent event = appender.createEvent(logging);
+    MDC.put("learning_session_id", "200");
+    MDC.put("free_talk_session_id", "9");
+    Sentry.captureEvent(event);
+    assertThat(events.getFirst().getTag("learning_session_id")).isEqualTo("100");
+    assertThat(events.getFirst().getTag("free_talk_session_id")).isNull();
+    assertThat(events.getFirst().getTag("http_route")).isEqualTo("/sessions/{sessionId}/messages");
   }
 
   @Test
@@ -145,6 +241,91 @@ class FailureObservationTests {
     assertThat(events).hasSize(2);
     assertThat(events.get(0).getFingerprints()).isNotEqualTo(events.get(1).getFingerprints());
     assertThat(MDC.get("outcome")).isEqualTo("previous");
+  }
+
+  @Test
+  void upstreamStatusAndApiCodeSurviveSanitizationAndMdcIsRestored() throws Exception {
+    MDC.put("upstream_status", "old");
+    ApiException exception =
+        ApiException.causedBy(ErrorCode.AI_GENERATION_FAILED, new AiUpstreamException(429));
+    FailureObservation.failed("inner_thought", "generation", "result_missing", exception);
+    SentryEvent event = events.getFirst();
+    assertThat(event.getTag("upstream_status")).isEqualTo("429");
+    assertThat(event.getTag("error_code")).isEqualTo("AI_GENERATION_FAILED");
+    assertThat(event.getMessage().getFormatted()).contains("inner_thought", "result_missing");
+    assertThat(event.getExceptions().getLast().getValue()).contains("result_missing");
+    assertThat(event.getExceptions().getFirst().getStacktrace().getFrames()).isNotEmpty();
+    assertThat(MDC.get("upstream_status")).isEqualTo("old");
+    FailureObservation.failed(
+        "storage", "save", "storage_failed", new IllegalStateException("secret-body"));
+    assertThat(events.getLast().getTag("upstream_status")).isNull();
+    assertThat(serialized()).doesNotContain("secret-body");
+  }
+
+  @Test
+  void directSdkCaptureAlsoRetainsUpstreamStatus() {
+    Sentry.captureException(
+        ApiException.causedBy(ErrorCode.AI_RESPONSE_INVALID, new AiUpstreamException(502)));
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getTag("upstream_status")).isEqualTo("502");
+    assertThat(events.getFirst().getTag("error_code")).isEqualTo("AI_RESPONSE_INVALID");
+  }
+
+  @Test
+  void logAndSdkCaptureRetainOnlyAuthenticatedInternalId() throws Exception {
+    User scopeUser = new User();
+    scopeUser.setId("999");
+    scopeUser.setEmail("secret-email");
+    scopeUser.setIpAddress("secret-ip");
+    scopeUser.setUsername("secret-name");
+    Sentry.setUser(scopeUser);
+    MDC.put("user_id", "42");
+    FailureObservation.failed("feedback", "generation", "result_missing", null);
+    Sentry.captureException(new IllegalStateException("secret-body"));
+    assertThat(events).hasSize(2);
+    assertThat(events).allSatisfy(event -> assertThat(event.getUser().getId()).isEqualTo("42"));
+    assertThat(serialized()).doesNotContain("secret-");
+    MDC.remove("user_id");
+    Sentry.captureException(new IllegalStateException("next-request"));
+    assertThat(events.getLast().getUser()).isNull();
+  }
+
+  @Test
+  void loggingSnapshotKeepsOriginalActorWhenProcessedOnAnotherThread() {
+    MDC.put("user_id", "42");
+    LoggingEvent log = new LoggingEvent();
+    log.setLoggerName("test");
+    log.setLevel(ch.qos.logback.classic.Level.ERROR);
+    log.setMessage("failure");
+    log.setLoggerContext(logger.getLoggerContext());
+    log.prepareForDeferredProcessing();
+    MDC.put("user_id", "7");
+    Sentry.captureEvent(appender.createEvent(log));
+    assertThat(events.getFirst().getUser().getId()).isEqualTo("42");
+  }
+
+  @Test
+  void invalidMdcUserValueIsDropped() {
+    MDC.put("user_id", "secret-email");
+    Sentry.captureException(new IllegalStateException("failure"));
+    assertThat(events.getFirst().getUser()).isNull();
+  }
+
+  @Test
+  void unrelatedUntaggedLoggersHaveDifferentFingerprints() {
+    SentryEvent reservation = untaggedLog("NotificationJobReservationService");
+    SentryEvent attachment = untaggedLog("MailboxFeedbackSubmissionService");
+    assertThat(reservation.getFingerprints()).isNotEqualTo(attachment.getFingerprints());
+    assertThat(reservation.getMessage().getFormatted()).doesNotContain("secret-");
+  }
+
+  private SentryEvent untaggedLog(String loggerName) {
+    SentryEvent raw = new SentryEvent();
+    raw.setLogger(loggerName);
+    Message message = new Message();
+    message.setFormatted("secret-object-key");
+    raw.setMessage(message);
+    return SafeSentryAppender.sanitize(raw);
   }
 
   private String serialized() throws Exception {

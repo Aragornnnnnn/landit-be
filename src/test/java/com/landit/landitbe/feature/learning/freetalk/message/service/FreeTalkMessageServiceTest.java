@@ -318,6 +318,11 @@ class FreeTalkMessageServiceTest {
     assertThatThrownBy(() -> service.submit(1L, 300L, request())).isSameAs(exception);
 
     verify(aiFreeTalkClient, times(1)).generateTurn(any());
+    assertThat(com.landit.landitbe.shared.observability.ObservationContext.forFailure(exception))
+        .containsEntry("learning_session_id", "300")
+        .containsEntry("free_talk_session_id", "30")
+        .containsEntry("message_id", "7");
+    assertThat(org.slf4j.MDC.get("learning_session_id")).isNull();
   }
 
   @DisplayName("완료된 속마음의 저장이 실패하면 속마음을 실패 상태로 바꾼다.")

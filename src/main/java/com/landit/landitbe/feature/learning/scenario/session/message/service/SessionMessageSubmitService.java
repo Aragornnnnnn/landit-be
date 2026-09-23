@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.learning.scenario.session.message.dto.Session
 import com.landit.landitbe.feature.learning.scenario.session.message.dto.SessionMessageSubmitResponse;
 import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.observability.FailureObservation;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -96,43 +97,50 @@ public class SessionMessageSubmitService {
       return reservation.response();
     }
     SubmittedMessageContext submittedContext = reservation.context();
-    AsyncGenerationRequests asyncGenerationRequests = AsyncGenerationRequests.none();
-    try {
-      asyncGenerationRequests = startAsyncGeneration(submittedContext);
-      // 외부 AI 호출 중에는 DB 트랜잭션과 세션 row lock을 유지하지 않는다.
-      SessionMessageAiGenerator.Generation generation = generateAiMessage(submittedContext);
-      ProcessingStatus feedbackProcessingStatus =
-          feedbackProcessingStatus(submittedContext, generation);
-      SessionMessageSubmitResponse response =
-          executeInTransaction(
-              () -> {
-                if (generation.completed()) {
-                  // 세션 잠금보다 먼저 사용자 잠금을 획득해 완료 기록 순서를 통일한다.
-                  userProfileService.requireActiveForUpdate(userId);
-                }
-                return generatedMessageService.record(
-                    submittedContext, generation, feedbackProcessingStatus);
-              });
-      recordInnerThoughtAfterMessageGeneration(
-          submittedContext.submittedMessageId(), asyncGenerationRequests.innerThoughtFuture());
-      if (response.progress().completed()) {
-        levelAssessmentGenerationService.startIfNeeded(userId, sessionId);
-      }
-      log.info(
-          "session message submitted: userId={}, sessionId={}, messageId={}, "
-              + "inputType={}, contentLength={}",
-          userId,
-          sessionId,
-          response.submittedMessage().messageId(),
-          inputType,
-          content.length());
-      return response;
-    } catch (RuntimeException exception) {
-      // 키 있는 발화는 보존하고 구 FE의 키 없는 실패 발화는 다시 입력할 수 있게 한다.
-      asyncGenerationRequests.cancel();
-      removeSubmittedMessageInTransaction(submittedContext);
-      throw exception;
-    }
+    return ObservationContext.call(
+        sessionId,
+        null,
+        submittedContext.submittedMessageId(),
+        () -> {
+          AsyncGenerationRequests asyncGenerationRequests = AsyncGenerationRequests.none();
+          try {
+            asyncGenerationRequests = startAsyncGeneration(submittedContext);
+            // 외부 AI 호출 중에는 DB 트랜잭션과 세션 row lock을 유지하지 않는다.
+            SessionMessageAiGenerator.Generation generation = generateAiMessage(submittedContext);
+            ProcessingStatus feedbackProcessingStatus =
+                feedbackProcessingStatus(submittedContext, generation);
+            SessionMessageSubmitResponse response =
+                executeInTransaction(
+                    () -> {
+                      if (generation.completed()) {
+                        // 세션 잠금보다 먼저 사용자 잠금을 획득해 완료 기록 순서를 통일한다.
+                        userProfileService.requireActiveForUpdate(userId);
+                      }
+                      return generatedMessageService.record(
+                          submittedContext, generation, feedbackProcessingStatus);
+                    });
+            recordInnerThoughtAfterMessageGeneration(
+                submittedContext.submittedMessageId(),
+                asyncGenerationRequests.innerThoughtFuture());
+            if (response.progress().completed()) {
+              levelAssessmentGenerationService.startIfNeeded(userId, sessionId);
+            }
+            log.info(
+                "session message submitted: userId={}, sessionId={}, messageId={}, "
+                    + "inputType={}, contentLength={}",
+                userId,
+                sessionId,
+                response.submittedMessage().messageId(),
+                inputType,
+                content.length());
+            return response;
+          } catch (RuntimeException exception) {
+            // 키 있는 발화는 보존하고 구 FE의 키 없는 실패 발화는 다시 입력할 수 있게 한다.
+            asyncGenerationRequests.cancel();
+            removeSubmittedMessageInTransaction(submittedContext);
+            throw exception;
+          }
+        });
   }
 
   private AsyncGenerationRequests startAsyncGeneration(SubmittedMessageContext submittedContext) {
@@ -278,7 +286,15 @@ public class SessionMessageSubmitService {
   private <T> CompletableFuture<T> submitCancellableAsync(Callable<T> task) {
     CancellableCompletableFuture<T> result = new CancellableCompletableFuture<>();
     FutureTask<T> futureTask =
-        new FutureTask<>(task) {
+        new FutureTask<>(
+            () -> {
+              try {
+                return task.call();
+              } catch (Exception failure) {
+                ObservationContext.remember(failure);
+                throw failure;
+              }
+            }) {
           @Override
           protected void done() {
             if (isCancelled()) {

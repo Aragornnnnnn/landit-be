@@ -17,6 +17,7 @@ import com.landit.landitbe.feature.learning.scenario.session.message.feedback.re
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.landit.landitbe.shared.observability.FailureObservation;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -164,8 +165,13 @@ public class MessageFeedbackWorkService {
                     LocalDateTime.now(clock))
                 > 0) {
               messages.failFeedback(exhausted.getMessageId());
-              FailureObservation.afterCommit(
-                  "message_feedback", "recovery", "attempts_exhausted", null);
+              ObservationContext.run(
+                  exhausted.getSessionId(),
+                  null,
+                  exhausted.getMessageId(),
+                  () ->
+                      FailureObservation.afterCommit(
+                          "message_feedback", "recovery", "attempts_exhausted", null));
             }
           });
     }
@@ -176,8 +182,13 @@ public class MessageFeedbackWorkService {
         try {
           executor.execute(() -> execute(claim));
         } catch (RuntimeException exception) {
-          FailureObservation.failed(
-              "message_feedback", "dispatch", "executor_unavailable", exception);
+          ObservationContext.run(
+              work.getSessionId(),
+              null,
+              work.getMessageId(),
+              () ->
+                  FailureObservation.failed(
+                      "message_feedback", "dispatch", "executor_unavailable", exception));
         }
       }
     }
@@ -252,6 +263,12 @@ public class MessageFeedbackWorkService {
 
   private void recoverOrWarmCache(long messageId) {
     MessageFeedbackWork work = repository.findById(messageId).orElseThrow();
+    ObservationContext.run(
+        work.getSessionId(), null, work.getMessageId(), () -> recoverOrWarmCacheInContext(work));
+  }
+
+  private void recoverOrWarmCacheInContext(MessageFeedbackWork work) {
+    long messageId = work.getMessageId();
     if (work.getResultPayload() == null) {
       generate(messageId);
       return;
@@ -283,6 +300,14 @@ public class MessageFeedbackWorkService {
   }
 
   private ProcessingStatus execute(Claim claim) {
+    return ObservationContext.call(
+        claim.request().sessionId(),
+        null,
+        claim.request().messageId(),
+        () -> executeInContext(claim));
+  }
+
+  private ProcessingStatus executeInContext(Claim claim) {
     String payload = null;
     boolean failed = false;
     boolean legacy = false;

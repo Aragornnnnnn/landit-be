@@ -19,6 +19,7 @@ import com.landit.landitbe.feature.learning.scenario.session.message.client.ai.A
 import com.landit.landitbe.feature.learning.scenario.session.message.client.ai.AiNextMessageResult;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackResult;
+import com.landit.landitbe.shared.client.ai.AiUpstreamException;
 import com.landit.landitbe.shared.domain.InnerThoughtType;
 import com.landit.landitbe.shared.exception.ApiErrorCode;
 import com.landit.landitbe.shared.exception.ApiException;
@@ -179,7 +180,11 @@ public class RemoteAiConversationClient implements AiConversationClient {
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
-        throw toApiException(response.body(), defaultErrorCode);
+        ApiException failure = toApiException(response.body(), defaultErrorCode);
+        if (failure.getStatus().is5xxServerError()) {
+          failure.initCause(new AiUpstreamException(response.statusCode()));
+        }
+        throw failure;
       }
       return readData(response.body(), responseType);
     } catch (ApiException exception) {

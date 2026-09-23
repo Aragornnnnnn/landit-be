@@ -6,9 +6,9 @@ import com.landit.landitbe.feature.mailbox.feedback.event.MailboxReplyCreatedEve
 import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.delivery.messaging.MailboxReplyNotificationRequest;
 import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePublisher;
+import com.landit.landitbe.shared.observability.FailureObservation;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -17,7 +17,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /** 커밋된 편지함 답장을 Push Queue 알림으로 발행한다. */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 @ConditionalOnProperty(
     prefix = "landit.notification",
     name = "consumer-enabled",
@@ -38,12 +37,8 @@ public class MailboxReplyNotificationListener {
           new MailboxReplyNotificationRequest(
               event.letterId(), event.userProfileIds(), event.replyTitle(), Instant.now()));
     } catch (PushNotificationException exception) {
-      log.error(
-          "편지함 답장 Push 메시지를 발행하지 못했습니다. workflow=mailbox_reply_notification"
-              + " letterId={} recipientCount={}",
-          event.letterId(),
-          event.userProfileIds().size(),
-          exception);
+      FailureObservation.failed(
+          "mailbox_reply_notification", "queue_publish", "publish_failed", exception);
     }
   }
 }

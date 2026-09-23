@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.memory.dto.ConversationMemoryPlanningResult;
 import com.landit.landitbe.feature.memory.planning.service.ConversationMemoryPlanningService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
 import com.landit.landitbe.shared.observability.FailureObservation;
+import com.landit.landitbe.shared.observability.ObservationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,11 @@ public class FreeTalkMemoryGenerationService {
 
   /** 장기기억 생성 문맥으로 후보를 판정하고 저장한다. */
   private void generate(ConversationMemoryGenerationRequest request) {
+    ObservationContext.run(
+        request.learningSessionId(), null, null, () -> generateInContext(request));
+  }
+
+  private void generateInContext(ConversationMemoryGenerationRequest request) {
     String stage = "generation";
     try {
       ConversationMemoryPlanningResult planning = planningService.createPlans(request);
@@ -68,6 +74,11 @@ public class FreeTalkMemoryGenerationService {
 
   /** 실패 상태 전환 자체의 예외가 후속 작업 실패 처리를 막지 않도록 삼킨다. */
   private void failSafely(long learningSessionId, String stage, RuntimeException cause) {
+    ObservationContext.run(
+        learningSessionId, null, null, () -> failSafelyInContext(learningSessionId, stage, cause));
+  }
+
+  private void failSafelyInContext(long learningSessionId, String stage, RuntimeException cause) {
     try {
       contextService.fail(learningSessionId);
     } catch (RuntimeException compensationFailure) {

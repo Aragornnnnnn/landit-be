@@ -31,6 +31,7 @@ import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTal
 import com.landit.landitbe.feature.learning.freetalk.topic.client.ai.AiFreeTalkTopic;
 import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
+import com.landit.landitbe.shared.client.ai.AiUpstreamException;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
@@ -75,6 +76,32 @@ class RemoteAiFreeTalkClientTest {
   @AfterEach
   void stopServer() {
     server.stop(0);
+  }
+
+  @Test
+  void preservesUpstreamStatusWithoutChangingPublicErrorOrKeepingBody() {
+    for (int status : new int[] {401, 429, 500, 503}) {
+      server.createContext(
+          "/api/v1/free-talk/opening",
+          exchange -> {
+            byte[] body = "secret-upstream-body".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+          });
+      assertThatThrownBy(() -> remoteClient().generateOpening(openingRequest()))
+          .isInstanceOfSatisfying(
+              ApiException.class,
+              failure -> {
+                assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.AI_GENERATION_FAILED);
+                assertThat(failure.getCause())
+                    .isInstanceOfSatisfying(
+                        AiUpstreamException.class,
+                        upstream -> assertThat(upstream.statusCode()).isEqualTo(status));
+                assertThat(failure.getCause().getMessage()).doesNotContain("secret-");
+              });
+      server.removeContext("/api/v1/free-talk/opening");
+    }
   }
 
   @Test
