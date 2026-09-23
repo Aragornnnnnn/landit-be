@@ -5,8 +5,8 @@ tone_instructions: >-
   한국어로 간결하고 직접적으로 작성한다. 실제 결함, 보안 문제, 계약 위반,
   회귀 가능성처럼 조치가 필요한 내용만 근거와 영향과 함께 지적한다.
   취향 차이, CI가 검사하는 포맷, 요청 범위 밖 리팩터링은 제안하지 않는다.
-  역할 기반 패키지 구조와 Service 접미사를 존중하고 client와 messaging을
-  외부 연동 경계로 취급한다.
+  업무별 패키지와 내부 역할 구분, Service 접미사를 존중하고 client와
+  messaging을 외부 연동 경계로 취급한다.
 
 reviews:
   profile: "chill"
@@ -25,6 +25,15 @@ reviews:
       - "^release/.*"
       - "^feat/.*"
   path_instructions:
+    - path: "src/main/java/**/feature/**"
+      instructions: |
+        업무 경계는 docs/architecture/backend.md와 FeatureBoundaryTest.moduleOf를 기준으로 확인한다.
+        하위 폴더 이름만으로 독립 업무나 모듈이라고 판단하지 않는다.
+        서로 다른 업무의 Repository·Entity 직접 참조와 순환 의존은 지적한다.
+        같은 업무 내부의 조회·변경 Service는 Repository를 공유할 수 있다.
+        시나리오 session·feedback·assessment·history는 같은 실행 업무이며,
+        selection·access·progress·level 및 공통 conversation은 별도 업무다.
+        단순한 폴더 간 이동을 이유로 위임 Service나 snapshot record를 추가하도록 요구하지 않는다.
     - path: "src/main/java/**/feature/**/service/**"
       instructions: |
         상태 변경과 트랜잭션 경계를 확인한다.
@@ -56,6 +65,12 @@ chat:
   auto_reply: true
 
 knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/AGENTS.md"
+      - "docs/architecture/backend.md"
+      - "docs/development/java-style.md"
   linked_repositories:
     - repository: "Aragornnnnnn/landit-fe"
       instructions: >-
