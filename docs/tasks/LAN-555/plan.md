@@ -33,3 +33,10 @@
 - 새 히스토리 API 통합 테스트 7건 모두 통과. 인증, 빈 기록, 회차·대화 정렬, 피드백 복원·잠금, AI 미호출, OpenAPI 스키마를 확인했다.
 - `git diff --check` 통과.
 - 로컬 H2 기반 검증이며, 운영 PostgreSQL·배포·FE 화면 연동은 확인하지 않았다.
+
+## PR 리뷰 검토
+
+- CodeRabbit의 history → feedback 저장소 접근 지적은 하위 폴더를 별도 업무로 판단한 오탐이다. 아키텍처 문서와 `FeatureBoundaryTest.moduleOf`는 두 패키지를 같은 `learning.scenario` 실행 업무로 분류한다.
+- 같은 업무 Service의 Repository 공유는 허용하므로 조회 로직은 유지한다. 별도 업무인 conversation의 메시지는 기존대로 공개 Service와 snapshot record를 통해 조회한다.
+- 아키텍처 문서의 실행 업무 열거에 history를 명시하고, CodeRabbit의 업무 경계 지침과 현행 가이드 문서 참조를 보완한다.
+- 보완 후 `FeatureBoundaryTest` 전체 통과, CodeRabbit 공식 JSON 스키마 검증과 `git diff --check` 통과. 실행 코드 변경은 없다.
