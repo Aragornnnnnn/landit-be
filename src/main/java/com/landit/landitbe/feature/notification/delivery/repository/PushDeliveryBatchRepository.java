@@ -1,4 +1,4 @@
-// 푸시 발송 이력의 다중 행 INSERT·UPDATE와 페이지 접수 이력 조회를 수행한다.
+// 푸시 발송 이력의 JDBC 배치 저장과 페이지 접수 이력 조회를 수행한다.
 
 package com.landit.landitbe.feature.notification.delivery.repository;
 
@@ -20,7 +20,7 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
 
-/** PushDeliveryService의 트랜잭션 안에서 제한된 묶음의 실제 SQL 요청 수를 줄인다. */
+/** PushDeliveryService의 트랜잭션 안에서 고정 SQL과 행별 파라미터로 이력을 묶어 저장한다. */
 @Repository
 @RequiredArgsConstructor
 public class PushDeliveryBatchRepository {
@@ -71,12 +71,12 @@ public class PushDeliveryBatchRepository {
     int[] counts =
         jdbc.batchUpdate(
             """
-        insert into push_delivery (user_profile_id, user_push_token_id, sent_expo_push_token,
-          notification_type, content_variant, deduplication_key, title, body, deep_link,
-          status, requested_at, created_at, updated_at) values
-          (:user, :token, :expo, :type, :variant, :key, :title, :body, :link,
-           'REQUESTED', :now, :now, :now)
-        """,
+            insert into push_delivery (user_profile_id, user_push_token_id, sent_expo_push_token,
+              notification_type, content_variant, deduplication_key, title, body, deep_link,
+              status, requested_at, created_at, updated_at) values
+              (:user, :token, :expo, :type, :variant, :key, :title, :body, :link,
+               'REQUESTED', :now, :now, :now)
+            """,
             parameters,
             keys,
             new String[] {"id", "deduplication_key"});
@@ -129,54 +129,40 @@ public class PushDeliveryBatchRepository {
   }
 
   /**
-   * 잠근 엔티티의 도메인 전이 결과를 한 UPDATE로 저장한다.
+   * 잠근 엔티티의 도메인 전이 결과를 고정 UPDATE의 JDBC 배치로 저장한다.
    *
    * @param deliveries 상태가 변경된 잠긴 이력
+   * @throws IllegalStateException 각 이력의 갱신 건수가 1이 아니거나 결과가 누락됐을 때
    */
   public void updateStates(List<PushDelivery> deliveries) {
     if (deliveries.isEmpty()) {
       return;
     }
-    MapSqlParameterSource params = new MapSqlParameterSource("now", LocalDateTime.now());
-    for (int i = 0; i < deliveries.size(); i++) {
-      PushDelivery d = deliveries.get(i);
-      params.addValue("id" + i, d.getId());
-      params.addValue("status" + i, d.getStatus().name());
-      params.addValue("ticket" + i, d.getExpoTicketId());
-      params.addValue("error" + i, d.getErrorCode());
-      params.addValue("checked" + i, d.getReceiptCheckedAt());
-      // JDBC가 상태를 저장하므로 JPA의 건별 dirty-check UPDATE를 실행하지 않는다.
-      entityManager.detach(d);
-    }
-    params.addValue("ids", deliveries.stream().map(PushDelivery::getId).toList());
-    String assignments =
-        Map.of(
-                "status",
-                "status",
-                "expo_ticket_id",
-                "ticket",
-                "error_code",
-                "error",
-                "receipt_checked_at",
-                "checked")
-            .entrySet()
-            .stream()
-            .map(entry -> assignment(entry.getKey(), entry.getValue(), deliveries.size()))
-            .collect(Collectors.joining(", "));
-    int updated =
-        jdbc.update(
-            "update push_delivery set " + assignments + ", updated_at = :now where id in (:ids)",
-            params);
-    if (updated != deliveries.size()) {
-      throw new IllegalStateException("발송 이력 갱신 개수가 요청과 다릅니다.");
-    }
+    LocalDateTime now = LocalDateTime.now();
+    SqlParameterSource[] parameters =
+        deliveries.stream()
+            .map(delivery -> updateParameters(delivery, now))
+            .toArray(SqlParameterSource[]::new);
+    int[] counts =
+        jdbc.batchUpdate(
+            """
+            update push_delivery
+            set status = :status, expo_ticket_id = :ticket, error_code = :error,
+                receipt_checked_at = :checked, updated_at = :now
+            where id = :id
+            """,
+            parameters);
+    requireSingleRowResults(counts, deliveries.size());
   }
 
-  private String assignment(String column, String parameter, int size) {
-    StringBuilder expression = new StringBuilder(column + " = case id");
-    for (int i = 0; i < size; i++) {
-      expression.append(" when :id").append(i).append(" then :").append(parameter).append(i);
-    }
-    return expression.append(" else ").append(column).append(" end").toString();
+  private SqlParameterSource updateParameters(PushDelivery delivery, LocalDateTime now) {
+    // JDBC가 상태를 저장하므로 JPA의 건별 dirty-check UPDATE를 실행하지 않는다.
+    entityManager.detach(delivery);
+    return new MapSqlParameterSource("id", delivery.getId())
+        .addValue("status", delivery.getStatus().name())
+        .addValue("ticket", delivery.getExpoTicketId(), Types.VARCHAR)
+        .addValue("error", delivery.getErrorCode(), Types.VARCHAR)
+        .addValue("checked", delivery.getReceiptCheckedAt(), Types.TIMESTAMP)
+        .addValue("now", now, Types.TIMESTAMP);
   }
 }
