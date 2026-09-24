@@ -6,14 +6,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.notification.NotificationProperties;
 import com.landit.landitbe.feature.audit.service.AdminAuditService;
 import com.landit.landitbe.feature.notification.campaign.admin.dto.AdminPushCampaignRequest;
 import com.landit.landitbe.feature.notification.campaign.domain.AdminPushAudienceType;
@@ -21,19 +24,26 @@ import com.landit.landitbe.feature.notification.campaign.repository.AdminPushRep
 import com.landit.landitbe.feature.notification.campaign.service.AdminPushProcessingService;
 import com.landit.landitbe.feature.notification.delivery.client.NotificationSender;
 import com.landit.landitbe.feature.notification.delivery.client.PushMessage;
+import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
 import com.landit.landitbe.feature.notification.delivery.client.PushTicketResult;
 import com.landit.landitbe.feature.notification.delivery.client.RetryablePushNotificationException;
 import com.landit.landitbe.feature.notification.delivery.dto.PreparePushDeliveryCommand;
 import com.landit.landitbe.feature.notification.delivery.dto.PreparedPushDelivery;
 import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePublisher;
+import com.landit.landitbe.feature.notification.delivery.messaging.SqsPushQueuePublisher;
 import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.delivery.service.PushDeliveryService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.token.service.UserPushTokenDeliveryService;
 import com.landit.landitbe.shared.exception.ApiException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,7 +51,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import software.amazon.awssdk.services.sqs.SqsAsyncClient;
+import software.amazon.awssdk.services.sqs.model.BatchResultErrorEntry;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchResponse;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchResultEntry;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Expo와 SQS만 모킹해 관리자 일괄 발송의 DB 경계를 검증한다. */
 @ActiveProfiles("test")
@@ -58,7 +75,7 @@ class AdminPushCampaignIntegrationTests {
   @Autowired private AdminPushRepository repository;
   @Autowired private AdminPushInputService input;
   @Autowired private AdminAuditService audit;
-  @Autowired private PushDeliveryService deliveries;
+  @MockitoSpyBean private PushDeliveryService deliveries;
   @Autowired private UserPushTokenDeliveryService tokens;
 
   private NotificationSender sender;
@@ -514,6 +531,13 @@ class AdminPushCampaignIntegrationTests {
 
     campaigns.send(id, ADMIN, "send");
     processor.process(id);
+    verify(deliveries).prepareAll(argThat(commands -> commands.size() == 100));
+    verify(deliveries)
+        .recordTicketResults(
+            argThat(ids -> ids.size() == 100), argThat(results -> results.size() == 100));
+    verify(deliveries, never()).prepare(org.mockito.ArgumentMatchers.any());
+    verify(deliveries, never()).recordTicketResult(anyLong(), org.mockito.ArgumentMatchers.any());
+    verify(queue).scheduleReceiptChecks(argThat(ids -> ids.size() == 100), eq(1));
     processor.process(id);
     processor.process(id);
 
@@ -527,6 +551,175 @@ class AdminPushCampaignIntegrationTests {
                 Long.class,
                 "push:admin-broadcast:" + id + ":%"))
         .isEqualTo(101);
+    verify(queue).scheduleReceiptChecks(argThat(ids -> ids.size() == 1), eq(1));
+    verify(queue, never()).scheduleReceiptCheck(anyLong(), eq(1));
+  }
+
+  @DisplayName("성공과 실패 Ticket을 함께 커밋한 뒤 성공 이력만 Receipt 확인을 예약한다.")
+  @Test
+  void commitsMixedTicketsBeforeSchedulingOnlyAcceptedReceipts() {
+    long first = token(USER, "mixed-first");
+    final long second = token(USER, "mixed-second");
+    UUID id = create("mixed");
+    campaigns.send(id, ADMIN, "send");
+    when(sender.send(anyList()))
+        .thenAnswer(
+            invocation -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              return List.of(
+                  PushTicketResult.accepted("accepted"),
+                  PushTicketResult.failed("DeviceNotRegistered"));
+            });
+    doAnswer(
+            invocation -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              assertThat(
+                      jdbc.queryForList(
+                          "select status from push_delivery order by id", String.class))
+                  .containsExactly("TICKET_ACCEPTED", "FAILED");
+              List<Long> ids = invocation.getArgument(0);
+              assertThat(ids).hasSize(1);
+              assertThat(
+                      jdbc.queryForObject(
+                          "select user_push_token_id from push_delivery where id=?",
+                          Long.class,
+                          ids.getFirst()))
+                  .isEqualTo(first);
+              return null;
+            })
+        .when(queue)
+        .scheduleReceiptChecks(anyList(), eq(1));
+
+    processor.process(id);
+
+    assertThat(
+            jdbc.queryForObject(
+                "select status from user_push_token where id=?", String.class, second))
+        .isEqualTo("REVOKED");
+    assertThat(campaigns.detail(id).failedCount()).isEqualTo(1);
+    verify(queue).scheduleReceiptChecks(anyList(), eq(1));
+  }
+
+  @DisplayName("동시 캠페인 처리는 같은 페이지를 재전송하거나 처리 중 커서를 넘기지 않는다.")
+  @Test
+  void concurrentCampaignProcessingSendsEachTokenOnlyOnce() throws Exception {
+    for (int index = 0; index < 3; index++) {
+      token(USER, "overlap-" + index);
+    }
+    UUID id = create("overlap");
+    campaigns.send(id, ADMIN, "send");
+    CountDownLatch sending = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    when(sender.send(anyList()))
+        .thenAnswer(
+            invocation -> {
+              sending.countDown();
+              assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+              return invocation.<List<PushMessage>>getArgument(0).stream()
+                  .map(message -> PushTicketResult.accepted(UUID.randomUUID().toString()))
+                  .toList();
+            });
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      var first = executor.submit(() -> processor.process(id));
+      try {
+        assertThat(sending.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThatThrownBy(() -> processor.process(id))
+            .isInstanceOf(RetryablePushNotificationException.class);
+        assertThat(repository.find(id).getFirst().lastTargetId()).isZero();
+      } finally {
+        release.countDown();
+      }
+      first.get(10, TimeUnit.SECONDS);
+    }
+    processor.process(id);
+    verify(sender).send(argThat(messages -> messages.size() == 3));
+    assertThat(jdbc.queryForObject("select count(*) from push_delivery", Long.class)).isEqualTo(3);
+    assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
+  }
+
+  @DisplayName("Ticket 저장 실패 시 선점 이력을 임의 재전송하거나 커서를 넘기지 않는다.")
+  @Test
+  void holdsClaimedPageWhenTicketPersistenceFails() {
+    token(USER, "persist-failure");
+    UUID id = create("persist-failure");
+    campaigns.send(id, ADMIN, "send");
+    doThrow(new IllegalStateException("ticket write failure"))
+        .when(deliveries)
+        .recordTicketResults(anyList(), anyList());
+
+    assertThatThrownBy(() -> processor.process(id)).isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> processor.process(id))
+        .isInstanceOf(RetryablePushNotificationException.class);
+
+    verify(sender).send(anyList());
+    assertThat(repository.find(id).getFirst().lastTargetId()).isZero();
+    assertThat(jdbc.queryForObject("select status from push_delivery", String.class))
+        .isEqualTo("REQUESTED");
+    verify(queue, never()).scheduleReceiptChecks(anyList(), eq(1));
+  }
+
+  @DisplayName("SQS 일부 예약 실패 뒤에도 Ticket을 보존하고 10건 단위 예약만 재시도한다.")
+  @Test
+  void retriesPartialSqsBatchesWithoutResendingPush() {
+    for (int index = 0; index < 12; index++) {
+      token(USER, "sqs-partial-" + index);
+    }
+    UUID id = create("sqs-partial");
+    campaigns.send(id, ADMIN, "send");
+    var sqs = mock(SqsAsyncClient.class);
+    var requests = new java.util.ArrayList<SendMessageBatchRequest>();
+    when(sqs.sendMessageBatch(org.mockito.ArgumentMatchers.any(SendMessageBatchRequest.class)))
+        .thenAnswer(
+            invocation -> {
+              assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+              SendMessageBatchRequest request = invocation.getArgument(0);
+              requests.add(request);
+              var result = SendMessageBatchResponse.builder();
+              if (requests.size() == 2) {
+                result.failed(
+                    BatchResultErrorEntry.builder().id("0").code("InternalError").build());
+              } else {
+                result.successful(
+                    request.entries().stream()
+                        .map(entry -> SendMessageBatchResultEntry.builder().id(entry.id()).build())
+                        .toList());
+              }
+              return CompletableFuture.completedFuture(result.build());
+            });
+    var publisher =
+        new SqsPushQueuePublisher(
+            sqs,
+            JsonMapper.builder().build(),
+            new NotificationProperties(
+                "https://exp.host",
+                null,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2),
+                "https://sqs.example.test/push",
+                900));
+    var dispatch =
+        new NotificationDispatchService(
+            tokens, deliveries, sender, publisher, new SimpleMeterRegistry());
+    var processing =
+        new AdminPushProcessingService(repository, deliveries, dispatch, queue, campaigns);
+
+    assertThatThrownBy(() -> processing.process(id)).isInstanceOf(PushNotificationException.class);
+    assertThat(repository.find(id).getFirst().lastTargetId()).isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "select count(*) from push_delivery where status='TICKET_ACCEPTED'", Long.class))
+        .isEqualTo(12);
+    // 접수 이후 토큰이 폐기돼도 기존 Receipt 예약은 복구해야 한다.
+    jdbc.update("update user_push_token set status='REVOKED'");
+    processing.process(id);
+
+    assertThat(requests)
+        .extracting(request -> request.entries().size())
+        .containsExactly(10, 2, 10, 2);
+    assertThat(requests.stream().flatMap(request -> request.entries().stream()))
+        .allSatisfy(entry -> assertThat(entry.delaySeconds()).isEqualTo(900));
+    verify(sender).send(anyList());
+    assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
   }
 
   @DisplayName("확정 후 비활성화된 대상은 제외하고 뒤늦게 등록된 토큰은 포함하지 않는다.")
@@ -575,7 +768,7 @@ class AdminPushCampaignIntegrationTests {
     doThrow(new IllegalStateException("SQS failure"))
         .doNothing()
         .when(queue)
-        .scheduleReceiptCheck(anyLong(), eq(1));
+        .scheduleReceiptChecks(anyList(), eq(1));
 
     assertThatThrownBy(() -> processor.process(id)).isInstanceOf(IllegalStateException.class);
     assertThat(
@@ -585,7 +778,8 @@ class AdminPushCampaignIntegrationTests {
     processor.process(id);
 
     verify(sender, times(1)).send(anyList());
-    verify(queue, times(3)).scheduleReceiptCheck(anyLong(), eq(1));
+    verify(queue, times(2)).scheduleReceiptChecks(argThat(ids -> ids.size() == 2), eq(1));
+    verify(queue, never()).scheduleReceiptCheck(anyLong(), eq(1));
     assertThat(campaigns.detail(id).status()).isEqualTo("COMPLETED");
   }
 
