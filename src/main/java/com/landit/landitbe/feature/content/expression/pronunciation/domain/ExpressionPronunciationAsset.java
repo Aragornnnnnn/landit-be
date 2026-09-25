@@ -56,11 +56,16 @@ public class ExpressionPronunciationAsset extends BaseTimeEntity {
   private String sentenceAudioUrl;
 
   // 단어별 발음 기준 데이터 배열. order 오름차순으로 대표 예문의 단어와 1:1 대응한다.
-  // 각 항목: order(문장 내 순번), word(단어), nativeWordAudioUrl(단어만 읽은 TTS URL),
-  //   nativeDisplay(원어민 발음 respelling), syllables(음절 분해), stressIndex(강세 음절 위치, 0부터)
-  // 예: [{"order": 2, "word": "nothing",
-  //       "nativeWordAudioUrl": "https://cdn.landit.com/.../nothing.mp3",
-  //       "nativeDisplay": "nuh·thing", "syllables": ["nuh", "thing"], "stressIndex": 0}, ...]
+  // 저장 키: order(문장 내 순번), word(단어), audioUrl(단어만 읽은 TTS URL),
+  //   pronunciationDisplay(원어민 발음 respelling), syllables(음절 분해),
+  //   stressIndex(강세 음절 위치, 0부터. 강세를 두지 않는 기능어는 -1 — 예: "a", "the")
+  // 프론트 응답에서는 audioUrl·pronunciationDisplay를 nativeWordAudioUrl·nativeDisplay로 바꿔 내려준다.
+  //   변환은 ExpressionPronunciationService가 한다 (프론트 계약 동결, 저장은 AI 파이프라인 계약).
+  // audioUrl은 LAN-560(V126)부터 (억양, 단어) 공용 주소를 가리킨다. 같은 억양의 같은 단어면
+  //   표현이 달라도 같은 URL이다 — 한 클립을 고치면 그 단어를 쓰는 모든 표현이 함께 바뀐다.
+  // 예: [{"order": 2, "word": "nothing", "pronunciationDisplay": "nuh·thing",
+  //       "syllables": ["nuh", "thing"], "stressIndex": 0,
+  //       "audioUrl": "https://{CDN}/content/expression-pronunciation-audio/word/EN_US/{해시}.mp3"}]
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(nullable = false, columnDefinition = "jsonb")
   private JsonNode words;
