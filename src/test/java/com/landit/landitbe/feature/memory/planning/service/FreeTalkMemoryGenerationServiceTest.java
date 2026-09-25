@@ -30,6 +30,8 @@ import com.landit.landitbe.feature.memory.repository.ConversationMemoryRepositor
 import com.landit.landitbe.feature.memory.retrieval.dto.ConversationMemoryMatch;
 import com.landit.landitbe.feature.memory.retrieval.repository.ConversationMemorySearchRepository;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -319,6 +321,19 @@ class FreeTalkMemoryGenerationServiceTest {
 
     verify(aiClient, never()).extractMemoryCandidates(any());
     verify(contextService, never()).persistAndComplete(any(), any());
+  }
+
+  @Test
+  @DisplayName("AI 시간 초과나 잘못된 응답은 빈 후보 성공으로 처리하거나 저장하지 않는다.")
+  void doesNotPersistOrCompleteOnAiFailure() {
+    for (ErrorCode code : List.of(ErrorCode.AI_GENERATION_FAILED, ErrorCode.AI_RESPONSE_INVALID)) {
+      setUp();
+      when(aiClient.extractMemoryCandidates(any())).thenThrow(new ApiException(code));
+      generationService.generate(LEARNING_SESSION_ID);
+      verify(contextService, never()).persistAndComplete(any(), any());
+      verify(aiClient, never()).resolveMemory(any());
+      verify(contextService).fail(LEARNING_SESSION_ID);
+    }
   }
 
   private ConversationMemoryGenerationRequest context() {

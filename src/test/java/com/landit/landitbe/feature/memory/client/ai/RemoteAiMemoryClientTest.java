@@ -4,6 +4,8 @@ package com.landit.landitbe.feature.memory.client.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.verify;
 
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
@@ -14,6 +16,7 @@ import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionR
 import com.landit.landitbe.feature.memory.planning.client.ai.AiMemoryResolutionResult;
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingRequest;
 import com.landit.landitbe.feature.memory.retrieval.client.ai.AiMemoryQueryEmbeddingResult;
+import com.landit.landitbe.shared.client.ai.AiHttpClient;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import com.sun.net.httpserver.HttpServer;
@@ -230,6 +233,82 @@ class RemoteAiMemoryClientTest {
                 .embedMemoryQuery(new AiMemoryQueryEmbeddingRequest("weekend plans")),
         ErrorCode.AI_GENERATION_FAILED);
     assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(2_900));
+  }
+
+  @Test
+  @DisplayName("기억 후보와 판정은 일반 대화와 별개의 55초·25초 제한을 전달한다.")
+  void usesDedicatedMemoryTimeouts() {
+    try (var construction = mockConstruction(AiHttpClient.class)) {
+      RemoteAiMemoryClient client = memoryClient();
+      AiMemoryCandidatesRequest candidates = memoryCandidatesRequest();
+      AiMemoryResolutionRequest resolution = memoryResolutionRequest();
+      client.extractMemoryCandidates(candidates);
+      client.resolveMemory(resolution);
+      AiHttpClient http = construction.constructed().getFirst();
+      verify(http)
+          .post(
+              "/api/v1/free-talk/memory-candidates",
+              candidates,
+              AiMemoryCandidatesResult.class,
+              Duration.ofSeconds(55));
+      verify(http)
+          .post(
+              "/api/v1/free-talk/memory-resolution",
+              resolution,
+              AiMemoryResolutionResult.class,
+              Duration.ofSeconds(25));
+    }
+  }
+
+  @Test
+  @DisplayName("기억 생성은 짧게 설정된 일반 대화 제한과 독립적으로 응답을 기다린다.")
+  void waitsForMemoryIndependentlyOfGeneralTimeout() {
+    registerDelayedResponse(
+        "/api/v1/free-talk/memory-candidates",
+        200,
+        successResponse("{\"extractorVersion\":\"v11\",\"candidates\":[]}"));
+    assertThat(
+            memoryClient(Duration.ofMillis(50))
+                .extractMemoryCandidates(memoryCandidatesRequest())
+                .candidates())
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("HTTP 헤더가 도착해도 응답 본문이 지연되면 전체 제한 시간에 실패한다.")
+  void timesOutWhileReceivingBody() {
+    server.createContext(
+        "/slow-body",
+        exchange -> {
+          byte[] body = successResponse("{}").getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, body.length);
+          try {
+            exchange.getResponseBody().write(body, 0, 1);
+            exchange.getResponseBody().flush();
+            Thread.sleep(700);
+            exchange.getResponseBody().write(body, 1, body.length - 1);
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+          } finally {
+            exchange.close();
+          }
+        });
+    AiClientProperties properties =
+        new AiClientProperties(
+            "http://localhost:" + server.getAddress().getPort(),
+            "remote",
+            "KOREAN_LEARNER",
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(5));
+    long start = System.nanoTime();
+    assertGenerationError(
+        () ->
+            new AiHttpClient(jsonMapper, properties)
+                .post("/slow-body", Map.of(), Map.class, Duration.ofMillis(150)),
+        ErrorCode.AI_GENERATION_FAILED);
+    assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofMillis(600));
   }
 
   private void registerDelayedResponse(String path, long delayMillis, String response) {
