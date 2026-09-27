@@ -164,7 +164,13 @@ prod 호출은 nginx 60초 타임아웃(504)에 걸렸다. Flyway로 넣으면 �
    - Supabase 대시보드에서 비밀번호를 리셋하지 않는다(dev BE가 SSM 값으로 접속 중이다)
    - 검사가 일부러 틀린 입력에서 중단되는지도 한 번 확인한다(예: 문장 한 글자 변경)
 10. **PR·배포** — 표현 INSERT PR을 먼저 머지·배포하고, 자산 PR을 그 뒤에 배포한다
-    - Flyway 검사가 실패하면 **서버가 기동하지 않는다**. 그래서 9번 드라이런을 건너뛰지 않는다
+    - 마이그레이션은 앱 기동이 아니라 배포 workflow의 앞 단계(`flyway-migration.yml` → `./gradlew migrateDatabase`)에서 돈다
+      - 검사가 실패하면 이 단계가 실패해서 **그 환경의 배포 전체가 막힌다**
+      - 서버는 이전 버전 그대로 돈다
+      - 그래서 9번 드라이런을 건너뛰지 않는다
+    - 배포는 수동(`workflow_dispatch`)이라 머지만으로는 적용되지 않는다
+      - 표현 PR과 자산 PR이 **둘 다 develop에 들어간 뒤에** 배포하면 한 번에 번호 순서대로 적용된다
+      - 자산 PR만 들어간 상태에서 누가 배포하면 적재 전 검사에서 막힌다
 11. **전수 확인**
     ```
     GET /api/v1/admin/expressions/pronunciation-assets/coverage
