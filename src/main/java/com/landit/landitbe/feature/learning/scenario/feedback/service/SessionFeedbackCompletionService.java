@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.service;
 
+import com.landit.landitbe.feature.content.scenario.service.ScenarioStarMessageService;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -31,6 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 class SessionFeedbackCompletionService {
 
+  // 시나리오·별점 조합의 문구가 없을 때 저장하는 기본 강조 문구다.
+  private static final String DEFAULT_HIGHLIGHT_MESSAGE = "오늘도 시나리오를 잘 마무리했어요";
+
+  private final ScenarioStarMessageService scenarioStarMessageService;
   private final LearningSessionService learningSessionService;
   private final SessionHistoryService sessionHistoryService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
@@ -77,7 +82,6 @@ class SessionFeedbackCompletionService {
         || result.nativeScore() < 0
         || result.nativeScore() > 100
         || !validStarRating(result.starRating())
-        || blank(result.highlightMessage())
         || blank(result.summaryMessage())) {
       throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
     }
@@ -142,8 +146,30 @@ class SessionFeedbackCompletionService {
             starRating,
             context.userMessages().size(),
             nativeLikeMessageCount,
-            result.highlightMessage(),
+            resolveHighlightMessage(context, starRating),
             result.summaryMessage()));
+  }
+
+  /**
+   * 시나리오·별점 조합에 지정된 강조 문구를 조회한다. 문구는 조회 시점이 아니라 저장 시점에 확정해 과거 피드백이 이후 문구 수정에 영향받지 않게 한다.
+   *
+   * @param context 완료 세션 컨텍스트
+   * @param starRating 검증을 통과한 세션 별점
+   * @return 지정된 문구. 조합에 문구가 없으면 기본 문구
+   */
+  private String resolveHighlightMessage(
+      LoadedSessionFeedbackContext context, BigDecimal starRating) {
+    Long scenarioId = context.scenario().scenarioId();
+    return scenarioStarMessageService
+        .findMessage(scenarioId, starRating)
+        .orElseGet(
+            () -> {
+              log.warn(
+                  "scenario star message missing: scenarioId={}, starRating={}",
+                  scenarioId,
+                  starRating);
+              return DEFAULT_HIGHLIGHT_MESSAGE;
+            });
   }
 
   /** AI 응답 순서에 맞춰 각 사용자 메시지의 상세 피드백을 저장한다. */

@@ -76,7 +76,6 @@ public class LocalAiConversationClient implements AiConversationClient {
         request.sessionId(),
         90,
         new BigDecimal("3.0"),
-        "You clearly communicated your main idea.",
         "Keep practicing complete sentences with clear reasons.",
         request.expectedMessageIds().stream()
             .map(
