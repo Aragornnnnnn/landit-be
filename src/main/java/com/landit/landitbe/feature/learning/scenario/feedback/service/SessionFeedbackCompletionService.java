@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -14,13 +15,19 @@ import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHist
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.ExistingSummaryFeedbackContext;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.LoadedSessionFeedbackContext;
+import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioExpressionReuseSummary;
+import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioExpressionReuseSummary.Item;
+import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioFeedbackEvidence;
+import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioGrowthCard;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.UserMessageContext;
 import com.landit.landitbe.feature.learning.scenario.progress.service.ScenarioProgressService;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,6 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Slf4j
 class SessionFeedbackCompletionService {
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().findAndRegisterModules();
+  private static final String SOURCE_LABEL = "%d월 %d일 - %s";
 
   private final LearningSessionService learningSessionService;
   private final SessionHistoryService sessionHistoryService;
@@ -41,6 +51,7 @@ class SessionFeedbackCompletionService {
   @Transactional
   Long record(long userId, LoadedSessionFeedbackContext context, AiSessionFeedbackResult result) {
     validateResult(context, result);
+    SupplementalFeedback supplemental = supplementalFeedback(context, result);
     BigDecimal starRating = result.starRating();
     // 동시 요청이 같은 세션 결과와 진행도를 두 번 확정하지 않도록 세션 row를 잠근다.
     final LearningSessionSnapshot learningSession =
@@ -52,7 +63,7 @@ class SessionFeedbackCompletionService {
     }
 
     SessionHistorySummaryFeedback summaryFeedback =
-        saveSummaryFeedback(context, result, starRating);
+        saveSummaryFeedback(context, result, starRating, supplemental);
     saveMessageFeedbacks(context, result, summaryFeedback.getId());
     completeSessionHistory(context, learningSession);
     completeScenarioProgress(context, learningSession, result.nativeScore(), starRating);
@@ -129,7 +140,10 @@ class SessionFeedbackCompletionService {
 
   /** 세션 전체 점수와 요약 문구를 완료 상태의 summary feedback으로 저장한다. */
   private SessionHistorySummaryFeedback saveSummaryFeedback(
-      LoadedSessionFeedbackContext context, AiSessionFeedbackResult result, BigDecimal starRating) {
+      LoadedSessionFeedbackContext context,
+      AiSessionFeedbackResult result,
+      BigDecimal starRating,
+      SupplementalFeedback supplemental) {
     int nativeLikeMessageCount =
         (int)
             result.messageFeedbacks().stream()
@@ -143,7 +157,164 @@ class SessionFeedbackCompletionService {
             context.userMessages().size(),
             nativeLikeMessageCount,
             result.highlightMessage(),
-            result.summaryMessage()));
+            result.summaryMessage(),
+            supplemental.growthFeedback() == null
+                ? null
+                : OBJECT_MAPPER.valueToTree(supplemental.growthFeedback()),
+            OBJECT_MAPPER.valueToTree(supplemental.expressionReuse())));
+  }
+
+  private SupplementalFeedback supplementalFeedback(
+      LoadedSessionFeedbackContext context, AiSessionFeedbackResult result) {
+    if (result.generationFallback()) {
+      return SupplementalFeedback.empty();
+    }
+    return new SupplementalFeedback(
+        validatedGrowth(context, result.growthFeedback()),
+        validatedExpressionReuse(context, result.usedExpressions()));
+  }
+
+  private ScenarioGrowthCard validatedGrowth(
+      LoadedSessionFeedbackContext context,
+      AiSessionFeedbackResult.ScenarioGrowthFeedback candidate) {
+    ScenarioFeedbackEvidence evidence = context.feedbackEvidence();
+    if (candidate == null
+        || evidence.previousSessionDate() == null
+        || candidate.pattern() == null
+        || candidate.previousMessageId() == null
+        || candidate.currentMessageId() == null) {
+      return null;
+    }
+    ScenarioFeedbackEvidence.PreviousMistake previous =
+        evidence.previousMistakes().stream()
+            .filter(mistake -> mistake.messageId() == candidate.previousMessageId())
+            .findFirst()
+            .orElse(null);
+    UserMessageContext current =
+        context.userMessages().stream()
+            .filter(message -> message.messageId().equals(candidate.currentMessageId()))
+            .findFirst()
+            .orElse(null);
+    if (previous == null
+        || current == null
+        || !validRequiredQuote(previous.userMessage(), candidate.previousSentence())
+        || !validOptionalQuote(candidate.previousSentence(), candidate.previousWrongSpan())
+        || !validRequiredQuote(current.content(), candidate.currentSentence())
+        || !validOptionalQuote(candidate.currentSentence(), candidate.currentSpan())
+        || candidate.succeeded() == null) {
+      log.warn(
+          "scenario growth feedback dropped because source evidence did not match session text");
+      return null;
+    }
+    return new ScenarioGrowthCard(
+        candidate.pattern(),
+        candidate.pattern().koreanLabel(),
+        candidate.succeeded(),
+        evidence.previousSessionDate(),
+        candidate.previousSentence(),
+        candidate.previousWrongSpan(),
+        candidate.currentSentence(),
+        candidate.currentSpan());
+  }
+
+  private ScenarioExpressionReuseSummary validatedExpressionReuse(
+      LoadedSessionFeedbackContext context,
+      List<AiSessionFeedbackResult.UsedExpression> claimedExpressions) {
+    if (claimedExpressions == null || claimedExpressions.isEmpty()) {
+      return new ScenarioExpressionReuseSummary(false, List.of());
+    }
+    Map<Long, ScenarioFeedbackEvidence.LearnedExpressionCandidate> candidatesById =
+        context.feedbackEvidence().learnedExpressions().stream()
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    ScenarioFeedbackEvidence.LearnedExpressionCandidate::expressionId,
+                    java.util.function.Function.identity()));
+    Map<Long, UserMessageContext> messagesById =
+        context.userMessages().stream()
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    UserMessageContext::messageId, message -> message));
+    Map<Long, Item> firstUseByExpressionId = new LinkedHashMap<>();
+    for (AiSessionFeedbackResult.UsedExpression claimed : claimedExpressions) {
+      if (claimed == null || claimed.expressionId() == null || claimed.messageId() == null) {
+        continue;
+      }
+      ScenarioFeedbackEvidence.LearnedExpressionCandidate expression =
+          candidatesById.get(claimed.expressionId());
+      UserMessageContext message = messagesById.get(claimed.messageId());
+      String matchedText = claimed.matchedText() == null ? null : claimed.matchedText().strip();
+      if (expression == null
+          || message == null
+          || matchedText == null
+          || matchedText.isBlank()
+          || !message.content().contains(matchedText)) {
+        log.warn(
+            "scenario expression reuse dropped because source evidence did not match session text:"
+                + " sessionId={}, expressionId={}, messageId={}",
+            context.sessionId(),
+            claimed.expressionId(),
+            claimed.messageId());
+        continue;
+      }
+      firstUseByExpressionId.putIfAbsent(
+          expression.expressionId(),
+          new Item(
+              expression.expressionId(),
+              expression.text(),
+              expression.meaning(),
+              sourceLabel(expression),
+              message.messageId(),
+              sentenceContaining(message.content(), matchedText),
+              matchedText));
+    }
+    return new ScenarioExpressionReuseSummary(false, List.copyOf(firstUseByExpressionId.values()));
+  }
+
+  private static String sourceLabel(
+      ScenarioFeedbackEvidence.LearnedExpressionCandidate expression) {
+    String label =
+        expression.source()
+                == com.landit.landitbe.feature.learning.expression.progress.domain
+                    .ExpressionLearningSource.SCENARIO
+            ? "시나리오"
+            : "스몰톡";
+    return SOURCE_LABEL.formatted(
+        expression.learnedOn().getMonthValue(), expression.learnedOn().getDayOfMonth(), label);
+  }
+
+  private static String sentenceContaining(String content, String matchedText) {
+    int matchStart = content.indexOf(matchedText);
+    int start = matchStart;
+    while (start > 0 && !endsSentence(content.charAt(start - 1))) {
+      start--;
+    }
+    int end = matchStart + matchedText.length();
+    while (end < content.length() && !endsSentence(content.charAt(end))) {
+      end++;
+    }
+    if (end < content.length()) {
+      end++;
+    }
+    return content.substring(start, end).strip();
+  }
+
+  private static boolean endsSentence(char value) {
+    return value == '.' || value == '!' || value == '?' || value == '\n' || value == '\r';
+  }
+
+  private static boolean validRequiredQuote(String source, String quote) {
+    return quote != null && !quote.isBlank() && source.contains(quote);
+  }
+
+  private static boolean validOptionalQuote(String source, String quote) {
+    return quote == null || validRequiredQuote(source, quote);
+  }
+
+  private record SupplementalFeedback(
+      ScenarioGrowthCard growthFeedback, ScenarioExpressionReuseSummary expressionReuse) {
+    private static SupplementalFeedback empty() {
+      return new SupplementalFeedback(null, new ScenarioExpressionReuseSummary(false, List.of()));
+    }
   }
 
   /** AI 응답 순서에 맞춰 각 사용자 메시지의 상세 피드백을 저장한다. */
