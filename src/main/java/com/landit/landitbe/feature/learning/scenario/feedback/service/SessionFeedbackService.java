@@ -2,14 +2,18 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
+import com.landit.landitbe.feature.learning.scenario.assessment.service.SessionLevelAssessmentGenerationService;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackResult;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.ExistingSummaryFeedbackContext;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.LoadedSessionFeedbackContext;
+import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioExpressionReuseSummary;
+import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioGrowthCard;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse.EvaluationContextResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse.MessageFeedbackResponse;
@@ -31,6 +35,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class SessionFeedbackService {
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().findAndRegisterModules();
+
   private final SessionFeedbackContextService contextService;
   private final SessionFeedbackCompletionService completionService;
   private final SessionFeedbackDataService sessionFeedbackDataService;
@@ -38,6 +44,7 @@ public class SessionFeedbackService {
   private final MessageFeedbackWorkService feedbackWorkService;
   private final AiClientProperties properties;
   private final ScenarioFeedbackAccessService feedbackAccess;
+  private final SessionLevelAssessmentGenerationService levelAssessmentGenerationService;
 
   /**
    * 완료된 세션의 최종 피드백을 생성하거나 기존 결과를 반환한다.
@@ -79,12 +86,28 @@ public class SessionFeedbackService {
 
   private AiSessionFeedbackRequest toRequest(LoadedSessionFeedbackContext context) {
     List<Long> ids = context.userMessages().stream().map(UserMessageContext::messageId).toList();
+    var evidence = context.feedbackEvidence();
     return new AiSessionFeedbackRequest(
         context.sessionId(),
         context.scenario(),
         ids,
         List.of(),
-        feedbackWorkService.completedResults(context.sessionId(), ids));
+        feedbackWorkService.completedResults(context.sessionId(), ids),
+        evidence.previousMistakes().stream()
+            .map(
+                mistake ->
+                    new AiSessionFeedbackRequest.PreviousMistake(
+                        mistake.messageId(),
+                        mistake.userMessage(),
+                        mistake.correctionExpression(),
+                        mistake.correctionReason()))
+            .toList(),
+        evidence.learnedExpressions().stream()
+            .map(
+                expression ->
+                    new AiSessionFeedbackRequest.LearnedExpression(
+                        expression.expressionId(), expression.text(), expression.meaning()))
+            .toList());
   }
 
   private Duration remaining(long deadline) {
@@ -122,7 +145,34 @@ public class SessionFeedbackService {
                         messageFeedbackResponse(
                             feedbackByMessageId.get(userMessage.messageId()), userMessage))
                 .toList(),
-        feedbackAccess.detailFeedbackLocked(userId, context.sessionId()));
+        feedbackAccess.detailFeedbackLocked(userId, context.sessionId()),
+        levelAssessmentGenerationService.get(userId, context.sessionId()),
+        growthFeedback(summary),
+        expressionReuse(summary));
+  }
+
+  private ScenarioGrowthCard growthFeedback(SessionHistorySummaryFeedback summary) {
+    if (summary.getGrowthFeedbackPayload() == null) {
+      return null;
+    }
+    try {
+      return OBJECT_MAPPER.treeToValue(
+          summary.getGrowthFeedbackPayload(), ScenarioGrowthCard.class);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+      throw ApiException.causedBy(ErrorCode.INTERNAL_SERVER_ERROR, exception);
+    }
+  }
+
+  private ScenarioExpressionReuseSummary expressionReuse(SessionHistorySummaryFeedback summary) {
+    if (summary.getExpressionReusePayload() == null) {
+      return new ScenarioExpressionReuseSummary(false, List.of());
+    }
+    try {
+      return OBJECT_MAPPER.treeToValue(
+          summary.getExpressionReusePayload(), ScenarioExpressionReuseSummary.class);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+      throw ApiException.causedBy(ErrorCode.INTERNAL_SERVER_ERROR, exception);
+    }
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
