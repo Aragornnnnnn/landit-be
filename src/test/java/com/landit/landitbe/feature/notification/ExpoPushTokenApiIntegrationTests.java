@@ -425,6 +425,24 @@ class ExpoPushTokenApiIntegrationTests {
     assertThat(tokenOwner(token)).isEqualTo(userProfileId("push-queued-account-b"));
   }
 
+  /** 설치 API는 인증과 활성 Expo Token 형식을 검증한다. */
+  @DisplayName("설치 API는 인증과 활성 Expo Token 형식을 검증한다.")
+  @Test
+  void validatesPushDeviceUpdate() throws Exception {
+    UUID installationId = UUID.randomUUID();
+    String path = "/api/v1/me/push-devices/" + installationId;
+    mockMvc
+        .perform(
+            put(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"platform\":\"IOS\",\"pushEnabled\":false}"))
+        .andExpect(status().isUnauthorized());
+    String accessToken = login("push-device-invalid-token");
+    mockMvc
+        .perform(putJsonWithToken(path, accessToken, "{\"platform\":\"IOS\",\"pushEnabled\":true}"))
+        .andExpect(status().isBadRequest());
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
