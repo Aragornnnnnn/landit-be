@@ -280,6 +280,41 @@ class ExpoPushTokenApiIntegrationTests {
     assertTokenStatus(unrelatedToken, "ACTIVE");
   }
 
+  /** 현재 구형 Token을 설치에 연결하고 같은 계정의 다른 구형 Token만 정리한다. */
+  @DisplayName("현재 구형 Token을 설치에 연결하고 같은 계정의 다른 구형 Token만 정리한다.")
+  @Test
+  void revokesLegacyDuplicatesWhilePreservingOtherInstallationsAndAccounts() throws Exception {
+    String account = login("push-legacy-cleanup-owner");
+    final String otherAccount = login("push-legacy-cleanup-other");
+    final UUID installationId = UUID.randomUUID();
+    UUID otherInstallationId = UUID.randomUUID();
+    String currentToken = "ExponentPushToken[legacy-cleanup-current]";
+    String oldToken = "ExponentPushToken[legacy-cleanup-old]";
+    String otherDeviceToken = "ExponentPushToken[legacy-cleanup-other-device]";
+    final String otherAccountToken = "ExponentPushToken[legacy-cleanup-other-account]";
+    updateDevice(account, otherInstallationId, otherDeviceToken, true);
+    registerToken(account, oldToken);
+    registerToken(account, currentToken);
+    registerToken(otherAccount, otherAccountToken);
+
+    updateDevice(account, installationId, currentToken, true);
+    updateDevice(account, installationId, currentToken, true);
+
+    assertTokenStatus(currentToken, "ACTIVE");
+    assertTokenStatus(oldToken, "REVOKED");
+    assertTokenStatus(otherDeviceToken, "ACTIVE");
+    assertTokenStatus(otherAccountToken, "ACTIVE");
+    assertThat(activeInstallationTokenCount(installationId)).isEqualTo(1);
+    assertThat(activeInstallationTokenCount(otherInstallationId)).isEqualTo(1);
+
+    // 아직 전환하지 않은 다른 기기도 설치 API로 등록하면 다시 수신할 수 있다.
+    UUID returningInstallationId = UUID.randomUUID();
+    updateDevice(account, returningInstallationId, oldToken, true);
+    assertTokenStatus(oldToken, "ACTIVE");
+    assertTokenStatus(currentToken, "ACTIVE");
+    assertThat(activeInstallationTokenCount(returningInstallationId)).isEqualTo(1);
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
