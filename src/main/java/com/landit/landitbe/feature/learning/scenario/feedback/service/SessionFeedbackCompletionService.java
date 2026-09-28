@@ -164,6 +164,7 @@ class SessionFeedbackCompletionService {
             OBJECT_MAPPER.valueToTree(supplemental.expressionReuse())));
   }
 
+  /** 대체 총평에는 비교 결과를 만들지 않고, 정상 생성 결과만 원문 근거로 검증한다. */
   private SupplementalFeedback supplementalFeedback(
       LoadedSessionFeedbackContext context, AiSessionFeedbackResult result) {
     if (result.generationFallback()) {
@@ -174,6 +175,7 @@ class SessionFeedbackCompletionService {
         validatedExpressionReuse(context, result.usedExpressions()));
   }
 
+  /** 요청한 직전 교정과 현재 발화에 메시지 ID·인용이 모두 대응하는 비교만 반환한다. */
   private ScenarioGrowthCard validatedGrowth(
       LoadedSessionFeedbackContext context,
       AiSessionFeedbackResult.ScenarioGrowthFeedback candidate) {
@@ -217,6 +219,7 @@ class SessionFeedbackCompletionService {
         candidate.currentSpan());
   }
 
+  /** 원문 인용이 학습 후보 표현도 포함할 때만 인정하고 표현별 첫 사용 결과를 보존한다. */
   private ScenarioExpressionReuseSummary validatedExpressionReuse(
       LoadedSessionFeedbackContext context,
       List<AiSessionFeedbackResult.UsedExpression> claimedExpressions) {
@@ -247,7 +250,8 @@ class SessionFeedbackCompletionService {
           || message == null
           || matchedText == null
           || matchedText.isBlank()
-          || !message.content().contains(matchedText)) {
+          || !message.content().contains(matchedText)
+          || !matchedText.contains(expression.text())) {
         log.warn(
             "scenario expression reuse dropped because source evidence did not match session text:"
                 + " sessionId={}, expressionId={}, messageId={}",
@@ -270,6 +274,7 @@ class SessionFeedbackCompletionService {
     return new ScenarioExpressionReuseSummary(false, List.copyOf(firstUseByExpressionId.values()));
   }
 
+  /** 학습 완료 당시의 날짜와 기능을 카드에 표시할 출처 문구로 변환한다. */
   private static String sourceLabel(
       ScenarioFeedbackEvidence.LearnedExpressionCandidate expression) {
     String label =
@@ -282,6 +287,7 @@ class SessionFeedbackCompletionService {
         expression.learnedOn().getMonthValue(), expression.learnedOn().getDayOfMonth(), label);
   }
 
+  /** 이미 검증한 인용의 첫 위치를 기준으로 문장 끝 구두점까지 포함한 원문을 추출한다. */
   private static String sentenceContaining(String content, String matchedText) {
     int matchStart = content.indexOf(matchedText);
     int start = matchStart;
@@ -298,20 +304,24 @@ class SessionFeedbackCompletionService {
     return content.substring(start, end).strip();
   }
 
+  /** 마침표·느낌표·물음표와 줄바꿈을 카드의 문장 발췌 경계로 취급한다. */
   private static boolean endsSentence(char value) {
     return value == '.' || value == '!' || value == '?' || value == '\n' || value == '\r';
   }
 
+  /** 필수 인용은 공백이 아니며 대소문자와 구두점을 바꾸지 않은 원문 일부여야 한다. */
   private static boolean validRequiredQuote(String source, String quote) {
     return quote != null && !quote.isBlank() && source.contains(quote);
   }
 
+  /** 선택 강조 구절은 생략할 수 있지만 제공했다면 필수 인용과 같은 원문 검증을 적용한다. */
   private static boolean validOptionalQuote(String source, String quote) {
     return quote == null || validRequiredQuote(source, quote);
   }
 
   private record SupplementalFeedback(
       ScenarioGrowthCard growthFeedback, ScenarioExpressionReuseSummary expressionReuse) {
+    /** 비교 근거가 없는 대체 응답은 숨길 성장 카드와 분석 완료된 빈 표현 목록을 반환한다. */
     private static SupplementalFeedback empty() {
       return new SupplementalFeedback(null, new ScenarioExpressionReuseSummary(false, List.of()));
     }
