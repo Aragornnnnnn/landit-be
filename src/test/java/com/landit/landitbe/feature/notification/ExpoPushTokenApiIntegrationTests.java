@@ -315,6 +315,40 @@ class ExpoPushTokenApiIntegrationTests {
     assertThat(activeInstallationTokenCount(returningInstallationId)).isEqualTo(1);
   }
 
+  /** 새 Token을 등록해도 같은 계정의 구형 Token을 정리한다. */
+  @DisplayName("새 Token을 등록해도 같은 계정의 구형 Token을 정리한다.")
+  @Test
+  void revokesLegacyTokensWhenRegisteringNewToken() throws Exception {
+    String account = login("push-legacy-new-token-owner");
+    String oldToken = "ExponentPushToken[legacy-new-token-old]";
+    String newToken = "ExponentPushToken[legacy-new-token-current]";
+    UUID installationId = UUID.randomUUID();
+    registerToken(account, oldToken);
+
+    updateDevice(account, installationId, newToken, true);
+
+    assertTokenStatus(oldToken, "REVOKED");
+    assertTokenStatus(newToken, "ACTIVE");
+    assertThat(activeInstallationTokenCount(installationId)).isEqualTo(1);
+  }
+
+  /** 푸시 비활성 요청은 현재 Token을 등록하지 않으므로 구형 Token을 정리하지 않는다. */
+  @DisplayName("푸시 비활성 요청은 현재 Token을 등록하지 않으므로 구형 Token을 정리하지 않는다.")
+  @Test
+  void preservesLegacyTokensWhenDisablingInstallation() throws Exception {
+    String account = login("push-legacy-disabled-owner");
+    String legacyToken = "ExponentPushToken[legacy-disabled-old]";
+    String installedToken = "ExponentPushToken[legacy-disabled-installed]";
+    UUID installationId = UUID.randomUUID();
+    updateDevice(account, installationId, installedToken, true);
+    registerToken(account, legacyToken);
+
+    updateDevice(account, installationId, null, false);
+
+    assertTokenStatus(installedToken, "REVOKED");
+    assertTokenStatus(legacyToken, "ACTIVE");
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
