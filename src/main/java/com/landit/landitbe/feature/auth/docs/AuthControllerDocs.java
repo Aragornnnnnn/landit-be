@@ -58,7 +58,9 @@ public interface AuthControllerDocs {
    * @param request 폐기할 Refresh token
    * @return 데이터가 없는 성공 응답
    */
-  @Operation(summary = "로그아웃", description = "전달받은 refresh token을 폐기한다.")
+  @Operation(
+      summary = "로그아웃",
+      description = "전달받은 refresh token을 폐기하고 installationId가 있으면 해당 설치의 푸시를 중지한다.")
   ApiResponse<Void> logout(LogoutRequest request);
 
   /**

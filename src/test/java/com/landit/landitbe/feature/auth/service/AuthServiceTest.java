@@ -23,6 +23,7 @@ import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
+import com.landit.landitbe.feature.notification.token.service.PushDevicePersistenceService;
 import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
@@ -53,6 +54,8 @@ class AuthServiceTest {
   private final LanditTokenService tokenService = mock(LanditTokenService.class);
   private final ConversationMemoryDeletionService conversationMemoryDeletionService =
       mock(ConversationMemoryDeletionService.class);
+  private final PushDevicePersistenceService pushDevicePersistenceService =
+      mock(PushDevicePersistenceService.class);
 
   private AuthService authService;
 
@@ -67,6 +70,7 @@ class AuthServiceTest {
             refreshTokenRepository,
             oidcTokenVerifier,
             conversationMemoryDeletionService,
+            pushDevicePersistenceService,
             tokenService,
             new TokenProperties("test-secret", 1800, 1209600));
   }

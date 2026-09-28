@@ -52,4 +52,17 @@ public class PushDevicePersistenceService {
     profilePreferences.grantPushPermission(userProfileId);
   }
 
+  /**
+   * 로그아웃한 계정이 여전히 해당 설치를 소유할 때만 발송을 중지한다.
+   *
+   * @param userProfileId 로그아웃 계정 ID
+   * @param installationId 앱 설치 UUID
+   */
+  @Transactional
+  public void revokeIfOwned(Long userProfileId, UUID installationId) {
+    tokens
+        .findByInstallationIdForUpdate(installationId)
+        .filter(token -> token.getUserProfileId().equals(userProfileId))
+        .ifPresent(UserPushToken::revoke);
+  }
 }
