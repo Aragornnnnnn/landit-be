@@ -264,6 +264,32 @@ class ExpoPushTokenApiIntegrationTests {
         .andExpect(jsonPath("$.success").value(true));
   }
 
+  private void updateDevice(
+      String accessToken, UUID installationId, String expoPushToken, boolean enabled)
+      throws Exception {
+    mockMvc
+        .perform(
+            putJsonWithToken(
+                "/api/v1/me/push-devices/" + installationId,
+                accessToken,
+                objectMapper.writeValueAsString(
+                    new com.landit.landitbe.feature.notification.token.dto.PushDeviceUpdateRequest(
+                        AppPlatform.IOS, expoPushToken, enabled))))
+        .andExpect(status().isOk());
+  }
+
+  private Long tokenOwner(String token) {
+    return jdbcTemplate.queryForObject(
+        "select user_profile_id from user_push_token where expo_push_token = ?", Long.class, token);
+  }
+
+  private Integer activeInstallationTokenCount(UUID installationId) {
+    return jdbcTemplate.queryForObject(
+        "select count(*) from user_push_token where installation_id = ? and status = 'ACTIVE'",
+        Integer.class,
+        installationId);
+  }
+
   /** Expo Push Token의 현재 저장 상태를 검증한다. */
   private void assertTokenStatus(String expoPushToken, String expectedStatus) {
     String actualStatus =
