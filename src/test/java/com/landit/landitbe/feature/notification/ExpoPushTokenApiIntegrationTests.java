@@ -16,8 +16,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.notification.delivery.dto.PreparePushDeliveryCommand;
 import com.landit.landitbe.feature.notification.delivery.service.PushDeliveryService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
+import com.landit.landitbe.feature.notification.token.domain.UserPushToken;
+import com.landit.landitbe.feature.notification.token.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateRequest;
 import com.landit.landitbe.feature.notification.token.dto.PushDeviceUpdateRequest;
+import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
 import com.landit.landitbe.feature.notification.token.service.ExpoPushTokenService;
 import com.landit.landitbe.feature.notification.token.service.PushDeviceService;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
@@ -42,6 +45,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Expo Push Token 상태 관리 API의 인증과 저장 계약을 검증한다. */
 @ActiveProfiles("test")
@@ -63,6 +68,10 @@ class ExpoPushTokenApiIntegrationTests {
   @Autowired private PushDeviceService pushDeviceService;
 
   @Autowired private PushDeliveryService pushDeliveryService;
+
+  @Autowired private UserPushTokenRepository tokens;
+
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -441,6 +450,33 @@ class ExpoPushTokenApiIntegrationTests {
     mockMvc
         .perform(putJsonWithToken(path, accessToken, "{\"platform\":\"IOS\",\"pushEnabled\":true}"))
         .andExpect(status().isBadRequest());
+  }
+
+  /** 설치 Token과 더 늦게 생성된 구형 Token을 발송과 같은 ID 순서로 잠근다. */
+  @Test
+  void locksInstallationAndLegacyTokensInDeliveryOrder() throws Exception {
+    String userKey = "push-device-lock-order";
+    String access = login(userKey);
+    UUID installationId = UUID.randomUUID();
+    String installed = "ExpoPushToken[lock-installed]";
+    String legacy = "ExpoPushToken[lock-legacy]";
+    updateDevice(access, installationId, installed, true);
+    registerToken(access, legacy);
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              List<UserPushToken> locked =
+                  tokens.findInstallationTokensForUpdate(
+                      userProfileId(userKey),
+                      installationId,
+                      installed,
+                      UserPushTokenStatus.ACTIVE);
+              assertThat(locked)
+                  .extracting(UserPushToken::getExpoPushToken)
+                  .containsExactly(installed, legacy);
+              assertThat(locked).extracting(UserPushToken::getId).isSorted();
+            });
   }
 
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
