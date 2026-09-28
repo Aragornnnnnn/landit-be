@@ -261,6 +261,25 @@ class ExpoPushTokenApiIntegrationTests {
     assertThat(tokenOwner(token)).isEqualTo(userProfileId("push-token-reuse-account-b"));
   }
 
+  /** 설치 등록 시 다른 계정에 남은 구형 Token의 발송은 유지한다. */
+  @DisplayName("설치 등록 시 다른 계정에 남은 구형 Token의 발송은 유지한다.")
+  @Test
+  void migratesMatchingLegacyTokenWithoutGlobalCutoff() throws Exception {
+    String accountA = login("push-legacy-owner-a");
+    String accountB = login("push-legacy-owner-b");
+    String matchingToken = "ExponentPushToken[legacy-matching-token]";
+    String unrelatedToken = "ExponentPushToken[legacy-unrelated-token]";
+    UUID installationId = UUID.randomUUID();
+    registerToken(accountA, matchingToken);
+    registerToken(accountA, unrelatedToken);
+
+    updateDevice(accountB, installationId, matchingToken, true);
+
+    assertThat(tokenOwner(matchingToken)).isEqualTo(userProfileId("push-legacy-owner-b"));
+    assertThat(activeInstallationTokenCount(installationId)).isEqualTo(1);
+    assertTokenStatus(unrelatedToken, "ACTIVE");
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
