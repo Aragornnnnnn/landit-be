@@ -6,7 +6,10 @@ import com.landit.landitbe.feature.learning.conversation.domain.LearningSession;
 import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.learning.conversation.domain.SessionType;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -28,6 +31,36 @@ public interface LearningSessionRepository extends JpaRepository<LearningSession
    */
   Optional<LearningSession> findTopByUserProfileIdAndSessionTypeAndStatusOrderByEndedAtDescIdDesc(
       Long userProfileId, SessionType sessionType, LearningSessionStatus status);
+
+  /**
+   * 현재 세션 시작 시각까지 완료된 같은 사용자의 직전 시나리오를 조회한다.
+   *
+   * @param userProfileId 세션 소유 사용자 ID
+   * @param sessionType 조회할 세션 유형
+   * @param status 조회할 세션 상태
+   * @param startedAt 직전 세션의 종료 시각 상한
+   * @param currentSessionId 제외할 현재 세션 ID
+   * @param pageable 결과 건수 제한
+   * @return 종료 시각과 ID 내림차순으로 조회한 완료 세션
+   */
+  @Query(
+      """
+      select learningSession
+      from LearningSession learningSession
+      where learningSession.userProfileId = :userProfileId
+        and learningSession.sessionType = :sessionType
+        and learningSession.status = :status
+        and learningSession.endedAt <= :startedAt
+        and learningSession.id <> :currentSessionId
+      order by learningSession.endedAt desc, learningSession.id desc
+      """)
+  List<LearningSession> findPreviousCompletedScenario(
+      @Param("userProfileId") Long userProfileId,
+      @Param("sessionType") SessionType sessionType,
+      @Param("status") LearningSessionStatus status,
+      @Param("startedAt") LocalDateTime startedAt,
+      @Param("currentSessionId") Long currentSessionId,
+      Pageable pageable);
 
   /** 같은 세션에 대한 동시 상태 변경을 직렬화하며 소유 세션을 조회한다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
