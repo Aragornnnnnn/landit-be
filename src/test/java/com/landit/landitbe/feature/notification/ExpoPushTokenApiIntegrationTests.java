@@ -222,6 +222,45 @@ class ExpoPushTokenApiIntegrationTests {
     assertThat(tokenCount(expoPushToken)).isZero();
   }
 
+  /** 같은 설치의 계정 전환과 Token 회전은 현재 계정의 활성 Token 하나만 남긴다. */
+  @DisplayName("같은 설치의 계정 전환과 Token 회전은 현재 계정의 활성 Token 하나만 남긴다.")
+  @Test
+  void keepsOnlyCurrentAccountTokenForInstallation() throws Exception {
+    String accountA = login("push-installation-account-a");
+    String accountB = login("push-installation-account-b");
+    UUID installationId = UUID.randomUUID();
+    String oldToken = "ExponentPushToken[installation-old-token]";
+    String newToken = "ExponentPushToken[installation-new-token]";
+
+    updateDevice(accountA, installationId, oldToken, true);
+    updateDevice(accountB, installationId, newToken, true);
+
+    assertThat(tokenCount(oldToken)).isZero();
+    assertThat(tokenOwner(newToken)).isEqualTo(userProfileId("push-installation-account-b"));
+    assertThat(activeInstallationTokenCount(installationId)).isEqualTo(1);
+
+    updateDevice(accountB, installationId, null, false);
+    assertTokenStatus(newToken, "REVOKED");
+  }
+
+  /** 동일 Expo Token을 다른 설치가 등록하면 설치 소유권도 이동한다. */
+  @DisplayName("동일 Expo Token을 다른 설치가 등록하면 설치 소유권도 이동한다.")
+  @Test
+  void movesInstallationOwnershipWithExpoToken() throws Exception {
+    String accountA = login("push-token-reuse-account-a");
+    String accountB = login("push-token-reuse-account-b");
+    UUID oldInstallation = UUID.randomUUID();
+    UUID newInstallation = UUID.randomUUID();
+    String token = "ExponentPushToken[installation-reused-token]";
+
+    updateDevice(accountA, oldInstallation, token, true);
+    updateDevice(accountB, newInstallation, token, true);
+
+    assertThat(activeInstallationTokenCount(oldInstallation)).isZero();
+    assertThat(activeInstallationTokenCount(newInstallation)).isEqualTo(1);
+    assertThat(tokenOwner(token)).isEqualTo(userProfileId("push-token-reuse-account-b"));
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
