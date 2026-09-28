@@ -15,6 +15,7 @@ import java.util.List;
  * @param highlightMessage 최종 피드백 강조 메시지
  * @param summaryMessage 최종 피드백 요약
  * @param messageFeedbacks 메시지별 피드백 목록
+ * @param levelAssessment 사용자 수준 평가 결과
  * @param growthFeedback AI가 제안한 직전 교정 비교 근거
  * @param usedExpressions AI가 제안한 배운 표현 사용 근거
  * @param generationFallback 결정적 대체 응답 여부

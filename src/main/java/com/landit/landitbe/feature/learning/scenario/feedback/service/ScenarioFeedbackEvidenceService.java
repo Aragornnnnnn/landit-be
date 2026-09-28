@@ -81,6 +81,7 @@ public class ScenarioFeedbackEvidenceService {
         learnedExpressions);
   }
 
+  /** 직전 세션의 USER 발화 중 교정 표현과 사유가 모두 저장된 실제 실수만 후보로 만든다. */
   private List<PreviousMistake> previousMistakes(
       long sessionHistoryId, List<SessionHistoryMessageFeedback> feedbacks) {
     Map<Long, SessionHistoryMessageSnapshot> userMessagesById =
@@ -109,6 +110,7 @@ public class ScenarioFeedbackEvidenceService {
         .toList();
   }
 
+  /** 공통 표현 선정 결과의 학습 당시 출처와 날짜를 보존해 시나리오 비교 후보로 변환한다. */
   private static LearnedExpressionCandidate candidate(FreeTalkLearnedExpression expression) {
     return new LearnedExpressionCandidate(
         expression.expressionId(),
@@ -118,6 +120,7 @@ public class ScenarioFeedbackEvidenceService {
         expression.learnedOn());
   }
 
+  /** 공통 선정 서비스의 출처를 시나리오 응답이 사용하는 학습 출처 계약으로 변환한다. */
   private static com.landit.landitbe.feature.learning.expression.progress.domain
           .ExpressionLearningSource
       source(FreeTalkExpressionReuseSource source) {

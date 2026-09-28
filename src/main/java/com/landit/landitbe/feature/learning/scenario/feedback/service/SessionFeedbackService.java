@@ -151,6 +151,7 @@ public class SessionFeedbackService {
         expressionReuse(summary));
   }
 
+  /** 저장된 비교만 복원하며, 도입 전 데이터와 비교 근거가 없는 결과는 null을 유지한다. */
   private ScenarioGrowthCard growthFeedback(SessionHistorySummaryFeedback summary) {
     if (summary.getGrowthFeedbackPayload() == null) {
       return null;
@@ -163,6 +164,7 @@ public class SessionFeedbackService {
     }
   }
 
+  /** 저장된 재사용 결과를 복원하며, 기존 null 데이터도 분석 완료된 빈 목록으로 응답한다. */
   private ScenarioExpressionReuseSummary expressionReuse(SessionHistorySummaryFeedback summary) {
     if (summary.getExpressionReusePayload() == null) {
       return new ScenarioExpressionReuseSummary(false, List.of());
