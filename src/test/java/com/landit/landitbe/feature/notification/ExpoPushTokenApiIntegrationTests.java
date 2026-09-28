@@ -375,6 +375,22 @@ class ExpoPushTokenApiIntegrationTests {
     assertThat(activeInstallationTokenCount(installationId)).isZero();
   }
 
+  /** 알림을 거부한 새 계정으로 전환해도 이전 계정에 발송하지 않는다. */
+  @DisplayName("알림을 거부한 새 계정으로 전환해도 이전 계정에 발송하지 않는다.")
+  @Test
+  void accountSwitchWithPushDisabledRevokesPreviousOwner() throws Exception {
+    String accountA = login("push-disabled-switch-account-a");
+    String accountB = login("push-disabled-switch-account-b");
+    UUID installationId = UUID.randomUUID();
+    String token = "ExponentPushToken[disabled-switch-token]";
+
+    updateDevice(accountA, installationId, token, true);
+    updateDevice(accountB, installationId, null, false);
+
+    assertTokenStatus(token, "REVOKED");
+    assertThat(tokenOwner(token)).isEqualTo(userProfileId("push-disabled-switch-account-b"));
+  }
+
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
   private String login(String userKey) throws Exception {
     String nonce = UUID.randomUUID().toString();
