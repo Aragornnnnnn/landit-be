@@ -17,23 +17,29 @@ import org.springframework.data.repository.query.Param;
 public interface UserPushTokenRepository extends JpaRepository<UserPushToken, Long> {
 
   /**
-   * 설치 전환 시 정리할 사용자 소유 구형 Token을 ID 순서로 잠근다.
+   * 설치 갱신과 구형 Token 정리에 필요한 모든 행을 발송 경로와 같은 ID 순서로 잠근다.
    *
    * @param userProfileId 현재 인증된 사용자 프로필 ID
-   * @param status 정리 대상 Token 상태
-   * @return 설치 ID가 없는 지정 상태의 Token 목록
+   * @param installationId 현재 설치 UUID
+   * @param expoPushToken 현재 Expo Token
+   * @param status 정리 대상 구형 Token 상태
+   * @return 설치 갱신 대상과 정리 대상 Token 목록
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       """
       select t from UserPushToken t
-      where t.userProfileId = :userProfileId
-        and t.installationId is null
-        and t.status = :status
+      where t.installationId = :installationId
+        or t.expoPushToken = :expoPushToken
+        or (t.userProfileId = :userProfileId
+          and t.installationId is null and t.status = :status)
       order by t.id
       """)
-  List<UserPushToken> findLegacyTokensForUpdate(
-      @Param("userProfileId") Long userProfileId, @Param("status") UserPushTokenStatus status);
+  List<UserPushToken> findInstallationTokensForUpdate(
+      @Param("userProfileId") Long userProfileId,
+      @Param("installationId") UUID installationId,
+      @Param("expoPushToken") String expoPushToken,
+      @Param("status") UserPushTokenStatus status);
 
   /** 설치 식별자로 현재 Token 행을 잠근다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)

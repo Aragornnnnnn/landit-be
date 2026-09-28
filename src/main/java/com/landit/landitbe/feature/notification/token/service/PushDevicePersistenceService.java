@@ -7,7 +7,9 @@ import com.landit.landitbe.feature.notification.token.domain.UserPushTokenStatus
 import com.landit.landitbe.feature.notification.token.dto.PushDeviceUpdateRequest;
 import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
 import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class PushDevicePersistenceService {
   private final UserPushTokenRepository tokens;
   private final ProfilePreferenceService profilePreferences;
   private final EntityManager entityManager;
+  private final UserProfileService profiles;
 
   /**
    * 현재 인증 계정의 설치 푸시 수신 상태를 갱신한다.
@@ -31,16 +34,26 @@ public class PushDevicePersistenceService {
    */
   @Transactional
   public void update(Long userProfileId, UUID installationId, PushDeviceUpdateRequest request) {
-    if (request.pushEnabled()) {
-      revokeLegacyTokens(userProfileId);
-    }
-    Optional<UserPushToken> installation = tokens.findByInstallationIdForUpdate(installationId);
     if (!request.pushEnabled()) {
-      installation.ifPresent(token -> token.bindDisabled(userProfileId, request.platform()));
+      tokens
+          .findByInstallationIdForUpdate(installationId)
+          .ifPresent(token -> token.bindDisabled(userProfileId, request.platform()));
       return;
     }
+    // 로그아웃과 동일하게 프로필을 먼저 잠그고, 모든 Token을 ID 순서로 한 번에 잠근다.
+    profiles.requireActiveForUpdate(userProfileId);
+    List<UserPushToken> locked =
+        tokens.findInstallationTokensForUpdate(
+            userProfileId, installationId, request.expoPushToken(), UserPushTokenStatus.ACTIVE);
+    revokeLegacyTokens(userProfileId, locked);
+    Optional<UserPushToken> installation =
+        locked.stream()
+            .filter(token -> installationId.equals(token.getInstallationId()))
+            .findFirst();
     Optional<UserPushToken> matchingToken =
-        tokens.findByExpoPushTokenForUpdate(request.expoPushToken());
+        locked.stream()
+            .filter(token -> request.expoPushToken().equals(token.getExpoPushToken()))
+            .findFirst();
     UserPushToken target = matchingToken.or(() -> installation).orElse(null);
     if (installation.isPresent() && installation.get() != target) {
       installation.get().detachInstallation();
@@ -56,10 +69,11 @@ public class PushDevicePersistenceService {
     profilePreferences.grantPushPermission(userProfileId);
   }
 
-  private void revokeLegacyTokens(Long userProfileId) {
-    // 서로 다른 구형 Token이 동시에 전환돼도 같은 순서로 잠근다. 현재 Token은 bind에서 재활성화된다.
-    tokens
-        .findLegacyTokensForUpdate(userProfileId, UserPushTokenStatus.ACTIVE)
+  private void revokeLegacyTokens(Long userProfileId, List<UserPushToken> locked) {
+    locked.stream()
+        .filter(token -> userProfileId.equals(token.getUserProfileId()))
+        .filter(token -> token.getInstallationId() == null)
+        .filter(token -> token.getStatus() == UserPushTokenStatus.ACTIVE)
         .forEach(UserPushToken::revoke);
   }
 
