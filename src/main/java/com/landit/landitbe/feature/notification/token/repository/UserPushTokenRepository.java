@@ -16,6 +16,25 @@ import org.springframework.data.repository.query.Param;
 /** 사용자 Expo Push Token을 저장하고 소유자 기준으로 조회한다. */
 public interface UserPushTokenRepository extends JpaRepository<UserPushToken, Long> {
 
+  /**
+   * 설치 전환 시 정리할 사용자 소유 구형 Token을 ID 순서로 잠근다.
+   *
+   * @param userProfileId 현재 인증된 사용자 프로필 ID
+   * @param status 정리 대상 Token 상태
+   * @return 설치 ID가 없는 지정 상태의 Token 목록
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select t from UserPushToken t
+      where t.userProfileId = :userProfileId
+        and t.installationId is null
+        and t.status = :status
+      order by t.id
+      """)
+  List<UserPushToken> findLegacyTokensForUpdate(
+      @Param("userProfileId") Long userProfileId, @Param("status") UserPushTokenStatus status);
+
   /** 설치 식별자로 현재 Token 행을 잠근다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select t from UserPushToken t where t.installationId = :installationId")

@@ -3,6 +3,7 @@
 package com.landit.landitbe.feature.notification.token.service;
 
 import com.landit.landitbe.feature.notification.token.domain.UserPushToken;
+import com.landit.landitbe.feature.notification.token.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.token.dto.PushDeviceUpdateRequest;
 import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
 import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
@@ -30,6 +31,9 @@ public class PushDevicePersistenceService {
    */
   @Transactional
   public void update(Long userProfileId, UUID installationId, PushDeviceUpdateRequest request) {
+    if (request.pushEnabled()) {
+      revokeLegacyTokens(userProfileId);
+    }
     Optional<UserPushToken> installation = tokens.findByInstallationIdForUpdate(installationId);
     if (!request.pushEnabled()) {
       installation.ifPresent(token -> token.bindDisabled(userProfileId, request.platform()));
@@ -50,6 +54,13 @@ public class PushDevicePersistenceService {
     target.bind(installationId, userProfileId, request.platform(), request.expoPushToken());
     tokens.flush();
     profilePreferences.grantPushPermission(userProfileId);
+  }
+
+  private void revokeLegacyTokens(Long userProfileId) {
+    // 서로 다른 구형 Token이 동시에 전환돼도 같은 순서로 잠근다. 현재 Token은 bind에서 재활성화된다.
+    tokens
+        .findLegacyTokensForUpdate(userProfileId, UserPushTokenStatus.ACTIVE)
+        .forEach(UserPushToken::revoke);
   }
 
   /**
