@@ -14,7 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateRequest;
+import com.landit.landitbe.feature.notification.token.dto.PushDeviceUpdateRequest;
 import com.landit.landitbe.feature.notification.token.service.ExpoPushTokenService;
+import com.landit.landitbe.feature.notification.token.service.PushDeviceService;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.shared.domain.AppPlatform;
 import java.time.LocalDateTime;
@@ -54,6 +56,8 @@ class ExpoPushTokenApiIntegrationTests {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Autowired private ExpoPushTokenService expoPushTokenService;
+
+  @Autowired private PushDeviceService pushDeviceService;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -347,6 +351,28 @@ class ExpoPushTokenApiIntegrationTests {
 
     assertTokenStatus(installedToken, "REVOKED");
     assertTokenStatus(legacyToken, "ACTIVE");
+  }
+
+  /** 설치 등록이 실패하면 구형 Token 비활성화도 함께 롤백한다. */
+  @DisplayName("설치 등록이 실패하면 구형 Token 비활성화도 함께 롤백한다.")
+  @Test
+  void rollsBackLegacyCleanupWhenInstallationRegistrationFails() throws Exception {
+    String userKey = "push-legacy-cleanup-rollback";
+    String account = login(userKey);
+    String oldToken = "ExponentPushToken[legacy-cleanup-rollback-old]";
+    String newToken = "ExponentPushToken[legacy-cleanup-rollback-new]";
+    registerToken(account, oldToken);
+    Long ownerId = userProfileId(userKey);
+    jdbcTemplate.update("update user_profile set status = 'WITHDRAWN' where id = ?", ownerId);
+    UUID installationId = UUID.randomUUID();
+    PushDeviceUpdateRequest request = new PushDeviceUpdateRequest(AppPlatform.IOS, newToken, true);
+
+    assertThatThrownBy(() -> pushDeviceService.update(ownerId, installationId, request))
+        .isInstanceOf(UserProfileException.class);
+
+    assertTokenStatus(oldToken, "ACTIVE");
+    assertThat(tokenCount(newToken)).isZero();
+    assertThat(activeInstallationTokenCount(installationId)).isZero();
   }
 
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
