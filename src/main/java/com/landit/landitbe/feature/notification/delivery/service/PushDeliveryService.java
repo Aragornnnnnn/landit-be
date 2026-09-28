@@ -120,7 +120,8 @@ public class PushDeliveryService {
                     d.getSentExpoPushToken(),
                     d.getTitle(),
                     d.getBody(),
-                    d.getDeepLink())));
+                    d.getDeepLink(),
+                    d.getUserProfileId())));
     return unique.stream()
         .map(c -> prepared.get(c.deduplicationKey()))
         .filter(java.util.Objects::nonNull)
@@ -358,7 +359,8 @@ public class PushDeliveryService {
         delivery.getSentExpoPushToken(),
         delivery.getTitle(),
         delivery.getBody(),
-        delivery.getDeepLink());
+        delivery.getDeepLink(),
+        delivery.getUserProfileId());
   }
 
   /** 상태를 변경할 Push Delivery를 쓰기 잠금으로 조회한다. */
