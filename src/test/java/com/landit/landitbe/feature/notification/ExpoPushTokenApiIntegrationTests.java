@@ -13,6 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.feature.notification.delivery.dto.PreparePushDeliveryCommand;
+import com.landit.landitbe.feature.notification.delivery.service.PushDeliveryService;
+import com.landit.landitbe.feature.notification.domain.NotificationType;
 import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateRequest;
 import com.landit.landitbe.feature.notification.token.dto.PushDeviceUpdateRequest;
 import com.landit.landitbe.feature.notification.token.service.ExpoPushTokenService;
@@ -58,6 +61,8 @@ class ExpoPushTokenApiIntegrationTests {
   @Autowired private ExpoPushTokenService expoPushTokenService;
 
   @Autowired private PushDeviceService pushDeviceService;
+
+  @Autowired private PushDeliveryService pushDeliveryService;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -389,6 +394,35 @@ class ExpoPushTokenApiIntegrationTests {
 
     assertTokenStatus(token, "REVOKED");
     assertThat(tokenOwner(token)).isEqualTo(userProfileId("push-disabled-switch-account-b"));
+  }
+
+  /** 예약 후 계정이 바뀌면 이전 계정의 딥링크 발송을 건너뛴다. */
+  @DisplayName("예약 후 계정이 바뀌면 이전 계정의 딥링크 발송을 건너뛴다.")
+  @Test
+  void skipsQueuedDeliveryForPreviousAccount() throws Exception {
+    String accountA = login("push-queued-account-a");
+    String accountB = login("push-queued-account-b");
+    UUID installationId = UUID.randomUUID();
+    String token = "ExponentPushToken[queued-account-switch]";
+    updateDevice(accountA, installationId, token, true);
+    Long tokenId =
+        jdbcTemplate.queryForObject(
+            "select id from user_push_token where expo_push_token = ?", Long.class, token);
+    Long userA = userProfileId("push-queued-account-a");
+    updateDevice(accountB, installationId, token, true);
+
+    assertThat(
+            pushDeliveryService.prepare(
+                new PreparePushDeliveryCommand(
+                    userA,
+                    tokenId,
+                    NotificationType.CONTINUE_EXPRESSION,
+                    "lan591:previous:" + installationId,
+                    "표현",
+                    "본문",
+                    "/expressions/scenario/1/1")))
+        .isEmpty();
+    assertThat(tokenOwner(token)).isEqualTo(userProfileId("push-queued-account-b"));
   }
 
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
