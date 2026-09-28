@@ -32,6 +32,7 @@ import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -152,6 +153,28 @@ class AuthServiceTest {
     lockOrder
         .verify(refreshTokenRepository)
         .revokeActiveByTokenHash(eq(CURRENT_TOKEN_HASH), any(LocalDateTime.class));
+  }
+
+  /** 유효한 로그아웃에서만 요청한 설치의 푸시를 비활성화한다. */
+  @DisplayName("유효한 로그아웃에서만 요청한 설치의 푸시를 비활성화한다.")
+  @Test
+  void logoutRevokesOwnedInstallationAfterRefreshToken() {
+    final UUID installationId = UUID.randomUUID();
+    AuthProfile authProfile =
+        new AuthProfile(
+            USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE);
+    when(tokenService.hashToken(CURRENT_TOKEN)).thenReturn(CURRENT_TOKEN_HASH);
+    when(refreshTokenRepository.findUserProfileIdByTokenHash(CURRENT_TOKEN_HASH))
+        .thenReturn(Optional.of(USER_ID));
+    when(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
+        .thenReturn(Optional.of(authProfile));
+    when(refreshTokenRepository.revokeActiveByTokenHash(
+            eq(CURRENT_TOKEN_HASH), any(LocalDateTime.class)))
+        .thenReturn(1);
+
+    authService.logout(new LogoutRequest(CURRENT_TOKEN, installationId));
+
+    verify(pushDevicePersistenceService).revokeIfOwned(USER_ID, installationId);
   }
 
   @DisplayName("탈퇴 시 인증 정보를 폐기하기 전에 기억 데이터를 삭제한다.")
