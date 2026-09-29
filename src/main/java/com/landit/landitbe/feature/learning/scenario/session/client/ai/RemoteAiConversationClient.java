@@ -124,6 +124,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
     payload.put("scenario", request.scenario());
     payload.put("expectedMessageIds", request.expectedMessageIds());
     payload.put("completedFeedbacks", request.completedFeedbacks());
+    payload.put("previousMistakes", request.previousMistakes());
+    payload.put("learnedExpressions", request.learnedExpressions());
     return post(
             sessionFeedbackUri(),
             payload,
@@ -334,7 +336,9 @@ public class RemoteAiConversationClient implements AiConversationClient {
       BigDecimal starRating,
       String summaryMessage,
       List<AiSessionMessageFeedbackResult> messageFeedbacks,
-      AiSessionLevelAssessment levelAssessment) {
+      AiSessionLevelAssessment levelAssessment,
+      AiSessionFeedbackResult.ScenarioGrowthFeedback growthFeedback,
+      List<AiSessionFeedbackResult.UsedExpression> usedExpressions) {
 
     /** 응답의 최상위 필수 필드를 확인한 뒤 애플리케이션 포트 결과로 변환한다. */
     private AiSessionFeedbackResult toResult() {
@@ -352,6 +356,8 @@ public class RemoteAiConversationClient implements AiConversationClient {
           summaryMessage,
           messageFeedbacks,
           levelAssessment,
+          growthFeedback,
+          usedExpressions == null ? List.of() : usedExpressions,
           false);
     }
   }

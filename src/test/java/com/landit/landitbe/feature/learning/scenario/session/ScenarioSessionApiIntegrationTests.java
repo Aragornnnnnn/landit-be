@@ -2264,6 +2264,18 @@ class ScenarioSessionApiIntegrationTests {
       awaitLevelAssessment(sessionId, accessToken);
       mockMvc
           .perform(
+              post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.userLevelAssessment.sessionId").value(sessionId))
+          .andExpect(jsonPath("$.data.userLevelAssessment.processingStatus").value("COMPLETED"))
+          .andExpect(
+              jsonPath("$.data.userLevelAssessment.levelAssessment.details.strength").isNotEmpty())
+          .andExpect(jsonPath("$.data.growthFeedback").value(nullValue()))
+          .andExpect(jsonPath("$.data.expressionReuse.pending").value(false))
+          .andExpect(jsonPath("$.data.expressionReuse.items").isEmpty());
+      mockMvc
+          .perform(
               get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
                   .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
           .andExpect(status().isOk())
