@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
 import com.landit.landitbe.feature.learning.conversation.domain.CompletionReason;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
+import com.landit.landitbe.feature.learning.conversation.domain.LearningSessionStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
@@ -39,6 +40,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -519,6 +521,70 @@ public class FreeTalkSubmittedMessageService {
                 decisionProcessingClientMessageId(reservation)
                     .equals(session.getProcessingClientMessageId()))
         .ifPresent(FreeTalkSession::clearProcessing);
+  }
+
+  /**
+   * 저장된 발화를 보존하면서 마무리 AI 발화 없이 세션을 완료한다.
+   *
+   * @param userId 요청 사용자 ID
+   * @param learningSessionId 프리톡 학습 세션 ID
+   * @return 새로 교정을 시작할 발화 ID 목록. 이미 완료된 세션이면 null
+   * @throws ApiException 세션이 없거나 소유자가 아니거나 중단된 상태일 때
+   */
+  @Transactional
+  public List<Long> completeDirectly(long userId, long learningSessionId) {
+    userProfileService.requireActiveForUpdate(userId);
+    LearningSessionSnapshot learningSession =
+        sessionService.requireOwnedSession(userId, learningSessionId);
+    FreeTalkSession session = sessionService.requireFreeTalkForUpdate(learningSessionId);
+    if (learningSession.getStatus() == LearningSessionStatus.COMPLETED) {
+      return null;
+    }
+    if (!learningSession.isInProgress()) {
+      throw new ApiException(ErrorCode.CONFLICT);
+    }
+    SessionHistorySnapshot history = requireHistory(learningSessionId);
+    List<SessionHistoryMessageSnapshot> messages =
+        conversationMessageService.findAll(history.getId());
+    final List<Long> corrections = prepareUnfinishedTurns(messages);
+    if (session.getTitle() == null) {
+      session.assignTitle(
+          FreeTalkCharacter.fromId(session.getCharacterId()).displayName() + "와의 대화");
+    }
+    session.completeDirectly(
+        messages.stream()
+            .filter(message -> message.getRole() == ConversationSpeaker.USER)
+            .mapToLong(
+                message ->
+                    message.getUtteranceDurationMs() == null ? 0 : message.getUtteranceDurationMs())
+            .sum());
+    prepareMemoryGeneration(session);
+    session.clearProcessing();
+    LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), KOREA_ZONE_ID);
+    learningSessionService.completeFreeTalkDirectly(learningSessionId, completedAt);
+    sessionHistoryService.complete(
+        history.getId(),
+        completedAt,
+        Math.toIntExact(
+            conversationMessageService.countByRole(history.getId(), ConversationSpeaker.USER)));
+    streakService.recordCompletedConversation(learningSession.getUserProfileId(), completedAt);
+    return corrections;
+  }
+
+  // AI 처리 중이거나 종료 확인을 기다리던 발화도 요약의 교정 대기 대상에 포함한다.
+  private List<Long> prepareUnfinishedTurns(List<SessionHistoryMessageSnapshot> messages) {
+    List<Long> corrections = new ArrayList<>();
+    for (SessionHistoryMessageSnapshot message : messages) {
+      if (message.getRole() != ConversationSpeaker.USER) {
+        continue;
+      }
+      FreeTalkTurnStatus status = message.getFreeTalkTurnStatus();
+      if (status == null || status == FreeTalkTurnStatus.EXIT_CONFIRMATION_REQUIRED) {
+        recordTurnResultAndPrepareFeedback(message.getId(), FreeTalkTurnStatus.COMPLETED);
+        corrections.add(message.getId());
+      }
+    }
+    return corrections;
   }
 
   private boolean isDirectlyCompleted(ManagedRecords records) {
