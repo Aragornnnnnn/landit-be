@@ -2548,6 +2548,74 @@ class FreeTalkSessionApiIntegrationTests {
         .asLong();
   }
 
+  @DisplayName("직접 완료는 마무리 발화 없이 목록·상세·요약과 스트릭에 반영되고 재시도해도 종료 시각을 유지한다.")
+  @Test
+  void directlyCompletesAndExposesHistoryWithoutClosingMessage() throws Exception {
+    seedEmbeddedCandidateExpression();
+    String token = login("direct-complete@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    long messageId = submitWithoutCorrectionFields(token, sessionId, "I went hiking.");
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    final int beforeRequests = requestCount();
+
+    requestDirectCompletion(token, sessionId);
+    var endedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT ended_at FROM learning_session WHERE id = ?",
+            java.sql.Timestamp.class,
+            sessionId);
+    requestDirectCompletion(token, sessionId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT ended_at FROM learning_session WHERE id = ?",
+                java.sql.Timestamp.class,
+                sessionId))
+        .isEqualTo(endedAt);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("DIRECT_COMPLETION");
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+    assertThat(requestCount()).isEqualTo(beforeRequests);
+    assertCurrentStreak(token, 1, true);
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].sessionId").value(sessionId));
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.messages.length()").value(2));
+    mockMvc
+        .perform(summary(sessionId, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false));
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                messagePath(sessionId),
+                token,
+                messageRequest(UUID.randomUUID().toString(), "Too late.", 1200, false)))
+        .andExpect(status().isConflict());
+  }
+
+  private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
+    return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+  }
+
+  private void requestDirectCompletion(String token, long sessionId) throws Exception {
+    MvcResult result =
+        mockMvc.perform(directCompletion(sessionId, token)).andExpect(status().isOk()).andReturn();
+    assertThat(result.getResponse().getContentAsString()).isEmpty();
+  }
+
   private long submitForExit(String accessToken, long sessionId) throws Exception {
     MvcResult result =
         mockMvc
