@@ -2605,6 +2605,26 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(status().isConflict());
   }
 
+  @DisplayName("발화가 없는 세션도 직접 완료할 수 있고 사용량 한도를 소진해도 완료와 재시도가 가능하다.")
+  @Test
+  void directlyCompletesEmptySessionWithoutConsumingRequestQuota() throws Exception {
+    String token = login("direct-empty@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 1000");
+    requestDirectCompletion(token, sessionId);
+    requestDirectCompletion(token, sessionId);
+    assertThat(requestCount()).isEqualTo(1000);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isZero();
+    mockMvc
+        .perform(summary(sessionId, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false));
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+  }
+
   private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
     return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
