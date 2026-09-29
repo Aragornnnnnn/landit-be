@@ -91,7 +91,7 @@
 4. 기간 만료 파기, 실패 재시도, 기존 탈퇴자 dry-run·계정별 재실행 가능한 정리 명령 구현.
 5. PostgreSQL 관계·동시성 및 API 회귀 검증, 문서와 운영 검증 절차 반영.
 
-현재 열린 PR에는 V132까지 있으므로 새 버전은 작성 직전에 다시 확인한다. V126~V132를 포함하지 않은 상태에서 높은 버전만 운영 DB에 먼저 적용하지 않는다. 이 문서에서 마이그레이션 번호를 예약하지 않는다.
+V133 작성 직전 GitHub의 열린 PR을 확인했다. #224(V126), #230(V127), #226(V128), #227(V129), #228(V130), #229(V131·V132)가 사용 중이므로 `V133__sanitize_withdrawn_user_data.sql`을 추가했다. 실제 적용 전에 버전 충돌을 다시 확인하고, 필요한 V126~V132가 포함된 통합 커밋에서 순서대로 적용한다. 현재 작업 브랜치만 먼저 운영 DB에 적용하지 않는다.
 
 ## 현재 구현 상태
 
@@ -99,7 +99,52 @@
 - 모든 OAuth 행의 원본 식별자를 덮어쓰고 Apple 이전 식별자 사본 및 만료·폐기된 항목을 포함한 Refresh token 해시를 제거한다. 기존 프로필 잠금과 단일 트랜잭션을 유지한다.
 - 독립 리뷰에서 확인한 Apple 이전 배치 중단 문제를 보완했다. Apple 응답 대기 중 탈퇴해 이전 행이 제거된 대상은 실패 기록 후처리에서 연결 해제와 행 소멸을 확인하고 건너뛴다. 활성 계정의 행 소실과 DB 오류는 정상 취소로 취급하지 않는다.
 - 장기기억 삭제와 소유 푸시 토큰 비활성화는 기존 동작을 유지한다.
-- 이번 변경은 스키마 변경이 없다. 기존 탈퇴 회원 소급 정리, 대화·피드백 및 푸시 토큰 원본 파기, 법정 보관 분리·기간 만료 처리, 외부 사업자·파일·백업 처리는 아직 구현하지 않았다.
+- V133으로 기존 탈퇴 회원에게 현재 API와 동일한 계정·인증·장기기억 정리와 푸시 비활성화를 소급 적용한다. 대화·피드백 및 푸시 토큰 원본 파기, 법정 보관 분리·기간 만료 처리, 외부 사업자·파일·백업 처리는 아직 구현하지 않았다.
+
+## 기존 탈퇴 회원 소급 적용: V133
+
+- 대상은 `user_profile.status = 'WITHDRAWN'`인 회원 ID다. 같은 이메일·소셜 식별자로 재가입한 활성 회원은 대상에 포함하지 않는다.
+- 닉네임·이메일·프로필 이미지 및 모든 소셜 연결의 식별 원본을 현재 API와 같은 값으로 덮어쓰고, Apple 이전 사본과 만료·폐기 이력을 포함한 Refresh token을 제거한다.
+- 현재 소유 푸시 토큰은 `REVOKED`로 전환한다. 다른 회원으로 이전된 기기와 발송 이력은 보존한다. 푸시 토큰 값 자체의 파기는 이 마이그레이션 범위에 포함되지 않는다.
+- 장기기억 검색 이력(marker 포함), 원본 계보, 기억 본문·임베딩을 제거한다. 교체된 기억은 자기 참조 FK와 상태 제약을 함께 만족하도록 먼저 무효화한 뒤 제거한다.
+- 회원 행·생성 시각·구독 상태, 문의·첨부파일·답변 연결, 결제 이벤트, 대화 원문을 보존한다.
+- 초기 설치에서는 버전 마이그레이션이 반복 마이그레이션보다 먼저 실행된다. Apple 이전 테이블이 없는 신규 DB도 처리하도록 기존 반복 마이그레이션의 스키마를 V133에 고정하고 `CREATE TABLE/INDEX IF NOT EXISTS`로 보장했다. 기존 반복 마이그레이션은 수정하지 않았다.
+- 다시 실행해도 이미 덮어쓴 행의 `updated_at`을 바꾸지 않고 같은 결과를 유지한다. 정식 적용 여부는 Flyway 이력으로 관리한다.
+- 운영 적용은 기존 Flyway 실행 경로와 PostgreSQL 트랜잭션을 사용한다. Apple 계정 이전 CLI와 소급 정리의 동시 실행을 피하고, 적용 후 수정된 배치로 실행한다.
+
+### 적용 전후 확인
+
+아래 조회는 원본 값을 출력하지 않고 정리 대상 건수만 확인한다. 적용 후 각 값은 0이어야 한다. 회원 행·문의·첨부파일·결제 자료의 보존 여부도 별도로 확인한다. 운영 DB 조회·마이그레이션 실행·배포는 아직 수행하지 않았다.
+
+```sql
+SELECT 'profile_identifiers' AS category, COUNT(*) AS remaining
+FROM user_profile
+WHERE status = 'WITHDRAWN'
+  AND (nickname <> '탈퇴한 사용자' OR email IS NOT NULL OR profile_image_url IS NOT NULL)
+UNION ALL
+SELECT 'social_identifiers', COUNT(*) FROM oauth_identity identity
+JOIN user_profile profile ON profile.id = identity.user_profile_id
+WHERE profile.status = 'WITHDRAWN'
+  AND (identity.provider_user_id <> 'withdrawn' OR identity.provider_email IS NOT NULL
+       OR identity.status <> 'UNLINKED')
+UNION ALL
+SELECT 'apple_migrations', COUNT(*) FROM apple_user_migration migration
+JOIN oauth_identity identity ON identity.id = migration.oauth_identity_id
+JOIN user_profile profile ON profile.id = identity.user_profile_id
+WHERE profile.status = 'WITHDRAWN'
+UNION ALL
+SELECT 'refresh_tokens', COUNT(*) FROM refresh_token token
+JOIN user_profile profile ON profile.id = token.user_profile_id
+WHERE profile.status = 'WITHDRAWN'
+UNION ALL
+SELECT 'unrevoked_push_tokens', COUNT(*) FROM user_push_token token
+JOIN user_profile profile ON profile.id = token.user_profile_id
+WHERE profile.status = 'WITHDRAWN' AND token.status <> 'REVOKED'
+UNION ALL
+SELECT 'memories', COUNT(*) FROM conversation_memory memory
+JOIN user_profile profile ON profile.id = memory.user_profile_id
+WHERE profile.status = 'WITHDRAWN';
+```
 
 ## 검증 계획과 결과
 
@@ -115,6 +160,7 @@
 - [ ] 법정 보관 기한 경계, 재시도, 기존 탈퇴자 재실행 및 dry-run 무변경 검증.
 - [x] 계정 원본 덮어쓰기 구현 후 `JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew spotlessApply check --offline --console=plain` 통과(2026-09-29): 1,806건, 실패·오류 0건, 건너뜀 12건. 실제 PostgreSQL 검증과 운영 적용은 포함하지 않는다.
 - [x] 독립 리뷰 P2 수정 후 같은 전체 검사 통과: 1,812건, 실패·오류 0건, 건너뜀 12건. 독립 리뷰어의 기존 H2 재현기에서도 다음 정상 회원의 이전 완료를 확인했으며 재리뷰 추가 지적은 없다. PostgreSQL 실제 동시성과 운영 적용은 미검증이다.
+- [x] V133 추가 후 같은 전체 검사 통과(2026-09-29): 1,814건, 실패·오류 0건, 건너뜀 12건. 실제 Flyway/H2 스키마에서 기존 탈퇴자 소급 정리·재가입 계정과 이전된 기기 보존·문의와 첨부파일 및 거래 이력 보존·재실행 시 무변경·신규 DB 적용을 검증했다. 장기기억 자기 참조 FK 정리도 포함하며 독립 리뷰 추가 지적은 없다. 실제 PostgreSQL 및 다른 PR의 마이그레이션을 포함한 통합 검증과 운영 적용은 미수행이다.
 - [ ] 배포된 버전·운영 삭제 결과·외부 사업자 완료 상태 별도 확인.
 
 기준 검사 로그는 작업 환경의 `/tmp/lan593-baseline.log`에 있으며 영구 증빙 파일이 아니다. 운영 검증과 외부 파기 완료 기준은 아직 달성하지 않았다.
