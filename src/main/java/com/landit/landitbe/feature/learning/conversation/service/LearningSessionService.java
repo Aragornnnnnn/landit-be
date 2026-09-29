@@ -405,6 +405,21 @@ public class LearningSessionService {
   }
 
   /**
+   * 완료 버튼으로 프리톡을 완료하고 종료 방식을 기록한다.
+   *
+   * @param sessionId 이미 소유권과 상태를 검증한 세션 ID
+   * @param endedAt 종료 시각
+   * @return 변경 직후의 세션 값
+   * @throws ApiException 지정한 세션이 없을 때
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public LearningSessionSnapshot completeFreeTalkDirectly(long sessionId, LocalDateTime endedAt) {
+    LearningSession session = requireEntity(sessionId);
+    session.completeFreeTalkDirectly(endedAt);
+    return LearningSessionSnapshot.from(session);
+  }
+
+  /**
    * 발화 시간 한도 도달로 프리톡을 완료한다.
    *
    * @param sessionId 이미 검증한 세션 ID

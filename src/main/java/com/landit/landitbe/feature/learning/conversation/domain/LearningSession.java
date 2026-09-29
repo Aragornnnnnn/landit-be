@@ -152,6 +152,16 @@ public class LearningSession extends BaseTimeEntity {
   }
 
   /**
+   * 완료 버튼으로 프리톡 세션을 종료하고 직접 종료 사유를 남긴다.
+   *
+   * @param endedAt 세션 종료 시각
+   */
+  public void completeFreeTalkDirectly(LocalDateTime endedAt) {
+    completeFreeTalkByUser(endedAt);
+    this.completionReason = CompletionReason.DIRECT_COMPLETION;
+  }
+
+  /**
    * 시간 제한 도달로 프리톡 세션을 완료한다.
    *
    * @param endedAt 세션 종료 시각
