@@ -71,7 +71,7 @@ public interface AuthControllerDocs {
    */
   @Operation(
       summary = "회원 탈퇴",
-      description = "현재 사용자를 탈퇴 처리하고 활성 refresh token을 폐기한다.",
+      description = "현재 사용자를 탈퇴 처리하고 활성 refresh token을 폐기하며, 계정 소유의 모든 푸시 Token을 비활성화한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<Void> withdraw(AuthUserPrincipal principal);
 }
