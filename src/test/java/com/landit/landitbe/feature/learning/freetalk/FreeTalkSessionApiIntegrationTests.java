@@ -2625,6 +2625,37 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
   }
 
+  @DisplayName("종료 확인 대기에서 직접 완료하면 누락된 교정을 시작하고 같은 발화 재전송도 완료로 응답한다.")
+  @Test
+  void directlyCompletesExitConfirmationAndPreparesCorrection() throws Exception {
+    String token = login("direct-exit@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.detectExitIntent();
+    String request = messageRequest(UUID.randomUUID().toString(), "I have to go.", 1200, false);
+    MvcResult result =
+        mockMvc
+            .perform(postJsonWithToken(messagePath(sessionId), token, request))
+            .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
+            .andReturn();
+    long messageId = responseData(result).at("/submittedMessage/messageId").asLong();
+    requestDirectCompletion(token, sessionId);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    mockMvc
+        .perform(postJsonWithToken(messagePath(sessionId), token, request))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.nextMessage").value(nullValue()));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accumulated_speaking_duration_ms FROM free_talk_session", Long.class))
+        .isEqualTo(1200);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+  }
+
   private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
     return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
