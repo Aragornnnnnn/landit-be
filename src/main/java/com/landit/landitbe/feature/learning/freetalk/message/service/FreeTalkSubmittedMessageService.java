@@ -78,6 +78,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageReservation reserve(
       long userId, long learningSessionId, FreeTalkMessageSubmitRequest request) {
+    userProfileService.requireActiveForUpdate(userId);
     final LearningSessionSnapshot learningSession =
         sessionService.requireOwnedSession(userId, learningSessionId);
     FreeTalkSession freeTalkSession = sessionService.requireFreeTalkForUpdate(learningSessionId);
@@ -232,6 +233,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeTurn(
       FreeTalkMessageReservation reservation, AiFreeTalkTurnResult result) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
     requireProcessingOwner(session, reservation.clientMessageId());
@@ -334,6 +336,7 @@ public class FreeTalkSubmittedMessageService {
    */
   @Transactional
   public void compensate(FreeTalkMessageReservation reservation) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     FreeTalkSession session =
         freeTalkSessionRepository
             .findByLearningSessionIdForUpdate(reservation.learningSessionId())
@@ -361,6 +364,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkExitDecisionReservation reserveDecision(
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
+    userProfileService.requireActiveForUpdate(userId);
     final LearningSessionSnapshot learningSession =
         sessionService.requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = sessionService.requireFreeTalkForUpdate(learningSessionId);
@@ -407,6 +411,7 @@ public class FreeTalkSubmittedMessageService {
   @Transactional
   public FreeTalkMessageSubmitResponse finalizeContinue(
       FreeTalkExitDecisionReservation reservation, AiFreeTalkTurnResult result) {
+    userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
