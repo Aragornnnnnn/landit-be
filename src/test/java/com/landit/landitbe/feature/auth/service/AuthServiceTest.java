@@ -30,7 +30,6 @@ import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,8 +180,6 @@ class AuthServiceTest {
   @Test
   void withdrawDeletesMemoryBeforeRevokingAuthenticationArtifacts() {
     when(userProfileService.withdrawIfActiveForUpdate(USER_ID)).thenReturn(true);
-    when(oauthIdentityRepository.findAllByUserProfileIdAndStatus(any(), any()))
-        .thenReturn(List.of());
 
     authService.withdraw(USER_ID);
 
@@ -191,12 +188,13 @@ class AuthServiceTest {
             userProfileService,
             conversationMemoryDeletionService,
             pushDevicePersistenceService,
-            refreshTokenRepository);
+            refreshTokenRepository,
+            oauthIdentityRepository);
     withdrawalOrder.verify(userProfileService).withdrawIfActiveForUpdate(USER_ID);
     withdrawalOrder.verify(conversationMemoryDeletionService).deleteAllByUserProfileId(USER_ID);
     withdrawalOrder.verify(pushDevicePersistenceService).revokeAllOwned(USER_ID);
-    withdrawalOrder
-        .verify(refreshTokenRepository)
-        .revokeAllActiveByUserProfileId(eq(USER_ID), any(LocalDateTime.class));
+    withdrawalOrder.verify(refreshTokenRepository).deleteAllByUserProfileId(USER_ID);
+    withdrawalOrder.verify(oauthIdentityRepository).overwritePersonalData(USER_ID);
+    withdrawalOrder.verify(oauthIdentityRepository).deleteAppleMigrationData(USER_ID);
   }
 }

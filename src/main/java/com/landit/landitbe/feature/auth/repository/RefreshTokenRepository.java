@@ -14,6 +14,15 @@ import org.springframework.data.repository.query.Param;
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
   /**
+   * 탈퇴 사용자의 만료·폐기 이력을 포함한 모든 Refresh token 해시를 제거한다.
+   *
+   * @param userProfileId 탈퇴 사용자 ID
+   */
+  @Modifying(flushAutomatically = true)
+  @Query("delete from RefreshToken token where token.userProfileId = :userProfileId")
+  void deleteAllByUserProfileId(@Param("userProfileId") Long userProfileId);
+
+  /**
    * Refresh token 해시로 토큰 소유 사용자 ID를 조회한다.
    *
    * @param tokenHash 조회할 Refresh token 해시
