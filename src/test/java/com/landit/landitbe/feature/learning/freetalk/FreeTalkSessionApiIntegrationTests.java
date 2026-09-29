@@ -2729,6 +2729,44 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo("INTERRUPTED");
   }
 
+  @DisplayName("기존 작별 완료와 시간 소진 완료에 직접 완료를 재요청해도 원래 종료 사유를 유지한다.")
+  @Test
+  void retainsOriginalCompletionReasonForAlreadyCompletedSessions() throws Exception {
+    String token = login("direct-existing@example.com").at("/data/accessToken").asText();
+    long goodbyeSessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long messageId = submitForExit(token, goodbyeSessionId);
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                exitDecisionPath(goodbyeSessionId),
+                token,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(messageId)))
+        .andExpect(status().isOk());
+    requestDirectCompletion(token, goodbyeSessionId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                goodbyeSessionId))
+        .isEqualTo("USER_ENDED");
+    long timedSessionId = startUserFirstSession(token);
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                messagePath(timedSessionId),
+                token,
+                messageRequest(UUID.randomUUID().toString(), "Bye.", 7200000, false)))
+        .andExpect(status().isOk());
+    requestDirectCompletion(token, timedSessionId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                timedSessionId))
+        .isEqualTo("TIME_LIMIT_REACHED");
+  }
+
   private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
     return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
