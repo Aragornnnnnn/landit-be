@@ -187,9 +187,14 @@ class AuthServiceTest {
     authService.withdraw(USER_ID);
 
     InOrder withdrawalOrder =
-        inOrder(userProfileService, conversationMemoryDeletionService, refreshTokenRepository);
+        inOrder(
+            userProfileService,
+            conversationMemoryDeletionService,
+            pushDevicePersistenceService,
+            refreshTokenRepository);
     withdrawalOrder.verify(userProfileService).withdrawIfActiveForUpdate(USER_ID);
     withdrawalOrder.verify(conversationMemoryDeletionService).deleteAllByUserProfileId(USER_ID);
+    withdrawalOrder.verify(pushDevicePersistenceService).revokeAllOwned(USER_ID);
     withdrawalOrder
         .verify(refreshTokenRepository)
         .revokeAllActiveByUserProfileId(eq(USER_ID), any(LocalDateTime.class));

@@ -6,6 +6,7 @@ import static com.landit.landitbe.support.AuthenticatedJsonRequests.putJsonWithT
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -477,6 +478,40 @@ class ExpoPushTokenApiIntegrationTests {
                   .containsExactly(installed, legacy);
               assertThat(locked).extracting(UserPushToken::getId).isSorted();
             });
+  }
+
+  /** 탈퇴는 모든 소유 Token을 폐기하되 다른 계정으로 이전된 Token은 유지한다. */
+  @Test
+  void withdrawalRevokesAllOwnedTokensAndPreservesTransferredToken() throws Exception {
+    String userKey = "push-withdraw-owner";
+    String access = login(userKey);
+    String other = login("push-withdraw-other");
+    UUID transferredInstallation = UUID.randomUUID();
+    String transferred = "ExpoPushToken[withdraw-transferred]";
+    String installed = "ExpoPushToken[withdraw-installed]";
+    updateDevice(access, transferredInstallation, transferred, true);
+    updateDevice(other, transferredInstallation, transferred, true);
+    updateDevice(access, UUID.randomUUID(), installed, true);
+    String second = "ExpoPushToken[withdraw-second]";
+    updateDevice(access, UUID.randomUUID(), second, true);
+    String legacy = "ExpoPushToken[withdraw-legacy]";
+    registerToken(access, legacy);
+
+    mockMvc
+        .perform(delete("/api/v1/auth/me").header("Authorization", "Bearer " + access))
+        .andExpect(status().isOk());
+
+    assertTokenStatus(installed, "REVOKED");
+    assertTokenStatus(second, "REVOKED");
+    assertTokenStatus(legacy, "REVOKED");
+    assertTokenStatus(transferred, "ACTIVE");
+    assertThat(tokenOwner(transferred)).isEqualTo(userProfileId("push-withdraw-other"));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from user_push_token where user_profile_id = ? and status = 'ACTIVE'",
+                Integer.class,
+                userProfileId(userKey)))
+        .isZero();
   }
 
   /** 테스트 식별자로 가짜 소셜 로그인을 수행하고 access token을 반환한다. */
