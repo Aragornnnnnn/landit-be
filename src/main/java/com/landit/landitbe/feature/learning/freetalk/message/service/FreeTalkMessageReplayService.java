@@ -82,7 +82,10 @@ public class FreeTalkMessageReplayService {
     }
 
     // 저장된 다음 AI 메시지와 완료 당시의 대화 상태로 응답을 복원한다.
-    SessionHistoryMessageSnapshot nextMessage = requireNextAiMessage(messages, userMessageIndex);
+    SessionHistoryMessageSnapshot nextMessage =
+        storedTurnStatus == FreeTalkTurnStatus.COMPLETED && userMessageIndex + 1 == messages.size()
+            ? null
+            : requireNextAiMessage(messages, userMessageIndex);
     return responseService.buildReplayResponse(
         learningSessionId,
         session.getTitle(),
@@ -139,7 +142,10 @@ public class FreeTalkMessageReplayService {
     List<SessionHistoryMessageSnapshot> messages =
         conversationMessageService.findAll(history.getId());
     int userMessageIndex = indexOfMessage(messages, userMessage.getId());
-    SessionHistoryMessageSnapshot nextMessage = requireNextAiMessage(messages, userMessageIndex);
+    SessionHistoryMessageSnapshot nextMessage =
+        storedTurnStatus == FreeTalkTurnStatus.COMPLETED && userMessageIndex + 1 == messages.size()
+            ? null
+            : requireNextAiMessage(messages, userMessageIndex);
     return responseService.buildReplayResponse(
         learningSessionId,
         session.getTitle(),

@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.freetalk.message.service;
 import com.landit.landitbe.config.memory.MemoryProperties;
 import com.landit.landitbe.feature.character.service.StreakService;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
+import com.landit.landitbe.feature.learning.conversation.domain.CompletionReason;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
@@ -236,6 +237,9 @@ public class FreeTalkSubmittedMessageService {
     userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
+    if (isDirectlyCompleted(records)) {
+      return directlyCompletedResponse(records);
+    }
     requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessageSnapshot userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
@@ -292,6 +296,9 @@ public class FreeTalkSubmittedMessageService {
     userProfileService.requireActiveForUpdate(reservation.userId());
     ManagedRecords records = managedRecords(reservation);
     FreeTalkSession session = records.freeTalkSession();
+    if (isDirectlyCompleted(records)) {
+      return directlyCompletedResponse(records);
+    }
     requireProcessingOwner(session, reservation.clientMessageId());
     SessionHistoryMessageSnapshot userMessage = records.userMessage();
     session.addSpeakingDuration(reservation.utteranceDurationMs());
@@ -415,6 +422,9 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
+    if (isDirectlyCompleted(records)) {
+      return directlyCompletedResponse(records);
+    }
     requireProcessingOwner(
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     records =
@@ -455,6 +465,9 @@ public class FreeTalkSubmittedMessageService {
     ManagedRecords records =
         managedRecords(
             reservation.learningSessionId(), reservation.historyId(), reservation.userMessageId());
+    if (isDirectlyCompleted(records)) {
+      return directlyCompletedResponse(records);
+    }
     requireProcessingOwner(
         records.freeTalkSession(), decisionProcessingClientMessageId(reservation));
     assignClosingTitle(records.freeTalkSession(), result, reservation.titleGenerationRequired());
@@ -506,6 +519,20 @@ public class FreeTalkSubmittedMessageService {
                 decisionProcessingClientMessageId(reservation)
                     .equals(session.getProcessingClientMessageId()))
         .ifPresent(FreeTalkSession::clearProcessing);
+  }
+
+  private boolean isDirectlyCompleted(ManagedRecords records) {
+    return records.learningSession().getCompletionReason() == CompletionReason.DIRECT_COMPLETION;
+  }
+
+  private FreeTalkMessageSubmitResponse directlyCompletedResponse(ManagedRecords records) {
+    return responseService.buildResponse(
+        records.learningSessionId(),
+        records.freeTalkSession(),
+        FreeTalkTurnStatus.COMPLETED,
+        records.userMessage(),
+        null,
+        records.learningSession().getUserProfileId());
   }
 
   // 속마음과 턴 교정은 같은 AI 응답으로 오므로 준비도 같은 트랜잭션에서 함께 건다.
