@@ -175,7 +175,7 @@ public class AuthService {
   }
 
   /**
-   * 현재 사용자를 탈퇴 처리하고 활성 Refresh token을 모두 폐기한다.
+   * 현재 사용자를 탈퇴 처리하고 활성 Refresh token과 푸시 Token을 모두 폐기한다.
    *
    * @param userId 탈퇴할 사용자 ID
    * @throws ApiException 활성 사용자를 찾을 수 없을 때
@@ -186,6 +186,7 @@ public class AuthService {
       throw new ApiException(AuthErrorCode.INVALID_TOKEN);
     }
     conversationMemoryDeletionService.deleteAllByUserProfileId(userId);
+    pushDevicePersistenceService.revokeAllOwned(userId);
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
     oauthIdentityRepository
         .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.ACTIVE)

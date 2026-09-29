@@ -78,6 +78,18 @@ public class PushDevicePersistenceService {
   }
 
   /**
+   * 탈퇴 계정이 현재 소유한 모든 설치 및 구형 Token을 비활성화한다.
+   *
+   * <p>호출자는 탈퇴 트랜잭션에서 프로필 잠금을 먼저 획득해야 한다.
+   *
+   * @param userProfileId 탈퇴 사용자 ID
+   */
+  @Transactional
+  public void revokeAllOwned(Long userProfileId) {
+    tokens.findAllOwnedForUpdate(userProfileId).forEach(UserPushToken::revoke);
+  }
+
+  /**
    * 로그아웃한 계정이 여전히 해당 설치를 소유할 때만 발송을 중지한다.
    *
    * @param userProfileId 로그아웃 계정 ID

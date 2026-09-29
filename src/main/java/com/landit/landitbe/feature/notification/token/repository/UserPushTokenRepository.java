@@ -41,6 +41,16 @@ public interface UserPushTokenRepository extends JpaRepository<UserPushToken, Lo
       @Param("expoPushToken") String expoPushToken,
       @Param("status") UserPushTokenStatus status);
 
+  /**
+   * 탈퇴 계정에 남아 있는 Token을 발송과 같은 ID 순서로 잠근다.
+   *
+   * @param userProfileId 탈퇴 사용자 ID
+   * @return 현재 해당 계정이 소유한 모든 Token
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select t from UserPushToken t where t.userProfileId = :userProfileId order by t.id")
+  List<UserPushToken> findAllOwnedForUpdate(@Param("userProfileId") Long userProfileId);
+
   /** 설치 식별자로 현재 Token 행을 잠근다. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select t from UserPushToken t where t.installationId = :installationId")
