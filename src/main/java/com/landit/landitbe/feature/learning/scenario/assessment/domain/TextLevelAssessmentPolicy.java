@@ -86,8 +86,7 @@ public final class TextLevelAssessmentPolicy {
             .add(discourse.confidence().multiply(new BigDecimal("0.15")))
             .add(interaction.confidence().multiply(new BigDecimal("0.15")))
             .setScale(2, RoundingMode.HALF_UP);
-    Integer assessedLevel =
-        overall == null ? null : overall.setScale(0, RoundingMode.HALF_UP).intValue();
+    Integer assessedLevel = overall == null ? null : LearningLevelPolicy.levelForScore(overall);
     return Optional.of(
         new Score(
             situation,
@@ -112,7 +111,7 @@ public final class TextLevelAssessmentPolicy {
       }
       totalWeights = totalWeights.add(observation.responseDemand().weight());
       Integer value = level.apply(observation);
-      if (value == null || value < 1 || value > 5) {
+      if (value == null || value < 1 || value > 100) {
         continue;
       }
       weightedLevels =
@@ -131,9 +130,9 @@ public final class TextLevelAssessmentPolicy {
 
   private static BigDecimal observationCap(ContentLearningLevel group) {
     return switch (group) {
-      case LEVEL_1 -> new BigDecimal("2.00");
-      case LEVEL_2_TO_3 -> new BigDecimal("4.00");
-      case LEVEL_4_TO_5, DIAGNOSTIC -> new BigDecimal("5.00");
+      case LEVEL_1 -> new BigDecimal("40.00");
+      case LEVEL_2_TO_3 -> new BigDecimal("80.00");
+      case LEVEL_4_TO_5, DIAGNOSTIC -> new BigDecimal("100.00");
     };
   }
 }
