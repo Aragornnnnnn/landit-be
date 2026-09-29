@@ -136,6 +136,9 @@ public class PremiumAccessFilter extends OncePerRequestFilter {
     }
     var freeTalk = FREE_TALK_ACTION.matcher(request);
     if (freeTalk.isMatch()) {
+      if ("complete".equals(freeTalk.getVariables().get("action"))) {
+        return true;
+      }
       return grants.allowsExisting(
           userId,
           new ExistingLearningRequest(

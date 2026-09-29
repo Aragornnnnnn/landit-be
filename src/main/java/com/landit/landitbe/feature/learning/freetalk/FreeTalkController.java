@@ -12,6 +12,7 @@ import com.landit.landitbe.feature.learning.freetalk.history.service.FreeTalkHis
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkExitDecisionRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageSubmitRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.dto.FreeTalkMessageSubmitResponse;
+import com.landit.landitbe.feature.learning.freetalk.message.service.FreeTalkCompletionService;
 import com.landit.landitbe.feature.learning.freetalk.message.service.FreeTalkMessageService;
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartResponse;
@@ -42,6 +43,7 @@ public class FreeTalkController implements FreeTalkControllerDocs {
   private final FreeTalkTopicService freeTalkTopicService;
   private final FreeTalkSessionStartService freeTalkSessionStartService;
   private final FreeTalkMessageService freeTalkMessageService;
+  private final FreeTalkCompletionService completionService;
   private final FreeTalkHistoryQueryService freeTalkHistoryQueryService;
   private final FreeTalkSummaryService freeTalkSummaryService;
   private final FreeTalkExpressionRetryService freeTalkExpressionRetryService;
@@ -87,6 +89,15 @@ public class FreeTalkController implements FreeTalkControllerDocs {
     return ResponseEntity.ok(
         ApiResponse.success(
             freeTalkMessageService.decideExit(principal.userId(), sessionId, request)));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @PostMapping("/api/v1/free-talk/sessions/{sessionId}/complete")
+  public ResponseEntity<Void> completeSession(
+      @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
+    completionService.complete(principal.userId(), sessionId);
+    return ResponseEntity.ok().build();
   }
 
   /** {@inheritDoc} */
