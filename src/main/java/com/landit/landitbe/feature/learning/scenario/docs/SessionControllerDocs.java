@@ -137,6 +137,9 @@ public interface SessionControllerDocs {
       summary = "세션 텍스트 수준 평가 조회",
       description =
           "비동기 수준 평가 상태와 완료된 영역별 평가 결과를 조회한다. "
+              + "신규 영역·종합 점수는 1~100이며 scoreMax=100이다. "
+              + "과거 평가는 원래 1~5 점수와 scoreMax=5를 유지한다. "
+              + "학습 레벨과 displayLevel은 1~5이며 confidence는 관찰 비율이다. "
               + "LANDIT_SUBSCRIPTION_LAUNCHED_AT 미설정, 현재 시각이 도입 시각 전이거나 도입 전 완료 세션이면 "
               + "HTTP 200과 success=true, data=null, error=null을 반환한다. FE는 polling을 종료한다. "
               + "현재 시각이 도입 시각에 도달하면 서버 재시작 없이 수준 평가를 활성화한다. "
