@@ -2656,6 +2656,52 @@ class FreeTalkSessionApiIntegrationTests {
     assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
   }
 
+  @DisplayName("AI 응답을 기다리는 발화를 보존하여 즉시 완료하고 늦은 AI 응답으로 대화를 다시 열지 않는다.")
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void directlyCompletesWhileSubmittedTurnIsWaitingForAi(boolean failTurn) throws Exception {
+    String token = login("direct-inflight@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.blockTurn();
+    if (failTurn) {
+      fakeAiFreeTalkClient.failTurn();
+    }
+    String request = messageRequest(UUID.randomUUID().toString(), "I went hiking.", 4200, false);
+    CompletableFuture<Integer> pending =
+        CompletableFuture.supplyAsync(() -> performMessageStatus(token, sessionId, request));
+    try {
+      assertThat(fakeAiFreeTalkClient.awaitTurnStarted()).isTrue();
+      requestDirectCompletion(token, sessionId);
+      assertThat(pending.isDone()).isFalse();
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT status FROM learning_session WHERE id = ?", String.class, sessionId))
+          .isEqualTo("COMPLETED");
+    } finally {
+      fakeAiFreeTalkClient.releaseTurn();
+    }
+    assertThat(pending.get(5, TimeUnit.SECONDS)).isEqualTo(failTurn ? 503 : 200);
+    long messageId =
+        jdbcTemplate.queryForObject("SELECT id FROM session_history_message", Long.class);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accumulated_speaking_duration_ms FROM free_talk_session", Long.class))
+        .isEqualTo(4200);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isEqualTo(4200);
+    mockMvc
+        .perform(postJsonWithToken(messagePath(sessionId), token, request))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
   private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
     return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
