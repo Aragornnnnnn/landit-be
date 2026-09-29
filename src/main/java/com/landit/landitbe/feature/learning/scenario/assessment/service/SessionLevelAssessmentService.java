@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionLevelAssessmentService {
 
-  private static final String ASSESSMENT_VERSION = "text-level-v1.3";
+  private static final String ASSESSMENT_VERSION = "text-score-v2.0";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final ProfileLearningService profileLearningService;
@@ -140,11 +140,11 @@ class SessionLevelAssessmentService {
       observations.add(
           new Observation(
               expected.responseDemand(),
-              observedLevel(domains.situationPerformance()),
-              observedLevel(domains.grammar()),
-              observedLevel(domains.vocabulary()),
-              observedLevel(domains.discourse()),
-              observedLevel(domains.interactionPragmatics())));
+              observedScore(domains.situationPerformance()),
+              observedScore(domains.grammar()),
+              observedScore(domains.vocabulary()),
+              observedScore(domains.discourse()),
+              observedScore(domains.interactionPragmatics())));
     }
     return TextLevelAssessmentPolicy.calculate(observations, context.questionLevelGroup())
         .orElse(null);
@@ -155,19 +155,19 @@ class SessionLevelAssessmentService {
       return false;
     }
     if (domain.evidenceStatus() != AiSessionLevelAssessment.EvidenceStatus.OBSERVED) {
-      return domain.level() == null && domain.evidenceExcerpt() == null;
+      return domain.score() == null && domain.evidenceExcerpt() == null;
     }
-    return domain.level() != null
-        && domain.level() >= 1
-        && domain.level() <= 5
+    return domain.score() != null
+        && domain.score() >= 1
+        && domain.score() <= 100
         && domain.evidenceExcerpt() != null
         && !domain.evidenceExcerpt().isBlank()
         && userMessage.contains(domain.evidenceExcerpt());
   }
 
-  private Integer observedLevel(AiSessionLevelAssessment.Domain domain) {
+  private Integer observedScore(AiSessionLevelAssessment.Domain domain) {
     return domain.evidenceStatus() == AiSessionLevelAssessment.EvidenceStatus.OBSERVED
-        ? domain.level()
+        ? domain.score()
         : null;
   }
 

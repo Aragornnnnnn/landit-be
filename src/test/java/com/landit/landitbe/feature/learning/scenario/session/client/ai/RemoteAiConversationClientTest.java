@@ -430,8 +430,8 @@ class RemoteAiConversationClientTest {
     assertThat(result.highlightMessage()).isEqualTo("You clearly explained your preference.");
     assertThat(result.summaryMessage()).isEqualTo("Keep connecting your reasons with because.");
     assertThat(result.levelAssessment().core().messages()).hasSize(2);
-    assertThat(result.levelAssessment().core().messages().getFirst().domains().grammar().level())
-        .isEqualTo(4);
+    assertThat(result.levelAssessment().core().messages().getFirst().domains().grammar().score())
+        .isEqualTo(70);
   }
 
   @DisplayName("최종 피드백 응답의 메시지별 칭찬과 교정 내용을 변환한다.")
@@ -824,22 +824,22 @@ class RemoteAiConversationClientTest {
                             "messageId": 200,
                             "taskPerformance": "ACHIEVED",
                             "domains": {
-                              "situationPerformance": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I like pizza"},
-                              "grammar": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "because it is spicy"},
-                              "vocabulary": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "spicy"},
-                              "discourse": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "because"},
-                              "interactionPragmatics": {"level": 4, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I like pizza"}
+                              "situationPerformance": {"score": 70, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I like pizza"},
+                              "grammar": {"score": 70, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "because it is spicy"},
+                              "vocabulary": {"score": 70, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "spicy"},
+                              "discourse": {"score": 70, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "because"},
+                              "interactionPragmatics": {"score": 70, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I like pizza"}
                             }
                           },
                           {
                             "messageId": 201,
                             "taskPerformance": "PARTIAL",
                             "domains": {
-                              "situationPerformance": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "cafe yesterday"},
-                              "grammar": {"level": 2, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I go"},
-                              "vocabulary": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "cafe"},
-                              "discourse": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "yesterday"},
-                              "interactionPragmatics": {"level": 3, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I go to the cafe"}
+                              "situationPerformance": {"score": 50, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "cafe yesterday"},
+                              "grammar": {"score": 30, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I go"},
+                              "vocabulary": {"score": 50, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "cafe"},
+                              "discourse": {"score": 50, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "yesterday"},
+                              "interactionPragmatics": {"score": 50, "evidenceStatus": "OBSERVED", "evidenceExcerpt": "I go to the cafe"}
                             }
                           }
                         ]
