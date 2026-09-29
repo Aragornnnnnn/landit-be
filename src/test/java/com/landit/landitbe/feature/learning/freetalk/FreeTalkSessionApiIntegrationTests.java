@@ -2702,6 +2702,33 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
   }
 
+  @DisplayName("직접 완료는 미인증·타인·없는 세션·중단 세션을 기존 오류로 거부한다.")
+  @Test
+  void rejectsInvalidDirectCompletionRequests() throws Exception {
+    String token = login("direct-owner@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    String other = login("direct-other@example.com").at("/data/accessToken").asText();
+    mockMvc
+        .perform(post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(directCompletion(sessionId, other)).andExpect(status().isForbidden());
+    mockMvc.perform(directCompletion(999999L, token)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/sessions/{sessionId}/end", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(directCompletion(sessionId, token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT status FROM learning_session WHERE id = ?", String.class, sessionId))
+        .isEqualTo("INTERRUPTED");
+  }
+
   private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
     return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
