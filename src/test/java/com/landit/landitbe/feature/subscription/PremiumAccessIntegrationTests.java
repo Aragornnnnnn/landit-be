@@ -267,6 +267,43 @@ class PremiumAccessIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("PREMIUM_REQUIRED"));
   }
 
+  @DisplayName("구독과 기존 학습 권한이 만료되어도 소유한 스몰톡을 직접 완료하고 재시도할 수 있다.")
+  @Test
+  void allowsDirectCompletionAfterPremiumExpires() throws Exception {
+    String userKey = "premium-direct-complete";
+    String token = login(userKey);
+    Long userId = userIdOf(userKey);
+    activatePremium(userId);
+    MvcResult started =
+        mockMvc
+            .perform(
+                post("/api/v1/free-talk/sessions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"startMode\":\"USER_FIRST\",\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    long sessionId =
+        objectMapper
+            .readTree(started.getResponse().getContentAsByteArray())
+            .at("/data/sessionId")
+            .asLong();
+    expirePremium(userId);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+          .andExpect(status().isOk());
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("DIRECT_COMPLETION");
+  }
+
   /** 인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다. */
   @DisplayName("인증되지 않은 요청은 게이트 경로에서도 403이 아니라 401을 받는다.")
   @Test

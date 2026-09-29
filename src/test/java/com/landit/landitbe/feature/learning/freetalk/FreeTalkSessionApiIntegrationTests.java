@@ -2767,6 +2767,21 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo("TIME_LIMIT_REACHED");
   }
 
+  @DisplayName("직접 완료 API 문서는 인증·오류와 본문 없는 200 응답을 명시한다.")
+  @Test
+  void documentsDirectCompletion() throws Exception {
+    String path = "$.paths['/api/v1/free-talk/sessions/{sessionId}/complete'].post";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(path + ".responses['200'].content").doesNotExist())
+        .andExpect(jsonPath(path + ".responses['401']").exists())
+        .andExpect(jsonPath(path + ".responses['403']").exists())
+        .andExpect(jsonPath(path + ".responses['404']").exists())
+        .andExpect(jsonPath(path + ".responses['409']").exists());
+  }
+
   private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
     return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
