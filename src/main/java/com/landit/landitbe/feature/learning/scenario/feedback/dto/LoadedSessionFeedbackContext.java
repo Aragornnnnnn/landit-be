@@ -18,6 +18,7 @@ import java.util.Optional;
  * @param questionLevelGroup 세션 질문 수준
  * @param scenario AI 요청 시나리오
  * @param userMessages 평가할 사용자 발화
+ * @param feedbackEvidence 직전 시나리오 교정과 배운 표현 후보
  * @param existingSummary 기존 최종 피드백
  */
 public record LoadedSessionFeedbackContext(
@@ -28,4 +29,39 @@ public record LoadedSessionFeedbackContext(
     ContentLearningLevel questionLevelGroup,
     AiScenarioContext scenario,
     List<UserMessageContext> userMessages,
-    Optional<ExistingSummaryFeedbackContext> existingSummary) {}
+    ScenarioFeedbackEvidence feedbackEvidence,
+    Optional<ExistingSummaryFeedbackContext> existingSummary) {
+
+  /**
+   * 기존 테스트와 수준 평가 입력은 비교 근거가 비어 있는 컨텍스트를 사용할 수 있다.
+   *
+   * @param sessionId 완료 세션 ID
+   * @param sessionHistoryId 대화 이력 ID
+   * @param targetLocale 학습 언어
+   * @param baseLocale 기준 언어
+   * @param questionLevelGroup 세션 질문 수준
+   * @param scenario AI 요청 시나리오
+   * @param userMessages 평가할 사용자 발화
+   * @param existingSummary 기존 최종 피드백
+   */
+  public LoadedSessionFeedbackContext(
+      Long sessionId,
+      Long sessionHistoryId,
+      Locale targetLocale,
+      Locale baseLocale,
+      ContentLearningLevel questionLevelGroup,
+      AiScenarioContext scenario,
+      List<UserMessageContext> userMessages,
+      Optional<ExistingSummaryFeedbackContext> existingSummary) {
+    this(
+        sessionId,
+        sessionHistoryId,
+        targetLocale,
+        baseLocale,
+        questionLevelGroup,
+        scenario,
+        userMessages,
+        new ScenarioFeedbackEvidence(null, List.of(), List.of()),
+        existingSummary);
+  }
+}
