@@ -7,6 +7,7 @@ import com.landit.landitbe.feature.notification.token.dto.ExpoPushTokenUpdateReq
 import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
 import com.landit.landitbe.feature.profile.exception.UserProfileException;
 import com.landit.landitbe.feature.profile.preference.service.ProfilePreferenceService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,18 +17,22 @@ public class ExpoPushTokenPersistenceService {
 
   private final UserPushTokenRepository userPushTokenRepository;
   private final ProfilePreferenceService profilePreferenceService;
+  private final UserProfileService userProfileService;
 
   /**
    * 사용자 Expo Push Token Repository를 주입받는다.
    *
    * @param userPushTokenRepository 사용자 Expo Push Token Repository
    * @param profilePreferenceService 사용자 프로필 Service
+   * @param userProfileService 프로필 잠금 Service
    */
   public ExpoPushTokenPersistenceService(
       UserPushTokenRepository userPushTokenRepository,
-      ProfilePreferenceService profilePreferenceService) {
+      ProfilePreferenceService profilePreferenceService,
+      UserProfileService userProfileService) {
     this.userPushTokenRepository = userPushTokenRepository;
     this.profilePreferenceService = profilePreferenceService;
+    this.userProfileService = userProfileService;
   }
 
   /**
@@ -39,6 +44,7 @@ public class ExpoPushTokenPersistenceService {
    */
   @Transactional
   public void registerOrClaim(Long userProfileId, ExpoPushTokenUpdateRequest request) {
+    userProfileService.requireActiveForUpdate(userProfileId);
     userPushTokenRepository
         .findByExpoPushTokenForUpdate(request.expoPushToken())
         .ifPresentOrElse(
@@ -60,6 +66,7 @@ public class ExpoPushTokenPersistenceService {
    */
   @Transactional
   public boolean claimExisting(Long userProfileId, ExpoPushTokenUpdateRequest request) {
+    userProfileService.requireActiveForUpdate(userProfileId);
     return userPushTokenRepository
         .findByExpoPushTokenForUpdate(request.expoPushToken())
         .map(

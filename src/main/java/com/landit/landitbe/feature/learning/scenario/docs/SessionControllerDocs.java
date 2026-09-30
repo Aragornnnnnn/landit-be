@@ -98,7 +98,10 @@ public interface SessionControllerDocs {
       description =
           "완료된 세션의 요약 피드백과 메시지별 피드백을 생성하거나 조회한다. 유료 도입 후 무료 사용자는 첫 시나리오의 첫 완료 세션만"
               + " 메시지별 피드백을 받고, 그 외 세션은 messageFeedbacks가 비고 detailFeedbackLocked가 true다. 결제 후 다시"
-              + " 조회하면 전부 내려간다.",
+              + " 조회하면 전부 내려간다. userLevelAssessment에는 기존 비동기 사용자 수준 평가 상태·결과를 포함한다."
+              + " growthFeedback은 직전 완료 시나리오와 비교할 근거가 없으면 null이다."
+              + " expressionReuse.pending은 분석 대기 여부이며,"
+              + " 완료 후 items가 비어 있으면 FE에서 카드를 숨긴다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(

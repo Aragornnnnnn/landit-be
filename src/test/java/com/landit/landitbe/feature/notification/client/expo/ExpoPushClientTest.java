@@ -87,6 +87,33 @@ class ExpoPushClientTest {
     assertThat(result.errorCode()).isNull();
   }
 
+  /** 앱이 딥링크를 열기 전에 비교할 대상 계정 ID를 Expo data에 포함한다. */
+  @DisplayName("앱이 딥링크를 열기 전에 비교할 대상 계정 ID를 Expo data에 포함한다.")
+  @Test
+  void includesTargetAccountInPushData() throws Exception {
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    server.createContext(
+        SEND_PATH,
+        exchange -> {
+          requestBody.set(readBody(exchange));
+          respond(exchange, 200, "{\"data\":[{\"status\":\"ok\",\"id\":\"ticket-account\"}]}");
+        });
+
+    expoPushClient(null)
+        .send(
+            List.of(
+                new PushMessage(
+                    "ExponentPushToken[account-token]",
+                    "제목",
+                    "본문",
+                    "/expressions/scenario/1/2",
+                    77L)));
+
+    JsonNode data = jsonMapper.readTree(requestBody.get()).get(0).get("data");
+    assertThat(data.get("url").asString()).isEqualTo("/expressions/scenario/1/2");
+    assertThat(data.get("userProfileId").asLong()).isEqualTo(77L);
+  }
+
   /** 여러 메시지를 한 요청 배열로 보내고 요청 순서대로 Ticket 결과를 반환한다. */
   @DisplayName("여러 메시지를 한 요청 배열로 보내고 요청 순서대로 Ticket 결과를 반환한다.")
   @Test

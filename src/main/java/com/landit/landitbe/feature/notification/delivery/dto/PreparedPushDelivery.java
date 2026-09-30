@@ -12,9 +12,21 @@ import com.landit.landitbe.feature.notification.delivery.client.PushMessage;
  * @param title 알림 제목
  * @param body 알림 본문
  * @param deepLink 앱 이동 경로
+ * @param userProfileId 딥링크 대상 계정 ID
  */
 public record PreparedPushDelivery(
-    Long pushDeliveryId, String expoPushToken, String title, String body, String deepLink) {
+    Long pushDeliveryId,
+    String expoPushToken,
+    String title,
+    String body,
+    String deepLink,
+    Long userProfileId) {
+
+  /** 기존 테스트 및 호출의 호환성을 유지한다. */
+  public PreparedPushDelivery(
+      Long pushDeliveryId, String expoPushToken, String title, String body, String deepLink) {
+    this(pushDeliveryId, expoPushToken, title, body, deepLink, null);
+  }
 
   /**
    * Expo 발송 Port에 전달할 메시지로 변환한다.
@@ -22,6 +34,6 @@ public record PreparedPushDelivery(
    * @return 외부 Push 제공자에 전달할 메시지
    */
   public PushMessage toPushMessage() {
-    return new PushMessage(expoPushToken, title, body, deepLink);
+    return new PushMessage(expoPushToken, title, body, deepLink, userProfileId);
   }
 }

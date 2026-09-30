@@ -83,6 +83,8 @@ class PushDeliveryServiceIntegrationTests {
   void persistsContentVariantSnapshot() {
     PreparedPushDelivery prepared = pushDeliveryService.prepare(commandWithVariant()).orElseThrow();
 
+    assertThat(prepared.userProfileId()).isEqualTo(USER_ID);
+
     assertThat(
             pushDeliveryRepository
                 .findById(prepared.pushDeliveryId())

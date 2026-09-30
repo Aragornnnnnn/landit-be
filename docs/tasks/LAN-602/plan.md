@@ -27,7 +27,7 @@
 - `git diff --check` 통과. 마이그레이션 SQL을 H2 PostgreSQL 모드에서 실행해 기존 소수/null/버전/원본 JSON 보존 및 여섯 컬럼의 100.00 저장을 검증했다.
 - API 통합 테스트로 신규 점수/scoreMax/버전, 과거 3.25점의 무환산 조회와 재평가 미실행, 부분 관찰 보존, 프로필 동시 변경 보호, 승급, OpenAPI 범위를 검증했다.
 - AI 전체 unittest 통과: 833건, 실패·오류 0건, 제외 7건. 코드 위치: `/Users/sangmin8817/Soma/landit-ai/.worktrees/LAN-602`의 독립 체크아웃, 브랜치 `feat/LAN-602`. 기존 AI 체크아웃의 브랜치와 미추적 파일은 보존했다.
-- 실제 모델 평가 일관성, 운영 PostgreSQL, BE의 열린 PR 통합본, 배포, 앱 화면은 검증하지 않았다. BE #233과 AI #125로 변경을 게시했다.
+- 실제 모델 평가 일관성, 운영 PostgreSQL, 배포, 앱 화면은 검증하지 않았다. BE #233과 AI #125로 변경을 게시했다.
 
 ## CodeRabbit 리뷰 대응
 
@@ -35,3 +35,10 @@
 - 집계·근거 검증의 Javadoc에 입력·반환 계약을 보완했다. 테스트의 동작 설명은 기존 한국어 `@DisplayName`을 유지한다. CodeRabbit의 docstring 비율 경고와 저장소의 필수 Java 검사 통과는 별개다.
 - Java 21 전체 `spotlessApply check --offline --console=plain` 재실행 통과: 1,809건, 실패·오류 0건, 제외 12건.
 - 사용자가 FE를 별도 작업으로 지정했다. FE `apps/web/src/features/feedback/model/level-assessment.ts`의 고정 5점 환산은 이 작업에서 수정하지 않는다. 신규 70/100은 70%, 과거 4/5는 80%로 표시하도록 FE 대응과 화면 검증이 선행돼야 한다. BE #233의 해당 리뷰 스레드는 미해결 상태로 남긴다.
+
+## 최신 develop 통합
+
+- 원격 CI에서 새 develop(9518adf05)의 히스토리 조회가 총평 응답 팩토리의 확장된 인자와 맞지 않아 컴파일에 실패했다. develop을 통합하고 저장 payload를 복원하는 응답 팩토리를 총평·히스토리가 함께 사용하도록 수정했다.
+- 히스토리에서 수준 평가 생성·상태 갱신 API는 호출하지 않는다. 기존처럼 userLevelAssessment는 null이며, 저장된 비교·표현 재사용 결과를 읽기 전용으로 복원한다. 과거 비교 결과가 없으면 null, 재사용 결과가 없으면 완료된 빈 목록을 반환한다.
+- H2 fixture는 재사용 payload를 명시적 JSON으로 넣어 PostgreSQL JSONB 객체와 같은 형태를 유지한다. 히스토리 테스트에서 과거 빈 결과와 저장된 재사용 결과 및 AI 미호출을 검증한다.
+- 통합본 전체 `./gradlew spotlessApply check --offline --console=plain` 통과: 1,889건, 실패·오류 0건, 제외 12건.

@@ -201,9 +201,7 @@ public class NotificationDispatchService {
       markDeliveriesFailed(deliveries, EXPO_TICKET_RESULT_MISMATCH);
       return;
     }
-    for (int i = 0; i < deliveries.size(); i++) {
-      pushDeliveryService.recordTicketResult(deliveries.get(i).pushDeliveryId(), results.get(i));
-    }
+    recordTickets(deliveries, results);
   }
 
   /**
@@ -212,9 +210,7 @@ public class NotificationDispatchService {
    * @param eventId 다시 예약할 발송 이벤트 ID
    */
   public void scheduleAcceptedDeliveryReceipts(String eventId) {
-    pushDeliveryService
-        .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId))
-        .forEach(pushDeliveryId -> pushQueuePublisher.scheduleReceiptCheck(pushDeliveryId, 1));
+    scheduleReceipts(pushDeliveryService.findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId)));
   }
 
   /**
@@ -227,9 +223,9 @@ public class NotificationDispatchService {
     if (userPushTokenIds.isEmpty()) {
       return;
     }
-    pushDeliveryService
-        .findAcceptedDeliveryIds(deduplicationKeyPrefix(eventId), userPushTokenIds)
-        .forEach(pushDeliveryId -> pushQueuePublisher.scheduleReceiptCheck(pushDeliveryId, 1));
+    scheduleReceipts(
+        pushDeliveryService.findAcceptedDeliveryIds(
+            deduplicationKeyPrefix(eventId), userPushTokenIds));
   }
 
   /** 선점된 알림 묶음을 Expo에 보내고 요청 순서대로 Ticket 결과와 Receipt 예약을 기록한다. */
