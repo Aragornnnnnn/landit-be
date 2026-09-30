@@ -421,7 +421,14 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(jsonPath(schema + "assessedScore.maximum").value(100))
         .andExpect(jsonPath(schema + "assessedLevel.maximum").value(5))
-        .andExpect(jsonPath(schema + "scoreMax").exists());
+        .andExpect(jsonPath(schema + "scoreMax").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/sessions/{sessionId}/level-assessment'].get.description")
+                .value(
+                    org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("현재 레벨 상한보다 4점"),
+                        org.hamcrest.Matchers.containsString("24·44·64·84점"),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("0.7")))));
   }
 
   @DisplayName("OpenAPI 문서에서 고정 질문 본문이 null일 수 있음을 명시한다.")
