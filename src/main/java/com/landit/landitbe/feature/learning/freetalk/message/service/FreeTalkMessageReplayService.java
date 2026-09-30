@@ -2,7 +2,9 @@
 
 package com.landit.landitbe.feature.learning.freetalk.message.service;
 
+import com.landit.landitbe.feature.learning.conversation.domain.CompletionReason;
 import com.landit.landitbe.feature.learning.conversation.domain.FreeTalkTurnStatus;
+import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
@@ -112,7 +114,8 @@ public class FreeTalkMessageReplayService {
   public FreeTalkMessageSubmitResponse findCompletedDecisionResponse(
       long userId, long learningSessionId, long submittedMessageId, FreeTalkExitDecision decision) {
     // 요청 사용자의 세션과 종료 확인 대상 메시지를 확인한다.
-    sessionService.requireOwnedSession(userId, learningSessionId);
+    final LearningSessionSnapshot learningSession =
+        sessionService.requireOwnedSession(userId, learningSessionId);
     FreeTalkSession session = sessionService.requireFreeTalkForUpdate(learningSessionId);
     sessionService.clearExpiredProcessing(session);
     if (session.getProcessingClientMessageId() != null) {
@@ -131,10 +134,15 @@ public class FreeTalkMessageReplayService {
         && storedTurnStatus != FreeTalkTurnStatus.COMPLETED) {
       return null;
     }
-    if ((storedTurnStatus == FreeTalkTurnStatus.CONTINUE
-            && decision != FreeTalkExitDecision.CONTINUE)
-        || (storedTurnStatus == FreeTalkTurnStatus.COMPLETED
-            && decision != FreeTalkExitDecision.END)) {
+    // 직접 완료가 진행 중 결정을 대체한 턴은 원래 CONTINUE였어도 완료 결과를 재생한다.
+    boolean directlyCompletedTurn =
+        storedTurnStatus == FreeTalkTurnStatus.COMPLETED
+            && learningSession.getCompletionReason() == CompletionReason.DIRECT_COMPLETION;
+    if (!directlyCompletedTurn
+        && ((storedTurnStatus == FreeTalkTurnStatus.CONTINUE
+                && decision != FreeTalkExitDecision.CONTINUE)
+            || (storedTurnStatus == FreeTalkTurnStatus.COMPLETED
+                && decision != FreeTalkExitDecision.END))) {
       throw new ApiException(ErrorCode.CONFLICT);
     }
 
