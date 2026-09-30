@@ -212,6 +212,30 @@ class ScenarioHistoryApiIntegrationTests {
   }
 
   @Test
+  @DisplayName("히스토리는 새 AI 호출 없이 저장된 표현 재사용 결과를 복원한다.")
+  void restoresStoredExpressionReuseWithoutGeneration() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    summary(5550101L, "COMPLETED");
+    jdbc.update(
+        "UPDATE session_history_summary_feedback"
+            + " SET expression_reuse_payload = ? FORMAT JSON WHERE id = ?",
+        """
+        {"pending":false,"items":[{"expressionId":1,"text":"Sounds good.","meaning":"좋아요.",
+          "sourceLabel":"지난 학습","messageId":5550201,"quotedSentence":"Sounds good.",
+          "matchedText":"Sounds good."}]}
+        """,
+        5550101L);
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.sessions[0].feedback.expressionReuse.pending").value(false))
+        .andExpect(jsonPath("$.data.sessions[0].feedback.expressionReuse.items", hasSize(1)))
+        .andExpect(
+            jsonPath("$.data.sessions[0].feedback.expressionReuse.items[0].expressionId").value(1))
+        .andExpect(
+            jsonPath("$.data.sessions[0].feedback.expressionReuse.items[0].matchedText")
+                .value("Sounds good."));
+  }
+
+  @Test
   @DisplayName("사용자 선톡은 시작 안내 스냅샷을 복원하고 미완료 피드백은 null로 반환한다.")
   void restoresUserFirstSnapshotAndDoesNotExposeUnfinishedSummary() throws Exception {
     session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));

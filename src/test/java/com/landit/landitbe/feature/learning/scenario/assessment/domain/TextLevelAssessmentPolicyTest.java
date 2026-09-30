@@ -16,7 +16,7 @@ class TextLevelAssessmentPolicyTest {
   @DisplayName("진단 질문으로 전체 학습 수준 범위를 평가할 수 있다.")
   @Test
   void diagnosticQuestionsCanAssessTheFullLevelRange() {
-    for (int level = 1; level <= 5; level++) {
+    for (int level = 1; level <= 100; level++) {
       var score =
           TextLevelAssessmentPolicy.calculate(
                   List.of(
@@ -26,7 +26,7 @@ class TextLevelAssessmentPolicyTest {
                       observation(ResponseDemand.HIGH, level)),
                   ContentLearningLevel.DIAGNOSTIC)
               .orElseThrow();
-      assertThat(score.assessedLevel()).isEqualTo(level);
+      assertThat(score.assessedLevel()).isEqualTo((level + 19) / 20);
       assertThat(score.sufficientEvidence()).isTrue();
     }
   }
@@ -36,14 +36,14 @@ class TextLevelAssessmentPolicyTest {
   void calculatesDemandWeightedDomainsAndCapsOnlyOverallScore() {
     TextLevelAssessmentPolicy.Score score =
         TextLevelAssessmentPolicy.calculate(
-                List.of(observation(ResponseDemand.LOW, 5), observation(ResponseDemand.HIGH, 3)),
+                List.of(observation(ResponseDemand.LOW, 100), observation(ResponseDemand.HIGH, 50)),
                 ContentLearningLevel.LEVEL_1)
             .orElseThrow();
 
-    assertThat(score.situationPerformance().score()).isEqualByComparingTo("3.52");
+    assertThat(score.situationPerformance().score()).isEqualByComparingTo("62.96");
     assertThat(score.situationPerformance().confidence()).isEqualByComparingTo("1.00");
-    assertThat(score.grammar().score()).isEqualByComparingTo("3.52");
-    assertThat(score.overallScore()).isEqualByComparingTo("2.00");
+    assertThat(score.grammar().score()).isEqualByComparingTo("62.96");
+    assertThat(score.overallScore()).isEqualByComparingTo("40.00");
     assertThat(score.assessedLevel()).isEqualTo(2);
   }
 
@@ -52,21 +52,22 @@ class TextLevelAssessmentPolicyTest {
   void preservesSingleAnswerForDisplayWithoutTreatingItAsSufficient() {
     var score =
         TextLevelAssessmentPolicy.calculate(
-                List.of(observation(ResponseDemand.HIGH, 5)), ContentLearningLevel.LEVEL_4_TO_5)
+                List.of(observation(ResponseDemand.HIGH, 100)), ContentLearningLevel.LEVEL_4_TO_5)
             .orElseThrow();
-    assertThat(score.grammar().score()).isEqualByComparingTo("5.00");
+    assertThat(score.grammar().score()).isEqualByComparingTo("100.00");
     assertThat(score.sufficientEvidence()).isFalse();
   }
 
   @DisplayName("화용 영역을 관측하지 못해도 다른 관측 영역의 결과를 보존한다.")
   @Test
   void preservesObservedDomainsWhenPragmaticsWasNotObserved() {
-    var answer = new TextLevelAssessmentPolicy.Observation(ResponseDemand.HIGH, 3, 3, 3, 3, null);
+    var answer =
+        new TextLevelAssessmentPolicy.Observation(ResponseDemand.HIGH, 50, 50, 50, 50, null);
     var score =
         TextLevelAssessmentPolicy.calculate(
                 List.of(answer, answer), ContentLearningLevel.LEVEL_4_TO_5)
             .orElseThrow();
-    assertThat(score.grammar().score()).isEqualByComparingTo("3.00");
+    assertThat(score.grammar().score()).isEqualByComparingTo("50.00");
     assertThat(score.interactionPragmatics().score()).isNull();
     assertThat(score.overallScore()).isNull();
     assertThat(score.assessedLevel()).isNull();

@@ -413,6 +413,25 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionEndPath + ".responses['409'].description").value("이미 완료됨"));
   }
 
+  @DisplayName("OpenAPI에서 100점 평가와 5단계 학습 레벨을 구분한다.")
+  @Test
+  void openApiSeparatesAssessmentScoresAndLearningLevels() throws Exception {
+    String schema = "$.components.schemas.SessionLevelAssessment.properties.";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(schema + "assessedScore.maximum").value(100))
+        .andExpect(jsonPath(schema + "assessedLevel.maximum").value(5))
+        .andExpect(jsonPath(schema + "scoreMax").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/sessions/{sessionId}/level-assessment'].get.description")
+                .value(
+                    org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("현재 레벨 상한보다 4점"),
+                        org.hamcrest.Matchers.containsString("24·44·64·84점"),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("0.7")))));
+  }
+
   @DisplayName("OpenAPI 문서에서 고정 질문 본문이 null일 수 있음을 명시한다.")
   @Test
   void openApiDocumentsFixedQuestionTextAsNullable() throws Exception {
@@ -2059,17 +2078,19 @@ class ScenarioSessionApiIntegrationTests {
 
     getCompletedLevelAssessment(session)
         .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
-        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(5.0))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(100.0))
+        .andExpect(jsonPath("$.data.levelAssessment.scoreMax").value(100))
+        .andExpect(jsonPath("$.data.levelAssessment.assessmentVersion").value("text-score-v2.0"))
         .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(true))
         .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(5));
 
     assertThat(storedLevelAssessment(session.sessionId()))
-        .containsEntry("SITUATION_PERFORMANCE_SCORE", new BigDecimal("5.00"))
-        .containsEntry("GRAMMAR_SCORE", new BigDecimal("5.00"))
-        .containsEntry("VOCABULARY_SCORE", new BigDecimal("5.00"))
-        .containsEntry("DISCOURSE_SCORE", new BigDecimal("5.00"))
-        .containsEntry("INTERACTION_PRAGMATICS_SCORE", new BigDecimal("5.00"))
-        .containsEntry("ASSESSED_SCORE", new BigDecimal("5.00"))
+        .containsEntry("SITUATION_PERFORMANCE_SCORE", new BigDecimal("100.00"))
+        .containsEntry("GRAMMAR_SCORE", new BigDecimal("100.00"))
+        .containsEntry("VOCABULARY_SCORE", new BigDecimal("100.00"))
+        .containsEntry("DISCOURSE_SCORE", new BigDecimal("100.00"))
+        .containsEntry("INTERACTION_PRAGMATICS_SCORE", new BigDecimal("100.00"))
+        .containsEntry("ASSESSED_SCORE", new BigDecimal("100.00"))
         .containsEntry("ASSESSED_LEVEL", 5)
         .containsEntry("SOURCE", "MODEL")
         .containsEntry("PREVIOUS_LEVEL", 5)
@@ -2077,6 +2098,26 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("PROMOTION_STREAK_AFTER", 0)
         .containsEntry("HAS_CORE", true)
         .containsEntry("HAS_DETAILS", true);
+  }
+
+  @DisplayName("과거 5점 평가를 원래 점수와 척도로 반환하고 AI 재평가하지 않는다.")
+  @Test
+  void historicalAssessmentKeepsFivePointScores() throws Exception {
+    StartedSession session = startCompletedUserFirstFeedbackSession("legacy-score@example.com");
+    getCompletedLevelAssessment(session);
+    jdbcTemplate.update(
+        "UPDATE user_level_assessment SET assessment_version='text-level-v1.3', "
+            + "situation_performance_score=3.25, grammar_score=3.25, vocabulary_score=3.25, "
+            + "discourse_score=3.25, interaction_pragmatics_score=3.25, assessed_score=3.25, "
+            + "assessed_level=3, current_level=3 WHERE learning_session_id=?",
+        session.sessionId());
+    int calls = fakeAiConversationClient.sessionLevelAssessmentCallCount;
+    getCompletedLevelAssessment(session)
+        .andExpect(jsonPath("$.data.levelAssessment.scoreMax").value(5))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(3.25))
+        .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(3.25))
+        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3));
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(calls);
   }
 
   @DisplayName("첫 평가로 선택 수준을 대체한 뒤에는 연속 승급 조건을 적용한다.")
@@ -2093,7 +2134,7 @@ class ScenarioSessionApiIntegrationTests {
             + "WHERE id=(SELECT user_profile_id FROM learning_session WHERE id=?)",
         selectedLevel,
         sessionId);
-    fakeAiConversationClient.assessedDomainLevel = 3;
+    fakeAiConversationClient.assessedDomainScore = 50;
     submitMessage(accessToken, sessionId, "Can I get an iced americano?");
     submitMessage(accessToken, sessionId, "That is all, thank you.");
     awaitLevelAssessment(sessionId, accessToken);
@@ -2223,7 +2264,7 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private long completeLevelAssessmentScenario(String accessToken, int level) throws Exception {
-    fakeAiConversationClient.assessedDomainLevel = level;
+    fakeAiConversationClient.assessedDomainScore = level * 20 - 10;
     long sessionId = startScenario(accessToken, 2121);
     submitMessage(accessToken, sessionId, "Can I get an iced americano?");
     submitMessage(accessToken, sessionId, "That is all, thank you.");
@@ -2281,7 +2322,7 @@ class ScenarioSessionApiIntegrationTests {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
           .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
-          .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(5.0))
+          .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(100.0))
           .andExpect(
               jsonPath("$.data.levelAssessment.interactionPragmatics.score").value(nullValue()))
           .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
@@ -2301,7 +2342,7 @@ class ScenarioSessionApiIntegrationTests {
                 WHERE a.learning_session_id = ?
                 """,
                 sessionId))
-        .containsEntry("GRAMMAR_SCORE", new BigDecimal("5.00"))
+        .containsEntry("GRAMMAR_SCORE", new BigDecimal("100.00"))
         .containsEntry("INTERACTION_PRAGMATICS_SCORE", null)
         .containsEntry("SUFFICIENT_EVIDENCE", false)
         .containsEntry("HAS_CORE", true)
@@ -4311,7 +4352,7 @@ class ScenarioSessionApiIntegrationTests {
     private int sessionFeedbackCallCount;
     private int sessionLevelAssessmentCallCount;
     private boolean unobservedPragmatics;
-    private int assessedDomainLevel = 5;
+    private int assessedDomainScore = 100;
 
     private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
 
@@ -4519,7 +4560,7 @@ class ScenarioSessionApiIntegrationTests {
     private AiSessionLevelAssessment.Domains observedDomains(String evidence) {
       AiSessionLevelAssessment.Domain domain =
           new AiSessionLevelAssessment.Domain(
-              assessedDomainLevel, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
+              assessedDomainScore, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
       return new AiSessionLevelAssessment.Domains(
           domain,
           domain,
@@ -4557,7 +4598,7 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackCallCount = 0;
       sessionLevelAssessmentCallCount = 0;
       unobservedPragmatics = false;
-      assessedDomainLevel = 5;
+      assessedDomainScore = 100;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;
       messageFeedbackResponseSessionId = null;

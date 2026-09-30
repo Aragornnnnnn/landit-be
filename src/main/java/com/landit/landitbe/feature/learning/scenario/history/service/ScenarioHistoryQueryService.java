@@ -2,16 +2,11 @@
 
 package com.landit.landitbe.feature.learning.scenario.history.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistoryMessageSnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistorySummaryFeedback;
-import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioExpressionReuseSummary;
-import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioGrowthCard;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse.EvaluationContextResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse.MessageFeedbackResponse;
@@ -23,8 +18,6 @@ import com.landit.landitbe.feature.learning.scenario.history.repository.Scenario
 import com.landit.landitbe.feature.learning.scenario.history.repository.projection.ScenarioHistoryProjection;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackEvaluationContextType;
 import com.landit.landitbe.shared.domain.ConversationSpeaker;
-import com.landit.landitbe.shared.exception.ApiException;
-import com.landit.landitbe.shared.exception.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ScenarioHistoryQueryService {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().findAndRegisterModules();
-
   private final ScenarioHistoryQueryRepository histories;
   private final ConversationMessageService messages;
   private final SessionHistorySummaryFeedbackRepository summaries;
@@ -116,12 +107,7 @@ public class ScenarioHistoryQueryService {
                   ? List.of()
                   : messageFeedbacks(session, historyMessages, summary.getId(), feedbackByMessage),
               locked,
-              null,
-              storedPayload(summary.getGrowthFeedbackPayload(), ScenarioGrowthCard.class, null),
-              storedPayload(
-                  summary.getExpressionReusePayload(),
-                  ScenarioExpressionReuseSummary.class,
-                  new ScenarioExpressionReuseSummary(false, List.of())));
+              null);
     }
     return new ScenarioHistoryResponse.Session(
         session.sessionId(),
@@ -129,18 +115,6 @@ public class ScenarioHistoryQueryService {
         session.endedAt(),
         historyMessages.stream().map(ScenarioHistoryResponse.Message::from).toList(),
         feedback);
-  }
-
-  // 이력 조회는 생성이나 만료 복구 없이 저장된 결과만 복원한다.
-  private <T> T storedPayload(JsonNode payload, Class<T> type, T fallback) {
-    if (payload == null) {
-      return fallback;
-    }
-    try {
-      return OBJECT_MAPPER.treeToValue(payload, type);
-    } catch (JsonProcessingException exception) {
-      throw ApiException.causedBy(ErrorCode.INTERNAL_SERVER_ERROR, exception);
-    }
   }
 
   // 평가 문맥은 현재 질문 콘텐츠가 아니라 당시 메시지와 선톡 안내 스냅샷으로 복원한다.

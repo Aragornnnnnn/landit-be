@@ -9,9 +9,25 @@ import java.math.RoundingMode;
 public final class LearningLevelPolicy {
 
   private static final BigDecimal MINIMUM_CONFIDENCE = new BigDecimal("0.75");
-  private static final BigDecimal PROMOTION_GAP = new BigDecimal("0.70");
+  private static final BigDecimal PROMOTION_GAP = new BigDecimal("4.00");
 
   private LearningLevelPolicy() {}
+
+  /**
+   * 100점 평가를 20점 구간의 학습 레벨로 변환한다. 경계값은 낮은 레벨에 포함한다.
+   *
+   * @param score 1 이상 100 이하의 종합 점수
+   * @return 1부터 5까지의 학습 레벨
+   * @throws IllegalArgumentException 점수가 없거나 범위를 벗어난 경우
+   */
+  public static int levelForScore(BigDecimal score) {
+    if (score == null
+        || score.compareTo(BigDecimal.ONE) < 0
+        || score.compareTo(new BigDecimal("100")) > 0) {
+      throw new IllegalArgumentException("평가 점수는 1부터 100까지여야 합니다.");
+    }
+    return score.divide(new BigDecimal("20"), 0, RoundingMode.CEILING).intValueExact();
+  }
 
   /** 이번 평가로 발생한 적용 수준 변경 유형이다. */
   public enum ChangeType {
@@ -46,17 +62,19 @@ public final class LearningLevelPolicy {
       boolean levelInitialized) {
     if (!sufficientEvidence
         || assessedScore == null
+        || assessedScore.compareTo(BigDecimal.ONE) < 0
+        || assessedScore.compareTo(new BigDecimal("100")) > 0
         || assessmentConfidence == null
         || assessmentConfidence.compareTo(MINIMUM_CONFIDENCE) < 0) {
       return new Decision(currentLevel, promotionStreak, ChangeType.NOT_APPLIED);
     }
     if (!levelInitialized || currentLevel == null) {
-      int initializedLevel =
-          Math.max(1, Math.min(5, assessedScore.setScale(0, RoundingMode.HALF_UP).intValue()));
+      int initializedLevel = levelForScore(assessedScore);
       return new Decision(initializedLevel, 0, ChangeType.INITIALIZED);
     }
     if (currentLevel < 5
-        && assessedScore.compareTo(BigDecimal.valueOf(currentLevel).add(PROMOTION_GAP)) >= 0) {
+        && assessedScore.compareTo(BigDecimal.valueOf(currentLevel * 20L).add(PROMOTION_GAP))
+            >= 0) {
       int nextStreak = promotionStreak + 1;
       return nextStreak >= 2
           ? new Decision(currentLevel + 1, 0, ChangeType.PROMOTED)

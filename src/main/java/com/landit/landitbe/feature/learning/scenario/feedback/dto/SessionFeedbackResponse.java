@@ -2,11 +2,15 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.feature.learning.scenario.assessment.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.FeedbackType;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.feature.learning.scenario.session.message.feedback.client.ai.AiMessageFeedbackEvaluationContextType;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
@@ -44,6 +48,38 @@ public record SessionFeedbackResponse(
     @Schema(description = "pending이면 분석 중, 완료 후 items가 비어 있으면 FE에서 카드를 숨긴다")
         ScenarioExpressionReuseSummary expressionReuse) {
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().findAndRegisterModules();
+
+  /**
+   * 저장된 비교·재사용 payload를 복원해 응답한다. 평가 생성이나 상태 변경은 수행하지 않는다.
+   *
+   * @param sessionId 학습 세션 ID
+   * @param summary 저장된 세션 요약 피드백
+   * @param messageFeedbacks 메시지별 피드백 응답
+   * @param detailFeedbackLocked 상세 피드백 잠금 여부
+   * @param userLevelAssessment 별도로 조회한 수준 평가. 읽기 전용 히스토리는 null
+   * @return 저장 당시 결과를 복원한 응답. 과거 재사용 payload가 없으면 완료된 빈 목록
+   * @throws ApiException 저장된 payload를 복원할 수 없는 경우
+   */
+  public static SessionFeedbackResponse from(
+      Long sessionId,
+      SessionHistorySummaryFeedback summary,
+      List<MessageFeedbackResponse> messageFeedbacks,
+      boolean detailFeedbackLocked,
+      SessionLevelAssessmentResponse userLevelAssessment) {
+    return from(
+        sessionId,
+        summary,
+        messageFeedbacks,
+        detailFeedbackLocked,
+        userLevelAssessment,
+        restore(summary.getGrowthFeedbackPayload(), ScenarioGrowthCard.class, null),
+        restore(
+            summary.getExpressionReusePayload(),
+            ScenarioExpressionReuseSummary.class,
+            new ScenarioExpressionReuseSummary(false, List.of())));
+  }
+
   /**
    * 저장된 세션 요약 피드백과 메시지별 응답을 최종 피드백 응답으로 변환한다.
    *
@@ -75,6 +111,17 @@ public record SessionFeedbackResponse(
         userLevelAssessment,
         growthFeedback,
         expressionReuse);
+  }
+
+  private static <T> T restore(JsonNode payload, Class<T> type, T fallback) {
+    if (payload == null) {
+      return fallback;
+    }
+    try {
+      return OBJECT_MAPPER.treeToValue(payload, type);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+      throw ApiException.causedBy(ErrorCode.INTERNAL_SERVER_ERROR, exception);
+    }
   }
 
   /**

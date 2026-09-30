@@ -47,11 +47,11 @@ public record AiSessionLevelAssessment(Core core, Details details) {
   /**
    * 한 영역의 관찰 수준과 원문 근거다.
    *
-   * @param level 관찰한 Level 1~5. 미관찰이면 {@code null}
+   * @param score 관찰한 1~100 정수 점수. 미관찰이면 {@code null}
    * @param evidenceStatus 근거 관찰 상태
    * @param evidenceExcerpt 사용자 발화에서 인용한 근거
    */
-  public record Domain(Integer level, EvidenceStatus evidenceStatus, String evidenceExcerpt) {}
+  public record Domain(Integer score, EvidenceStatus evidenceStatus, String evidenceExcerpt) {}
 
   /**
    * 형식 오류가 나도 Core에 영향을 주지 않는 선택 설명이다.

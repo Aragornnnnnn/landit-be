@@ -38,3 +38,9 @@
 - develop을 병합하고 이력 조회에서도 저장된 성장 비교·표현 재사용 결과를 복원한다. 수준 평가 생성·만료 복구를 호출하지 않아 읽기 전용 조회를 유지한다.
 - 저장 결과 복원과 기존 데이터의 빈 응답을 회귀 검증했다. H2 테스트 데이터는 JSON 문자열 기본값 대신 `FORMAT JSON`으로 객체를 저장한다.
 - Java 21에서 `./gradlew spotlessApply check --offline --console=plain` 통과: 1,880건, 실패·오류 0건, 제외 12건. 배포 검증 스크립트 문법·테스트와 `git diff --check`도 통과했다.
+
+## LAN-602 병합 이후 충돌 해결
+
+- develop `32db70eb2`의 LAN-602 병합으로 이력 서비스와 통합 테스트 2개 파일에 발생한 충돌을 해결했다.
+- 이력 서비스는 develop의 `SessionFeedbackResponse.from` 공통 payload 복원을 사용하고, 양쪽의 성장 비교·표현 재사용 회귀 테스트를 모두 유지한다.
+- 통합 결과의 Java 21 `./gradlew spotlessApply check --offline --console=plain` 통과: 1,901건, 실패·오류 0건, 제외 12건. 배포 검증 스크립트와 `git diff --check`도 통과했다.
