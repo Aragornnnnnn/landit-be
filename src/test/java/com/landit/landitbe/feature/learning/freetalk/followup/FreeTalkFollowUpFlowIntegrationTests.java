@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,8 +68,9 @@ class FreeTalkFollowUpFlowIntegrationTests {
   }
 
   @DisplayName("세션이 끝나 저장된 후속 질문은 요약에 그대로 나오고, 근거 기억은 다음 세션의 질문 생성에서 빠지도록 전달된다.")
-  @Test
-  void storesFollowUpAfterSessionAndExcludesItsMemoryFromTheNextSession() {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"USER_ENDED", "DIRECT_COMPLETION"})
+  void storesFollowUpAfterSessionAndExcludesItsMemoryFromTheNextSession(String completionReason) {
     seedUser();
     seedCompletedSession(FIRST_SESSION_BASE_ID, "TIME_LIMIT", "TIME_LIMIT_REACHED");
     when(aiMemoryClient.extractMemoryCandidates(any()))
@@ -100,7 +100,7 @@ class FreeTalkFollowUpFlowIntegrationTests {
                 FIRST_SESSION_BASE_ID + 1))
         .isEqualTo(newMemoryId);
 
-    seedCompletedSession(SECOND_SESSION_BASE_ID, "USER", "USER_ENDED");
+    seedCompletedSession(SECOND_SESSION_BASE_ID, "USER", completionReason);
     when(aiMemoryClient.extractMemoryCandidates(any()))
         .thenReturn(new AiMemoryCandidatesResult("extractor-v1", List.of()));
 

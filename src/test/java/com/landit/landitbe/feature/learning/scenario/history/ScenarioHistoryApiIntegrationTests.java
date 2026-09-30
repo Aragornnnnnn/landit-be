@@ -183,6 +183,35 @@ class ScenarioHistoryApiIntegrationTests {
   }
 
   @Test
+  @DisplayName("이력은 저장된 성장 비교와 표현 재사용 결과를 AI 호출 없이 복원한다.")
+  void restoresStoredGrowthAndExpressionReuse() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    summary(5550101L, "COMPLETED");
+    jdbc.update(
+        """
+        UPDATE session_history_summary_feedback
+        SET growth_feedback_payload = ? FORMAT JSON, expression_reuse_payload = ? FORMAT JSON
+        WHERE id = 5550101
+        """,
+        """
+        {"patternLabel":"시제", "succeeded":true, "previousDate":"2026-09-19",
+         "previousSentence":"I go yesterday.", "currentSentence":"I went yesterday."}
+        """,
+        """
+        {"pending":false,"items":[{"expressionId":1,"text":"by the way","messageId":2,
+         "quotedSentence":"By the way, hello.","matchedText":"By the way"}]}
+        """);
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.sessions[0].feedback.growthFeedback.succeeded").value(true))
+        .andExpect(
+            jsonPath("$.data.sessions[0].feedback.growthFeedback.previousDate").value("2026-09-19"))
+        .andExpect(jsonPath("$.data.sessions[0].feedback.expressionReuse.items", hasSize(1)))
+        .andExpect(
+            jsonPath("$.data.sessions[0].feedback.expressionReuse.items[0].text")
+                .value("by the way"));
+  }
+
+  @Test
   @DisplayName("히스토리는 새 AI 호출 없이 저장된 표현 재사용 결과를 복원한다.")
   void restoresStoredExpressionReuseWithoutGeneration() throws Exception {
     session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
