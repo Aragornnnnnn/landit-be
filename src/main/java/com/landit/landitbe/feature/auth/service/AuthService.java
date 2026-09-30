@@ -20,6 +20,7 @@ import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
+import com.landit.landitbe.feature.notification.token.service.PushDevicePersistenceService;
 import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.shared.domain.AccentLocale;
@@ -46,6 +47,7 @@ public class AuthService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final OidcTokenVerifier oidcTokenVerifier;
   private final ConversationMemoryDeletionService conversationMemoryDeletionService;
+  private final PushDevicePersistenceService pushDevicePersistenceService;
   private final LanditTokenService tokenService;
   private final TokenProperties tokenProperties;
 
@@ -58,6 +60,7 @@ public class AuthService {
    * @param refreshTokenRepository Refresh token Repository
    * @param oidcTokenVerifier OIDC ID Token 검증기
    * @param conversationMemoryDeletionService 탈퇴 사용자의 장기기억 삭제 Service
+   * @param pushDevicePersistenceService 로그아웃한 설치의 푸시 중지 Service
    * @param tokenService 자체 토큰 Service
    * @param tokenProperties 자체 토큰 설정
    */
@@ -68,6 +71,7 @@ public class AuthService {
       RefreshTokenRepository refreshTokenRepository,
       OidcTokenVerifier oidcTokenVerifier,
       ConversationMemoryDeletionService conversationMemoryDeletionService,
+      PushDevicePersistenceService pushDevicePersistenceService,
       LanditTokenService tokenService,
       TokenProperties tokenProperties) {
     this.profileAuthenticationService = profileAuthenticationService;
@@ -76,6 +80,7 @@ public class AuthService {
     this.refreshTokenRepository = refreshTokenRepository;
     this.oidcTokenVerifier = oidcTokenVerifier;
     this.conversationMemoryDeletionService = conversationMemoryDeletionService;
+    this.pushDevicePersistenceService = pushDevicePersistenceService;
     this.tokenService = tokenService;
     this.tokenProperties = tokenProperties;
   }
@@ -157,14 +162,20 @@ public class AuthService {
         .findUserProfileIdByTokenHash(refreshTokenHash)
         .flatMap(profileAuthenticationService::findAuthenticationProfileForUpdate)
         .ifPresent(
-            ignored ->
-                refreshTokenRepository.revokeActiveByTokenHash(
-                    refreshTokenHash, LocalDateTime.now()));
+            profile -> {
+              int revoked =
+                  refreshTokenRepository.revokeActiveByTokenHash(
+                      refreshTokenHash, LocalDateTime.now());
+              if (revoked == 1 && request.installationId() != null) {
+                pushDevicePersistenceService.revokeIfOwned(
+                    profile.userId(), request.installationId());
+              }
+            });
     log.info("logout request completed");
   }
 
   /**
-   * 현재 사용자를 탈퇴 처리하고 활성 Refresh token을 모두 폐기한다.
+   * 현재 사용자를 탈퇴 처리하고 활성 Refresh token과 푸시 Token을 모두 폐기한다.
    *
    * @param userId 탈퇴할 사용자 ID
    * @throws ApiException 활성 사용자를 찾을 수 없을 때
@@ -175,6 +186,7 @@ public class AuthService {
       throw new ApiException(AuthErrorCode.INVALID_TOKEN);
     }
     conversationMemoryDeletionService.deleteAllByUserProfileId(userId);
+    pushDevicePersistenceService.revokeAllOwned(userId);
     refreshTokenRepository.revokeAllActiveByUserProfileId(userId, LocalDateTime.now());
     oauthIdentityRepository
         .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.ACTIVE)
