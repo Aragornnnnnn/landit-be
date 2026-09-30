@@ -11,6 +11,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.feature.learning.review.dto.ReviewOffer;
+import com.landit.landitbe.feature.learning.review.service.ExpressionReviewService;
 import com.landit.landitbe.feature.notification.delivery.client.NotificationSender;
 import com.landit.landitbe.feature.notification.delivery.client.PushMessage;
 import com.landit.landitbe.feature.notification.delivery.client.PushNotificationException;
@@ -27,6 +29,8 @@ import com.landit.landitbe.feature.notification.delivery.repository.PushDelivery
 import com.landit.landitbe.feature.notification.delivery.repository.PushDeliveryRepository;
 import com.landit.landitbe.feature.notification.domain.NotificationContentVariant;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
+import com.landit.landitbe.feature.notification.scheduled.service.LearningNotificationFrequencyService;
+import com.landit.landitbe.feature.notification.scheduled.service.ReviewNotificationService;
 import com.landit.landitbe.feature.notification.token.domain.UserPushToken;
 import com.landit.landitbe.feature.notification.token.domain.UserPushTokenStatus;
 import com.landit.landitbe.feature.notification.token.repository.UserPushTokenRepository;
@@ -38,9 +42,13 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -64,6 +72,7 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -74,6 +83,7 @@ class PushDeliveryBatchIntegrationTests {
 
   @Autowired private PushDeliveryService deliveries;
   @Autowired private PushDeliveryRepository repository;
+  @Autowired private PushDeliveryBatchRepository batchRepository;
   @Autowired private UserPushTokenRepository tokens;
   @Autowired private UserPushTokenDeliveryService tokenService;
   @Autowired private CountingDataSource dataSource;
@@ -86,10 +96,10 @@ class PushDeliveryBatchIntegrationTests {
     dataSource.reset();
   }
 
-  /** 동일 500토큰의 기존 경로와 새 dispatch 경로에서 실제 SQL·쓰기 커밋 수를 비교한다. */
-  @DisplayName("동일 500토큰의 기존 경로와 새 dispatch 경로에서 실제 SQL·쓰기 커밋 수를 비교한다.")
+  /** 동일 500토큰의 JDBC 실행 호출과 쓰기 커밋 수를 비교한다. */
+  @DisplayName("동일 500토큰의 JDBC 실행 호출과 쓰기 커밋 수를 비교한다.")
   @Test
-  void reducesFiveHundredTokenSqlFrom3501To32() {
+  void reducesFiveHundredTokenJdbcCallsFrom3501To32() {
     List<UserPushToken> seeded = seed(500);
     List<Long> users = seeded.stream().map(UserPushToken::getUserProfileId).toList();
     dataSource.reset();
@@ -110,13 +120,117 @@ class PushDeliveryBatchIntegrationTests {
         dispatch.sendAll(seeded.stream().map(t -> sendCommand(t, "after")).toList());
     assertThat(result).isEqualTo(new NotificationDispatchResult(500, 5, 500, 0));
     assertThat(dataSource.sql).hasSize(32);
+    assertThat(dataSource.batchExecutions.get()).isEqualTo(10);
+    assertThat(dataSource.batchedStatements.get()).isEqualTo(1000);
     assertThat(dataSource.writeCommits.get()).isEqualTo(10);
     assertThat(dataSource.sql.stream().filter(s -> s.startsWith("insert into push_delivery")))
         .hasSize(5);
     assertThat(dataSource.sql.stream().filter(s -> s.startsWith("update push_delivery")))
         .hasSize(5);
     verify(sender, times(5)).send(anyList());
-    System.out.println("LAN468_SQL baseline=3501 batched=32 writeCommits=1000->10 tokens=500");
+    System.out.println(
+        "LAN557_JDBC calls=3501->32 batchExecutions=10 batchedStatements=1000"
+            + " writeCommits=1000->10 tokens=500");
+  }
+
+  @DisplayName("복습 알림의 NULL 문구 유형을 저장하고 예약 실패 후 푸시 없이 Receipt만 복구한다.")
+  @Test
+  void preservesReviewNotificationSnapshotsAndReceiptRecovery() {
+    List<UserPushToken> seeded = seed(2);
+    List<Long> users = seeded.stream().map(UserPushToken::getUserProfileId).toList();
+    ExpressionReviewService reviews = mock(ExpressionReviewService.class);
+    when(reviews.candidateUsers(0, 100)).thenReturn(users);
+    when(reviews.candidateUsers(users.getLast(), 100)).thenReturn(List.of());
+    Clock clock = Clock.fixed(Instant.parse("2026-09-23T08:00:00Z"), ZoneId.of("Asia/Seoul"));
+    UUID reviewId = UUID.randomUUID();
+    for (Long user : users) {
+      when(reviews.offer(user, java.time.LocalDate.now(clock)))
+          .thenReturn(java.util.Optional.of(new ReviewOffer(reviewId, user, 3)));
+    }
+    LearningNotificationFrequencyService frequency =
+        mock(LearningNotificationFrequencyService.class);
+    when(frequency.reserveAll(anyList())).thenAnswer(call -> call.getArgument(0));
+    NotificationSender sender = sender();
+    PushQueuePublisher publisher = mock(PushQueuePublisher.class);
+    doThrow(new PushNotificationException("receipt reservation failed"))
+        .doNothing()
+        .when(publisher)
+        .scheduleReceiptChecks(anyList(), org.mockito.ArgumentMatchers.eq(1));
+    ReviewNotificationService reviewBatch =
+        new ReviewNotificationService(
+            reviews,
+            frequency,
+            tokenService,
+            dispatch(sender, publisher),
+            clock,
+            transactionManager);
+
+    assertThatThrownBy(() -> reviewBatch.process("first", clock.instant(), () -> {}))
+        .isInstanceOf(PushNotificationException.class);
+    reviewBatch.process("retry", clock.instant(), () -> {});
+
+    assertThat(repository.findAll())
+        .hasSize(2)
+        .allSatisfy(
+            delivery -> {
+              assertThat(delivery.getNotificationType())
+                  .isEqualTo(NotificationType.EXPRESSION_REVIEW);
+              assertThat(delivery.getContentVariant()).isNull();
+              assertThat(delivery.getStatus()).isEqualTo(PushDeliveryStatus.TICKET_ACCEPTED);
+              assertThat(delivery.getErrorCode()).isNull();
+              assertThat(delivery.getReceiptCheckedAt()).isNull();
+              assertThat(delivery.getDeduplicationKey())
+                  .isEqualTo(
+                      "push:review:2026-09-23:"
+                          + delivery.getUserProfileId()
+                          + ":"
+                          + delivery.getUserPushTokenId());
+              assertThat(delivery.getTitle()).isEqualTo("배웠던 표현, 다시 꺼내 볼까요?");
+              assertThat(delivery.getBody()).isEqualTo("표현 3개를 짧은 퀴즈로 복습해 보세요.");
+              assertThat(delivery.getDeepLink())
+                  .isEqualTo(
+                      "/reviews/"
+                          + reviewId
+                          + "?utm_source=push&utm_medium=notification"
+                          + "&utm_campaign=expression_review"
+                          + "&utm_content=expression_review_quiz");
+            });
+    verify(sender, times(1)).send(anyList());
+    verify(publisher, times(2))
+        .scheduleReceiptChecks(anyList(), org.mockito.ArgumentMatchers.eq(1));
+  }
+
+  @DisplayName("UPDATE 배치에서 한 행이 누락되면 앞서 성공한 행도 롤백한다.")
+  @Test
+  void rollsBackSuccessfulUpdateWhenAnotherRowIsMissing() {
+    PreparedPushDelivery prepared =
+        deliveries.prepareAll(List.of(command(seed(1).getFirst(), "update-missing"))).getFirst();
+    assertThatThrownBy(
+            () ->
+                new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(
+                        status -> {
+                          PushDelivery existing =
+                              repository.findById(prepared.pushDeliveryId()).orElseThrow();
+                          existing.acceptTicket("must-roll-back");
+                          PushDelivery missing =
+                              PushDelivery.requested(
+                                  1L,
+                                  1L,
+                                  "ExponentPushToken[missing]",
+                                  NotificationType.EXPRESSION_REVIEW,
+                                  "missing",
+                                  "title",
+                                  "body",
+                                  "/reviews/missing",
+                                  java.time.LocalDateTime.now());
+                          ReflectionTestUtils.setField(missing, "id", Long.MAX_VALUE);
+                          batchRepository.updateStates(List.of(existing, missing));
+                        }))
+        .isInstanceOf(IllegalStateException.class);
+    PushDelivery unchanged = repository.findById(prepared.pushDeliveryId()).orElseThrow();
+    assertThat(unchanged.getStatus()).isEqualTo(PushDeliveryStatus.REQUESTED);
+    assertThat(unchanged.getExpoTicketId()).isNull();
   }
 
   /** 새 행의 키·문구 스냅샷을 보존하고 Ticket 결과를 응답 순서로 연결한다. */
@@ -556,6 +670,8 @@ class PushDeliveryBatchIntegrationTests {
   static class CountingDataSource extends DelegatingDataSource {
     final List<String> sql = new CopyOnWriteArrayList<>();
     final AtomicInteger writeCommits = new AtomicInteger();
+    final AtomicInteger batchExecutions = new AtomicInteger();
+    final AtomicInteger batchedStatements = new AtomicInteger();
 
     CountingDataSource(DataSource target) {
       super(target);
@@ -564,6 +680,8 @@ class PushDeliveryBatchIntegrationTests {
     void reset() {
       sql.clear();
       writeCommits.set(0);
+      batchExecutions.set(0);
+      batchedStatements.set(0);
     }
 
     /** {@inheritDoc} */
@@ -597,6 +715,12 @@ class PushDeliveryBatchIntegrationTests {
               PreparedStatement.class.getClassLoader(),
               new Class<?>[] {PreparedStatement.class},
               (proxy, method, args) -> {
+                if (method.getName().equals("addBatch")) {
+                  batchedStatements.incrementAndGet();
+                }
+                if (method.getName().equals("executeBatch")) {
+                  batchExecutions.incrementAndGet();
+                }
                 if (List.of("execute", "executeQuery", "executeUpdate", "executeBatch")
                     .contains(method.getName())) {
                   sql.add(query.toLowerCase(java.util.Locale.ROOT).strip());
