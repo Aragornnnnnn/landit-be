@@ -161,6 +161,10 @@ class ScenarioHistoryApiIntegrationTests {
         .andExpect(jsonPath("$.data.sessions[1].messages[2].content").value("Goodbye."))
         .andExpect(jsonPath("$.data.sessions[1].feedback.sessionId").value(5550101L))
         .andExpect(jsonPath("$.data.sessions[1].feedback.nativeScore").value(80))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.userLevelAssessment").value(nullValue()))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.growthFeedback").value(nullValue()))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.expressionReuse.pending").value(false))
+        .andExpect(jsonPath("$.data.sessions[1].feedback.expressionReuse.items", hasSize(0)))
         .andExpect(jsonPath("$.data.sessions[1].feedback.starRating").value(2.5))
         .andExpect(jsonPath("$.data.sessions[1].feedback.summaryMessage").value("저장된 요약"))
         .andExpect(
@@ -176,6 +180,35 @@ class ScenarioHistoryApiIntegrationTests {
                     "$.data.sessions[1].feedback.messageFeedbacks[0]"
                         + ".evaluationContext.translatedContent")
                 .value("저장된 번역"));
+  }
+
+  @Test
+  @DisplayName("이력은 저장된 성장 비교와 표현 재사용 결과를 AI 호출 없이 복원한다.")
+  void restoresStoredGrowthAndExpressionReuse() throws Exception {
+    session(5550101L, USER, SCENARIO, "COMPLETED", START.plusMinutes(1));
+    summary(5550101L, "COMPLETED");
+    jdbc.update(
+        """
+        UPDATE session_history_summary_feedback
+        SET growth_feedback_payload = ? FORMAT JSON, expression_reuse_payload = ? FORMAT JSON
+        WHERE id = 5550101
+        """,
+        """
+        {"patternLabel":"시제", "succeeded":true, "previousDate":"2026-09-19",
+         "previousSentence":"I go yesterday.", "currentSentence":"I went yesterday."}
+        """,
+        """
+        {"pending":false,"items":[{"expressionId":1,"text":"by the way","messageId":2,
+         "quotedSentence":"By the way, hello.","matchedText":"By the way"}]}
+        """);
+    history(USER, SCENARIO)
+        .andExpect(jsonPath("$.data.sessions[0].feedback.growthFeedback.succeeded").value(true))
+        .andExpect(
+            jsonPath("$.data.sessions[0].feedback.growthFeedback.previousDate").value("2026-09-19"))
+        .andExpect(jsonPath("$.data.sessions[0].feedback.expressionReuse.items", hasSize(1)))
+        .andExpect(
+            jsonPath("$.data.sessions[0].feedback.expressionReuse.items[0].text")
+                .value("by the way"));
   }
 
   @Test
@@ -312,8 +345,9 @@ class ScenarioHistoryApiIntegrationTests {
         """
         INSERT INTO session_history_summary_feedback (id, session_history_id, processing_status,
             native_score, star_rating, total_message_count, native_like_message_count,
-            highlight_message, summary_message, created_at, updated_at)
-        VALUES (?, ?, ?, 80, 2.5, 1, 1, '저장된 강조', '저장된 요약', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            highlight_message, summary_message, expression_reuse_payload, created_at, updated_at)
+        VALUES (?, ?, ?, 80, 2.5, 1, 1, '저장된 강조', '저장된 요약',
+            '{"pending":false,"items":[]}' FORMAT JSON, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """,
         historyId,
         historyId,
