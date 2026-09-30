@@ -4,11 +4,13 @@ package com.landit.landitbe.feature.learning.scenario.feedback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.landit.landitbe.feature.content.scenario.service.ScenarioStarMessageService;
 import com.landit.landitbe.feature.learning.conversation.dto.LearningSessionSnapshot;
 import com.landit.landitbe.feature.learning.conversation.dto.SessionHistorySnapshot;
 import com.landit.landitbe.feature.learning.conversation.history.service.ConversationMessageService;
@@ -45,7 +47,7 @@ class SessionFeedbackCompletionServiceTest {
     assertThat(payload.get("items").isEmpty()).isTrue();
   }
 
-  @DisplayName("후보 표현과 이를 포함하는 긴 원문 인용을 재사용으로 저장한다.")
+  @DisplayName("별점 고정 문구와 후보 표현에 근거한 재사용 결과를 함께 저장한다.")
   @ParameterizedTest
   @ValueSource(strings = {"used to", "used to go", "I used to go hiking yesterday."})
   void savesExactExpressionWithinLongerQuote(String matchedText) {
@@ -61,8 +63,11 @@ class SessionFeedbackCompletionServiceTest {
     LearningSessionService sessions = mock(LearningSessionService.class);
     SessionHistoryService histories = mock(SessionHistoryService.class);
     SessionFeedbackDataService data = mock(SessionFeedbackDataService.class);
+    ScenarioStarMessageService starMessages = mock(ScenarioStarMessageService.class);
+    when(starMessages.findMessage(anyLong(), any())).thenReturn(Optional.of("별점 고정 문구"));
     final SessionFeedbackCompletionService service =
         new SessionFeedbackCompletionService(
+            starMessages,
             sessions,
             histories,
             data,
@@ -104,7 +109,6 @@ class SessionFeedbackCompletionServiceTest {
             10L,
             80,
             new BigDecimal("2.0"),
-            "강조",
             "총평",
             List.of(feedback),
             null,
@@ -114,6 +118,7 @@ class SessionFeedbackCompletionServiceTest {
 
     var saved = ArgumentCaptor.forClass(SessionHistorySummaryFeedback.class);
     verify(data).saveSummary(saved.capture());
+    assertThat(saved.getValue().getHighlightMessage()).isEqualTo("별점 고정 문구");
     return saved.getValue().getExpressionReusePayload();
   }
 }

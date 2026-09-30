@@ -334,7 +334,6 @@ public class RemoteAiConversationClient implements AiConversationClient {
       Long sessionId,
       Integer nativeScore,
       BigDecimal starRating,
-      String highlightMessage,
       String summaryMessage,
       List<AiSessionMessageFeedbackResult> messageFeedbacks,
       AiSessionLevelAssessment levelAssessment,
@@ -346,7 +345,6 @@ public class RemoteAiConversationClient implements AiConversationClient {
       if (sessionId == null
           || nativeScore == null
           || starRating == null
-          || blank(highlightMessage)
           || blank(summaryMessage)
           || messageFeedbacks == null) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
@@ -355,7 +353,6 @@ public class RemoteAiConversationClient implements AiConversationClient {
           sessionId,
           nativeScore,
           starRating,
-          highlightMessage,
           summaryMessage,
           messageFeedbacks,
           levelAssessment,

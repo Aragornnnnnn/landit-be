@@ -175,6 +175,7 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
     jdbcTemplate.update("DELETE FROM scenario_question");
     jdbcTemplate.update("DELETE FROM scenario_language_variant");
+    jdbcTemplate.update("DELETE FROM scenario_star_message");
     jdbcTemplate.update("DELETE FROM scenario");
     jdbcTemplate.update("DELETE FROM category_language_variant");
     jdbcTemplate.update("DELETE FROM category");
@@ -1736,6 +1737,36 @@ class ScenarioSessionApiIntegrationTests {
     assertThat(scenarioProgressSnapshot(session.userId(), 2120))
         .containsEntry("STATUS", "CLEARED")
         .containsEntry("COMPLETED_COUNT", 1);
+  }
+
+  @DisplayName("최종 피드백은 시나리오 별점 문구를 강조 메시지로 저장해 반환한다.")
+  @Test
+  void getSessionFeedbackUsesScenarioStarMessageForHighlight() throws Exception {
+    StartedSession session =
+        startCompletedAiFirstSession("session-feedback-star-message@example.com");
+    seedScenarioStarMessage(2120, "3.0", "이제 어디서든 음식 취향을 소개할 수 있어요!");
+    seedScenarioStarMessage(2120, "2.5", "취향 설명까지 할 수 있게 됐어요");
+
+    requestSessionFeedback(session)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.starRating").value(3.0))
+        .andExpect(jsonPath("$.data.highlightMessage").value("이제 어디서든 음식 취향을 소개할 수 있어요!"));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT highlight_message FROM session_history_summary_feedback", String.class))
+        .isEqualTo("이제 어디서든 음식 취향을 소개할 수 있어요!");
+  }
+
+  @DisplayName("시나리오 별점 문구가 없으면 기본 강조 문구를 저장한다.")
+  @Test
+  void getSessionFeedbackFallsBackToDefaultHighlightWhenStarMessageMissing() throws Exception {
+    StartedSession session =
+        startCompletedAiFirstSession("session-feedback-star-default@example.com");
+
+    requestSessionFeedback(session)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.highlightMessage").value("오늘도 시나리오를 잘 마무리했어요"));
   }
 
   @DisplayName("최종 피드백을 재조회하면 AI 호출과 중복 저장 없이 기존 결과를 반환한다.")
@@ -3620,6 +3651,17 @@ class ScenarioSessionApiIntegrationTests {
         status);
   }
 
+  private void seedScenarioStarMessage(long scenarioId, String starRating, String message) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_star_message (scenario_id, star_rating, message, created_at, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        scenarioId,
+        new BigDecimal(starRating),
+        message);
+  }
+
   private void seedScenarioVariant(
       long variantId,
       long scenarioId,
@@ -4425,7 +4467,6 @@ class ScenarioSessionApiIntegrationTests {
           request.sessionId(),
           90,
           sessionFeedbackStarRating,
-          "You clearly communicated your main idea.",
           "Keep practicing complete sentences with clear reasons.",
           request.expectedMessageIds().stream()
               .map(

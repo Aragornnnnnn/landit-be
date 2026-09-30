@@ -455,7 +455,6 @@ class RemoteAiConversationClientTest {
     assertThat(result.sessionId()).isEqualTo(100L);
     assertThat(result.nativeScore()).isEqualTo(75);
     assertThat(result.starRating()).isEqualByComparingTo(new BigDecimal("2.5"));
-    assertThat(result.highlightMessage()).isEqualTo("You clearly explained your preference.");
     assertThat(result.summaryMessage()).isEqualTo("Keep connecting your reasons with because.");
     assertThat(result.levelAssessment().core().messages()).hasSize(2);
     assertThat(result.levelAssessment().core().messages().getFirst().domains().grammar().level())

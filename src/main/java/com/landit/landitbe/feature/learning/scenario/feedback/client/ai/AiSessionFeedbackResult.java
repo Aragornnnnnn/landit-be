@@ -9,10 +9,11 @@ import java.util.List;
 /**
  * AI 세션 최종 피드백 생성 결과를 표현한다.
  *
+ * <p>별점 구간별 강조 메시지는 AI 결과가 아니라 시나리오 별점 문구 테이블에서 조회해 저장한다.
+ *
  * @param sessionId 학습 세션 ID
  * @param nativeScore 원어민 관점 점수
  * @param starRating 세션 별점
- * @param highlightMessage 최종 피드백 강조 메시지
  * @param summaryMessage 최종 피드백 요약
  * @param messageFeedbacks 메시지별 피드백 목록
  * @param levelAssessment 사용자 수준 평가 결과
@@ -24,7 +25,6 @@ public record AiSessionFeedbackResult(
     Long sessionId,
     int nativeScore,
     BigDecimal starRating,
-    String highlightMessage,
     String summaryMessage,
     List<AiSessionMessageFeedbackResult> messageFeedbacks,
     AiSessionLevelAssessment levelAssessment,
@@ -38,7 +38,6 @@ public record AiSessionFeedbackResult(
    * @param sessionId 학습 세션 ID
    * @param nativeScore 원어민 관점 점수
    * @param starRating 세션 별점
-   * @param highlightMessage 최종 피드백 강조 메시지
    * @param summaryMessage 최종 피드백 요약
    * @param messageFeedbacks 메시지별 피드백 목록
    */
@@ -46,14 +45,12 @@ public record AiSessionFeedbackResult(
       Long sessionId,
       int nativeScore,
       BigDecimal starRating,
-      String highlightMessage,
       String summaryMessage,
       List<AiSessionMessageFeedbackResult> messageFeedbacks) {
     this(
         sessionId,
         nativeScore,
         starRating,
-        highlightMessage,
         summaryMessage,
         messageFeedbacks,
         null,
@@ -68,7 +65,6 @@ public record AiSessionFeedbackResult(
    * @param sessionId 학습 세션 ID
    * @param nativeScore 원어민 관점 점수
    * @param starRating 세션 별점
-   * @param highlightMessage 최종 피드백 강조 메시지
    * @param summaryMessage 최종 피드백 요약
    * @param messageFeedbacks 메시지별 피드백 목록
    * @param levelAssessment 사용자 수준 평가 결과
@@ -78,7 +74,6 @@ public record AiSessionFeedbackResult(
       Long sessionId,
       int nativeScore,
       BigDecimal starRating,
-      String highlightMessage,
       String summaryMessage,
       List<AiSessionMessageFeedbackResult> messageFeedbacks,
       AiSessionLevelAssessment levelAssessment,
@@ -87,7 +82,6 @@ public record AiSessionFeedbackResult(
         sessionId,
         nativeScore,
         starRating,
-        highlightMessage,
         summaryMessage,
         messageFeedbacks,
         levelAssessment,
@@ -102,7 +96,6 @@ public record AiSessionFeedbackResult(
    * @param sessionId 학습 세션 ID
    * @param nativeScore 원어민 관점 점수
    * @param starRating 세션 별점
-   * @param highlightMessage 최종 피드백 강조 메시지
    * @param summaryMessage 최종 피드백 요약
    * @param messageFeedbacks 메시지별 피드백 목록
    * @param levelAssessment 사용자 수준 평가 결과
@@ -111,7 +104,6 @@ public record AiSessionFeedbackResult(
       Long sessionId,
       int nativeScore,
       BigDecimal starRating,
-      String highlightMessage,
       String summaryMessage,
       List<AiSessionMessageFeedbackResult> messageFeedbacks,
       AiSessionLevelAssessment levelAssessment) {
@@ -119,7 +111,6 @@ public record AiSessionFeedbackResult(
         sessionId,
         nativeScore,
         starRating,
-        highlightMessage,
         summaryMessage,
         messageFeedbacks,
         levelAssessment,
@@ -134,7 +125,6 @@ public record AiSessionFeedbackResult(
    * @param sessionId 학습 세션 ID
    * @param nativeScore 원어민 관점 점수
    * @param starRating 세션 별점
-   * @param highlightMessage 최종 피드백 강조 메시지
    * @param summaryMessage 최종 피드백 요약
    * @param messageFeedbacks 메시지별 피드백 목록
    * @param growthFeedback 직전 교정 비교 결과
@@ -144,7 +134,6 @@ public record AiSessionFeedbackResult(
       Long sessionId,
       int nativeScore,
       BigDecimal starRating,
-      String highlightMessage,
       String summaryMessage,
       List<AiSessionMessageFeedbackResult> messageFeedbacks,
       ScenarioGrowthFeedback growthFeedback,
@@ -153,7 +142,6 @@ public record AiSessionFeedbackResult(
         sessionId,
         nativeScore,
         starRating,
-        highlightMessage,
         summaryMessage,
         messageFeedbacks,
         null,
@@ -173,7 +161,6 @@ public record AiSessionFeedbackResult(
         sessionId,
         0,
         new BigDecimal("1.0"),
-        "오늘의 대화를 끝까지 완료했어요.",
         "대화 내용을 바탕으로 현재 수준을 확인했어요.",
         List.of(),
         null,
