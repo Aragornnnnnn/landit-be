@@ -106,7 +106,8 @@ public class ScenarioHistoryQueryService {
               locked
                   ? List.of()
                   : messageFeedbacks(session, historyMessages, summary.getId(), feedbackByMessage),
-              locked);
+              locked,
+              null);
     }
     return new ScenarioHistoryResponse.Session(
         session.sessionId(),

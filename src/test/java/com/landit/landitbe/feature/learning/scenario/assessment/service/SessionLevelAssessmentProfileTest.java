@@ -28,11 +28,26 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class SessionLevelAssessmentProfileTest {
   private static final Clock CLOCK =
       Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+
+  @DisplayName("잘못된 100점 평가값은 점수를 저장하거나 프로필을 변경하지 않는다.")
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 0, 101})
+  void invalidScoresFallBackWithoutChangingProfile(int score) {
+    UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+    var result = assessScore(profile, LocalDateTime.now(CLOCK), score, true, false);
+    assertThat(result.getAssessedScore()).isNull();
+    assertThat(result.getAssessedLevel()).isNull();
+    assertThat(result.getChangeType()).isEqualTo(ChangeType.NOT_APPLIED);
+    assertThat(result.getSource().name()).isEqualTo("FALLBACK");
+    assertThat(profile.getLearningLevel()).isEqualTo(3);
+  }
 
   @DisplayName("학습 수준과 무관한 프로필 변경 후에도 첫 수준 평가를 적용한다.")
   @Test
@@ -69,7 +84,7 @@ class SessionLevelAssessmentProfileTest {
     assertThat(result.getPreviousLevel()).isEqualTo(4);
     assertThat(result.getCurrentLevel()).isEqualTo(3);
     assertThat(result.getAssessedLevel()).isEqualTo(3);
-    assertThat(result.getAssessmentVersion()).isEqualTo("text-level-v1.3");
+    assertThat(result.getAssessmentVersion()).isEqualTo("text-score-v2.0");
     assertThat(profile.getLearningLevel()).isEqualTo(3);
     assertThat(profile.getPromotionStreak()).isZero();
   }
@@ -122,6 +137,16 @@ class SessionLevelAssessmentProfileTest {
       int assessedLevel,
       boolean applyToProfile,
       boolean levelInitialized) {
+    return assessScore(
+        profile, requestedAt, assessedLevel * 20 - 10, applyToProfile, levelInitialized);
+  }
+
+  private UserLevelAssessment assessScore(
+      UserProfile profile,
+      LocalDateTime requestedAt,
+      int score,
+      boolean applyToProfile,
+      boolean levelInitialized) {
     var profiles = mock(UserProfileRepository.class);
     var assessments = mock(UserLevelAssessmentRepository.class);
     when(profiles.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(profile));
@@ -141,7 +166,7 @@ class SessionLevelAssessmentProfileTest {
     when(context.userMessages()).thenReturn(inputs);
     var domain =
         new AiSessionLevelAssessment.Domain(
-            assessedLevel, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, "I like coffee.");
+            score, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, "I like coffee.");
     var domains = new AiSessionLevelAssessment.Domains(domain, domain, domain, domain, domain);
     var core =
         new AiSessionLevelAssessment.Core(

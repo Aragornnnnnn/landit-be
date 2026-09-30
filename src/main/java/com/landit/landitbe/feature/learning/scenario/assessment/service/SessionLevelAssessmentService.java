@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionLevelAssessmentService {
 
-  private static final String ASSESSMENT_VERSION = "text-level-v1.3";
+  private static final String ASSESSMENT_VERSION = "text-score-v2.0";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final ProfileLearningService profileLearningService;
@@ -110,6 +110,13 @@ class SessionLevelAssessmentService {
     return userLevelAssessmentRepository.findByLearningSessionId(sessionId).orElse(null);
   }
 
+  /**
+   * 메시지 순서와 모든 영역의 근거 계약을 검증한 뒤 100점 평가를 집계한다.
+   *
+   * @param context 요청 당시의 사용자 발화와 질문 그룹
+   * @param assessment AI가 반환한 평가
+   * @return 유효한 집계 결과. 계약 불일치 시 fallback을 위해 null
+   */
   private TextLevelAssessmentPolicy.Score modelScore(
       LoadedSessionFeedbackContext context, AiSessionLevelAssessment assessment) {
     if (assessment == null || assessment.core() == null || assessment.core().messages() == null) {
@@ -140,34 +147,41 @@ class SessionLevelAssessmentService {
       observations.add(
           new Observation(
               expected.responseDemand(),
-              observedLevel(domains.situationPerformance()),
-              observedLevel(domains.grammar()),
-              observedLevel(domains.vocabulary()),
-              observedLevel(domains.discourse()),
-              observedLevel(domains.interactionPragmatics())));
+              observedScore(domains.situationPerformance()),
+              observedScore(domains.grammar()),
+              observedScore(domains.vocabulary()),
+              observedScore(domains.discourse()),
+              observedScore(domains.interactionPragmatics())));
     }
     return TextLevelAssessmentPolicy.calculate(observations, context.questionLevelGroup())
         .orElse(null);
   }
 
+  /**
+   * 관찰 영역에는 1~100점과 원문 인용을, 미관찰 영역에는 점수와 인용의 부재를 요구한다.
+   *
+   * @param domain AI 영역 평가
+   * @param userMessage 해당 평가 대상의 원문
+   * @return 관찰 상태에 맞는 점수와 근거 계약을 충족하면 true
+   */
   private boolean validDomain(AiSessionLevelAssessment.Domain domain, String userMessage) {
     if (domain == null || domain.evidenceStatus() == null) {
       return false;
     }
     if (domain.evidenceStatus() != AiSessionLevelAssessment.EvidenceStatus.OBSERVED) {
-      return domain.level() == null && domain.evidenceExcerpt() == null;
+      return domain.score() == null && domain.evidenceExcerpt() == null;
     }
-    return domain.level() != null
-        && domain.level() >= 1
-        && domain.level() <= 5
+    return domain.score() != null
+        && domain.score() >= 1
+        && domain.score() <= 100
         && domain.evidenceExcerpt() != null
         && !domain.evidenceExcerpt().isBlank()
         && userMessage.contains(domain.evidenceExcerpt());
   }
 
-  private Integer observedLevel(AiSessionLevelAssessment.Domain domain) {
+  private Integer observedScore(AiSessionLevelAssessment.Domain domain) {
     return domain.evidenceStatus() == AiSessionLevelAssessment.EvidenceStatus.OBSERVED
-        ? domain.level()
+        ? domain.score()
         : null;
   }
 

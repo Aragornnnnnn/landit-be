@@ -2,7 +2,6 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.scenario.assessment.service.SessionLevelAssessmentGenerationService;
@@ -12,8 +11,6 @@ import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHist
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistorySummaryFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.ExistingSummaryFeedbackContext;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.LoadedSessionFeedbackContext;
-import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioExpressionReuseSummary;
-import com.landit.landitbe.feature.learning.scenario.feedback.dto.ScenarioGrowthCard;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse.EvaluationContextResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.dto.SessionFeedbackResponse.MessageFeedbackResponse;
@@ -34,8 +31,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @Service
 public class SessionFeedbackService {
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().findAndRegisterModules();
 
   private final SessionFeedbackContextService contextService;
   private final SessionFeedbackCompletionService completionService;
@@ -146,35 +141,7 @@ public class SessionFeedbackService {
                             feedbackByMessageId.get(userMessage.messageId()), userMessage))
                 .toList(),
         feedbackAccess.detailFeedbackLocked(userId, context.sessionId()),
-        levelAssessmentGenerationService.get(userId, context.sessionId()),
-        growthFeedback(summary),
-        expressionReuse(summary));
-  }
-
-  /** 저장된 비교만 복원하며, 도입 전 데이터와 비교 근거가 없는 결과는 null을 유지한다. */
-  private ScenarioGrowthCard growthFeedback(SessionHistorySummaryFeedback summary) {
-    if (summary.getGrowthFeedbackPayload() == null) {
-      return null;
-    }
-    try {
-      return OBJECT_MAPPER.treeToValue(
-          summary.getGrowthFeedbackPayload(), ScenarioGrowthCard.class);
-    } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
-      throw ApiException.causedBy(ErrorCode.INTERNAL_SERVER_ERROR, exception);
-    }
-  }
-
-  /** 저장된 재사용 결과를 복원하며, 기존 null 데이터도 분석 완료된 빈 목록으로 응답한다. */
-  private ScenarioExpressionReuseSummary expressionReuse(SessionHistorySummaryFeedback summary) {
-    if (summary.getExpressionReusePayload() == null) {
-      return new ScenarioExpressionReuseSummary(false, List.of());
-    }
-    try {
-      return OBJECT_MAPPER.treeToValue(
-          summary.getExpressionReusePayload(), ScenarioExpressionReuseSummary.class);
-    } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
-      throw ApiException.causedBy(ErrorCode.INTERNAL_SERVER_ERROR, exception);
-    }
+        levelAssessmentGenerationService.get(userId, context.sessionId()));
   }
 
   /** 메시지별 피드백과 평가 기준을 FE가 표시할 단일 메시지 응답으로 변환한다. */
