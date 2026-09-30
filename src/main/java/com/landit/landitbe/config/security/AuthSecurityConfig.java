@@ -124,6 +124,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/calendar")
                     .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/*/history")
+                    .authenticated()
                     .requestMatchers(
                         HttpMethod.GET, "/api/v1/me/streak", "/api/v1/me/streak/calendar")
                     .authenticated()
