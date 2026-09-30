@@ -19,6 +19,7 @@ import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.auth.service.LanditTokenService;
 import com.landit.landitbe.feature.profile.domain.UserProfile;
+import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.repository.UserProfileRepository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -576,7 +577,7 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
   }
 
-  @DisplayName("탈퇴는 access token으로 인증하고 refresh token을 폐기한다.")
+  @DisplayName("탈퇴는 식별 원본을 덮어쓰고 회원 행과 문의를 보존하며 재가입은 새 회원으로 처리한다.")
   @Test
   void withdrawUsesAccessTokenAndRevokesRefreshTokens() throws Exception {
     mockMvc
@@ -594,7 +595,12 @@ class SocialAuthApiIntegrationTests {
             "withdraw-nonce");
     Long userId = loginBody.get("data").get("user").get("userId").asLong();
     String accessToken = loginBody.get("data").get("accessToken").asText();
-    String refreshToken = loginBody.get("data").get("refreshToken").asText();
+    final String refreshToken = loginBody.get("data").get("refreshToken").asText();
+
+    prepareWithdrawalRecords(userId);
+    JsonNode otherLogin =
+        login("GOOGLE", "withdraw-other", "other@example.com", "Other", "other-nonce");
+    final long otherUserId = otherLogin.get("data").get("user").get("userId").asLong();
 
     mockMvc
         .perform(
@@ -605,13 +611,34 @@ class SocialAuthApiIntegrationTests {
         .andExpect(jsonPath("$.error").value(nullValue()));
 
     UserProfile withdrawnUser = userProfileRepository.findById(userId).orElseThrow();
-    OauthIdentity withdrawnIdentity =
-        oauthIdentityRepository
-            .findAllByUserProfileIdAndStatus(userId, OauthIdentityStatus.UNLINKED)
-            .getFirst();
-    assertThat(withdrawnUser.getEmail()).isEqualTo("withdraw@example.com");
-    assertThat(withdrawnUser.getNickname()).isEqualTo("Withdraw User");
-    assertThat(withdrawnIdentity).extracting("providerEmail").isEqualTo("withdraw@example.com");
+    assertThat(withdrawnUser.getEmail()).isNull();
+    assertThat(withdrawnUser.getNickname()).isEqualTo("탈퇴한 사용자");
+    assertThat(withdrawnUser.getProfileImageUrl()).isNull();
+    assertThat(withdrawnUser.getStatus()).isEqualTo(UserProfileStatus.WITHDRAWN);
+    assertThat(
+            oauthIdentityRepository.findAllByUserProfileIdAndStatus(
+                userId, OauthIdentityStatus.UNLINKED))
+        .hasSize(2)
+        .allSatisfy(
+            identity -> {
+              assertThat(identity).extracting("providerEmail").isNull();
+              assertThat(identity).extracting("providerUserId").isEqualTo("withdrawn");
+            });
+    assertWithdrawalRecords(userId);
+    assertThat(userProfileRepository.findById(otherUserId).orElseThrow().getEmail())
+        .isEqualTo("other@example.com");
+
+    mockMvc
+        .perform(
+            delete("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isUnauthorized());
+
+    JsonNode rejoined =
+        login("GOOGLE", "google-withdraw-1", "withdraw@example.com", "Rejoined", "rejoin-nonce");
+    assertThat(rejoined.get("data").get("user").get("userId").asLong()).isNotEqualTo(userId);
+    assertThat(rejoined.get("data").get("user").get("newUser").asBoolean()).isTrue();
+    assertThat(userProfileRepository.findById(userId).orElseThrow().getNickname())
+        .isEqualTo("탈퇴한 사용자");
 
     mockMvc
         .perform(
@@ -626,6 +653,75 @@ class SocialAuthApiIntegrationTests {
                         .formatted(refreshToken)))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.error.code").value("REFRESH_TOKEN_INVALID"));
+  }
+
+  private void prepareWithdrawalRecords(Long userId) {
+    jdbcTemplate.update(
+        "UPDATE user_profile SET profile_image_url = ? WHERE id = ?",
+        "https://example.com/private-profile.png",
+        userId);
+    OauthIdentity oldIdentity =
+        new OauthIdentity(
+            userId, SocialProvider.APPLE, "withdraw-old-apple-sub", "old-apple@example.com");
+    oldIdentity.unlink();
+    oauthIdentityRepository.save(oldIdentity);
+    jdbcTemplate.update(
+        """
+        INSERT INTO apple_user_migration (oauth_identity_id, transfer_sub, status)
+        SELECT id, 'withdraw-transfer-sub', 'PREPARED' FROM oauth_identity
+        WHERE user_profile_id = ? AND provider = 'APPLE'
+        """,
+        userId);
+    refreshTokenRepository.save(
+        new RefreshToken(userId, "withdraw-expired-hash", LocalDateTime.now().minusDays(1)));
+    jdbcTemplate.update(
+        """
+        INSERT INTO mailbox_feedback
+            (user_profile_id, feedback_type, content_text, processing_status, created_at, updated_at)
+        VALUES (?, 'QUESTION', '보존할 문의 원문', 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        userId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO mailbox_feedback_attachment
+            (feedback_id, object_key, content_type, file_size, display_order, created_at)
+        SELECT id, 'withdraw-kept-attachment', 'image/png', 100, 0, CURRENT_TIMESTAMP
+        FROM mailbox_feedback WHERE user_profile_id = ?
+        """,
+        userId);
+  }
+
+  private void assertWithdrawalRecords(Long userId) {
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM refresh_token WHERE user_profile_id = ?", Long.class, userId))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM apple_user_migration migration
+                JOIN oauth_identity identity ON identity.id = migration.oauth_identity_id
+                WHERE identity.user_profile_id = ?
+                """,
+                Long.class,
+                userId))
+        .isZero();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT content_text FROM mailbox_feedback WHERE user_profile_id = ?",
+                String.class,
+                userId))
+        .isEqualTo("보존할 문의 원문");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                SELECT object_key FROM mailbox_feedback_attachment attachment
+                JOIN mailbox_feedback feedback ON feedback.id = attachment.feedback_id
+                WHERE feedback.user_profile_id = ?
+                """,
+                String.class,
+                userId))
+        .isEqualTo("withdraw-kept-attachment");
   }
 
   @DisplayName("유효하지 않은 access token으로 탈퇴할 수 없다.")

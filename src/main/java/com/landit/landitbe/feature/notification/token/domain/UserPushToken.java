@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.UUID;
 import lombok.Getter;
 
 /** 사용자 디바이스의 Expo Push Token을 저장한다. */
@@ -26,6 +27,9 @@ public class UserPushToken extends BaseTimeEntity {
 
   @Column(name = "user_profile_id", nullable = false)
   private Long userProfileId;
+
+  @Column(name = "installation_id", unique = true)
+  private UUID installationId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
@@ -71,7 +75,30 @@ public class UserPushToken extends BaseTimeEntity {
   public void claim(Long userProfileId, AppPlatform platform) {
     this.userProfileId = userProfileId;
     this.platform = platform;
+    this.installationId = null;
     this.status = UserPushTokenStatus.ACTIVE;
+  }
+
+  /** 설치의 현재 로그인 계정과 Expo Token을 연결한다. */
+  public void bind(UUID installationId, Long userProfileId, AppPlatform platform, String token) {
+    this.installationId = installationId;
+    this.userProfileId = userProfileId;
+    this.platform = platform;
+    this.expoPushToken = token;
+    this.status = UserPushTokenStatus.ACTIVE;
+  }
+
+  /** 다른 Token 행으로 설치 소유권을 이전하기 전에 기존 연결을 해제한다. */
+  public void detachInstallation() {
+    this.installationId = null;
+    this.status = UserPushTokenStatus.REVOKED;
+  }
+
+  /** 설치가 다른 계정으로 전환됐지만 푸시를 허용하지 않은 상태를 기록한다. */
+  public void bindDisabled(Long userProfileId, AppPlatform platform) {
+    this.userProfileId = userProfileId;
+    this.platform = platform;
+    this.status = UserPushTokenStatus.REVOKED;
   }
 
   /** 현재 사용자 소유의 Expo Push Token을 비활성화한다. */

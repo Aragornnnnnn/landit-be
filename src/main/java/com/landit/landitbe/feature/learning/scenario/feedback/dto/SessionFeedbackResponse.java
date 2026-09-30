@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.dto;
 
+import com.landit.landitbe.feature.learning.scenario.assessment.dto.SessionLevelAssessmentResponse;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.FeedbackType;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistoryMessageFeedback;
 import com.landit.landitbe.feature.learning.scenario.feedback.domain.SessionHistorySummaryFeedback;
@@ -20,6 +21,9 @@ import java.util.List;
  * @param summaryMessage 최종 피드백 요약
  * @param messageFeedbacks 메시지별 피드백(상세 피드백) 목록. 잠긴 세션이면 빈 목록
  * @param detailFeedbackLocked 무료 사용자에게 상세 피드백이 잠겨 메시지별 피드백을 비워 내렸는지
+ * @param userLevelAssessment 사용자 수준 평가 처리 상태와 결과. 평가 비활성 세션이면 null
+ * @param growthFeedback 직전 완료 시나리오의 실수 비교. 보여줄 근거가 없으면 null
+ * @param expressionReuse 배운 표현 재사용 분석 상태와 결과. 결과가 없으면 빈 목록
  */
 public record SessionFeedbackResponse(
     Long sessionId,
@@ -33,7 +37,12 @@ public record SessionFeedbackResponse(
                 "상세 피드백 잠금 여부. 유료 도입 후 무료 사용자는 첫 시나리오의 첫 완료 세션만 메시지별 피드백을 받고, 그 외 세션은"
                     + " messageFeedbacks가 비고 이 값이 true다. 결제 후 다시 조회하면 false와 함께 전부 내려간다.",
             example = "false")
-        boolean detailFeedbackLocked) {
+        boolean detailFeedbackLocked,
+    @Schema(description = "비동기 사용자 수준 평가 상태와 결과. 평가 비활성 세션이면 null")
+        SessionLevelAssessmentResponse userLevelAssessment,
+    @Schema(description = "직전 완료 시나리오와 비교할 근거가 없으면 null") ScenarioGrowthCard growthFeedback,
+    @Schema(description = "pending이면 분석 중, 완료 후 items가 비어 있으면 FE에서 카드를 숨긴다")
+        ScenarioExpressionReuseSummary expressionReuse) {
 
   /**
    * 저장된 세션 요약 피드백과 메시지별 응답을 최종 피드백 응답으로 변환한다.
@@ -42,13 +51,19 @@ public record SessionFeedbackResponse(
    * @param summary 저장된 세션 요약 피드백
    * @param messageFeedbacks 메시지별 피드백 응답
    * @param detailFeedbackLocked 상세 피드백 잠금 여부. true면 메시지별 피드백을 비워 내린다
+   * @param userLevelAssessment 사용자 수준 평가 상태와 결과
+   * @param growthFeedback 직전 시나리오 비교 결과
+   * @param expressionReuse 배운 표현 재사용 결과
    * @return 세션 최종 피드백 응답
    */
   public static SessionFeedbackResponse from(
       Long sessionId,
       SessionHistorySummaryFeedback summary,
       List<MessageFeedbackResponse> messageFeedbacks,
-      boolean detailFeedbackLocked) {
+      boolean detailFeedbackLocked,
+      SessionLevelAssessmentResponse userLevelAssessment,
+      ScenarioGrowthCard growthFeedback,
+      ScenarioExpressionReuseSummary expressionReuse) {
     return new SessionFeedbackResponse(
         sessionId,
         summary.getNativeScore(),
@@ -56,7 +71,10 @@ public record SessionFeedbackResponse(
         summary.getHighlightMessage(),
         summary.getSummaryMessage(),
         detailFeedbackLocked ? List.of() : messageFeedbacks,
-        detailFeedbackLocked);
+        detailFeedbackLocked,
+        userLevelAssessment,
+        growthFeedback,
+        expressionReuse);
   }
 
   /**

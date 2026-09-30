@@ -95,6 +95,8 @@ public class AuthSecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/me/expo-push-token")
                     .authenticated()
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/me/push-devices/*")
+                    .authenticated()
                     .requestMatchers("/api/v1/me/alarm")
                     .authenticated()
                     .requestMatchers("/api/v1/reviews/**")
@@ -123,6 +125,8 @@ public class AuthSecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/daily")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/calendar")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/scenarios/*/history")
                     .authenticated()
                     .requestMatchers(
                         HttpMethod.GET, "/api/v1/me/streak", "/api/v1/me/streak/calendar")

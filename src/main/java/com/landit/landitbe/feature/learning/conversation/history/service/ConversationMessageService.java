@@ -55,6 +55,24 @@ public class ConversationMessageService {
   }
 
   /**
+   * 여러 회차의 메시지를 저장 당시 순서대로 일괄 조회한다.
+   *
+   * @param sessionHistoryIds 조회할 이력 ID 목록
+   * @return 회차와 메시지 순서로 정렬된 불변 값 목록
+   */
+  @Transactional(readOnly = true)
+  public List<SessionHistoryMessageSnapshot> findAllByHistoryIds(List<Long> sessionHistoryIds) {
+    if (sessionHistoryIds.isEmpty()) {
+      return List.of();
+    }
+    return sessionHistoryMessageRepository
+        .findBySessionHistoryIdInOrderBySessionHistoryIdAscMessageSequenceAsc(sessionHistoryIds)
+        .stream()
+        .map(SessionHistoryMessageSnapshot::from)
+        .toList();
+  }
+
+  /**
    * 메시지 ID로 메시지를 조회한다.
    *
    * @param messageId 메시지 ID

@@ -72,6 +72,35 @@ class NotificationDispatchServiceTest {
             meterRegistry);
   }
 
+  @DisplayName("관리자 Ticket 수가 다르면 전체 선점 이력을 실패로 기록하고 자동 재시도하지 않는다.")
+  @Test
+  void failsAdminBatchWhenTicketCountDoesNotMatch() {
+    when(notificationSender.send(anyList())).thenReturn(List.of());
+
+    notificationDispatchService.sendAdminPrepared(List.of(PREPARED_DELIVERY));
+
+    verify(pushDeliveryService)
+        .recordTicketResults(
+            List.of(10L), List.of(PushTicketResult.failed("EXPO_TICKET_RESULT_MISMATCH")));
+    verify(pushDeliveryService, never()).markRetryable(any());
+    org.mockito.Mockito.verifyNoInteractions(pushQueuePublisher);
+  }
+
+  @DisplayName("관리자 Receipt 재예약은 현재 페이지의 접수 이력만 묶어서 발행한다.")
+  @Test
+  void schedulesOnlyAcceptedReceiptsInCurrentAdminPage() {
+    when(pushDeliveryService.findAcceptedDeliveryIds(
+            "push:admin-broadcast:campaign:", List.of(2L, 3L)))
+        .thenReturn(List.of(10L, 11L));
+
+    notificationDispatchService.scheduleAcceptedDeliveryReceipts(
+        "admin-broadcast:campaign", List.of(2L, 3L));
+
+    verify(pushQueuePublisher).scheduleReceiptChecks(List.of(10L, 11L), 1);
+    verify(pushDeliveryService, never()).findAcceptedDeliveryIds(any());
+    org.mockito.Mockito.verifyNoInteractions(userPushTokenDeliveryService, notificationSender);
+  }
+
   /** 사용자의 발송 가능한 Token별 Ticket을 기록하고 Receipt 확인을 예약한다. */
   @DisplayName("사용자의 발송 가능한 Token별 Ticket을 기록하고 Receipt 확인을 예약한다.")
   @Test

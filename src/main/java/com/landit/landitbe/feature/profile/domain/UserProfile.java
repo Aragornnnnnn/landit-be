@@ -287,8 +287,10 @@ public class UserProfile extends BaseTimeEntity {
     }
   }
 
-  /** 사용자 프로필을 탈퇴 상태로 전환하고 프로필 이미지를 정리한다. */
+  /** 회원 행과 문의 연결을 유지하면서 개인 식별 원본을 덮어쓰고 탈퇴 상태로 전환한다. */
   public void withdraw() {
+    this.nickname = "탈퇴한 사용자";
+    this.email = null;
     this.profileImageUrl = null;
     this.status = UserProfileStatus.WITHDRAWN;
   }

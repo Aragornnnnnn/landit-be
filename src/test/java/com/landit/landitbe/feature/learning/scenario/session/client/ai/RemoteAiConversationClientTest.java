@@ -416,6 +416,34 @@ class RemoteAiConversationClientTest {
     assertThat(request.has("assessmentMessages")).isFalse();
   }
 
+  @DisplayName("직전 교정과 배운 표현 후보를 실제 AI HTTP 요청에 포함한다.")
+  @Test
+  void generateSessionFeedbackForwardsComparisonEvidence() throws Exception {
+    AtomicReference<String> body = stubSessionFeedbackSuccess();
+    AiSessionFeedbackRequest legacy = aiSessionFeedbackRequest();
+    var mistake =
+        new AiSessionFeedbackRequest.PreviousMistake(
+            99L, "I go yesterday.", "I went yesterday.", "과거 시제를 사용해요.");
+    var expression = new AiSessionFeedbackRequest.LearnedExpression(812L, "used to", "예전에 ~하곤 했다");
+    remoteClient()
+        .generateSessionFeedback(
+            new AiSessionFeedbackRequest(
+                legacy.sessionId(),
+                legacy.scenario(),
+                legacy.expectedMessageIds(),
+                List.of(),
+                null,
+                List.of(mistake),
+                List.of(expression)));
+
+    JsonNode sent = jsonMapper.readTree(body.get());
+    assertThat(sent.get("previousMistakes"))
+        .isEqualTo(jsonMapper.readTree(jsonMapper.writeValueAsString(List.of(mistake))));
+    assertThat(sent.get("learnedExpressions"))
+        .isEqualTo(jsonMapper.readTree(jsonMapper.writeValueAsString(List.of(expression))));
+    assertThat(sent.has("assessmentMessages")).isFalse();
+  }
+
   @DisplayName("최종 피드백 응답의 요약 점수와 수준 평가를 변환한다.")
   @Test
   void generateSessionFeedbackMapsSummaryAndLevelAssessment() {
@@ -427,7 +455,6 @@ class RemoteAiConversationClientTest {
     assertThat(result.sessionId()).isEqualTo(100L);
     assertThat(result.nativeScore()).isEqualTo(75);
     assertThat(result.starRating()).isEqualByComparingTo(new BigDecimal("2.5"));
-    assertThat(result.highlightMessage()).isEqualTo("You clearly explained your preference.");
     assertThat(result.summaryMessage()).isEqualTo("Keep connecting your reasons with because.");
     assertThat(result.levelAssessment().core().messages()).hasSize(2);
     assertThat(result.levelAssessment().core().messages().getFirst().domains().grammar().level())

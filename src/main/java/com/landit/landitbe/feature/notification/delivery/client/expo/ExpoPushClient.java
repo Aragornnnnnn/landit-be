@@ -115,7 +115,7 @@ public class ExpoPushClient implements NotificationSender {
         message.expoPushToken(),
         message.title(),
         message.body(),
-        new ExpoPushData(message.deepLink()),
+        new ExpoPushData(message.deepLink(), message.userProfileId()),
         "default",
         "default");
   }
@@ -239,7 +239,7 @@ public class ExpoPushClient implements NotificationSender {
       String to, String title, String body, ExpoPushData data, String sound, String channelId) {}
 
   /** 알림을 탭했을 때 앱이 이동할 경로를 담는다. */
-  private record ExpoPushData(String url) {}
+  private record ExpoPushData(String url, Long userProfileId) {}
 
   /** Expo Receipt API에 전달하는 Ticket ID 목록이다. */
   private record ExpoReceiptRequest(List<String> ids) {}

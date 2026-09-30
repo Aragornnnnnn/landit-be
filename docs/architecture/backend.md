@@ -78,6 +78,7 @@ com.landit.landitbe
 │   │   │   ├── progress    # 시나리오 진행·완료 이력
 │   │   │   ├── level       # 사용자별 콘텐츠 수준 결정 / 과거 수준 조회
 │   │   │   ├── session     # start / message / innerthought / admin
+│   │   │   ├── history     # 전체 완료 회차 대화·피드백 조회
 │   │   │   ├── feedback    # 최종 피드백
 │   │   │   └── assessment  # 수준 평가
 │   │   ├── freetalk         # start / message / topic / usage / innerthought
@@ -108,7 +109,7 @@ com.landit.landitbe
 각 업무 패키지에는 Controller와 필요한 `service`, `repository`, `domain`, `dto`,
 `docs`, `client`, `exception`을 둡니다. 같은 업무의 변경 파일을 함께 찾을 수 있게 합니다.
 `learning`은 학습 실행과 결과를 묶는 상위 폴더이며 독립 배포를 보장하지 않습니다.
-시나리오의 선택·접근·진도·수준 결정은 각각 별도 경계입니다. 시나리오 세션·피드백·평가는
+시나리오의 선택·접근·진도·수준 결정은 각각 별도 경계입니다. 시나리오 세션·피드백·평가·완료 회차 히스토리는
 현재 하나의 실행 업무로 검사합니다. 공통 대화 저장소, 프리톡, 표현 완료 이력, 표현 조율,
 복습은 서로 다른 경계입니다. 나머지 기능은 `content`, `profile` 등 feature 바로 아래
 패키지를 업무 단위로 검사합니다. 같은 learning 폴더에 있어도 타 업무 Entity·Repository
@@ -124,7 +125,7 @@ com.landit.landitbe
 | `learning.expression.progress` | 표현 완료 이력과 진도 집계. content/profile/scenario.level을 조회합니다. |
 | `learning.review` | 복습 문항과 채점 값 계약. 학습 조율을 참조하지 않습니다. |
 | `learning.scenario.selection` | 개인별 시나리오 목록·일별 선택·달력. content와 접근·진도·수준 값을 사용합니다. |
-| `learning.scenario`의 실행 영역 | 시나리오 시작·메시지·피드백·평가. content, conversation, 접근·진도·수준, 구독·프로필을 조율합니다. |
+| `learning.scenario`의 실행 영역 | 시나리오 시작·메시지·피드백·평가·완료 회차 히스토리. content, conversation, 접근·진도·수준, 구독·프로필을 조율합니다. |
 | `learning.freetalk` | 프리톡 대화·추천 표현·기억 생성. 공통 대화 상태는 conversation Service로 변경합니다. |
 | `learning.expression` | 표현 목록·시작·완료. 콘텐츠, 수준, 표현 진도, 구독, 프리톡을 조율합니다. |
 | `learning.conversation` | 공통 세션·이력·메시지의 저장과 소유권. 다른 learning 업무를 참조하지 않습니다. |
@@ -291,6 +292,7 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | content의 시나리오/표현 조회 Repository | 사용자 언어·학습 진행을 함께 조회하는 JPQL/SQL. 기존 정렬·필터와 일괄 조회를 유지합니다. |
 | learning.scenario.level의 ScenarioLearningHistoryQueryRepository | 최초 완료한 세션·수준 평가를 읽어 과거 복습 콘텐츠 수준을 보존합니다. 기존 SQL을 유지합니다. |
 | learning.scenario.session의 메시지 컨텍스트 조회 Repository·ScenarioSessionRepository | 세션에 연결된 시나리오 콘텐츠와 최초 완료 세션을 조회합니다. 상세 피드백 공개 판단에 필요한 완료 순서는 시나리오 실행 업무가 소유합니다. |
+| learning.scenario.history의 ScenarioHistoryQueryRepository | 로그인 사용자의 완료 회차를 조회하기 위해 세션·대화 이력·시나리오 언어 테이블을 JOIN합니다. 메시지는 conversation의 공개 Service로 일괄 조회합니다. |
 | learning.scenario.access의 UserScenarioAccessRepository | 과거 미완료 세션 조회에서 대화/콘텐츠 테이블을 JOIN합니다. |
 | notification.scheduled의 NotificationTargetQueryRepository | 사용자·콘텐츠·진행·세션·스트릭을 페이지 단위로 읽습니다. 사용자별 N+1 조회로 바꾸지 않습니다. |
 | learning.review의 ExpressionReviewRepository | 학습 완료 이력·활성 콘텐츠·사용자 언어를 읽어 복습 후보를 선정합니다. 복습 스냅샷·진행·제출 테이블만 씁니다. |

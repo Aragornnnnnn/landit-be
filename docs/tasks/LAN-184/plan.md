@@ -1,5 +1,67 @@
 # LAN-184 구현 및 검증 기록
 
+## 2026-09-24 어드민 배치 개선과 main 발송 경로 점검
+
+이번 작업의 기준은 `origin/main`의 `47c7c103e`와 `origin/develop`의 `06f477579`다.
+두 참조의 notification 운영 소스에는 차이가 없었다. 깨끗한 작업 트리에서
+`develop` 기준 `feat/LAN-184`를 생성했다. 아래 8월 기록은 당시 정책과 검증 이력이며
+현재 운영 상태를 뜻하지 않는다.
+
+### 개선 범위
+
+- 어드민 캠페인의 고정 대상 100개를 `prepareAll()`로 선점한다.
+- 정상 Expo 응답은 `recordTicketResults()`로 한 번에 저장하고 커밋한다.
+- 현재 페이지의 접수 이력만 조회해 `scheduleReceiptChecks()`로 최대 10개씩 예약한다.
+- 캠페인 키, 대상 고정, 토큰 소유권/상태 재확인, 페이지 커서와 별도 SQS 페이지 작업은 유지한다.
+- 어드민 Expo 요청의 일시 오류도 종료하는 기존 정책을 유지한다. 정기 푸시의 자동 재시도 경로로 합치지 않는다.
+- Ticket 저장 실패로 남은 REQUESTED는 자동 재발송하거나 커서를 넘기지 않는다.
+- Receipt 예약 실패 시 저장된 Ticket을 바탕으로 예약만 복구한다. 이미 폐기된 토큰의 접수 이력도 포함한다.
+- API, DB 마이그레이션, 운영 데이터, Scheduler 설정, 배포는 변경하지 않는다.
+- LAN-557의 미병합 JDBC 저장 방식 전환을 가져오지 않고 현재 develop의 공통 배치 API를 재사용한다.
+
+정상 신규 발송 100토큰의 선점/Ticket 쓰기 트랜잭션은 코드 구조상 200개에서 2개로,
+Receipt 예약 요청은 100개에서 10개로 줄어든다. 캠페인 조회와 상태 갱신, 후속 Receipt 처리는
+이 계산에서 제외한다. 운영 시간이나 DB CPU의 감소율을 측정한 결과는 아니다.
+
+### main 알림 경로 점검 결과
+
+| 경로 | 현재 처리 방식 | 이번 조치 |
+| --- | --- | --- |
+| 20시 시나리오/표현/스몰톡 | 500명 조회 후 sendAll, DB/Expo 최대 100건, SQS 예약 최대 10건 | 기존 배치와 재시도 회귀 검증 |
+| 표현 복습 | 100명 후보, 사용자별 복습 생성/빈도 슬롯 예약 후 sendAll | 발송은 이미 배치. 사용자별 업무 트랜잭션은 유지 |
+| 어드민 즉시/예약 캠페인 | 고정 토큰 100개씩, 선점/Ticket/Receipt 예약은 건별 | 세 작업을 기존 공통 배치 API로 교체 |
+| 어드민 본인 테스트 및 dev 테스트 API | send 또는 sendAll을 통한 공통 배치 | 캠페인과 다른 키 및 기존 실패 정책 유지 |
+| 편지함 답장 | 답장 커밋 후 SQS, 수신자 목록을 sendAll로 처리 | 이미 배치. 커밋 후 SQS 발행 실패는 로그 기록이며 영속 재발행 장치는 없음 |
+| 무료 체험 종료 푸시 | 사용자별 예약 Job에서 sendAll | 다중 토큰은 공통 배치. Job 선점/재시도 계약 유지 |
+| 무료 체험 종료/관리자 테스트 이메일 | 별도 Job과 SES 경로 | 접수/재시도/불확실 응답 정책 점검, 변경 없음 |
+| Receipt 확인 | 메시지별 단건 조회/저장, 900초 지연, NOT_READY 최대 3회 | 예약 API만 묶음 전환. 확인 자체의 메시지 계약은 유지 |
+
+공통 Push Queue 소비 동시성은 인스턴스당 2이며 캠페인, 정기 알림, Receipt와 Job이 공유한다.
+Receipt 적체 시 다른 작업의 대기에도 영향을 줄 수 있으나 실제 적체는 이번에 조회하지 않았다.
+Receipt 확인의 일괄화나 Queue 분리, 편지함 발행의 영속 재시도는 별도 설계가 필요해 추가하지 않는다.
+Expo 접수 후 결과 유실 및 프로세스 종료의 불확실성을 제거한 것은 아니며 exactly-once를 보장하지 않는다.
+
+### 이번 검증
+
+- 100건과 잔여 1건이 배치 선점/저장/예약 경로를 사용하고 단건 API를 호출하지 않는지 확인한다.
+- 동시 실행, 소유권 변경, 폐기/늦게 등록된 토큰 제외, 테스트/공지 키 분리, 요청 실패 정책을 확인한다.
+- 성공/실패 Ticket의 원자적 저장과 DeviceNotRegistered 폐기, DB 트랜잭션 밖 Expo/SQS 호출을 확인한다.
+- SQS 일부 예약 실패 뒤 10+2건 예약을 다시 실행해도 Expo는 한 번만 호출하는지 확인한다.
+- Ticket 저장 실패 시 REQUESTED와 커서를 보존하고 자동 재전송하지 않는지 확인한다.
+- 관련 테스트 51개 통과: 어드민 캠페인 통합 24개, 공통 발송 18개, SQS Publisher 9개.
+- `./gradlew check` 최종 통과: 229개 클래스, 1,795개 중 1,783개 통과, 실패/오류 0개, 환경 조건에 따른 기존 테스트 12개 제외.
+- 첫 전체 검사에서 테스트 변수의 선언/사용 거리 규칙 위반 1건을 확인하고 final로 수정했다. 재검사에서 Spotless와 Checkstyle도 통과했다.
+- 제외된 테스트는 관리자 대상 조회 PostgreSQL 4개, 구독 FE 연동 1개, 실제 AI 배포 호환성 1개, 스몰톡 컨텍스트 PostgreSQL 3개, 한국어 퀴즈 PostgreSQL 3개다.
+- 새 캠페인 통합 테스트의 DB는 H2이며 Expo와 SQS 응답은 대역이다. 이번 작업에서 별도 PostgreSQL 실행, 운영 로그/DB 조회, 실제 외부 발송과 성능 측정은 하지 않았다.
+- `git diff --check` 통과. 운영 소스 변경은 어드민 Processor와 공통 Dispatch 두 파일이다.
+
+```bash
+# Java 21 사용.
+./gradlew spotlessApply test --tests '*AdminPushCampaignIntegrationTests' --tests '*NotificationDispatchServiceTest' --tests '*SqsPushQueuePublisherTest' --console=plain
+./gradlew check --console=plain
+git diff --check
+```
+
 ## 2026-08-29 정책 변경 상태
 
 예약 알림 정책은 [design.md](design.md)의 `DAILY_SCENARIO_REMINDER → CONTINUE_EXPRESSION → SMALL_TALK_REMINDER` 우선순위로 구현했다. Scheduler는 새 정책의 dev 검증 전까지 계속 비활성 상태로 둔다.

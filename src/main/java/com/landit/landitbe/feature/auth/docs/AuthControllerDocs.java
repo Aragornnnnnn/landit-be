@@ -58,7 +58,9 @@ public interface AuthControllerDocs {
    * @param request 폐기할 Refresh token
    * @return 데이터가 없는 성공 응답
    */
-  @Operation(summary = "로그아웃", description = "전달받은 refresh token을 폐기한다.")
+  @Operation(
+      summary = "로그아웃",
+      description = "전달받은 refresh token을 폐기하고 installationId가 있으면 해당 설치의 푸시를 중지한다.")
   ApiResponse<Void> logout(LogoutRequest request);
 
   /**
@@ -69,7 +71,10 @@ public interface AuthControllerDocs {
    */
   @Operation(
       summary = "회원 탈퇴",
-      description = "현재 사용자를 탈퇴 처리하고 활성 refresh token을 폐기한다.",
+      description =
+          "회원 행과 문의·첨부파일은 유지하고 닉네임을 '탈퇴한 사용자'로 덮어쓴다. "
+              + "이메일·프로필 이미지·소셜 식별 원본과 refresh token을 정리하고, "
+              + "장기기억을 삭제하며 계정 소유의 모든 푸시 Token을 비활성화한다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<Void> withdraw(AuthUserPrincipal principal);
 }
