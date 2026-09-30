@@ -49,7 +49,13 @@ public final class TextLevelAssessmentPolicy {
     }
   }
 
-  /** 관찰된 영역을 보존하고, 다섯 영역이 관찰됐을 때만 종합 점수를 계산한다. */
+  /**
+   * 관찰된 영역을 보존하고, 다섯 영역이 관찰됐을 때만 100점 종합 점수를 계산한다.
+   *
+   * @param observations 질문 요구 난이도와 영역별 1~100점 관찰값
+   * @param questionLevelGroup 종합 점수의 관찰 상한을 결정하는 질문 그룹
+   * @return 소수 둘째 자리로 반올림한 평가. 관찰 목록이 없으면 빈 값
+   */
   public static Optional<Score> calculate(
       List<Observation> observations, ContentLearningLevel questionLevelGroup) {
     if (observations == null || observations.isEmpty()) {
@@ -99,6 +105,13 @@ public final class TextLevelAssessmentPolicy {
             assessedLevel));
   }
 
+  /**
+   * 유효 점수만 난이도로 가중 평균하되 미관찰 질문도 근거 비율의 분모에 포함한다.
+   *
+   * @param observations 질문별 영역 관찰값
+   * @param level 집계할 영역의 점수 추출 함수
+   * @return 영역 점수, 관찰 난이도 비율 및 유효 관찰 수
+   */
   private static DomainScore average(
       List<Observation> observations, Function<Observation, Integer> level) {
     BigDecimal weightedLevels = BigDecimal.ZERO;
