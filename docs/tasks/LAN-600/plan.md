@@ -31,3 +31,10 @@
 - 직접 완료로 대체된 `CONTINUE` 종료 결정의 재전송은 추가 AI 호출 없이 완료 응답을 반환한다. 기존 작별 `END` 완료에 `CONTINUE`를 보내는 불일치는 계속 409로 거부한다.
 - latch로 계속 결정의 AI 처리를 멈춘 회귀 테스트에서 기존 코드의 409를 재현했다.
 - 리뷰 수정 후 Java 21에서 `./gradlew check --offline --console=plain` 통과: 1,800건, 실패·오류 0건, 제외 12건. `git diff --check` 통과.
+
+## CI 병합 검증 수정
+
+- PR CI의 `compileJava`가 최신 develop의 `ScenarioHistoryQueryService`에서 실패했다. 확장된 `SessionFeedbackResponse.from`에 이전 4개 인자만 전달하던 호출을 수정했다.
+- develop을 병합하고 이력 조회에서도 저장된 성장 비교·표현 재사용 결과를 복원한다. 수준 평가 생성·만료 복구를 호출하지 않아 읽기 전용 조회를 유지한다.
+- 저장 결과 복원과 기존 데이터의 빈 응답을 회귀 검증했다. H2 테스트 데이터는 JSON 문자열 기본값 대신 `FORMAT JSON`으로 객체를 저장한다.
+- Java 21에서 `./gradlew spotlessApply check --offline --console=plain` 통과: 1,880건, 실패·오류 0건, 제외 12건. 배포 검증 스크립트 문법·테스트와 `git diff --check`도 통과했다.
