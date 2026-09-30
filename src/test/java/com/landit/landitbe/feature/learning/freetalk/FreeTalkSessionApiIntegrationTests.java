@@ -2702,6 +2702,48 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
   }
 
+  @DisplayName("직접 완료가 진행 중인 계속 결정을 대체하면 같은 결정 재전송도 완료 결과를 반환한다.")
+  @Test
+  void replaysContinueDecisionSupersededByDirectCompletion() throws Exception {
+    String token = login("direct-continue-replay@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long messageId = submitForExit(token, sessionId);
+    String decision = "{\"submittedMessageId\":%d,\"decision\":\"CONTINUE\"}".formatted(messageId);
+    fakeAiFreeTalkClient.blockTurn();
+    CompletableFuture<MvcResult> pending =
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                return mockMvc
+                    .perform(postJsonWithToken(exitDecisionPath(sessionId), token, decision))
+                    .andReturn();
+              } catch (Exception exception) {
+                throw new IllegalStateException(exception);
+              }
+            });
+    try {
+      assertThat(fakeAiFreeTalkClient.awaitTurnStarted()).isTrue();
+      requestDirectCompletion(token, sessionId);
+    } finally {
+      fakeAiFreeTalkClient.releaseTurn();
+    }
+    MvcResult original = pending.get(5, TimeUnit.SECONDS);
+    assertThat(original.getResponse().getStatus()).isEqualTo(200);
+    assertThat(responseData(original).at("/turnStatus").asText()).isEqualTo("COMPLETED");
+    mockMvc
+        .perform(postJsonWithToken(exitDecisionPath(sessionId), token, decision))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.nextMessage").value(nullValue()));
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+  }
+
   @DisplayName("직접 완료는 미인증·타인·없는 세션·중단 세션을 기존 오류로 거부한다.")
   @Test
   void rejectsInvalidDirectCompletionRequests() throws Exception {
@@ -2744,6 +2786,13 @@ class FreeTalkSessionApiIntegrationTests {
                 "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(messageId)))
         .andExpect(status().isOk());
     requestDirectCompletion(token, goodbyeSessionId);
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                exitDecisionPath(goodbyeSessionId),
+                token,
+                "{\"submittedMessageId\":%d,\"decision\":\"CONTINUE\"}".formatted(messageId)))
+        .andExpect(status().isConflict());
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT completion_reason FROM learning_session WHERE id = ?",
@@ -3350,6 +3399,7 @@ class FreeTalkSessionApiIntegrationTests {
     }
 
     void blockTurn() {
+      turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(1);
     }
 
