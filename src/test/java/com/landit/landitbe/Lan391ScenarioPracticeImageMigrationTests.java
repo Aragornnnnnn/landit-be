@@ -28,7 +28,6 @@ class Lan391ScenarioPracticeImageMigrationTests {
       "db/postgresql/V138__update_scenario_41_70_practice_example_image_urls.sql";
   private static final Pattern SOURCE_ROW = Pattern.compile("(?m)^  \\((\\d+), (\\d+),");
   private static final Pattern SOURCE_ORDER = Pattern.compile("'EN', 'KR',\\s*(\\d+),");
-  private static final Pattern SOURCE_EXAMPLES = Pattern.compile("'((?:[^']|'')*)'::jsonb");
   private static final Pattern IMAGE_ROW =
       Pattern.compile(
           "(?m)^    \\((\\d+), (\\d+), (\\d+), (\\d+), '((?:[^']|'')*)', "
@@ -62,10 +61,8 @@ class Lan391ScenarioPracticeImageMigrationTests {
                   : source.length());
       Matcher sourceHeader = SOURCE_ROW.matcher(sourceRow);
       Matcher sourceOrder = SOURCE_ORDER.matcher(sourceRow);
-      Matcher sourceExamples = SOURCE_EXAMPLES.matcher(sourceRow);
       assertThat(sourceHeader.find()).isTrue();
       assertThat(sourceOrder.find()).isTrue();
-      assertThat(sourceExamples.find()).isTrue();
 
       int expressionId = Integer.parseInt(imageRows.group(1));
       int scenarioId = Integer.parseInt(imageRows.group(2));
@@ -77,7 +74,12 @@ class Lan391ScenarioPracticeImageMigrationTests {
           .isEqualTo(Integer.parseInt(sourceOrder.group(1)));
       assertThat(sqlRow).isEqualTo(rowNumber);
 
-      JsonNode examples = mapper.readTree(sourceExamples.group(1).replace("''", "'"));
+      int examplesStart = sourceRow.indexOf("'[{");
+      int examplesEnd = sourceRow.indexOf("]'::jsonb", examplesStart);
+      assertThat(examplesStart).isGreaterThanOrEqualTo(0);
+      assertThat(examplesEnd).isGreaterThan(examplesStart);
+      String examplesJson = sourceRow.substring(examplesStart + 1, examplesEnd + 1);
+      JsonNode examples = mapper.readTree(examplesJson.replace("''", "'"));
       assertThat(examples.size()).isEqualTo(4);
       for (int exampleNumber = 3; exampleNumber <= 4; exampleNumber++) {
         JsonNode example = examples.get(exampleNumber - 1);
