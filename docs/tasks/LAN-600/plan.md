@@ -2,7 +2,7 @@
 
 ## 계약과 구현
 
-- `POST /api/v1/free-talk/sessions/{sessionId}/complete`는 본문 없이 200을 반환한다. 진행 중·종료 확인 대기를 완료하고, 이미 완료된 세션은 변경하지 않는다. 타인 403, 없는 프리톡 404, INTERRUPTED 409(CONFLICT), 미인증 401이다.
+- `POST /api/v1/free-talk/sessions/{sessionId}/complete`는 200과 공통 성공 응답 `{"success":true,"data":null,"error":null}`을 반환한다. 진행 중·종료 확인 대기를 완료하고, 이미 완료된 세션은 변경하지 않는다. 타인 403, 없는 프리톡 404, INTERRUPTED 409(CONFLICT), 미인증 401이다.
 - 기존 `learning_session.completion_reason VARCHAR(30)`에 `DIRECT_COMPLETION`을 저장한다. 기존 작별 완료 `USER_ENDED`, 시간 소진 `TIME_LIMIT_REACHED`는 유지한다. 기존 컬럼으로 표현 가능하므로 Flyway 변경이 없다.
 - 학습 세션·프리톡·이력·누적 발화 시간·스트릭을 같은 트랜잭션에서 확정한다. 제목이 없으면 기존 캐릭터별 대체 제목을 쓴다.
 - 커밋 후 미확정 발화 교정, 기존 맞춤 표현·장기기억 생성 서비스를 비동기로 호출한다. 장기기억은 기존 write-enabled 설정을 따른다. 요약 총평은 기존 summary 조회 시 교정 대기·pending·계산 정책을 따른다.
@@ -24,3 +24,10 @@
 - Java 21에서 `./gradlew spotlessApply check --offline --console=plain` 통과: 1,799건, 실패·오류 0건, 제외 12건. `git diff --check` 통과.
 - 장기기억 후속 질문 통합 테스트에서 `USER_ENDED`와 `DIRECT_COMPLETION` 모두 기존 `USER_CONFIRMED` AI 계약으로 전달됨을 확인했다.
 - 실제 PostgreSQL 잠금, 원격 AI, FE 화면, 배포는 이 로컬 검증에 포함하지 않는다.
+
+## PR 리뷰 반영
+
+- FE 공통 `parseApiResponse`가 빈 200을 오류로 처리하므로 직접 완료도 공통 성공 응답을 반환한다. 완료 후 summary 조회 방식은 유지한다.
+- 직접 완료로 대체된 `CONTINUE` 종료 결정의 재전송은 추가 AI 호출 없이 완료 응답을 반환한다. 기존 작별 `END` 완료에 `CONTINUE`를 보내는 불일치는 계속 409로 거부한다.
+- latch로 계속 결정의 AI 처리를 멈춘 회귀 테스트에서 기존 코드의 409를 재현했다.
+- 리뷰 수정 후 Java 21에서 `./gradlew check --offline --console=plain` 통과: 1,800건, 실패·오류 0건, 제외 12건. `git diff --check` 통과.
