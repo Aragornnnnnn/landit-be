@@ -14,7 +14,6 @@ import com.landit.landitbe.feature.notification.delivery.messaging.PushQueuePubl
 import com.landit.landitbe.feature.notification.delivery.service.NotificationDispatchService;
 import com.landit.landitbe.feature.notification.delivery.service.PushDeliveryService;
 import com.landit.landitbe.feature.notification.domain.NotificationType;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -53,25 +52,9 @@ public class AdminPushProcessingService {
       return;
     }
     List<Target> targets = repository.targets(campaign);
-    List<PreparedPushDelivery> prepared = new ArrayList<>();
-    for (Target target : targets) {
-      deliveries
-          .prepare(
-              new PreparePushDeliveryCommand(
-                  target.userId(),
-                  target.tokenId(),
-                  NotificationType.ADMIN_BROADCAST,
-                  "push:admin-broadcast:"
-                      + campaignId
-                      + ":"
-                      + target.userId()
-                      + ":"
-                      + target.tokenId(),
-                  campaign.content().title(),
-                  campaign.content().body(),
-                  campaign.content().deepLink()))
-          .ifPresent(prepared::add);
-    }
+    List<PreparedPushDelivery> prepared =
+        deliveries.prepareAll(
+            targets.stream().map(target -> prepareCommand(campaign, target)).toList());
     if (!prepared.isEmpty()) {
       dispatch.sendAdminPrepared(prepared);
     }
@@ -87,6 +70,17 @@ public class AdminPushProcessingService {
     if (!completed) {
       publisher.publishAdminCampaign(campaignId);
     }
+  }
+
+  private PreparePushDeliveryCommand prepareCommand(Campaign campaign, Target target) {
+    return new PreparePushDeliveryCommand(
+        target.userId(),
+        target.tokenId(),
+        NotificationType.ADMIN_BROADCAST,
+        "push:admin-broadcast:" + campaign.id() + ":" + target.userId() + ":" + target.tokenId(),
+        campaign.content().title(),
+        campaign.content().body(),
+        campaign.content().deepLink());
   }
 
   /**
