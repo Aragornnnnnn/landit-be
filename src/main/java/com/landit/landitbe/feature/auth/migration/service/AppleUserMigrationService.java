@@ -69,7 +69,20 @@ public class AppleUserMigrationService {
       repository.complete(
           candidate.migrationId(), recipientUser.providerUserId(), recipientUser.providerEmail());
     } catch (AppleUserMigrationException exception) {
-      repository.markFailed(candidate.migrationId(), phase, exception.failureCode());
+      markFailedUnlessWithdrawn(candidate, phase, exception.failureCode());
+    }
+  }
+
+  // 실패 기록 직전에도 탈퇴가 완료될 수 있으므로 저장 실패 후 연결 해제와 행 소멸을 함께 확인한다.
+  private void markFailedUnlessWithdrawn(
+      AppleUserMigrationCandidate candidate, AppleUserMigrationPhase phase, String failureCode) {
+    try {
+      repository.markFailed(candidate.migrationId(), phase, failureCode);
+    } catch (AppleUserMigrationException exception) {
+      if (!"MIGRATION_STATE_INVALID".equals(exception.failureCode())
+          || !repository.isUnlinkedWithoutMigration(candidate.oauthIdentityId())) {
+        throw exception;
+      }
     }
   }
 }

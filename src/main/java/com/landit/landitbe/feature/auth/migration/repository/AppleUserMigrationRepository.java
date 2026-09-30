@@ -108,6 +108,34 @@ public class AppleUserMigrationRepository {
   }
 
   /**
+   * 소셜 연결이 해제되고 이전 상태 행도 제거되어 결과를 저장할 필요가 없어진 대상인지 확인한다.
+   *
+   * @param oauthIdentityId 배치가 조회했던 OAuth identity ID
+   * @return 연결 해제 상태이고 이전 상태 행이 없으면 {@code true}
+   * @throws AppleUserMigrationException 데이터베이스 조회에 실패할 때
+   */
+  public boolean isUnlinkedWithoutMigration(long oauthIdentityId) {
+    String sql =
+        """
+        SELECT identity.id FROM oauth_identity identity
+        WHERE identity.id = ? AND identity.status = 'UNLINKED'
+          AND NOT EXISTS (
+              SELECT 1 FROM apple_user_migration migration
+              WHERE migration.oauth_identity_id = identity.id
+          )
+        """;
+    try (Connection connection = openConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setLong(1, oauthIdentityId);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        return resultSet.next();
+      }
+    } catch (SQLException exception) {
+      throw new AppleUserMigrationException(DATABASE_ERROR, exception);
+    }
+  }
+
+  /**
    * Apple이 발급한 이전 식별자를 저장하고 준비 완료로 표시한다.
    *
    * @param migrationId 사용자 이전 상태 ID

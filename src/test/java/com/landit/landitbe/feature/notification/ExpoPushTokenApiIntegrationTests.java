@@ -485,6 +485,7 @@ class ExpoPushTokenApiIntegrationTests {
   void withdrawalRevokesAllOwnedTokensAndPreservesTransferredToken() throws Exception {
     String userKey = "push-withdraw-owner";
     String access = login(userKey);
+    final Long withdrawnUserId = userProfileId(userKey);
     String other = login("push-withdraw-other");
     UUID transferredInstallation = UUID.randomUUID();
     String transferred = "ExpoPushToken[withdraw-transferred]";
@@ -510,7 +511,7 @@ class ExpoPushTokenApiIntegrationTests {
             jdbcTemplate.queryForObject(
                 "select count(*) from user_push_token where user_profile_id = ? and status = 'ACTIVE'",
                 Integer.class,
-                userProfileId(userKey)))
+                withdrawnUserId))
         .isZero();
   }
 
