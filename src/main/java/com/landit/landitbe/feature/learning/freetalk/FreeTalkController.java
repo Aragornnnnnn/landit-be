@@ -94,10 +94,10 @@ public class FreeTalkController implements FreeTalkControllerDocs {
   /** {@inheritDoc} */
   @Override
   @PostMapping("/api/v1/free-talk/sessions/{sessionId}/complete")
-  public ResponseEntity<Void> completeSession(
+  public ResponseEntity<ApiResponse<Void>> completeSession(
       @AuthenticationPrincipal AuthUserPrincipal principal, @PathVariable long sessionId) {
     completionService.complete(principal.userId(), sessionId);
-    return ResponseEntity.ok().build();
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 
   /** {@inheritDoc} */

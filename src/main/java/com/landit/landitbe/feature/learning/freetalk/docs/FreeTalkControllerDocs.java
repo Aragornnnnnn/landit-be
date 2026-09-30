@@ -184,7 +184,7 @@ public interface FreeTalkControllerDocs {
    *
    * @param principal 인증된 사용자
    * @param sessionId 프리톡 학습 세션 ID
-   * @return 본문 없는 200 응답
+   * @return 데이터가 null인 공통 성공 응답
    */
   @Operation(
       summary = "프리톡 직접 완료",
@@ -198,8 +198,7 @@ public interface FreeTalkControllerDocs {
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "200",
-        description = "완료 성공 또는 이미 완료됨",
-        content = @io.swagger.v3.oas.annotations.media.Content),
+        description = "완료 성공 또는 이미 완료됨"),
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
         responseCode = "401",
         description = "인증 실패"),
@@ -213,7 +212,7 @@ public interface FreeTalkControllerDocs {
         responseCode = "409",
         description = "중단된 세션 (CONFLICT)")
   })
-  ResponseEntity<Void> completeSession(AuthUserPrincipal principal, long sessionId);
+  ResponseEntity<ApiResponse<Void>> completeSession(AuthUserPrincipal principal, long sessionId);
 
   /**
    * 완료된 지난 프리톡 목록을 완료 시각 최신순으로 페이지 조회한다.

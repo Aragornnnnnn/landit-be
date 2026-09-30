@@ -2816,7 +2816,7 @@ class FreeTalkSessionApiIntegrationTests {
         .isEqualTo("TIME_LIMIT_REACHED");
   }
 
-  @DisplayName("직접 완료 API 문서는 인증·오류와 본문 없는 200 응답을 명시한다.")
+  @DisplayName("직접 완료 API 문서는 인증·오류와 공통 성공 응답을 명시한다.")
   @Test
   void documentsDirectCompletion() throws Exception {
     String path = "$.paths['/api/v1/free-talk/sessions/{sessionId}/complete'].post";
@@ -2824,7 +2824,7 @@ class FreeTalkSessionApiIntegrationTests {
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath(path + ".security[0].bearerAuth").exists())
-        .andExpect(jsonPath(path + ".responses['200'].content").doesNotExist())
+        .andExpect(jsonPath(path + ".responses['200'].content").exists())
         .andExpect(jsonPath(path + ".responses['401']").exists())
         .andExpect(jsonPath(path + ".responses['403']").exists())
         .andExpect(jsonPath(path + ".responses['404']").exists())
@@ -2837,9 +2837,12 @@ class FreeTalkSessionApiIntegrationTests {
   }
 
   private void requestDirectCompletion(String token, long sessionId) throws Exception {
-    MvcResult result =
-        mockMvc.perform(directCompletion(sessionId, token)).andExpect(status().isOk()).andReturn();
-    assertThat(result.getResponse().getContentAsString()).isEmpty();
+    mockMvc
+        .perform(directCompletion(sessionId, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").value(nullValue()))
+        .andExpect(jsonPath("$.error").value(nullValue()));
   }
 
   private long submitForExit(String accessToken, long sessionId) throws Exception {
