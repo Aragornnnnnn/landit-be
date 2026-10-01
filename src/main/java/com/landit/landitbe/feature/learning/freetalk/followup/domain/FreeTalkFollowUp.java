@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.Getter;
 
 /**
@@ -47,6 +48,18 @@ public class FreeTalkFollowUp extends BaseTimeEntity {
   // 예: "다음엔 그 얘기 하자. 궁금해."
   @Column(name = "invite", nullable = false, columnDefinition = "text", updatable = false)
   private String invite;
+
+  @Column(name = "claimed_free_talk_session_id")
+  private Long claimedFreeTalkSessionId;
+
+  @Column(name = "claim_expires_at")
+  private LocalDateTime claimExpiresAt;
+
+  @Column(name = "asked_at")
+  private LocalDateTime askedAt;
+
+  @Column(name = "asked_message_id")
+  private Long askedMessageId;
 
   /** JPA에서 사용하는 기본 생성자다. */
   protected FreeTalkFollowUp() {}
@@ -97,5 +110,63 @@ public class FreeTalkFollowUp extends BaseTimeEntity {
     }
     return new FreeTalkFollowUp(
         userProfileId, freeTalkSessionId, memoryId, triggerType, question, invite);
+  }
+
+  /**
+   * 아직 묻지 않았고 선점되지 않은 질문인지 확인한다.
+   *
+   * @param now 현재 시각
+   * @return 다시 선점할 수 있으면 true
+   */
+  public boolean isAvailable(LocalDateTime now) {
+    return triggerType != FreeTalkFollowUpTriggerType.NONE
+        && askedAt == null
+        && (claimExpiresAt == null || !claimExpiresAt.isAfter(now));
+  }
+
+  /**
+   * 새 스몰톡이 질문을 선점한다.
+   *
+   * @param freeTalkSessionId 새 프리톡 세션 ID
+   * @param now 현재 시각
+   */
+  public void claim(long freeTalkSessionId, LocalDateTime now) {
+    if (!isAvailable(now)) {
+      throw new IllegalStateException("이미 사용 중인 예고 질문입니다.");
+    }
+    claimedFreeTalkSessionId = freeTalkSessionId;
+    claimExpiresAt = now.plusMinutes(5);
+  }
+
+  /**
+   * 실제 질문이 포함된 첫 AI 메시지 저장을 확정한다.
+   *
+   * @param freeTalkSessionId 선점한 프리톡 세션 ID
+   * @param messageId 저장된 AI 메시지 ID
+   * @param now 현재 시각
+   */
+  public void markAsked(long freeTalkSessionId, long messageId, LocalDateTime now) {
+    if (askedAt != null
+        || !Long.valueOf(freeTalkSessionId).equals(claimedFreeTalkSessionId)
+        || claimExpiresAt == null
+        || !claimExpiresAt.isAfter(now)) {
+      throw new IllegalStateException("예고 질문 선점이 유효하지 않습니다.");
+    }
+    askedAt = now;
+    askedMessageId = messageId;
+  }
+
+  /**
+   * 실패한 세션의 선점과 사용 표시를 해제한다.
+   *
+   * @param freeTalkSessionId 실패한 프리톡 세션 ID
+   */
+  public void release(long freeTalkSessionId) {
+    if (Long.valueOf(freeTalkSessionId).equals(claimedFreeTalkSessionId)) {
+      claimedFreeTalkSessionId = null;
+      claimExpiresAt = null;
+      askedAt = null;
+      askedMessageId = null;
+    }
   }
 }
