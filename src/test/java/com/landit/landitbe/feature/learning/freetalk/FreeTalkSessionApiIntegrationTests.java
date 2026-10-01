@@ -152,6 +152,7 @@ class FreeTalkSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM user_learning_activity_summary");
     jdbcTemplate.update("DELETE FROM free_talk_daily_speaking_usage");
     jdbcTemplate.update("DELETE FROM free_talk_session_summary");
+    jdbcTemplate.update("DELETE FROM free_talk_follow_up");
     jdbcTemplate.update("DELETE FROM free_talk_pattern_usage");
     jdbcTemplate.update("DELETE FROM free_talk_expression_reuse");
     jdbcTemplate.update("DELETE FROM free_talk_session_expression");
@@ -298,6 +299,131 @@ class FreeTalkSessionApiIntegrationTests {
         .andExpect(jsonPath("$.data.currentMessage.translatedContent").value("이번 주말 계획은 뭐야?"))
         .andExpect(jsonPath("$.data.currentMessage.emotion").value("HAPPY"))
         .andReturn();
+  }
+
+  @DisplayName("완료한 대화의 예고 질문을 메인에서 보여 주고, 선택 시 첫 AI 발화와 함께 사용을 확정한다.")
+  @Test
+  void continuesPreviousConversationWithStoredFollowUp() throws Exception {
+    JsonNode loginBody = login("free-talk-follow-up-continuation@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long userProfileId = loginBody.at("/data/user/userId").asLong();
+    long firstLearningSessionId = startUserFirstSession(accessToken);
+    long firstFreeTalkSessionId = completeSession(firstLearningSessionId);
+    jdbcTemplate.update(
+        "INSERT INTO free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id,"
+            + " trigger_type, question, invite, created_at, updated_at)"
+            + " VALUES (?, ?, NULL, 'CONCERN', '면접은 어떻게 됐어?', '다음에 알려 줘.',"
+            + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        userProfileId,
+        firstFreeTalkSessionId);
+    long followUpId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_follow_up WHERE free_talk_session_id = ?",
+            Long.class,
+            firstFreeTalkSessionId);
+
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/topics")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.followUps[0].characterId").value("chloe"))
+        .andExpect(jsonPath("$.data.followUps[0].followUpId").value(followUpId))
+        .andExpect(jsonPath("$.data.followUps[0].question").value("면접은 어떻게 됐어?"));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                postJsonWithToken(
+                    "/api/v1/free-talk/sessions",
+                    accessToken,
+                    "{\"startMode\":\"AI_FIRST\",\"followUpId\":"
+                        + followUpId
+                        + ",\"characterId\":\"chloe\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.title").value("지난 대화 이어가기"))
+            .andExpect(jsonPath("$.data.currentMessage.content").value("면접은 어떻게 됐어?"))
+            .andReturn();
+    long secondLearningSessionId = responseData(result).path("sessionId").asLong();
+    long secondFreeTalkSessionId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_session WHERE learning_session_id = ?",
+            Long.class,
+            secondLearningSessionId);
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().topic()).isNull();
+    assertThat(fakeAiFreeTalkClient.lastOpeningRequest().pendingFollowUp().followUpId())
+        .isEqualTo(followUpId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT claimed_free_talk_session_id FROM free_talk_follow_up WHERE id = ?",
+                Long.class,
+                followUpId))
+        .isEqualTo(secondFreeTalkSessionId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT asked_message_id FROM free_talk_follow_up WHERE id = ?",
+                Long.class,
+                followUpId))
+        .isPositive();
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/topics")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(jsonPath("$.data.followUps.length()").value(0));
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"followUpId\":"
+                    + followUpId
+                    + ",\"characterId\":\"chloe\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @DisplayName("예고 질문 오프닝 생성에 실패하면 선점을 풀어 질문을 다시 선택할 수 있다.")
+  @Test
+  void releasesFollowUpWhenOpeningFails() throws Exception {
+    JsonNode loginBody = login("free-talk-follow-up-failure@example.com");
+    String accessToken = loginBody.at("/data/accessToken").asText();
+    long userProfileId = loginBody.at("/data/user/userId").asLong();
+    long firstLearningSessionId = startUserFirstSession(accessToken);
+    long firstFreeTalkSessionId = completeSession(firstLearningSessionId);
+    jdbcTemplate.update(
+        "INSERT INTO free_talk_follow_up (user_profile_id, free_talk_session_id, memory_id,"
+            + " trigger_type, question, invite, created_at, updated_at)"
+            + " VALUES (?, ?, NULL, 'CONCERN', '면접은 어떻게 됐어?', '다음에 알려 줘.',"
+            + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        userProfileId,
+        firstFreeTalkSessionId);
+    long followUpId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM free_talk_follow_up WHERE free_talk_session_id = ?",
+            Long.class,
+            firstFreeTalkSessionId);
+    fakeAiFreeTalkClient.failOpening();
+
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                "/api/v1/free-talk/sessions",
+                accessToken,
+                "{\"startMode\":\"AI_FIRST\",\"followUpId\":"
+                    + followUpId
+                    + ",\"characterId\":\"chloe\"}"))
+        .andExpect(status().isServiceUnavailable());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT claimed_free_talk_session_id FROM free_talk_follow_up WHERE id = ?",
+                Long.class,
+                followUpId))
+        .isNull();
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/topics")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.followUps[0].followUpId").value(followUpId));
   }
 
   @DisplayName("AI 선발화 시작은 선택한 주제와 캐릭터 ID를 트랜잭션 밖에서 AI에 전달한다.")
@@ -3234,6 +3360,15 @@ class FreeTalkSessionApiIntegrationTests {
       openingTransactionActive = TransactionSynchronizationManager.isActualTransactionActive();
       if (failOpening) {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
+      }
+      if (request.pendingFollowUp() != null) {
+        return new AiFreeTalkOpeningResult(
+            request.pendingFollowUp().question(),
+            request.pendingFollowUp().question(),
+            CharacterEmotion.HAPPY,
+            List.of(),
+            true,
+            request.pendingFollowUp().followUpId());
       }
       return new AiFreeTalkOpeningResult(
           "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY, List.of());
