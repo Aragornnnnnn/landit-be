@@ -36,7 +36,7 @@ class Lan584EnglishQuizMigrationTests {
                 .formatHex(
                     MessageDigest.getInstance("SHA-256")
                         .digest(manifest.getBytes(StandardCharsets.UTF_8))))
-        .isEqualTo("fc7f1059e96203cad6333ad8045eac823f1ab76bb5c5102a6e8d55f3a97377d4");
+        .isEqualTo("bd9dc08b31871942378381e91dab61e882f184ec633ccc22a09494a9d6866c4e");
     var keys = new HashSet<String>();
     var ids = new HashSet<Long>();
     int production = 0;
@@ -49,9 +49,9 @@ class Lan584EnglishQuizMigrationTests {
       ids.add(id);
       production += id <= 3000 ? 1 : 0;
     }
-    assertThat(keys).hasSize(1025);
-    assertThat(ids).hasSize(784);
-    assertThat(production).isEqualTo(711);
+    assertThat(keys).hasSize(1541);
+    assertThat(ids).hasSize(1179);
+    assertThat(production).isEqualTo(1118);
   }
 
   @DisplayName("칩을 묶어도 원래 영어 단어열과 오답 개수가 유지되고 중복 정답도 충분하다.")
@@ -166,7 +166,7 @@ class Lan584EnglishQuizMigrationTests {
         alternatives++;
       }
     }
-    assertThat(alternatives).isEqualTo(832);
+    assertThat(alternatives).isEqualTo(1368);
   }
 
   private static boolean canBuildAlternative(
