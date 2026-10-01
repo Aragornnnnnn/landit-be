@@ -75,8 +75,7 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
-    return http.post(OPENING_PATH, request, RemoteOpeningResponse.class)
-        .toResult(request.memoryContext());
+    return http.post(OPENING_PATH, request, RemoteOpeningResponse.class).toResult(request);
   }
 
   /** {@inheritDoc} */
@@ -146,15 +145,27 @@ public class RemoteAiFreeTalkClient implements AiFreeTalkClient {
       String aiMessage,
       String translatedMessage,
       CharacterEmotion emotion,
-      List<Long> usedMemoryIds) {
+      List<Long> usedMemoryIds,
+      Boolean followUpAsked,
+      Long followUpId) {
 
     /** 원격 첫 발화와 memory 사용 ID를 검증해 애플리케이션 결과로 변환한다. */
-    private AiFreeTalkOpeningResult toResult(List<AiFreeTalkMemoryContext> memoryContext) {
+    private AiFreeTalkOpeningResult toResult(AiFreeTalkOpeningRequest request) {
       if (blank(aiMessage) || blank(translatedMessage)) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
+      if (request.pendingFollowUp() != null
+          && (!Boolean.TRUE.equals(followUpAsked)
+              || !Long.valueOf(request.pendingFollowUp().followUpId()).equals(followUpId))) {
+        throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+      }
       return new AiFreeTalkOpeningResult(
-          aiMessage, translatedMessage, emotion, validUsedMemoryIds(usedMemoryIds, memoryContext));
+          aiMessage,
+          translatedMessage,
+          emotion,
+          validUsedMemoryIds(usedMemoryIds, request.memoryContext()),
+          Boolean.TRUE.equals(followUpAsked),
+          followUpId);
     }
   }
 

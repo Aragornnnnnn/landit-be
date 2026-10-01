@@ -20,6 +20,7 @@ import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFree
 import com.landit.landitbe.feature.learning.freetalk.feedback.domain.FreeTalkMistakePattern;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkPatternUsageDraft;
 import com.landit.landitbe.feature.learning.freetalk.feedback.dto.FreeTalkTurnCorrection;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.AiFreeTalkPendingFollowUp;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtResult;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkClosingReason;
@@ -951,6 +952,68 @@ class RemoteAiFreeTalkClientTest {
     assertThat(memoryContext.get("validTo").asText()).isEqualTo("2026-07-31T23:59:00");
     assertThat(memoryContext.get("observedAt").asText()).isEqualTo("2026-08-01T10:30:00");
     assertThat(result.usedMemoryIds()).containsExactly(77L);
+  }
+
+  @DisplayName("주제 없는 이어가기 오프닝에 저장 질문을 전달하고 AI가 질문 사용을 보고해야 허용한다.")
+  @Test
+  void requiresFollowUpAcknowledgementForTopiclessOpening() throws Exception {
+    Map<String, JsonNode> requests = new ConcurrentHashMap<>();
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        requests,
+        successResponse(
+            "{\"aiMessage\":\"How did the interview go?\","
+                + "\"translatedMessage\":\"면접은 어떻게 됐어?\","
+                + "\"followUpAsked\":true,\"followUpId\":501,\"usedMemoryIds\":[]}"));
+    AiFreeTalkOpeningRequest request =
+        new AiFreeTalkOpeningRequest(
+            300L,
+            "chloe",
+            "EN",
+            "KR",
+            null,
+            List.of(),
+            new AiFreeTalkPendingFollowUp(501L, null, "CONCERN", "면접은 어떻게 됐어?"));
+
+    AiFreeTalkOpeningResult result = remoteClient().generateOpening(request);
+
+    assertThat(requests.get("/api/v1/free-talk/opening").hasNonNull("topic")).isFalse();
+    assertThat(
+            requests
+                .get("/api/v1/free-talk/opening")
+                .get("pendingFollowUp")
+                .get("followUpId")
+                .asLong())
+        .isEqualTo(501L);
+    assertThat(result.followUpAsked()).isTrue();
+    assertThat(result.followUpId()).isEqualTo(501L);
+  }
+
+  @DisplayName("AI가 선택한 예고 질문 ID를 확인하지 않으면 첫 발화를 저장하지 않는다.")
+  @Test
+  void rejectsOpeningThatAcknowledgesAnotherFollowUp() throws Exception {
+    registerJsonResponse(
+        "/api/v1/free-talk/opening",
+        new ConcurrentHashMap<>(),
+        successResponse(
+            "{\"aiMessage\":\"How did the interview go?\","
+                + "\"translatedMessage\":\"면접은 어떻게 됐어?\","
+                + "\"followUpAsked\":true,\"followUpId\":999,\"usedMemoryIds\":[]}"));
+    AiFreeTalkOpeningRequest request =
+        new AiFreeTalkOpeningRequest(
+            300L,
+            "chloe",
+            "EN",
+            "KR",
+            null,
+            List.of(),
+            new AiFreeTalkPendingFollowUp(501L, null, "CONCERN", "면접은 어떻게 됐어?"));
+
+    assertThatThrownBy(() -> remoteClient().generateOpening(request))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
   @DisplayName("문맥에 없는 기억 ID는 정리하되 대화 응답 자체는 거부하지 않는다.")
