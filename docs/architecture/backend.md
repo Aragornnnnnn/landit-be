@@ -298,6 +298,7 @@ DB는 아직 하나를 공유합니다. 다음 교차 조회는 명시적으로 
 | learning.review의 ExpressionReviewRepository | 학습 완료 이력·활성 콘텐츠·사용자 언어를 읽어 복습 후보를 선정합니다. 복습 스냅샷·진행·제출 테이블만 씁니다. |
 | notification.scheduled의 LearningNotificationSlotRepository | 활성 프로필을 ID 순서로 잠그고 알림 슬롯을 묶음 예약합니다. 기존 알림 상태는 읽기만 하며, 프로필 필드를 변경하지 않습니다. |
 | memory의 검색/원본 계보 저장 | 공유 DB의 기억 원본 메시지·세션 FK 관계를 유지합니다. |
+| learning.freetalk.followup의 사용 가능한 예고 질문 조회 | 같은 사용자의 완료 스몰톡과 캐릭터를 확인하려고 FreeTalkSession과 LearningSession을 읽습니다. 질문 상태 쓰기는 followup Service가 소유합니다. |
 
 공통 메시지 테이블에는 시나리오 생성 선점·응답과 프리톡 처리 결과 칼럼이 남습니다. `FreeTalkTurnStatus`는 저장·응답에 사용하는 값 계약으로 conversation에 두며 종료 판단 로직은 freetalk에 둡니다. 이를 옮겼다고 테이블이 독립된 것은 아닙니다.
 

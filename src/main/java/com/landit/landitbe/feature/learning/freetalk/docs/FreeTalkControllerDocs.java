@@ -26,16 +26,18 @@ import org.springframework.http.ResponseEntity;
 public interface FreeTalkControllerDocs {
 
   /**
-   * 활성 프리톡 추천 주제 중 무작위로 최대 5개를 뽑아 일일 발화 시간과 함께 반환한다.
+   * 활성 프리톡 추천 주제와 캐릭터별 이어가기 질문을 일일 발화 시간과 함께 반환한다.
    *
    * <p>주제 구성과 displayOrder(1부터)는 요청마다 달라지며, 활성 주제가 5개 미만이면 있는 만큼만 내려준다.
    *
    * @param principal 인증된 사용자
-   * @return 무작위로 뽑은 추천 주제(최대 5개)와 KST 당일 발화 시간 정보
+   * @return 추천 주제, 캐릭터별 사용 가능한 예고 질문과 KST 당일 발화 시간 정보
    */
   @Operation(
       summary = "프리톡 추천 주제 조회",
-      description = "활성 프리톡 추천 주제 중 무작위로 최대 5개를 뽑아 반환한다. 주제 구성과 displayOrder는 요청마다 달라진다.",
+      description =
+          "활성 프리톡 추천 주제 중 무작위로 최대 5개를 뽑고, 캐릭터별 아직 사용하지 않은 이어가기 질문을 함께 반환한다. "
+              + "주제 구성과 displayOrder는 요청마다 달라진다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
     @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -51,13 +53,14 @@ public interface FreeTalkControllerDocs {
    * AI 또는 사용자가 먼저 발화하는 프리톡 세션을 시작한다.
    *
    * @param principal 인증된 사용자
-   * @param request 세션 시작 방식과 선택 주제
+   * @param request 세션 시작 방식과 선택 주제 또는 이어가기 질문
    * @return 생성된 프리톡 세션
    */
   @Operation(
       summary = "프리톡 세션 시작",
       description =
           "AI 선시작 또는 사용자 선시작 프리톡 세션을 생성한다. "
+              + "AI 선시작은 topicId와 followUpId 중 하나를 보내며, 이어가기는 저장된 질문을 다시 검증해 첫 AI 발화에서 묻는다. "
               + "발화 한도 기본값은 KST 하루 누적 120분이다. "
               + "세션 시작·발화·종료 결정·표현 재시도는 계정별 요청 한도를 공유한다 "
               + "(기본 일일 1,000회, 고정 1분 구간당 20회).",
