@@ -158,6 +158,97 @@ class Lan584EnglishQuizPostgresTests {
     assertRolledBack(before);
   }
 
+  @DisplayName("V139 이후 승인된 12건만 교정하고 나머지 전체 데이터는 보존한다.")
+  @Test
+  void migratesApprovedTextsAfterEnglishChips() throws Exception {
+    installTextMigration();
+    Map<Long, ObjectNode> expected = snapshot();
+    for (JsonNode patch : Lan584QuizTextMigrationTests.readManifest()) {
+      ObjectNode example =
+          (ObjectNode)
+              expected
+                  .get(patch.path("expressionId").asLong())
+                  .path("practice_examples_payload")
+                  .get(patch.path("exampleNumber").asInt() - 1);
+      example.setAll((ObjectNode) patch.path("changes"));
+    }
+    assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+    assertThat(snapshot()).hasSize(4002).isEqualTo(expected);
+    assertThat(flyway.migrate().migrationsExecuted).isZero();
+    assertThat(snapshot()).isEqualTo(expected);
+  }
+
+  @DisplayName("본문 교정 직전의 한국어 배열과 질문 등 원본 변경을 감지한다.")
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "sentenceTranslation",
+        "sentenceTranslateWords",
+        "sentenceTranslateWordChoices",
+        "sentenceTranslateAcceptedAnswers",
+        "practiceQuestion",
+        "practiceQuestionTranslation",
+        "sentenceText",
+        "highlightingPart"
+      })
+  void rejectsTextSourceDrift(String field) throws Exception {
+    installTextMigration();
+    execute(
+        "UPDATE writing_expression SET practice_examples_payload = jsonb_set("
+            + "practice_examples_payload, '{1,"
+            + field
+            + "}', '\"changed\"') WHERE id = 2026");
+    Map<Long, ObjectNode> before = snapshot();
+    assertThatThrownBy(() -> flyway.migrate())
+        .isInstanceOf(FlywayException.class)
+        .hasStackTraceContaining("LAN-584 text source precondition failed");
+    assertTextRolledBack(before);
+  }
+
+  @DisplayName("본문 교정 중 정답·이미지·수정 시각 변조 시 12건 전체를 롤백한다.")
+  @ParameterizedTest
+  @ValueSource(strings = {"sentenceTranslateAcceptedAnswers", "imageUrl", "updated_at"})
+  void rollsBackCorruptedTextMigration(String field) throws Exception {
+    installTextMigration();
+    String mutation =
+        field.equals("updated_at")
+            ? "NEW.updated_at = CURRENT_TIMESTAMP;"
+            : "NEW.practice_examples_payload = jsonb_set(NEW.practice_examples_payload, '{1,"
+                + field
+                + "}', '[\"corrupted\"]');";
+    execute(
+        "CREATE FUNCTION corrupt_text() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN "
+            + "IF NEW.id = 2026 THEN "
+            + mutation
+            + " END IF; RETURN NEW; END $$");
+    execute(
+        "CREATE TRIGGER corrupt_text BEFORE UPDATE ON writing_expression "
+            + "FOR EACH ROW EXECUTE FUNCTION corrupt_text()");
+    Map<Long, ObjectNode> before = snapshot();
+    assertThatThrownBy(() -> flyway.migrate())
+        .isInstanceOf(FlywayException.class)
+        .hasStackTraceContaining("LAN-584 text postcondition failed");
+    assertTextRolledBack(before);
+  }
+
+  private void installTextMigration() throws Exception {
+    assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+    Files.writeString(
+        migrations.resolve(Lan584QuizTextMigrationTests.MIGRATION),
+        Lan584QuizTextMigrationTests.readSql());
+  }
+
+  private void assertTextRolledBack(Map<Long, ObjectNode> before) throws Exception {
+    assertThat(snapshot()).isEqualTo(before);
+    try (var statement = connection.createStatement();
+        var result =
+            statement.executeQuery(
+                "SELECT count(*) FROM flyway_schema_history WHERE version = '140'")) {
+      result.next();
+      assertThat(result.getInt(1)).isZero();
+    }
+  }
+
   private void insertFixture() throws Exception {
     Map<Long, ObjectNode> rows = fixtureRows();
     connection.setAutoCommit(false);
@@ -198,6 +289,14 @@ class Lan584EnglishQuizPostgresTests {
     } else {
       for (long id = 1; id <= 4000; id++) {
         rows.put(id, dummyRow(id));
+      }
+      for (JsonNode patch : Lan584QuizTextMigrationTests.readManifest()) {
+        ObjectNode row = rows.get(patch.path("expressionId").asLong());
+        row.put("expression_source", patch.path("expressionSource").asText());
+        ObjectNode example =
+            (ObjectNode)
+                row.path("practice_examples_payload").get(patch.path("exampleNumber").asInt() - 1);
+        example.setAll((ObjectNode) patch.path("expected"));
       }
       for (JsonNode patch : manifest) {
         ObjectNode row = rows.get(patch.path("expressionId").asLong());
