@@ -14,6 +14,8 @@ import com.landit.landitbe.feature.learning.conversation.service.LearningSession
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkCharacter;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkStartMode;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.AiFreeTalkPendingFollowUp;
+import com.landit.landitbe.feature.learning.freetalk.followup.service.FreeTalkFollowUpService;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningResult;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.learning.freetalk.start.dto.FreeTalkSessionStartRequest;
@@ -51,6 +53,7 @@ public class FreeTalkSessionService {
   private final ConversationMessageService conversationMessageService;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
   private final ConversationCharacterService conversationCharacterService;
+  private final FreeTalkFollowUpService followUpService;
 
   /**
    * 사용자 잠금 안에서 프리톡 시작 레코드와 빈 히스토리를 생성한다.
@@ -89,9 +92,16 @@ public class FreeTalkSessionService {
                 topic == null ? null : topic.getId(),
                 request.startMode(),
                 character));
+    AiFreeTalkPendingFollowUp pendingFollowUp =
+        request.followUpId() == null
+            ? null
+            : followUpService.claim(
+                userProfile.id(), character.id(), request.followUpId(), freeTalkSession.getId());
     contextSummaryService.initialize(userId, freeTalkSession.getId());
     if (topic != null) {
       freeTalkSession.assignTitle(topic.getDisplayName());
+    } else if (pendingFollowUp != null) {
+      freeTalkSession.assignTitle("지난 대화 이어가기");
     }
     SessionHistorySnapshot sessionHistory =
         sessionHistoryService.startFreeTalk(
@@ -107,11 +117,12 @@ public class FreeTalkSessionService {
         request.startMode(),
         character.id(),
         topic == null ? null : topic.getId(),
-        topic == null ? null : topic.getDisplayName(),
+        freeTalkSession.getTitle(),
         topic == null ? null : topic.getPromptDescription(),
         userProfile.targetLocale().name(),
         userProfile.baseLocale().name(),
-        ttsVoice);
+        ttsVoice,
+        pendingFollowUp);
   }
 
   /**
@@ -124,6 +135,12 @@ public class FreeTalkSessionService {
   @Transactional
   public CurrentMessageResponse saveOpening(
       StartedFreeTalkSession startedSession, AiFreeTalkOpeningResult openingResult) {
+    if (startedSession.pendingFollowUp() != null
+        && (!openingResult.followUpAsked()
+            || !Long.valueOf(startedSession.pendingFollowUp().followUpId())
+                .equals(openingResult.followUpId()))) {
+      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+    }
     SessionHistoryMessageSnapshot openingMessage =
         conversationMessageService.recordFreeTalkAi(
             startedSession.sessionHistoryId(),
@@ -132,6 +149,12 @@ public class FreeTalkSessionService {
             openingResult.aiMessage(),
             openingResult.translatedMessage(),
             openingResult.emotion());
+    if (startedSession.pendingFollowUp() != null) {
+      followUpService.markAsked(
+          startedSession.pendingFollowUp().followUpId(),
+          startedSession.freeTalkSessionId(),
+          openingMessage.getId());
+    }
     return CurrentMessageResponse.from(openingMessage);
   }
 
@@ -153,6 +176,7 @@ public class FreeTalkSessionService {
         .findByLearningSessionId(learningSessionId)
         .ifPresent(
             freeTalkSession -> {
+              followUpService.release(freeTalkSession.getId());
               freeTalkSessionRepository.delete(freeTalkSession);
               freeTalkSessionRepository.flush();
             });
@@ -164,16 +188,20 @@ public class FreeTalkSessionService {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
     boolean aiFirstWithTopic =
-        request.startMode() == FreeTalkStartMode.AI_FIRST && request.topicId() != null;
+        request.startMode() == FreeTalkStartMode.AI_FIRST
+            && (request.topicId() != null) != (request.followUpId() != null);
     boolean userFirstWithoutTopic =
-        request.startMode() == FreeTalkStartMode.USER_FIRST && request.topicId() == null;
-    if (!aiFirstWithTopic && !userFirstWithoutTopic) {
+        request.startMode() == FreeTalkStartMode.USER_FIRST
+            && request.topicId() == null
+            && request.followUpId() == null;
+    if ((!aiFirstWithTopic && !userFirstWithoutTopic)
+        || (request.followUpId() != null && request.followUpId() <= 0)) {
       throw new ApiException(ErrorCode.INVALID_REQUEST);
     }
   }
 
   private FreeTalkTopic findTopic(FreeTalkSessionStartRequest request) {
-    if (request.startMode() == FreeTalkStartMode.USER_FIRST) {
+    if (request.startMode() == FreeTalkStartMode.USER_FIRST || request.followUpId() != null) {
       return null;
     }
     return freeTalkTopicRepository
