@@ -18,6 +18,7 @@ import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTal
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +40,7 @@ class FreeTalkFollowUpServiceTest {
   private final ConversationMemoryWriteService memoryWriteService =
       mock(ConversationMemoryWriteService.class);
   private final FreeTalkFollowUpService service =
-      new FreeTalkFollowUpService(repository, memoryWriteService);
+      new FreeTalkFollowUpService(repository, memoryWriteService, mock(UserProfileService.class));
 
   @DisplayName("질문이 없고 장기기억 작업이 아직 준비 중이면 기다리는 중으로 알린다.")
   @Test
