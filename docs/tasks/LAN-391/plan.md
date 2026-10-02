@@ -35,3 +35,17 @@
 - 격리 PostgreSQL 15: V136 328행 삽입, 한국어 배열, 범위 외 데이터 보존, ID 충돌 보호 검증. V137 발음 자산 984행 적재와 원문 대조 보호 통과. 전체 트랜잭션 롤백 및 임시 서버 종료.
 - FE 기준 `492b4ed32805150079ba83c8428e8ebbe95cd5ed`: `word-bank` 및 `QuizStep`, LAN-584 묶음 칩 표시·선택·채점 테스트 33개 통과. FE 코드는 변경하지 않는다.
 - 영어 구조 검증과 확인한 대체 답안 회귀는 자동 검사하며, 의미 검수는 직접 수행했다. 가능한 모든 영어 표현의 유일성을 수학적으로 증명한 것은 아니다. CI, 원격 PR 반영, 운영 배포, 실제 기기 레이아웃 검증은 이 로컬 검증에 포함되지 않는다.
+
+## 대표 이미지 게시 및 PR #235 연결
+
+- 2026-10-03 사용자 요청에 따라 대표 이미지 328개의 검수 완료 WebP를 S3에 게시했다. 각 이미지의 PNG/WebP 개별 검수와 1448×1086 규격 확인을 마쳤다.
+- 대상 버킷은 `landit-content-982529430654`이며, `content/scenario-expression-representative/sha256-{source}/scenario-order-{scenario}/sql-row-{row}/{webp_sha256}.webp` 경로를 사용한다. 조건부 PUT으로 기존 객체를 덮어쓰지 않았다.
+- WebP 328개, 총 36,049,436바이트의 S3 체크섬·크기·MIME·캐시 메타데이터와 CloudFront GET 크기·SHA-256·MIME이 전수 일치했다.
+- 게시 매니페스트 SHA-256: `d6f2a420f29db389543984026de5a7520749ff0b2de0f90a98200754656b8812`.
+- 대표 이미지 매핑 SHA-256: `7834958aee53b664cb99555633f8db9feda37b3433e69b7686af07e2f3437aed`.
+- 대표 이미지 기준 원본 SQL SHA-256: `5af4794cc120dad8e3e897dc03117cfbcfd37125de23e8305a1e8b69fd4943f4`. 최신 선행 PR의 대표 문장·질문과 시나리오·표시 순서 328개가 모두 일치한다.
+- 미병합 V138의 기존 예문 블록 뒤에 대표 이미지 블록을 추가했다. 대표 문장·질문의 영어와 한국어 원문, ID·시나리오·순서, 기존 NULL URL을 검증하고 `representative_image_url`만 변경한다.
+- `./gradlew spotlessApply check --offline`: 테스트 1,794개, 실패·오류 0, 기존 비활성 12개. Spotless 및 Checkstyle 통과.
+- `python3 scripts/verify_lan391_image_migration.py --report /tmp/lan391-image-migration-verification.json`: 격리 PostgreSQL 15.18에서 V136→V138 적용, 대표 328개와 예문 656개 정확 매핑 및 나머지 모든 필드·중첩 JSON·시퀀스·범위 밖 2행 보존 확인. 재실행 거부와 20개 오류 조건의 전체 트랜잭션 롤백 통과.
+- PostgreSQL 검증은 V136/V138 관련 열을 구성한 임시 스키마에 한정한다. 임시 서버는 TCP를 열지 않고 전용 UNIX 소켓을 사용했으며 종료·정리를 확인했다.
+- S3 게시 완료와 서비스 DB 적용은 별도다. 서비스 DB 마이그레이션, PR 병합, 배포는 수행하지 않았다.
