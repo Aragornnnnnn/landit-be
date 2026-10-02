@@ -5,6 +5,7 @@ package com.landit.landitbe.feature.learning.scenario.session.client.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.landit.landitbe.config.ai.AiAssessmentProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversationHistoryMessage;
@@ -39,6 +40,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -85,6 +88,102 @@ class RemoteAiConversationClientTest {
               });
       server.removeContext("/api/v1/conversation/session-level-assessment");
     }
+  }
+
+  @DisplayName("구형 AI가 헤더를 무시해도 응답 척도를 보존하고 요청 본문을 확장하지 않는다.")
+  @ParameterizedTest
+  @CsvSource({
+    "text-level-v1.3,level,4,5,",
+    "text-score-v2.0,level,4,5,",
+    "text-level-v1.3,level,4,5,text-level-v1.3",
+    "text-score-v2.0,score,90,100,text-score-v2.0",
+    "text-level-v1.3,score,3,100,"
+  })
+  void mixedAiVersionsPreserveActualScale(
+      String requestedVersion, String field, int value, int maximum, String responseVersion)
+      throws Exception {
+    final AtomicReference<String> header = new AtomicReference<>();
+    final AtomicReference<String> body = new AtomicReference<>();
+    var domain =
+        java.util.Map.of(
+            field, value, "evidenceStatus", "OBSERVED", "evidenceExcerpt", "I like coffee.");
+    var domains =
+        java.util.Map.of(
+            "grammar",
+            domain,
+            "vocabulary",
+            domain,
+            "discourse",
+            domain,
+            "situationPerformance",
+            domain,
+            "interactionPragmatics",
+            domain);
+    var data = new java.util.LinkedHashMap<String, Object>();
+    data.put("sessionId", 100);
+    data.put("assessmentVersion", responseVersion);
+    data.put(
+        "levelAssessment",
+        java.util.Map.of(
+            "core",
+            java.util.Map.of(
+                "messages",
+                List.of(
+                    java.util.Map.of(
+                        "messageId", 1, "taskPerformance", "ACHIEVED", "domains", domains)))));
+    server.createContext(
+        "/api/v1/conversation/session-level-assessment",
+        exchange -> {
+          header.set(exchange.getRequestHeaders().getFirst("X-Landit-Assessment-Version"));
+          body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+          byte[] response =
+              jsonMapper.writeValueAsBytes(java.util.Map.of("success", true, "data", data));
+          exchange.sendResponseHeaders(200, response.length);
+          exchange.getResponseBody().write(response);
+          exchange.close();
+        });
+    Duration timeout = Duration.ofSeconds(5);
+    var client =
+        new RemoteAiConversationClient(
+            jsonMapper,
+            new AiClientProperties(
+                "http://localhost:" + server.getAddress().getPort(),
+                "remote",
+                "KOREAN_LEARNER",
+                timeout,
+                timeout,
+                timeout,
+                timeout),
+            new AiAssessmentProperties(requestedVersion));
+    var assessment = client.generateSessionLevelAssessment(aiSessionFeedbackRequest());
+    assertThat(assessment.scale().maximum()).isEqualTo(maximum);
+    assertThat(assessment.core().messages().getFirst().domains().grammar().score())
+        .isEqualTo(value);
+    assertThat(header.get()).isEqualTo(requestedVersion);
+    assertThat(jsonMapper.readTree(body.get()).properties())
+        .extracting(java.util.Map.Entry::getKey)
+        .containsExactlyInAnyOrder(
+            "sessionId", "scenario", "expectedMessageIds", "assessmentMessages");
+  }
+
+  @DisplayName("다른 세션의 평가 응답을 저장용 결과로 반환하지 않는다.")
+  @Test
+  void rejectsMismatchedAssessmentSession() {
+    server.createContext(
+        "/api/v1/conversation/session-level-assessment",
+        exchange -> {
+          byte[] response =
+              "{\"success\":true,\"data\":{\"sessionId\":999,\"levelAssessment\":null}}"
+                  .getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, response.length);
+          exchange.getResponseBody().write(response);
+          exchange.close();
+        });
+    assertThatThrownBy(
+            () -> remoteClient().generateSessionLevelAssessment(aiSessionFeedbackRequest()))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
   @DisplayName("수준 평가 요청에는 최종 피드백이 소유한 필드를 보내지 않는다.")
@@ -419,7 +518,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("직전 교정과 배운 표현 후보를 실제 AI HTTP 요청에 포함한다.")
   @Test
   void generateSessionFeedbackForwardsComparisonEvidence() throws Exception {
-    AtomicReference<String> body = stubSessionFeedbackSuccess();
+    final AtomicReference<String> body = stubSessionFeedbackSuccess();
     AiSessionFeedbackRequest legacy = aiSessionFeedbackRequest();
     var mistake =
         new AiSessionFeedbackRequest.PreviousMistake(
@@ -494,7 +593,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("수준 평가 계약은 최종 피드백 필드를 포함하지 않는다.")
   @Test
   void levelAssessmentDoesNotReceiveFinalFeedbackFields() throws Exception {
-    AtomicReference<String> body = new AtomicReference<>();
+    final AtomicReference<String> body = new AtomicReference<>();
     server.createContext(
         "/api/v1/conversation/session-level-assessment",
         exchange -> {
@@ -521,7 +620,7 @@ class RemoteAiConversationClientTest {
   @DisplayName("완료된 메시지 피드백을 전달하면서 기존 요청 필드를 유지한다.")
   @Test
   void hotfixForwardsCompletedFeedbacksWithoutChangingLegacyFields() throws Exception {
-    AtomicReference<String> body = stubSessionFeedbackSuccess();
+    final AtomicReference<String> body = stubSessionFeedbackSuccess();
     AiSessionFeedbackRequest legacy = aiSessionFeedbackRequest();
     JsonNode snapshot = jsonMapper.readTree("{\"schemaVersion\":1,\"sessionId\":100}");
     remoteClient()
