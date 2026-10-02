@@ -1,7 +1,8 @@
-// 편지함 어드민 공지·업데이트를 조회하고 저장한다.
+// 편지함 관리자 발송 이력과 공지·업데이트를 조회하고 저장한다.
 
 package com.landit.landitbe.feature.mailbox.letter.repository;
 
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterSummary;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetter;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType;
 import com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus;
@@ -16,8 +17,34 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** 편지함 어드민 공지·업데이트를 조회하고 저장한다. */
+/** 편지함 관리자 발송 이력과 공지·업데이트를 조회하고 저장한다. */
 public interface AdminMailboxLetterRepository extends JpaRepository<MailboxLetter, Long> {
+
+  /**
+   * 직접 편지 발송 건별 수신자 수를 집계해 최신순으로 조회한다.
+   *
+   * @param pageable 페이지 조건
+   * @return 발송 시각과 ID 내림차순 직접 편지 페이지
+   */
+  @Query(
+      value =
+          """
+          select new com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterSummary(
+              letter.id, letter.title, letter.publishedAt, count(recipient.id))
+          from MailboxLetter letter
+          left join MailboxLetterRecipient recipient on recipient.letterId = letter.id
+          where letter.letterType = com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType.DIRECT
+            and letter.publicationStatus = com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus.PUBLISHED
+          group by letter.id, letter.title, letter.publishedAt
+          order by letter.publishedAt desc, letter.id desc
+          """,
+      countQuery =
+          """
+          select count(letter.id) from MailboxLetter letter
+          where letter.letterType = com.landit.landitbe.feature.mailbox.letter.domain.MailboxLetterType.DIRECT
+            and letter.publicationStatus = com.landit.landitbe.feature.mailbox.letter.domain.MailboxPublicationStatus.PUBLISHED
+          """)
+  Page<AdminMailboxDirectLetterSummary> findDirectLetters(Pageable pageable);
 
   /**
    * 사용자와 대표 피드백 후보에 연결된 답장을 최신순으로 조회한다.
