@@ -30,6 +30,9 @@ public class RemoteAiMemoryClient implements AiMemoryClient {
   private static final String MEMORY_CANDIDATES_PATH = "/api/v1/free-talk/memory-candidates";
   private static final String MEMORY_RESOLUTION_PATH = "/api/v1/free-talk/memory-resolution";
   private static final Duration MEMORY_QUERY_TIMEOUT = Duration.ofSeconds(2);
+  // AI 내부 후보 생성 50초·판정 20초 예산에 HTTP 전달 여유 5초를 둔다.
+  private static final Duration MEMORY_CANDIDATES_TIMEOUT = Duration.ofSeconds(55);
+  private static final Duration MEMORY_RESOLUTION_TIMEOUT = Duration.ofSeconds(25);
 
   /**
    * JSON 변환기와 AI 서버 설정으로 원격 기억 클라이언트를 구성한다.
@@ -55,13 +58,15 @@ public class RemoteAiMemoryClient implements AiMemoryClient {
   /** {@inheritDoc} */
   @Override
   public AiMemoryCandidatesResult extractMemoryCandidates(AiMemoryCandidatesRequest request) {
-    return http.post(MEMORY_CANDIDATES_PATH, request, AiMemoryCandidatesResult.class);
+    return http.post(
+        MEMORY_CANDIDATES_PATH, request, AiMemoryCandidatesResult.class, MEMORY_CANDIDATES_TIMEOUT);
   }
 
   /** {@inheritDoc} */
   @Override
   public AiMemoryResolutionResult resolveMemory(AiMemoryResolutionRequest request) {
-    return http.post(MEMORY_RESOLUTION_PATH, request, AiMemoryResolutionResult.class);
+    return http.post(
+        MEMORY_RESOLUTION_PATH, request, AiMemoryResolutionResult.class, MEMORY_RESOLUTION_TIMEOUT);
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
