@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.landit.landitbe.config.ai.AiAssessmentProperties;
 import com.landit.landitbe.config.subscription.SubscriptionProperties;
 import com.landit.landitbe.feature.content.domain.ContentLearningLevel;
 import com.landit.landitbe.feature.content.scenario.question.domain.ResponseDemand;
 import com.landit.landitbe.feature.learning.scenario.assessment.client.ai.AiSessionLevelAssessment;
+import com.landit.landitbe.feature.learning.scenario.assessment.domain.AssessmentScale;
 import com.landit.landitbe.feature.learning.scenario.assessment.domain.LearningLevelPolicy.ChangeType;
 import com.landit.landitbe.feature.learning.scenario.assessment.domain.UserLevelAssessment;
 import com.landit.landitbe.feature.learning.scenario.assessment.repository.UserLevelAssessmentRepository;
@@ -35,6 +37,41 @@ import org.springframework.test.util.ReflectionTestUtils;
 class SessionLevelAssessmentProfileTest {
   private static final Clock CLOCK =
       Clock.fixed(Instant.parse("2026-07-01T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+
+  @DisplayName("같은 숫자 4도 실제 응답 척도의 점수와 학습 수준으로 저장한다.")
+  @Test
+  void savesActualScaleEvenWhenRequestedVersionDiffers() {
+    for (AssessmentScale scale : AssessmentScale.values()) {
+      UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+      var result = assessScore(profile, LocalDateTime.now(CLOCK), 4, true, false, scale, null);
+      assertThat(result.getAssessmentVersion()).isEqualTo(scale.version());
+      assertThat(result.getAssessedScore()).isEqualByComparingTo("4.00");
+      assertThat(result.getAssessedLevel()).isEqualTo(scale == AssessmentScale.LEGACY ? 4 : 1);
+      assertThat(result.toAssessment().scoreMax()).isEqualTo(scale.maximum());
+      assertThat(result.getSource().name()).isEqualTo("MODEL");
+    }
+  }
+
+  @DisplayName("평가 척도가 바뀌면 다른 척도의 승급 신호를 합산하지 않는다.")
+  @Test
+  void doesNotCombinePromotionSignalsAcrossScales() {
+    for (AssessmentScale scale : AssessmentScale.values()) {
+      UserProfile profile = new UserProfile("test@example.com", "test", 1L);
+      ReflectionTestUtils.setField(profile, "promotionStreak", 1);
+      var previous = mock(UserLevelAssessment.class);
+      when(previous.getAssessmentVersion())
+          .thenReturn(
+              scale == AssessmentScale.LEGACY
+                  ? AssessmentScale.SCORE.version()
+                  : AssessmentScale.LEGACY.version());
+      int score = scale == AssessmentScale.LEGACY ? 4 : 80;
+      var result =
+          assessScore(profile, LocalDateTime.now(CLOCK), score, true, true, scale, previous);
+      assertThat(result.getChangeType()).isEqualTo(ChangeType.UNCHANGED);
+      assertThat(result.getCurrentLevel()).isEqualTo(3);
+      assertThat(result.getPromotionStreakAfter()).isEqualTo(1);
+    }
+  }
 
   @DisplayName("잘못된 100점 평가값은 점수를 저장하거나 프로필을 변경하지 않는다.")
   @ParameterizedTest
@@ -147,6 +184,18 @@ class SessionLevelAssessmentProfileTest {
       int score,
       boolean applyToProfile,
       boolean levelInitialized) {
+    return assessScore(
+        profile, requestedAt, score, applyToProfile, levelInitialized, AssessmentScale.SCORE, null);
+  }
+
+  private UserLevelAssessment assessScore(
+      UserProfile profile,
+      LocalDateTime requestedAt,
+      int score,
+      boolean applyToProfile,
+      boolean levelInitialized,
+      AssessmentScale scale,
+      UserLevelAssessment previous) {
     var profiles = mock(UserProfileRepository.class);
     var assessments = mock(UserLevelAssessmentRepository.class);
     when(profiles.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(profile));
@@ -157,6 +206,9 @@ class SessionLevelAssessmentProfileTest {
             new com.landit.landitbe.feature.subscription.service.SubscriptionLaunchPolicyService(
                 new SubscriptionProperties("2026-06-01T00:00:00Z"), CLOCK),
             CLOCK);
+    when(assessments.findFirstByUserProfileIdAndChangeTypeNotOrderByIdDesc(
+            1L, ChangeType.NOT_APPLIED))
+        .thenReturn(Optional.ofNullable(previous));
     when(assessments.existsInitializedLevelSince(1L, launch.requireLaunchedAt()))
         .thenReturn(levelInitialized);
     var context = mock(LoadedSessionFeedbackContext.class);
@@ -179,9 +231,17 @@ class SessionLevelAssessmentProfileTest {
                             domains))
                 .toList());
     return new SessionLevelAssessmentService(
-            new ProfileLearningService(profiles, CLOCK), assessments, CLOCK, launch)
+            new ProfileLearningService(profiles, CLOCK),
+            assessments,
+            CLOCK,
+            launch,
+            new AiAssessmentProperties(null))
         .assessApplyAndSave(
-            1L, context, new AiSessionLevelAssessment(core, null), applyToProfile, requestedAt);
+            1L,
+            context,
+            new AiSessionLevelAssessment(core, null, scale),
+            applyToProfile,
+            requestedAt);
   }
 
   private UserMessageContext input(long id) {

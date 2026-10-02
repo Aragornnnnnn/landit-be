@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.assessment.repository;
 
+import com.landit.landitbe.feature.learning.scenario.assessment.domain.LearningLevelPolicy;
 import com.landit.landitbe.feature.learning.scenario.assessment.domain.UserLevelAssessment;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -19,6 +20,16 @@ public interface UserLevelAssessmentRepository extends JpaRepository<UserLevelAs
    * @return 해당 세션의 수준 평가 이력
    */
   Optional<UserLevelAssessment> findByLearningSessionId(Long learningSessionId);
+
+  /**
+   * 승급 신호의 평가 버전을 확인하기 위해 마지막 적용 이력을 조회한다.
+   *
+   * @param userProfileId 평가 대상 사용자
+   * @param excludedChangeType 프로필에 적용하지 않은 평가 유형
+   * @return 마지막으로 프로필에 적용한 평가
+   */
+  Optional<UserLevelAssessment> findFirstByUserProfileIdAndChangeTypeNotOrderByIdDesc(
+      Long userProfileId, LearningLevelPolicy.ChangeType excludedChangeType);
 
   /**
    * 결제 도입 이후 완료한 세션에서 평가가 실제로 수준을 확정한 이력이 있는지 확인한다.

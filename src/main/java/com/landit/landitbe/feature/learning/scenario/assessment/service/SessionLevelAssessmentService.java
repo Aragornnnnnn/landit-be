@@ -4,7 +4,9 @@ package com.landit.landitbe.feature.learning.scenario.assessment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.landit.landitbe.config.ai.AiAssessmentProperties;
 import com.landit.landitbe.feature.learning.scenario.assessment.client.ai.AiSessionLevelAssessment;
+import com.landit.landitbe.feature.learning.scenario.assessment.domain.AssessmentScale;
 import com.landit.landitbe.feature.learning.scenario.assessment.domain.LearningLevelPolicy;
 import com.landit.landitbe.feature.learning.scenario.assessment.domain.SessionLevelAssessment;
 import com.landit.landitbe.feature.learning.scenario.assessment.domain.TextLevelAssessmentPolicy;
@@ -28,13 +30,13 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionLevelAssessmentService {
 
-  private static final String ASSESSMENT_VERSION = "text-score-v2.0";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final ProfileLearningService profileLearningService;
   private final UserLevelAssessmentRepository userLevelAssessmentRepository;
   private final java.time.Clock clock;
   private final SessionLevelAssessmentLaunchService launchService;
+  private final AiAssessmentProperties assessmentProperties;
 
   UserLevelAssessment assessApplyAndSave(
       long userId,
@@ -52,17 +54,19 @@ class SessionLevelAssessmentService {
             && (profile.updatedAt() == null || !profile.updatedAt().isAfter(requestedAt));
     TextLevelAssessmentPolicy.Score modelScore = modelScore(context, aiAssessment);
     boolean modelResult = modelScore != null;
+    AssessmentScale scale = modelResult ? aiAssessment.scale() : assessmentProperties.scale();
     TextLevelAssessmentPolicy.Score score = modelResult ? modelScore : fallbackScore();
     LearningLevelPolicy.Decision decision =
         applyToProfile
             ? LearningLevelPolicy.apply(
                 previousLevel,
-                profile.promotionStreak(),
+                promotionStreak(userId, profile.promotionStreak(), scale),
                 score.overallScore(),
                 score.overallConfidence(),
                 score.sufficientEvidence(),
                 userLevelAssessmentRepository.existsInitializedLevelSince(
-                    userId, launchService.requireLaunchedAt()))
+                    userId, launchService.requireLaunchedAt()),
+                scale)
             : new LearningLevelPolicy.Decision(
                 previousLevel,
                 profile.promotionStreak(),
@@ -92,7 +96,7 @@ class SessionLevelAssessmentService {
             validDetails(details)
                 ? new SessionLevelAssessment.Details(details.strength(), details.improvement())
                 : null,
-            ASSESSMENT_VERSION);
+            scale.version());
     JsonNode corePayload = modelResult ? OBJECT_MAPPER.valueToTree(aiAssessment.core()) : null;
     JsonNode detailsPayload =
         assessment.details() == null ? null : OBJECT_MAPPER.valueToTree(assessment.details());
@@ -106,12 +110,24 @@ class SessionLevelAssessmentService {
             detailsPayload));
   }
 
+  private int promotionStreak(long userId, int streak, AssessmentScale scale) {
+    if (streak == 0) {
+      return 0;
+    }
+    return userLevelAssessmentRepository
+        .findFirstByUserProfileIdAndChangeTypeNotOrderByIdDesc(
+            userId, LearningLevelPolicy.ChangeType.NOT_APPLIED)
+        .filter(previous -> !previous.getAssessmentVersion().equals(scale.version()))
+        .map(previous -> 0)
+        .orElse(streak);
+  }
+
   UserLevelAssessment findBySessionId(long sessionId) {
     return userLevelAssessmentRepository.findByLearningSessionId(sessionId).orElse(null);
   }
 
   /**
-   * 메시지 순서와 모든 영역의 근거 계약을 검증한 뒤 100점 평가를 집계한다.
+   * 메시지 순서와 모든 영역의 근거 계약을 검증한 뒤 실제 척도로 평가를 집계한다.
    *
    * @param context 요청 당시의 사용자 발화와 질문 그룹
    * @param assessment AI가 반환한 평가
@@ -119,7 +135,10 @@ class SessionLevelAssessmentService {
    */
   private TextLevelAssessmentPolicy.Score modelScore(
       LoadedSessionFeedbackContext context, AiSessionLevelAssessment assessment) {
-    if (assessment == null || assessment.core() == null || assessment.core().messages() == null) {
+    if (assessment == null
+        || assessment.scale() == null
+        || assessment.core() == null
+        || assessment.core().messages() == null) {
       return null;
     }
     List<AiSessionLevelAssessment.Message> messages = assessment.core().messages();
@@ -137,11 +156,12 @@ class SessionLevelAssessmentService {
         return null;
       }
       AiSessionLevelAssessment.Domains domains = message.domains();
-      if (!validDomain(domains.situationPerformance(), expected.content())
-          || !validDomain(domains.grammar(), expected.content())
-          || !validDomain(domains.vocabulary(), expected.content())
-          || !validDomain(domains.discourse(), expected.content())
-          || !validDomain(domains.interactionPragmatics(), expected.content())) {
+      if (!validDomain(domains.situationPerformance(), expected.content(), assessment.scale())
+          || !validDomain(domains.grammar(), expected.content(), assessment.scale())
+          || !validDomain(domains.vocabulary(), expected.content(), assessment.scale())
+          || !validDomain(domains.discourse(), expected.content(), assessment.scale())
+          || !validDomain(
+              domains.interactionPragmatics(), expected.content(), assessment.scale())) {
         return null;
       }
       observations.add(
@@ -153,18 +173,21 @@ class SessionLevelAssessmentService {
               observedScore(domains.discourse()),
               observedScore(domains.interactionPragmatics())));
     }
-    return TextLevelAssessmentPolicy.calculate(observations, context.questionLevelGroup())
+    return TextLevelAssessmentPolicy.calculate(
+            observations, context.questionLevelGroup(), assessment.scale())
         .orElse(null);
   }
 
   /**
-   * 관찰 영역에는 1~100점과 원문 인용을, 미관찰 영역에는 점수와 인용의 부재를 요구한다.
+   * 관찰 영역에는 해당 척도의 점수와 원문 인용을, 미관찰 영역에는 점수와 인용의 부재를 요구한다.
    *
    * @param domain AI 영역 평가
    * @param userMessage 해당 평가 대상의 원문
+   * @param scale 실제 평가 척도
    * @return 관찰 상태에 맞는 점수와 근거 계약을 충족하면 true
    */
-  private boolean validDomain(AiSessionLevelAssessment.Domain domain, String userMessage) {
+  private boolean validDomain(
+      AiSessionLevelAssessment.Domain domain, String userMessage, AssessmentScale scale) {
     if (domain == null || domain.evidenceStatus() == null) {
       return false;
     }
@@ -173,7 +196,7 @@ class SessionLevelAssessmentService {
     }
     return domain.score() != null
         && domain.score() >= 1
-        && domain.score() <= 100
+        && domain.score() <= scale.maximum()
         && domain.evidenceExcerpt() != null
         && !domain.evidenceExcerpt().isBlank()
         && userMessage.contains(domain.evidenceExcerpt());

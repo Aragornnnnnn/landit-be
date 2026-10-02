@@ -9,7 +9,6 @@ import java.math.RoundingMode;
 public final class LearningLevelPolicy {
 
   private static final BigDecimal MINIMUM_CONFIDENCE = new BigDecimal("0.75");
-  private static final BigDecimal PROMOTION_GAP = new BigDecimal("4.00");
 
   private LearningLevelPolicy() {}
 
@@ -60,21 +59,49 @@ public final class LearningLevelPolicy {
       BigDecimal assessmentConfidence,
       boolean sufficientEvidence,
       boolean levelInitialized) {
+    return apply(
+        currentLevel,
+        promotionStreak,
+        assessedScore,
+        assessmentConfidence,
+        sufficientEvidence,
+        levelInitialized,
+        AssessmentScale.SCORE);
+  }
+
+  /**
+   * 실제 평가 척도에 해당하는 초기 확정 및 승급 정책을 적용한다.
+   *
+   * @param currentLevel 현재 학습 수준
+   * @param promotionStreak 같은 척도의 연속 승급 신호
+   * @param assessedScore 종합 점수
+   * @param assessmentConfidence 관찰 비율
+   * @param sufficientEvidence 근거 충족 여부
+   * @param levelInitialized 평가로 수준을 확정한 이력 여부
+   * @param scale 실제 평가 척도
+   * @return 적용 수준과 승급 상태
+   */
+  public static Decision apply(
+      Integer currentLevel,
+      int promotionStreak,
+      BigDecimal assessedScore,
+      BigDecimal assessmentConfidence,
+      boolean sufficientEvidence,
+      boolean levelInitialized,
+      AssessmentScale scale) {
     if (!sufficientEvidence
         || assessedScore == null
         || assessedScore.compareTo(BigDecimal.ONE) < 0
-        || assessedScore.compareTo(new BigDecimal("100")) > 0
+        || assessedScore.compareTo(BigDecimal.valueOf(scale.maximum())) > 0
         || assessmentConfidence == null
         || assessmentConfidence.compareTo(MINIMUM_CONFIDENCE) < 0) {
       return new Decision(currentLevel, promotionStreak, ChangeType.NOT_APPLIED);
     }
     if (!levelInitialized || currentLevel == null) {
-      int initializedLevel = levelForScore(assessedScore);
+      int initializedLevel = scale.levelForScore(assessedScore);
       return new Decision(initializedLevel, 0, ChangeType.INITIALIZED);
     }
-    if (currentLevel < 5
-        && assessedScore.compareTo(BigDecimal.valueOf(currentLevel * 20L).add(PROMOTION_GAP))
-            >= 0) {
+    if (currentLevel < 5 && assessedScore.compareTo(scale.promotionThreshold(currentLevel)) >= 0) {
       int nextStreak = promotionStreak + 1;
       return nextStreak >= 2
           ? new Decision(currentLevel + 1, 0, ChangeType.PROMOTED)

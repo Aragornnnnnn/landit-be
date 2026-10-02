@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.assessment.client.ai;
 
+import com.landit.landitbe.feature.learning.scenario.assessment.domain.AssessmentScale;
 import java.util.List;
 
 /**
@@ -9,8 +10,18 @@ import java.util.List;
  *
  * @param core 수준 계산에 사용하는 필수 평가 원본
  * @param details 사용자에게 보여줄 선택 설명
+ * @param scale 응답에서 확인한 실제 평가 척도
  */
-public record AiSessionLevelAssessment(Core core, Details details) {
+public record AiSessionLevelAssessment(Core core, Details details, AssessmentScale scale) {
+  /**
+   * 기존 100점 클라이언트 호출과 호환되는 생성자다.
+   *
+   * @param core 질문별 평가
+   * @param details 선택 설명
+   */
+  public AiSessionLevelAssessment(Core core, Details details) {
+    this(core, details, AssessmentScale.SCORE);
+  }
 
   /**
    * 반드시 검증할 질문별 평가 목록이다.
@@ -47,7 +58,7 @@ public record AiSessionLevelAssessment(Core core, Details details) {
   /**
    * 한 영역의 관찰 수준과 원문 근거다.
    *
-   * @param score 관찰한 1~100 정수 점수. 미관찰이면 {@code null}
+   * @param score 응답 척도에 따른 정수 관찰값(기존 1~5, 신규 1~100). 미관찰이면 {@code null}
    * @param evidenceStatus 근거 관찰 상태
    * @param evidenceExcerpt 사용자 발화에서 인용한 근거
    */

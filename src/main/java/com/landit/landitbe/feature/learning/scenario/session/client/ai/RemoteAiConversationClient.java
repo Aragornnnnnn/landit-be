@@ -3,9 +3,11 @@
 package com.landit.landitbe.feature.learning.scenario.session.client.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.landit.landitbe.config.ai.AiAssessmentProperties;
 import com.landit.landitbe.config.ai.AiClientProperties;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
+import com.landit.landitbe.feature.learning.scenario.assessment.client.ai.AiAssessmentResponseParser;
 import com.landit.landitbe.feature.learning.scenario.assessment.client.ai.AiSessionLevelAssessment;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackResult;
@@ -35,6 +37,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -57,6 +60,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
   private final HttpClient httpClient;
   private final JsonMapper jsonMapper;
   private final AiClientProperties properties;
+  private final AiAssessmentProperties assessmentProperties;
 
   /**
    * JSON 변환기와 AI 서버 설정으로 원격 클라이언트를 구성한다.
@@ -65,6 +69,22 @@ public class RemoteAiConversationClient implements AiConversationClient {
    * @param properties AI 서버 연결 설정
    */
   public RemoteAiConversationClient(JsonMapper jsonMapper, AiClientProperties properties) {
+    this(jsonMapper, properties, new AiAssessmentProperties(null));
+  }
+
+  /**
+   * 연결 설정과 평가 계약으로 원격 클라이언트를 구성한다.
+   *
+   * @param jsonMapper JSON 변환기
+   * @param properties AI 연결 설정
+   * @param assessmentProperties 활성화할 평가 계약
+   */
+  @Autowired
+  public RemoteAiConversationClient(
+      JsonMapper jsonMapper,
+      AiClientProperties properties,
+      AiAssessmentProperties assessmentProperties) {
+    this.assessmentProperties = assessmentProperties;
     this.jsonMapper = jsonMapper;
     this.properties = properties;
     this.httpClient = HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
@@ -153,7 +173,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
             RemoteSessionLevelAssessmentResponse.class,
             SessionErrorCode.FEEDBACK_GENERATION_FAILED,
             properties.sessionFeedbackRequestTimeout())
-        .toResult();
+        .toResult(request.sessionId(), jsonMapper);
   }
 
   private <T> T post(
@@ -169,8 +189,7 @@ public class RemoteAiConversationClient implements AiConversationClient {
       Duration requestTimeout) {
     try {
       HttpRequest request =
-          properties
-              .authorize(HttpRequest.newBuilder(uri))
+          authorizeRequest(uri)
               .version(HttpClient.Version.HTTP_1_1)
               .header("Accept", "application/json")
               .header("Content-Type", "application/json")
@@ -197,6 +216,14 @@ public class RemoteAiConversationClient implements AiConversationClient {
     } catch (IOException exception) {
       throw ApiException.causedBy(defaultErrorCode, exception);
     }
+  }
+
+  private HttpRequest.Builder authorizeRequest(URI uri) {
+    HttpRequest.Builder builder = properties.authorize(HttpRequest.newBuilder(uri));
+    if (SESSION_LEVEL_ASSESSMENT_PATH.equals(uri.getPath())) {
+      builder.header("X-Landit-Assessment-Version", assessmentProperties.version());
+    }
+    return builder;
   }
 
   /** AI 서버 오류 응답에서 공개할 수 있는 오류 코드만 선별해 변환한다. */
@@ -364,13 +391,13 @@ public class RemoteAiConversationClient implements AiConversationClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record RemoteSessionLevelAssessmentResponse(
-      Long sessionId, AiSessionLevelAssessment levelAssessment) {
+      Long sessionId, JsonNode levelAssessment, String assessmentVersion) {
 
-    private AiSessionLevelAssessment toResult() {
-      if (sessionId == null) {
+    private AiSessionLevelAssessment toResult(long expectedSessionId, JsonMapper mapper) {
+      if (sessionId == null || sessionId != expectedSessionId) {
         throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
       }
-      return levelAssessment;
+      return AiAssessmentResponseParser.parse(levelAssessment, assessmentVersion, mapper);
     }
   }
 
