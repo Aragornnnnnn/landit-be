@@ -9,12 +9,15 @@ import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyR
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyResponse;
 import com.landit.landitbe.feature.mailbox.admin.feedback.service.AdminMailboxFeedbackQueryService;
 import com.landit.landitbe.feature.mailbox.admin.feedback.service.AdminMailboxReplyService;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterDetailResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterListResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterCreateRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterListResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterPatchRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.service.AdminMailboxDirectLetterQueryService;
 import com.landit.landitbe.feature.mailbox.admin.letter.service.AdminMailboxDirectLetterService;
 import com.landit.landitbe.feature.mailbox.admin.letter.service.AdminMailboxLetterService;
 import com.landit.landitbe.feature.mailbox.feedback.domain.MailboxFeedbackSort;
@@ -48,6 +51,24 @@ public class AdminMailboxController implements AdminMailboxControllerDocs {
   private final AdminMailboxReplyService adminMailboxReplyService;
   private final AdminMailboxLetterService adminMailboxLetterService;
   private final AdminMailboxDirectLetterService adminMailboxDirectLetterService;
+
+  private final AdminMailboxDirectLetterQueryService adminMailboxDirectLetterQueryService;
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/admin/mailbox/direct-letters")
+  public ApiResponse<AdminMailboxDirectLetterListResponse> getDirectLetters(
+      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+    return ApiResponse.success(adminMailboxDirectLetterQueryService.getLetters(page, size));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @GetMapping("/api/v1/admin/mailbox/direct-letters/{letterId}")
+  public ApiResponse<AdminMailboxDirectLetterDetailResponse> getDirectLetter(
+      @PathVariable Long letterId) {
+    return ApiResponse.success(adminMailboxDirectLetterQueryService.getLetter(letterId));
+  }
 
   /** {@inheritDoc} */
   @Override

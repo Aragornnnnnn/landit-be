@@ -6,6 +6,8 @@ import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedba
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxFeedbackListResponse;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyRequest;
 import com.landit.landitbe.feature.mailbox.admin.feedback.dto.AdminMailboxReplyResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterDetailResponse;
+import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterListResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterRequest;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxDirectLetterResponse;
 import com.landit.landitbe.feature.mailbox.admin.letter.dto.AdminMailboxLetterCreateRequest;
@@ -21,6 +23,8 @@ import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.response.ApiResponse;
 import com.landit.landitbe.shared.security.AuthUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,6 +34,44 @@ import org.springframework.http.ResponseEntity;
 /** 편지함 어드민 API의 OpenAPI 문서를 정의한다. */
 @Tag(name = "Admin Mailbox", description = "편지함 어드민 API")
 public interface AdminMailboxControllerDocs {
+
+  /**
+   * 직접 편지 발송 이력을 페이지로 조회한다.
+   *
+   * @param page 0부터 시작하는 페이지 번호. 기본값 0
+   * @param size 페이지 크기 1~100. 기본값 20
+   * @return 발송 건별 요약 페이지
+   * @throws ApiException 페이지 조건이 유효하지 않을 때
+   */
+  @Operation(
+      summary = "직접 편지 발송 목록",
+      description =
+          "DIRECT 발송만 sentAt DESC, letterId DESC로 조회한다. 한 번의 발송은 한 항목이며 "
+              + "recipientCount는 탈퇴 수신자를 포함한다. 잘못된 페이지 조건은 400 VALIDATION_FAILED다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ApiResponse<AdminMailboxDirectLetterListResponse> getDirectLetters(
+      @Parameter(description = "0부터 시작하는 페이지 번호", schema = @Schema(minimum = "0")) int page,
+      @Parameter(description = "페이지 크기", schema = @Schema(minimum = "1", maximum = "100"))
+          int size);
+
+  /**
+   * 직접 편지 발송 상세를 조회한다.
+   *
+   * @param letterId 편지 ID
+   * @return 본문과 사용자 ID 오름차순 수신 이력
+   * @throws ApiException 편지가 없거나 발송된 직접 편지가 아닐 때
+   */
+  @Operation(
+      summary = "직접 편지 발송 상세",
+      description =
+          "탈퇴 수신자도 포함한다. readAt은 최초 읽음 시각이며 미열람이면 null이다. "
+              + "관리자 조회는 읽음 상태를 변경하지 않는다. 없거나 DIRECT 발송이 아니면 404 RESOURCE_NOT_FOUND다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "404",
+      description = "직접 편지 없음")
+  ApiResponse<AdminMailboxDirectLetterDetailResponse> getDirectLetter(Long letterId);
 
   /**
    * 지정한 활성 사용자에게 문의 연결 없이 직접 편지를 발송한다.
