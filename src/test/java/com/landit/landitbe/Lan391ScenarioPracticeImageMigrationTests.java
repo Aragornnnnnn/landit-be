@@ -109,10 +109,14 @@ class Lan391ScenarioPracticeImageMigrationTests {
     assertThat(java.util.HexFormat.of().formatHex(digest)).isEqualTo(MAPPING_SHA256);
   }
 
-  @DisplayName("V138은 대상 상태를 검사하고 예문 3·4 이미지 URL만 변경한다.")
+  @DisplayName("V138의 예문 블록은 대상 상태를 검사하고 예문 3·4 이미지 URL만 변경한다.")
   @Test
   void guardsStateAndPreservesOtherPayloadFields() throws Exception {
-    assertThat(readSql(UPDATE))
+    String migration = readSql(UPDATE);
+    String practiceBlock =
+        migration.substring(
+            0, migration.indexOf("CREATE TEMP TABLE lan391_representative_image_map"));
+    assertThat(practiceBlock)
         .contains(
             "LOCK TABLE writing_expression IN SHARE ROW EXCLUSIVE MODE",
             "expression.scenario_id IS DISTINCT FROM asset.scenario_id",
