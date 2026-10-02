@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.content.scenario.schedule.repository.DailySce
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.scenario.assessment.client.ai.AiSessionLevelAssessment;
+import com.landit.landitbe.feature.learning.scenario.assessment.domain.AssessmentScale;
 import com.landit.landitbe.feature.learning.scenario.assessment.repository.UserLevelAssessmentRepository;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackResult;
@@ -2100,6 +2101,39 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("HAS_DETAILS", true);
   }
 
+  @DisplayName("같은 DB에서 척도 전환과 복귀 후에도 저장 점수와 승급 신호를 분리한다.")
+  @Test
+  void mixedAssessmentVersionsPersistWithoutConversionOrCrossScalePromotion() throws Exception {
+    String accessToken = login("mixed-scale@example.com").path("data").path("accessToken").asText();
+    seedLevelAssessmentScenario();
+    fakeAiConversationClient.assessmentScale = AssessmentScale.LEGACY;
+    long legacySession = completeLevelAssessmentScenario(accessToken, 3);
+    assertSavedLevelDecision(legacySession, 3, 0, "INITIALIZED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 4), 3, 1, "UNCHANGED");
+    fakeAiConversationClient.assessmentScale = AssessmentScale.SCORE;
+    long scoreSession = completeLevelAssessmentScenario(accessToken, 4);
+    assertSavedLevelDecision(scoreSession, 3, 1, "UNCHANGED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 4), 4, 0, "PROMOTED");
+    fakeAiConversationClient.assessmentScale = AssessmentScale.LEGACY;
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 5), 4, 1, "UNCHANGED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 5), 5, 0, "PROMOTED");
+    int calls = fakeAiConversationClient.sessionLevelAssessmentCallCount;
+    for (long sessionId : new long[] {legacySession, scoreSession}) {
+      boolean legacy = sessionId == legacySession;
+      mockMvc
+          .perform(
+              get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.levelAssessment.scoreMax").value(legacy ? 5 : 100))
+          .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(legacy ? 3.0 : 70.0))
+          .andExpect(
+              jsonPath("$.data.levelAssessment.assessmentVersion")
+                  .value(legacy ? "text-level-v1.3" : "text-score-v2.0"));
+    }
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(calls);
+  }
+
   @DisplayName("과거 5점 평가를 원래 점수와 척도로 반환하고 AI 재평가하지 않는다.")
   @Test
   void historicalAssessmentKeepsFivePointScores() throws Exception {
@@ -2264,7 +2298,10 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private long completeLevelAssessmentScenario(String accessToken, int level) throws Exception {
-    fakeAiConversationClient.assessedDomainScore = level * 20 - 10;
+    fakeAiConversationClient.assessedDomainScore =
+        fakeAiConversationClient.assessmentScale == AssessmentScale.LEGACY
+            ? level
+            : level * 20 - 10;
     long sessionId = startScenario(accessToken, 2121);
     submitMessage(accessToken, sessionId, "Can I get an iced americano?");
     submitMessage(accessToken, sessionId, "That is all, thank you.");
@@ -4353,6 +4390,7 @@ class ScenarioSessionApiIntegrationTests {
     private int sessionLevelAssessmentCallCount;
     private boolean unobservedPragmatics;
     private int assessedDomainScore = 100;
+    private AssessmentScale assessmentScale = AssessmentScale.SCORE;
 
     private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
 
@@ -4550,7 +4588,8 @@ class ScenarioSessionApiIntegrationTests {
                               AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
                               observedDomains(message.userMessage())))
                   .toList()),
-          new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요."));
+          new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요."),
+          assessmentScale);
     }
 
     private void failSessionFeedbackGeneration() {
@@ -4599,6 +4638,7 @@ class ScenarioSessionApiIntegrationTests {
       sessionLevelAssessmentCallCount = 0;
       unobservedPragmatics = false;
       assessedDomainScore = 100;
+      assessmentScale = AssessmentScale.SCORE;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;
       messageFeedbackResponseSessionId = null;
