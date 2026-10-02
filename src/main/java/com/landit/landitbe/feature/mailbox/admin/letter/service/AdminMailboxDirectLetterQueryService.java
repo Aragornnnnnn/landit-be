@@ -38,7 +38,7 @@ public class AdminMailboxDirectLetterQueryService {
    * @throws ApiException 페이지 조건이 유효하지 않을 때
    */
   public AdminMailboxDirectLetterListResponse getLetters(int page, int size) {
-    if (page < 0 || size < 1 || size > 100) {
+    if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) {
       throw new ApiException(ErrorCode.VALIDATION_FAILED);
     }
     Page<AdminMailboxDirectLetterSummary> letters =

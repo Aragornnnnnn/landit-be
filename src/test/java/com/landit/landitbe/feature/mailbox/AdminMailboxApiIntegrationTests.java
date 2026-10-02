@@ -1179,6 +1179,30 @@ class AdminMailboxApiIntegrationTests {
     }
   }
 
+  @DisplayName("JPA 오프셋 상한은 허용하고 초과한 페이지 요청은 400으로 거부한다.")
+  @Test
+  void directLetterHistoryValidatesJpaOffsetLimit() throws Exception {
+    String admin = loginAsAdmin("direct-offset-admin");
+    for (String query : List.of("page=2147483647&size=1", "page=21474836&size=100")) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters?" + query)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.items").isEmpty())
+          .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+    for (String query :
+        List.of("page=1073741824&size=2", "page=21474837&size=100", "page=2147483647&size=100")) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters?" + query)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+  }
+
   private MvcResult sendDirectLetter(String adminToken, List<Long> userIds) throws Exception {
     return mockMvc
         .perform(

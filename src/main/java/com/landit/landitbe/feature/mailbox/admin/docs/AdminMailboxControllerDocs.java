@@ -47,7 +47,8 @@ public interface AdminMailboxControllerDocs {
       summary = "직접 편지 발송 목록",
       description =
           "DIRECT 발송만 sentAt DESC, letterId DESC로 조회한다. 한 번의 발송은 한 항목이며 "
-              + "recipientCount는 탈퇴 수신자를 포함한다. 잘못된 페이지 조건은 400 VALIDATION_FAILED다.",
+              + "recipientCount는 탈퇴 수신자를 포함한다. page × size는 2147483647 이하여야 하며 "
+              + "잘못된 페이지 조건은 400 VALIDATION_FAILED다.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ApiResponse<AdminMailboxDirectLetterListResponse> getDirectLetters(
       @Parameter(description = "0부터 시작하는 페이지 번호", schema = @Schema(minimum = "0")) int page,
