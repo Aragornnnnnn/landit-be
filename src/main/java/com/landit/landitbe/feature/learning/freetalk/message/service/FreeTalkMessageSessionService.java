@@ -23,16 +23,14 @@ class FreeTalkMessageSessionService {
   private final FreeTalkSessionRepository freeTalkSessionRepository;
 
   LearningSessionSnapshot requireOwnedSession(long userId, long learningSessionId) {
-    LearningSessionSnapshot session =
-        learningSessionService
-            .findSession(learningSessionId)
-            .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
-    if (!Long.valueOf(userId).equals(session.getUserProfileId())) {
-      throw new ApiException(ErrorCode.FORBIDDEN);
-    }
     return learningSessionService
         .lockOwnedSnapshot(learningSessionId, userId)
-        .orElseThrow(() -> new ApiException(SessionErrorCode.SESSION_NOT_FOUND));
+        .orElseThrow(
+            () ->
+                new ApiException(
+                    learningSessionService.exists(learningSessionId)
+                        ? ErrorCode.FORBIDDEN
+                        : SessionErrorCode.SESSION_NOT_FOUND));
   }
 
   FreeTalkSession requireFreeTalkForUpdate(long learningSessionId) {

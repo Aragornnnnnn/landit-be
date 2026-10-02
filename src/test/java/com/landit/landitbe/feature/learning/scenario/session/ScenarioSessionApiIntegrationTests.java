@@ -22,6 +22,7 @@ import com.landit.landitbe.feature.content.scenario.schedule.repository.DailySce
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.feature.learning.conversation.exception.SessionErrorCode;
 import com.landit.landitbe.feature.learning.scenario.assessment.client.ai.AiSessionLevelAssessment;
+import com.landit.landitbe.feature.learning.scenario.assessment.domain.AssessmentScale;
 import com.landit.landitbe.feature.learning.scenario.assessment.repository.UserLevelAssessmentRepository;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackRequest;
 import com.landit.landitbe.feature.learning.scenario.feedback.client.ai.AiSessionFeedbackResult;
@@ -175,6 +176,7 @@ class ScenarioSessionApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
     jdbcTemplate.update("DELETE FROM scenario_question");
     jdbcTemplate.update("DELETE FROM scenario_language_variant");
+    jdbcTemplate.update("DELETE FROM scenario_star_message");
     jdbcTemplate.update("DELETE FROM scenario");
     jdbcTemplate.update("DELETE FROM category_language_variant");
     jdbcTemplate.update("DELETE FROM category");
@@ -410,6 +412,25 @@ class ScenarioSessionApiIntegrationTests {
         .andExpect(jsonPath(sessionEndPath + ".responses['403'].description").value("권한 없음"))
         .andExpect(jsonPath(sessionEndPath + ".responses['404'].description").value("세션 없음"))
         .andExpect(jsonPath(sessionEndPath + ".responses['409'].description").value("이미 완료됨"));
+  }
+
+  @DisplayName("OpenAPI에서 100점 평가와 5단계 학습 레벨을 구분한다.")
+  @Test
+  void openApiSeparatesAssessmentScoresAndLearningLevels() throws Exception {
+    String schema = "$.components.schemas.SessionLevelAssessment.properties.";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(schema + "assessedScore.maximum").value(100))
+        .andExpect(jsonPath(schema + "assessedLevel.maximum").value(5))
+        .andExpect(jsonPath(schema + "scoreMax").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/sessions/{sessionId}/level-assessment'].get.description")
+                .value(
+                    org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("현재 레벨 상한보다 4점"),
+                        org.hamcrest.Matchers.containsString("24·44·64·84점"),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("0.7")))));
   }
 
   @DisplayName("OpenAPI 문서에서 고정 질문 본문이 null일 수 있음을 명시한다.")
@@ -1738,6 +1759,36 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("COMPLETED_COUNT", 1);
   }
 
+  @DisplayName("최종 피드백은 시나리오 별점 문구를 강조 메시지로 저장해 반환한다.")
+  @Test
+  void getSessionFeedbackUsesScenarioStarMessageForHighlight() throws Exception {
+    StartedSession session =
+        startCompletedAiFirstSession("session-feedback-star-message@example.com");
+    seedScenarioStarMessage(2120, "3.0", "이제 어디서든 음식 취향을 소개할 수 있어요!");
+    seedScenarioStarMessage(2120, "2.5", "취향 설명까지 할 수 있게 됐어요");
+
+    requestSessionFeedback(session)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.starRating").value(3.0))
+        .andExpect(jsonPath("$.data.highlightMessage").value("이제 어디서든 음식 취향을 소개할 수 있어요!"));
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT highlight_message FROM session_history_summary_feedback", String.class))
+        .isEqualTo("이제 어디서든 음식 취향을 소개할 수 있어요!");
+  }
+
+  @DisplayName("시나리오 별점 문구가 없으면 기본 강조 문구를 저장한다.")
+  @Test
+  void getSessionFeedbackFallsBackToDefaultHighlightWhenStarMessageMissing() throws Exception {
+    StartedSession session =
+        startCompletedAiFirstSession("session-feedback-star-default@example.com");
+
+    requestSessionFeedback(session)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.highlightMessage").value("오늘도 시나리오를 잘 마무리했어요"));
+  }
+
   @DisplayName("최종 피드백을 재조회하면 AI 호출과 중복 저장 없이 기존 결과를 반환한다.")
   @Test
   void getSessionFeedbackCreatesResultAndReturnsExistingResultWithoutRegeneration()
@@ -2028,17 +2079,19 @@ class ScenarioSessionApiIntegrationTests {
 
     getCompletedLevelAssessment(session)
         .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
-        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(5.0))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(100.0))
+        .andExpect(jsonPath("$.data.levelAssessment.scoreMax").value(100))
+        .andExpect(jsonPath("$.data.levelAssessment.assessmentVersion").value("text-score-v2.0"))
         .andExpect(jsonPath("$.data.levelAssessment.sufficientEvidence").value(true))
         .andExpect(jsonPath("$.data.levelAssessment.currentLevel").value(5));
 
     assertThat(storedLevelAssessment(session.sessionId()))
-        .containsEntry("SITUATION_PERFORMANCE_SCORE", new BigDecimal("5.00"))
-        .containsEntry("GRAMMAR_SCORE", new BigDecimal("5.00"))
-        .containsEntry("VOCABULARY_SCORE", new BigDecimal("5.00"))
-        .containsEntry("DISCOURSE_SCORE", new BigDecimal("5.00"))
-        .containsEntry("INTERACTION_PRAGMATICS_SCORE", new BigDecimal("5.00"))
-        .containsEntry("ASSESSED_SCORE", new BigDecimal("5.00"))
+        .containsEntry("SITUATION_PERFORMANCE_SCORE", new BigDecimal("100.00"))
+        .containsEntry("GRAMMAR_SCORE", new BigDecimal("100.00"))
+        .containsEntry("VOCABULARY_SCORE", new BigDecimal("100.00"))
+        .containsEntry("DISCOURSE_SCORE", new BigDecimal("100.00"))
+        .containsEntry("INTERACTION_PRAGMATICS_SCORE", new BigDecimal("100.00"))
+        .containsEntry("ASSESSED_SCORE", new BigDecimal("100.00"))
         .containsEntry("ASSESSED_LEVEL", 5)
         .containsEntry("SOURCE", "MODEL")
         .containsEntry("PREVIOUS_LEVEL", 5)
@@ -2046,6 +2099,59 @@ class ScenarioSessionApiIntegrationTests {
         .containsEntry("PROMOTION_STREAK_AFTER", 0)
         .containsEntry("HAS_CORE", true)
         .containsEntry("HAS_DETAILS", true);
+  }
+
+  @DisplayName("같은 DB에서 척도 전환과 복귀 후에도 저장 점수와 승급 신호를 분리한다.")
+  @Test
+  void mixedAssessmentVersionsPersistWithoutConversionOrCrossScalePromotion() throws Exception {
+    String accessToken = login("mixed-scale@example.com").path("data").path("accessToken").asText();
+    seedLevelAssessmentScenario();
+    fakeAiConversationClient.assessmentScale = AssessmentScale.LEGACY;
+    long legacySession = completeLevelAssessmentScenario(accessToken, 3);
+    assertSavedLevelDecision(legacySession, 3, 0, "INITIALIZED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 4), 3, 1, "UNCHANGED");
+    fakeAiConversationClient.assessmentScale = AssessmentScale.SCORE;
+    long scoreSession = completeLevelAssessmentScenario(accessToken, 4);
+    assertSavedLevelDecision(scoreSession, 3, 1, "UNCHANGED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 4), 4, 0, "PROMOTED");
+    fakeAiConversationClient.assessmentScale = AssessmentScale.LEGACY;
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 5), 4, 1, "UNCHANGED");
+    assertSavedLevelDecision(completeLevelAssessmentScenario(accessToken, 5), 5, 0, "PROMOTED");
+    int calls = fakeAiConversationClient.sessionLevelAssessmentCallCount;
+    for (long sessionId : new long[] {legacySession, scoreSession}) {
+      boolean legacy = sessionId == legacySession;
+      mockMvc
+          .perform(
+              get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.levelAssessment.scoreMax").value(legacy ? 5 : 100))
+          .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(legacy ? 3.0 : 70.0))
+          .andExpect(
+              jsonPath("$.data.levelAssessment.assessmentVersion")
+                  .value(legacy ? "text-level-v1.3" : "text-score-v2.0"));
+    }
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(calls);
+  }
+
+  @DisplayName("과거 5점 평가를 원래 점수와 척도로 반환하고 AI 재평가하지 않는다.")
+  @Test
+  void historicalAssessmentKeepsFivePointScores() throws Exception {
+    StartedSession session = startCompletedUserFirstFeedbackSession("legacy-score@example.com");
+    getCompletedLevelAssessment(session);
+    jdbcTemplate.update(
+        "UPDATE user_level_assessment SET assessment_version='text-level-v1.3', "
+            + "situation_performance_score=3.25, grammar_score=3.25, vocabulary_score=3.25, "
+            + "discourse_score=3.25, interaction_pragmatics_score=3.25, assessed_score=3.25, "
+            + "assessed_level=3, current_level=3 WHERE learning_session_id=?",
+        session.sessionId());
+    int calls = fakeAiConversationClient.sessionLevelAssessmentCallCount;
+    getCompletedLevelAssessment(session)
+        .andExpect(jsonPath("$.data.levelAssessment.scoreMax").value(5))
+        .andExpect(jsonPath("$.data.levelAssessment.assessedScore").value(3.25))
+        .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(3.25))
+        .andExpect(jsonPath("$.data.levelAssessment.displayLevel").value(3));
+    assertThat(fakeAiConversationClient.sessionLevelAssessmentCallCount).isEqualTo(calls);
   }
 
   @DisplayName("첫 평가로 선택 수준을 대체한 뒤에는 연속 승급 조건을 적용한다.")
@@ -2062,7 +2168,7 @@ class ScenarioSessionApiIntegrationTests {
             + "WHERE id=(SELECT user_profile_id FROM learning_session WHERE id=?)",
         selectedLevel,
         sessionId);
-    fakeAiConversationClient.assessedDomainLevel = 3;
+    fakeAiConversationClient.assessedDomainScore = 50;
     submitMessage(accessToken, sessionId, "Can I get an iced americano?");
     submitMessage(accessToken, sessionId, "That is all, thank you.");
     awaitLevelAssessment(sessionId, accessToken);
@@ -2192,7 +2298,10 @@ class ScenarioSessionApiIntegrationTests {
   }
 
   private long completeLevelAssessmentScenario(String accessToken, int level) throws Exception {
-    fakeAiConversationClient.assessedDomainLevel = level;
+    fakeAiConversationClient.assessedDomainScore =
+        fakeAiConversationClient.assessmentScale == AssessmentScale.LEGACY
+            ? level
+            : level * 20 - 10;
     long sessionId = startScenario(accessToken, 2121);
     submitMessage(accessToken, sessionId, "Can I get an iced americano?");
     submitMessage(accessToken, sessionId, "That is all, thank you.");
@@ -2233,12 +2342,24 @@ class ScenarioSessionApiIntegrationTests {
       awaitLevelAssessment(sessionId, accessToken);
       mockMvc
           .perform(
+              post("/api/v1/sessions/%d/feedback".formatted(sessionId))
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.userLevelAssessment.sessionId").value(sessionId))
+          .andExpect(jsonPath("$.data.userLevelAssessment.processingStatus").value("COMPLETED"))
+          .andExpect(
+              jsonPath("$.data.userLevelAssessment.levelAssessment.details.strength").isNotEmpty())
+          .andExpect(jsonPath("$.data.growthFeedback").value(nullValue()))
+          .andExpect(jsonPath("$.data.expressionReuse.pending").value(false))
+          .andExpect(jsonPath("$.data.expressionReuse.items").isEmpty());
+      mockMvc
+          .perform(
               get("/api/v1/sessions/%d/level-assessment".formatted(sessionId))
                   .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
           .andExpect(jsonPath("$.data.levelAssessment.source").value("MODEL"))
-          .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(5.0))
+          .andExpect(jsonPath("$.data.levelAssessment.grammar.score").value(100.0))
           .andExpect(
               jsonPath("$.data.levelAssessment.interactionPragmatics.score").value(nullValue()))
           .andExpect(jsonPath("$.data.levelAssessment.assessedLevel").value(nullValue()))
@@ -2258,7 +2379,7 @@ class ScenarioSessionApiIntegrationTests {
                 WHERE a.learning_session_id = ?
                 """,
                 sessionId))
-        .containsEntry("GRAMMAR_SCORE", new BigDecimal("5.00"))
+        .containsEntry("GRAMMAR_SCORE", new BigDecimal("100.00"))
         .containsEntry("INTERACTION_PRAGMATICS_SCORE", null)
         .containsEntry("SUFFICIENT_EVIDENCE", false)
         .containsEntry("HAS_CORE", true)
@@ -3608,6 +3729,17 @@ class ScenarioSessionApiIntegrationTests {
         status);
   }
 
+  private void seedScenarioStarMessage(long scenarioId, String starRating, String message) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO scenario_star_message (scenario_id, star_rating, message, created_at, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        scenarioId,
+        new BigDecimal(starRating),
+        message);
+  }
+
   private void seedScenarioVariant(
       long variantId,
       long scenarioId,
@@ -4257,7 +4389,8 @@ class ScenarioSessionApiIntegrationTests {
     private int sessionFeedbackCallCount;
     private int sessionLevelAssessmentCallCount;
     private boolean unobservedPragmatics;
-    private int assessedDomainLevel = 5;
+    private int assessedDomainScore = 100;
+    private AssessmentScale assessmentScale = AssessmentScale.SCORE;
 
     private ProcessingStatus messageFeedbackStatus = ProcessingStatus.PREPARING;
 
@@ -4413,7 +4546,6 @@ class ScenarioSessionApiIntegrationTests {
           request.sessionId(),
           90,
           sessionFeedbackStarRating,
-          "You clearly communicated your main idea.",
           "Keep practicing complete sentences with clear reasons.",
           request.expectedMessageIds().stream()
               .map(
@@ -4456,7 +4588,8 @@ class ScenarioSessionApiIntegrationTests {
                               AiSessionLevelAssessment.TaskPerformance.ACHIEVED,
                               observedDomains(message.userMessage())))
                   .toList()),
-          new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요."));
+          new AiSessionLevelAssessment.Details("질문에 맞게 답했어요.", "문장을 조금 더 길게 이어보세요."),
+          assessmentScale);
     }
 
     private void failSessionFeedbackGeneration() {
@@ -4466,7 +4599,7 @@ class ScenarioSessionApiIntegrationTests {
     private AiSessionLevelAssessment.Domains observedDomains(String evidence) {
       AiSessionLevelAssessment.Domain domain =
           new AiSessionLevelAssessment.Domain(
-              assessedDomainLevel, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
+              assessedDomainScore, AiSessionLevelAssessment.EvidenceStatus.OBSERVED, evidence);
       return new AiSessionLevelAssessment.Domains(
           domain,
           domain,
@@ -4504,7 +4637,8 @@ class ScenarioSessionApiIntegrationTests {
       sessionFeedbackCallCount = 0;
       sessionLevelAssessmentCallCount = 0;
       unobservedPragmatics = false;
-      assessedDomainLevel = 5;
+      assessedDomainScore = 100;
+      assessmentScale = AssessmentScale.SCORE;
       messageFeedbackStatus = ProcessingStatus.PREPARING;
       messageFeedbackResponseMessageId = null;
       messageFeedbackResponseSessionId = null;

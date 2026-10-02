@@ -2548,6 +2548,303 @@ class FreeTalkSessionApiIntegrationTests {
         .asLong();
   }
 
+  @DisplayName("직접 완료는 마무리 발화 없이 목록·상세·요약과 스트릭에 반영되고 재시도해도 종료 시각을 유지한다.")
+  @Test
+  void directlyCompletesAndExposesHistoryWithoutClosingMessage() throws Exception {
+    seedEmbeddedCandidateExpression();
+    String token = login("direct-complete@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    long messageId = submitWithoutCorrectionFields(token, sessionId, "I went hiking.");
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    final int beforeRequests = requestCount();
+
+    requestDirectCompletion(token, sessionId);
+    var endedAt =
+        jdbcTemplate.queryForObject(
+            "SELECT ended_at FROM learning_session WHERE id = ?",
+            java.sql.Timestamp.class,
+            sessionId);
+    requestDirectCompletion(token, sessionId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT ended_at FROM learning_session WHERE id = ?",
+                java.sql.Timestamp.class,
+                sessionId))
+        .isEqualTo(endedAt);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                sessionId))
+        .isEqualTo("DIRECT_COMPLETION");
+    assertThat(awaitExpressionGenerationStatus(sessionId)).isEqualTo("READY");
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+    assertThat(requestCount()).isEqualTo(beforeRequests);
+    assertCurrentStreak(token, 1, true);
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].sessionId").value(sessionId));
+    mockMvc
+        .perform(
+            get("/api/v1/free-talk/sessions/{sessionId}", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.messages.length()").value(2));
+    mockMvc
+        .perform(summary(sessionId, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false));
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                messagePath(sessionId),
+                token,
+                messageRequest(UUID.randomUUID().toString(), "Too late.", 1200, false)))
+        .andExpect(status().isConflict());
+  }
+
+  @DisplayName("발화가 없는 세션도 직접 완료할 수 있고 사용량 한도를 소진해도 완료와 재시도가 가능하다.")
+  @Test
+  void directlyCompletesEmptySessionWithoutConsumingRequestQuota() throws Exception {
+    String token = login("direct-empty@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    jdbcTemplate.update("UPDATE free_talk_daily_speaking_usage SET request_count = 1000");
+    requestDirectCompletion(token, sessionId);
+    requestDirectCompletion(token, sessionId);
+    assertThat(requestCount()).isEqualTo(1000);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isZero();
+    mockMvc
+        .perform(summary(sessionId, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pending").value(false));
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+  }
+
+  @DisplayName("종료 확인 대기에서 직접 완료하면 누락된 교정을 시작하고 같은 발화 재전송도 완료로 응답한다.")
+  @Test
+  void directlyCompletesExitConfirmationAndPreparesCorrection() throws Exception {
+    String token = login("direct-exit@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.detectExitIntent();
+    String request = messageRequest(UUID.randomUUID().toString(), "I have to go.", 1200, false);
+    MvcResult result =
+        mockMvc
+            .perform(postJsonWithToken(messagePath(sessionId), token, request))
+            .andExpect(jsonPath("$.data.turnStatus").value("EXIT_CONFIRMATION_REQUIRED"))
+            .andReturn();
+    long messageId = responseData(result).at("/submittedMessage/messageId").asLong();
+    requestDirectCompletion(token, sessionId);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    mockMvc
+        .perform(postJsonWithToken(messagePath(sessionId), token, request))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.nextMessage").value(nullValue()));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accumulated_speaking_duration_ms FROM free_talk_session", Long.class))
+        .isEqualTo(1200);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    assertThat(fakeAiFreeTalkClient.closingCallCount.get()).isZero();
+  }
+
+  @DisplayName("AI 응답을 기다리는 발화를 보존하여 즉시 완료하고 늦은 AI 응답으로 대화를 다시 열지 않는다.")
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void directlyCompletesWhileSubmittedTurnIsWaitingForAi(boolean failTurn) throws Exception {
+    String token = login("direct-inflight@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.blockTurn();
+    if (failTurn) {
+      fakeAiFreeTalkClient.failTurn();
+    }
+    String request = messageRequest(UUID.randomUUID().toString(), "I went hiking.", 4200, false);
+    CompletableFuture<Integer> pending =
+        CompletableFuture.supplyAsync(() -> performMessageStatus(token, sessionId, request));
+    try {
+      assertThat(fakeAiFreeTalkClient.awaitTurnStarted()).isTrue();
+      requestDirectCompletion(token, sessionId);
+      assertThat(pending.isDone()).isFalse();
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT status FROM learning_session WHERE id = ?", String.class, sessionId))
+          .isEqualTo("COMPLETED");
+    } finally {
+      fakeAiFreeTalkClient.releaseTurn();
+    }
+    assertThat(pending.get(5, TimeUnit.SECONDS)).isEqualTo(failTurn ? 503 : 200);
+    long messageId =
+        jdbcTemplate.queryForObject("SELECT id FROM session_history_message", Long.class);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT accumulated_speaking_duration_ms FROM free_talk_session", Long.class))
+        .isEqualTo(4200);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT used_speaking_duration_ms FROM free_talk_daily_speaking_usage", Long.class))
+        .isEqualTo(4200);
+    mockMvc
+        .perform(postJsonWithToken(messagePath(sessionId), token, request))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"));
+  }
+
+  @DisplayName("직접 완료가 진행 중인 계속 결정을 대체하면 같은 결정 재전송도 완료 결과를 반환한다.")
+  @Test
+  void replaysContinueDecisionSupersededByDirectCompletion() throws Exception {
+    String token = login("direct-continue-replay@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long messageId = submitForExit(token, sessionId);
+    String decision = "{\"submittedMessageId\":%d,\"decision\":\"CONTINUE\"}".formatted(messageId);
+    fakeAiFreeTalkClient.blockTurn();
+    CompletableFuture<MvcResult> pending =
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                return mockMvc
+                    .perform(postJsonWithToken(exitDecisionPath(sessionId), token, decision))
+                    .andReturn();
+              } catch (Exception exception) {
+                throw new IllegalStateException(exception);
+              }
+            });
+    try {
+      assertThat(fakeAiFreeTalkClient.awaitTurnStarted()).isTrue();
+      requestDirectCompletion(token, sessionId);
+    } finally {
+      fakeAiFreeTalkClient.releaseTurn();
+    }
+    MvcResult original = pending.get(5, TimeUnit.SECONDS);
+    assertThat(original.getResponse().getStatus()).isEqualTo(200);
+    assertThat(responseData(original).at("/turnStatus").asText()).isEqualTo("COMPLETED");
+    mockMvc
+        .perform(postJsonWithToken(exitDecisionPath(sessionId), token, decision))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.turnStatus").value("COMPLETED"))
+        .andExpect(jsonPath("$.data.nextMessage").value(nullValue()));
+    assertThat(fakeAiFreeTalkClient.turnCallCount()).isEqualTo(2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM session_history_message", Integer.class))
+        .isEqualTo(1);
+    awaitCorrectionStatus(messageId, "COMPLETED");
+  }
+
+  @DisplayName("직접 완료는 미인증·타인·없는 세션·중단 세션을 기존 오류로 거부한다.")
+  @Test
+  void rejectsInvalidDirectCompletionRequests() throws Exception {
+    String token = login("direct-owner@example.com").at("/data/accessToken").asText();
+    long sessionId = startUserFirstSession(token);
+    String other = login("direct-other@example.com").at("/data/accessToken").asText();
+    mockMvc
+        .perform(post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(directCompletion(sessionId, other)).andExpect(status().isForbidden());
+    mockMvc.perform(directCompletion(999999L, token)).andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/sessions/{sessionId}/end", sessionId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(directCompletion(sessionId, token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT status FROM learning_session WHERE id = ?", String.class, sessionId))
+        .isEqualTo("INTERRUPTED");
+  }
+
+  @DisplayName("기존 작별 완료와 시간 소진 완료에 직접 완료를 재요청해도 원래 종료 사유를 유지한다.")
+  @Test
+  void retainsOriginalCompletionReasonForAlreadyCompletedSessions() throws Exception {
+    String token = login("direct-existing@example.com").at("/data/accessToken").asText();
+    long goodbyeSessionId = startUserFirstSession(token);
+    fakeAiFreeTalkClient.detectExitIntent();
+    long messageId = submitForExit(token, goodbyeSessionId);
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                exitDecisionPath(goodbyeSessionId),
+                token,
+                "{\"submittedMessageId\":%d,\"decision\":\"END\"}".formatted(messageId)))
+        .andExpect(status().isOk());
+    requestDirectCompletion(token, goodbyeSessionId);
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                exitDecisionPath(goodbyeSessionId),
+                token,
+                "{\"submittedMessageId\":%d,\"decision\":\"CONTINUE\"}".formatted(messageId)))
+        .andExpect(status().isConflict());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                goodbyeSessionId))
+        .isEqualTo("USER_ENDED");
+    long timedSessionId = startUserFirstSession(token);
+    mockMvc
+        .perform(
+            postJsonWithToken(
+                messagePath(timedSessionId),
+                token,
+                messageRequest(UUID.randomUUID().toString(), "Bye.", 7200000, false)))
+        .andExpect(status().isOk());
+    requestDirectCompletion(token, timedSessionId);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT completion_reason FROM learning_session WHERE id = ?",
+                String.class,
+                timedSessionId))
+        .isEqualTo("TIME_LIMIT_REACHED");
+  }
+
+  @DisplayName("직접 완료 API 문서는 인증·오류와 공통 성공 응답을 명시한다.")
+  @Test
+  void documentsDirectCompletion() throws Exception {
+    String path = "$.paths['/api/v1/free-talk/sessions/{sessionId}/complete'].post";
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(path + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(path + ".responses['200'].content").exists())
+        .andExpect(jsonPath(path + ".responses['401']").exists())
+        .andExpect(jsonPath(path + ".responses['403']").exists())
+        .andExpect(jsonPath(path + ".responses['404']").exists())
+        .andExpect(jsonPath(path + ".responses['409']").exists());
+  }
+
+  private MockHttpServletRequestBuilder directCompletion(long sessionId, String token) {
+    return post("/api/v1/free-talk/sessions/{sessionId}/complete", sessionId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+  }
+
+  private void requestDirectCompletion(String token, long sessionId) throws Exception {
+    mockMvc
+        .perform(directCompletion(sessionId, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data").value(nullValue()))
+        .andExpect(jsonPath("$.error").value(nullValue()));
+  }
+
   private long submitForExit(String accessToken, long sessionId) throws Exception {
     MvcResult result =
         mockMvc
@@ -3105,6 +3402,7 @@ class FreeTalkSessionApiIntegrationTests {
     }
 
     void blockTurn() {
+      turnStarted = new CountDownLatch(1);
       turnRelease = new CountDownLatch(1);
     }
 

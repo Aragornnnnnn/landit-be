@@ -7,5 +7,7 @@ public enum CompletionReason {
   GOAL_COMPLETED,
   MAX_TURNS_REACHED,
   USER_ENDED,
+  /** 작별 발화 없이 사용자가 완료 버튼으로 종료했다. */
+  DIRECT_COMPLETION,
   TIME_LIMIT_REACHED
 }

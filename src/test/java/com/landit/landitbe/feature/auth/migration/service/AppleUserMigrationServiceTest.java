@@ -23,10 +23,14 @@ import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class AppleUserMigrationServiceTest {
 
@@ -146,6 +150,91 @@ class AppleUserMigrationServiceTest {
     assertThat(client.exchangeCallCount).isEqualTo(2);
   }
 
+  @DisplayName("Apple 응답 대기 중 탈퇴한 대상은 다시 저장하지 않고 다음 회원의 이전을 계속한다.")
+  @ParameterizedTest
+  @CsvSource({"PREPARE,false", "PREPARE,true", "COMPLETE,false", "COMPLETE,true"})
+  void withdrawalDuringAppleRequestDoesNotAbortBatch(
+      AppleUserMigrationPhase phase, boolean appleFails) throws Exception {
+    prepareTwoCandidates(phase);
+    onFirstAppleRequest(phase, () -> removeFirstCandidate(true));
+    if (appleFails) {
+      client.failCreateFor("old-sub-1");
+      client.failExchangeFor("transfer-old-sub-1");
+    }
+
+    AppleUserMigrationSummary summary = service.run(phase);
+
+    assertThat(summary).isEqualTo(new AppleUserMigrationSummary(1, 1, 0, 0));
+    assertThat(readIdentity())
+        .isEqualTo(new IdentityRow(1L, "withdrawn", null, "APPLE", "UNLINKED"));
+    assertThat(repository.findCandidates(AppleUserMigrationPhase.COMPLETE))
+        .hasSize(phase == AppleUserMigrationPhase.PREPARE ? 1 : 0);
+    assertThat(
+            phase == AppleUserMigrationPhase.PREPARE
+                ? client.createCallCount
+                : client.exchangeCallCount)
+        .isEqualTo(2);
+  }
+
+  @DisplayName("활성 계정의 이전 행이 사라진 오류는 탈퇴로 간주하지 않고 배치를 중단한다.")
+  @ParameterizedTest
+  @EnumSource(AppleUserMigrationPhase.class)
+  void missingMigrationForActiveIdentityStillAbortsBatch(AppleUserMigrationPhase phase)
+      throws Exception {
+    prepareTwoCandidates(phase);
+    onFirstAppleRequest(phase, () -> removeFirstCandidate(false));
+
+    assertThatThrownBy(() -> service.run(phase))
+        .isInstanceOf(AppleUserMigrationException.class)
+        .extracting("failureCode")
+        .isEqualTo("MIGRATION_STATE_INVALID");
+    assertThat(readIdentity().status()).isEqualTo("ACTIVE");
+  }
+
+  private void prepareTwoCandidates(AppleUserMigrationPhase phase) throws SQLException {
+    insertIdentity(1L, "old-sub-1");
+    insertIdentity(2L, "old-sub-2");
+    if (phase == AppleUserMigrationPhase.COMPLETE) {
+      service.run(AppleUserMigrationPhase.PREPARE);
+    }
+  }
+
+  private void onFirstAppleRequest(AppleUserMigrationPhase phase, Runnable action) {
+    Consumer<String> callback =
+        identifier -> {
+          if (identifier.endsWith("old-sub-1")) {
+            action.run();
+          }
+        };
+    if (phase == AppleUserMigrationPhase.PREPARE) {
+      client.onCreate = callback;
+    } else {
+      client.onExchange = callback;
+    }
+  }
+
+  private void removeFirstCandidate(boolean withdrawn) {
+    try (Connection connection = openConnection();
+        Statement statement = connection.createStatement()) {
+      connection.setAutoCommit(false);
+      if (withdrawn) {
+        statement.executeUpdate(
+            """
+            UPDATE oauth_identity SET provider_user_id = 'withdrawn', provider_email = NULL,
+                status = 'UNLINKED' WHERE user_profile_id = 1
+            """);
+      }
+      statement.executeUpdate(
+          """
+          DELETE FROM apple_user_migration WHERE oauth_identity_id IN (
+              SELECT id FROM oauth_identity WHERE user_profile_id = 1)
+          """);
+      connection.commit();
+    } catch (SQLException exception) {
+      throw new AssertionError("탈퇴 또는 이전 행 삭제 재현 실패", exception);
+    }
+  }
+
   private void createOauthIdentityTable() throws SQLException {
     try (Statement statement = databaseKeeper.createStatement()) {
       statement.execute(
@@ -242,6 +331,8 @@ class AppleUserMigrationServiceTest {
     private int tokenCallCount;
     private int createCallCount;
     private int exchangeCallCount;
+    private Consumer<String> onCreate = ignored -> {};
+    private Consumer<String> onExchange = ignored -> {};
 
     @Override
     public String requestAccessToken() {
@@ -257,6 +348,7 @@ class AppleUserMigrationServiceTest {
     public String createTransferSub(String accessToken, String providerUserId) {
       rejectIfNeeded();
       createCallCount++;
+      onCreate.accept(providerUserId);
       if (createFailures.contains(providerUserId)) {
         throw new AppleUserMigrationException("APPLE_HTTP_400");
       }
@@ -267,6 +359,7 @@ class AppleUserMigrationServiceTest {
     public AppleRecipientUser exchangeTransferSub(String accessToken, String transferSub) {
       rejectIfNeeded();
       exchangeCallCount++;
+      onExchange.accept(transferSub);
       if (exchangeFailures.contains(transferSub)) {
         throw new AppleUserMigrationException("APPLE_HTTP_400");
       }

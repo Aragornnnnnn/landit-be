@@ -202,6 +202,20 @@ public class FreeTalkSession extends BaseTimeEntity {
   }
 
   /**
+   * 저장된 사용자 발화 시간 전체를 반영하여 직접 완료한다.
+   *
+   * @param totalSpeakingDurationMs 저장된 사용자 발화 시간 합계
+   * @throws IllegalStateException 이미 완료된 세션이거나 시간이 음수일 때
+   */
+  public void completeDirectly(long totalSpeakingDurationMs) {
+    if (totalSpeakingDurationMs < 0) {
+      throw new IllegalStateException("사용자 발화 시간은 0 이상이어야 합니다.");
+    }
+    completeByUserExit();
+    accumulatedSpeakingDurationMs = totalSpeakingDurationMs;
+  }
+
+  /**
    * 시간 제한 도달로 세션 대화를 완료한다.
    *
    * @throws IllegalStateException 진행 중 상태가 아닐 때

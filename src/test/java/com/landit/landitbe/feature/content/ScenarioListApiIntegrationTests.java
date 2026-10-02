@@ -70,6 +70,7 @@ class ScenarioListApiIntegrationTests {
     jdbcTemplate.update("DELETE FROM scenario_question_language_variant");
     jdbcTemplate.update("DELETE FROM scenario_question");
     jdbcTemplate.update("DELETE FROM scenario_language_variant");
+    jdbcTemplate.update("DELETE FROM scenario_star_message");
     jdbcTemplate.update("DELETE FROM scenario");
     jdbcTemplate.update("DELETE FROM category_language_variant");
     jdbcTemplate.update("DELETE FROM category");

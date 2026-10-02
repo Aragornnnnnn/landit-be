@@ -42,6 +42,7 @@ public class SessionFeedbackContextService {
   private final SessionFeedbackDataService sessionFeedbackDataService;
   private final ScenarioContentService scenarioContentService;
   private final AiConversationSettings aiConversationSettings;
+  private final ScenarioFeedbackEvidenceService feedbackEvidenceService;
 
   /**
    * 소유한 완료 시나리오 세션의 최종 피드백 입력을 불변 값으로 조회한다.
@@ -66,6 +67,7 @@ public class SessionFeedbackContextService {
         conversationMessageService.findAll(sessionHistory.getId());
 
     // 이후 AI 호출과 응답 조립에 필요한 값을 트랜잭션 안에서 모두 읽어 불변 컨텍스트로 넘긴다.
+    List<UserMessageContext> messages = userMessages(historyMessages, scenarioContext);
     return new LoadedSessionFeedbackContext(
         learningSession.getId(),
         sessionHistory.getId(),
@@ -73,7 +75,8 @@ public class SessionFeedbackContextService {
         learningSession.getBaseLocale(),
         scenarioContext.questionLevelGroup(),
         AiScenarioContext.from(scenarioContext, aiConversationSettings),
-        userMessages(historyMessages, scenarioContext),
+        messages,
+        feedbackEvidenceService.load(learningSession, messages),
         sessionFeedbackDataService
             .findSummaryByHistoryId(sessionHistory.getId())
             .map(ExistingSummaryFeedbackContext::from));

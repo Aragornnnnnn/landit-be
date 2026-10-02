@@ -33,37 +33,37 @@ public class UserLevelAssessment extends BaseTimeEntity {
   @Column(name = "learning_session_id", nullable = false, unique = true)
   private Long learningSessionId;
 
-  @Column(name = "situation_performance_score", precision = 3, scale = 2)
+  @Column(name = "situation_performance_score", precision = 5, scale = 2)
   private BigDecimal situationPerformanceScore;
 
   @Column(name = "situation_performance_confidence", nullable = false, precision = 3, scale = 2)
   private BigDecimal situationPerformanceConfidence;
 
-  @Column(name = "grammar_score", precision = 3, scale = 2)
+  @Column(name = "grammar_score", precision = 5, scale = 2)
   private BigDecimal grammarScore;
 
   @Column(name = "grammar_confidence", nullable = false, precision = 3, scale = 2)
   private BigDecimal grammarConfidence;
 
-  @Column(name = "vocabulary_score", precision = 3, scale = 2)
+  @Column(name = "vocabulary_score", precision = 5, scale = 2)
   private BigDecimal vocabularyScore;
 
   @Column(name = "vocabulary_confidence", nullable = false, precision = 3, scale = 2)
   private BigDecimal vocabularyConfidence;
 
-  @Column(name = "discourse_score", precision = 3, scale = 2)
+  @Column(name = "discourse_score", precision = 5, scale = 2)
   private BigDecimal discourseScore;
 
   @Column(name = "discourse_confidence", nullable = false, precision = 3, scale = 2)
   private BigDecimal discourseConfidence;
 
-  @Column(name = "interaction_pragmatics_score", precision = 3, scale = 2)
+  @Column(name = "interaction_pragmatics_score", precision = 5, scale = 2)
   private BigDecimal interactionPragmaticsScore;
 
   @Column(name = "interaction_pragmatics_confidence", nullable = false, precision = 3, scale = 2)
   private BigDecimal interactionPragmaticsConfidence;
 
-  @Column(name = "assessed_score", precision = 3, scale = 2)
+  @Column(name = "assessed_score", precision = 5, scale = 2)
   private BigDecimal assessedScore;
 
   @Column(name = "assessed_level")

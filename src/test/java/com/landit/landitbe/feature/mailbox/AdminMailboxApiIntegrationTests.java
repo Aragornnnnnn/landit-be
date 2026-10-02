@@ -987,7 +987,7 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(status().isBadRequest());
   }
 
-  @DisplayName("OpenAPI에 직접 편지 발송 계약과 DIRECT 유형을 노출한다.")
+  @DisplayName("OpenAPI에 직접 편지 발송·조회 계약과 DIRECT 유형을 노출한다.")
   @Test
   void documentsDirectLetterContract() throws Exception {
     mockMvc
@@ -995,6 +995,13 @@ class AdminMailboxApiIntegrationTests {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath("$.paths['/api/v1/admin/mailbox/direct-letters'].post.responses['201']")
+                .exists())
+        .andExpect(jsonPath("$.paths['/api/v1/admin/mailbox/direct-letters'].get").exists())
+        .andExpect(
+            jsonPath("$.paths['/api/v1/admin/mailbox/direct-letters/{letterId}'].get").exists())
+        .andExpect(
+            jsonPath(
+                    "$.components.schemas.AdminMailboxDirectLetterRecipient" + ".properties.readAt")
                 .exists())
         .andExpect(
             jsonPath(
@@ -1005,6 +1012,195 @@ class AdminMailboxApiIntegrationTests {
             jsonPath(
                     "$.components.schemas.MailboxReceivedDetailResponse.properties.letterType.enum")
                 .value(org.hamcrest.Matchers.hasItem("DIRECT")));
+  }
+
+  @DisplayName("직접 편지 목록은 발송 건별 수신자 수와 최신순 페이지를 반환한다.")
+  @Test
+  void directLetterHistoryPaginatesDispatchesInsteadOfRecipients() throws Exception {
+    String admin = loginAsAdmin("direct-history-admin");
+    long first = loginAndFindUserId("direct-history-first");
+    long second = loginAndFindUserId("direct-history-second");
+    final long firstLetter =
+        responseData(sendDirectLetter(admin, List.of(first))).get("letterId").asLong();
+    final long secondLetter =
+        responseData(sendDirectLetter(admin, List.of(second, first))).get("letterId").asLong();
+    long olderLetter =
+        responseData(sendDirectLetter(admin, List.of(first))).get("letterId").asLong();
+    jdbcTemplate.update(
+        "update mailbox_letter set published_at = ?", LocalDateTime.of(2026, 1, 2, 0, 0));
+    jdbcTemplate.update(
+        "update mailbox_letter set published_at = ? where id = ?",
+        LocalDateTime.of(2026, 1, 1, 0, 0),
+        olderLetter);
+    jdbcTemplate.update("update user_profile set status = 'WITHDRAWN' where id = ?", second);
+    createNotice(admin, "목록에서 제외할 공지");
+    long feedback = insertFeedback(first, "이력 테스트 문의", "QUESTION", "PENDING", 1);
+    sendReply(admin, List.of(feedback), "목록에서 제외할 답장");
+
+    for (int page = 0; page < 3; page++) {
+      long expectedId = List.of(secondLetter, firstLetter, olderLetter).get(page);
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters")
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)
+                  .param("page", String.valueOf(page))
+                  .param("size", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.page").value(page))
+          .andExpect(jsonPath("$.data.size").value(1))
+          .andExpect(jsonPath("$.data.totalElements").value(3))
+          .andExpect(jsonPath("$.data.totalPages").value(3))
+          .andExpect(jsonPath("$.data.items.length()").value(1))
+          .andExpect(jsonPath("$.data.items[0].letterId").value(expectedId))
+          .andExpect(jsonPath("$.data.items[0].title").value("직접 편지 제목"))
+          .andExpect(jsonPath("$.data.items[0].sentAt").isNotEmpty())
+          .andExpect(jsonPath("$.data.items[0].recipientCount").value(page == 0 ? 2 : 1))
+          .andExpect(jsonPath("$.data.items[0].bodyText").doesNotExist());
+    }
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/direct-letters")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)
+                .param("page", "3")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items").isEmpty())
+        .andExpect(jsonPath("$.data.totalElements").value(3));
+  }
+
+  @DisplayName("관리자 상세 조회는 탈퇴 수신자와 최초 읽음을 보존하고 미열람 상태를 변경하지 않는다.")
+  @Test
+  void directLetterDetailPreservesRecipientHistoryAndReads() throws Exception {
+    String admin = loginAsAdmin("direct-detail-admin");
+    LoginResult first = login("direct-detail-first");
+    LoginResult second = login("direct-detail-second");
+    JsonNode sent =
+        responseData(
+            sendDirectLetter(admin, List.of(second.userProfileId(), first.userProfileId())));
+    long letterId = sent.get("letterId").asLong();
+    MvcResult read =
+        mockMvc
+            .perform(
+                get("/api/v1/mailbox/received/{letterId}", letterId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + first.accessToken()))
+            .andExpect(status().isOk())
+            .andReturn();
+    String readAt = responseData(read).get("readAt").asText();
+    jdbcTemplate.update(
+        "update user_profile set status = 'WITHDRAWN' where id = ?", first.userProfileId());
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters/{letterId}", letterId)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.letterId").value(letterId))
+          .andExpect(jsonPath("$.data.title").value("직접 편지 제목"))
+          .andExpect(jsonPath("$.data.bodyText").value("직접 편지 본문"))
+          .andExpect(jsonPath("$.data.sentAt").value(sent.get("sentAt").asText()))
+          .andExpect(jsonPath("$.data.recipientCount").value(2))
+          .andExpect(jsonPath("$.data.recipients.length()").value(2))
+          .andExpect(jsonPath("$.data.recipients[0].userProfileId").value(first.userProfileId()))
+          .andExpect(jsonPath("$.data.recipients[0].readAt").value(readAt))
+          .andExpect(jsonPath("$.data.recipients[1].userProfileId").value(second.userProfileId()))
+          .andExpect(jsonPath("$.data.recipients[1].readAt").value(nullValue()));
+    }
+    assertUnreadCount(second, 1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from mailbox_letter_recipient"
+                    + " where letter_id = ? and read_at is not null",
+                Integer.class,
+                letterId))
+        .isEqualTo(1);
+    verify(sqsAsyncClient, never()).sendMessage(any(SendMessageRequest.class));
+  }
+
+  @DisplayName("직접 편지 조회는 관리자만 접근하며 다른 유형과 없는 ID는 404다.")
+  @Test
+  void directLetterQueriesRequireAdminAndRejectOtherLetterTypes() throws Exception {
+    String admin = loginAsAdmin("direct-query-auth-admin");
+    LoginResult user = login("direct-query-auth-user");
+    long direct =
+        responseData(sendDirectLetter(admin, List.of(user.userProfileId())))
+            .get("letterId")
+            .asLong();
+    for (String path :
+        List.of(
+            "/api/v1/admin/mailbox/direct-letters",
+            "/api/v1/admin/mailbox/direct-letters/" + direct)) {
+      mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+      mockMvc
+          .perform(get(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + user.accessToken()))
+          .andExpect(status().isForbidden());
+    }
+    long notice = responseData(createNotice(admin, "직접 편지가 아닌 공지")).get("letterId").asLong();
+    long feedback = insertFeedback(user.userProfileId(), "타 유형 문의", "QUESTION", "PENDING", 1);
+    long reply =
+        responseData(sendReply(admin, List.of(feedback), "직접 편지가 아닌 답장")).get("letterId").asLong();
+    for (long id : List.of(Long.MAX_VALUE, notice, reply)) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters/{letterId}", id)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+  }
+
+  @DisplayName("직접 편지 목록은 빈 페이지와 크기 경계를 처리하고 잘못된 페이지 조건을 거부한다.")
+  @Test
+  void directLetterHistoryValidatesPageBoundsAndDefaults() throws Exception {
+    String admin = loginAsAdmin("direct-page-admin");
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/direct-letters")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.items").isEmpty())
+        .andExpect(jsonPath("$.data.totalElements").value(0))
+        .andExpect(jsonPath("$.data.totalPages").value(0));
+    mockMvc
+        .perform(
+            get("/api/v1/admin/mailbox/direct-letters")
+                .param("size", "100")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.size").value(100));
+    for (String query : List.of("page=-1", "size=0", "size=101")) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters?" + query)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+  }
+
+  @DisplayName("JPA 오프셋 상한은 허용하고 초과한 페이지 요청은 400으로 거부한다.")
+  @Test
+  void directLetterHistoryValidatesJpaOffsetLimit() throws Exception {
+    String admin = loginAsAdmin("direct-offset-admin");
+    for (String query : List.of("page=2147483647&size=1", "page=21474836&size=100")) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters?" + query)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.items").isEmpty())
+          .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+    for (String query :
+        List.of("page=1073741824&size=2", "page=21474837&size=100", "page=2147483647&size=100")) {
+      mockMvc
+          .perform(
+              get("/api/v1/admin/mailbox/direct-letters?" + query)
+                  .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
   }
 
   private MvcResult sendDirectLetter(String adminToken, List<Long> userIds) throws Exception {

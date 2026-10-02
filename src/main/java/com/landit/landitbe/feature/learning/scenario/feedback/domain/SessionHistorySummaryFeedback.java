@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.scenario.feedback.domain;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.landit.landitbe.feature.learning.conversation.domain.ProcessingStatus;
 import com.landit.landitbe.shared.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
@@ -14,6 +15,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import lombok.Getter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 세션 히스토리 전체 피드백과 결과 요약을 저장한다. */
 @Getter
@@ -50,6 +53,14 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
   @Column(name = "summary_message", columnDefinition = "text")
   private String summaryMessage;
 
+  @Column(name = "growth_feedback_payload", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode growthFeedbackPayload;
+
+  @Column(name = "expression_reuse_payload", nullable = false, columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode expressionReusePayload;
+
   /** JPA에서 사용하는 기본 생성자다. */
   protected SessionHistorySummaryFeedback() {}
 
@@ -61,7 +72,9 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
       int totalMessageCount,
       int nativeLikeMessageCount,
       String highlightMessage,
-      String summaryMessage) {
+      String summaryMessage,
+      JsonNode growthFeedbackPayload,
+      JsonNode expressionReusePayload) {
     this.sessionHistoryId = sessionHistoryId;
     this.processingStatus = processingStatus;
     this.nativeScore = nativeScore;
@@ -70,9 +83,24 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
     this.nativeLikeMessageCount = nativeLikeMessageCount;
     this.highlightMessage = highlightMessage;
     this.summaryMessage = summaryMessage;
+    this.growthFeedbackPayload = growthFeedbackPayload;
+    this.expressionReusePayload = expressionReusePayload;
   }
 
-  /** AI 최종 피드백이 완료된 세션 히스토리 요약을 생성한다. */
+  /**
+   * AI 최종 피드백이 완료된 세션 히스토리 요약을 생성한다.
+   *
+   * @param sessionHistoryId 세션 히스토리 ID
+   * @param nativeScore 원어민 관점 점수
+   * @param starRating 세션 별점
+   * @param totalMessageCount 사용자 메시지 수
+   * @param nativeLikeMessageCount 원어민처럼 평가된 메시지 수
+   * @param highlightMessage 최종 피드백 강조 메시지
+   * @param summaryMessage 최종 피드백 요약
+   * @param growthFeedbackPayload 직전 교정 비교 결과
+   * @param expressionReusePayload 배운 표현 재사용 분석 결과
+   * @return 완료 상태의 최종 피드백 요약
+   */
   public static SessionHistorySummaryFeedback completed(
       Long sessionHistoryId,
       int nativeScore,
@@ -80,7 +108,9 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
       int totalMessageCount,
       int nativeLikeMessageCount,
       String highlightMessage,
-      String summaryMessage) {
+      String summaryMessage,
+      JsonNode growthFeedbackPayload,
+      JsonNode expressionReusePayload) {
     return new SessionHistorySummaryFeedback(
         sessionHistoryId,
         ProcessingStatus.COMPLETED,
@@ -89,6 +119,8 @@ public class SessionHistorySummaryFeedback extends BaseTimeEntity {
         totalMessageCount,
         nativeLikeMessageCount,
         highlightMessage,
-        summaryMessage);
+        summaryMessage,
+        growthFeedbackPayload,
+        expressionReusePayload);
   }
 }

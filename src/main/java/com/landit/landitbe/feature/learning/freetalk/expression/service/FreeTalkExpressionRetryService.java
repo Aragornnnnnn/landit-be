@@ -11,6 +11,7 @@ import com.landit.landitbe.feature.learning.freetalk.domain.FreeTalkSession;
 import com.landit.landitbe.feature.learning.freetalk.expression.dto.FreeTalkExpressionRetryResponse;
 import com.landit.landitbe.feature.learning.freetalk.repository.FreeTalkSessionRepository;
 import com.landit.landitbe.feature.learning.freetalk.usage.service.FreeTalkDailySpeakingUsageService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
 import com.landit.landitbe.shared.exception.ApiException;
 import com.landit.landitbe.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FreeTalkExpressionRetryService {
 
+  private final UserProfileService userProfileService;
   private final LearningSessionService learningSessionService;
   private final FreeTalkSessionRepository freeTalkSessionRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
@@ -38,6 +40,7 @@ public class FreeTalkExpressionRetryService {
    */
   @Transactional
   public FreeTalkExpressionRetryResponse retry(long userId, long learningSessionId) {
+    userProfileService.requireActiveForUpdate(userId);
     LearningSessionSnapshot learningSession =
         learningSessionService
             .lockOwnedSnapshot(learningSessionId, userId)

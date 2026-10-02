@@ -180,6 +180,41 @@ public interface FreeTalkControllerDocs {
       AuthUserPrincipal principal, long sessionId, FreeTalkExitDecisionRequest request);
 
   /**
+   * 마무리 발화 없이 사용자가 프리톡을 직접 완료한다.
+   *
+   * @param principal 인증된 사용자
+   * @param sessionId 프리톡 학습 세션 ID
+   * @return 데이터가 null인 공통 성공 응답
+   */
+  @Operation(
+      summary = "프리톡 직접 완료",
+      description =
+          "진행 중이거나 종료 확인 대기 중인 세션을 즉시 완료한다. 이미 완료된 세션도 200을 반환한다. "
+              + "서버에 저장된 발화까지 보존하고 마무리 AI 발화는 생성하지 않는다. "
+              + "동시 발화 요청은 서버의 발화 저장과 완료 잠금 순서로 결정되며 완료 후 새 발화는 거부한다. "
+              + "응답 후 summary를 조회하고 pending이면 다시 조회한다. "
+              + "종료 사유는 DIRECT_COMPLETION이며 작별 종료 USER_ENDED, 시간 소진 TIME_LIMIT_REACHED와 구분한다.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "200",
+        description = "완료 성공 또는 이미 완료됨"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "401",
+        description = "인증 실패"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "세션 소유자 아님"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "404",
+        description = "프리톡 세션 없음"),
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "409",
+        description = "중단된 세션 (CONFLICT)")
+  })
+  ResponseEntity<ApiResponse<Void>> completeSession(AuthUserPrincipal principal, long sessionId);
+
+  /**
    * 완료된 지난 프리톡 목록을 완료 시각 최신순으로 페이지 조회한다.
    *
    * @param principal 인증된 사용자

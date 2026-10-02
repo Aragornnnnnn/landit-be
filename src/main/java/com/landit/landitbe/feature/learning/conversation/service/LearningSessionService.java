@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,29 @@ public class LearningSessionService {
     return learningSessionRepository.findAllById(sessionIds).stream()
         .map(LearningSessionSnapshot::from)
         .toList();
+  }
+
+  /**
+   * 현재 시나리오 시작 시각 이전에 완료된 같은 사용자 프로필의 가장 최근 시나리오를 찾는다.
+   *
+   * @param userProfileId 사용자 프로필 ID
+   * @param currentSessionId 현재 시나리오 세션 ID
+   * @param currentStartedAt 현재 세션 시작 시각
+   * @return 직전 완료 시나리오. 주제와 시나리오 ID는 비교 조건에 포함하지 않는다
+   */
+  public Optional<LearningSessionSnapshot> findPreviousCompletedScenario(
+      long userProfileId, long currentSessionId, LocalDateTime currentStartedAt) {
+    return learningSessionRepository
+        .findPreviousCompletedScenario(
+            userProfileId,
+            SessionType.SCENARIO,
+            LearningSessionStatus.COMPLETED,
+            currentStartedAt,
+            currentSessionId,
+            PageRequest.of(0, 1))
+        .stream()
+        .findFirst()
+        .map(LearningSessionSnapshot::from);
   }
 
   /**
@@ -401,6 +425,21 @@ public class LearningSessionService {
   public LearningSessionSnapshot completeFreeTalkByUser(long sessionId, LocalDateTime endedAt) {
     LearningSession session = requireEntity(sessionId);
     session.completeFreeTalkByUser(endedAt);
+    return LearningSessionSnapshot.from(session);
+  }
+
+  /**
+   * 완료 버튼으로 프리톡을 완료하고 종료 방식을 기록한다.
+   *
+   * @param sessionId 이미 소유권과 상태를 검증한 세션 ID
+   * @param endedAt 종료 시각
+   * @return 변경 직후의 세션 값
+   * @throws ApiException 지정한 세션이 없을 때
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public LearningSessionSnapshot completeFreeTalkDirectly(long sessionId, LocalDateTime endedAt) {
+    LearningSession session = requireEntity(sessionId);
+    session.completeFreeTalkDirectly(endedAt);
     return LearningSessionSnapshot.from(session);
   }
 

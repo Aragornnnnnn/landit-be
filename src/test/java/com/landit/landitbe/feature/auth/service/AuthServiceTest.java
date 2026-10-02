@@ -23,14 +23,15 @@ import com.landit.landitbe.feature.auth.repository.OauthIdentityRepository;
 import com.landit.landitbe.feature.auth.repository.RefreshTokenRepository;
 import com.landit.landitbe.feature.content.tutor.service.AiTutorService;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryDeletionService;
+import com.landit.landitbe.feature.notification.token.service.PushDevicePersistenceService;
 import com.landit.landitbe.feature.profile.authentication.service.ProfileAuthenticationService;
 import com.landit.landitbe.feature.profile.domain.UserProfileStatus;
 import com.landit.landitbe.feature.profile.domain.UserRole;
 import com.landit.landitbe.feature.profile.dto.AuthProfile;
 import com.landit.landitbe.shared.exception.ApiException;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,8 @@ class AuthServiceTest {
   private final LanditTokenService tokenService = mock(LanditTokenService.class);
   private final ConversationMemoryDeletionService conversationMemoryDeletionService =
       mock(ConversationMemoryDeletionService.class);
+  private final PushDevicePersistenceService pushDevicePersistenceService =
+      mock(PushDevicePersistenceService.class);
 
   private AuthService authService;
 
@@ -67,6 +70,7 @@ class AuthServiceTest {
             refreshTokenRepository,
             oidcTokenVerifier,
             conversationMemoryDeletionService,
+            pushDevicePersistenceService,
             tokenService,
             new TokenProperties("test-secret", 1800, 1209600));
   }
@@ -150,21 +154,47 @@ class AuthServiceTest {
         .revokeActiveByTokenHash(eq(CURRENT_TOKEN_HASH), any(LocalDateTime.class));
   }
 
+  /** 유효한 로그아웃에서만 요청한 설치의 푸시를 비활성화한다. */
+  @DisplayName("유효한 로그아웃에서만 요청한 설치의 푸시를 비활성화한다.")
+  @Test
+  void logoutRevokesOwnedInstallationAfterRefreshToken() {
+    final UUID installationId = UUID.randomUUID();
+    AuthProfile authProfile =
+        new AuthProfile(
+            USER_ID, "nickname", "user@example.com", UserRole.USER, UserProfileStatus.ACTIVE);
+    when(tokenService.hashToken(CURRENT_TOKEN)).thenReturn(CURRENT_TOKEN_HASH);
+    when(refreshTokenRepository.findUserProfileIdByTokenHash(CURRENT_TOKEN_HASH))
+        .thenReturn(Optional.of(USER_ID));
+    when(userProfileService.findAuthenticationProfileForUpdate(USER_ID))
+        .thenReturn(Optional.of(authProfile));
+    when(refreshTokenRepository.revokeActiveByTokenHash(
+            eq(CURRENT_TOKEN_HASH), any(LocalDateTime.class)))
+        .thenReturn(1);
+
+    authService.logout(new LogoutRequest(CURRENT_TOKEN, installationId));
+
+    verify(pushDevicePersistenceService).revokeIfOwned(USER_ID, installationId);
+  }
+
   @DisplayName("탈퇴 시 인증 정보를 폐기하기 전에 기억 데이터를 삭제한다.")
   @Test
   void withdrawDeletesMemoryBeforeRevokingAuthenticationArtifacts() {
     when(userProfileService.withdrawIfActiveForUpdate(USER_ID)).thenReturn(true);
-    when(oauthIdentityRepository.findAllByUserProfileIdAndStatus(any(), any()))
-        .thenReturn(List.of());
 
     authService.withdraw(USER_ID);
 
     InOrder withdrawalOrder =
-        inOrder(userProfileService, conversationMemoryDeletionService, refreshTokenRepository);
+        inOrder(
+            userProfileService,
+            conversationMemoryDeletionService,
+            pushDevicePersistenceService,
+            refreshTokenRepository,
+            oauthIdentityRepository);
     withdrawalOrder.verify(userProfileService).withdrawIfActiveForUpdate(USER_ID);
     withdrawalOrder.verify(conversationMemoryDeletionService).deleteAllByUserProfileId(USER_ID);
-    withdrawalOrder
-        .verify(refreshTokenRepository)
-        .revokeAllActiveByUserProfileId(eq(USER_ID), any(LocalDateTime.class));
+    withdrawalOrder.verify(pushDevicePersistenceService).revokeAllOwned(USER_ID);
+    withdrawalOrder.verify(refreshTokenRepository).deleteAllByUserProfileId(USER_ID);
+    withdrawalOrder.verify(oauthIdentityRepository).overwritePersonalData(USER_ID);
+    withdrawalOrder.verify(oauthIdentityRepository).deleteAppleMigrationData(USER_ID);
   }
 }

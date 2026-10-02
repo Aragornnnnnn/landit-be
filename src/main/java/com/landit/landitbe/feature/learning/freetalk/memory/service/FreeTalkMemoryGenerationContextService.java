@@ -87,7 +87,8 @@ public class FreeTalkMemoryGenerationContextService {
 
   // AI 서버는 끊긴 얘기(CUT_OFF)를 가려내려고 세션이 어떻게 끝났는지를 본다. 프리톡에서 생기지 않는 종료 사유는 보내지 않는다.
   private static String sessionEndedBy(CompletionReason completionReason) {
-    if (completionReason == CompletionReason.USER_ENDED) {
+    if (completionReason == CompletionReason.USER_ENDED
+        || completionReason == CompletionReason.DIRECT_COMPLETION) {
       return AiFreeTalkClosingReason.USER_CONFIRMED.name();
     }
     if (completionReason == CompletionReason.TIME_LIMIT_REACHED) {
