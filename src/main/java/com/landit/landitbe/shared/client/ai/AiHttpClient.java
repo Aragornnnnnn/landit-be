@@ -10,9 +10,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -79,8 +82,7 @@ public class AiHttpClient {
                   HttpRequest.BodyPublishers.ofString(
                       jsonMapper.writeValueAsString(payload), StandardCharsets.UTF_8))
               .build();
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+      HttpResponse<String> response = sendWithinDeadline(request, requestTimeout);
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
         ApiException failure = toApiException(response.statusCode(), response.body());
         if (failure.getStatus().is5xxServerError()) {
@@ -100,6 +102,24 @@ public class AiHttpClient {
       // 성공과 실패를 가리지 않고 왕복 시간을 남겨 지연 구간을 특정한다.
       log.info(
           AI_CALL_ELAPSED_LOG, path, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
+    }
+  }
+
+  // HttpRequest.timeout만으로는 헤더 이후 지연된 본문 수신 시간을 제한하지 못한다.
+  private HttpResponse<String> sendWithinDeadline(HttpRequest request, Duration timeout)
+      throws IOException, InterruptedException {
+    var response =
+        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    try {
+      return response.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+    } catch (TimeoutException exception) {
+      throw new HttpTimeoutException("AI response deadline exceeded");
+    } catch (ExecutionException exception) {
+      throw new IOException("AI request failed", exception.getCause());
+    } finally {
+      if (!response.isDone()) {
+        response.cancel(true);
+      }
     }
   }
 

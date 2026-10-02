@@ -131,6 +131,7 @@ class FreeTalkSessionTest {
 
     session.failMemoryGeneration();
 
+    assertThat(session.getConversationStatus()).isEqualTo(FreeTalkConversationStatus.COMPLETED);
     assertThat(session.getMemoryGenerationStatus()).isEqualTo(MemoryGenerationStatus.FAILED);
     assertThat(session.getMemoryGenerationStartedAt()).isNull();
   }
@@ -145,6 +146,7 @@ class FreeTalkSessionTest {
 
     session.failMemoryGeneration();
 
+    assertThat(session.getConversationStatus()).isEqualTo(FreeTalkConversationStatus.COMPLETED);
     assertThat(session.getMemoryGenerationStatus()).isEqualTo(MemoryGenerationStatus.FAILED);
     assertThat(session.getMemoryGenerationStartedAt()).isNull();
   }
