@@ -8,9 +8,13 @@ import com.landit.landitbe.feature.learning.conversation.client.ai.AiConversatio
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExistingExpression;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendation;
 import com.landit.landitbe.feature.learning.freetalk.expression.client.ai.AiFreeTalkExpressionRecommendationsRequest;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.AiFreeTalkPendingFollowUp;
 import com.landit.landitbe.feature.learning.freetalk.innerthought.client.ai.AiFreeTalkInnerThoughtRequest;
+import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkOpeningRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnRequest;
 import com.landit.landitbe.feature.learning.freetalk.message.client.ai.AiFreeTalkTurnResult;
+import com.landit.landitbe.feature.memory.client.ai.AiFreeTalkMemoryContext;
+import com.landit.landitbe.feature.memory.domain.ConversationMemoryType;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +23,27 @@ import org.junit.jupiter.api.Test;
 class LocalAiFreeTalkClientTest {
 
   private final LocalAiFreeTalkClient client = new LocalAiFreeTalkClient();
+
+  @DisplayName("로컬 이어가기는 선택한 질문과 ID를 반환하고 제공된 근거 기억만 사용 처리한다.")
+  @Test
+  void acknowledgesTheSelectedFollowUpAndOnlyProvidedMemory() {
+    var pending = new AiFreeTalkPendingFollowUp(501L, 77L, "CONCERN", "면접은 어떻게 됐어?");
+    for (List<AiFreeTalkMemoryContext> contexts :
+        List.of(
+            List.<AiFreeTalkMemoryContext>of(),
+            List.of(new AiFreeTalkMemoryContext(77L, ConversationMemoryType.EVENT, "면접 준비")))) {
+      var result =
+          client.generateOpening(
+              new AiFreeTalkOpeningRequest(300L, "chloe", "EN", "KR", null, contexts, pending));
+
+      assertThat(result.aiMessage()).isEqualTo(pending.question());
+      assertThat(result.translatedMessage()).isEqualTo(pending.question());
+      assertThat(result.followUpAsked()).isTrue();
+      assertThat(result.followUpId()).isEqualTo(501L);
+      assertThat(result.usedMemoryIds())
+          .isEqualTo(contexts.stream().map(AiFreeTalkMemoryContext::memoryId).toList());
+    }
+  }
 
   @DisplayName("로컬 AI 클라이언트는 재현 가능한 발화와 기존 표현 추천 계약을 반환한다.")
   @Test

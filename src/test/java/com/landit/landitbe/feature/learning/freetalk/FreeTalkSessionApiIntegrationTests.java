@@ -3362,13 +3362,8 @@ class FreeTalkSessionApiIntegrationTests {
         throw new ApiException(ErrorCode.AI_GENERATION_FAILED);
       }
       if (request.pendingFollowUp() != null) {
-        return new AiFreeTalkOpeningResult(
-            request.pendingFollowUp().question(),
-            request.pendingFollowUp().question(),
-            CharacterEmotion.HAPPY,
-            List.of(),
-            true,
-            request.pendingFollowUp().followUpId());
+        return new com.landit.landitbe.feature.learning.freetalk.client.ai.LocalAiFreeTalkClient()
+            .generateOpening(request);
       }
       return new AiFreeTalkOpeningResult(
           "What are your weekend plans?", "이번 주말 계획은 뭐야?", CharacterEmotion.HAPPY, List.of());
