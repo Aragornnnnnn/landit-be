@@ -32,8 +32,7 @@ class FreeTalkExpressionV141MigrationTests {
       Path.of(
           "src/main/resources/db/postgresql/"
               + "V141__insert_reviewed_free_talk_expressions_4329_6000.sql");
-  private static final Path ASSETS =
-      Path.of("docs/tasks/direct-2026-10-03-expression-6000/image-assets.jsonl");
+  private static final Path ASSETS = Path.of("docs/tasks/LAN-610/image-assets.jsonl");
   private static final String CDN = "https://d19azau1un4t7r.cloudfront.net/content/";
   private static final Pattern PRACTICE = Pattern.compile("'(\\[\\{.*}])'::jsonb");
   private static final Pattern VECTOR = Pattern.compile("'\\[([^]]+)]'::extensions\\.vector");

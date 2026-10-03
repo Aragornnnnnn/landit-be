@@ -75,7 +75,7 @@
     "sourceModified": false
   },
   "verification": {
-    "gradleCommand": "./gradlew check --offline --no-daemon --console=plain",
+    "gradleCommand": "./gradlew spotlessApply check --offline --no-daemon --console=plain",
     "result": "BUILD SUCCESSFUL",
     "tests": 1969,
     "passed": 1948,
@@ -90,11 +90,15 @@
     "pgvectorSourceVersion": "0.8.0",
     "fullMigrationChainExecuted": false,
     "productionDatabaseAccessed": false,
-    "ciPostgresTestsRequireExplicitLocalDatabase": true
+    "ciPostgresTestsRequireExplicitLocalDatabase": true,
+    "documentPath": "docs/tasks/LAN-610/",
+    "elapsedSeconds": 93
   },
   "review": {
     "critical": 0,
     "important": 0,
     "deferredMinor": "The isolated fixture retains the pre-V78 scenario-order unique constraint. FREE_TALK rows have null scenario_id, so this does not change the V141 result; update before reusing the fixture for scenario migrations."
-  }
+  },
+  "issue": "LAN-610",
+  "branch": "feat/LAN-610"
 }

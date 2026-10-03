@@ -12,7 +12,7 @@
 
 ## 승인 범위와 고정 입력
 
-- 사용자 지시로 이슈 번호 없이 origin/develop에서 별도 브랜치와 draft PR을 만든다. 커밋·원격 브랜치 push까지 허용됐다.
+- 이슈: `LAN-610`. 사용자가 최종 브랜치를 `feat/LAN-610`으로 지정했다. origin/develop 기준 별도 브랜치에서 검증·커밋·push·draft PR까지 허용됐다.
 - 기준 커밋: `6eac5db55` (`origin/develop`). 기존 체크아웃의 사용자 변경은 보존한다.
 - 검수 원본: `writing_expression_quiz_corrected.sql`, SHA-256 `a9592c303a90ef3986819b12127bc388dd1f048158c2abf942aa87fd8402d8dd`.
 - 업로드 매핑 SHA-256: `ad2a730bb23b52a6f6c14f682d6c4c2762840770c918a33285939fe022fdbcda`.
@@ -63,7 +63,7 @@
 
 ## 검증 결과
 
-- `./gradlew check --offline --no-daemon --console=plain`: **BUILD SUCCESSFUL**, 1분 34초. 테스트 1,969건 중 1,948건 통과, 21건 제외, 실패·오류 0건. Spotless와 Checkstyle 포함.
+- 브랜치명 지정 전 `./gradlew check --offline --no-daemon --console=plain`: **BUILD SUCCESSFUL**, 1분 34초. 테스트 1,969건 중 1,948건 통과, 21건 제외, 실패·오류 0건. Spotless와 Checkstyle 포함.
 - 신규 검증 13건 모두 통과: 원본 행 해시·이미지 매핑·서비스 소비·임베딩 4건, 격리 PostgreSQL 적재·충돌·롤백·시퀀스 9건.
 - `bash -n .github/scripts/verify-ecs-deployment.sh` 및 `bash .github/scripts/test/verify-ecs-deployment_test.sh`: 종료 코드 0.
 - 로컬 PostgreSQL 15.18과 pgvector v0.8.0의 실제 vector 타입·함수로 V141을 실행했다. 운영 PostgreSQL 17 또는 V1~V141 전체 migration 체인을 재실행한 검증은 아니다. CI에는 전용 DB가 없어 PostgreSQL 9건은 별도 설정 없이는 제외된다.
@@ -84,3 +84,5 @@
 - 문구·이미지의 편집 품질은 사용자 검수 결과를 유지했다. 의미나 정답을 새로 교정하지 않았으므로 기존 검수 오류가 있다면 그대로 남는다.
 - 음성 URL과 발음 평가 기준 자산은 범위 밖이다. 콘텐츠 조회는 가능하지만 발음 평가 기능은 별도 자산 준비가 필요하다.
 - 전체 프로젝트 검사는 통과했으나, 격리된 대상 테이블 fixture 검증만으로 운영 환경과 전체 migration 이력의 차이까지 보장하지 않는다.
+
+브랜치명 지정 후 문서를 `docs/tasks/LAN-610/`으로 이동하고 이미지 매핑 테스트의 입력 경로만 변경했다. migration·검수 데이터·이미지 매핑 내용은 동일하다. 변경 후 `./gradlew spotlessApply check --offline --no-daemon --console=plain`은 1분 33초에 통과했다. 테스트 1,948건 통과, 21건 제외, 실패·오류 0건이며 신규 13건도 모두 실행됐다. 경로가 짧아지면서 생긴 초기 줄바꿈 검사 오류는 공식 포맷터로 수정한 뒤 재검증했다.
