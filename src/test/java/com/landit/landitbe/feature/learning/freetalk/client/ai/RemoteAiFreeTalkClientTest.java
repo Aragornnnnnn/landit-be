@@ -989,16 +989,22 @@ class RemoteAiFreeTalkClientTest {
     assertThat(result.followUpId()).isEqualTo(501L);
   }
 
-  @DisplayName("AI가 선택한 예고 질문 ID를 확인하지 않으면 첫 발화를 저장하지 않는다.")
-  @Test
-  void rejectsOpeningThatAcknowledgesAnotherFollowUp() throws Exception {
+  @DisplayName("AI가 질문 사용을 확인하지 않거나 다른 질문 ID를 반환하면 첫 발화를 거부한다.")
+  @ParameterizedTest
+  @CsvSource({"true, 999", "false, 501"})
+  void rejectsOpeningWithoutMatchingFollowUpAcknowledgement(boolean asked, long followUpId)
+      throws Exception {
     registerJsonResponse(
         "/api/v1/free-talk/opening",
         new ConcurrentHashMap<>(),
         successResponse(
             "{\"aiMessage\":\"How did the interview go?\","
                 + "\"translatedMessage\":\"면접은 어떻게 됐어?\","
-                + "\"followUpAsked\":true,\"followUpId\":999,\"usedMemoryIds\":[]}"));
+                + "\"followUpAsked\":"
+                + asked
+                + ",\"followUpId\":"
+                + followUpId
+                + ",\"usedMemoryIds\":[]}"));
     AiFreeTalkOpeningRequest request =
         new AiFreeTalkOpeningRequest(
             300L,
