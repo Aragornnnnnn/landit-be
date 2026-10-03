@@ -64,5 +64,37 @@
     "scope": "All 5016 mapped S3 keys checked individually; all CDN full response bodies compared with local SHA256. No claim about the total bucket object count."
   },
   "liveDatabaseChecked": false,
-  "sourcePreservation": "All 1672 INSERT rows are byte-identical after reversing only the 5016 image URL substitutions."
+  "sourcePreservation": "All 1672 INSERT rows are byte-identical after reversing only the 5016 image URL substitutions.",
+  "optionalAcceptedAnswerFallbacks": {
+    "count": 988,
+    "exampleNumbers": [
+      3,
+      4
+    ],
+    "quizExamplesMissing": 0,
+    "sourceModified": false
+  },
+  "verification": {
+    "gradleCommand": "./gradlew check --offline --no-daemon --console=plain",
+    "result": "BUILD SUCCESSFUL",
+    "tests": 1969,
+    "passed": 1948,
+    "skipped": 21,
+    "failures": 0,
+    "errors": 0,
+    "v141StaticTests": 4,
+    "v141PostgresTests": 9,
+    "deploymentScriptSyntax": "passed",
+    "deploymentScriptTests": "passed",
+    "postgresVersion": "15.18",
+    "pgvectorSourceVersion": "0.8.0",
+    "fullMigrationChainExecuted": false,
+    "productionDatabaseAccessed": false,
+    "ciPostgresTestsRequireExplicitLocalDatabase": true
+  },
+  "review": {
+    "critical": 0,
+    "important": 0,
+    "deferredMinor": "The isolated fixture retains the pre-V78 scenario-order unique constraint. FREE_TALK rows have null scenario_id, so this does not change the V141 result; update before reusing the fixture for scenario migrations."
+  }
 }
