@@ -55,15 +55,15 @@ public class FreeTalkSessionStartService {
   /** AI-first 세션은 검색 문맥을 먼저 만들고 실패하면 시작 작업을 정리한다. */
   private FreeTalkSessionStartResponse startAiFirstSession(
       long userId, StartedFreeTalkSession startedSession) {
-    MemoryRetrievalResult memoryResult =
-        memoryRetrievalService.retrieve(
-            new MemoryRetrievalRequest(
-                startedSession.freeTalkSessionId(),
-                userId,
-                startedSession.characterId(),
-                MemoryRetrievalStage.OPENING,
-                memoryQuery(startedSession)));
     try {
+      MemoryRetrievalResult memoryResult =
+          memoryRetrievalService.retrieve(
+              new MemoryRetrievalRequest(
+                  startedSession.freeTalkSessionId(),
+                  userId,
+                  startedSession.characterId(),
+                  MemoryRetrievalStage.OPENING,
+                  memoryQuery(startedSession)));
       AiFreeTalkOpeningResult openingResult = generateOpening(startedSession, memoryResult);
       CurrentMessageResponse currentMessage =
           freeTalkSessionService.saveOpening(startedSession, openingResult);
@@ -90,22 +90,26 @@ public class FreeTalkSessionStartService {
         startedSession.characterId(),
         startedSession.targetLocale(),
         startedSession.baseLocale(),
-        new AiFreeTalkTopic(
-            startedSession.topicId(),
-            startedSession.title(),
-            startedSession.topicPromptDescription()),
-        memoryContext);
+        startedSession.pendingFollowUp() == null
+            ? new AiFreeTalkTopic(
+                startedSession.topicId(),
+                startedSession.title(),
+                startedSession.topicPromptDescription())
+            : null,
+        memoryContext,
+        startedSession.pendingFollowUp());
   }
 
   /** 시작 시 AI가 참고할 수 있도록 주제와 캐릭터의 짧은 검색 문맥을 만든다. */
   private String memoryQuery(StartedFreeTalkSession startedSession) {
     return String.join(
         " ",
-        java.util.List.of(
-                startedSession.title(),
+        java.util.stream.Stream.of(
+                startedSession.pendingFollowUp() == null
+                    ? startedSession.title()
+                    : startedSession.pendingFollowUp().question(),
                 startedSession.topicPromptDescription(),
                 startedSession.characterId())
-            .stream()
             .filter(value -> value != null && !value.isBlank())
             .toList());
   }

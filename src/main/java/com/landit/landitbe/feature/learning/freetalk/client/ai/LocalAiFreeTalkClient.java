@@ -40,6 +40,20 @@ public class LocalAiFreeTalkClient implements AiFreeTalkClient {
   /** {@inheritDoc} */
   @Override
   public AiFreeTalkOpeningResult generateOpening(AiFreeTalkOpeningRequest request) {
+    var pending = request.pendingFollowUp();
+    if (pending != null) {
+      // 로컬 대체 구현은 번역 호출 없이 저장 질문을 그대로 돌려준다.
+      return new AiFreeTalkOpeningResult(
+          pending.question(),
+          pending.question(),
+          CharacterEmotion.HAPPY,
+          request.memoryContext().stream()
+              .filter(memory -> Long.valueOf(memory.memoryId()).equals(pending.memoryId()))
+              .map(memory -> memory.memoryId())
+              .toList(),
+          true,
+          pending.followUpId());
+    }
     return new AiFreeTalkOpeningResult(
         "What would you like to talk about today?",
         "오늘은 무슨 이야기를 하고 싶어?",

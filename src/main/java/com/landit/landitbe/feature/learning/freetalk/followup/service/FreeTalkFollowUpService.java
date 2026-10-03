@@ -4,11 +4,20 @@ package com.landit.landitbe.feature.learning.freetalk.followup.service;
 
 import com.landit.landitbe.feature.learning.freetalk.followup.domain.FreeTalkFollowUp;
 import com.landit.landitbe.feature.learning.freetalk.followup.domain.FreeTalkFollowUpTriggerType;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.AiFreeTalkPendingFollowUp;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkAvailableFollowUp;
+import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollowUpCandidate;
 import com.landit.landitbe.feature.learning.freetalk.followup.dto.FreeTalkFollowUpSummary;
 import com.landit.landitbe.feature.learning.freetalk.followup.repository.FreeTalkFollowUpRepository;
 import com.landit.landitbe.feature.learning.freetalk.memory.domain.MemoryGenerationStatus;
 import com.landit.landitbe.feature.memory.dto.ConversationMemoryFollowUpDraft;
 import com.landit.landitbe.feature.memory.service.ConversationMemoryWriteService;
+import com.landit.landitbe.feature.profile.service.UserProfileService;
+import com.landit.landitbe.shared.exception.ApiException;
+import com.landit.landitbe.shared.exception.ErrorCode;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +34,102 @@ public class FreeTalkFollowUpService {
 
   private final FreeTalkFollowUpRepository followUpRepository;
   private final ConversationMemoryWriteService memoryWriteService;
+  private final UserProfileService userProfileService;
+
+  /**
+   * 스몰톡 메인 화면에 보여 줄 캐릭터별 최신 질문을 조회한다.
+   *
+   * @param userId 로그인 사용자 ID
+   * @return 캐릭터마다 최대 하나인 질문 목록
+   */
+  @Transactional(readOnly = true)
+  public List<FreeTalkAvailableFollowUp> findAvailable(long userId) {
+    long userProfileId = userProfileService.requireActive(userId).id();
+    return availableForProfile(userProfileId, LocalDateTime.now());
+  }
+
+  /**
+   * 시작 트랜잭션 안에서 선택한 질문을 선점한다.
+   *
+   * @param userProfileId 세션 사용자 프로필 ID
+   * @param characterId 선택한 캐릭터
+   * @param followUpId 선택한 질문 ID
+   * @param freeTalkSessionId 새 프리톡 세션 ID
+   * @return AI에 전달할 저장 질문
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public AiFreeTalkPendingFollowUp claim(
+      long userProfileId, String characterId, long followUpId, long freeTalkSessionId) {
+    LocalDateTime now = LocalDateTime.now();
+    boolean offered =
+        availableForProfile(userProfileId, now).stream()
+            .anyMatch(
+                item -> item.followUpId() == followUpId && item.characterId().equals(characterId));
+    if (!offered) {
+      throw new ApiException(ErrorCode.INVALID_REQUEST);
+    }
+    FreeTalkFollowUp followUp =
+        followUpRepository
+            .findByIdForUpdate(followUpId)
+            .orElseThrow(() -> new ApiException(ErrorCode.INVALID_REQUEST));
+    if (!followUp.isAvailable(now)) {
+      throw new ApiException(ErrorCode.INVALID_REQUEST);
+    }
+    followUp.claim(freeTalkSessionId, now);
+    return AiFreeTalkPendingFollowUp.from(followUp);
+  }
+
+  /**
+   * 첫 AI 메시지와 같은 트랜잭션에서 질문의 사용을 확정한다.
+   *
+   * @param followUpId 사용한 질문 ID
+   * @param freeTalkSessionId 선점한 세션 ID
+   * @param messageId 저장된 첫 AI 메시지 ID
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void markAsked(long followUpId, long freeTalkSessionId, long messageId) {
+    FreeTalkFollowUp followUp =
+        followUpRepository
+            .findByIdForUpdate(followUpId)
+            .orElseThrow(() -> new ApiException(ErrorCode.AI_RESPONSE_INVALID));
+    try {
+      followUp.markAsked(freeTalkSessionId, messageId, LocalDateTime.now());
+    } catch (IllegalStateException exception) {
+      throw new ApiException(ErrorCode.AI_RESPONSE_INVALID);
+    }
+  }
+
+  /**
+   * 시작 실패로 삭제할 세션의 질문 선점을 풀어 다시 선택할 수 있게 한다.
+   *
+   * @param freeTalkSessionId 실패한 프리톡 세션 ID
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void release(long freeTalkSessionId) {
+    followUpRepository
+        .findByClaimedFreeTalkSessionId(freeTalkSessionId)
+        .ifPresent(followUp -> followUp.release(freeTalkSessionId));
+  }
+
+  private List<FreeTalkAvailableFollowUp> availableForProfile(
+      long userProfileId, LocalDateTime now) {
+    var latestByCharacter = new LinkedHashMap<String, FreeTalkAvailableFollowUp>();
+    for (FreeTalkFollowUpCandidate candidate :
+        followUpRepository.findRecentCandidates(userProfileId, now.minusDays(30))) {
+      FreeTalkFollowUp followUp = candidate.followUp();
+      if (!followUp.isAvailable(now)
+          || (followUp.getMemoryId() != null
+              && !memoryWriteService.isActiveAfterPersistence(
+                  userProfileId, followUp.getMemoryId()))) {
+        continue;
+      }
+      latestByCharacter.putIfAbsent(
+          candidate.characterId(),
+          new FreeTalkAvailableFollowUp(
+              candidate.characterId(), followUp.getId(), followUp.getQuestion()));
+    }
+    return new ArrayList<>(latestByCharacter.values());
+  }
 
   /**
    * 사용자가 지금까지 받은 후속 질문들이 근거로 쓴 장기기억 ID를 조회한다.

@@ -2,6 +2,7 @@
 
 package com.landit.landitbe.feature.learning.freetalk.topic.service;
 
+import com.landit.landitbe.feature.learning.freetalk.followup.service.FreeTalkFollowUpService;
 import com.landit.landitbe.feature.learning.freetalk.topic.domain.FreeTalkTopic;
 import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkMainResponse;
 import com.landit.landitbe.feature.learning.freetalk.topic.dto.FreeTalkTopicResponse;
@@ -28,6 +29,7 @@ public class FreeTalkTopicService {
 
   private final FreeTalkTopicRepository freeTalkTopicRepository;
   private final FreeTalkDailySpeakingUsageService dailySpeakingUsageService;
+  private final FreeTalkFollowUpService followUpService;
   private final Random random = new Random();
 
   /**
@@ -63,6 +65,7 @@ public class FreeTalkTopicService {
         getActiveTopics(),
         dailySpeakingUsageService.speakingTimeLimitMs(),
         dailyUsage.usedSpeakingDurationMs(),
-        dailyUsage.remainingMs());
+        dailyUsage.remainingMs(),
+        followUpService.findAvailable(userId));
   }
 }

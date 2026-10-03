@@ -61,7 +61,10 @@ class FreeTalkSessionServiceTest {
           new com.landit.landitbe.feature.learning.conversation.history.service
               .ConversationMessageService(sessionHistoryMessageRepository),
           dailySpeakingUsageService,
-          conversationCharacterService);
+          conversationCharacterService,
+          mock(
+              com.landit.landitbe.feature.learning.freetalk.followup.service.FreeTalkFollowUpService
+                  .class));
 
   /** 사용자 잠금을 얻은 뒤 일일 잔여 시간을 다시 확인하고 세션 저장을 중단한다. */
   @DisplayName("사용자 잠금을 얻은 뒤 일일 잔여 시간을 다시 확인하고 세션 저장을 중단한다.")
